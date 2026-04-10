@@ -2,7 +2,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { uid, today } from "A/lib/utils";
+import { uid, today } from "@/lib/utils";
 import { Upload, FileSpreadsheet, ArrowRight, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 
 const UNIDADES = ["UN", "KG", "LT", "M", "M²", "CX", "PC", "GL", "TB", "RL", "PAR", "JG", "SC", "VB", "CJ", "PCT", "TON"];
@@ -237,7 +237,7 @@ export default function ImportarRmPage() {
                 type="text"
                 value={form.descricao}
                 onChange={(e) => set("descricao", e.target.value)}
-                placeholder="Ex: Estrutura metálica — Galpço Industrial"
+                placeholder="Ex: Estrutura metálica — Galpão Industrial"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -245,7 +245,7 @@ export default function ImportarRmPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo</label>
                 <input
-                  type="teyt"
+                  type="text"
                   value={form.centroCusto}
                   onChange={(e) => set("centroCusto", e.target.value)}
                   placeholder="Ex: Obra Galpão Central"
@@ -253,7 +253,7 @@ export default function ImportarRmPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observação">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observação</label>
                 <input
                   type="text"
                   value={form.observacao}
