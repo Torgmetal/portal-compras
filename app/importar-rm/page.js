@@ -2,7 +2,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { uid, today } from "@/lib/utils";
+import { uid, today } from "A/lib/utils";
 import { Upload, FileSpreadsheet, ArrowRight, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 
 const UNIDADES = ["UN", "KG", "LT", "M", "M²", "CX", "PC", "GL", "TB", "RL", "PAR", "JG", "SC", "VB", "CJ", "PCT", "TON"];
@@ -41,29 +41,64 @@ export default function ImportarRmPage() {
           const data = new Uint8Array(ev.target.result);
           const wb = XLSX.read(data, { type: "array" });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          dados = XLSX.utils.sheet_to_json(ws);
+          // Lê como array de arrays para detectar cabeçalho real do Tekla
+          const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+          // Encontra a linha de cabeçalho (contém "Descrição" ou "Qtd.")
+          let headerIdx = -1;
+          for (let r = 0; r < Math.min(20, rawRows.length); r++) {
+            const rowStr = rawRows[r].map((c) => String(c).toLowerCase()).join("|");
+            if (rowStr.includes("descri") && (rowStr.includes("qtd") || rowStr.includes("item"))) {
+              headerIdx = r;
+              break;
+            }
+          }
+          if (headerIdx >= 0) {
+            const headers = rawRows[headerIdx].map((h) => String(h).trim());
+            for (let r = headerIdx + 1; r < rawRows.length; r++) {
+              const row = rawRows[r];
+              if (!row || row.every((c) => c === "" || c == null)) continue;
+              const obj = {};
+              headers.forEach((h, i) => { obj[h] = row[i] != null ? row[i] : ""; });
+              dados.push(obj);
+            }
+          } else {
+            // Fallback: usa sheet_to_json normal
+            dados = XLSX.utils.sheet_to_json(ws);
+          }
+          // Extrai metadados do Tekla (Cliente, Obra, RM, OS)
+          for (let r = 0; r < Math.min(12, rawRows.length); r++) {
+            const row = rawRows[r];
+            if (!row) continue;
+            for (let c = 0; c < row.length - 1; c++) {
+              const cell = String(row[c]).trim();
+              if (cell === "Obra:" && row[c + 1]) set("descricao", String(row[c + 1]).trim());
+              if (cell === "Cliente:" && row[c + 1] && !form.solicitante) set("solicitante", String(row[c + 1]).trim());
+              if (cell === "C. de Custo:" && row[c + 1]) set("centroCusto", String(row[c + 1]).trim());
+              if (cell === "RM:" && row[c + 1]) set("descricao", `Tekla ${String(row[c + 1]).trim()} — ${form.descricao || String(rawRows[r][3] || "").trim()}`);
+            }
+          }
         }
 
         const normalize = (row) => {
           const keys = Object.keys(row);
           const find = (terms) => keys.find((k) => terms.some((t) => k.toLowerCase().includes(t)));
           return {
-            descricao: row[find(["descri", "nome", "material", "produto", "item", "peça", "peca"])] || row[keys[0]] || "",
+            descricao: row[find(["descri", "nome", "produto", "peça", "peca"])] || row[keys[0]] || "",
             qtd: parseFloat(String(row[find(["qtd", "quant", "quantidade", "qty"])] || "1").replace(/[^\d.,]/g, "").replace(",", ".")) || 1,
-            unidade: row[find(["unidade", "und", "un", "uom"])] || "UN",
-            codigo: row[find(["código", "codigo", "cod", "ref", "part", "mark"])] || "",
-            peso: parseFloat(String(row[find(["peso", "weight", "kg"])] || "0").replace(/[^\d.,]/g, "").replace(",", ".")) || 0,
-            comprimento: row[find(["compri", "length", "tamanho"])] || "",
+            unidade: row[find(["unid", "und", "un", "uom"])] || "UN",
+            codigo: row[find(["codigo", "código", "cod", "ref", "part", "mark"])] || "",
+            peso: parseFloat(String(row[find(["peso total", "peso"])] || "0").replace(/[^\d.,]/g, "").replace(",", ".")) || 0,
+            comprimento: row[find(["comp", "length", "tamanho"])] || "",
             perfil: row[find(["perfil", "profile", "section", "seção", "secao"])] || "",
-            material: row[find(["material", "grade", "aço", "aco"])] || "",
+            material: row[find(["mat", "grade", "aço", "aco"])] || "",
           };
         };
 
-        const itens = dados.map(normalize).filter((d) => d.descricao.trim() !== "");
+        const itens = dados.map(normalize).filter((d) => d.descricao.trim() !== "" && d.descricao.toLowerCase() !== "item");
         if (itens.length === 0) return showToast("Nenhum item encontrado na planilha do Tekla", "error");
 
         setItensImportados(itens);
-        // Auto-preencher descrição baseada no nome do arquivo
+        // Auto-preencher descrição se ainda estiver vazia
         if (!form.descricao) {
           const desc = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
           set("descricao", `Importação Tekla — ${desc}`);
@@ -202,7 +237,7 @@ export default function ImportarRmPage() {
                 type="text"
                 value={form.descricao}
                 onChange={(e) => set("descricao", e.target.value)}
-                placeholder="Ex: Estrutura metálica — Galpão Industrial"
+                placeholder="Ex: Estrutura metálica — Galpço Industrial"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -210,7 +245,7 @@ export default function ImportarRmPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo</label>
                 <input
-                  type="text"
+                  type="teyt"
                   value={form.centroCusto}
                   onChange={(e) => set("centroCusto", e.target.value)}
                   placeholder="Ex: Obra Galpão Central"
@@ -218,7 +253,7 @@ export default function ImportarRmPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observação</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observação">
                 <input
                   type="text"
                   value={form.observacao}
