@@ -31,7 +31,7 @@ export default function RmDetail({ params }) {
     return (
       <div className="p-12 text-center">
         <AlertCircle size={48} className="mx-auto text-gray-300 mb-4" />
-        <p className="text-gray-500 text-lg">RM nÃ£o encontrada</p>
+        <p className="text-gray-500 text-lg">RM não encontrada</p>
         <button onClick={() => router.push("/")} className="mt-4 text-blue-600 hover:underline">Voltar ao Painel</button>
       </div>
     );
@@ -41,7 +41,7 @@ export default function RmDetail({ params }) {
     setRms((prev) => prev.map((r) => (r.id === rm.id ? { ...r, ...updates } : r)));
   };
 
-  // âââ FILE UPLOAD & PARSING (EXCEL/CSV) âââââââââââââââââââ
+  // ─── FILE UPLOAD & PARSING (EXCEL/CSV) ───────────────────
   const processFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
@@ -64,10 +64,10 @@ export default function RmDetail({ params }) {
           const keys = Object.keys(row);
           const find = (terms) => keys.find((k) => terms.some((t) => k.toLowerCase().includes(t)));
           return {
-            item: row[find(["item", "descri", "material", "produto", "nome"])] || row[keys[0]] || "â",
+            item: row[find(["item", "descri", "material", "produto", "nome"])] || row[keys[0]] || "—",
             precoUnit:
               parseFloat(
-                String(row[find(["pre", "unit", "valor unit", "vl unit", "vl. unit", "preco", "preÃ§o"])] || row[keys[1]] || "0")
+                String(row[find(["pre", "unit", "valor unit", "vl unit", "vl. unit", "preco", "preço"])] || row[keys[1]] || "0")
                   .replace(/[^\d.,]/g, "")
                   .replace(",", ".")
               ) || 0,
@@ -77,14 +77,14 @@ export default function RmDetail({ params }) {
                   .replace(/[^\d.,]/g, "")
                   .replace(",", ".")
               ) || 1,
-            prazoEntrega: row[find(["prazo", "entrega", "dias", "lead"])] || "â",
-            condicao: row[find(["cond", "pagamento", "pag", "forma"])] || "â",
-            estoque: row[find(["estoque", "disp", "disponib"])] || "â",
+            prazoEntrega: row[find(["prazo", "entrega", "dias", "lead"])] || "—",
+            condicao: row[find(["cond", "pagamento", "pag", "forma"])] || "—",
+            estoque: row[find(["estoque", "disp", "disponib"])] || "—",
           };
         };
 
-        const itens = dados.map(normalize).filter((d) => d.item !== "â" || d.precoUnit > 0);
-        if (itens.length === 0) return showToast("NÃ£o foi possÃ­vel ler itens da planilha. Verifique o formato.", "error");
+        const itens = dados.map(normalize).filter((d) => d.item !== "—" || d.precoUnit > 0);
+        if (itens.length === 0) return showToast("Não foi possível ler itens da planilha. Verifique o formato.", "error");
 
         const total = itens.reduce((s, it) => s + it.precoUnit * it.qtd, 0);
 
@@ -100,11 +100,11 @@ export default function RmDetail({ params }) {
 
         updateRm({
           cotacoes: [...(rm.cotacoes || []), novaCotacao],
-          status: rm.status === "Aberta" ? "Em CotaÃ§Ã£o" : rm.status,
+          status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
         });
 
         setCotFornecedor("");
-        showToast(`CotaÃ§Ã£o "${file.name}" importada com ${itens.length} itens!`);
+        showToast(`Cotação "${file.name}" importada com ${itens.length} itens!`);
       } catch (err) {
         showToast("Erro ao ler arquivo: " + err.message, "error");
       }
@@ -124,7 +124,7 @@ export default function RmDetail({ params }) {
     processFile(e.dataTransfer.files[0]);
   };
 
-  // âââ PDF/ANEXO UPLOAD ââââââââââââââââââââââââââââââââââââ
+  // ─── PDF/ANEXO UPLOAD ────────────────────────────────────
   const processPdf = (file) => {
     if (!file) return;
     const reader = new FileReader();
@@ -141,7 +141,7 @@ export default function RmDetail({ params }) {
 
       updateRm({
         anexos: [...(rm.anexos || []), novoAnexo],
-        status: rm.status === "Aberta" ? "Em CotaÃ§Ã£o" : rm.status,
+        status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
       });
 
       setCotFornecedor("");
@@ -168,12 +168,12 @@ export default function RmDetail({ params }) {
 
   const removeCotacao = (cotId) => {
     updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) });
-    showToast("CotaÃ§Ã£o removida");
+    showToast("Cotação removida");
   };
 
-  // âââ MAPA DE COMPRAS âââââââââââââââââââââââââââââââââââââ
+  // ─── MAPA DE COMPRAS ─────────────────────────────────────
   const gerarMapa = () => {
-    if ((rm.cotacoes || []).length < 2) return showToast("Suba pelo menos 2 cotaÃ§Ãµes para gerar o mapa", "error");
+    if ((rm.cotacoes || []).length < 2) return showToast("Suba pelo menos 2 cotações para gerar o mapa", "error");
     updateRm({ status: "Cotada", mapaGerado: true });
     setShowMapa(true);
   };
@@ -199,7 +199,7 @@ export default function RmDetail({ params }) {
   });
   const mapaItems = Array.from(allItems.values());
 
-  // âââ GERAR PEDIDO OMIE âââââââââââââââââââââââââââââââââââ
+  // ─── GERAR PEDIDO OMIE ───────────────────────────────────
   const gerarPedidoOmie = () => {
     if (!selectedFornecedorPedido) return showToast("Selecione o fornecedor para o pedido", "error");
     const cot = cotacoes.find((c) => c.fornecedor === selectedFornecedorPedido);
@@ -258,8 +258,8 @@ export default function RmDetail({ params }) {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
           <div><span className="text-gray-500">Tipo:</span> <span className="font-medium ml-1">{rm.tipo}</span></div>
           <div><span className="text-gray-500">Data:</span> <span className="font-medium ml-1">{rm.data}</span></div>
-          <div><span className="text-gray-500">Solicitante:</span> <span className="font-medium ml-1">{rm.solicitante || "â"}</span></div>
-          <div><span className="text-gray-500">CotaÃ§Ãµes:</span> <span className="font-medium ml-1">{cotacoes.length} planilhas + {anexos.length} anexos</span></div>
+          <div><span className="text-gray-500">Solicitante:</span> <span className="font-medium ml-1">{rm.solicitante || "—"}</span></div>
+          <div><span className="text-gray-500">Cotações:</span> <span className="font-medium ml-1">{cotacoes.length} planilhas + {anexos.length} anexos</span></div>
         </div>
         <p className="mt-3 text-gray-700 font-medium">{rm.descricao}</p>
         {rm.observacao && <p className="mt-1 text-gray-500 text-sm">{rm.observacao}</p>}
@@ -269,7 +269,7 @@ export default function RmDetail({ params }) {
       {/* Itens da RM */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800">Itens da RequisiÃ§Ã£o ({(rm.itens || []).length})</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Itens da Requisição ({(rm.itens || []).length})</h3>
         </div>
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
           <table className="w-full text-sm">
@@ -295,11 +295,11 @@ export default function RmDetail({ params }) {
         </div>
       </div>
 
-      {/* âââ UPLOAD DE PROPOSTAS âââââââââââââââââââââââââââ */}
+      {/* ─── UPLOAD DE PROPOSTAS ─────────────────────────── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">Incluir Propostas / CotaÃ§Ãµes</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Incluir Propostas / Cotações</h3>
         <p className="text-sm text-gray-500 mb-4">
-          Suba planilhas (.xlsx/.csv) para leitura automÃ¡tica de preÃ§os, ou PDFs de propostas recebidas como anexo.
+          Suba planilhas (.xlsx/.csv) para leitura automática de preços, ou PDFs de propostas recebidas como anexo.
         </p>
 
         {/* Nome do fornecedor */}
@@ -326,8 +326,8 @@ export default function RmDetail({ params }) {
             onDrop={handleDrop}
           >
             <FileSpreadsheet size={36} className="mx-auto text-green-500 mb-2" />
-            <p className="text-gray-600 font-medium text-sm">Planilha de CotaÃ§Ã£o</p>
-            <p className="text-gray-400 text-xs mt-1">.xlsx, .xls ou .csv â leitura automÃ¡tica</p>
+            <p className="text-gray-600 font-medium text-sm">Planilha de Cotação</p>
+            <p className="text-gray-400 text-xs mt-1">.xlsx, .xls ou .csv — leitura automática</p>
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
           </div>
 
@@ -343,7 +343,7 @@ export default function RmDetail({ params }) {
           >
             <FileText size={36} className="mx-auto text-red-500 mb-2" />
             <p className="text-gray-600 font-medium text-sm">Proposta em PDF</p>
-            <p className="text-gray-400 text-xs mt-1">.pdf â salvo como anexo</p>
+            <p className="text-gray-400 text-xs mt-1">.pdf — salvo como anexo</p>
             <input ref={pdfRef} type="file" accept=".pdf,.doc,.docx,.jpg,.png" className="hidden" onChange={handlePdfUpload} />
           </div>
         </div>
@@ -364,7 +364,7 @@ export default function RmDetail({ params }) {
                   <FileText size={20} className="text-red-500" />
                   <div>
                     <p className="text-sm font-medium text-gray-800">{anexo.nomeArquivo}</p>
-                    <p className="text-xs text-gray-400">{anexo.fornecedor} â {anexo.tamanho} â {anexo.data}</p>
+                    <p className="text-xs text-gray-400">{anexo.fornecedor} — {anexo.tamanho} — {anexo.data}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -383,13 +383,13 @@ export default function RmDetail({ params }) {
         </div>
       )}
 
-      {/* Lista de cotaÃ§Ãµes (planilhas) */}
+      {/* Lista de cotações (planilhas) */}
       {cotacoes.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center flex-wrap gap-3">
             <h3 className="text-lg font-semibold text-gray-800">
               <FileSpreadsheet size={18} className="inline text-green-600 mr-1" />
-              CotaÃ§Ãµes em Planilha ({cotacoes.length})
+              Cotações em Planilha ({cotacoes.length})
             </h3>
             {cotacoes.length >= 2 && (
               <button
@@ -409,7 +409,7 @@ export default function RmDetail({ params }) {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Itens</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AÃ§Ãµes</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -440,7 +440,7 @@ export default function RmDetail({ params }) {
         <div className="bg-white rounded-xl shadow-sm border-2 border-purple-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-purple-100 bg-purple-50">
             <h3 className="text-lg font-semibold text-purple-800">Mapa de Compras</h3>
-            <p className="text-sm text-purple-600">O menor valor por item estÃ¡ destacado em verde</p>
+            <p className="text-sm text-purple-600">O menor valor por item está destacado em verde</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -457,7 +457,7 @@ export default function RmDetail({ params }) {
                   <th className="px-4 py-2 sticky left-0 bg-gray-50"></th>
                   {cotacoes.map((cot) => (
                     <Fragment key={cot.id + "-sub"}>
-                      <th className="px-3 py-2 text-xs text-gray-400 text-center">PreÃ§o Un.</th>
+                      <th className="px-3 py-2 text-xs text-gray-400 text-center">Preço Un.</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Cond. Pag.</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Prazo</th>
                     </Fragment>
@@ -477,11 +477,11 @@ export default function RmDetail({ params }) {
                         return (
                           <Fragment key={cot.id + "-" + idx}>
                             <td className={`px-3 py-3 text-center font-semibold ${isBest ? "bg-green-50 text-green-700" : "text-gray-700"}`}>
-                              {match ? fmt(match.precoUnit) : "â"}
+                              {match ? fmt(match.precoUnit) : "—"}
                               {isBest && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
                             </td>
-                            <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "â"}</td>
-                            <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.prazoEntrega || "â"}</td>
+                            <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "—"}</td>
+                            <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.prazoEntrega || "—"}</td>
                           </Fragment>
                         );
                       })}
@@ -516,7 +516,7 @@ export default function RmDetail({ params }) {
       {/* GERAR PEDIDO OMIE */}
       {cotacoes.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Gerar Pedido de Compra â Omie</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Gerar Pedido de Compra — Omie</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor Selecionado</label>
@@ -528,7 +528,7 @@ export default function RmDetail({ params }) {
                 <option value="">Selecione o fornecedor vencedor...</option>
                 {cotacoes.map((c) => (
                   <option key={c.id} value={c.fornecedor}>
-                    {c.fornecedor} â {fmt(c.total)}
+                    {c.fornecedor} — {fmt(c.total)}
                   </option>
                 ))}
               </select>
@@ -546,9 +546,9 @@ export default function RmDetail({ params }) {
       {/* Pedido Gerado */}
       {showPedido && pedidoOmie && (
         <div className="bg-white rounded-xl shadow-sm border-2 border-emerald-200 p-6">
-          <h3 className="text-lg font-semibold text-emerald-800 mb-2">Pedido de Compra â Pronto para Envio</h3>
+          <h3 className="text-lg font-semibold text-emerald-800 mb-2">Pedido de Compra — Pronto para Envio</h3>
           <p className="text-sm text-emerald-600 mb-4">
-            O JSON abaixo serÃ¡ enviado para a API do Omie. Configure suas credenciais (App Key e App Secret) para envio automÃ¡tico.
+            O JSON abaixo será enviado para a API do Omie. Configure suas credenciais (App Key e App Secret) para envio automático.
           </p>
           <pre className="bg-gray-900 text-green-400 rounded-lg p-4 text-xs overflow-x-auto max-h-96">
             {JSON.stringify(pedidoOmie, null, 2)}
@@ -560,7 +560,7 @@ export default function RmDetail({ params }) {
             </code>
             <br />
             <span className="text-xs mt-1 block">
-              Substitua SUA_APP_KEY e SEU_APP_SECRET pelas suas credenciais do Omie. Na prÃ³xima fase, integramos o envio direto.
+              Substitua SUA_APP_KEY e SEU_APP_SECRET pelas suas credenciais do Omie. Na próxima fase, integramos o envio direto.
             </span>
           </div>
         </div>
