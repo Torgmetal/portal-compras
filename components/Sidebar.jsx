@@ -1,11 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, PlusCircle, Truck } from "lucide-react";
+import { BarChart3, PlusCircle, Truck, Package, Upload } from "lucide-react";
 
 const menu = [
   { href: "/", label: "Painel", icon: BarChart3 },
   { href: "/nova-rm", label: "Nova RM", icon: PlusCircle },
+  { href: "/importar-rm", label: "Importar RM (Tekla)", icon: Upload },
+  { href: "/catalogo", label: "Catálogo de Itens", icon: Package },
   { href: "/fornecedores", label: "Fornecedores", icon: Truck },
 ];
 
@@ -41,7 +43,7 @@ export default function Sidebar() {
       <div className="px-6 py-4 border-t border-gray-100 text-xs text-gray-400">
         Integração Omie API
         <br />
-        v1.0 — Protótipo
+        v1.1 — Protótipo
       </div>
     </aside>
   );
