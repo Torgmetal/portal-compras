@@ -8,8 +8,6 @@ import {
   ArrowLeft, Upload, FileSpreadsheet, FileText, BarChart3, Truck, Trash2,
   CheckCircle2, AlertCircle, Paperclip, Download, Eye,
 } from "lucide-react";
-import * as XLSX from "xlsx";
-import Papa from "papaparse";
 
 export default function RmDetail({ params }) {
   const { id } = use(params);
@@ -47,13 +45,15 @@ export default function RmDetail({ params }) {
   const processFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         let dados = [];
         if (file.name.endsWith(".csv") || file.name.endsWith(".tsv")) {
+          const Papa = (await import("papaparse")).default;
           const parsed = Papa.parse(ev.target.result, { header: true, skipEmptyLines: true });
           dados = parsed.data;
         } else {
+          const XLSX = await import("xlsx");
           const data = new Uint8Array(ev.target.result);
           const wb = XLSX.read(data, { type: "array" });
           const ws = wb.Sheets[wb.SheetNames[0]];
