@@ -131,7 +131,7 @@ export default function ImportarRmPage() {
         if (teklaInfo.cliente) parts.push(teklaInfo.cliente);
         updates.descricao = parts.length > 0
           ? `Tekla ${parts.join(" — ")}`
-             : `Importação Tekla — ${file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")}`;
+          : `Importação Tekla — ${file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")}`;
 
         setBatch(updates);
 
@@ -177,7 +177,8 @@ export default function ImportarRmPage() {
           const material = String(row[find(["mat", "grade", "aço", "aco"])] || "").trim();
           const largura = String(row[find(["larg", "width"])] || "").trim();
           const tratamento = String(row[find(["tratamento", "treat", "acabamento"])] || "").trim();
-          const pesoLinear = String(row[find(["peso/m", "peso linear"])] || "").trim();
+          const pesoLinearRaw = String(row[find(["peso/m", "peso linear", "peso/m²"])] || "0");
+          const pesoLinear = parseFloat(pesoLinearRaw.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
 
           return { descricao, codigo, qtd, unidade, peso, comprimento, material, largura, tratamento, pesoLinear };
         };
@@ -489,7 +490,8 @@ export default function ImportarRmPage() {
                     <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unid.</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Comp.</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Peso (kg)</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Peso/m</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Peso Total (kg)</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10"></th>
                   </tr>
                 </thead>
@@ -528,7 +530,8 @@ export default function ImportarRmPage() {
                         </select>
                       </td>
                       <td className="px-3 py-2 text-gray-500 text-xs">{it.comprimento || "—"}</td>
-                      <td className="px-3 py-2 text-right text-gray-500">{it.peso > 0 ? it.peso.toFixed(2) : "—"}</td>
+                      <td className="px-3 py-2 text-right text-gray-500">{it.pesoLinear > 0 ? it.pesoLinear.toFixed(2) : "—"}</td>
+                      <td className="px-3 py-2 text-right text-gray-700 font-medium">{it.peso > 0 ? it.peso.toFixed(2) : "—"}</td>
                       <td className="px-3 py-2">
                         <button onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600">
                           <Trash2 size={14} />
