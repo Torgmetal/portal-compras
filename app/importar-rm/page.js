@@ -102,10 +102,10 @@ export default function ImportarRmPage() {
         let dados = [];
         const XLSX = await import("xlsx");
         const data = new Uint8Array(ev.target.result);
-        const wb = XLSX.read(data, { type: "array" });
+        const wb = XLSX.read(data, { type: "array", cellFormula: false });
         const ws = wb.Sheets[wb.SheetNames[0]];
 
-        // Lê como array de arrays para detectar cabeçalho real do Tekla
+        // Lé como array de arrays para detectar cabeçalho real do Tekla
         const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
         // ─── Extrai metadados do cabeçalho ───
@@ -165,20 +165,38 @@ export default function ImportarRmPage() {
         const normalize = (row) => {
           const keys = Object.keys(row);
           const find = (terms) => keys.find((k) => terms.some((t) => k.toLowerCase().includes(t)));
+          // findExact: procura um header que contenha TODOS os termos (mais preciso)
+          const findExact = (terms) => keys.find((k) => {
+            const kl = k.toLowerCase();
+            return terms.every((t) => kl.includes(t));
+          });
 
           const descricao = String(row[find(["descri", "nome", "produto", "peça", "peca"])] || row[keys[0]] || "").trim();
           const codigo = String(row[find(["codigo", "código", "cod"])] || "").trim();
           const qtdRaw = String(row[find(["qtd", "quant", "quantidade", "qty"])] || "1");
           const qtd = parseFloat(qtdRaw.replace(/[^\d.,]/g, "").replace(",", ".")) || 1;
           const unidade = String(row[find(["unid", "und", "un", "uom"])] || "UN").trim();
-          const pesoRaw = String(row[find(["peso total", "peso"])] || "0");
-          const peso = parseFloat(pesoRaw.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
           const comprimento = String(row[find(["comp", "length", "tamanho"])] || "").trim();
           const material = String(row[find(["mat", "grade", "aço", "aco"])] || "").trim();
           const largura = String(row[find(["larg", "width"])] || "").trim();
           const tratamento = String(row[find(["tratamento", "treat", "acabamento"])] || "").trim();
+
+          // Peso linear (peso/m): busca coluna que tenha "peso/m" ou "peso linear"
           const pesoLinearRaw = String(row[find(["peso/m", "peso linear", "peso/m²"])] || "0");
           const pesoLinear = parseFloat(pesoLinearRaw.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+
+          // Peso total: busca coluna específica "peso total" (sem fallback genérico "peso")
+          const pesoTotalKey = findExact(["peso", "total"]) || findExact(["peso", "kg"]);
+          const pesoTotalRaw = String(row[pesoTotalKey] || "0");
+          let peso = parseFloat(pesoTotalRaw.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+
+          // Se peso total é 0 (fórmula não resolvida ou vazio), calcula a partir de peso/m × comp × qtd
+          if (peso === 0 && pesoLinear > 0) {
+            const compNum = parseFloat(String(comprimento).replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+            if (compNum > 0) {
+              peso = pesoLinear * compNum * qtd;
+            }
+          }
 
           return { descricao, codigo, qtd, unidade, peso, comprimento, material, largura, tratamento, pesoLinear };
         };
