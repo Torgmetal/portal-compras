@@ -1,12 +1,13 @@
 "use client";
-import { useState, useRef, Fragment } from "react";
+import { useState, useRef, Fragment, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { uid, today, fmt } from "@/lib/utils";
 import Badge from "@/components/Badge";
 import {
   ArrowLeft, Upload, FileSpreadsheet, FileText, BarChart3, Truck, Trash2,
-  CheckCircle2, AlertCircle, Paperclip, Download, Eye,
+  CheckCircle2, AlertCircle, Paperclip, Download, Eye, ShoppingCart, Award,
+  ArrowRightLeft, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 export default function RmDetail({ params }) {
@@ -18,11 +19,13 @@ export default function RmDetail({ params }) {
 
   const [cotFornecedor, setCotFornecedor] = useState("");
   const [showMapa, setShowMapa] = useState(false);
-  const [showPedido, setShowPedido] = useState(false);
-  const [pedidoOmie, setPedidoOmie] = useState(null);
-  const [selectedFornecedorPedido, setSelectedFornecedorPedido] = useState("");
+  const [showPedidos, setShowPedidos] = useState(false);
+  const [pedidosOmie, setPedidosOmie] = useState([]);
   const [dragActive, setDragActive] = useState(false);
   const [dragActivePdf, setDragActivePdf] = useState(false);
+  // Mapa: override do fornecedor vencedor por item (key = item lowercase, value = fornecedor name)
+  const [overrides, setOverrides] = useState({});
+  const [expandedPedido, setExpandedPedido] = useState(null);
 
   if (!loaded) return <div className="p-12 text-center text-gray-400">Carregando...</div>;
 
@@ -55,7 +58,7 @@ export default function RmDetail({ params }) {
         } else {
           const XLSX = await import("xlsx");
           const data = new Uint8Array(ev.target.result);
-          const wb = XLSX.read(data, { type: "array" });
+          const wb = XLSX.read(data, { type: "array", cellFormula: false });
           const ws = wb.Sheets[wb.SheetNames[0]];
           dados = XLSX.utils.sheet_to_json(ws);
         }
@@ -64,7 +67,7 @@ export default function RmDetail({ params }) {
           const keys = Object.keys(row);
           const find = (terms) => keys.find((k) => terms.some((t) => k.toLowerCase().includes(t)));
           return {
-            item: row[find(["item", "descri", "material", "produto", "nome"])] || row[keys[0]] || "—",
+            item: String(row[find(["item", "descri", "material", "produto", "nome"])] || row[keys[0]] || "—").trim(),
             precoUnit:
               parseFloat(
                 String(row[find(["pre", "unit", "valor unit", "vl unit", "vl. unit", "preco", "preço"])] || row[keys[1]] || "0")
@@ -77,9 +80,9 @@ export default function RmDetail({ params }) {
                   .replace(/[^\d.,]/g, "")
                   .replace(",", ".")
               ) || 1,
-            prazoEntrega: row[find(["prazo", "entrega", "dias", "lead"])] || "—",
-            condicao: row[find(["cond", "pagamento", "pag", "forma"])] || "—",
-            estoque: row[find(["estoque", "disp", "disponib"])] || "—",
+            prazoEntrega: String(row[find(["prazo", "entrega", "dias", "lead"])] || "—").trim(),
+            condicao: String(row[find(["cond", "pagamento", "pag", "forma"])] || "—").trim(),
+            estoque: String(row[find(["estoque", "disp", "disponib"])] || "—").trim(),
           };
         };
 
@@ -113,16 +116,8 @@ export default function RmDetail({ params }) {
     else reader.readAsArrayBuffer(file);
   };
 
-  const handleFileUpload = (e) => {
-    processFile(e.target.files[0]);
-    e.target.value = "";
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragActive(false);
-    processFile(e.dataTransfer.files[0]);
-  };
+  const handleFileUpload = (e) => { processFile(e.target.files[0]); e.target.value = ""; };
+  const handleDrop = (e) => { e.preventDefault(); setDragActive(false); processFile(e.dataTransfer.files[0]); };
 
   // ─── PDF/ANEXO UPLOAD ────────────────────────────────────
   const processPdf = (file) => {
@@ -138,40 +133,22 @@ export default function RmDetail({ params }) {
         data: today(),
         dataUrl: ev.target.result,
       };
-
       updateRm({
         anexos: [...(rm.anexos || []), novoAnexo],
         status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
       });
-
       setCotFornecedor("");
       showToast(`Proposta "${file.name}" anexada!`);
     };
     reader.readAsDataURL(file);
   };
 
-  const handlePdfUpload = (e) => {
-    processPdf(e.target.files[0]);
-    e.target.value = "";
-  };
+  const handlePdfUpload = (e) => { processPdf(e.target.files[0]); e.target.value = ""; };
+  const handleDropPdf = (e) => { e.preventDefault(); setDragActivePdf(false); processPdf(e.dataTransfer.files[0]); };
+  const removeAnexo = (anexoId) => { updateRm({ anexos: (rm.anexos || []).filter((a) => a.id !== anexoId) }); showToast("Anexo removido"); };
+  const removeCotacao = (cotId) => { updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) }); showToast("Cotação removida"); };
 
-  const handleDropPdf = (e) => {
-    e.preventDefault();
-    setDragActivePdf(false);
-    processPdf(e.dataTransfer.files[0]);
-  };
-
-  const removeAnexo = (anexoId) => {
-    updateRm({ anexos: (rm.anexos || []).filter((a) => a.id !== anexoId) });
-    showToast("Anexo removido");
-  };
-
-  const removeCotacao = (cotId) => {
-    updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) });
-    showToast("Cotação removida");
-  };
-
-  // ─── MAPA DE COMPRAS ─────────────────────────────────────
+  // ─── MAPA DE COTAÇÃO ─────────────────────────────────────
   const gerarMapa = () => {
     if ((rm.cotacoes || []).length < 2) return showToast("Suba pelo menos 2 cotações para gerar o mapa", "error");
     updateRm({ status: "Cotada", mapaGerado: true });
@@ -181,6 +158,7 @@ export default function RmDetail({ params }) {
   const cotacoes = rm.cotacoes || [];
   const anexos = rm.anexos || [];
 
+  // Build mapa items: consolidate all items across all quotations
   const allItems = new Map();
   cotacoes.forEach((cot) => {
     (cot.itens || []).forEach((it) => {
@@ -199,48 +177,105 @@ export default function RmDetail({ params }) {
   });
   const mapaItems = Array.from(allItems.values());
 
-  // ─── GERAR PEDIDO OMIE ───────────────────────────────────
-  const gerarPedidoOmie = () => {
-    if (!selectedFornecedorPedido) return showToast("Selecione o fornecedor para o pedido", "error");
-    const cot = cotacoes.find((c) => c.fornecedor === selectedFornecedorPedido);
-    if (!cot) return;
-
-    const payload = {
-      call: "IncluirPedidoCompra",
-      app_key: "SUA_APP_KEY",
-      app_secret: "SEU_APP_SECRET",
-      param: [
-        {
-          cabecalho: {
-            numero_pedido: `RM-${rm.numero}`,
-            codigo_cliente_fornecedor: 0,
-            data_previsao: today(),
-            observacao: rm.descricao,
-          },
-          det: cot.itens.map((it, idx) => ({
-            ide: { sequencia: idx + 1 },
-            produto: {
-              descricao: it.item,
-              quantidade: it.qtd,
-              valor_unitario: it.precoUnit,
-              valor_total: it.precoUnit * it.qtd,
-            },
-            observacao: `Prazo: ${it.prazoEntrega} | Cond: ${it.condicao}`,
-          })),
-          observacoes: { obs_venda: rm.observacao || "" },
-          total_pedido: { valor_total_pedido: cot.total },
-        },
-      ],
-    };
-
-    setPedidoOmie(payload);
-    updateRm({ status: "Pedido Gerado" });
-    setShowPedido(true);
-    showToast("Pedido de compra gerado!");
+  // Determine the winner for each item (lowest price, with manual override)
+  const getWinner = (mi) => {
+    const key = mi.item.toLowerCase().trim();
+    if (overrides[key]) return overrides[key];
+    const precos = mi.cotacoes.filter((c) => c.precoUnit > 0);
+    if (precos.length === 0) return null;
+    precos.sort((a, b) => a.precoUnit - b.precoUnit);
+    return precos[0].fornecedor;
   };
 
+  const setWinner = (itemKey, fornecedor) => {
+    setOverrides((prev) => ({ ...prev, [itemKey]: fornecedor }));
+  };
+
+  // Group winning items by supplier for purchase orders
+  const pedidosPorFornecedor = useMemo(() => {
+    if (mapaItems.length === 0) return {};
+    const groups = {};
+    mapaItems.forEach((mi) => {
+      const winner = getWinner(mi);
+      if (!winner) return;
+      const match = mi.cotacoes.find((c) => c.fornecedor === winner);
+      if (!match) return;
+      if (!groups[winner]) groups[winner] = { fornecedor: winner, itens: [], total: 0 };
+      groups[winner].itens.push({
+        item: mi.item,
+        precoUnit: match.precoUnit,
+        qtd: match.qtd,
+        total: match.total,
+        prazoEntrega: match.prazoEntrega,
+        condicao: match.condicao,
+      });
+      groups[winner].total += match.total;
+    });
+    return groups;
+  }, [mapaItems, overrides]);
+
+  // ─── GERAR PEDIDOS DE COMPRA (SPLIT POR FORNECEDOR) ─────
+  const gerarPedidosOmie = () => {
+    const groups = Object.values(pedidosPorFornecedor);
+    if (groups.length === 0) return showToast("Nenhum item selecionado no mapa", "error");
+
+    const pedidos = groups.map((g) => ({
+      fornecedor: g.fornecedor,
+      total: g.total,
+      itensCount: g.itens.length,
+      payload: {
+        call: "IncluirPedidoCompra",
+        app_key: "SUA_APP_KEY",
+        app_secret: "SEU_APP_SECRET",
+        param: [
+          {
+            cabecalho: {
+              numero_pedido: `RM-${rm.numero}-${g.fornecedor.replace(/\s+/g, "").substring(0, 10)}`,
+              codigo_cliente_fornecedor: 0,
+              data_previsao: today(),
+              observacao: `${rm.descricao} — Fornecedor: ${g.fornecedor}`,
+            },
+            det: g.itens.map((it, idx) => ({
+              ide: { sequencia: idx + 1 },
+              produto: {
+                descricao: it.item,
+                quantidade: it.qtd,
+                valor_unitario: it.precoUnit,
+                valor_total: it.total,
+              },
+              observacao: `Prazo: ${it.prazoEntrega} | Cond: ${it.condicao}`,
+            })),
+            observacoes: { obs_venda: rm.observacao || "" },
+            total_pedido: { valor_total_pedido: g.total },
+          },
+        ],
+      },
+    }));
+
+    setPedidosOmie(pedidos);
+    updateRm({ status: "Pedido Gerado" });
+    setShowPedidos(true);
+    showToast(`${pedidos.length} pedido(s) de compra gerado(s)!`);
+  };
+
+  // ─── CONTAGENS POR FORNECEDOR NO MAPA ───────────────────
+  const winnerStats = useMemo(() => {
+    const stats = {};
+    mapaItems.forEach((mi) => {
+      const winner = getWinner(mi);
+      if (!winner) return;
+      if (!stats[winner]) stats[winner] = { count: 0, total: 0 };
+      const match = mi.cotacoes.find((c) => c.fornecedor === winner);
+      if (match) {
+        stats[winner].count++;
+        stats[winner].total += match.total;
+      }
+    });
+    return stats;
+  }, [mapaItems, overrides]);
+
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <button onClick={() => router.push("/")} className="text-gray-500 hover:text-gray-700 flex items-center gap-1 text-sm">
@@ -301,8 +336,6 @@ export default function RmDetail({ params }) {
         <p className="text-sm text-gray-500 mb-4">
           Suba planilhas (.xlsx/.csv) para leitura automática de preços, ou PDFs de propostas recebidas como anexo.
         </p>
-
-        {/* Nome do fornecedor */}
         <div className="mb-4 max-w-md">
           <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Fornecedor</label>
           <input
@@ -313,9 +346,7 @@ export default function RmDetail({ params }) {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Upload Excel/CSV */}
           <div
             className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
               dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"
@@ -330,8 +361,6 @@ export default function RmDetail({ params }) {
             <p className="text-gray-400 text-xs mt-1">.xlsx, .xls ou .csv — leitura automática</p>
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
           </div>
-
-          {/* Upload PDF */}
           <div
             className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
               dragActivePdf ? "border-red-500 bg-red-50" : "border-gray-300 hover:border-red-400"
@@ -396,7 +425,7 @@ export default function RmDetail({ params }) {
                 onClick={gerarMapa}
                 className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
               >
-                <BarChart3 size={16} /> Gerar Mapa de Compras
+                <BarChart3 size={16} /> Gerar Mapa de Cotação
               </button>
             )}
           </div>
@@ -435,23 +464,60 @@ export default function RmDetail({ params }) {
         </div>
       )}
 
-      {/* MAPA DE COMPRAS */}
+      {/* ═══════════ MAPA DE COTAÇÃO ═══════════ */}
       {showMapa && mapaItems.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border-2 border-purple-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-purple-100 bg-purple-50">
-            <h3 className="text-lg font-semibold text-purple-800">Mapa de Compras</h3>
-            <p className="text-sm text-purple-600">O menor valor por item está destacado em verde</p>
+          <div className="px-6 py-4 border-b border-purple-100 bg-purple-50 flex justify-between items-start flex-wrap gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-purple-800 flex items-center gap-2">
+                <BarChart3 size={20} /> Mapa de Cotação
+              </h3>
+              <p className="text-sm text-purple-600 mt-1">
+                O menor preço por item está destacado em verde. Clique em outro fornecedor para alterar a seleção.
+              </p>
+            </div>
           </div>
+
+          {/* Resumo por fornecedor vencedor */}
+          <div className="px-6 py-4 bg-purple-50/50 border-b border-purple-100">
+            <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
+              <Award size={16} /> Resumo — Itens por Fornecedor Vencedor
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Object.entries(winnerStats).map(([forn, stats]) => (
+                <div key={forn} className="bg-white rounded-lg border border-purple-200 px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-800 text-sm">{forn}</p>
+                    <p className="text-xs text-gray-500">{stats.count} ite{stats.count === 1 ? "m" : "ns"}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-green-700 text-sm">{fmt(stats.total)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 pt-3 border-t border-purple-200 flex items-center justify-between text-sm">
+              <span className="text-purple-700 font-medium">
+                Total geral (menores preços): {fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}
+              </span>
+              <span className="text-xs text-purple-500">
+                {Object.keys(winnerStats).length} fornecedor{Object.keys(winnerStats).length !== 1 ? "es" : ""}
+              </span>
+            </div>
+          </div>
+
+          {/* Tabela do mapa */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50">Item</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 min-w-[200px]">Item</th>
                   {cotacoes.map((cot) => (
                     <th key={cot.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" colSpan={3}>
                       {cot.fornecedor}
                     </th>
                   ))}
+                  <th className="px-4 py-3 text-center text-xs font-medium text-purple-600 uppercase bg-purple-50">Vencedor</th>
                 </tr>
                 <tr className="bg-gray-50">
                   <th className="px-4 py-2 sticky left-0 bg-gray-50"></th>
@@ -462,36 +528,53 @@ export default function RmDetail({ params }) {
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Prazo</th>
                     </Fragment>
                   ))}
+                  <th className="px-3 py-2 text-xs text-purple-400 text-center bg-purple-50">Seleção</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {mapaItems.map((mi, idx) => {
                   const precos = mi.cotacoes.map((c) => c.precoUnit).filter((p) => p > 0);
                   const menorPreco = precos.length > 0 ? Math.min(...precos) : 0;
+                  const winner = getWinner(mi);
+                  const itemKey = mi.item.toLowerCase().trim();
                   return (
                     <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-800 sticky left-0 bg-white">{mi.item}</td>
+                      <td className="px-4 py-3 font-medium text-gray-800 sticky left-0 bg-white min-w-[200px]">{mi.item}</td>
                       {cotacoes.map((cot) => {
                         const match = mi.cotacoes.find((c) => c.fornecedor === cot.fornecedor);
-                        const isBest = match && match.precoUnit === menorPreco && match.precoUnit > 0;
+                        const isLowest = match && match.precoUnit === menorPreco && match.precoUnit > 0;
+                        const isWinner = match && cot.fornecedor === winner;
                         return (
                           <Fragment key={cot.id + "-" + idx}>
-                            <td className={`px-3 py-3 text-center font-semibold ${isBest ? "bg-green-50 text-green-700" : "text-gray-700"}`}>
+                            <td
+                              className={`px-3 py-3 text-center font-semibold cursor-pointer transition-colors ${
+                                isWinner
+                                  ? "bg-green-50 text-green-700 ring-2 ring-inset ring-green-300"
+                                  : isLowest
+                                  ? "bg-green-50/50 text-green-600"
+                                  : "text-gray-700 hover:bg-blue-50"
+                              }`}
+                              onClick={() => match && match.precoUnit > 0 && setWinner(itemKey, cot.fornecedor)}
+                              title={`Clique para selecionar ${cot.fornecedor} como vencedor`}
+                            >
                               {match ? fmt(match.precoUnit) : "—"}
-                              {isBest && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
+                              {isWinner && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
                             </td>
                             <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "—"}</td>
                             <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.prazoEntrega || "—"}</td>
                           </Fragment>
                         );
                       })}
+                      <td className="px-3 py-3 text-center bg-purple-50 text-xs font-semibold text-purple-700">
+                        {winner || "—"}
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot className="bg-gray-50 font-semibold">
                 <tr>
-                  <td className="px-4 py-3 text-gray-700 sticky left-0 bg-gray-50">TOTAL GERAL</td>
+                  <td className="px-4 py-3 text-gray-700 sticky left-0 bg-gray-50">TOTAL POR FORNECEDOR</td>
                   {cotacoes.map((cot) => {
                     const minTotal = Math.min(...cotacoes.map((c) => c.total));
                     const isBest = cot.total === minTotal;
@@ -506,63 +589,117 @@ export default function RmDetail({ params }) {
                       </Fragment>
                     );
                   })}
+                  <td className="px-3 py-3 text-center bg-purple-50 text-purple-700 font-bold">
+                    {fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}
+                  </td>
                 </tr>
               </tfoot>
             </table>
           </div>
+
+          {/* Botão para gerar pedidos */}
+          <div className="px-6 py-4 bg-purple-50/50 border-t border-purple-100 flex justify-end gap-3">
+            <button
+              onClick={gerarPedidosOmie}
+              className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2"
+            >
+              <ShoppingCart size={18} /> Gerar Pedidos de Compra ({Object.keys(pedidosPorFornecedor).length} fornecedor{Object.keys(pedidosPorFornecedor).length !== 1 ? "es" : ""})
+            </button>
+          </div>
         </div>
       )}
 
-      {/* GERAR PEDIDO OMIE */}
-      {cotacoes.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Gerar Pedido de Compra — Omie</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor Selecionado</label>
-              <select
-                value={selectedFornecedorPedido}
-                onChange={(e) => setSelectedFornecedorPedido(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      {/* ═══════════ PEDIDOS GERADOS (SPLIT POR FORNECEDOR) ═══════════ */}
+      {showPedidos && pedidosOmie.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-semibold text-emerald-800 flex items-center gap-2">
+              <Truck size={20} /> Pedidos de Compra Gerados ({pedidosOmie.length})
+            </h3>
+          </div>
+
+          {pedidosOmie.map((pedido, pidx) => (
+            <div key={pidx} className="bg-white rounded-xl shadow-sm border-2 border-emerald-200 overflow-hidden">
+              {/* Header do pedido */}
+              <div
+                className="px-6 py-4 bg-emerald-50 flex justify-between items-center cursor-pointer"
+                onClick={() => setExpandedPedido(expandedPedido === pidx ? null : pidx)}
               >
-                <option value="">Selecione o fornecedor vencedor...</option>
-                {cotacoes.map((c) => (
-                  <option key={c.id} value={c.fornecedor}>
-                    {c.fornecedor} — {fmt(c.total)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <button
-            onClick={gerarPedidoOmie}
-            className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2"
-          >
-            <Truck size={18} /> Gerar Pedido no Omie
-          </button>
-        </div>
-      )}
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                    <Truck size={20} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-emerald-800">{pedido.fornecedor}</p>
+                    <p className="text-sm text-emerald-600">{pedido.itensCount} ite{pedido.itensCount === 1 ? "m" : "ns"} — Total: {fmt(pedido.total)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">
+                    RM-{rm.numero}
+                  </span>
+                  {expandedPedido === pidx ? <ChevronUp size={20} className="text-emerald-600" /> : <ChevronDown size={20} className="text-emerald-600" />}
+                </div>
+              </div>
 
-      {/* Pedido Gerado */}
-      {showPedido && pedidoOmie && (
-        <div className="bg-white rounded-xl shadow-sm border-2 border-emerald-200 p-6">
-          <h3 className="text-lg font-semibold text-emerald-800 mb-2">Pedido de Compra — Pronto para Envio</h3>
-          <p className="text-sm text-emerald-600 mb-4">
-            O JSON abaixo será enviado para a API do Omie. Configure suas credenciais (App Key e App Secret) para envio automático.
-          </p>
-          <pre className="bg-gray-900 text-green-400 rounded-lg p-4 text-xs overflow-x-auto max-h-96">
-            {JSON.stringify(pedidoOmie, null, 2)}
-          </pre>
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-            <strong>Endpoint:</strong>{" "}
-            <code className="bg-yellow-100 px-1 rounded">
-              POST https://app.omie.com.br/api/v1/produtos/pedidocompra/
-            </code>
-            <br />
-            <span className="text-xs mt-1 block">
-              Substitua SUA_APP_KEY e SEU_APP_SECRET pelas suas credenciais do Omie. Na próxima fase, integramos o envio direto.
-            </span>
-          </div>
+              {/* Itens do pedido */}
+              {expandedPedido === pidx && (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço Unit.</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prazo</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cond. Pag.</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {pedido.payload.param[0].det.map((det, didx) => (
+                          <tr key={didx} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-400">{det.ide.sequencia}</td>
+                            <td className="px-4 py-2 text-gray-800 font-medium">{det.produto.descricao}</td>
+                            <td className="px-4 py-2 text-right text-gray-700">{det.produto.quantidade}</td>
+                            <td className="px-4 py-2 text-right text-gray-700">{fmt(det.produto.valor_unitario)}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-gray-800">{fmt(det.produto.valor_total)}</td>
+                            <td className="px-4 py-2 text-gray-600 text-xs">{det.observacao.split("|")[0].replace("Prazo:", "").trim()}</td>
+                            <td className="px-4 py-2 text-gray-600 text-xs">{det.observacao.split("|")[1]?.replace("Cond:", "").trim() || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-50">
+                        <tr>
+                          <td colSpan={4} className="px-4 py-2 text-right font-semibold text-gray-700">Total do Pedido:</td>
+                          <td className="px-4 py-2 text-right font-bold text-emerald-700">{fmt(pedido.total)}</td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* JSON Omie */}
+                  <div className="px-6 py-4 border-t border-gray-100">
+                    <details className="text-sm">
+                      <summary className="cursor-pointer text-emerald-600 hover:text-emerald-800 font-medium">
+                        Ver JSON para API Omie
+                      </summary>
+                      <pre className="mt-2 bg-gray-900 text-green-400 rounded-lg p-4 text-xs overflow-x-auto max-h-60">
+                        {JSON.stringify(pedido.payload, null, 2)}
+                      </pre>
+                      <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
+                        <strong>Endpoint:</strong>{" "}
+                        <code className="bg-yellow-100 px-1 rounded">POST https://app.omie.com.br/api/v1/produtos/pedidocompra/</code>
+                      </div>
+                    </details>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
