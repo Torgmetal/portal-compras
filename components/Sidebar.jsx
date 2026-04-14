@@ -1,12 +1,11 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, PlusCircle, Truck, Package, Upload } from "lucide-react";
+import { BarChart3, PlusCircle, Truck, Package } from "lucide-react";
 
 const menu = [
   { href: "/", label: "Painel", icon: BarChart3 },
   { href: "/nova-rm", label: "Nova RM", icon: PlusCircle },
-  { href: "/importar-rm", label: "Importar RM (Tekla)", icon: Upload },
   { href: "/catalogo", label: "Catálogo de Itens", icon: Package },
   { href: "/fornecedores", label: "Fornecedores", icon: Truck },
 ];
