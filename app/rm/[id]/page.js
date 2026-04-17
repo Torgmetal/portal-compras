@@ -342,6 +342,18 @@ export default function RmDetail({ params }) {
         {rm.origemTekla && (
           <span className="text-xs bg-orange-50 text-orange-600 px-2 py-1 rounded-full font-medium">Importado</span>
         )}
+        <button
+          onClick={() => {
+            if (window.confirm("Tem certeza que deseja excluir a RM-" + rm.numero + "? Esta ação não pode ser desfeita.")) {
+              setRms((prev) => prev.filter((r) => r.id !== rm.id));
+              showToast("RM-" + rm.numero + " excluída com sucesso!");
+              router.push("/");
+            }
+          }}
+          className="ml-auto px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 transition-colors"
+        >
+          <Trash2 size={14} /> Excluir RM
+        </button>
       </div>
 
       {/* RM Info */}
