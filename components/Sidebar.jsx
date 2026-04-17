@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, PlusCircle, Truck, Package } from "lucide-react";
+import { BarChart3, PlusCircle, Truck, Package, FolderKanban } from "lucide-react";
 
 const menu = [
   { href: "/", label: "Painel", icon: BarChart3 },
+  { href: "/painel-ops", label: "Painel de OPs", icon: FolderKanban },
   { href: "/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/catalogo", label: "Catálogo de Itens", icon: Package },
   { href: "/fornecedores", label: "Fornecedores", icon: Truck },
@@ -22,7 +23,10 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {menu.map((m) => {
           const Icon = m.icon;
-          const active = pathname === m.href || (m.href === "/" && pathname.startsWith("/rm"));
+          const active =
+            pathname === m.href ||
+            (m.href === "/" && pathname.startsWith("/rm")) ||
+            (m.href === "/painel-ops" && pathname.startsWith("/painel-ops"));
           return (
             <Link
               key={m.href}
@@ -42,7 +46,7 @@ export default function Sidebar() {
       <div className="px-6 py-4 border-t border-gray-100 text-xs text-gray-400">
         Integração Omie API
         <br />
-        v1.1 — Protótipo
+        v1.2 — Protótipo
       </div>
     </aside>
   );
