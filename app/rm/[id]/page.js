@@ -345,9 +345,13 @@ export default function RmDetail({ params }) {
         <button
           onClick={() => {
             if (window.confirm("Tem certeza que deseja excluir a RM-" + rm.numero + "? Esta ação não pode ser desfeita.")) {
-              setRms((prev) => prev.filter((r) => r.id !== rm.id));
-              showToast("RM-" + rm.numero + " excluída com sucesso!");
+              const rmNum = rm.numero;
+              const rmId = rm.id;
               router.push("/");
+              setTimeout(() => {
+                setRms((prev) => prev.filter((r) => r.id !== rmId));
+                showToast("RM-" + rmNum + " excluída com sucesso!");
+              }, 100);
             }
           }}
           className="ml-auto px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 transition-colors"
