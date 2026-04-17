@@ -52,6 +52,7 @@ export default function NovaRm() {
   const [nomeArquivo, setNomeArquivo] = useState("");
   const [itensImportados, setItensImportados] = useState([]);
   const [meta, setMeta] = useState(null);
+  const [opExtraida, setOpExtraida] = useState("");
 
   // âââ Extrai metadados do cabeÃ§alho Tekla âââ
   const extractMeta = (rawRows) => {
@@ -104,6 +105,9 @@ export default function NovaRm() {
   const processFile = (file) => {
     if (!file) return;
     setNomeArquivo(file.name);
+    // Extrai OP do nome do arquivo (padrao TXXX)
+    const opMatch = file.name.match(/^T(\d+)/i);
+    setOpExtraida(opMatch ? opMatch[1] : "");
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
@@ -269,6 +273,7 @@ export default function NovaRm() {
       mapaGerado: false,
       origemTekla: true,
       arquivoOrigem: nomeArquivo,
+      op: opExtraida,
     };
     setRms((prev) => [novaRm, ...prev]);
     showToast(`RM-${novaRm.numero} criada com ${itensImportados.length} itens importados!`);
