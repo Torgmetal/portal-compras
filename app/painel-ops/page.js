@@ -24,11 +24,6 @@ export default function PainelOPs() {
   const [expandedOp, setExpandedOp] = useState(null);
   const [filterStatus, setFilterStatus] = useState("Todas");
 
-  if (!loaded)
-    return (
-      <div className="p-12 text-center text-gray-400">Carregando...</div>
-    );
-
   // Group RMs by OP number
   const opGroups = useMemo(() => {
     const groups = {};
@@ -76,6 +71,11 @@ export default function PainelOPs() {
     }
     return result;
   }, [opGroups, searchTerm, filterStatus]);
+
+  if (!loaded)
+    return (
+      <div className="p-12 text-center text-gray-400">Carregando...</div>
+    );
 
   const allStatuses = [
     "Todas",
