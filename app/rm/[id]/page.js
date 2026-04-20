@@ -110,27 +110,124 @@ export default function RmDetail({ params }) {
   const handleDrop = (e) => { e.preventDefault(); setDragActive(false); processFile(e.dataTransfer.files[0]); };
 
   // ─── PDF/ANEXO UPLOAD ────────────────────────────────────
-  const processPdf = (file) => {
+  const processPdf = async (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const novoAnexo = {
+    const fornecedorNome = cotFornecedor.trim() || "Fornecedor " + ((rm.cotacoes || []).length + 1);
+
+    // Read file as both dataURL (for anexo) and ArrayBuffer (for extraction)
+    const readAsDataURL = (f) => new Promise((res) => { const r = new FileReader(); r.onload = (e) => res(e.target.result); r.readAsDataURL(f); });
+    const readAsArrayBuffer = (f) => new Promise((res) => { const r = new FileReader(); r.onload = (e) => res(e.target.result); r.readAsArrayBuffer(f); });
+
+    const dataUrl = await readAsDataURL(file);
+    
+    // Always save as anexo
+    const novoAnexo = { id: uid(), nome: file.name, tipo: "application/pdf", tamanho: file.size, data: today(), fornecedor: fornecedorNome, url: dataUrl };
+    
+    // Try to extract prices from PDF
+    let extractedItens = [];
+    try {
+      const arrayBuf = await readAsArrayBuffer(file);
+      const pdfjsLib = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.mjs");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.mjs";
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
+      let fullText = "";
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        fullText += tc.items.map(i => i.str).join(" ") + "\n";
+      }
+      // Try to match RM items and extract prices
+      const rmItens = rm.itens || [];
+      extractedItens = matchPdfPrices(fullText, rmItens);
+    } catch (err) {
+      console.warn("PDF extraction failed:", err);
+    }
+
+    if (extractedItens.length > 0) {
+      const total = extractedItens.reduce((s, it) => s + (it.precoUnit * (it.qtd || 1)), 0);
+      const novaCotacao = {
         id: uid(),
-        fornecedor: cotFornecedor.trim() || "Fornecedor " + ((rm.anexos?.length || 0) + (rm.cotacoes?.length || 0) + 1),
+        fornecedor: fornecedorNome,
         nomeArquivo: file.name,
-        tipo: file.name.endsWith(".pdf") ? "pdf" : "outro",
-        tamanho: (file.size / 1024).toFixed(0) + " KB",
+        tipo: "pdf-extraido",
         data: today(),
-        dataUrl: ev.target.result,
+        itens: extractedItens,
+        total,
       };
       updateRm({
+        cotacoes: [...(rm.cotacoes || []), novaCotacao],
         anexos: [...(rm.anexos || []), novoAnexo],
-        status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
+        status: rm.status === "Aberta" ? "Em Cota\u00e7\u00e3o" : rm.status,
       });
-      setCotFornecedor("");
-      showToast(`Proposta "${file.name}" anexada!`);
-    };
-    reader.readAsDataURL(file);
+      showToast("Cota\u00e7\u00e3o extra\u00edda do PDF com " + extractedItens.length + " itens!");
+    } else {
+      updateRm({ anexos: [...(rm.anexos || []), novoAnexo] });
+      showToast("PDF salvo como anexo. N\u00e3o foi poss\u00edvel extrair pre\u00e7os automaticamente.");
+    }
+    setCotFornecedor("");
+  };
+
+  const matchPdfPrices = (text, rmItens) => {
+    const result = [];
+    const lines = text.split("\n");
+    const allText = text.toUpperCase();
+    
+    rmItens.forEach((rmItem) => {
+      const desc = (rmItem.descricao || rmItem.item || "").toUpperCase().trim();
+      if (!desc) return;
+      
+      // Try to find this item in the PDF text
+      const words = desc.split(/\s+/).filter(w => w.length > 2);
+      let bestLine = "";
+      let bestScore = 0;
+      
+      lines.forEach((line) => {
+        const upper = line.toUpperCase();
+        let score = 0;
+        words.forEach(w => { if (upper.includes(w)) score++; });
+        if (score > bestScore && score >= Math.max(1, words.length * 0.5)) {
+          bestScore = score;
+          bestLine = line;
+        }
+      });
+      
+      if (bestLine) {
+        // Extract price from the matched line - look for currency patterns
+        const pricePatterns = [
+          /R\$\s*([\d.,]+)/g,
+          /([\d.]+,[\d]{2})(?!\d)/g,
+          /\b(\d{1,3}(?:\.\d{3})*,\d{2})\b/g,
+        ];
+        let price = 0;
+        let qtdCot = rmItem.qtd || 1;
+        
+        // Try to find quantity in the line
+        const qtyMatch = bestLine.match(new RegExp(desc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+(\\d+(?:[.,]\\d+)?)'));
+        if (qtyMatch) qtdCot = parseFloat(qtyMatch[1].replace(',', '.'));
+        
+        for (const pattern of pricePatterns) {
+          const matches = [...bestLine.matchAll(pattern)];
+          if (matches.length > 0) {
+            // Take the last number as price (usually unit price is last)
+            const lastMatch = matches[matches.length - 1][1];
+            price = parseFloat(lastMatch.replace(/\./g, '').replace(',', '.'));
+            break;
+          }
+        }
+        
+        if (price > 0) {
+          result.push({
+            item: rmItem.descricao || rmItem.item,
+            precoUnit: price,
+            qtd: qtdCot,
+            prazoEntrega: "\u2014",
+            condicao: "\u2014",
+            estoque: "\u2014",
+          });
+        }
+      }
+    });
+    return result;
   };
 
   const handlePdfUpload = (e) => { processPdf(e.target.files[0]); e.target.value = ""; };
@@ -166,6 +263,11 @@ export default function RmDetail({ params }) {
     });
   });
   const mapaItems = Array.from(allItems.values());
+      // Adicionar quantidade da RM para comparação de divergência
+      mapaItems.forEach(mi => {
+        const rmItem = rm.itens.find(it => it.descricao && it.descricao.toLowerCase().trim() === mi.item.toLowerCase().trim());
+        mi.qtdRm = rmItem ? (parseFloat(rmItem.qtd) || 0) : 0;
+      });
 
   // Determine the winner for each item (lowest price, with manual override)
   const getWinner = (mi) => {
@@ -695,7 +797,7 @@ export default function RmDetail({ params }) {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 min-w-[200px]">Item</th>
                   {cotacoes.map((cot) => (
-                    <th key={cot.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" colSpan={3}>
+                    <th key={cot.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" colSpan={4}>
                       {cot.fornecedor}
                     </th>
                   ))}
@@ -706,6 +808,7 @@ export default function RmDetail({ params }) {
                   {cotacoes.map((cot) => (
                     <Fragment key={cot.id + "-sub"}>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Preço Un.</th>
+                      <th className="px-3 py-2 text-xs text-gray-400 text-center">Qtd</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Cond. Pag.</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Prazo</th>
                     </Fragment>
@@ -742,7 +845,8 @@ export default function RmDetail({ params }) {
                               {match ? fmt(match.precoUnit) : "—"}
                               {isWinner && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
                             </td>
-                            <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "—"}</td>
+                            <td className={`px-3 py-3 text-center text-xs ${match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm ? "bg-yellow-100 text-yellow-800 font-bold" : "text-gray-600"}`}>{match ? (match.qtd || "—") : "—"}{match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm && <AlertCircle size={12} className="inline ml-1 text-yellow-600" title={`Qtd RM: ${mi.qtdRm}`} />}</td>
+                      <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "—"}</td>
                             <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.prazoEntrega || "—"}</td>
                           </Fragment>
                         );
