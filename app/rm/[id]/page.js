@@ -28,19 +28,8 @@ export default function RmDetail({ params }) {
   const [expandedPedido, setExpandedPedido] = useState(null);
   const [selectedFornecedores, setSelectedFornecedores] = useState([]);
 
-  if (!loaded) return <div className="p-12 text-center text-gray-400">Carregando...</div>;
-
-  const rm = rms.find((r) => r.id === id);
-  if (!rm) {
-    return (
-      <div className="p-12 text-center">
-        <AlertCircle size={48} className="mx-auto text-gray-300 mb-4" />
-        <p className="text-gray-500 text-lg">RM não encontrada</p>
-        <button onClick={() => router.push("/")} className="mt-4 text-blue-600 hover:underline">Voltar ao Painel</button>
-      </div>
-    );
-  }
-
+  const rmFound = rms.find((r) => r.id === id);
+  const rm = rmFound || { itens: [], cotacoes: [], envios: [], anexos: [], status: "", numero: "", descricao: "", observacao: "", data: "", op: "", tipo: "", id: null };
   const updateRm = (updates) => {
     setRms((prev) => prev.map((r) => (r.id === rm.id ? { ...r, ...updates } : r)));
   };
@@ -274,6 +263,16 @@ export default function RmDetail({ params }) {
     });
     return stats;
   }, [mapaItems, overrides]);
+
+  if (!loaded) return <div className="p-12 text-center text-gray-400">Carregando...</div>;
+  if (!rmFound) {
+    return (
+      <div className="p-12 text-center">
+        <div className="text-gray-500 text-lg">RM não encontrada</div>
+        <button onClick={() => router.push("/")} className="mt-4 text-blue-600 hover:underline">Voltar ao Painel</button>
+      </div>
+    );
+  }
 
   // ─── ENVIO DE COTAÇÃO (SIMULADO) ──────────────────────
   const toggleFornecedor = (fornId) => {
