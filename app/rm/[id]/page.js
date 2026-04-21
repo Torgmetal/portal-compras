@@ -358,7 +358,7 @@ export default function RmDetail({ params }) {
         allItems.get(key).cotacoes.push({ fornecedor: cot.fornecedor, precoUnit: it.precoUnit, qtd: it.qtd, total: it.total || (it.precoUnit * it.qtd), condicao: it.condicao, prazo: it.prazoEntrega, unidade: it._unidade || "" });
       });
     });
-    const mapaArr = Array.from(allItems.values());
+    const mapaItems = Array.from(allItems.values());
     const wsData = [["Item RM", "CÃ³d. Omie", "Qtd Barras", "Peso RM (kg)", "Un RM", "Fornecedor", "Descri\u00e7\u00e3o Proposta", "Qtd (kg)", "Pre\u00e7o/kg", "Total R$", "Condi\u00e7\u00e3o", "Prazo", "Alerta Engenharia"]];
     mapaArr.forEach(mi => {
       const rmItem = (rm.itens || []).find(it => (it.descricao || "").toLowerCase().trim() === mi.item.toLowerCase().trim());
