@@ -13,7 +13,7 @@ export async function POST(request) {
     const appSecret = process.env.OMIE_APP_SECRET;
     if (!appKey || !appSecret) {
       return NextResponse.json({ error: "Credenciais Omie n\u00e3o configuradas" }, { status: 500 });
-    }h
+    }
 
     const codigoPedidoIntegracao = "PC-" + Date.now();
     const hoje = new Date();
