@@ -4,7 +4,7 @@ const OMIE_URL = "https://app.omie.com.br/api/v1/produtos/pedidocompra/";
 
 export async function POST(request) {
   try {
-    const { itens, observacao } = await request.json();
+    const { itens, observacao, nCodFor } = await request.json();
     if (!itens || !itens.length) {
       return NextResponse.json({ error: "Nenhum item informado" }, { status: 400 });
     }
@@ -37,7 +37,7 @@ export async function POST(request) {
         cabecalho_incluir: {
           cCodIntPed: codigoPedidoIntegracao,
           dDtPrevisao: dataPrevisao,
-          nCodFor: 0,
+          nCodFor: nCodFor || 0,
           cNumPedido: "",
             cObs: observacao || ""
         },
