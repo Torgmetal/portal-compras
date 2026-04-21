@@ -866,14 +866,14 @@ export default function RmDetail({ params }) {
       )}
 
       {/* Lista de cotações (planilhas) */}
-      {cotacoes.length > 0 && (
+      {(cotacoes.length > 0 || (rm.anexos && rm.anexos.length > 0)) && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center flex-wrap gap-3">
             <h3 className="text-lg font-semibold text-gray-800">
               <FileSpreadsheet size={18} className="inline text-green-600 mr-1" />
               Cotações em Planilha ({cotacoes.length})
             </h3>
-            {cotacoes.length >= 2 && (
+            {(cotacoes.length >= 1 || (rm.anexos && rm.anexos.length > 0)) && (
               <button
                 onClick={gerarMapa}
                 className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
