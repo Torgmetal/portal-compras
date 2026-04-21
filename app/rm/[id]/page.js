@@ -7,7 +7,7 @@ import Badge from "@/components/Badge";
 import {
   ArrowLeft, Upload, FileSpreadsheet, FileText, BarChart3, Truck, Trash2,
   CheckCircle2, AlertCircle, Paperclip, Download, Eye, ShoppingCart, Award,
-  ArrowRightLeft, ChevronDown, ChevronUp, Mail, Send, Clock,
+  ArrowRightLeft, ChevronDown, ChevronUp, Mail, Send, Clock, ExternalLink,
 } from "lucide-react";
 
 export default function RmDetail({ params }) {
@@ -18,6 +18,8 @@ export default function RmDetail({ params }) {
   const pdfRef = useRef(null);
 
   const [cotFornecedor, setCotFornecedor] = useState("");
+  const [sendingOmie, setSendingOmie] = useState(false);
+  const [omieResult, setOmieResult] = useState(null);
   const [showMapa, setShowMapa] = useState(false);
   const [showPedidos, setShowPedidos] = useState(false);
   const [pedidosOmie, setPedidosOmie] = useState([]);
@@ -377,6 +379,43 @@ export default function RmDetail({ params }) {
     XLSX.utils.book_append_sheet(wb, ws, "Mapa Cota\u00e7\u00e3o");
     XLSX.writeFile(wb, "Mapa_Cotacao_RM-" + (rm.numero || rm.id) + ".xlsx");
     showToast("Planilha do mapa exportada!");
+  };
+
+  const criarPedidoOmie = async () => {
+    if (!mapaItems || mapaItems.length === 0) return alert("Gere o mapa primeiro.");
+    const vencedorItens = [];
+    mapaItems.forEach(mi => {
+      const winner = getWinner(mi);
+      if (!winner) return;
+      const match = mi.cotacoes.find(c => c.fornecedor === winner);
+      if (!match) return;
+      vencedorItens.push({
+        codigo: mi.codigoOmie || "",
+        descricao: mi.item,
+        qtd: match.qtd || mi.pesoRm || 0,
+        precoUnit: match.precoUnit || 0,
+        unidade: match.unidade || "KG"
+      });
+    });
+    if (vencedorItens.length === 0) return alert("Selecione ao menos um fornecedor vencedor.");
+    setSendingOmie(true);
+    setOmieResult(null);
+    try {
+      const resp = await fetch("/api/omie/pedido-compra", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itens: vencedorItens, observacao: "Pedido via Portal de Compras - RM " + rm.numero })
+      });
+      const data = await resp.json();
+      setOmieResult(data);
+      if (data.success) {
+        window.open("https://app.omie.com.br/", "_blank");
+      }
+    } catch (err) {
+      setOmieResult({ error: err.message });
+    } finally {
+      setSendingOmie(false);
+    }
   };
   const cotacoes = rm.cotacoes || [];
   const anexos = rm.anexos || [];
@@ -881,6 +920,11 @@ export default function RmDetail({ params }) {
                   <Download size={16} /> Exportar Mapa (.xlsx)
                 </button>
               )}
+              {showMapa && mapaItems.length > 0 && (
+                <button onClick={criarPedidoOmie} disabled={sendingOmie} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">
+                  <ExternalLink size={16} /> {sendingOmie ? "Enviando..." : "Criar Pedido no Omie"}
+                </button>
+              )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -975,6 +1019,14 @@ export default function RmDetail({ params }) {
               </span>
             </div>
           </div>
+
+          {omieResult && (
+            <div className={`p-3 rounded-lg text-sm ${omieResult.success ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+              {omieResult.success
+                ? `Pedido criado com sucesso no Omie! C\u00f3digo: ${omieResult.numero_pedido || omieResult.codigo_pedido_integracao}`
+                : `Erro: ${omieResult.error}`}
+            </div>
+          )}
 
           {/* Tabela do mapa */}
           <div className="overflow-x-auto">
