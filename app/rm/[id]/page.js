@@ -29,6 +29,7 @@ export default function RmDetail({ params }) {
   const [overrides, setOverrides] = useState({});
   const [expandedPedido, setExpandedPedido] = useState(null);
   const [selectedFornecedores, setSelectedFornecedores] = useState([]);
+  const [criandoPedido, setCriandoPedido] = useState(false);
   const [alertasEng, setAlertasEng] = useState([]);
 
   const rmFound = rms.find((r) => r.id === id);
@@ -381,97 +382,64 @@ export default function RmDetail({ params }) {
     showToast("Planilha do mapa exportada!");
   };
 
-  const criarPedidoOmie = async () => {
-    if (!mapaItems || mapaItems.length === 0) return alert("Gere o mapa primeiro.");
-    const vencedorItens = [];
-    mapaItems.forEach(mi => {
-      const winner = getWinner(mi);
-      if (!winner) return;
-      const match = mi.cotacoes.find(c => c.fornecedor === winner);
-      if (!match) return;
-      vencedorItens.push({
-        codigo: mi.codigoOmie || "",
-        descricao: mi.item,
-        qtd: match.qtd || mi.pesoRm || 0,
-        precoUnit: match.precoUnit || 0,
-        unidade: match.unidade || "KG"
-      });
-    });
-    if (vencedorItens.length === 0) return alert("Selecione ao menos um fornecedor vencedor.");
-    setSendingOmie(true);
-    setOmieResult(null);
+  const criarPedidoOmie = async (fornecedorNome) => {
+    const group = pedidosPorFornecedor[fornecedorNome];
+    if (!group || group.itens.length === 0) return showToast("Nenhum item para este fornecedor", "error");
+    setCriandoPedido(true);
     try {
+      const fornCadastrado = fornecedores.find(
+        (f) => f.nome && f.nome.toLowerCase().trim() === fornecedorNome.toLowerCase().trim()
+      );
+      const nCodFor = fornCadastrado?.nCodOmie || 0;
+      const nQtdeParc = fornCadastrado?.parcelas || 1;
+      const opInfo = rm.op ? `OP: ${rm.op}` : "";
+      const cotacaoNumero = `RM-${rm.numero}`;
+      const observacaoInterna = `Pedido via Portal de Compras - ${cotacaoNumero} - Fornecedor: ${fornecedorNome}${rm.observacao ? " | " + rm.observacao : ""}`;
       const resp = await fetch("/api/omie/pedido-compra", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itens: vencedorItens, nCodFor: 7318285259, observacao: "Pedido via Portal de Compras - RM " + rm.numero })
+        body: JSON.stringify({
+          itens: group.itens.map((it) => ({ codigo: it.codigo, descricao: it.descricao || it.item, unidade: it.unidade || "KG", qtd: it.qtd, precoUnit: it.precoUnit })),
+          nCodFor, cNumPedido: cotacaoNumero, nQtdeParc, cInfAdic: opInfo, observacao: observacaoInterna,
+        }),
       });
       const data = await resp.json();
-      setOmieResult(data);
-      if (data.success) {
-        window.open("https://app.omie.com.br/", "_blank");
-      }
-    } catch (err) {
-      setOmieResult({ error: err.message });
-    } finally {
-      setSendingOmie(false);
-    }
-  };
-  const cotacoes = rm.cotacoes || [];
-  const anexos = rm.anexos || [];
-
-  // Build mapa items: consolidate all items across all quotations
-  const allItems = new Map();
-  cotacoes.forEach((cot) => {
-    (cot.itens || []).forEach((it) => {
-      const key = it.item.toLowerCase().trim();
-      if (!allItems.has(key)) allItems.set(key, { item: it.item, cotacoes: [] });
-      allItems.get(key).cotacoes.push({
-        fornecedor: cot.fornecedor,
-        precoUnit: it.precoUnit,
-        qtd: it.qtd,
-        total: it.precoUnit * it.qtd,
-        prazoEntrega: it.prazoEntrega,
-        condicao: it.condicao,
-        estoque: it.estoque,
-      });
-    });
-  });
-  const mapaItems = Array.from(allItems.values());
-      // Adicionar quantidade da RM para comparaÃ§Ã£o de divergÃªncia
-      mapaItems.forEach(mi => {
-        const rmItem = rm.itens.find(it => it.descricao && it.descricao.toLowerCase().trim() === mi.item.toLowerCase().trim());
-        mi.qtdRm = rmItem ? (parseFloat(rmItem.qtd) || 0) : 0;
-        mi.pesoRm = rmItem ? (parseFloat(rmItem.peso) || 0) : 0;
-        mi.codigoOmie = rmItem ? (rmItem.codigo || "") : "";
-      });
-
-  // Determine the winner for each item (lowest price, with manual override)
-  const getWinner = (mi) => {
-    const key = mi.item.toLowerCase().trim();
-    if (overrides[key]) return overrides[key];
-    const precos = mi.cotacoes.filter((c) => c.precoUnit > 0);
-    if (precos.length === 0) return null;
-    precos.sort((a, b) => a.precoUnit - b.precoUnit);
-    return precos[0].fornecedor;
+      if (!resp.ok || data.error) { showToast(`Erro Omie: ${data.error || "Erro desconhecido"}`, "error"); return; }
+      const novoPedido = { fornecedor: fornecedorNome, total: group.total, itensCount: group.itens.length, codigoPedido: data.codigo_pedido, numeroPedido: data.numero_pedido, codigoIntegracao: data.codigo_pedido_integracao, itens: group.itens };
+      setPedidosOmie((prev) => [...prev, novoPedido]);
+      updateRm({ status: "Pedido Gerado" });
+      setShowPedidos(true);
+      showToast(`Pedido criado no Omie! N: ${data.numero_pedido || data.codigo_pedido}`);
+    } catch (err) { showToast("Erro ao criar pedido: " + err.message, "error"); }
+    finally { setCriandoPedido(false); }
   };
 
-  const setWinner = (itemKey, fornecedor) => {
-    setOverrides((prev) => ({ ...prev, [itemKey]: fornecedor }));
+  const criarTodosPedidosOmie = async () => {
+    const groups = Object.keys(pedidosPorFornecedor);
+    if (groups.length === 0) return showToast("Nenhum item selecionado no mapa", "error");
+    for (const fornecedorNome of groups) { await criarPedidoOmie(fornecedorNome); }
   };
 
-  // Group winning items by supplier for purchase orders
+    // Group winning items by supplier for purchase orders
   const pedidosPorFornecedor = useMemo(() => {
     if (mapaItems.length === 0) return {};
     const groups = {};
+    const rmItens = rm.itens || [];
     mapaItems.forEach((mi) => {
       const winner = getWinner(mi);
       if (!winner) return;
       const match = mi.cotacoes.find((c) => c.fornecedor === winner);
       if (!match) return;
+      // Match back to RM item to get codigo and unidade
+      const rmItem = rmItens.find(
+        (ri) => ri.descricao && ri.descricao.toLowerCase().trim() === mi.item.toLowerCase().trim()
+      );
       if (!groups[winner]) groups[winner] = { fornecedor: winner, itens: [], total: 0 };
       groups[winner].itens.push({
         item: mi.item,
+        descricao: mi.item,
+        codigo: rmItem?.codigo || "",
+        unidade: rmItem?.unidade || "KG",
         precoUnit: match.precoUnit,
         qtd: match.qtd,
         total: match.total,
@@ -484,48 +452,7 @@ export default function RmDetail({ params }) {
   }, [mapaItems, overrides]);
 
   // âââ GERAR PEDIDOS DE COMPRA (SPLIT POR FORNECEDOR) âââââ
-  const gerarPedidosOmie = () => {
-    const groups = Object.values(pedidosPorFornecedor);
-    if (groups.length === 0) return showToast("Nenhum item selecionado no mapa", "error");
-
-    const pedidos = groups.map((g) => ({
-      fornecedor: g.fornecedor,
-      total: g.total,
-      itensCount: g.itens.length,
-      payload: {
-        call: "IncluirPedidoCompra",
-        app_key: "SUA_APP_KEY",
-        app_secret: "SEU_APP_SECRET",
-        param: [
-          {
-            cabecalho: {
-              numero_pedido: `RM-${rm.numero}-${g.fornecedor.replace(/\s+/g, "").substring(0, 10)}`,
-              codigo_cliente_fornecedor: 0,
-              data_previsao: today(),
-              observacao: `${rm.descricao} â Fornecedor: ${g.fornecedor}`,
-            },
-            det: g.itens.map((it, idx) => ({
-              ide: { sequencia: idx + 1 },
-              produto: {
-                descricao: it.item,
-                quantidade: it.qtd,
-                valor_unitario: it.precoUnit,
-                valor_total: it.total,
-              },
-              observacao: `Prazo: ${it.prazoEntrega} | Cond: ${it.condicao}`,
-            })),
-            observacoes: { obs_venda: rm.observacao || "" },
-            total_pedido: { valor_total_pedido: g.total },
-          },
-        ],
-      },
-    }));
-
-    setPedidosOmie(pedidos);
-    updateRm({ status: "Pedido Gerado" });
-    setShowPedidos(true);
-    showToast(`${pedidos.length} pedido(s) de compra gerado(s)!`);
-  };
+  
 
   // âââ CONTAGENS POR FORNECEDOR NO MAPA âââââââââââââââââââ
   const winnerStats = useMemo(() => {
@@ -1133,10 +1060,14 @@ export default function RmDetail({ params }) {
           {/* BotÃ£o para gerar pedidos */}
           <div className="px-6 py-4 bg-purple-50/50 border-t border-purple-100 flex justify-end gap-3">
             <button
-              onClick={gerarPedidosOmie}
+              onClick={criarTodosPedidosOmie}
+              disabled={criandoPedido}
               className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2"
             >
-              <ShoppingCart size={18} /> Gerar Pedidos de Compra ({Object.keys(pedidosPorFornecedor).length} fornecedor{Object.keys(pedidosPorFornecedor).length !== 1 ? "es" : ""})
+              <ShoppingCart size={18} />
+              {criandoPedido
+                ? "Criando no Omie..."
+                : `Criar Pedido no Omie (${Object.keys(pedidosPorFornecedor).length} fornecedor${Object.keys(pedidosPorFornecedor).length !== 1 ? "es" : ""})`}
             </button>
           </div>
         </div>
@@ -1192,7 +1123,7 @@ export default function RmDetail({ params }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {pedido.payload.param[0].det.map((det, didx) => (
+                        {pedido.itens.map((det, didx) => (
                           <tr key={didx} className="hover:bg-gray-50">
                             <td className="px-4 py-2 text-gray-400">{det.ide.sequencia}</td>
                             <td className="px-4 py-2 text-gray-800 font-medium">{det.produto.descricao}</td>
@@ -1221,7 +1152,7 @@ export default function RmDetail({ params }) {
                         Ver JSON para API Omie
                       </summary>
                       <pre className="mt-2 bg-gray-900 text-green-400 rounded-lg p-4 text-xs overflow-x-auto max-h-60">
-                        {JSON.stringify(pedido.payload, null, 2)}
+                        {JSON.stringify(pedido, null, 2)}
                       </pre>
                       <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
                         <strong>Endpoint:</strong>{" "}
