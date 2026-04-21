@@ -38,11 +38,11 @@ export async function POST(request) {
           cCodIntPed: codigoPedidoIntegracao,
           dDtPrevisao: dataPrevisao,
           nCodFor: 0,
-          cNumPedido: ""
+          cNumPedido: "",
+            cObs: observacao || ""
         },
         produtos_incluir: produtos_incluir,
         frete_incluir: { nCodTransp: 0, cTpFrete: "9" },
-        observacoes_incluir: { cObsCompra: observacao || "" }
       }]
     };
 
