@@ -1,6 +1,26 @@
 import { NextResponse } from "next/server";
 
 const OMIE_URL = "https://app.omie.com.br/api/v1/produtos/pedidocompra/";
+const OMIE_PROD_URL = "https://app.omie.com.br/api/v1/geral/produtos/";
+
+async function resolverProduto(codigo, appKey, appSecret) {
+  try {
+    const resp = await fetch(OMIE_PROD_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        call: "ConsultarProduto",
+        app_key: appKey,
+        app_secret: appSecret,
+        param: [{ codigo: String(codigo) }]
+      })
+    });
+    const data = await resp.json();
+    return data.codigo_produto || 0;
+  } catch {
+    return 0;
+  }
+}
 
 export async function POST(request) {
   try {
@@ -19,15 +39,20 @@ export async function POST(request) {
     const hoje = new Date();
     const dataPrevisao = String(hoje.getDate()).padStart(2, "0") + "/" + String(hoje.getMonth() + 1).padStart(2, "0") + "/" + hoje.getFullYear();
 
-    const produtos_incluir = itens.map((item, idx) => ({
-      cCodIntItem: codigoPedidoIntegracao + "-" + (idx + 1),
-      nCodProd: Number(item.codigo) || 0,
-      cDescricao: item.descricao || "",
-      cUnidade: item.unidade || "KG",
-      nQtde: Number(item.qtd) || 0,
-      nValUnit: Number(item.precoUnit) || 0,
-      nDesconto: 0
-    }));
+    const produtos_incluir = [];
+    for (let idx = 0; idx < itens.length; idx++) {
+      const item = itens[idx];
+      const nCodProd = await resolverProduto(item.codigo, appKey, appSecret);
+      produtos_incluir.push({
+        cCodIntItem: codigoPedidoIntegracao + "-" + (idx + 1),
+        nCodProd: nCodProd,
+        cDescricao: item.descricao || "",
+        cUnidade: item.unidade || "KG",
+        nQtde: Number(item.qtd) || 0,
+        nValUnit: Number(item.precoUnit) || 0,
+        nDesconto: 0
+      });
+    }
 
     const payload = {
       call: "IncluirPedCompra",
@@ -39,10 +64,10 @@ export async function POST(request) {
           dDtPrevisao: dataPrevisao,
           nCodFor: nCodFor || 0,
           cNumPedido: "",
-            cObs: observacao || ""
+          cObs: observacao || ""
         },
         produtos_incluir: produtos_incluir,
-        frete_incluir: { nCodTransp: 0, cTpFrete: "9" },
+        frete_incluir: { nCodTransp: 0, cTpFrete: "9" }
       }]
     };
 
