@@ -416,7 +416,10 @@ export default function RmDetail({ params }) {
       "Por favor, enviar cotação com preços unitários, condições de pagamento e prazo de entrega.\n\n" +
       "Atenciosamente,\nTorg Metal"
     );
-    window.open("mailto:" + emails + "?subject=" + assunto + "&body=" + corpo, "_blank");
+    const mailUrl = "mailto:" + emails + "?subject=" + assunto + "&body=" + corpo;
+    const a = document.createElement("a");
+    a.href = mailUrl;
+    a.click();
     const novosEnvios = selectedFornecedores.map(fornId => {
       const forn = fornecedores.find(f => f.id === fornId);
       return {
