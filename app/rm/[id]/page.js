@@ -1,3 +1,4 @@
+app/rm/[id]/page.js
 "use client";
 import { useState, useRef, Fragment, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -360,7 +361,7 @@ export default function RmDetail({ params }) {
     });
     const mapaItems = Array.from(allItems.values());
     const wsData = [["Item RM", "CÃ³d. Omie", "Qtd Barras", "Peso RM (kg)", "Un RM", "Fornecedor", "Descri\u00e7\u00e3o Proposta", "Qtd (kg)", "Pre\u00e7o/kg", "Total R$", "Condi\u00e7\u00e3o", "Prazo", "Alerta Engenharia"]];
-    mapaArr.forEach(mi => {
+    mapaItems.forEach(mi => {
       const rmItem = (rm.itens || []).find(it => (it.descricao || "").toLowerCase().trim() === mi.item.toLowerCase().trim());
       mi.cotacoes.forEach(c => {
         const alerta = alertasEng.filter(a => a.item.toLowerCase().includes(mi.item.toLowerCase().split(" ").slice(-1)[0])).map(a => a.msg).join("; ");
