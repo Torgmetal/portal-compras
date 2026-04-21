@@ -1,4 +1,3 @@
-app/rm/[id]/page.js
 "use client";
 import { useState, useRef, Fragment, useMemo } from "react";
 import { useRouter } from "next/navigation";
