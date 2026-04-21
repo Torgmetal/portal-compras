@@ -248,6 +248,30 @@ export default function RmDetail({ params }) {
   const removeAnexo = (anexoId) => { updateRm({ anexos: (rm.anexos || []).filter((a) => a.id !== anexoId) }); showToast("Anexo removido"); };
   const removeCotacao = (cotId) => { updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) }); showToast("CotaÃ§Ã£o removida"); };
 
+  const cotacoes = rm.cotacoes || [];
+  const allItems = new Map();
+  cotacoes.forEach((cot) => {
+    (cot.itens || []).forEach((it) => {
+      const key = it.item.toLowerCase().trim();
+      if (!allItems.has(key)) allItems.set(key, { item: it.item, cotacoes: [] });
+      allItems.get(key).cotacoes.push({ fornecedor: cot.fornecedor, precoUnit: it.precoUnit, qtd: it.qtd, total: it.precoUnit * it.qtd });
+    });
+  });
+  const mapaItems = Array.from(allItems.values());
+
+  const getWinner = (mi) => {
+    const key = mi.item.toLowerCase().trim();
+    if (overrides[key]) return overrides[key];
+    const precos = mi.cotacoes.filter((c) => c.precoUnit > 0);
+    if (precos.length === 0) return null;
+    precos.sort((a, b) => a.precoUnit - b.precoUnit);
+    return precos[0].fornecedor;
+  };
+
+  const setWinner = (itemKey, fornecedor) => {
+    setOverrides((prev) => ({ ...prev, [itemKey]: fornecedor }));
+  };
+
   // âââ MAPA DE COTAÃÃO âââââââââââââââââââââââââââââââââââââ
   // --- Parse PDF proposal into cotacao format ---
   const parsePdfCotacao = async (anexo) => {
