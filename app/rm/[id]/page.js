@@ -27,6 +27,7 @@ export default function RmDetail({ params }) {
   const [overrides, setOverrides] = useState({});
   const [expandedPedido, setExpandedPedido] = useState(null);
   const [selectedFornecedores, setSelectedFornecedores] = useState([]);
+  const [alertasEng, setAlertasEng] = useState([]);
 
   const rmFound = rms.find((r) => r.id === id);
   const rm = rmFound || { itens: [], cotacoes: [], envios: [], anexos: [], status: "", numero: "", descricao: "", observacao: "", data: "", op: "", tipo: "", id: null };
@@ -245,12 +246,145 @@ export default function RmDetail({ params }) {
   const removeCotacao = (cotId) => { updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) }); showToast("Cotação removida"); };
 
   // ─── MAPA DE COTAÇÃO ─────────────────────────────────────
-  const gerarMapa = () => {
-    if ((rm.cotacoes || []).length < 2) return showToast("Suba pelo menos 2 cotações para gerar o mapa", "error");
-    updateRm({ status: "Cotada", mapaGerado: true });
+  // --- Parse PDF proposal into cotacao format ---
+  const parsePdfCotacao = async (anexo) => {
+    if (!window.pdfjsLib) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    const pdfjsLib = window.pdfjsLib;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const base64 = anexo.dataUrl.split(",")[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+    let fullText = "";
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const content = await page.getTextContent();
+      fullText += content.items.map(x => x.str).join(" ") + "\n";
+    }
+    // Parse items from PDF text (Gerdau format and generic)
+    const items = [];
+    const regex = /(\d+)\s+(PF [IH] [\w,.]+|CANT [\d/X\.]+)\s+([A-Z0-9]+)\s+(\d+M)\s+FX[\d,]+T\s+([\d.,]+)\s+KG\s+[\d.,]+\s+KG\s+\d+\/\d+\/\d+\s+([\d.,]+)\s+BRL\/KG[\s\S]*?([\d.,]+)\s+BRL/g;
+    let m;
+    while ((m = regex.exec(fullText)) !== null) {
+      const qtdKg = parseFloat(m[5].replace(/\./g,"").replace(",","."));
+      const precoKg = parseFloat(m[6].replace(/\./g,"").replace(",","."));
+      const totalBrl = parseFloat(m[7].replace(/\./g,"").replace(",","."));
+      // Normalize description to match RM format
+      let desc = m[2].replace("PF I ", "PERFIL W").replace("PF H ", "PERFIL W").replace(",",".");
+      desc = desc.replace("CANT ", "CANTONEIRA ");
+      items.push({
+        item: desc,
+        precoUnit: precoKg,
+        qtd: qtdKg,
+        total: totalBrl,
+        prazoEntrega: "30/45/60 dias",
+        condicao: "CIF",
+        estoque: "",
+        _pdfOrigDesc: m[2],
+        _pdfMaterial: m[3],
+        _pdfComprimento: m[4],
+        _pdfQtdKg: qtdKg,
+        _pdfPrecoKg: precoKg,
+        _unidade: "KG",
+      });
+    }
+    return { fornecedor: anexo.fornecedor || "Fornecedor PDF", itens: items };
+  };
+
+  const gerarMapa = async () => {
+    const hasCotacoes = rm.cotacoes && rm.cotacoes.length > 0;
+    const hasAnexosPdf = rm.anexos && rm.anexos.some(a => a.tipo === "pdf" && a.dataUrl);
+    if (!hasCotacoes && !hasAnexosPdf) return showToast("Suba pelo menos uma cota\u00e7\u00e3o (planilha ou PDF)", "error");
+    // Parse PDF annexos into cotacao format
+    const pdfCotacoes = [];
+    const alertas = [];
+    if (hasAnexosPdf) {
+      for (const anexo of rm.anexos.filter(a => a.tipo === "pdf" && a.dataUrl)) {
+        try {
+          const parsed = await parsePdfCotacao(anexo);
+          pdfCotacoes.push(parsed);
+          // Check for alerts
+          const rmDescs = (rm.itens || []).map(it => (it.descricao || "").toUpperCase().trim());
+          // Items in RM but not in PDF
+          rmDescs.forEach(rd => {
+            const found = parsed.itens.some(pi => rd.includes(pi.item.split(" ").slice(-1)[0]) || pi.item.toUpperCase().includes(rd.split(" ").slice(-1)[0]));
+            if (!found && rd) alertas.push({ tipo: "sem_cotacao", item: rd, msg: "Item sem cota\u00e7\u00e3o no PDF: " + rd });
+          });
+          // Check type mismatches (PF I vs PF H)
+          parsed.itens.forEach(pi => {
+            if (pi._pdfOrigDesc && pi._pdfOrigDesc.startsWith("PF H")) {
+              alertas.push({ tipo: "tipo_diferente", item: pi.item, msg: pi.item + " cotado como PF H (perfil H) - verificar com engenharia" });
+            }
+          });
+          // Check length differences
+          parsed.itens.forEach(pi => {
+            if (pi._pdfComprimento) {
+              const rmItem = (rm.itens || []).find(it => {
+                const rd = (it.descricao || "").toUpperCase();
+                const pd = pi.item.toUpperCase();
+                return rd.includes(pd.split(" ").slice(-1)[0]) || pd.includes(rd.split(" ").slice(-1)[0]);
+              });
+              if (rmItem && rmItem.comprimento && rmItem.comprimento !== pi._pdfComprimento) {
+                alertas.push({ tipo: "comprimento", item: pi.item, msg: pi.item + " - comprimento RM: " + rmItem.comprimento + " vs Proposta: " + pi._pdfComprimento });
+              }
+            }
+          });
+        } catch (e) { showToast("Erro ao ler PDF: " + e.message, "error"); }
+      }
+    }
+    // Store PDF cotacoes merged with existing cotacoes
+    if (pdfCotacoes.length) {
+      updateRm({ cotacoes: [...(rm.cotacoes || []), ...pdfCotacoes], status: rm.status === "Aberta" || rm.status === "Em Cota\u00e7\u00e3o" ? "Cotada" : rm.status, mapaGerado: true });
+    } else {
+      updateRm({ status: "Cotada", mapaGerado: true });
+    }
+    setAlertasEng(alertas);
     setShowMapa(true);
   };
 
+
+  const gerarXlsxMapa = async () => {
+    const XLSX = await import("xlsx");
+    const cotacoes = rm.cotacoes || [];
+    const allItems = new Map();
+    cotacoes.forEach(cot => {
+      (cot.itens || []).forEach(it => {
+        const key = (it.item || "").toLowerCase().trim();
+        if (!allItems.has(key)) allItems.set(key, { item: it.item, cotacoes: [] });
+        allItems.get(key).cotacoes.push({ fornecedor: cot.fornecedor, precoUnit: it.precoUnit, qtd: it.qtd, total: it.total || (it.precoUnit * it.qtd), condicao: it.condicao, prazo: it.prazoEntrega, unidade: it._unidade || "" });
+      });
+    });
+    const mapaArr = Array.from(allItems.values());
+    const wsData = [["Item RM", "Qtd RM", "Un RM", "Fornecedor", "Descri\u00e7\u00e3o Proposta", "Qtd (kg)", "Pre\u00e7o/kg", "Total R$", "Condi\u00e7\u00e3o", "Prazo", "Alerta Engenharia"]];
+    mapaArr.forEach(mi => {
+      const rmItem = (rm.itens || []).find(it => (it.descricao || "").toLowerCase().trim() === mi.item.toLowerCase().trim());
+      mi.cotacoes.forEach(c => {
+        const alerta = alertasEng.filter(a => a.item.toLowerCase().includes(mi.item.toLowerCase().split(" ").slice(-1)[0])).map(a => a.msg).join("; ");
+        wsData.push([mi.item, rmItem ? rmItem.qtd : "", rmItem ? rmItem.unidade : "", c.fornecedor, c.unidade === "KG" ? "Pre\u00e7o por KG" : "", c.qtd, c.precoUnit, c.total, c.condicao, c.prazo, alerta]);
+      });
+    });
+    // Add items without quotation
+    (rm.itens || []).forEach(it => {
+      const key = (it.descricao || "").toLowerCase().trim();
+      if (!allItems.has(key)) {
+        wsData.push([it.descricao, it.qtd, it.unidade, "", "", "", "", "", "", "", "SEM COTA\u00c7\u00c3O"]);
+      }
+    });
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws["!cols"] = [{wch:25},{wch:8},{wch:8},{wch:20},{wch:18},{wch:12},{wch:12},{wch:14},{wch:10},{wch:18},{wch:35}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Mapa Cota\u00e7\u00e3o");
+    XLSX.writeFile(wb, "Mapa_Cotacao_RM-" + (rm.numero || rm.id) + ".xlsx");
+    showToast("Planilha do mapa exportada!");
+  };
   const cotacoes = rm.cotacoes || [];
   const anexos = rm.anexos || [];
 
@@ -746,6 +880,11 @@ export default function RmDetail({ params }) {
               >
                 <BarChart3 size={16} /> Gerar Mapa de Cotação
               </button>
+              {showMapa && (
+                <button onClick={gerarXlsxMapa} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                  <Download size={16} /> Exportar Mapa (.xlsx)
+                </button>
+              )}
             )}
           </div>
           <div className="overflow-x-auto">
@@ -796,6 +935,23 @@ export default function RmDetail({ params }) {
               </p>
             </div>
           </div>
+              {alertasEng.length > 0 && (
+                <div className="mx-6 mb-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
+                  <h4 className="text-sm font-semibold text-yellow-800 flex items-center gap-2 mb-2">
+                    <AlertCircle size={16} /> Alertas para Engenharia ({alertasEng.length})
+                  </h4>
+                  <ul className="space-y-1">
+                    {alertasEng.map((a, i) => (
+                      <li key={i} className="text-xs text-yellow-700 flex items-start gap-2">
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${a.tipo === "sem_cotacao" ? "bg-red-100 text-red-700" : a.tipo === "tipo_diferente" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
+                          {a.tipo === "sem_cotacao" ? "SEM COT." : a.tipo === "tipo_diferente" ? "TIPO DIF." : "COMPRIM."}
+                        </span>
+                        <span>{a.msg}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
           {/* Resumo por fornecedor vencedor */}
           <div className="px-6 py-4 bg-purple-50/50 border-b border-purple-100">
