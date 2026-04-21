@@ -880,12 +880,12 @@ export default function RmDetail({ params }) {
               >
                 <BarChart3 size={16} /> Gerar Mapa de Cotação
               </button>
+            )}
               {showMapa && (
                 <button onClick={gerarXlsxMapa} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
                   <Download size={16} /> Exportar Mapa (.xlsx)
                 </button>
               )}
-            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
