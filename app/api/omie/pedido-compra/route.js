@@ -19,41 +19,30 @@ export async function POST(request) {
     const hoje = new Date();
     const dataPrevisao = String(hoje.getDate()).padStart(2, "0") + "/" + String(hoje.getMonth() + 1).padStart(2, "0") + "/" + hoje.getFullYear();
 
-    const det = itens.map((item, idx) => ({
-      ide: { codigo_item_integracao: codigoPedidoIntegracao + "-" + (idx + 1) },
-      produto: {
-        codigo_produto: Number(item.codigo) || 0,
-        descricao: item.descricao || "",
-        quantidade: Number(item.qtd) || 0,
-        valor_unitario: Number(item.precoUnit) || 0,
-        tipo_desconto: "V",
-        valor_desconto: 0,
-        unidade: item.unidade || "KG"
-      }
+    const produtos_incluir = itens.map((item, idx) => ({
+      cCodIntItem: codigoPedidoIntegracao + "-" + (idx + 1),
+      nCodProd: Number(item.codigo) || 0,
+      cDescricao: item.descricao || "",
+      cUnidade: item.unidade || "KG",
+      nQtde: Number(item.qtd) || 0,
+      nValUnit: Number(item.precoUnit) || 0,
+      nDesconto: 0
     }));
 
     const payload = {
-      call: "IncluirPedidoCompra",
+      call: "IncluirPedCompra",
       app_key: appKey,
       app_secret: appSecret,
       param: [{
-        cabecalho: {
-          codigo_pedido_integracao: codigoPedidoIntegracao,
-          numero_pedido: "",
-          codigo_cliente_fornecedor: 0,
-          data_previsao: dataPrevisao,
-          quantidade_itens: itens.length,
-          etapa: "10"
+        cabecalho_incluir: {
+          cCodIntPed: codigoPedidoIntegracao,
+          dDtPrevisao: dataPrevisao,
+          nCodFor: 0,
+          cNumPedido: ""
         },
-        det: det,
-        frete: { modalidade: "9" },
-        observacoes: { obs_venda: observacao || "" },
-        informacoes_adicionais: {
-          codigo_categoria: "",
-          codigo_conta_corrente: 0,
-          consumidor_final: "N",
-          utilizar_emails: "N"
-        }
+        produtos_incluir: produtos_incluir,
+        frete_incluir: { nCodTransp: 0, cCIF_FOB: "9" },
+        observacoes_incluir: { cObsCompra: observacao || "" }
       }]
     };
 
@@ -71,9 +60,9 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      codigo_pedido: data.codigo_pedido || data.numero_pedido || "",
+      codigo_pedido: data.nCodPed || "",
       codigo_pedido_integracao: codigoPedidoIntegracao,
-      numero_pedido: data.numero_pedido || "",
+      numero_pedido: data.cNumero || data.cNumPedido || "",
       omie_response: data
     });
   } catch (err) {
