@@ -10,7 +10,7 @@ export default function Fornecedores() {
   const { fornecedores, setFornecedores, showToast } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", categorias: [] });
+  const [form, setForm] = useState({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", nCodOmie: "", parcelas: "", categorias: [] });
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const toggleCat = (cat) => {
@@ -32,7 +32,7 @@ export default function Fornecedores() {
     }
     setShowForm(false);
     setEditingId(null);
-    setForm({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", categorias: [] });
+    setForm({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", categorias: [] });
     showToast(editingId ? "Fornecedor atualizado!" : "Fornecedor cadastrado!");
   };
 
@@ -46,7 +46,7 @@ export default function Fornecedores() {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">Fornecedores</h2>
         <button
-          onClick={() => { if (showForm) { setShowForm(false); setEditingId(null); setForm({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", categorias: [] }); } else { setShowForm(true); } }}
+          onClick={() => { if (showForm) { setShowForm(false); setEditingId(null); setForm({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", categorias: [] }); } else { setShowForm(true); } }}
           className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
         >
           <PlusCircle size={18} /> Novo Fornecedor
@@ -71,6 +71,14 @@ export default function Fornecedores() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
               <input type="text" value={form.telefone} onChange={(e) => set("telefone", e.target.value)} placeholder="(00) 00000-0000" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Codigo Omie (nCodFor)</label>
+              <input type="text" value={form.nCodOmie} onChange={(e) => set("nCodOmie", e.target.value)} placeholder="Ex: 7318285259" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Parcelas (Cond. Pagamento)</label>
+              <input type="number" min="1" value={form.parcelas} onChange={(e) => set("parcelas", e.target.value)} placeholder="Ex: 3" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
           </div>
           <div>
@@ -106,7 +114,7 @@ export default function Fornecedores() {
             </div>
           </div>
           <div className="flex justify-end gap-3">
-            <button onClick={() => { setShowForm(false); setEditingId(null); setForm({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", categorias: [] }); }} className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">Cancelar</button>
+            <button onClick={() => { setShowForm(false); setEditingId(null); setForm({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", categorias: [] }); }} className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">Cancelar</button>
             <button onClick={salvar} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">{editingId ? "Atualizar" : "Salvar"}</button>
           </div>
         </div>
@@ -126,6 +134,8 @@ export default function Fornecedores() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CNPJ</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">E-mail</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telefone</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cód. Omie</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parcelas</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categorias</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
@@ -137,6 +147,8 @@ export default function Fornecedores() {
                     <td className="px-6 py-3 text-gray-600 font-mono text-xs">{f.cnpj || "—"}</td>
                     <td className="px-6 py-3 text-gray-600">{f.email || "—"}</td>
                     <td className="px-6 py-3 text-gray-600">{f.telefone || "—"}</td>
+                    <td className="px-6 py-3 text-gray-600 font-mono text-xs">{f.nCodOmie || "—"}</td>
+                    <td className="px-6 py-3 text-gray-600">{f.parcelas || "—"}</td>
                     <td className="px-6 py-3">
                       <div className="flex gap-1 flex-wrap">
                         {(f.categorias || []).map((c) => (
