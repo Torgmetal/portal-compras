@@ -145,8 +145,6 @@ export default function Fornecedores() {
                       </div>
                     </td>
                     <td className="px-6 py-3">
-                      <button onClick={() => remover(f.id)} className="text-red-400 hover:text-red-600">
-                        <Pencil size={16} /></button>
                     <button onClick={() => editar(f)} className="text-blue-500 hover:text-blue-700 mr-2"><Pencil size={16} /></button>
                     <button onClick={() => remover(f.id)} className="text-red-500 hover:text-red-700"><Trash2 size={16} />
                       </button>
