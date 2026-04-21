@@ -12,8 +12,8 @@ async function resolverProduto(codigo, appKey, appSecret) {
         call: "ConsultarProduto",
         app_key: appKey,
         app_secret: appSecret,
-        param: [{ codigo: String(codigo) }]
-      })
+        param: [{ codigo: String(codigo) }],
+      }),
     });
     const data = await resp.json();
     return data.codigo_produto || 0;
@@ -24,7 +24,15 @@ async function resolverProduto(codigo, appKey, appSecret) {
 
 export async function POST(request) {
   try {
-    const { itens, observacao, nCodFor } = await request.json();
+    const {
+      itens,
+      observacao,
+      nCodFor,
+      cNumPedido,
+      nQtdeParc,
+      cInfAdic,
+    } = await request.json();
+
     if (!itens || !itens.length) {
       return NextResponse.json({ error: "Nenhum item informado" }, { status: 400 });
     }
@@ -32,12 +40,17 @@ export async function POST(request) {
     const appKey = process.env.OMIE_APP_KEY;
     const appSecret = process.env.OMIE_APP_SECRET;
     if (!appKey || !appSecret) {
-      return NextResponse.json({ error: "Credenciais Omie n\u00e3o configuradas" }, { status: 500 });
+      return NextResponse.json({ error: "Credenciais Omie não configuradas" }, { status: 500 });
     }
 
     const codigoPedidoIntegracao = "PC-" + Date.now();
     const hoje = new Date();
-    const dataPrevisao = String(hoje.getDate()).padStart(2, "0") + "/" + String(hoje.getMonth() + 1).padStart(2, "0") + "/" + hoje.getFullYear();
+    const dataPrevisao =
+      String(hoje.getDate()).padStart(2, "0") +
+      "/" +
+      String(hoje.getMonth() + 1).padStart(2, "0") +
+      "/" +
+      hoje.getFullYear();
 
     const produtos_incluir = [];
     for (let idx = 0; idx < itens.length; idx++) {
@@ -50,7 +63,7 @@ export async function POST(request) {
         cUnidade: item.unidade || "KG",
         nQtde: Number(item.qtd) || 0,
         nValUnit: Number(item.precoUnit) || 0,
-        nDesconto: 0
+        nDesconto: 0,
       });
     }
 
@@ -58,29 +71,40 @@ export async function POST(request) {
       call: "IncluirPedCompra",
       app_key: appKey,
       app_secret: appSecret,
-      param: [{
-        cabecalho_incluir: {
-          cCodIntPed: codigoPedidoIntegracao,
-          dDtPrevisao: dataPrevisao,
-          nCodFor: nCodFor || 0,
-          cNumPedido: "",
-          cObs: observacao || ""
+      param: [
+        {
+          cabecalho_incluir: {
+            cCodIntPed: codigoPedidoIntegracao,
+            dDtPrevisao: dataPrevisao,
+            nCodFor: nCodFor || 0,
+            cNumPedido: cNumPedido || "",
+            cCodCateg: "2.01.02",
+            cObsInt: observacao || "",
+            nQtdeParc: Number(nQtdeParc) || 1,
+            cInfAdic: cInfAdic || "",
+          },
+          produtos_incluir: produtos_incluir,
+          frete_incluir: { nCodTransp: 0, cTpFrete: "9" },
         },
-        produtos_incluir: produtos_incluir,
-        frete_incluir: { nCodTransp: 0, cTpFrete: "9" }
-      }]
+      ],
     };
 
     const resp = await fetch(OMIE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
-
     const data = await resp.json();
 
     if (data.faultstring) {
-      return NextResponse.json({ error: data.faultstring, codigo_pedido_integracao: codigoPedidoIntegracao }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: data.faultstring,
+          codigo_pedido_integracao: codigoPedidoIntegracao,
+          payload_enviado: payload,
+        },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({
@@ -88,7 +112,7 @@ export async function POST(request) {
       codigo_pedido: data.nCodPed || "",
       codigo_pedido_integracao: codigoPedidoIntegracao,
       numero_pedido: data.cNumero || data.cNumPedido || "",
-      omie_response: data
+      omie_response: data,
     });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
