@@ -312,7 +312,7 @@ export default function RmDetail({ params }) {
           const parsed = await parsePdfCotacao(anexo);
           pdfCotacoes.push(parsed);
           // Check for alerts
-          const rmDescs = (rm.itens || []).map(it => (it.descricao || "").toUpperCase().trim());
+          const rmDescs = (rm.itens || []).map(it => (it.descricao || "").toUpperCase().trim().replace(/"/g, ""));
           // Items in RM but not in PDF
           rmDescs.forEach(rd => {
             const found = parsed.itens.some(pi => rd.includes(pi.item.split(" ").slice(-1)[0]) || pi.item.toUpperCase().includes(rd.split(" ").slice(-1)[0]));
@@ -322,7 +322,7 @@ export default function RmDetail({ params }) {
           parsed.itens.forEach(pi => {
             if (pi._pdfComprimento) {
               const rmItem = (rm.itens || []).find(it => {
-                const rd = (it.descricao || "").toUpperCase();
+                const rd = (it.descricao || "").toUpperCase().replace(/"/g, "");
                 const pd = pi.item.toUpperCase();
                 return rd.includes(pd.split(" ").slice(-1)[0]) || pd.includes(rd.split(" ").slice(-1)[0]);
               });
