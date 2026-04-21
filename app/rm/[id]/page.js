@@ -278,7 +278,7 @@ export default function RmDetail({ params }) {
       const precoKg = parseFloat(m[6].replace(/\./g,"").replace(",","."));
       const totalBrl = parseFloat(m[7].replace(/\./g,"").replace(",","."));
       // Normalize description to match RM format
-      let desc = m[2].replace("PF I ", "PERFIL W").replace("PF H ", "PERFIL W").replace(",",".");
+      let desc = m[2].replace("PF I ", "PERFIL ").replace("PF H ", "PERFIL ").replace(",",".");
       desc = desc.replace("CANT ", "CANTONEIRA ");
       items.push({
         item: desc,
