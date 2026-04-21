@@ -356,19 +356,19 @@ export default function RmDetail({ params }) {
       });
     });
     const mapaArr = Array.from(allItems.values());
-    const wsData = [["Item RM", "Qtd RM", "Un RM", "Fornecedor", "Descri\u00e7\u00e3o Proposta", "Qtd (kg)", "Pre\u00e7o/kg", "Total R$", "Condi\u00e7\u00e3o", "Prazo", "Alerta Engenharia"]];
+    const wsData = [["Item RM", "Cód. Omie", "Qtd Barras", "Peso RM (kg)", "Un RM", "Fornecedor", "Descri\u00e7\u00e3o Proposta", "Qtd (kg)", "Pre\u00e7o/kg", "Total R$", "Condi\u00e7\u00e3o", "Prazo", "Alerta Engenharia"]];
     mapaArr.forEach(mi => {
       const rmItem = (rm.itens || []).find(it => (it.descricao || "").toLowerCase().trim() === mi.item.toLowerCase().trim());
       mi.cotacoes.forEach(c => {
         const alerta = alertasEng.filter(a => a.item.toLowerCase().includes(mi.item.toLowerCase().split(" ").slice(-1)[0])).map(a => a.msg).join("; ");
-        wsData.push([mi.item, rmItem ? rmItem.qtd : "", rmItem ? rmItem.unidade : "", c.fornecedor, c.unidade === "KG" ? "Pre\u00e7o por KG" : "", c.qtd, c.precoUnit, c.total, c.condicao, c.prazo, alerta]);
+        wsData.push([mi.item, rmItem ? rmItem.codigo || "" : "", rmItem ? rmItem.qtd : "", rmItem ? rmItem.peso : "", rmItem ? rmItem.unidade : "", c.fornecedor, c.unidade === "KG" ? "Pre\u00e7o por KG" : "", c.qtd, c.precoUnit, c.total, c.condicao, c.prazo, alerta]);
       });
     });
     // Add items without quotation
     (rm.itens || []).forEach(it => {
       const key = (it.descricao || "").toLowerCase().trim();
       if (!allItems.has(key)) {
-        wsData.push([it.descricao, it.qtd, it.unidade, "", "", "", "", "", "", "", "SEM COTA\u00c7\u00c3O"]);
+        wsData.push([it.descricao, it.codigo || "", it.qtd, it.peso || "", it.unidade, "", "", "", "", "", "", "", "SEM COTA\u00c7\u00c3O"]);
       }
     });
     const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -403,6 +403,8 @@ export default function RmDetail({ params }) {
       mapaItems.forEach(mi => {
         const rmItem = rm.itens.find(it => it.descricao && it.descricao.toLowerCase().trim() === mi.item.toLowerCase().trim());
         mi.qtdRm = rmItem ? (parseFloat(rmItem.qtd) || 0) : 0;
+        mi.pesoRm = rmItem ? (parseFloat(rmItem.peso) || 0) : 0;
+        mi.codigoOmie = rmItem ? (rmItem.codigo || "") : "";
       });
 
   // Determine the winner for each item (lowest price, with manual override)
@@ -980,6 +982,9 @@ export default function RmDetail({ params }) {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 min-w-[200px]">Item</th>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cód. Omie</th>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Barras</th>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Peso (kg)</th>
                   {cotacoes.map((cot) => (
                     <th key={cot.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" colSpan={4}>
                       {cot.fornecedor}
@@ -989,6 +994,9 @@ export default function RmDetail({ params }) {
                 </tr>
                 <tr className="bg-gray-50">
                   <th className="px-4 py-2 sticky left-0 bg-gray-50"></th>
+                  <th className="px-3 py-2 text-xs text-gray-400 text-center"></th>
+                  <th className="px-3 py-2 text-xs text-gray-400 text-center"></th>
+                  <th className="px-3 py-2 text-xs text-gray-400 text-center"></th>
                   {cotacoes.map((cot) => (
                     <Fragment key={cot.id + "-sub"}>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Preço Un.</th>
@@ -1009,6 +1017,9 @@ export default function RmDetail({ params }) {
                   return (
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-gray-800 sticky left-0 bg-white min-w-[200px]">{mi.item}</td>
+                      <td className="px-3 py-3 text-center text-xs text-gray-500">{mi.codigoOmie}</td>
+                      <td className="px-3 py-3 text-center text-xs text-gray-700">{mi.qtdRm}</td>
+                      <td className="px-3 py-3 text-center text-xs text-gray-700">{mi.pesoRm ? mi.pesoRm.toLocaleString("pt-BR") : ""}</td>
                       {cotacoes.map((cot) => {
                         const match = mi.cotacoes.find((c) => c.fornecedor === cot.fornecedor);
                         const isLowest = match && match.precoUnit === menorPreco && match.precoUnit > 0;
