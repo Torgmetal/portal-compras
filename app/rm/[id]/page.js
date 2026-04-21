@@ -342,7 +342,7 @@ export default function RmDetail({ params }) {
     }
     // Store PDF cotacoes merged with existing cotacoes
     if (pdfCotacoes.length) {
-      updateRm({ cotacoes: [...(rm.cotacoes || []), ...pdfCotacoes], status: rm.status === "Aberta" || rm.status === "Em Cota\u00e7\u00e3o" ? "Cotada" : rm.status, mapaGerado: true });
+      updateRm({ cotacoes: [...(rm.cotacoes || []).filter(c => !pdfCotacoes.some(p => p.fornecedor === c.fornecedor)), ...pdfCotacoes], status: rm.status === "Aberta" || rm.status === "Em Cota\u00e7\u00e3o" ? "Cotada" : rm.status, mapaGerado: true });
     } else {
       updateRm({ status: "Cotada", mapaGerado: true });
     }
