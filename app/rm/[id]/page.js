@@ -318,13 +318,7 @@ export default function RmDetail({ params }) {
             const found = parsed.itens.some(pi => rd.includes(pi.item.split(" ").slice(-1)[0]) || pi.item.toUpperCase().includes(rd.split(" ").slice(-1)[0]));
             if (!found && rd) alertas.push({ tipo: "sem_cotacao", item: rd, msg: "Item sem cota\u00e7\u00e3o no PDF: " + rd });
           });
-          // Check type mismatches (PF I vs PF H)
-          parsed.itens.forEach(pi => {
-            if (pi._pdfOrigDesc && pi._pdfOrigDesc.startsWith("PF H")) {
-              alertas.push({ tipo: "tipo_diferente", item: pi.item, msg: pi.item + " cotado como PF H (perfil H) - verificar com engenharia" });
-            }
-          });
-          // Check length differences
+// Check length differences
           parsed.itens.forEach(pi => {
             if (pi._pdfComprimento) {
               const rmItem = (rm.itens || []).find(it => {
@@ -349,7 +343,6 @@ export default function RmDetail({ params }) {
     setAlertasEng(alertas);
     setShowMapa(true);
   };
-
 
   const gerarXlsxMapa = async () => {
     const XLSX = await import("xlsx");
