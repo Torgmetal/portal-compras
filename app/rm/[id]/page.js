@@ -393,17 +393,40 @@ export default function RmDetail({ params }) {
   };
 
   const enviarCotacao = () => {
-    if (selectedFornecedores.length === 0) return showToast("Selecione pelo menos um fornecedor", "error");
-    const novosEnvios = selectedFornecedores.map((fornId) => {
-      const forn = fornecedores.find((f) => f.id === fornId);
+    if (!selectedFornecedores.length) return showToast("Selecione pelo menos um fornecedor", "error");
+    const destinatarios = selectedFornecedores.map(fornId => {
+      const forn = fornecedores.find(f => f.id === fornId);
+      return forn;
+    }).filter(f => f && f.email);
+    if (!destinatarios.length) return showToast("Nenhum fornecedor selecionado possui e-mail cadastrado", "error");
+    const emails = destinatarios.map(f => f.email).join(";");
+    const assunto = encodeURIComponent("Solicitação de Cotação - RM " + (rm.numero || rm.id));
+    const itensTexto = (rm.itens || []).map((it, i) =>
+      (i + 1) + ". " + (it.descricao || "Item " + (i + 1)) + " - Qtd: " + (it.qtd || "-") + " " + (it.unidade || "un") + (it.material ? " - Material: " + it.material : "") + (it.comprimento ? " - Comp: " + it.comprimento : "")
+    ).join("\n");
+    const corpo = encodeURIComponent(
+      "Prezado(a) fornecedor(a),\n\n" +
+      "Gostaríamos de solicitar cotação para os itens abaixo:\n\n" +
+      "RM: " + (rm.numero || rm.id) + "\n" +
+      (rm.descricao ? "Descrição: " + rm.descricao + "\n" : "") +
+      (rm.solicitante ? "Solicitante: " + rm.solicitante + "\n" : "") +
+      "Data: " + (rm.data || today()) + "\n\n" +
+      "ITENS:\n" + itensTexto + "\n\n" +
+      (rm.observacao ? "Observações: " + rm.observacao + "\n\n" : "") +
+      "Por favor, enviar cotação com preços unitários, condições de pagamento e prazo de entrega.\n\n" +
+      "Atenciosamente,\nTorg Metal"
+    );
+    window.open("mailto:" + emails + "?subject=" + assunto + "&body=" + corpo, "_blank");
+    const novosEnvios = selectedFornecedores.map(fornId => {
+      const forn = fornecedores.find(f => f.id === fornId);
       return {
         id: uid(),
         fornecedorId: fornId,
-        fornecedorNome: forn?.nome || "—",
-        fornecedorEmail: forn?.email || "—",
+        fornecedorNome: forn.nome,
+        fornecedorEmail: forn.email,
         data: today(),
         hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        status: "Enviado (simulado)",
+        status: "Enviado",
       };
     });
     updateRm({
@@ -411,7 +434,7 @@ export default function RmDetail({ params }) {
       status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
     });
     setSelectedFornecedores([]);
-    showToast(`Cotação enviada para ${novosEnvios.length} fornecedor(es)! (simulado)`);
+    showToast("E-mail aberto para " + novosEnvios.length + " fornecedor(es)");
   };
 
   const gerarXlsxItens = async () => {
