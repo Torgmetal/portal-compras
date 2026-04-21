@@ -249,6 +249,7 @@ export default function RmDetail({ params }) {
   const removeCotacao = (cotId) => { updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) }); showToast("CotaÃ§Ã£o removida"); };
 
   const cotacoes = rm.cotacoes || [];
+  const anexos = rm.anexos || [];
   const allItems = new Map();
   cotacoes.forEach((cot) => {
     (cot.itens || []).forEach((it) => {
