@@ -182,64 +182,87 @@ export default function RmDetail({ params }) {
 
   const matchPdfPrices = (text, rmItens) => {
     const result = [];
-    const lines = text.split("\n");
-    const allText = text.toUpperCase();
+    const fullText = text.replace(/---PAGE \d+---/g, ' ').replace(/\n/g, ' ');
+    const stripZero = (s) => s.replace(/\.0$/, '');
     
+    // Split text into item blocks using sequence numbers (10, 20, 30...)
+    const itemRegex = /(?:^|\s)(\d{2,3})\s{2,}(?=\d{5,}|PF|PERFIL|CANT|CHAPA|BARRA|TUBO)/gi;
+    const positions = [];
+    let m;
+    while ((m = itemRegex.exec(fullText)) !== null) {
+      positions.push(m.index);
+    }
+    
+    const blocks = [];
+    for (let i = 0; i < positions.length; i++) {
+      const start = positions[i];
+      const end = i + 1 < positions.length ? positions[i + 1] : fullText.length;
+      blocks.push(fullText.substring(start, end).trim());
+    }
+    
+    const pdfItems = [];
+    for (const block of blocks) {
+      let normDesc = '';
+      const wMatch = block.match(/(?:PF\s*[IH]?\s+)?(?:PERFIL\s+)?W\s*H?\s*(\d{2,3})\s*X\s*(\d+[,.]?\d*)/i);
+      const cantMatch = block.match(/CANT(?:ONEIRA)?[\s]*(\d[\d.\/]*)\s*[Xx]\s*(\d[\d.\/]*)/i);
+      
+      if (wMatch) {
+        normDesc = stripZero('W' + wMatch[1] + 'X' + wMatch[2].replace(',', '.'));
+      } else if (cantMatch) {
+        normDesc = 'CANT' + cantMatch[1] + 'X' + cantMatch[2];
+      }
+      
+      const priceMatches = [...block.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})(?:\s*BRL)?/g)];
+      let totalPrice = 0;
+      if (priceMatches.length > 0) {
+        const last = priceMatches[priceMatches.length - 1][1];
+        totalPrice = parseFloat(last.replace(/\./g, '').replace(',', '.'));
+      }
+      
+      let qty = 1;
+      const qtyMatch = block.match(/Quantidade\s+(\d+)/i);
+      if (qtyMatch) qty = parseInt(qtyMatch[1]);
+      
+      if (normDesc && totalPrice > 0) {
+        pdfItems.push({ normDesc, totalPrice, qty });
+      }
+    }
+    
+    const usedPdf = new Set();
     rmItens.forEach((rmItem) => {
-      const desc = (rmItem.descricao || rmItem.item || "").toUpperCase().trim();
-      if (!desc) return;
+      const rmDesc = (rmItem.descricao || rmItem.item || '').toUpperCase().trim();
+      if (!rmDesc) return;
       
-      // Try to find this item in the PDF text
-      const words = desc.split(/\s+/).filter(w => w.length > 2);
-      let bestLine = "";
-      let bestScore = 0;
+      let rmNorm = '';
+      const rmW = rmDesc.match(/W\s*H?\s*(\d{2,3})\s*X\s*(\d+[,.]?\d*)/i);
+      const rmCant = rmDesc.match(/CANTONEIRA[\s]*(\d[\d.\/\"]*)[\"\s]*[Xx][\"\s]*(\d[\d.\/\"]*)/i);
       
-      lines.forEach((line) => {
-        const upper = line.toUpperCase();
-        let score = 0;
-        words.forEach(w => { if (upper.includes(w)) score++; });
-        if (score > bestScore && score >= Math.max(1, words.length * 0.5)) {
-          bestScore = score;
-          bestLine = line;
-        }
-      });
+      if (rmW) {
+        rmNorm = stripZero('W' + rmW[1] + 'X' + rmW[2].replace(',', '.'));
+      } else if (rmCant) {
+        rmNorm = 'CANT' + rmCant[1].replace(/"/g, '') + 'X' + rmCant[2].replace(/"/g, '');
+      }
       
-      if (bestLine) {
-        // Extract price from the matched line - look for currency patterns
-        const pricePatterns = [
-          /R\$\s*([\d.,]+)/g,
-          /([\d.]+,[\d]{2})(?!\d)/g,
-          /\b(\d{1,3}(?:\.\d{3})*,\d{2})\b/g,
-        ];
-        let price = 0;
-        let qtdCot = rmItem.qtd || 1;
-        
-        // Try to find quantity in the line
-        const qtyMatch = bestLine.match(new RegExp(desc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+(\\d+(?:[.,]\\d+)?)'));
-        if (qtyMatch) qtdCot = parseFloat(qtyMatch[1].replace(',', '.'));
-        
-        for (const pattern of pricePatterns) {
-          const matches = [...bestLine.matchAll(pattern)];
-          if (matches.length > 0) {
-            // Take the last number as price (usually unit price is last)
-            const lastMatch = matches[matches.length - 1][1];
-            price = parseFloat(lastMatch.replace(/\./g, '').replace(',', '.'));
-            break;
-          }
-        }
-        
-        if (price > 0) {
+      if (!rmNorm) return;
+      
+      for (let i = 0; i < pdfItems.length; i++) {
+        if (usedPdf.has(i)) continue;
+        if (pdfItems[i].normDesc === rmNorm) {
+          usedPdf.add(i);
+          const unitPrice = pdfItems[i].totalPrice / pdfItems[i].qty;
           result.push({
             item: rmItem.descricao || rmItem.item,
-            precoUnit: price,
-            qtd: qtdCot,
-            prazoEntrega: "\u2014",
-            condicao: "\u2014",
-            estoque: "\u2014",
+            precoUnit: Math.round(unitPrice * 100) / 100,
+            qtd: pdfItems[i].qty,
+            prazoEntrega: '\u2014',
+            condicao: '\u2014',
+            estoque: '\u2014',
           });
+          return;
         }
       }
     });
+    
     return result;
   };
 
