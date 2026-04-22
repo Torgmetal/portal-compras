@@ -185,18 +185,22 @@ export default function RmDetail({ params }) {
     const fullText = text.replace(/---PAGE \d+---/g, ' ').replace(/\n/g, ' ');
     const stripZero = (s) => s.replace(/\.0$/, '');
     
+    // Truncate at summary sections
+    const summaryIdx = fullText.search(/\bTOTAL\s+KG|\bPeso\s+total|\bValor\s+total|\bMensagem\b|\bDescarga\b|\bFique\s+atento/i);
+    const textToProcess = summaryIdx > 0 ? fullText.substring(0, summaryIdx) : fullText;
+    
     // Split text into item blocks using sequence numbers (10, 20, 30...)
     const itemRegex = /(?:^|\s)(\d{2,3})\s{2,}(?=\d{5,}|PF|PERFIL|CANT|CHAPA|BARRA|TUBO)/gi;
     const positions = [];
     let m;
-    while ((m = itemRegex.exec(fullText)) !== null) {
+    while ((m = itemRegex.exec(textToProcess)) !== null) {
       positions.push(m.index);
     }
     
     const blocks = [];
     for (let i = 0; i < positions.length; i++) {
       const start = positions[i];
-      const end = i + 1 < positions.length ? positions[i + 1] : fullText.length;
+      const end = i + 1 < positions.length ? positions[i + 1] : textToProcess.length;
       blocks.push(fullText.substring(start, end).trim());
     }
     
