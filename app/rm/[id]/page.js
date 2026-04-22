@@ -38,7 +38,7 @@ export default function RmDetail({ params }) {
     setRms((prev) => prev.map((r) => (r.id === rm.id ? { ...r, ...updates } : r)));
   };
 
-  // âââ FILE UPLOAD & PARSING (EXCEL/CSV) âââââââââââââââââââ
+  // ─── FILE UPLOAD & PARSING (EXCEL/CSV) ───────────────────
   const processFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
@@ -61,10 +61,10 @@ export default function RmDetail({ params }) {
           const keys = Object.keys(row);
           const find = (terms) => keys.find((k) => terms.some((t) => k.toLowerCase().includes(t)));
           return {
-            item: String(row[find(["item", "descri", "material", "produto", "nome"])] || row[keys[0]] || "â").trim(),
+            item: String(row[find(["item", "descri", "material", "produto", "nome"])] || row[keys[0]] || "—").trim(),
             precoUnit:
               parseFloat(
-                String(row[find(["pre", "unit", "valor unit", "vl unit", "vl. unit", "preco", "preÃ§o"])] || row[keys[1]] || "0")
+                String(row[find(["pre", "unit", "valor unit", "vl unit", "vl. unit", "preco", "preço"])] || row[keys[1]] || "0")
                   .replace(/[^\d.,]/g, "")
                   .replace(",", ".")
               ) || 0,
@@ -74,14 +74,14 @@ export default function RmDetail({ params }) {
                   .replace(/[^\d.,]/g, "")
                   .replace(",", ".")
               ) || 1,
-            prazoEntrega: String(row[find(["prazo", "entrega", "dias", "lead"])] || "â").trim(),
-            condicao: String(row[find(["cond", "pagamento", "pag", "forma"])] || "â").trim(),
-            estoque: String(row[find(["estoque", "disp", "disponib"])] || "â").trim(),
+            prazoEntrega: String(row[find(["prazo", "entrega", "dias", "lead"])] || "—").trim(),
+            condicao: String(row[find(["cond", "pagamento", "pag", "forma"])] || "—").trim(),
+            estoque: String(row[find(["estoque", "disp", "disponib"])] || "—").trim(),
           };
         };
 
-        const itens = dados.map(normalize).filter((d) => d.item !== "â" || d.precoUnit > 0);
-        if (itens.length === 0) return showToast("NÃ£o foi possÃ­vel ler itens da planilha. Verifique o formato.", "error");
+        const itens = dados.map(normalize).filter((d) => d.item !== "—" || d.precoUnit > 0);
+        if (itens.length === 0) return showToast("Não foi possível ler itens da planilha. Verifique o formato.", "error");
 
         const total = itens.reduce((s, it) => s + it.precoUnit * it.qtd, 0);
 
@@ -97,11 +97,11 @@ export default function RmDetail({ params }) {
 
         updateRm({
           cotacoes: [...(rm.cotacoes || []), novaCotacao],
-          status: rm.status === "Aberta" ? "Em CotaÃ§Ã£o" : rm.status,
+          status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
         });
 
         setCotFornecedor("");
-        showToast(`CotaÃ§Ã£o "${file.name}" importada com ${itens.length} itens!`);
+        showToast(`Cotação "${file.name}" importada com ${itens.length} itens!`);
       } catch (err) {
         showToast("Erro ao ler arquivo: " + err.message, "error");
       }
@@ -113,7 +113,7 @@ export default function RmDetail({ params }) {
   const handleFileUpload = (e) => { processFile(e.target.files[0]); e.target.value = ""; };
   const handleDrop = (e) => { e.preventDefault(); setDragActive(false); processFile(e.dataTransfer.files[0]); };
 
-  // âââ PDF/ANEXO UPLOAD ââââââââââââââââââââââââââââââââââââ
+  // ─── PDF/ANEXO UPLOAD ────────────────────────────────────
   const processPdf = async (file) => {
     if (!file) return;
     const fornecedorNome = cotFornecedor.trim() || "Fornecedor " + ((rm.cotacoes || []).length + 1);
@@ -246,7 +246,7 @@ export default function RmDetail({ params }) {
   const handlePdfUpload = (e) => { processPdf(e.target.files[0]); e.target.value = ""; };
   const handleDropPdf = (e) => { e.preventDefault(); setDragActivePdf(false); processPdf(e.dataTransfer.files[0]); };
   const removeAnexo = (anexoId) => { updateRm({ anexos: (rm.anexos || []).filter((a) => a.id !== anexoId) }); showToast("Anexo removido"); };
-  const removeCotacao = (cotId) => { updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) }); showToast("CotaÃ§Ã£o removida"); };
+  const removeCotacao = (cotId) => { updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) }); showToast("Cotação removida"); };
 
   const cotacoes = rm.cotacoes || [];
   const anexos = rm.anexos || [];
@@ -273,7 +273,7 @@ export default function RmDetail({ params }) {
     setOverrides((prev) => ({ ...prev, [itemKey]: fornecedor }));
   };
 
-  // âââ MAPA DE COTAÃÃO âââââââââââââââââââââââââââââââââââââ
+  // ─── MAPA DE COTAÇÃO ─────────────────────────────────────
   // --- Parse PDF proposal into cotacao format ---
   const parsePdfCotacao = async (anexo) => {
     if (!window.pdfjsLib) {
@@ -384,7 +384,7 @@ export default function RmDetail({ params }) {
       });
     });
     const mapaItems = Array.from(allItems.values());
-    const wsData = [["Item RM", "CÃ³d. Omie", "Qtd Barras", "Peso RM (kg)", "Un RM", "Fornecedor", "Descri\u00e7\u00e3o Proposta", "Qtd (kg)", "Pre\u00e7o/kg", "Total R$", "Condi\u00e7\u00e3o", "Prazo", "Alerta Engenharia"]];
+    const wsData = [["Item RM", "Cód. Omie", "Qtd Barras", "Peso RM (kg)", "Un RM", "Fornecedor", "Descri\u00e7\u00e3o Proposta", "Qtd (kg)", "Pre\u00e7o/kg", "Total R$", "Condi\u00e7\u00e3o", "Prazo", "Alerta Engenharia"]];
     mapaItems.forEach(mi => {
       const rmItem = (rm.itens || []).find(it => (it.descricao || "").toLowerCase().trim() === mi.item.toLowerCase().trim());
       mi.cotacoes.forEach(c => {
@@ -476,10 +476,10 @@ export default function RmDetail({ params }) {
     return groups;
   }, [mapaItems, overrides]);
 
-  // âââ GERAR PEDIDOS DE COMPRA (SPLIT POR FORNECEDOR) âââââ
+  // ─── GERAR PEDIDOS DE COMPRA (SPLIT POR FORNECEDOR) ─────
   
 
-  // âââ CONTAGENS POR FORNECEDOR NO MAPA âââââââââââââââââââ
+  // ─── CONTAGENS POR FORNECEDOR NO MAPA ───────────────────
   const winnerStats = useMemo(() => {
     const stats = {};
     mapaItems.forEach((mi) => {
@@ -499,13 +499,13 @@ export default function RmDetail({ params }) {
   if (!rmFound) {
     return (
       <div className="p-12 text-center">
-        <div className="text-gray-500 text-lg">RM nÃ£o encontrada</div>
+        <div className="text-gray-500 text-lg">RM não encontrada</div>
         <button onClick={() => router.push("/")} className="mt-4 text-blue-600 hover:underline">Voltar ao Painel</button>
       </div>
     );
   }
 
-  // âââ ENVIO DE COTAÃÃO (SIMULADO) ââââââââââââââââââââââ
+  // ─── ENVIO DE COTAÇÃO (SIMULADO) ──────────────────────
   const toggleFornecedor = (fornId) => {
     setSelectedFornecedores((prev) =>
       prev.includes(fornId) ? prev.filter((id) => id !== fornId) : [...prev, fornId]
@@ -520,20 +520,20 @@ export default function RmDetail({ params }) {
     }).filter(f => f && f.email);
     if (!destinatarios.length) return showToast("Nenhum fornecedor selecionado possui e-mail cadastrado", "error");
     const emails = destinatarios.map(f => f.email).join(";");
-    const assunto = encodeURIComponent("SolicitaÃ§Ã£o de CotaÃ§Ã£o - RM " + (rm.numero || rm.id));
+    const assunto = encodeURIComponent("Solicitação de Cotação - RM " + (rm.numero || rm.id));
     const itensTexto = (rm.itens || []).map((it, i) =>
       (i + 1) + ". " + (it.descricao || "Item " + (i + 1)) + " - Qtd: " + (it.qtd || "-") + " " + (it.unidade || "un") + (it.material ? " - Material: " + it.material : "") + (it.comprimento ? " - Comp: " + it.comprimento : "")
     ).join("\n");
     const corpo = encodeURIComponent(
       "Prezado(a) fornecedor(a),\n\n" +
-      "GostarÃ­amos de solicitar cotaÃ§Ã£o para os itens abaixo:\n\n" +
+      "Gostaríamos de solicitar cotação para os itens abaixo:\n\n" +
       "RM: " + (rm.numero || rm.id) + "\n" +
-      (rm.descricao ? "DescriÃ§Ã£o: " + rm.descricao + "\n" : "") +
+      (rm.descricao ? "Descrição: " + rm.descricao + "\n" : "") +
       (rm.solicitante ? "Solicitante: " + rm.solicitante + "\n" : "") +
       "Data: " + (rm.data || today()) + "\n\n" +
       "ITENS:\n" + itensTexto + "\n\n" +
-      (rm.observacao ? "ObservaÃ§Ãµes: " + rm.observacao + "\n\n" : "") +
-      "Por favor, enviar cotaÃ§Ã£o com preÃ§os unitÃ¡rios, condiÃ§Ãµes de pagamento e prazo de entrega.\n\n" +
+      (rm.observacao ? "Observações: " + rm.observacao + "\n\n" : "") +
+      "Por favor, enviar cotação com preços unitários, condições de pagamento e prazo de entrega.\n\n" +
       "Atenciosamente,\nTorg Metal"
     );
     const mailUrl = "mailto:" + emails + "?subject=" + assunto + "&body=" + corpo;
@@ -554,7 +554,7 @@ export default function RmDetail({ params }) {
     });
     updateRm({
       envios: [...(rm.envios || []), ...novosEnvios],
-      status: rm.status === "Aberta" ? "Em CotaÃ§Ã£o" : rm.status,
+      status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
     });
     setSelectedFornecedores([]);
     showToast("E-mail aberto para " + novosEnvios.length + " fornecedor(es)");
@@ -563,7 +563,7 @@ export default function RmDetail({ params }) {
   const gerarXlsxItens = async () => {
     const XLSX = await import("xlsx");
     const wsData = [
-      ["#", "DescriÃ§Ã£o", "Qtd", "Unidade", "CÃ³digo", "Material", "Comprimento", "Peso (kg)"],
+      ["#", "Descrição", "Qtd", "Unidade", "Código", "Material", "Comprimento", "Peso (kg)"],
       ...(rm.itens || []).map((it, i) => [
         i + 1,
         it.descricao,
@@ -600,13 +600,13 @@ export default function RmDetail({ params }) {
         )}
         <button
           onClick={() => {
-            if (window.confirm("Tem certeza que deseja excluir a RM-" + rm.numero + "? Esta aÃ§Ã£o nÃ£o pode ser desfeita.")) {
+            if (window.confirm("Tem certeza que deseja excluir a RM-" + rm.numero + "? Esta ação não pode ser desfeita.")) {
               const rmNum = rm.numero;
               const rmId = rm.id;
               router.push("/");
               setTimeout(() => {
                 setRms((prev) => prev.filter((r) => r.id !== rmId));
-                showToast("RM-" + rmNum + " excluÃ­da com sucesso!");
+                showToast("RM-" + rmNum + " excluída com sucesso!");
               }, 100);
             }
           }}
@@ -621,8 +621,8 @@ export default function RmDetail({ params }) {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
           <div><span className="text-gray-500">Tipo:</span> <span className="font-medium ml-1">{rm.tipo}</span></div>
           <div><span className="text-gray-500">Data:</span> <span className="font-medium ml-1">{rm.data}</span></div>
-          <div><span className="text-gray-500">Solicitante:</span> <span className="font-medium ml-1">{rm.solicitante || "â"}</span></div>
-          <div><span className="text-gray-500">CotaÃ§Ãµes:</span> <span className="font-medium ml-1">{cotacoes.length} planilhas + {anexos.length} anexos</span></div>
+          <div><span className="text-gray-500">Solicitante:</span> <span className="font-medium ml-1">{rm.solicitante || "—"}</span></div>
+          <div><span className="text-gray-500">Cotações:</span> <span className="font-medium ml-1">{cotacoes.length} planilhas + {anexos.length} anexos</span></div>
         </div>
         <p className="mt-3 text-gray-700 font-medium">{rm.descricao}</p>
         {rm.observacao && <p className="mt-1 text-gray-500 text-sm">{rm.observacao}</p>}
@@ -632,7 +632,7 @@ export default function RmDetail({ params }) {
       {/* Itens da RM */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800">Itens da RequisiÃ§Ã£o ({(rm.itens || []).length})</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Itens da Requisição ({(rm.itens || []).length})</h3>
         </div>
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
           <table className="w-full text-sm">
@@ -658,15 +658,15 @@ export default function RmDetail({ params }) {
         </div>
       </div>
 
-      {/* âââââââââââ ENVIAR COTAÃÃO AOS FORNECEDORES âââââââââââ */}
+      {/* ═══════════ ENVIAR COTAÇÃO AOS FORNECEDORES ═══════════ */}
       <div className="bg-white rounded-xl shadow-sm border-2 border-blue-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-blue-100 bg-blue-50 flex justify-between items-center flex-wrap gap-3">
           <div>
             <h3 className="text-lg font-semibold text-blue-800 flex items-center gap-2">
-              <Mail size={20} /> Enviar CotaÃ§Ã£o aos Fornecedores
+              <Mail size={20} /> Enviar Cotação aos Fornecedores
             </h3>
             <p className="text-sm text-blue-600 mt-1">
-              Selecione os fornecedores e envie a requisiÃ§Ã£o para cotaÃ§Ã£o. A planilha de itens serÃ¡ anexada.
+              Selecione os fornecedores e envie a requisição para cotação. A planilha de itens será anexada.
             </p>
           </div>
           <button
@@ -731,19 +731,19 @@ export default function RmDetail({ params }) {
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
                   }`}
                 >
-                  <Send size={18} /> Enviar CotaÃ§Ã£o ({selectedFornecedores.length})
+                  <Send size={18} /> Enviar Cotação ({selectedFornecedores.length})
                 </button>
               </div>
             </>
           )}
         </div>
 
-        {/* HistÃ³rico de envios */}
+        {/* Histórico de envios */}
         {envios.length > 0 && (
           <div className="border-t border-blue-100">
             <div className="px-6 py-3 bg-blue-50/50">
               <h4 className="text-sm font-semibold text-blue-700 flex items-center gap-2">
-                <Clock size={14} /> HistÃ³rico de Envios ({envios.length})
+                <Clock size={14} /> Histórico de Envios ({envios.length})
               </h4>
             </div>
             <div className="divide-y divide-gray-100">
@@ -759,7 +759,7 @@ export default function RmDetail({ params }) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-gray-500">{envio.data} Ã s {envio.hora}</p>
+                    <p className="text-xs text-gray-500">{envio.data} às {envio.hora}</p>
                     <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{envio.status}</span>
                   </div>
                 </div>
@@ -769,11 +769,11 @@ export default function RmDetail({ params }) {
         )}
       </div>
 
-      {/* âââ UPLOAD DE PROPOSTAS âââââââââââââââââââââââââââ */}
+      {/* ─── UPLOAD DE PROPOSTAS ─────────────────────────── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">Incluir Propostas / CotaÃ§Ãµes</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Incluir Propostas / Cotações</h3>
         <p className="text-sm text-gray-500 mb-4">
-          Suba planilhas (.xlsx/.csv) para leitura automÃ¡tica de preÃ§os, ou PDFs de propostas recebidas como anexo.
+          Suba planilhas (.xlsx/.csv) para leitura automática de preços, ou PDFs de propostas recebidas como anexo.
         </p>
         <div className="mb-4 max-w-md">
           <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Fornecedor</label>
@@ -796,8 +796,8 @@ export default function RmDetail({ params }) {
             onDrop={handleDrop}
           >
             <FileSpreadsheet size={36} className="mx-auto text-green-500 mb-2" />
-            <p className="text-gray-600 font-medium text-sm">Planilha de CotaÃ§Ã£o</p>
-            <p className="text-gray-400 text-xs mt-1">.xlsx, .xls ou .csv â leitura automÃ¡tica</p>
+            <p className="text-gray-600 font-medium text-sm">Planilha de Cotação</p>
+            <p className="text-gray-400 text-xs mt-1">.xlsx, .xls ou .csv — leitura automática</p>
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
           </div>
           <div
@@ -811,7 +811,7 @@ export default function RmDetail({ params }) {
           >
             <FileText size={36} className="mx-auto text-red-500 mb-2" />
             <p className="text-gray-600 font-medium text-sm">Proposta em PDF</p>
-            <p className="text-gray-400 text-xs mt-1">.pdf â salvo como anexo</p>
+            <p className="text-gray-400 text-xs mt-1">.pdf — salvo como anexo</p>
             <input ref={pdfRef} type="file" accept=".pdf,.doc,.docx,.jpg,.png" className="hidden" onChange={handlePdfUpload} />
           </div>
         </div>
@@ -832,7 +832,7 @@ export default function RmDetail({ params }) {
                   <FileText size={20} className="text-red-500" />
                   <div>
                     <p className="text-sm font-medium text-gray-800">{anexo.nomeArquivo}</p>
-                    <p className="text-xs text-gray-400">{anexo.fornecedor} â {anexo.tamanho} â {anexo.data}</p>
+                    <p className="text-xs text-gray-400">{anexo.fornecedor} — {anexo.tamanho} — {anexo.data}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -851,20 +851,20 @@ export default function RmDetail({ params }) {
         </div>
       )}
 
-      {/* Lista de cotaÃ§Ãµes (planilhas) */}
+      {/* Lista de cotações (planilhas) */}
       {(cotacoes.length > 0 || (rm.anexos && rm.anexos.length > 0)) && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center flex-wrap gap-3">
             <h3 className="text-lg font-semibold text-gray-800">
               <FileSpreadsheet size={18} className="inline text-green-600 mr-1" />
-              CotaÃ§Ãµes em Planilha ({cotacoes.length})
+              Cotações em Planilha ({cotacoes.length})
             </h3>
             {(cotacoes.length >= 1 || (rm.anexos && rm.anexos.length > 0)) && (
               <button
                 onClick={gerarMapa}
                 className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
               >
-                <BarChart3 size={16} /> Gerar Mapa de CotaÃ§Ã£o
+                <BarChart3 size={16} /> Gerar Mapa de Cotação
               </button>
             )}
               {showMapa && (
@@ -887,7 +887,7 @@ export default function RmDetail({ params }) {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Itens</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AÃ§Ãµes</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -913,16 +913,16 @@ export default function RmDetail({ params }) {
         </div>
       )}
 
-      {/* âââââââââââ MAPA DE COTAÃÃO âââââââââââ */}
+      {/* ═══════════ MAPA DE COTAÇÃO ═══════════ */}
       {showMapa && mapaItems.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border-2 border-purple-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-purple-100 bg-purple-50 flex justify-between items-start flex-wrap gap-3">
             <div>
               <h3 className="text-lg font-semibold text-purple-800 flex items-center gap-2">
-                <BarChart3 size={20} /> Mapa de CotaÃ§Ã£o
+                <BarChart3 size={20} /> Mapa de Cotação
               </h3>
               <p className="text-sm text-purple-600 mt-1">
-                O menor preÃ§o por item estÃ¡ destacado em verde. Clique em outro fornecedor para alterar a seleÃ§Ã£o.
+                O menor preço por item está destacado em verde. Clique em outro fornecedor para alterar a seleção.
               </p>
             </div>
           </div>
@@ -947,7 +947,7 @@ export default function RmDetail({ params }) {
           {/* Resumo por fornecedor vencedor */}
           <div className="px-6 py-4 bg-purple-50/50 border-b border-purple-100">
             <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
-              <Award size={16} /> Resumo â Itens por Fornecedor Vencedor
+              <Award size={16} /> Resumo — Itens por Fornecedor Vencedor
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {Object.entries(winnerStats).map(([forn, stats]) => (
@@ -964,7 +964,7 @@ export default function RmDetail({ params }) {
             </div>
             <div className="mt-3 pt-3 border-t border-purple-200 flex items-center justify-between text-sm">
               <span className="text-purple-700 font-medium">
-                Total geral (menores preÃ§os): {fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}
+                Total geral (menores preços): {fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}
               </span>
               <span className="text-xs text-purple-500">
                 {Object.keys(winnerStats).length} fornecedor{Object.keys(winnerStats).length !== 1 ? "es" : ""}
@@ -986,7 +986,7 @@ export default function RmDetail({ params }) {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 min-w-[200px]">Item</th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">CÃ³d. Omie</th>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cód. Omie</th>
                   <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Barras</th>
                   <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Peso (kg)</th>
                   {cotacoes.map((cot) => (
@@ -1003,13 +1003,13 @@ export default function RmDetail({ params }) {
                   <th className="px-3 py-2 text-xs text-gray-400 text-center"></th>
                   {cotacoes.map((cot) => (
                     <Fragment key={cot.id + "-sub"}>
-                      <th className="px-3 py-2 text-xs text-gray-400 text-center">PreÃ§o Un.</th>
+                      <th className="px-3 py-2 text-xs text-gray-400 text-center">Preço Un.</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Qtd</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Cond. Pag.</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Prazo</th>
                     </Fragment>
                   ))}
-                  <th className="px-3 py-2 text-xs text-purple-400 text-center bg-purple-50">SeleÃ§Ã£o</th>
+                  <th className="px-3 py-2 text-xs text-purple-400 text-center bg-purple-50">Seleção</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -1041,17 +1041,17 @@ export default function RmDetail({ params }) {
                               onClick={() => match && match.precoUnit > 0 && setWinner(itemKey, cot.fornecedor)}
                               title={`Clique para selecionar ${cot.fornecedor} como vencedor`}
                             >
-                              {match ? fmt(match.precoUnit) : "â"}
+                              {match ? fmt(match.precoUnit) : "—"}
                               {isWinner && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
                             </td>
-                            <td className={`px-3 py-3 text-center text-xs ${match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm ? "bg-yellow-100 text-yellow-800 font-bold" : "text-gray-600"}`}>{match ? (match.qtd || "â") : "â"}{match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm && <AlertCircle size={12} className="inline ml-1 text-yellow-600" title={`Qtd RM: ${mi.qtdRm}`} />}</td>
-                      <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "â"}</td>
-                            <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.prazoEntrega || "â"}</td>
+                            <td className={`px-3 py-3 text-center text-xs ${match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm ? "bg-yellow-100 text-yellow-800 font-bold" : "text-gray-600"}`}>{match ? (match.qtd || "—") : "—"}{match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm && <AlertCircle size={12} className="inline ml-1 text-yellow-600" title={`Qtd RM: ${mi.qtdRm}`} />}</td>
+                      <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "—"}</td>
+                            <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.prazoEntrega || "—"}</td>
                           </Fragment>
                         );
                       })}
                       <td className="px-3 py-3 text-center bg-purple-50 text-xs font-semibold text-purple-700">
-                        {winner || "â"}
+                        {winner || "—"}
                       </td>
                     </tr>
                   );
@@ -1082,7 +1082,7 @@ export default function RmDetail({ params }) {
             </table>
           </div>
 
-          {/* BotÃ£o para gerar pedidos */}
+          {/* Botão para gerar pedidos */}
           <div className="px-6 py-4 bg-purple-50/50 border-t border-purple-100 flex justify-end gap-3">
             <button
               onClick={criarTodosPedidosOmie}
@@ -1098,7 +1098,7 @@ export default function RmDetail({ params }) {
         </div>
       )}
 
-      {/* âââââââââââ PEDIDOS GERADOS (SPLIT POR FORNECEDOR) âââââââââââ */}
+      {/* ═══════════ PEDIDOS GERADOS (SPLIT POR FORNECEDOR) ═══════════ */}
       {showPedidos && pedidosOmie.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -1120,7 +1120,7 @@ export default function RmDetail({ params }) {
                   </div>
                   <div>
                     <p className="font-semibold text-emerald-800">{pedido.fornecedor}</p>
-                    <p className="text-sm text-emerald-600">{pedido.itensCount} ite{pedido.itensCount === 1 ? "m" : "ns"} â Total: {fmt(pedido.total)}</p>
+                    <p className="text-sm text-emerald-600">{pedido.itensCount} ite{pedido.itensCount === 1 ? "m" : "ns"} — Total: {fmt(pedido.total)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1141,7 +1141,7 @@ export default function RmDetail({ params }) {
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
                           <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">PreÃ§o Unit.</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço Unit.</th>
                           <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prazo</th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cond. Pag.</th>
@@ -1156,7 +1156,7 @@ export default function RmDetail({ params }) {
                             <td className="px-4 py-2 text-right text-gray-700">{fmt(det.produto.valor_unitario)}</td>
                             <td className="px-4 py-2 text-right font-semibold text-gray-800">{fmt(det.produto.valor_total)}</td>
                             <td className="px-4 py-2 text-gray-600 text-xs">{det.observacao.split("|")[0].replace("Prazo:", "").trim()}</td>
-                            <td className="px-4 py-2 text-gray-600 text-xs">{det.observacao.split("|")[1]?.replace("Cond:", "").trim() || "â"}</td>
+                            <td className="px-4 py-2 text-gray-600 text-xs">{det.observacao.split("|")[1]?.replace("Cond:", "").trim() || "—"}</td>
                           </tr>
                         ))}
                       </tbody>
