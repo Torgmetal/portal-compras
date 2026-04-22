@@ -254,7 +254,7 @@ export default function RmDetail({ params }) {
   cotacoes.forEach((cot) => {
     (cot.itens || []).forEach((it) => {
       const key = it.item.toLowerCase().trim();
-      if (!allItems.has(key)) allItems.set(key, { item: it.item, cotacoes: [] });
+      const rmItem = rmItens.find(ri => ri.descricao && ri.descricao.toLowerCase().trim() === key); if (!allItems.has(key)) allItems.set(key, { item: it.item, codigoOmie: rmItem?.codigo || "", cotacoes: [] });
       allItems.get(key).cotacoes.push({ fornecedor: cot.fornecedor, precoUnit: it.precoUnit, qtd: it.qtd, total: it.precoUnit * it.qtd });
     });
   });
