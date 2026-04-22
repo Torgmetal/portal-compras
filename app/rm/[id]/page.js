@@ -250,7 +250,7 @@ export default function RmDetail({ params }) {
 
   const cotacoes = rm.cotacoes || [];
   const anexos = rm.anexos || [];
-  const allItems = new Map();
+  const allItems = new Map(); (rm.itens || []).forEach((ri) => { const k = (ri.descricao || ri.item || "").toLowerCase().trim(); if (k) allItems.set(k, { item: ri.descricao || ri.item, codigoOmie: ri.codigo || "", cotacoes: [] }); });
   cotacoes.forEach((cot) => {
     (cot.itens || []).forEach((it) => {
       const key = it.item.toLowerCase().trim();
