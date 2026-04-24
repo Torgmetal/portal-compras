@@ -6,6 +6,7 @@ import { uid, today, fmt } from "@/lib/utils";
 import Badge from "@/components/Badge";
 import ExportOmieModal from "@/components/ExportOmieModal";
 import { gerarPlanilhasOmie } from "@/lib/omie-export";
+import { parsePdfCotacao } from "@/lib/pdf-parser";
 import {
   ArrowLeft, Upload, FileSpreadsheet, FileText, BarChart3, Truck, Trash2,
   CheckCircle2, AlertCircle, Paperclip, Download, Eye, ShoppingCart, Award,
@@ -120,158 +121,60 @@ export default function RmDetail({ params }) {
   // ─── PDF/ANEXO UPLOAD ────────────────────────────────────
   const processPdf = async (file) => {
     if (!file) return;
-    const fornecedorNome = cotFornecedor.trim() || "Fornecedor " + ((rm.cotacoes || []).length + 1);
+    const fornecedorDigitado = cotFornecedor.trim();
+    const fornecedorFallback = fornecedorDigitado || "Fornecedor " + ((rm.cotacoes || []).length + 1);
 
-    // Read file as both dataURL (for anexo) and ArrayBuffer (for extraction)
-    const readAsDataURL = (f) => new Promise((res) => { const r = new FileReader(); r.onload = (e) => res(e.target.result); r.readAsDataURL(f); });
-    const readAsArrayBuffer = (f) => new Promise((res) => { const r = new FileReader(); r.onload = (e) => res(e.target.result); r.readAsArrayBuffer(f); });
-
+    const readAsDataURL = (f) => new Promise((res) => {
+      const r = new FileReader();
+      r.onload = (e) => res(e.target.result);
+      r.readAsDataURL(f);
+    });
     const dataUrl = await readAsDataURL(file);
-    
-    // Always save as anexo
-    const novoAnexo = { id: uid(), nome: file.name, tipo: "pdf", tamanho: file.size, data: today(), fornecedor: fornecedorNome, dataUrl };
-    
-    // Try to extract prices from PDF
-    let extractedItens = [];
+
+    let parsed = { fornecedor: "", itens: [], formato: "generic", avisos: [] };
     try {
-      const arrayBuf = await readAsArrayBuffer(file);
-      if (!window.pdfjsLib) {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-          s.onload = resolve;
-          s.onerror = reject;
-          document.head.appendChild(s);
-        });
-      }
-      const pdfjsLib = window.pdfjsLib;
-      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
-      let fullText = "";
-      for (let p = 1; p <= pdf.numPages; p++) {
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-        fullText += tc.items.map(i => i.str).join(" ") + "\n";
-      }
-      // Try to match RM items and extract prices
-      const rmItens = rm.itens || [];
-      extractedItens = matchPdfPrices(fullText, rmItens);
+      parsed = await parsePdfCotacao(file, { fornecedorFallback });
     } catch (err) {
       console.warn("PDF extraction failed:", err);
+      showToast("Erro ao ler PDF: " + err.message, "error");
     }
 
-    if (extractedItens.length > 0) {
-      const total = extractedItens.reduce((s, it) => s + (it.precoUnit * (it.qtd || 1)), 0);
+    // Prioridade do nome: o que o usuário digitou > detectado no PDF > fallback
+    const fornecedorNome = fornecedorDigitado || parsed.fornecedor || fornecedorFallback;
+
+    const novoAnexo = {
+      id: uid(),
+      nome: file.name,
+      tipo: "pdf",
+      tamanho: file.size,
+      data: today(),
+      fornecedor: fornecedorNome,
+      dataUrl,
+    };
+
+    if (parsed.itens.length > 0) {
+      const total = parsed.itens.reduce((s, it) => s + (Number(it.total) || Number(it.precoUnit) * Number(it.qtd || 1)), 0);
       const novaCotacao = {
         id: uid(),
         fornecedor: fornecedorNome,
         nomeArquivo: file.name,
         tipo: "pdf-extraido",
+        formato: parsed.formato,
         data: today(),
-        itens: extractedItens,
+        itens: parsed.itens,
         total,
       };
       updateRm({
         cotacoes: [...(rm.cotacoes || []), novaCotacao],
         anexos: [...(rm.anexos || []), novoAnexo],
-        status: rm.status === "Aberta" ? "Em Cota\u00e7\u00e3o" : rm.status,
+        status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
       });
-      showToast("Cota\u00e7\u00e3o extra\u00edda do PDF com " + extractedItens.length + " itens!");
+      showToast(`Cotação ${parsed.formato} extraída com ${parsed.itens.length} ite${parsed.itens.length === 1 ? "m" : "ns"}!`);
     } else {
       updateRm({ anexos: [...(rm.anexos || []), novoAnexo] });
-      showToast("PDF salvo como anexo. N\u00e3o foi poss\u00edvel extrair pre\u00e7os automaticamente.");
+      showToast("PDF salvo como anexo. Não foi possível extrair preços automaticamente (formato não reconhecido).");
     }
     setCotFornecedor("");
-  };
-
-  const matchPdfPrices = (text, rmItens) => {
-    const result = [];
-    const fullText = text.replace(/---PAGE \d+---/g, ' ').replace(/\n/g, ' ');
-    const stripZero = (s) => s.replace(/\.0$/, '');
-    
-    // Truncate at summary sections
-    const summaryIdx = fullText.search(/\bTOTAL\s+KG|\bPeso\s+total|\bValor\s+total|\bMensagem\b|\bDescarga\b|\bFique\s+atento/i);
-    const textToProcess = summaryIdx > 0 ? fullText.substring(0, summaryIdx) : fullText;
-    
-    // Split text into item blocks using sequence numbers (10, 20, 30...)
-    const itemRegex = /(?:^|\s)(\d{2,3})\s{2,}(?=\d{5,}|PF|PERFIL|CANT|CHAPA|BARRA|TUBO)/gi;
-    const positions = [];
-    let m;
-    while ((m = itemRegex.exec(textToProcess)) !== null) {
-      positions.push(m.index);
-    }
-    
-    const blocks = [];
-    for (let i = 0; i < positions.length; i++) {
-      const start = positions[i];
-      const end = i + 1 < positions.length ? positions[i + 1] : textToProcess.length;
-      blocks.push(fullText.substring(start, end).trim());
-    }
-    
-    const pdfItems = [];
-    for (const block of blocks) {
-      let normDesc = '';
-      const wMatch = block.match(/(?:PF\s*[IH]?\s+)?(?:PERFIL\s+)?W\s*H?\s*(\d{2,3})\s*X\s*(\d+[,.]?\d*)/i);
-      const cantMatch = block.match(/CANT(?:ONEIRA)?[\s]*(\d[\d.\/]*)\s*[Xx]\s*(\d[\d.\/]*)/i);
-      
-      if (wMatch) {
-        normDesc = stripZero('W' + wMatch[1] + 'X' + wMatch[2].replace(',', '.'));
-      } else if (cantMatch) {
-        normDesc = 'CANT' + cantMatch[1] + 'X' + cantMatch[2];
-      }
-      
-      const priceMatches = [...block.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})(?:\s*BRL)?/g)];
-      let totalPrice = 0;
-      if (priceMatches.length > 0) {
-        const last = priceMatches[priceMatches.length - 1][1];
-        totalPrice = parseFloat(last.replace(/\./g, '').replace(',', '.'));
-      }
-      
-      let qty = 1;
-      const qtyMatch = block.match(/Quantidade\s+(\d+)/i);
-      if (qtyMatch) qty = parseInt(qtyMatch[1]);
-      
-      if (normDesc && totalPrice > 0) {
-        pdfItems.push({ normDesc, totalPrice, qty });
-      }
-    }
-    
-    const usedPdf = new Set();
-    rmItens.forEach((rmItem) => {
-      const rmDesc = (rmItem.descricao || rmItem.item || '').toUpperCase().trim();
-      if (!rmDesc) return;
-      
-      let rmNorm = '';
-      const rmW = rmDesc.match(/W\s*H?\s*(\d{2,3})\s*X\s*(\d+[,.]?\d*)/i);
-      const rmCant = rmDesc.match(/CANTONEIRA[\s]*(\d[\d.\/\"]*)[\"\s]*[Xx][\"\s]*(\d[\d.\/\"]*)/i);
-      
-      if (rmW) {
-        rmNorm = stripZero('W' + rmW[1] + 'X' + rmW[2].replace(',', '.'));
-      } else if (rmCant) {
-        rmNorm = 'CANT' + rmCant[1].replace(/"/g, '') + 'X' + rmCant[2].replace(/"/g, '');
-      }
-      
-      if (!rmNorm) return;
-      
-      for (let i = 0; i < pdfItems.length; i++) {
-        if (usedPdf.has(i)) continue;
-        if (pdfItems[i].normDesc === rmNorm) {
-          usedPdf.add(i);
-          const unitPrice = pdfItems[i].totalPrice / pdfItems[i].qty;
-          result.push({
-            item: rmItem.descricao || rmItem.item,
-            precoUnit: Math.round(unitPrice * 100) / 100,
-            qtd: pdfItems[i].qty,
-            prazoEntrega: '\u2014',
-            condicao: '\u2014',
-            estoque: '\u2014',
-          });
-          return;
-        }
-      }
-    });
-    
-    return result;
   };
 
   const handlePdfUpload = (e) => { processPdf(e.target.files[0]); e.target.value = ""; };
@@ -305,100 +208,67 @@ export default function RmDetail({ params }) {
   };
 
   // ─── MAPA DE COTAÇÃO ─────────────────────────────────────
-  // --- Parse PDF proposal into cotacao format ---
-  const parsePdfCotacao = async (anexo) => {
-    if (!window.pdfjsLib) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-        s.onload = resolve; s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
-    const pdfjsLib = window.pdfjsLib;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-    const base64 = anexo.dataUrl.split(",")[1];
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
-    let fullText = "";
-    for (let p = 1; p <= doc.numPages; p++) {
-      const page = await doc.getPage(p);
-      const content = await page.getTextContent();
-      fullText += content.items.map(x => x.str).join(" ") + "\n";
-    }
-    // Parse items from PDF text (Gerdau format and generic)
-    const items = [];
-    const regex = /(\d+)\s+(PF [IH] [\w,.]+|CANT [\d/X\.]+)\s+([A-Z0-9]+)\s+(\d+M)\s+FX[\d,]+T\s+([\d.,]+)\s+KG\s+[\d.,]+\s+KG\s+\d+\/\d+\/\d+\s+([\d.,]+)\s+BRL\/KG[\s\S]*?([\d.,]+)\s+BRL/g;
-    let m;
-    while ((m = regex.exec(fullText)) !== null) {
-      const qtdKg = parseFloat(m[5].replace(/\./g,"").replace(",","."));
-      const precoKg = parseFloat(m[6].replace(/\./g,"").replace(",","."));
-      const totalBrl = parseFloat(m[7].replace(/\./g,"").replace(",","."));
-      // Normalize description to match RM format
-      let desc = m[2].replace("PF I ", "PERFIL ").replace("PF H ", "PERFIL ").replace(",",".");
-      desc = desc.replace("CANT ", "CANTONEIRA ");
-      items.push({
-        item: desc,
-        precoUnit: precoKg,
-        qtd: qtdKg,
-        total: totalBrl,
-        prazoEntrega: "30/45/60 dias",
-        condicao: "CIF",
-        estoque: "",
-        _pdfOrigDesc: m[2],
-        _pdfMaterial: m[3],
-        _pdfComprimento: m[4],
-        _pdfQtdKg: qtdKg,
-        _pdfPrecoKg: precoKg,
-        _unidade: "KG",
-      });
-    }
-    return { fornecedor: anexo.fornecedor || "Fornecedor PDF", itens: items };
-  };
-
   const gerarMapa = async () => {
-    const hasCotacoes = rm.cotacoes && rm.cotacoes.length > 0;
-    const hasAnexosPdf = rm.anexos && rm.anexos.some(a => a.tipo === "pdf" && a.dataUrl);
-    if (!hasCotacoes && !hasAnexosPdf) return showToast("Suba pelo menos uma cota\u00e7\u00e3o (planilha ou PDF)", "error");
-    // Parse PDF annexos into cotacao format
-    const pdfCotacoes = [];
-    const alertas = [];
-    if (hasAnexosPdf) {
-      for (const anexo of rm.anexos.filter(a => a.tipo === "pdf" && a.dataUrl)) {
-        try {
-          const parsed = await parsePdfCotacao(anexo);
-          pdfCotacoes.push(parsed);
-          // Check for alerts
-          const rmDescs = (rm.itens || []).map(it => (it.descricao || "").toUpperCase().trim().replace(/"/g, ""));
-          // Items in RM but not in PDF
-          rmDescs.forEach(rd => {
-            const found = parsed.itens.some(pi => rd.includes(pi.item.split(" ").slice(-1)[0]) || pi.item.toUpperCase().includes(rd.split(" ").slice(-1)[0]));
-            if (!found && rd) alertas.push({ tipo: "sem_cotacao", item: rd, msg: "Item sem cota\u00e7\u00e3o no PDF: " + rd });
-          });
-// Check length differences
-          parsed.itens.forEach(pi => {
-            if (pi._pdfComprimento) {
-              const rmItem = (rm.itens || []).find(it => {
-                const rd = (it.descricao || "").toUpperCase().replace(/"/g, "");
-                const pd = pi.item.toUpperCase();
-                return rd.includes(pd.split(" ").slice(-1)[0]) || pd.includes(rd.split(" ").slice(-1)[0]);
-              });
-              if (rmItem && rmItem.comprimento && rmItem.comprimento !== pi._pdfComprimento) {
-                alertas.push({ tipo: "comprimento", item: pi.item, msg: pi.item + " - comprimento RM: " + rmItem.comprimento + " vs Proposta: " + pi._pdfComprimento });
-              }
-            }
-          });
-        } catch (e) { showToast("Erro ao ler PDF: " + e.message, "error"); }
+    // Re-processa PDFs órfãos (anexo sem cotação do mesmo fornecedor).
+    // Cobre: (a) anexos antigos salvos antes do parser funcionar;
+    //        (b) uploads que falharam por formato desconhecido.
+    const fornecedoresComCotacao = new Set((rm.cotacoes || []).map((c) => c.fornecedor));
+    const pdfsOrfaos = (rm.anexos || []).filter(
+      (a) => /pdf/i.test(a.tipo || "") && a.dataUrl && !fornecedoresComCotacao.has(a.fornecedor)
+    );
+
+    let novasCotacoes = [...(rm.cotacoes || [])];
+    for (const anexo of pdfsOrfaos) {
+      try {
+        const parsed = await parsePdfCotacao(anexo.dataUrl, { fornecedorFallback: anexo.fornecedor });
+        if (parsed.itens.length === 0) continue;
+        const total = parsed.itens.reduce(
+          (s, it) => s + (Number(it.total) || Number(it.precoUnit) * Number(it.qtd || 1)),
+          0
+        );
+        novasCotacoes.push({
+          id: uid(),
+          fornecedor: parsed.fornecedor || anexo.fornecedor,
+          nomeArquivo: anexo.nome,
+          tipo: "pdf-extraido",
+          formato: parsed.formato,
+          data: today(),
+          itens: parsed.itens,
+          total,
+        });
+      } catch (e) {
+        showToast(`Erro ao ler PDF ${anexo.nome}: ${e.message}`, "error");
       }
     }
-    // Store PDF cotacoes merged with existing cotacoes
-    if (pdfCotacoes.length) {
-      updateRm({ cotacoes: [...(rm.cotacoes || []).filter(c => !pdfCotacoes.some(p => p.fornecedor === c.fornecedor)), ...pdfCotacoes], status: rm.status === "Aberta" || rm.status === "Em Cota\u00e7\u00e3o" ? "Cotada" : rm.status, mapaGerado: true });
-    } else {
-      updateRm({ status: "Cotada", mapaGerado: true });
+
+    if (novasCotacoes.length === 0) {
+      return showToast("Suba pelo menos uma cotação (planilha ou PDF)", "error");
     }
+
+    // Alertas rápidos de engenharia: itens da RM sem cobertura em alguma cotação
+    const alertas = [];
+    const rmDescs = (rm.itens || []).map((it) => (it.descricao || "").toUpperCase().trim().replace(/"/g, ""));
+    novasCotacoes.forEach((cot) => {
+      const cotDescs = (cot.itens || []).map((it) => (it.item || it.descricao || "").toUpperCase().trim());
+      rmDescs.forEach((rd) => {
+        if (!rd) return;
+        const last = rd.split(" ").slice(-1)[0];
+        const found = cotDescs.some((cd) => cd.includes(last) || (last && cd.includes(last)));
+        if (!found) {
+          alertas.push({
+            tipo: "sem_cotacao",
+            item: rd,
+            msg: `${cot.fornecedor} não cotou: ${rd}`,
+          });
+        }
+      });
+    });
+
+    updateRm({
+      cotacoes: novasCotacoes,
+      status: rm.status === "Aberta" || rm.status === "Em Cotação" ? "Cotada" : rm.status,
+      mapaGerado: true,
+    });
     setAlertasEng(alertas);
     setShowMapa(true);
   };
