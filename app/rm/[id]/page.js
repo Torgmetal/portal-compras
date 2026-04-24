@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { uid, today, fmt } from "@/lib/utils";
 import Badge from "@/components/Badge";
+import ExportOmieModal from "@/components/ExportOmieModal";
+import { gerarPlanilhasOmie } from "@/lib/omie-export";
 import {
   ArrowLeft, Upload, FileSpreadsheet, FileText, BarChart3, Truck, Trash2,
   CheckCircle2, AlertCircle, Paperclip, Download, Eye, ShoppingCart, Award,
@@ -31,6 +33,8 @@ export default function RmDetail({ params }) {
   const [selectedFornecedores, setSelectedFornecedores] = useState([]);
   const [criandoPedido, setCriandoPedido] = useState(false);
   const [alertasEng, setAlertasEng] = useState([]);
+  const [showExportOmie, setShowExportOmie] = useState(false);
+  const [exportandoOmie, setExportandoOmie] = useState(false);
 
   const rmFound = rms.find((r) => r.id === id);
   const rm = rmFound || { itens: [], cotacoes: [], envios: [], anexos: [], status: "", numero: "", descricao: "", observacao: "", data: "", op: "", tipo: "", id: null };
@@ -470,6 +474,26 @@ export default function RmDetail({ params }) {
     const groups = Object.keys(pedidosPorFornecedor);
     if (groups.length === 0) return showToast("Nenhum item selecionado no mapa", "error");
     for (const fornecedorNome of groups) { await criarPedidoOmie(fornecedorNome); }
+  };
+
+  const handleExportOmie = async ({ categoria, localEstoque }) => {
+    setExportandoOmie(true);
+    try {
+      const arquivos = await gerarPlanilhasOmie({
+        rm,
+        pedidosPorFornecedor,
+        fornecedores,
+        categoriaCompra: categoria,
+        localEstoque,
+      });
+      showToast(`${arquivos.length} planilha(s) Omie gerada(s)!`);
+      setShowExportOmie(false);
+    } catch (err) {
+      showToast(err.message || "Erro ao gerar planilhas Omie", "error");
+      throw err;
+    } finally {
+      setExportandoOmie(false);
+    }
   };
 
     // Group winning items by supplier for purchase orders
@@ -1110,7 +1134,22 @@ export default function RmDetail({ params }) {
           </div>
 
           {/* Botão para gerar pedidos */}
-          <div className="px-6 py-4 bg-purple-50/50 border-t border-purple-100 flex justify-end gap-3">
+          <div className="px-6 py-4 bg-purple-50/50 border-t border-purple-100 flex flex-wrap justify-end gap-3">
+            <button
+              onClick={() => {
+                if (Object.keys(pedidosPorFornecedor).length === 0)
+                  return showToast("Nenhum fornecedor vencedor no mapa", "error");
+                setShowExportOmie(true);
+              }}
+              disabled={exportandoOmie}
+              className="px-6 py-2.5 bg-white border-2 border-emerald-600 text-emerald-700 rounded-lg hover:bg-emerald-50 font-medium flex items-center gap-2 disabled:opacity-50"
+              title="Gera planilhas no layout oficial Omie, 1 por fornecedor vencedor"
+            >
+              <FileSpreadsheet size={18} />
+              {exportandoOmie
+                ? "Gerando planilhas..."
+                : `Gerar Planilhas Omie (${Object.keys(pedidosPorFornecedor).length})`}
+            </button>
             <button
               onClick={criarTodosPedidosOmie}
               disabled={criandoPedido}
@@ -1218,6 +1257,14 @@ export default function RmDetail({ params }) {
           ))}
         </div>
       )}
+
+      <ExportOmieModal
+        open={showExportOmie}
+        onClose={() => (exportandoOmie ? null : setShowExportOmie(false))}
+        pedidosPorFornecedor={pedidosPorFornecedor}
+        loading={exportandoOmie}
+        onConfirm={handleExportOmie}
+      />
     </div>
   );
 }
