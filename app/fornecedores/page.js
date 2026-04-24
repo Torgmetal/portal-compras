@@ -10,7 +10,7 @@ export default function Fornecedores() {
   const { fornecedores, setFornecedores, showToast } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", nCodOmie: "", parcelas: "", categorias: [] });
+  const [form, setForm] = useState({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", categorias: [] });
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const toggleCat = (cat) => {

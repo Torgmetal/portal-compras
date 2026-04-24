@@ -129,7 +129,7 @@ export default function RmDetail({ params }) {
     const dataUrl = await readAsDataURL(file);
     
     // Always save as anexo
-    const novoAnexo = { id: uid(), nome: file.name, tipo: "application/pdf", tamanho: file.size, data: today(), fornecedor: fornecedorNome, url: dataUrl };
+    const novoAnexo = { id: uid(), nome: file.name, tipo: "pdf", tamanho: file.size, data: today(), fornecedor: fornecedorNome, dataUrl };
     
     // Try to extract prices from PDF
     let extractedItens = [];
