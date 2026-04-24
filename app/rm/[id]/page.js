@@ -594,35 +594,45 @@ export default function RmDetail({ params }) {
         )}
       </div>
 
-      {/* ─── UPLOAD DE PROPOSTAS ─────────────────────────── */}
+      {/* ─── INCLUIR COTAÇÕES ─────────────────────────── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-2">Incluir Propostas / Cotações</h3>
         <p className="text-sm text-gray-500 mb-4">
-          Suba planilhas (.xlsx/.csv) para leitura automática de preços, ou PDFs de propostas recebidas como anexo.
+          Use <strong>Lançar Cotação</strong> pra digitar os preços manualmente com impostos, disponibilidade e prazo.
+          A planilha é um atalho quando o fornecedor mandou um .xlsx simples.
         </p>
-        <div className="mb-4 max-w-md">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Fornecedor</label>
-          <input
-            type="text"
-            value={cotFornecedor}
-            onChange={(e) => setCotFornecedor(e.target.value)}
-            placeholder="Ex: Tintas Coral Ltda"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        <div
-          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-            dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"
-          }`}
-          onClick={() => fileRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={handleDrop}
-        >
-          <FileSpreadsheet size={36} className="mx-auto text-green-500 mb-2" />
-          <p className="text-gray-600 font-medium text-sm">Planilha de Cotação (atalho)</p>
-          <p className="text-gray-400 text-xs mt-1">.xlsx, .xls ou .csv — leitura automática de item + preço. Para lançar com impostos e disponibilidade, use <strong>Lançar Cotação</strong>.</p>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
+        <div className="flex flex-wrap gap-3 items-stretch">
+          <button
+            onClick={() => router.push(`/rm/${rm.id}/cotar`)}
+            className="flex-1 min-w-[240px] flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+          >
+            <ShoppingCart size={18} /> Lançar Cotação (manual)
+          </button>
+          <div className="flex-1 min-w-[240px]">
+            <div className="mb-2">
+              <input
+                type="text"
+                value={cotFornecedor}
+                onChange={(e) => setCotFornecedor(e.target.value)}
+                placeholder="Nome do fornecedor (p/ upload)"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div
+              className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+                dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"
+              }`}
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={handleDrop}
+            >
+              <FileSpreadsheet size={28} className="mx-auto text-green-500 mb-1" />
+              <p className="text-gray-600 text-sm">Subir Planilha (.xlsx/.csv)</p>
+              <p className="text-gray-400 text-xs mt-0.5">sem impostos nem disponibilidade</p>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
+            </div>
+          </div>
         </div>
       </div>
 
