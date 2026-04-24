@@ -6,7 +6,6 @@ import { uid, today, fmt } from "@/lib/utils";
 import Badge from "@/components/Badge";
 import ExportOmieModal from "@/components/ExportOmieModal";
 import { gerarPlanilhasOmie } from "@/lib/omie-export";
-import { parsePdfCotacao } from "@/lib/pdf-parser";
 import {
   ArrowLeft, Upload, FileSpreadsheet, FileText, BarChart3, Truck, Trash2,
   CheckCircle2, AlertCircle, Paperclip, Download, Eye, ShoppingCart, Award,
@@ -18,7 +17,6 @@ export default function RmDetail({ params }) {
   const { rms, setRms, fornecedores, showToast, loaded } = useStore();
   const router = useRouter();
   const fileRef = useRef(null);
-  const pdfRef = useRef(null);
 
   const [cotFornecedor, setCotFornecedor] = useState("");
   const [sendingOmie, setSendingOmie] = useState(false);
@@ -27,7 +25,6 @@ export default function RmDetail({ params }) {
   const [showPedidos, setShowPedidos] = useState(false);
   const [pedidosOmie, setPedidosOmie] = useState([]);
   const [dragActive, setDragActive] = useState(false);
-  const [dragActivePdf, setDragActivePdf] = useState(false);
   // Mapa: override do fornecedor vencedor por item (key = item lowercase, value = fornecedor name)
   const [overrides, setOverrides] = useState({});
   const [expandedPedido, setExpandedPedido] = useState(null);
@@ -118,67 +115,6 @@ export default function RmDetail({ params }) {
   const handleFileUpload = (e) => { processFile(e.target.files[0]); e.target.value = ""; };
   const handleDrop = (e) => { e.preventDefault(); setDragActive(false); processFile(e.dataTransfer.files[0]); };
 
-  // ─── PDF/ANEXO UPLOAD ────────────────────────────────────
-  const processPdf = async (file) => {
-    if (!file) return;
-    const fornecedorDigitado = cotFornecedor.trim();
-    const fornecedorFallback = fornecedorDigitado || "Fornecedor " + ((rm.cotacoes || []).length + 1);
-
-    const readAsDataURL = (f) => new Promise((res) => {
-      const r = new FileReader();
-      r.onload = (e) => res(e.target.result);
-      r.readAsDataURL(f);
-    });
-    const dataUrl = await readAsDataURL(file);
-
-    let parsed = { fornecedor: "", itens: [], formato: "generic", avisos: [] };
-    try {
-      parsed = await parsePdfCotacao(file, { fornecedorFallback });
-    } catch (err) {
-      console.warn("PDF extraction failed:", err);
-      showToast("Erro ao ler PDF: " + err.message, "error");
-    }
-
-    // Prioridade do nome: o que o usuário digitou > detectado no PDF > fallback
-    const fornecedorNome = fornecedorDigitado || parsed.fornecedor || fornecedorFallback;
-
-    const novoAnexo = {
-      id: uid(),
-      nome: file.name,
-      tipo: "pdf",
-      tamanho: file.size,
-      data: today(),
-      fornecedor: fornecedorNome,
-      dataUrl,
-    };
-
-    if (parsed.itens.length > 0) {
-      const total = parsed.itens.reduce((s, it) => s + (Number(it.total) || Number(it.precoUnit) * Number(it.qtd || 1)), 0);
-      const novaCotacao = {
-        id: uid(),
-        fornecedor: fornecedorNome,
-        nomeArquivo: file.name,
-        tipo: "pdf-extraido",
-        formato: parsed.formato,
-        data: today(),
-        itens: parsed.itens,
-        total,
-      };
-      updateRm({
-        cotacoes: [...(rm.cotacoes || []), novaCotacao],
-        anexos: [...(rm.anexos || []), novoAnexo],
-        status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
-      });
-      showToast(`Cotação ${parsed.formato} extraída com ${parsed.itens.length} ite${parsed.itens.length === 1 ? "m" : "ns"}!`);
-    } else {
-      updateRm({ anexos: [...(rm.anexos || []), novoAnexo] });
-      showToast("PDF salvo como anexo. Não foi possível extrair preços automaticamente (formato não reconhecido).");
-    }
-    setCotFornecedor("");
-  };
-
-  const handlePdfUpload = (e) => { processPdf(e.target.files[0]); e.target.value = ""; };
-  const handleDropPdf = (e) => { e.preventDefault(); setDragActivePdf(false); processPdf(e.dataTransfer.files[0]); };
   const removeAnexo = (anexoId) => { updateRm({ anexos: (rm.anexos || []).filter((a) => a.id !== anexoId) }); showToast("Anexo removido"); };
   const removeCotacao = (cotId) => { updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) }); showToast("Cotação removida"); };
 
@@ -209,46 +145,15 @@ export default function RmDetail({ params }) {
 
   // ─── MAPA DE COTAÇÃO ─────────────────────────────────────
   const gerarMapa = async () => {
-    // Re-processa PDFs órfãos (anexo sem cotação do mesmo fornecedor).
-    // Cobre: (a) anexos antigos salvos antes do parser funcionar;
-    //        (b) uploads que falharam por formato desconhecido.
-    const fornecedoresComCotacao = new Set((rm.cotacoes || []).map((c) => c.fornecedor));
-    const pdfsOrfaos = (rm.anexos || []).filter(
-      (a) => /pdf/i.test(a.tipo || "") && (a.dataUrl || a.url) && !fornecedoresComCotacao.has(a.fornecedor)
-    );
-
-    let novasCotacoes = [...(rm.cotacoes || [])];
-    for (const anexo of pdfsOrfaos) {
-      try {
-        const parsed = await parsePdfCotacao(anexo.dataUrl || anexo.url, { fornecedorFallback: anexo.fornecedor });
-        if (parsed.itens.length === 0) continue;
-        const total = parsed.itens.reduce(
-          (s, it) => s + (Number(it.total) || Number(it.precoUnit) * Number(it.qtd || 1)),
-          0
-        );
-        novasCotacoes.push({
-          id: uid(),
-          fornecedor: parsed.fornecedor || anexo.fornecedor,
-          nomeArquivo: anexo.nome,
-          tipo: "pdf-extraido",
-          formato: parsed.formato,
-          data: today(),
-          itens: parsed.itens,
-          total,
-        });
-      } catch (e) {
-        showToast(`Erro ao ler PDF ${anexo.nome}: ${e.message}`, "error");
-      }
+    const cotacoesAtuais = rm.cotacoes || [];
+    if (cotacoesAtuais.length === 0) {
+      return showToast("Lance pelo menos uma cotação antes de gerar o mapa", "error");
     }
 
-    if (novasCotacoes.length === 0) {
-      return showToast("Suba pelo menos uma cotação (planilha ou PDF)", "error");
-    }
-
-    // Alertas rápidos de engenharia: itens da RM sem cobertura em alguma cotação
+    // Alertas: itens da RM sem cobertura em alguma cotação
     const alertas = [];
     const rmDescs = (rm.itens || []).map((it) => (it.descricao || "").toUpperCase().trim().replace(/"/g, ""));
-    novasCotacoes.forEach((cot) => {
+    cotacoesAtuais.forEach((cot) => {
       const cotDescs = (cot.itens || []).map((it) => (it.item || it.descricao || "").toUpperCase().trim());
       rmDescs.forEach((rd) => {
         if (!rd) return;
@@ -265,7 +170,6 @@ export default function RmDetail({ params }) {
     });
 
     updateRm({
-      cotacoes: novasCotacoes,
       status: rm.status === "Aberta" || rm.status === "Em Cotação" ? "Cotada" : rm.status,
       mapaGerado: true,
     });
@@ -706,35 +610,19 @@ export default function RmDetail({ params }) {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-              dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"
-            }`}
-            onClick={() => fileRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={handleDrop}
-          >
-            <FileSpreadsheet size={36} className="mx-auto text-green-500 mb-2" />
-            <p className="text-gray-600 font-medium text-sm">Planilha de Cotação</p>
-            <p className="text-gray-400 text-xs mt-1">.xlsx, .xls ou .csv — leitura automática</p>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
-          </div>
-          <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-              dragActivePdf ? "border-red-500 bg-red-50" : "border-gray-300 hover:border-red-400"
-            }`}
-            onClick={() => pdfRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragActivePdf(true); }}
-            onDragLeave={() => setDragActivePdf(false)}
-            onDrop={handleDropPdf}
-          >
-            <FileText size={36} className="mx-auto text-red-500 mb-2" />
-            <p className="text-gray-600 font-medium text-sm">Proposta em PDF</p>
-            <p className="text-gray-400 text-xs mt-1">.pdf — salvo como anexo</p>
-            <input ref={pdfRef} type="file" accept=".pdf,.doc,.docx,.jpg,.png" className="hidden" onChange={handlePdfUpload} />
-          </div>
+        <div
+          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+            dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"
+          }`}
+          onClick={() => fileRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={handleDrop}
+        >
+          <FileSpreadsheet size={36} className="mx-auto text-green-500 mb-2" />
+          <p className="text-gray-600 font-medium text-sm">Planilha de Cotação (atalho)</p>
+          <p className="text-gray-400 text-xs mt-1">.xlsx, .xls ou .csv — leitura automática de item + preço. Para lançar com impostos e disponibilidade, use <strong>Lançar Cotação</strong>.</p>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
         </div>
       </div>
 

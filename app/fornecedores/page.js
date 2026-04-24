@@ -5,12 +5,14 @@ import { uid } from "@/lib/utils";
 import { PlusCircle, Trash2, Pencil, X } from "lucide-react";
 
 const CATEGORIAS = ["Material", "Consumível", "Tintas", "Parafusos", "Acessórios", "EPI", "Ferramentas", "Elétrica", "Hidráulica"];
+const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
+const FORM_INICIAL = { nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", uf: "", icmsPadrao: "", categorias: [] };
 
 export default function Fornecedores() {
   const { fornecedores, setFornecedores, showToast } = useStore();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", categorias: [] });
+  const [form, setForm] = useState(FORM_INICIAL);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const toggleCat = (cat) => {
@@ -19,7 +21,21 @@ export default function Fornecedores() {
 
   const editar = (f) => {
     setEditingId(f.id);
-    setForm({ nome: f.nome || "", cnpj: f.cnpj || "", email: f.email || "", telefone: f.telefone || "", contato: f.contato || "", endereco: f.endereco || "", observacoes: f.observacoes || "", categorias: f.categorias || [] });
+    setForm({
+      ...FORM_INICIAL,
+      nome: f.nome || "",
+      cnpj: f.cnpj || "",
+      email: f.email || "",
+      telefone: f.telefone || "",
+      contato: f.contato || "",
+      endereco: f.endereco || "",
+      observacoes: f.observacoes || "",
+      nCodOmie: f.nCodOmie || "",
+      parcelas: f.parcelas || "",
+      uf: f.uf || "",
+      icmsPadrao: f.icmsPadrao || "",
+      categorias: f.categorias || [],
+    });
     setShowForm(true);
   };
 
@@ -32,7 +48,7 @@ export default function Fornecedores() {
     }
     setShowForm(false);
     setEditingId(null);
-    setForm({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", categorias: [] });
+    setForm(FORM_INICIAL);
     showToast(editingId ? "Fornecedor atualizado!" : "Fornecedor cadastrado!");
   };
 
@@ -46,7 +62,7 @@ export default function Fornecedores() {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">Fornecedores</h2>
         <button
-          onClick={() => { if (showForm) { setShowForm(false); setEditingId(null); setForm({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", categorias: [] }); } else { setShowForm(true); } }}
+          onClick={() => { if (showForm) { setShowForm(false); setEditingId(null); setForm(FORM_INICIAL); } else { setShowForm(true); } }}
           className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
         >
           <PlusCircle size={18} /> Novo Fornecedor
@@ -79,6 +95,18 @@ export default function Fornecedores() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Parcelas (Cond. Pagamento)</label>
               <input type="number" min="1" value={form.parcelas} onChange={(e) => set("parcelas", e.target.value)} placeholder="Ex: 3" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">UF (Origem do fornecedor)</label>
+              <select value={form.uf} onChange={(e) => set("uf", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <option value="">—</option>
+                {UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">ICMS padrão (%)</label>
+              <input type="number" min="0" max="100" step="0.01" value={form.icmsPadrao} onChange={(e) => set("icmsPadrao", e.target.value)} placeholder="Ex: 12" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <p className="text-xs text-gray-400 mt-1">Alíquota usada como default ao lançar cotação. Editável por cotação.</p>
             </div>
           </div>
           <div>
@@ -114,7 +142,7 @@ export default function Fornecedores() {
             </div>
           </div>
           <div className="flex justify-end gap-3">
-            <button onClick={() => { setShowForm(false); setEditingId(null); setForm({ nome: "", cnpj: "", email: "", telefone: "", contato: "", endereco: "", observacoes: "", nCodOmie: "", parcelas: "", categorias: [] }); }} className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">Cancelar</button>
+            <button onClick={() => { setShowForm(false); setEditingId(null); setForm(FORM_INICIAL); }} className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">Cancelar</button>
             <button onClick={salvar} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">{editingId ? "Atualizar" : "Salvar"}</button>
           </div>
         </div>
