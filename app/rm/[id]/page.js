@@ -120,23 +120,49 @@ export default function RmDetail({ params }) {
 
   const cotacoes = rm.cotacoes || [];
   const anexos = rm.anexos || [];
-  const allItems = new Map(); (rm.itens || []).forEach((ri) => { const k = (ri.descricao || ri.item || "").toLowerCase().trim(); if (k) allItems.set(k, { item: ri.descricao || ri.item, codigoOmie: ri.codigo || "", cotacoes: [] }); });
+
+  // Determina se algum fornecedor é Faturamento=Torg (muda a exibição do mapa)
+  const temFaturamentoTorg = cotacoes.some((c) => c.faturamento === "Torg");
+
+  const allItems = new Map();
+  (rm.itens || []).forEach((ri) => {
+    const k = (ri.descricao || ri.item || "").toLowerCase().trim();
+    if (k) allItems.set(k, { item: ri.descricao || ri.item, codigoOmie: ri.codigo || "", cotacoes: [] });
+  });
   cotacoes.forEach((cot) => {
     (cot.itens || []).forEach((it) => {
-      const key = it.item.toLowerCase().trim();
-      const rmItem = (rm.itens || []).find(ri => ri.descricao && ri.descricao.toLowerCase().trim() === key); if (!allItems.has(key)) allItems.set(key, { item: it.item, codigoOmie: rmItem?.codigo || "", cotacoes: [] });
-      allItems.get(key).cotacoes.push({ fornecedor: cot.fornecedor, precoUnit: it.precoUnit, qtd: it.qtd, total: it.precoUnit * it.qtd });
+      const key = (it.item || it.descricao || "").toLowerCase().trim();
+      const rmItem = (rm.itens || []).find((ri) => ri.descricao && ri.descricao.toLowerCase().trim() === key);
+      if (!allItems.has(key)) allItems.set(key, { item: it.item || it.descricao, codigoOmie: rmItem?.codigo || "", cotacoes: [] });
+      const precoUnit = Number(it.precoUnit) || 0;
+      // Cotações antigas não têm precoLiquido/disponibilidade; fallback: líquido=bruto, disponível
+      const precoLiquido = Number(it.precoLiquido) || precoUnit;
+      const disponibilidade = it.disponibilidade || "Suficiente";
+      allItems.get(key).cotacoes.push({
+        fornecedor: cot.fornecedor,
+        precoUnit,
+        precoLiquido,
+        qtd: Number(it.qtd) || 0,
+        total: precoUnit * (Number(it.qtd) || 0),
+        totalLiquido: precoLiquido * (Number(it.qtd) || 0),
+        disponibilidade,
+        faturamento: cot.faturamento || "Cliente",
+        prazoEntrega: it.prazoEntrega || "",
+      });
     });
   });
   const mapaItems = Array.from(allItems.values());
 
+  const ELEGIVEIS = new Set(["Suficiente", "Sob encomenda"]);
   const getWinner = (mi) => {
     const key = mi.item.toLowerCase().trim();
     if (overrides[key]) return overrides[key];
-    const precos = mi.cotacoes.filter((c) => c.precoUnit > 0);
-    if (precos.length === 0) return null;
-    precos.sort((a, b) => a.precoUnit - b.precoUnit);
-    return precos[0].fornecedor;
+    // Só entram elegíveis (Suficiente/Sob encomenda) com preço > 0
+    const elegiveis = mi.cotacoes.filter((c) => c.precoLiquido > 0 && ELEGIVEIS.has(c.disponibilidade));
+    if (elegiveis.length === 0) return null;
+    // Ordena por preço líquido crescente (que já considera impostos quando Torg)
+    elegiveis.sort((a, b) => a.precoLiquido - b.precoLiquido);
+    return elegiveis[0].fornecedor;
   };
 
   const setWinner = (itemKey, fornecedor) => {
@@ -811,6 +837,11 @@ export default function RmDetail({ params }) {
                   {cotacoes.map((cot) => (
                     <th key={cot.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" colSpan={4}>
                       {cot.fornecedor}
+                      {cot.faturamento && (
+                        <span className={`ml-2 inline-block text-[10px] px-1.5 py-0.5 rounded-full font-normal ${cot.faturamento === "Torg" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                          {cot.faturamento}
+                        </span>
+                      )}
                     </th>
                   ))}
                   <th className="px-4 py-3 text-center text-xs font-medium text-purple-600 uppercase bg-purple-50">Vencedor</th>
@@ -822,7 +853,9 @@ export default function RmDetail({ params }) {
                   <th className="px-3 py-2 text-xs text-gray-400 text-center"></th>
                   {cotacoes.map((cot) => (
                     <Fragment key={cot.id + "-sub"}>
-                      <th className="px-3 py-2 text-xs text-gray-400 text-center">Preço Un.</th>
+                      <th className="px-3 py-2 text-xs text-gray-400 text-center" title={cot.faturamento === "Torg" ? "Líquido: considera créditos de ICMS/PIS/Cofins/IPI" : "Bruto: sem dedução de impostos"}>
+                        {cot.faturamento === "Torg" ? "Preço Líq." : "Preço Un."}
+                      </th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Qtd</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Cond. Pag.</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Prazo</th>
@@ -847,21 +880,36 @@ export default function RmDetail({ params }) {
                         const match = mi.cotacoes.find((c) => c.fornecedor === cot.fornecedor);
                         const isLowest = match && match.precoUnit === menorPreco && match.precoUnit > 0;
                         const isWinner = match && cot.fornecedor === winner;
+                        const isInelegivel = match && match.disponibilidade && !ELEGIVEIS.has(match.disponibilidade);
+                        const precoMostrar = match && temFaturamentoTorg && cot.faturamento === "Torg"
+                          ? match.precoLiquido
+                          : match?.precoUnit;
                         return (
                           <Fragment key={cot.id + "-" + idx}>
                             <td
                               className={`px-3 py-3 text-center font-semibold cursor-pointer transition-colors ${
-                                isWinner
+                                isInelegivel
+                                  ? "bg-gray-50 text-gray-400 line-through"
+                                  : isWinner
                                   ? "bg-green-50 text-green-700 ring-2 ring-inset ring-green-300"
                                   : isLowest
                                   ? "bg-green-50/50 text-green-600"
                                   : "text-gray-700 hover:bg-blue-50"
                               }`}
-                              onClick={() => match && match.precoUnit > 0 && setWinner(itemKey, cot.fornecedor)}
-                              title={`Clique para selecionar ${cot.fornecedor} como vencedor`}
+                              onClick={() => match && match.precoUnit > 0 && !isInelegivel && setWinner(itemKey, cot.fornecedor)}
+                              title={
+                                match
+                                  ? `${cot.fornecedor}${match.disponibilidade ? " — " + match.disponibilidade : ""}${temFaturamentoTorg && cot.faturamento === "Torg" ? ` (bruto ${fmt(match.precoUnit)})` : ""}`
+                                  : ""
+                              }
                             >
-                              {match ? fmt(match.precoUnit) : "—"}
+                              {match && precoMostrar ? fmt(precoMostrar) : "—"}
                               {isWinner && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
+                              {match && match.disponibilidade && match.disponibilidade !== "Suficiente" && (
+                                <span className="block text-[10px] font-normal mt-0.5 opacity-80">
+                                  {match.disponibilidade}
+                                </span>
+                              )}
                             </td>
                             <td className={`px-3 py-3 text-center text-xs ${match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm ? "bg-yellow-100 text-yellow-800 font-bold" : "text-gray-600"}`}>{match ? (match.qtd || "—") : "—"}{match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm && <AlertCircle size={12} className="inline ml-1 text-yellow-600" title={`Qtd RM: ${mi.qtdRm}`} />}</td>
                       <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "—"}</td>
