@@ -214,13 +214,13 @@ export default function RmDetail({ params }) {
     //        (b) uploads que falharam por formato desconhecido.
     const fornecedoresComCotacao = new Set((rm.cotacoes || []).map((c) => c.fornecedor));
     const pdfsOrfaos = (rm.anexos || []).filter(
-      (a) => /pdf/i.test(a.tipo || "") && a.dataUrl && !fornecedoresComCotacao.has(a.fornecedor)
+      (a) => /pdf/i.test(a.tipo || "") && (a.dataUrl || a.url) && !fornecedoresComCotacao.has(a.fornecedor)
     );
 
     let novasCotacoes = [...(rm.cotacoes || [])];
     for (const anexo of pdfsOrfaos) {
       try {
-        const parsed = await parsePdfCotacao(anexo.dataUrl, { fornecedorFallback: anexo.fornecedor });
+        const parsed = await parsePdfCotacao(anexo.dataUrl || anexo.url, { fornecedorFallback: anexo.fornecedor });
         if (parsed.itens.length === 0) continue;
         const total = parsed.itens.reduce(
           (s, it) => s + (Number(it.total) || Number(it.precoUnit) * Number(it.qtd || 1)),
