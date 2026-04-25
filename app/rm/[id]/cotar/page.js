@@ -389,6 +389,7 @@ export default function LancarCotacaoPage({ params }) {
       .map((it) => {
         const precoUnit = Number(it.precoUnit) || 0;
         const qtdCotada = Number(it.qtdCotada) || 0;
+        const qtdProposta = Number(it.qtdProposta) || qtdCotada; // se IA não trouxe, igual à RM
         const ipiPct = Number(it.ipiPct) || 0;
         const icmsItem = it.icmsPct !== "" && it.icmsPct != null ? Number(it.icmsPct) : Number(icmsPctDefault) || 0;
         const precoLiquido = calcPrecoLiquido(precoUnit, {
@@ -408,12 +409,15 @@ export default function LancarCotacaoPage({ params }) {
           // Campos novos (estruturados)
           qtdSolicitada: it.qtdSolicitada,
           qtdCotada,
+          qtdProposta, // qtd que o fornecedor cotou no PDF (pode ser != qtdCotada)
           icmsPct: icmsItem,
           ipiPct,
           prazoEntrega: it.prazoEntrega,
           observacao: it.observacao,
           precoLiquido,
           totalLiquido: precoLiquido * qtdCotada,
+          // Total da proposta original (qtd do PDF × preço × (1 + IPI%))
+          totalProposta: precoUnit * qtdProposta * (1 + ipiPct / 100),
         };
       });
 

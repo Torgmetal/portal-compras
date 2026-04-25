@@ -350,18 +350,20 @@ export default function RmDetail({ params }) {
     return stats;
   }, [mapaItems, overrides]);
 
-  // proposalStats: total de TODA a proposta de cada fornecedor (= o que ele
-  // ofereceu no papel, independente de quem ganhou). Inclui IPI por fora
-  // pra bater com o "Valor total" do PDF do fornecedor.
+  // proposalStats: total de TODA a proposta original do fornecedor (= o que
+  // ele ofereceu no PDF, independente do quanto a Torg vai comprar). Usa
+  // qtdProposta quando salvo (qtd do PDF, pode ser maior/menor que a RM);
+  // fallback: qtd cotada × preço × (1 + IPI). Inclui IPI por fora.
   const proposalStats = useMemo(() => {
     const stats = {};
     (rm.cotacoes || []).forEach((cot) => {
       if (!stats[cot.fornecedor]) stats[cot.fornecedor] = { count: 0, total: 0 };
       (cot.itens || []).forEach((it) => {
         const precoUnit = Number(it.precoUnit) || 0;
-        const qtd = Number(it.qtd) || 0;
+        const qtdRef = Number(it.qtdProposta) || Number(it.qtd) || 0;
         const ipiPct = Number(it.ipiPct) || 0;
-        const linha = precoUnit * qtd * (1 + ipiPct / 100);
+        // Usa totalProposta salvo se disponível (ja inclui IPI); senao calcula
+        const linha = Number(it.totalProposta) || precoUnit * qtdRef * (1 + ipiPct / 100);
         stats[cot.fornecedor].count++;
         stats[cot.fornecedor].total += linha;
       });
