@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { uid, today, fmt } from "@/lib/utils";
-import { findRmIndexSmart } from "@/lib/product-matcher";
+import { findRmIndexSmart, normalizeProduto } from "@/lib/product-matcher";
 import {
   ArrowLeft, Save, Trash2, Paperclip, AlertCircle, Info, FileText, Loader2,
 } from "lucide-react";
@@ -142,6 +142,18 @@ export default function LancarCotacaoPage({ params }) {
       });
 
       setAnexo({ nome: file.name, tipo: "pdf", tamanho: file.size, dataUrl });
+
+      // Debug: amostras normalizadas pra diagnosticar quando o match falha
+      const debug = (data.itens || []).slice(0, 3).map((p) => ({
+        pdfDesc: p.descricao || p.item || "",
+        pdfNorm: normalizeProduto(p.descricao || p.item || "", ""),
+      }));
+      const debugRm = rmItens.slice(0, 3).map((r) => ({
+        rmDesc: r.descricao || r.item || "",
+        rmMat: r.material || r.mat || "",
+        rmNorm: normalizeProduto(r.descricao || r.item || "", r.material || r.mat || ""),
+      }));
+
       setImportInfo({
         formato: data.formato,
         totalItens: (data.itens || []).length,
@@ -149,6 +161,7 @@ export default function LancarCotacaoPage({ params }) {
         semMatch,
         avisos: data.avisos || [],
         meta: data._meta || {},
+        debug: { pdf: debug, rm: debugRm },
       });
       const totalIt = (data.itens || []).length;
       if (totalIt === 0) {
@@ -359,6 +372,33 @@ export default function LancarCotacaoPage({ params }) {
               <pre className="mt-2 text-xs bg-white border border-gray-200 p-2 rounded overflow-x-auto whitespace-pre-wrap">
                 {importInfo.meta.textPreview}
               </pre>
+            </details>
+          )}
+          {importInfo.casados === 0 && importInfo.totalItens > 0 && importInfo.debug && (
+            <details className="mt-2" open>
+              <summary className="cursor-pointer text-orange-700 hover:underline text-xs font-medium">
+                🔍 Debug do matcher (clique pra ver amostras normalizadas)
+              </summary>
+              <div className="mt-2 text-xs bg-white border border-gray-200 p-2 rounded space-y-2">
+                <div>
+                  <p className="font-semibold text-gray-700">Amostras do PDF (3 primeiros):</p>
+                  {importInfo.debug.pdf.map((d, i) => (
+                    <div key={i} className="ml-2 mt-1 font-mono">
+                      <div>desc: <span className="text-blue-700">{d.pdfDesc}</span></div>
+                      <div>norm: <span className={d.pdfNorm ? "text-green-700" : "text-red-700"}>{d.pdfNorm ? JSON.stringify(d.pdfNorm) : "null (não reconhecido)"}</span></div>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-700 mt-2">Amostras da RM (3 primeiros):</p>
+                  {importInfo.debug.rm.map((d, i) => (
+                    <div key={i} className="ml-2 mt-1 font-mono">
+                      <div>desc: <span className="text-blue-700">{d.rmDesc}</span> | mat: <span className="text-purple-700">{d.rmMat || "(vazio)"}</span></div>
+                      <div>norm: <span className={d.rmNorm ? "text-green-700" : "text-red-700"}>{d.rmNorm ? JSON.stringify(d.rmNorm) : "null (não reconhecido)"}</span></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </details>
           )}
         </div>
