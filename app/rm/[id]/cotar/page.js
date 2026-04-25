@@ -8,6 +8,7 @@ import { uid, today, fmt } from "@/lib/utils";
 import { findRmIndexSmart, normalizeProduto } from "@/lib/product-matcher";
 import {
   ArrowLeft, Save, Trash2, Paperclip, AlertCircle, Info, FileText, Loader2,
+  Sparkles, Image as ImageIcon, ClipboardPaste,
 } from "lucide-react";
 
 // ─── Constantes ──────────────────────────────────────────────
@@ -63,10 +64,16 @@ export default function LancarCotacaoPage({ params }) {
   const [creditaIpi, setCreditaIpi] = useState(true);
   const [anexo, setAnexo] = useState(null);
 
-  // Importação de PDF
+  // Importação de PDF (regex — fallback)
   const [importingPdf, setImportingPdf] = useState(false);
   const [importInfo, setImportInfo] = useState(null);
   const pdfRef = useRef(null);
+
+  // Importação via IA
+  const [importingAi, setImportingAi] = useState(false);
+  const [aiMode, setAiMode] = useState("file"); // "file" | "text"
+  const [aiTextPaste, setAiTextPaste] = useState("");
+  const aiFileRef = useRef(null);
 
   // Itens (inicia com uma linha por item da RM)
   const [itens, setItens] = useState(() =>
@@ -173,6 +180,107 @@ export default function LancarCotacaoPage({ params }) {
       showToast("Erro ao importar PDF: " + err.message, "error");
     } finally {
       setImportingPdf(false);
+    }
+  };
+
+  // ─── Importar via IA (Claude API) ────────────────────────
+  const importarViaIa = async ({ file, text }) => {
+    if (!file && !text) {
+      showToast("Selecione um arquivo ou cole o texto da cotação", "error");
+      return;
+    }
+    setImportingAi(true);
+    setImportInfo(null);
+    try {
+      const rmItens = rm.itens || [];
+      const body = {
+        rmItens: rmItens.map((ri) => ({
+          descricao: ri.descricao || ri.item || "",
+          material: ri.material || ri.mat || "",
+          qtd: ri.qtd,
+          unidade: ri.unidade || "",
+        })),
+      };
+
+      let dataUrl = null;
+      if (file) {
+        dataUrl = await readAsDataURL(file);
+        const isPdf = (file.type || "").includes("pdf") || /\.pdf$/i.test(file.name);
+        if (isPdf) {
+          body.pdfBase64 = dataUrl;
+        } else {
+          body.imageBase64 = dataUrl;
+          body.imageType = file.type || "image/jpeg";
+        }
+      }
+      if (text && text.trim()) {
+        body.text = text.trim();
+      }
+
+      const resp = await fetch("/api/parse-cotacao-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || "Falha na IA");
+
+      // Pré-preenche cabeçalho se ainda não tiver valor
+      if (data.fornecedor && !fornecedorNome) setFornecedorNome(data.fornecedor);
+      if (data.prazoPagamento && !prazoPagamento) setPrazoPagamento(data.prazoPagamento);
+      if (data.tipoFrete && tipoFrete === "CIF" && data.tipoFrete !== "CIF") setTipoFrete(data.tipoFrete);
+
+      let casados = 0;
+      const semMatch = [];
+      const avisos = [];
+      setItens((prev) => {
+        const copy = [...prev];
+        for (const aiIt of data.itens || []) {
+          if (aiIt._warning) avisos.push(aiIt._warning);
+          const idx = aiIt.rmIndex;
+          if (idx != null && idx >= 0 && idx < copy.length) {
+            copy[idx] = {
+              ...copy[idx],
+              precoUnit: aiIt.precoUnit ? String(aiIt.precoUnit) : "",
+              qtdCotada: Number(aiIt.qtdCotada || aiIt.qtd || copy[idx].qtdSolicitada),
+              icmsPct: aiIt.icmsPct != null ? String(aiIt.icmsPct) : copy[idx].icmsPct,
+              ipiPct: aiIt.ipiPct != null ? String(aiIt.ipiPct) : copy[idx].ipiPct,
+              prazoEntrega: aiIt.prazoEntrega || copy[idx].prazoEntrega,
+              observacao: aiIt.observacao || copy[idx].observacao,
+              disponibilidade: copy[idx].disponibilidade || "Suficiente",
+            };
+            casados++;
+          } else {
+            semMatch.push(aiIt.descricao);
+          }
+        }
+        return copy;
+      });
+
+      // Anexa o arquivo (se for PDF) como comprovante
+      if (file && (file.type || "").includes("pdf")) {
+        setAnexo({ nome: file.name, tipo: "pdf", tamanho: file.size, dataUrl });
+      }
+
+      const total = (data.itens || []).length;
+      setImportInfo({
+        formato: "ia",
+        totalItens: total,
+        casados,
+        semMatch,
+        avisos,
+        meta: data._meta || {},
+      });
+      setAiTextPaste("");
+      if (total === 0) {
+        showToast("IA não reconheceu itens. Tente outro arquivo ou cole o texto.", "error");
+      } else {
+        showToast(`IA processou: ${casados}/${total} itens casados com a RM (custo ~R$ ${((data._meta?.inputTokens || 0) * 0.000005 + (data._meta?.outputTokens || 0) * 0.00002).toFixed(4)})`);
+      }
+    } catch (err) {
+      showToast("Erro IA: " + err.message, "error");
+    } finally {
+      setImportingAi(false);
     }
   };
 
@@ -314,40 +422,122 @@ export default function LancarCotacaoPage({ params }) {
           <ArrowLeft size={16} /> Voltar pra RM
         </Link>
       </div>
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Lançar Cotação</h2>
-          <p className="text-sm text-gray-500">
-            RM-{rm.numero} — {rm.descricao} · {(rm.itens || []).length} itens
-          </p>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-800">Lançar Cotação</h2>
+        <p className="text-sm text-gray-500">
+          RM-{rm.numero} — {rm.descricao} · {(rm.itens || []).length} itens
+        </p>
+      </div>
+
+      {/* ─── IMPORTAR VIA IA ─────────────────────────────── */}
+      <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-5 space-y-4">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-purple-900 flex items-center gap-2">
+              <Sparkles size={18} className="text-purple-600" /> Importar via IA
+            </h3>
+            <p className="text-sm text-purple-800/80 mt-1">
+              Sobe um PDF, foto, print ou cola o texto do email/WhatsApp — a IA extrai os itens
+              e já casa com sua RM. Funciona com qualquer formato de fornecedor.
+            </p>
+          </div>
         </div>
-        <div>
+
+        {/* Tabs: arquivo | texto */}
+        <div className="flex gap-2">
           <button
-            onClick={() => pdfRef.current?.click()}
-            disabled={importingPdf}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 disabled:opacity-50"
+            onClick={() => setAiMode("file")}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              aiMode === "file"
+                ? "bg-purple-600 text-white"
+                : "bg-white border border-purple-200 text-purple-700 hover:bg-purple-50"
+            }`}
           >
-            {importingPdf ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-            {importingPdf ? "Lendo PDF..." : "Importar PDF da cotação"}
+            <FileText size={14} className="inline mr-1" /> PDF / Imagem
           </button>
-          <input
-            ref={pdfRef}
-            type="file"
-            accept=".pdf"
-            className="hidden"
-            onChange={(e) => { importarPdf(e.target.files[0]); e.target.value = ""; }}
-          />
-          <p className="text-xs text-gray-400 mt-1 text-right">
-            Pré-preenche os campos a partir do PDF do fornecedor.
-          </p>
+          <button
+            onClick={() => setAiMode("text")}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              aiMode === "text"
+                ? "bg-purple-600 text-white"
+                : "bg-white border border-purple-200 text-purple-700 hover:bg-purple-50"
+            }`}
+          >
+            <ClipboardPaste size={14} className="inline mr-1" /> Colar texto
+          </button>
         </div>
+
+        {aiMode === "file" && (
+          <div>
+            <button
+              onClick={() => aiFileRef.current?.click()}
+              disabled={importingAi}
+              className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {importingAi ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              {importingAi ? "Processando com IA..." : "Selecionar PDF, JPG ou PNG"}
+            </button>
+            <input
+              ref={aiFileRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              className="hidden"
+              onChange={(e) => { importarViaIa({ file: e.target.files[0] }); e.target.value = ""; }}
+            />
+          </div>
+        )}
+
+        {aiMode === "text" && (
+          <div className="space-y-2">
+            <textarea
+              value={aiTextPaste}
+              onChange={(e) => setAiTextPaste(e.target.value)}
+              placeholder="Cole aqui o conteúdo do email, mensagem do WhatsApp, ou qualquer texto com os itens da cotação..."
+              rows={6}
+              className="w-full border border-purple-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono"
+              disabled={importingAi}
+            />
+            <button
+              onClick={() => importarViaIa({ text: aiTextPaste })}
+              disabled={importingAi || !aiTextPaste.trim()}
+              className="w-full px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {importingAi ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              {importingAi ? "Processando com IA..." : "Processar texto com IA"}
+            </button>
+          </div>
+        )}
+
+        <details className="text-xs text-purple-700/70">
+          <summary className="cursor-pointer hover:text-purple-900">Avançado — usar parser por regex (Soufer/Gerdau apenas)</summary>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => pdfRef.current?.click()}
+              disabled={importingPdf}
+              className="px-3 py-1.5 bg-white border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-50 text-xs flex items-center gap-1 disabled:opacity-50"
+            >
+              {importingPdf ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+              {importingPdf ? "Lendo..." : "Importar PDF (regex offline)"}
+            </button>
+            <input
+              ref={pdfRef}
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={(e) => { importarPdf(e.target.files[0]); e.target.value = ""; }}
+            />
+          </div>
+        </details>
       </div>
 
       {importInfo && (
         <div className={`border rounded-lg p-3 text-sm ${importInfo.totalItens === 0 ? "bg-yellow-50 border-yellow-200" : "bg-blue-50 border-blue-200"}`}>
           <p className={importInfo.totalItens === 0 ? "text-yellow-800" : "text-blue-800"}>
-            {importInfo.totalItens === 0 ? "⚠️" : "✓"} PDF <strong>{importInfo.formato}</strong> lido — {importInfo.casados} de {importInfo.totalItens} itens casados com itens da RM
-            {importInfo.meta?.pages ? ` · ${importInfo.meta.pages} página(s) · ${importInfo.meta.textLength} chars` : ""}.
+            {importInfo.totalItens === 0 ? "⚠️" : "✓"} {importInfo.formato === "ia" ? "IA processou" : `PDF ${importInfo.formato} lido`} — {importInfo.casados} de {importInfo.totalItens} itens casados com itens da RM
+            {importInfo.meta?.pages ? ` · ${importInfo.meta.pages} página(s) · ${importInfo.meta.textLength} chars` : ""}
+            {importInfo.formato === "ia" && importInfo.meta?.inputTokens
+              ? ` · ${importInfo.meta.inputTokens}↓+${importInfo.meta.outputTokens}↑ tokens (~R$ ${((importInfo.meta.inputTokens || 0) * 0.000005 + (importInfo.meta.outputTokens || 0) * 0.00002).toFixed(4)})`
+              : ""}.
           </p>
           {(importInfo.avisos || []).length > 0 && (
             <ul className="mt-2 text-xs text-gray-700 list-disc list-inside">
