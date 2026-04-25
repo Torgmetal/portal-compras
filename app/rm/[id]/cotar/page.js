@@ -115,6 +115,7 @@ export default function LancarCotacaoPage({ params }) {
         codigoOmie: ri.codigo || "",
         precoUnit: "",
         qtdCotada: usarPeso ? pesoKg : Number(ri.qtd) || 0,
+        qtdProposta: null, // qtd que o fornecedor cotou (do PDF) — pra alertar divergencia
         icmsPct: "",
         ipiPct: "",
         prazoEntrega: "",
@@ -263,27 +264,38 @@ export default function LancarCotacaoPage({ params }) {
       let casados = 0;
       const semMatch = [];
       const avisos = [];
+      const divergenciasQtd = [];
       setItens((prev) => {
         const copy = [...prev];
         for (const aiIt of data.itens || []) {
           if (aiIt._warning) avisos.push(aiIt._warning);
           const idx = aiIt.rmIndex;
           if (idx != null && idx >= 0 && idx < copy.length) {
-            // Confia na qtd que a IA extraiu do PDF — é exatamente o que está
-            // na proposta do fornecedor (em kg, com prompt explícito).
-            // Comparação fica em "termos da proposta" (igual ao PDF). Se o
-            // comprador quiser comprar menos, edita o campo manualmente.
-            // Fallback (qtd da RM) só se a IA não devolveu nada utilizável.
+            // Mantém qtd da RM (peso em kg) como qtdCotada — Torg só compra o
+            // que precisa. Mas guarda a qtd que o fornecedor cotou separadamente
+            // (qtdProposta) pra poder gerar alerta quando divergir, e pra que o
+            // comprador verifique manualmente.
             const aiQtd = Number(aiIt.qtdCotada || aiIt.qtd || 0);
             const aiUn = String(aiIt.unidade || "").toUpperCase();
             const formUn = String(copy[idx].unidade || "").toUpperCase();
-            // Só ignora a IA se a unidade for claramente diferente (ex: IA
-            // devolveu UN/PC mas form é KG) — proteção contra IA captar barras.
             const unidadesBatem = !aiUn || aiUn === formUn;
+            const qtdProposta = aiQtd > 0 && unidadesBatem ? aiQtd : null;
+            // Detecta divergência de qtd: fornecedor cotou diferente da RM
+            if (qtdProposta != null) {
+              const qtdRm = Number(copy[idx].qtdSolicitada) || 0;
+              const diffPct = qtdRm > 0 ? Math.abs(qtdProposta - qtdRm) / qtdRm : 0;
+              if (diffPct > 0.01 && Math.abs(qtdProposta - qtdRm) > 0.5) {
+                const sinal = qtdProposta > qtdRm ? "↑" : "↓";
+                divergenciasQtd.push(
+                  `${copy[idx].descricao}: RM pediu ${qtdRm.toLocaleString("pt-BR")} ${copy[idx].unidade}, proposta ${sinal} ${qtdProposta.toLocaleString("pt-BR")} ${copy[idx].unidade}`
+                );
+              }
+            }
             copy[idx] = {
               ...copy[idx],
               precoUnit: aiIt.precoUnit ? String(aiIt.precoUnit) : "",
-              qtdCotada: aiQtd > 0 && unidadesBatem ? aiQtd : copy[idx].qtdSolicitada,
+              // qtdCotada continua = qtdSolicitada (peso da RM em kg)
+              qtdProposta,
               icmsPct: aiIt.icmsPct != null ? String(aiIt.icmsPct) : copy[idx].icmsPct,
               ipiPct: aiIt.ipiPct != null ? String(aiIt.ipiPct) : copy[idx].ipiPct,
               prazoEntrega: aiIt.prazoEntrega || copy[idx].prazoEntrega,
@@ -309,6 +321,7 @@ export default function LancarCotacaoPage({ params }) {
         casados,
         semMatch,
         avisos,
+        divergenciasQtd,
         meta: data._meta || {},
       });
       setAiTextPaste("");
@@ -586,6 +599,16 @@ export default function LancarCotacaoPage({ params }) {
               {importInfo.avisos.map((a, i) => (<li key={i}>{a}</li>))}
             </ul>
           )}
+          {(importInfo.divergenciasQtd || []).length > 0 && (
+            <details className="mt-2 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 text-xs" open>
+              <summary className="cursor-pointer text-amber-800 font-medium">
+                ⚠ {importInfo.divergenciasQtd.length} item(s) com quantidade divergente entre RM e proposta — verifique antes de fechar pedido
+              </summary>
+              <ul className="mt-1 text-amber-900 list-disc list-inside space-y-0.5">
+                {importInfo.divergenciasQtd.map((d, i) => (<li key={i}>{d}</li>))}
+              </ul>
+            </details>
+          )}
           {importInfo.semMatch.length > 0 && (
             <details className="mt-2">
               <summary className="cursor-pointer text-blue-700 hover:underline text-xs">
@@ -843,6 +866,11 @@ export default function LancarCotacaoPage({ params }) {
                         onChange={(e) => setItem(i, "qtdCotada", e.target.value)}
                         className="w-20 border border-gray-200 rounded px-2 py-1 text-right focus:ring-1 focus:ring-blue-500"
                       />
+                      {it.qtdProposta != null && Math.abs(it.qtdProposta - Number(it.qtdCotada || 0)) > 0.5 && (
+                        <div className="mt-1 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 leading-tight" title="Quantidade na proposta do fornecedor difere da quantidade na RM. Verifique antes de fechar.">
+                          ⚠ Proposta: {Number(it.qtdProposta).toLocaleString("pt-BR", {maximumFractionDigits: 2})} {it.unidade}
+                        </div>
+                      )}
                     </td>
                     {mostrarImpostos && (
                       <td className="px-3 py-2">
