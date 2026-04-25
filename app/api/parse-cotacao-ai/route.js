@@ -11,6 +11,9 @@ const SYSTEM_PROMPT = `Você é um assistente de compras de uma siderúrgica (To
 REGRAS DE EXTRAÇÃO:
 - Reconhece notação brasileira: vírgula é decimal, ponto é separador de milhar (ex: "11.737,95" = 11737.95)
 - Identifica preço unitário em R$/KG, R$/UN, R$/PÇ, R$/M conforme a unidade
+- IMPORTANTE: a "qtd" e "unidade" devem ser SEMPRE como o FORNECEDOR cotou no documento
+  (tipicamente KG para aço/perfis/chapas). NÃO converta pra unidade da RM. Se o PDF
+  diz "1.440 KG", devolva qtd=1440 e unidade="KG", mesmo que a RM diga "8 barra(s)".
 - Captura ICMS%, IPI% por item quando disponíveis (geralmente em colunas separadas)
 - Captura prazo de pagamento (ex: "28 DDL", "30/60/90", "à vista")
 - Ignora cabeçalho, rodapé, dados de transporte, observações genéricas
@@ -148,12 +151,16 @@ export async function POST(request) {
       content.push({ type: "text", text: `Texto da cotação:\n\n${text}` });
     }
 
-    // Contexto da RM (lista de itens com índice)
+    // Contexto da RM (lista de itens com índice). Inclui peso kg pra IA
+    // confrontar com a qtd em kg que vem no PDF do fornecedor.
     const rmContext = (rmItens || [])
-      .map(
-        (it, i) =>
-          `${i}: "${it.descricao || it.item || ""}" (material: ${it.material || it.mat || "—"}, qtd: ${it.qtd ?? "?"}${it.unidade || ""})`
-      )
+      .map((it, i) => {
+        const qtd = it.qtd ?? "?";
+        const un = it.unidade || "";
+        const peso = it.pesoKg || it.peso;
+        const pesoStr = peso ? `, ~${peso}kg` : "";
+        return `${i}: "${it.descricao || it.item || ""}" (material: ${it.material || it.mat || "—"}, qtd RM: ${qtd}${un}${pesoStr})`;
+      })
       .join("\n");
 
     content.push({
