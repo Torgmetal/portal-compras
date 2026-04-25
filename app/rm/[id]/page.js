@@ -135,9 +135,8 @@ export default function RmDetail({ params }) {
       const rmItem = (rm.itens || []).find((ri) => ri.descricao && ri.descricao.toLowerCase().trim() === key);
       if (!allItems.has(key)) allItems.set(key, { item: it.item || it.descricao, codigoOmie: rmItem?.codigo || "", cotacoes: [] });
       const precoUnit = Number(it.precoUnit) || 0;
-      // Cotações antigas não têm precoLiquido/disponibilidade; fallback: líquido=bruto, disponível
+      // Cotações antigas podem não ter precoLiquido; fallback: líquido = bruto
       const precoLiquido = Number(it.precoLiquido) || precoUnit;
-      const disponibilidade = it.disponibilidade || "Suficiente";
       allItems.get(key).cotacoes.push({
         fornecedor: cot.fornecedor,
         precoUnit,
@@ -145,7 +144,6 @@ export default function RmDetail({ params }) {
         qtd: Number(it.qtd) || 0,
         total: precoUnit * (Number(it.qtd) || 0),
         totalLiquido: precoLiquido * (Number(it.qtd) || 0),
-        disponibilidade,
         faturamento: cot.faturamento || "Cliente",
         prazoEntrega: it.prazoEntrega || "",
       });
@@ -153,14 +151,13 @@ export default function RmDetail({ params }) {
   });
   const mapaItems = Array.from(allItems.values());
 
-  const ELEGIVEIS = new Set(["Suficiente", "Sob encomenda"]);
   const getWinner = (mi) => {
     const key = mi.item.toLowerCase().trim();
     if (overrides[key]) return overrides[key];
-    // Só entram elegíveis (Suficiente/Sob encomenda) com preço > 0
-    const elegiveis = mi.cotacoes.filter((c) => c.precoLiquido > 0 && ELEGIVEIS.has(c.disponibilidade));
+    // Vencedor = menor preço líquido (que considera impostos quando Faturamento=Torg)
+    // Fornecedor que não cotou um item simplesmente não aparece aqui.
+    const elegiveis = mi.cotacoes.filter((c) => c.precoLiquido > 0);
     if (elegiveis.length === 0) return null;
-    // Ordena por preço líquido crescente (que já considera impostos quando Torg)
     elegiveis.sort((a, b) => a.precoLiquido - b.precoLiquido);
     return elegiveis[0].fornecedor;
   };
@@ -331,6 +328,8 @@ export default function RmDetail({ params }) {
   
 
   // ─── CONTAGENS POR FORNECEDOR NO MAPA ───────────────────
+  // winnerStats: total dos itens em que cada fornecedor é o vencedor
+  // (= o que a Torg vai gastar com ele)
   const winnerStats = useMemo(() => {
     const stats = {};
     mapaItems.forEach((mi) => {
@@ -345,6 +344,22 @@ export default function RmDetail({ params }) {
     });
     return stats;
   }, [mapaItems, overrides]);
+
+  // proposalStats: total de TODA a proposta de cada fornecedor (= o que ele
+  // ofereceu no papel, independente de quem ganhou). Útil pra confrontar
+  // com o PDF do fornecedor.
+  const proposalStats = useMemo(() => {
+    const stats = {};
+    (rm.cotacoes || []).forEach((cot) => {
+      if (!stats[cot.fornecedor]) stats[cot.fornecedor] = { count: 0, total: 0 };
+      (cot.itens || []).forEach((it) => {
+        const linha = (Number(it.precoUnit) || 0) * (Number(it.qtd) || 0);
+        stats[cot.fornecedor].count++;
+        stats[cot.fornecedor].total += linha;
+      });
+    });
+    return stats;
+  }, [rm.cotacoes]);
 
   if (!loaded) return <div className="p-12 text-center text-gray-400">Carregando...</div>;
   if (!rmFound) {
@@ -880,7 +895,6 @@ export default function RmDetail({ params }) {
                         const match = mi.cotacoes.find((c) => c.fornecedor === cot.fornecedor);
                         const isLowest = match && match.precoUnit === menorPreco && match.precoUnit > 0;
                         const isWinner = match && cot.fornecedor === winner;
-                        const isInelegivel = match && match.disponibilidade && !ELEGIVEIS.has(match.disponibilidade);
                         const precoMostrar = match && temFaturamentoTorg && cot.faturamento === "Torg"
                           ? match.precoLiquido
                           : match?.precoUnit;
@@ -888,28 +902,21 @@ export default function RmDetail({ params }) {
                           <Fragment key={cot.id + "-" + idx}>
                             <td
                               className={`px-3 py-3 text-center font-semibold cursor-pointer transition-colors ${
-                                isInelegivel
-                                  ? "bg-gray-50 text-gray-400 line-through"
-                                  : isWinner
+                                isWinner
                                   ? "bg-green-50 text-green-700 ring-2 ring-inset ring-green-300"
                                   : isLowest
                                   ? "bg-green-50/50 text-green-600"
                                   : "text-gray-700 hover:bg-blue-50"
                               }`}
-                              onClick={() => match && match.precoUnit > 0 && !isInelegivel && setWinner(itemKey, cot.fornecedor)}
+                              onClick={() => match && match.precoUnit > 0 && setWinner(itemKey, cot.fornecedor)}
                               title={
                                 match
-                                  ? `${cot.fornecedor}${match.disponibilidade ? " — " + match.disponibilidade : ""}${temFaturamentoTorg && cot.faturamento === "Torg" ? ` (bruto ${fmt(match.precoUnit)})` : ""}`
+                                  ? `${cot.fornecedor}${temFaturamentoTorg && cot.faturamento === "Torg" ? ` (bruto ${fmt(match.precoUnit)})` : ""}`
                                   : ""
                               }
                             >
                               {match && precoMostrar ? fmt(precoMostrar) : "—"}
                               {isWinner && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
-                              {match && match.disponibilidade && match.disponibilidade !== "Suficiente" && (
-                                <span className="block text-[10px] font-normal mt-0.5 opacity-80">
-                                  {match.disponibilidade}
-                                </span>
-                              )}
                             </td>
                             <td className={`px-3 py-3 text-center text-xs ${match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm ? "bg-yellow-100 text-yellow-800 font-bold" : "text-gray-600"}`}>{match ? (match.qtd || "—") : "—"}{match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm && <AlertCircle size={12} className="inline ml-1 text-yellow-600" title={`Qtd RM: ${mi.qtdRm}`} />}</td>
                       <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "—"}</td>
@@ -926,22 +933,36 @@ export default function RmDetail({ params }) {
               </tbody>
               <tfoot className="bg-gray-50 font-semibold">
                 <tr>
-                  <td className="px-4 py-3 text-gray-700 sticky left-0 bg-gray-50">TOTAL POR FORNECEDOR</td>
+                  <td className="px-4 py-3 text-gray-700 sticky left-0 bg-gray-50" title="Soma de todos os itens da proposta original do fornecedor">TOTAL DA PROPOSTA</td>
                   {cotacoes.map((cot) => {
-                    const minTotal = Math.min(...cotacoes.map((c) => c.total));
-                     const isBest = cot.total === minTotal;
+                    const propTotal = proposalStats[cot.fornecedor]?.total || 0;
+                    const propTotals = cotacoes.map((c) => proposalStats[c.fornecedor]?.total || 0).filter((t) => t > 0);
+                    const minTotal = propTotals.length ? Math.min(...propTotals) : 0;
+                    const isBest = propTotal > 0 && propTotal === minTotal;
                     return (
                       <Fragment key={cot.id + "-total"}>
-                        <td className={`px-3 py-3 text-center ${isBest ? "bg-green-50 text-green-700" : "text-gray-700"}`}>
-                          {fmt(cot.total)}
+                        <td className={`px-3 py-3 text-center ${isBest ? "bg-green-50 text-green-700" : "text-gray-700"}`} colSpan={4}>
+                          {fmt(propTotal)}
                           {isBest && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
                         </td>
-                        <td></td>
-                        <td></td>
                       </Fragment>
                     );
                   })}
-                  <td className="px-3 py-3 text-center bg-purple-50 text-purple-700 font-bold">
+                  <td className="px-3 py-3 text-center bg-purple-50/50 text-purple-700">—</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-3 text-gray-700 sticky left-0 bg-gray-50" title="Total dos itens em que este fornecedor é vencedor (= o que a Torg vai gastar com ele)">TOTAL VENCEDOR (Torg compra)</td>
+                  {cotacoes.map((cot) => {
+                    const winTotal = winnerStats[cot.fornecedor]?.total || 0;
+                    return (
+                      <Fragment key={cot.id + "-vencedor"}>
+                        <td className={`px-3 py-3 text-center ${winTotal > 0 ? "bg-emerald-50 text-emerald-700 font-bold" : "text-gray-400"}`} colSpan={4}>
+                          {winTotal > 0 ? fmt(winTotal) : "—"}
+                        </td>
+                      </Fragment>
+                    );
+                  })}
+                  <td className="px-3 py-3 text-center bg-purple-100 text-purple-800 font-bold">
                     {fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}
                   </td>
                 </tr>

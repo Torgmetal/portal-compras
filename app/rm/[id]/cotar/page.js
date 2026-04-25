@@ -12,13 +12,6 @@ import {
 } from "lucide-react";
 
 // ─── Constantes ──────────────────────────────────────────────
-const DISPONIBILIDADES = [
-  { key: "Suficiente", cor: "green", elegivel: true, descr: "Tem estoque para atender a qtd solicitada" },
-  { key: "Sob encomenda", cor: "amber", elegivel: true, descr: "Produz/entrega num prazo informado" },
-  { key: "Parcial", cor: "orange", elegivel: false, descr: "Só tem parte da qtd solicitada" },
-  { key: "Não tem", cor: "red", elegivel: false, descr: "Fornecedor não consegue atender" },
-  { key: "Não cotou", cor: "gray", elegivel: false, descr: "Item não incluído na proposta" },
-];
 const TIPOS_FRETE = ["CIF", "FOB", "Retira"];
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -85,7 +78,6 @@ export default function LancarCotacaoPage({ params }) {
       codigoOmie: ri.codigo || "",
       precoUnit: "",
       qtdCotada: Number(ri.qtd) || 0,
-      disponibilidade: "Suficiente",
       icmsPct: "",
       ipiPct: "",
       prazoEntrega: "",
@@ -138,7 +130,6 @@ export default function LancarCotacaoPage({ params }) {
               qtdCotada: Number(pdfIt.qtdCotada ?? pdfIt.qtd ?? copy[idx].qtdSolicitada),
               icmsPct: String(pdfIt.icmsPct || ""),
               ipiPct: String(pdfIt.ipiPct || ""),
-              disponibilidade: pdfIt.disponibilidade || "Suficiente",
             };
             casados++;
           } else {
@@ -247,7 +238,6 @@ export default function LancarCotacaoPage({ params }) {
               ipiPct: aiIt.ipiPct != null ? String(aiIt.ipiPct) : copy[idx].ipiPct,
               prazoEntrega: aiIt.prazoEntrega || copy[idx].prazoEntrega,
               observacao: aiIt.observacao || copy[idx].observacao,
-              disponibilidade: copy[idx].disponibilidade || "Suficiente",
             };
             casados++;
           } else {
@@ -329,7 +319,7 @@ export default function LancarCotacaoPage({ params }) {
 
     // Monta itens da cotação — só os realmente cotados
     const itensCotacao = itens
-      .filter((it) => it.disponibilidade !== "Não cotou" && (Number(it.precoUnit) > 0 || Number(it.qtdCotada) > 0))
+      .filter((it) => Number(it.precoUnit) > 0 && Number(it.qtdCotada) > 0)
       .map((it) => {
         const precoUnit = Number(it.precoUnit) || 0;
         const qtdCotada = Number(it.qtdCotada) || 0;
@@ -352,7 +342,6 @@ export default function LancarCotacaoPage({ params }) {
           // Campos novos (estruturados)
           qtdSolicitada: it.qtdSolicitada,
           qtdCotada,
-          disponibilidade: it.disponibilidade,
           icmsPct: icmsItem,
           ipiPct,
           prazoEntrega: it.prazoEntrega,
@@ -742,7 +731,7 @@ export default function LancarCotacaoPage({ params }) {
         <div className="px-6 py-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-800">Itens da RM</h3>
           <p className="text-xs text-gray-500 mt-1">
-            Preencha preço, qtd cotada e disponibilidade para cada item. Se o fornecedor não cotou, selecione "Não cotou".
+            Preencha preço e qtd cotada para cada item. Itens sem preço são ignorados ao salvar (fornecedor que não cotou).
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -754,7 +743,6 @@ export default function LancarCotacaoPage({ params }) {
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Un.</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. (R$) *</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd cotada</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Disponibilidade</th>
                 {mostrarImpostos && <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">ICMS %</th>}
                 {mostrarImpostos && <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">IPI %</th>}
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prazo</th>
@@ -773,8 +761,6 @@ export default function LancarCotacaoPage({ params }) {
                   icmsPct: icmsItem, pisPct, cofinsPct, ipiPct: it.ipiPct, creditaIpi, faturamento,
                 });
                 const totalLiq = precoLiq * qtd;
-                const dispMeta = DISPONIBILIDADES.find((d) => d.key === it.disponibilidade);
-                const isSobEnc = it.disponibilidade === "Sob encomenda";
                 return (
                   <tr key={it.rmItemId || i} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-gray-800 font-medium">{it.descricao}</td>
@@ -795,15 +781,6 @@ export default function LancarCotacaoPage({ params }) {
                         onChange={(e) => setItem(i, "qtdCotada", e.target.value)}
                         className="w-20 border border-gray-200 rounded px-2 py-1 text-right focus:ring-1 focus:ring-blue-500"
                       />
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={it.disponibilidade}
-                        onChange={(e) => setItem(i, "disponibilidade", e.target.value)}
-                        className={`border rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500 bg-${dispMeta?.cor || "gray"}-50 border-${dispMeta?.cor || "gray"}-200 text-${dispMeta?.cor || "gray"}-800`}
-                      >
-                        {DISPONIBILIDADES.map((d) => <option key={d.key} value={d.key}>{d.key}</option>)}
-                      </select>
                     </td>
                     {mostrarImpostos && (
                       <td className="px-3 py-2">
@@ -832,7 +809,7 @@ export default function LancarCotacaoPage({ params }) {
                         type="text"
                         value={it.prazoEntrega}
                         onChange={(e) => setItem(i, "prazoEntrega", e.target.value)}
-                        placeholder={isSobEnc ? "ex: 15 dias" : "—"}
+                        placeholder="—"
                         className="w-24 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-500"
                       />
                     </td>
@@ -855,7 +832,7 @@ export default function LancarCotacaoPage({ params }) {
             </tbody>
             <tfoot className="bg-gray-50 font-semibold">
               <tr>
-                <td colSpan={mostrarImpostos ? 10 : 8} className="px-3 py-3 text-right text-gray-700">Totais:</td>
+                <td colSpan={mostrarImpostos ? 9 : 7} className="px-3 py-3 text-right text-gray-700">Totais:</td>
                 <td className="px-3 py-3 text-right text-gray-900 tabular-nums">{fmt(totais.totalBruto)}</td>
                 {mostrarImpostos && (
                   <td className="px-3 py-3 text-right text-green-700 tabular-nums">{fmt(totais.totalLiquido)}</td>
@@ -863,7 +840,7 @@ export default function LancarCotacaoPage({ params }) {
               </tr>
               {mostrarImpostos && totais.creditoTotal > 0 && (
                 <tr>
-                  <td colSpan={10} className="px-3 py-1 text-right text-xs text-gray-500">Crédito tributário estimado:</td>
+                  <td colSpan={9} className="px-3 py-1 text-right text-xs text-gray-500">Crédito tributário estimado:</td>
                   <td colSpan={2} className="px-3 py-1 text-right text-xs text-gray-500 tabular-nums">{fmt(totais.creditoTotal)}</td>
                 </tr>
               )}
