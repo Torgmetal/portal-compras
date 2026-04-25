@@ -814,32 +814,12 @@ export default function RmDetail({ params }) {
                 </div>
               )}
 
-          {/* Resumo por fornecedor vencedor */}
-          <div className="px-6 py-4 bg-purple-50/50 border-b border-purple-100">
-            <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
-              <Award size={16} /> Resumo — Itens por Fornecedor Vencedor
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {Object.entries(winnerStats).map(([forn, stats]) => (
-                <div key={forn} className="bg-white rounded-lg border border-purple-200 px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800 text-sm">{forn}</p>
-                    <p className="text-xs text-gray-500">{stats.count} ite{stats.count === 1 ? "m" : "ns"}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-green-700 text-sm">{fmt(stats.total)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 pt-3 border-t border-purple-200 flex items-center justify-between text-sm">
-              <span className="text-purple-700 font-medium">
-                Total geral (menores preços): {fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}
-              </span>
-              <span className="text-xs text-purple-500">
-                {Object.keys(winnerStats).length} fornecedor{Object.keys(winnerStats).length !== 1 ? "es" : ""}
-              </span>
-            </div>
+          {/* Resumo no topo — só o número total que vai sair de pedido */}
+          <div className="px-6 py-3 bg-purple-50 border-b border-purple-100 flex items-center justify-between text-sm">
+            <span className="text-purple-700 font-medium flex items-center gap-2">
+              <Award size={16} /> Pedido total (vencedores): {Object.keys(winnerStats).length} fornecedor{Object.keys(winnerStats).length !== 1 ? "es" : ""}
+            </span>
+            <span className="font-bold text-purple-900 text-base">{fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}</span>
           </div>
 
           {omieResult && (
@@ -942,38 +922,52 @@ export default function RmDetail({ params }) {
                 })}
               </tbody>
               <tfoot className="bg-gray-50 font-semibold">
-                <tr>
-                  <td className="px-4 py-3 text-gray-700 sticky left-0 bg-gray-50" title="Soma de todos os itens da proposta original do fornecedor">TOTAL DA PROPOSTA</td>
+                <tr className="border-t-2 border-gray-200">
+                  <td className="px-4 py-4 text-gray-700 sticky left-0 bg-gray-50 align-top">
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-gray-500 font-medium">Proposta</div>
+                        <div className="text-xs text-gray-400 font-normal">Valor total do PDF</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-emerald-700 font-medium">Vencedor</div>
+                        <div className="text-xs text-emerald-600 font-normal">Itens vencidos × qtd RM</div>
+                      </div>
+                    </div>
+                  </td>
                   {cotacoes.map((cot) => {
                     const propTotal = proposalStats[cot.fornecedor]?.total || 0;
+                    const propCount = proposalStats[cot.fornecedor]?.count || 0;
+                    const winTotal = winnerStats[cot.fornecedor]?.total || 0;
+                    const winCount = winnerStats[cot.fornecedor]?.count || 0;
                     const propTotals = cotacoes.map((c) => proposalStats[c.fornecedor]?.total || 0).filter((t) => t > 0);
-                    const minTotal = propTotals.length ? Math.min(...propTotals) : 0;
-                    const isBest = propTotal > 0 && propTotal === minTotal;
+                    const minProp = propTotals.length ? Math.min(...propTotals) : 0;
+                    const isBestProp = propTotal > 0 && propTotal === minProp;
                     return (
                       <Fragment key={cot.id + "-total"}>
-                        <td className={`px-3 py-3 text-center ${isBest ? "bg-green-50 text-green-700" : "text-gray-700"}`} colSpan={4}>
-                          {fmt(propTotal)}
-                          {isBest && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
+                        <td className="px-3 py-4 text-center align-top" colSpan={4}>
+                          <div className="space-y-2">
+                            <div className={`${isBestProp ? "text-green-700" : "text-gray-700"}`}>
+                              <div className="font-bold tabular-nums">{fmt(propTotal)}</div>
+                              <div className="text-[10px] font-normal text-gray-500">
+                                {propCount} ite{propCount === 1 ? "m" : "ns"} cotado{propCount === 1 ? "" : "s"}
+                                {isBestProp && <CheckCircle2 size={10} className="inline ml-1 text-green-500" />}
+                              </div>
+                            </div>
+                            <div className={`pt-2 border-t border-gray-200 ${winTotal > 0 ? "text-emerald-700" : "text-gray-300"}`}>
+                              <div className="font-bold tabular-nums">{winTotal > 0 ? fmt(winTotal) : "—"}</div>
+                              <div className="text-[10px] font-normal text-emerald-600">
+                                {winCount > 0 ? `${winCount} ite${winCount === 1 ? "m" : "ns"} vencido${winCount === 1 ? "" : "s"}` : "Nenhum vencedor"}
+                              </div>
+                            </div>
+                          </div>
                         </td>
                       </Fragment>
                     );
                   })}
-                  <td className="px-3 py-3 text-center bg-purple-50/50 text-purple-700">—</td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-3 text-gray-700 sticky left-0 bg-gray-50" title="Total dos itens em que este fornecedor é vencedor (= o que a Torg vai gastar com ele)">TOTAL VENCEDOR (Torg compra)</td>
-                  {cotacoes.map((cot) => {
-                    const winTotal = winnerStats[cot.fornecedor]?.total || 0;
-                    return (
-                      <Fragment key={cot.id + "-vencedor"}>
-                        <td className={`px-3 py-3 text-center ${winTotal > 0 ? "bg-emerald-50 text-emerald-700 font-bold" : "text-gray-400"}`} colSpan={4}>
-                          {winTotal > 0 ? fmt(winTotal) : "—"}
-                        </td>
-                      </Fragment>
-                    );
-                  })}
-                  <td className="px-3 py-3 text-center bg-purple-100 text-purple-800 font-bold">
-                    {fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}
+                  <td className="px-3 py-4 text-center bg-purple-100 text-purple-800 font-bold align-top">
+                    <div className="text-[10px] uppercase tracking-wide font-medium opacity-75">Total Pedido</div>
+                    <div className="text-base mt-1 tabular-nums">{fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}</div>
                   </td>
                 </tr>
               </tfoot>
