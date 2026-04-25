@@ -135,15 +135,20 @@ export default function RmDetail({ params }) {
       const rmItem = (rm.itens || []).find((ri) => ri.descricao && ri.descricao.toLowerCase().trim() === key);
       if (!allItems.has(key)) allItems.set(key, { item: it.item || it.descricao, codigoOmie: rmItem?.codigo || "", cotacoes: [] });
       const precoUnit = Number(it.precoUnit) || 0;
+      const ipiPct = Number(it.ipiPct) || 0;
+      const qtd = Number(it.qtd) || 0;
+      // IPI por fora: total da proposta = preço × qtd × (1 + IPI%)
+      const totalComIpi = precoUnit * qtd * (1 + ipiPct / 100);
       // Cotações antigas podem não ter precoLiquido; fallback: líquido = bruto
       const precoLiquido = Number(it.precoLiquido) || precoUnit;
       allItems.get(key).cotacoes.push({
         fornecedor: cot.fornecedor,
         precoUnit,
         precoLiquido,
-        qtd: Number(it.qtd) || 0,
-        total: precoUnit * (Number(it.qtd) || 0),
-        totalLiquido: precoLiquido * (Number(it.qtd) || 0),
+        ipiPct,
+        qtd,
+        total: totalComIpi,
+        totalLiquido: precoLiquido * qtd,
         faturamento: cot.faturamento || "Cliente",
         prazoEntrega: it.prazoEntrega || "",
       });
@@ -346,14 +351,17 @@ export default function RmDetail({ params }) {
   }, [mapaItems, overrides]);
 
   // proposalStats: total de TODA a proposta de cada fornecedor (= o que ele
-  // ofereceu no papel, independente de quem ganhou). Útil pra confrontar
-  // com o PDF do fornecedor.
+  // ofereceu no papel, independente de quem ganhou). Inclui IPI por fora
+  // pra bater com o "Valor total" do PDF do fornecedor.
   const proposalStats = useMemo(() => {
     const stats = {};
     (rm.cotacoes || []).forEach((cot) => {
       if (!stats[cot.fornecedor]) stats[cot.fornecedor] = { count: 0, total: 0 };
       (cot.itens || []).forEach((it) => {
-        const linha = (Number(it.precoUnit) || 0) * (Number(it.qtd) || 0);
+        const precoUnit = Number(it.precoUnit) || 0;
+        const qtd = Number(it.qtd) || 0;
+        const ipiPct = Number(it.ipiPct) || 0;
+        const linha = precoUnit * qtd * (1 + ipiPct / 100);
         stats[cot.fornecedor].count++;
         stats[cot.fornecedor].total += linha;
       });

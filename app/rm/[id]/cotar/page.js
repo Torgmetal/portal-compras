@@ -15,14 +15,36 @@ import {
 const TIPOS_FRETE = ["CIF", "FOB", "Retira"];
 
 // ─── Helpers ─────────────────────────────────────────────────
+// IPI no Brasil é "por fora": somado ao preço, não embutido. ICMS, PIS e
+// Cofins são "por dentro" (já dentro do preço cobrado).
+//
+// Faturamento Cliente:
+//   precoEfetivo = preço × (1 + IPI%)   // Torg só repassa; cliente paga IPI tb
+//
+// Faturamento Torg + IPI creditável (default p/ industrial):
+//   precoEfetivo = preço × (1 − ICMS% − PIS% − Cofins%)
+//   (IPI cancela: paga e credita; ICMS/PIS/Cofins descontam do custo)
+//
+// Faturamento Torg + IPI não creditável:
+//   precoEfetivo = preço × (1 − ICMS% − PIS% − Cofins% + IPI%)
 function calcPrecoLiquido(precoBruto, { icmsPct, pisPct, cofinsPct, ipiPct, creditaIpi, faturamento }) {
-  if (faturamento !== "Torg") return Number(precoBruto) || 0;
-  const creditTotal =
-    (Number(icmsPct) || 0) +
-    (Number(pisPct) || 0) +
-    (Number(cofinsPct) || 0) +
-    (creditaIpi ? Number(ipiPct) || 0 : 0);
-  return (Number(precoBruto) || 0) * (1 - creditTotal / 100);
+  const preco = Number(precoBruto) || 0;
+  const ipi = Number(ipiPct) || 0;
+  if (faturamento !== "Torg") {
+    // Cliente: IPI é custo (paga via Torg pra fornecedor, repassa pro cliente)
+    return preco * (1 + ipi / 100);
+  }
+  const creditDentro = (Number(icmsPct) || 0) + (Number(pisPct) || 0) + (Number(cofinsPct) || 0);
+  const ipiCusto = creditaIpi ? 0 : ipi; // se não credita, IPI vira custo
+  return preco * (1 - creditDentro / 100 + ipiCusto / 100);
+}
+
+// Total que aparece no PDF do fornecedor (preço × qtd + IPI por fora)
+function calcTotalProposta(precoBruto, qtd, ipiPct) {
+  const preco = Number(precoBruto) || 0;
+  const q = Number(qtd) || 0;
+  const ipi = Number(ipiPct) || 0;
+  return preco * q * (1 + ipi / 100);
 }
 
 
@@ -313,7 +335,8 @@ export default function LancarCotacaoPage({ params }) {
     });
   };
 
-  // Totais derivados
+  // Totais derivados — "totalBruto" aqui significa total da proposta (com IPI
+  // por fora somado), pra bater com o "Valor total" do PDF do fornecedor.
   const totais = useMemo(() => {
     let totalBruto = 0;
     let totalLiquido = 0;
@@ -323,8 +346,10 @@ export default function LancarCotacaoPage({ params }) {
     for (const it of itens) {
       const precoUnit = Number(it.precoUnit) || 0;
       const qtd = Number(it.qtdCotada) || 0;
-      const linha = precoUnit * qtd;
       if (precoUnit > 0 && qtd > 0) itensComPreco++;
+
+      // Total da proposta = preço × qtd × (1 + IPI%) — IPI por fora
+      const linha = calcTotalProposta(precoUnit, qtd, it.ipiPct);
       totalBruto += linha;
 
       // ICMS por item (com fallback pro default)
@@ -778,15 +803,16 @@ export default function LancarCotacaoPage({ params }) {
                 {mostrarImpostos && <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">IPI %</th>}
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prazo</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Obs</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total bruto</th>
-                {mostrarImpostos && <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total líquido</th>}
+                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Preço × qtd + IPI por fora (= total da proposta no PDF)">Total c/ IPI</th>
+                {mostrarImpostos && <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Custo efetivo Torg após créditos de ICMS/PIS/Cofins (e IPI se creditável)">Total líquido</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {itens.map((it, i) => {
                 const precoUnit = Number(it.precoUnit) || 0;
                 const qtd = Number(it.qtdCotada) || 0;
-                const totalBruto = precoUnit * qtd;
+                // Total c/ IPI = preço × qtd × (1 + IPI%) — bate com o PDF do fornecedor
+                const totalBruto = calcTotalProposta(precoUnit, qtd, it.ipiPct);
                 const icmsItem = it.icmsPct !== "" && it.icmsPct != null ? it.icmsPct : icmsPctDefault;
                 const precoLiq = calcPrecoLiquido(precoUnit, {
                   icmsPct: icmsItem, pisPct, cofinsPct, ipiPct: it.ipiPct, creditaIpi, faturamento,
