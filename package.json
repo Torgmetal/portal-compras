@@ -14,7 +14,7 @@
     "xlsx": "^0.18.5",
     "papaparse": "^5.4.1",
     "lucide-react": "^0.383.0",
-    "pdf-parse": "^1.1.1"
+    "unpdf": "^0.12.1"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",

@@ -147,8 +147,15 @@ export default function LancarCotacaoPage({ params }) {
         totalItens: (data.itens || []).length,
         casados,
         semMatch,
+        avisos: data.avisos || [],
+        meta: data._meta || {},
       });
-      showToast(`PDF lido (${data.formato}): ${casados}/${(data.itens || []).length} itens casados com a RM`);
+      const totalIt = (data.itens || []).length;
+      if (totalIt === 0) {
+        showToast(`PDF lido mas nenhum item reconhecido (formato: ${data.formato || "?"}). Veja o banner pra detalhes.`, "error");
+      } else {
+        showToast(`PDF lido (${data.formato}): ${casados}/${totalIt} itens casados com a RM`);
+      }
     } catch (err) {
       showToast("Erro ao importar PDF: " + err.message, "error");
     } finally {
@@ -324,10 +331,16 @@ export default function LancarCotacaoPage({ params }) {
       </div>
 
       {importInfo && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-          <p className="text-blue-800">
-            ✓ PDF <strong>{importInfo.formato}</strong> lido — {importInfo.casados} de {importInfo.totalItens} itens casados com itens da RM.
+        <div className={`border rounded-lg p-3 text-sm ${importInfo.totalItens === 0 ? "bg-yellow-50 border-yellow-200" : "bg-blue-50 border-blue-200"}`}>
+          <p className={importInfo.totalItens === 0 ? "text-yellow-800" : "text-blue-800"}>
+            {importInfo.totalItens === 0 ? "⚠️" : "✓"} PDF <strong>{importInfo.formato}</strong> lido — {importInfo.casados} de {importInfo.totalItens} itens casados com itens da RM
+            {importInfo.meta?.pages ? ` · ${importInfo.meta.pages} página(s) · ${importInfo.meta.textLength} chars` : ""}.
           </p>
+          {(importInfo.avisos || []).length > 0 && (
+            <ul className="mt-2 text-xs text-gray-700 list-disc list-inside">
+              {importInfo.avisos.map((a, i) => (<li key={i}>{a}</li>))}
+            </ul>
+          )}
           {importInfo.semMatch.length > 0 && (
             <details className="mt-2">
               <summary className="cursor-pointer text-blue-700 hover:underline text-xs">
@@ -336,6 +349,16 @@ export default function LancarCotacaoPage({ params }) {
               <ul className="mt-2 text-xs text-gray-700 list-disc list-inside">
                 {importInfo.semMatch.map((d, i) => (<li key={i}>{d}</li>))}
               </ul>
+            </details>
+          )}
+          {importInfo.meta?.textPreview && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-yellow-700 hover:underline text-xs">
+                Ver preview do texto extraído (debug)
+              </summary>
+              <pre className="mt-2 text-xs bg-white border border-gray-200 p-2 rounded overflow-x-auto whitespace-pre-wrap">
+                {importInfo.meta.textPreview}
+              </pre>
             </details>
           )}
         </div>
