@@ -68,21 +68,37 @@ export default function LancarCotacaoPage({ params }) {
   const [aiTextPaste, setAiTextPaste] = useState("");
   const aiFileRef = useRef(null);
 
-  // Itens (inicia com uma linha por item da RM)
+  // Itens (inicia com uma linha por item da RM).
+  // Fornecedor de aço/perfis cota sempre em R$/KG, então a "qtd cotada" deve
+  // ser o peso total em kg (não a qtd em barras/peças). Pré-preenche com
+  // rmItem.peso quando a RM tem unidade não-kg + peso > 0. Caso contrário,
+  // mantém a qtd original (caso de tintas/parafusos cotados por peça).
   const [itens, setItens] = useState(() =>
-    (rm?.itens || []).map((ri) => ({
-      rmItemId: ri.id,
-      descricao: ri.descricao || ri.item || "",
-      qtdSolicitada: Number(ri.qtd) || 0,
-      unidade: ri.unidade || "",
-      codigoOmie: ri.codigo || "",
-      precoUnit: "",
-      qtdCotada: Number(ri.qtd) || 0,
-      icmsPct: "",
-      ipiPct: "",
-      prazoEntrega: "",
-      observacao: "",
-    }))
+    (rm?.itens || []).map((ri) => {
+      const unidadeRm = (ri.unidade || "").trim();
+      const pesoKg = Number(ri.peso) || 0;
+      const isPesoUnidade = /^kg$/i.test(unidadeRm);
+      // Se já está em kg OU não tem peso cadastrado, usa a qtd como veio
+      const usarPeso = !isPesoUnidade && pesoKg > 0;
+      return {
+        rmItemId: ri.id,
+        descricao: ri.descricao || ri.item || "",
+        // Display: mostra qtd original + unidade (ex: "8 barra(s)")
+        qtdRmOriginal: Number(ri.qtd) || 0,
+        unidadeRmOriginal: unidadeRm,
+        pesoKg,
+        // Form: "qtdCotada" é em KG quando o fornecedor cota por kg
+        qtdSolicitada: usarPeso ? pesoKg : Number(ri.qtd) || 0,
+        unidade: usarPeso ? "KG" : unidadeRm,
+        codigoOmie: ri.codigo || "",
+        precoUnit: "",
+        qtdCotada: usarPeso ? pesoKg : Number(ri.qtd) || 0,
+        icmsPct: "",
+        ipiPct: "",
+        prazoEntrega: "",
+        observacao: "",
+      };
+    })
   );
 
   // Ao escolher um fornecedor do dropdown, preenche os campos que ele tem
@@ -761,10 +777,18 @@ export default function LancarCotacaoPage({ params }) {
                   icmsPct: icmsItem, pisPct, cofinsPct, ipiPct: it.ipiPct, creditaIpi, faturamento,
                 });
                 const totalLiq = precoLiq * qtd;
+                const unidadeMudou = it.unidade !== it.unidadeRmOriginal;
                 return (
                   <tr key={it.rmItemId || i} className="hover:bg-gray-50">
-                    <td className="px-3 py-2 text-gray-800 font-medium">{it.descricao}</td>
-                    <td className="px-3 py-2 text-right text-gray-500">{it.qtdSolicitada}</td>
+                    <td className="px-3 py-2 text-gray-800 font-medium">
+                      {it.descricao}
+                      {unidadeMudou && (
+                        <span className="block text-[10px] text-gray-400 mt-0.5">
+                          RM: {it.qtdRmOriginal} {it.unidadeRmOriginal}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-500 tabular-nums">{Number(it.qtdSolicitada).toLocaleString("pt-BR", {maximumFractionDigits: 2})}</td>
                     <td className="px-3 py-2 text-gray-500">{it.unidade}</td>
                     <td className="px-3 py-2">
                       <input
