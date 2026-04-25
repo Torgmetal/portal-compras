@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { uid, today, fmt } from "@/lib/utils";
 import {
-  ArrowLeft, Save, Trash2, Paperclip, AlertCircle, Info,
+  ArrowLeft, Save, Trash2, Paperclip, AlertCircle, Info, FileText, Loader2,
 } from "lucide-react";
 
 // ─── Constantes ──────────────────────────────────────────────
@@ -28,6 +28,29 @@ function calcPrecoLiquido(precoBruto, { icmsPct, pisPct, cofinsPct, ipiPct, cred
     (Number(cofinsPct) || 0) +
     (creditaIpi ? Number(ipiPct) || 0 : 0);
   return (Number(precoBruto) || 0) * (1 - creditTotal / 100);
+}
+
+// Tenta encontrar a melhor correspondência entre item da RM e item do PDF.
+// Retorna o índice da RM ou -1.
+function findRmIndex(pdfItem, rmItens) {
+  const pdfDesc = (pdfItem.descricao || pdfItem.item || "").toUpperCase().trim();
+  if (!pdfDesc) return -1;
+
+  // 1) Match exato
+  let idx = rmItens.findIndex((ri) => (ri.descricao || "").toUpperCase().trim() === pdfDesc);
+  if (idx >= 0) return idx;
+
+  // 2) Última palavra significativa (ex: "W150X13", "CHAPA 12.50", etc)
+  const lastTokenPdf = pdfDesc.split(/\s+/).pop();
+  idx = rmItens.findIndex((ri) => (ri.descricao || "").toUpperCase().includes(lastTokenPdf));
+  if (idx >= 0) return idx;
+
+  // 3) Substring genérica (qualquer parte > 4 chars)
+  idx = rmItens.findIndex((ri) => {
+    const rd = (ri.descricao || "").toUpperCase();
+    return pdfDesc.length > 4 && rd.includes(pdfDesc);
+  });
+  return idx;
 }
 
 function readAsDataURL(file) {
@@ -55,11 +78,16 @@ export default function LancarCotacaoPage({ params }) {
   const [prazoPagamento, setPrazoPagamento] = useState("");
   const [tipoFrete, setTipoFrete] = useState("CIF");
   const [faturamento, setFaturamento] = useState("Torg");
-  const [icmsPct, setIcmsPct] = useState("");
+  const [icmsPctDefault, setIcmsPctDefault] = useState("");
   const [pisPct, setPisPct] = useState("1.65");
   const [cofinsPct, setCofinsPct] = useState("7.6");
   const [creditaIpi, setCreditaIpi] = useState(true);
   const [anexo, setAnexo] = useState(null);
+
+  // Importação de PDF
+  const [importingPdf, setImportingPdf] = useState(false);
+  const [importInfo, setImportInfo] = useState(null);
+  const pdfRef = useRef(null);
 
   // Itens (inicia com uma linha por item da RM)
   const [itens, setItens] = useState(() =>
@@ -72,6 +100,7 @@ export default function LancarCotacaoPage({ params }) {
       precoUnit: "",
       qtdCotada: Number(ri.qtd) || 0,
       disponibilidade: "Suficiente",
+      icmsPct: "",
       ipiPct: "",
       prazoEntrega: "",
       observacao: "",
@@ -85,7 +114,66 @@ export default function LancarCotacaoPage({ params }) {
     if (f) {
       setFornecedorNome(f.nome || "");
       setPrazoPagamento(f.parcelas ? `${f.parcelas}x` : "");
-      if (f.icmsPadrao) setIcmsPct(String(f.icmsPadrao));
+      if (f.icmsPadrao) setIcmsPctDefault(String(f.icmsPadrao));
+    }
+  };
+
+  // ─── Importar PDF ─────────────────────────────────────────
+  const importarPdf = async (file) => {
+    if (!file) return;
+    setImportingPdf(true);
+    setImportInfo(null);
+    try {
+      const dataUrl = await readAsDataURL(file);
+      const resp = await fetch("/api/parse-pdf-cotacao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64: dataUrl }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || "Falha na API");
+
+      // Pré-preenche cabeçalho
+      if (data.fornecedor && !fornecedorNome) setFornecedorNome(data.fornecedor);
+      if (data.prazoPagamento && !prazoPagamento) setPrazoPagamento(data.prazoPagamento);
+
+      // Mapeia itens do PDF de volta pros itens da RM
+      const rmItens = rm.itens || [];
+      let casados = 0;
+      let semMatch = [];
+      setItens((prev) => {
+        const copy = [...prev];
+        for (const pdfIt of data.itens || []) {
+          const idx = findRmIndex(pdfIt, rmItens);
+          if (idx >= 0) {
+            copy[idx] = {
+              ...copy[idx],
+              precoUnit: String(pdfIt.precoUnit || ""),
+              qtdCotada: Number(pdfIt.qtdCotada ?? pdfIt.qtd ?? copy[idx].qtdSolicitada),
+              icmsPct: String(pdfIt.icmsPct || ""),
+              ipiPct: String(pdfIt.ipiPct || ""),
+              disponibilidade: pdfIt.disponibilidade || "Suficiente",
+            };
+            casados++;
+          } else {
+            semMatch.push(pdfIt.descricao || pdfIt.item);
+          }
+        }
+        return copy;
+      });
+
+      setAnexo({ nome: file.name, tipo: "pdf", tamanho: file.size, dataUrl });
+      setImportInfo({
+        formato: data.formato,
+        totalItens: (data.itens || []).length,
+        casados,
+        semMatch,
+      });
+      showToast(`PDF lido (${data.formato}): ${casados}/${(data.itens || []).length} itens casados com a RM`);
+    } catch (err) {
+      showToast("Erro ao importar PDF: " + err.message, "error");
+    } finally {
+      setImportingPdf(false);
     }
   };
 
@@ -111,14 +199,16 @@ export default function LancarCotacaoPage({ params }) {
       if (precoUnit > 0 && qtd > 0) itensComPreco++;
       totalBruto += linha;
 
+      // ICMS por item (com fallback pro default)
+      const icmsItem = it.icmsPct !== "" && it.icmsPct != null ? it.icmsPct : icmsPctDefault;
       const precoLiq = calcPrecoLiquido(precoUnit, {
-        icmsPct, pisPct, cofinsPct, ipiPct: it.ipiPct, creditaIpi, faturamento,
+        icmsPct: icmsItem, pisPct, cofinsPct, ipiPct: it.ipiPct, creditaIpi, faturamento,
       });
       totalLiquido += precoLiq * qtd;
     }
     creditoTotal = totalBruto - totalLiquido;
     return { totalBruto, totalLiquido, creditoTotal, itensComPreco };
-  }, [itens, icmsPct, pisPct, cofinsPct, creditaIpi, faturamento]);
+  }, [itens, icmsPctDefault, pisPct, cofinsPct, creditaIpi, faturamento]);
 
   const handleAnexo = async (file) => {
     if (!file) return;
@@ -137,8 +227,9 @@ export default function LancarCotacaoPage({ params }) {
         const precoUnit = Number(it.precoUnit) || 0;
         const qtdCotada = Number(it.qtdCotada) || 0;
         const ipiPct = Number(it.ipiPct) || 0;
+        const icmsItem = it.icmsPct !== "" && it.icmsPct != null ? Number(it.icmsPct) : Number(icmsPctDefault) || 0;
         const precoLiquido = calcPrecoLiquido(precoUnit, {
-          icmsPct, pisPct, cofinsPct, ipiPct: it.ipiPct, creditaIpi, faturamento,
+          icmsPct: icmsItem, pisPct, cofinsPct, ipiPct: it.ipiPct, creditaIpi, faturamento,
         });
         return {
           id: uid(),
@@ -155,6 +246,7 @@ export default function LancarCotacaoPage({ params }) {
           qtdSolicitada: it.qtdSolicitada,
           qtdCotada,
           disponibilidade: it.disponibilidade,
+          icmsPct: icmsItem,
           ipiPct,
           prazoEntrega: it.prazoEntrega,
           observacao: it.observacao,
@@ -172,7 +264,7 @@ export default function LancarCotacaoPage({ params }) {
       prazoPagamento: prazoPagamento || "",
       tipoFrete,
       faturamento,
-      icmsPct: Number(icmsPct) || 0,
+      icmsPct: Number(icmsPctDefault) || 0,
       pisPct: Number(pisPct) || 0,
       cofinsPct: Number(cofinsPct) || 0,
       creditaIpi,
@@ -223,12 +315,52 @@ export default function LancarCotacaoPage({ params }) {
           <ArrowLeft size={16} /> Voltar pra RM
         </Link>
       </div>
-      <div>
-        <h2 className="text-2xl font-bold text-gray-800">Lançar Cotação</h2>
-        <p className="text-sm text-gray-500">
-          RM-{rm.numero} — {rm.descricao} · {(rm.itens || []).length} itens
-        </p>
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Lançar Cotação</h2>
+          <p className="text-sm text-gray-500">
+            RM-{rm.numero} — {rm.descricao} · {(rm.itens || []).length} itens
+          </p>
+        </div>
+        <div>
+          <button
+            onClick={() => pdfRef.current?.click()}
+            disabled={importingPdf}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {importingPdf ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+            {importingPdf ? "Lendo PDF..." : "Importar PDF da cotação"}
+          </button>
+          <input
+            ref={pdfRef}
+            type="file"
+            accept=".pdf"
+            className="hidden"
+            onChange={(e) => { importarPdf(e.target.files[0]); e.target.value = ""; }}
+          />
+          <p className="text-xs text-gray-400 mt-1 text-right">
+            Pré-preenche os campos a partir do PDF do fornecedor.
+          </p>
+        </div>
       </div>
+
+      {importInfo && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+          <p className="text-blue-800">
+            ✓ PDF <strong>{importInfo.formato}</strong> lido — {importInfo.casados} de {importInfo.totalItens} itens casados com itens da RM.
+          </p>
+          {importInfo.semMatch.length > 0 && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-blue-700 hover:underline text-xs">
+                {importInfo.semMatch.length} item(s) do PDF não casaram (ver)
+              </summary>
+              <ul className="mt-2 text-xs text-gray-700 list-disc list-inside">
+                {importInfo.semMatch.map((d, i) => (<li key={i}>{d}</li>))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
 
       {/* Cabeçalho da cotação */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
@@ -328,14 +460,15 @@ export default function LancarCotacaoPage({ params }) {
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">ICMS %</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">ICMS % (default)</label>
                 <input
                   type="number" min="0" max="100" step="0.01"
-                  value={icmsPct}
-                  onChange={(e) => setIcmsPct(e.target.value)}
+                  value={icmsPctDefault}
+                  onChange={(e) => setIcmsPctDefault(e.target.value)}
                   placeholder="ex: 12"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
+                <p className="text-xs text-gray-400 mt-1">Usado se a linha não tiver ICMS próprio</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">PIS %</label>
@@ -390,6 +523,7 @@ export default function LancarCotacaoPage({ params }) {
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. (R$) *</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd cotada</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Disponibilidade</th>
+                {mostrarImpostos && <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">ICMS %</th>}
                 {mostrarImpostos && <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">IPI %</th>}
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prazo</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Obs</th>
@@ -402,8 +536,9 @@ export default function LancarCotacaoPage({ params }) {
                 const precoUnit = Number(it.precoUnit) || 0;
                 const qtd = Number(it.qtdCotada) || 0;
                 const totalBruto = precoUnit * qtd;
+                const icmsItem = it.icmsPct !== "" && it.icmsPct != null ? it.icmsPct : icmsPctDefault;
                 const precoLiq = calcPrecoLiquido(precoUnit, {
-                  icmsPct, pisPct, cofinsPct, ipiPct: it.ipiPct, creditaIpi, faturamento,
+                  icmsPct: icmsItem, pisPct, cofinsPct, ipiPct: it.ipiPct, creditaIpi, faturamento,
                 });
                 const totalLiq = precoLiq * qtd;
                 const dispMeta = DISPONIBILIDADES.find((d) => d.key === it.disponibilidade);
@@ -438,6 +573,17 @@ export default function LancarCotacaoPage({ params }) {
                         {DISPONIBILIDADES.map((d) => <option key={d.key} value={d.key}>{d.key}</option>)}
                       </select>
                     </td>
+                    {mostrarImpostos && (
+                      <td className="px-3 py-2">
+                        <input
+                          type="number" min="0" max="100" step="0.01"
+                          value={it.icmsPct}
+                          onChange={(e) => setItem(i, "icmsPct", e.target.value)}
+                          placeholder={icmsPctDefault || "—"}
+                          className="w-14 border border-gray-200 rounded px-2 py-1 text-right focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                    )}
                     {mostrarImpostos && (
                       <td className="px-3 py-2">
                         <input
@@ -477,7 +623,7 @@ export default function LancarCotacaoPage({ params }) {
             </tbody>
             <tfoot className="bg-gray-50 font-semibold">
               <tr>
-                <td colSpan={mostrarImpostos ? 9 : 8} className="px-3 py-3 text-right text-gray-700">Totais:</td>
+                <td colSpan={mostrarImpostos ? 10 : 8} className="px-3 py-3 text-right text-gray-700">Totais:</td>
                 <td className="px-3 py-3 text-right text-gray-900 tabular-nums">{fmt(totais.totalBruto)}</td>
                 {mostrarImpostos && (
                   <td className="px-3 py-3 text-right text-green-700 tabular-nums">{fmt(totais.totalLiquido)}</td>
@@ -485,7 +631,7 @@ export default function LancarCotacaoPage({ params }) {
               </tr>
               {mostrarImpostos && totais.creditoTotal > 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-1 text-right text-xs text-gray-500">Crédito tributário estimado:</td>
+                  <td colSpan={10} className="px-3 py-1 text-right text-xs text-gray-500">Crédito tributário estimado:</td>
                   <td colSpan={2} className="px-3 py-1 text-right text-xs text-gray-500 tabular-nums">{fmt(totais.creditoTotal)}</td>
                 </tr>
               )}
