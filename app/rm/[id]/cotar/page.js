@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { uid, today, fmt } from "@/lib/utils";
+import { findRmIndexSmart } from "@/lib/product-matcher";
 import {
   ArrowLeft, Save, Trash2, Paperclip, AlertCircle, Info, FileText, Loader2,
 } from "lucide-react";
@@ -30,28 +31,6 @@ function calcPrecoLiquido(precoBruto, { icmsPct, pisPct, cofinsPct, ipiPct, cred
   return (Number(precoBruto) || 0) * (1 - creditTotal / 100);
 }
 
-// Tenta encontrar a melhor correspondência entre item da RM e item do PDF.
-// Retorna o índice da RM ou -1.
-function findRmIndex(pdfItem, rmItens) {
-  const pdfDesc = (pdfItem.descricao || pdfItem.item || "").toUpperCase().trim();
-  if (!pdfDesc) return -1;
-
-  // 1) Match exato
-  let idx = rmItens.findIndex((ri) => (ri.descricao || "").toUpperCase().trim() === pdfDesc);
-  if (idx >= 0) return idx;
-
-  // 2) Última palavra significativa (ex: "W150X13", "CHAPA 12.50", etc)
-  const lastTokenPdf = pdfDesc.split(/\s+/).pop();
-  idx = rmItens.findIndex((ri) => (ri.descricao || "").toUpperCase().includes(lastTokenPdf));
-  if (idx >= 0) return idx;
-
-  // 3) Substring genérica (qualquer parte > 4 chars)
-  idx = rmItens.findIndex((ri) => {
-    const rd = (ri.descricao || "").toUpperCase();
-    return pdfDesc.length > 4 && rd.includes(pdfDesc);
-  });
-  return idx;
-}
 
 function readAsDataURL(file) {
   return new Promise((res) => {
@@ -144,7 +123,7 @@ export default function LancarCotacaoPage({ params }) {
       setItens((prev) => {
         const copy = [...prev];
         for (const pdfIt of data.itens || []) {
-          const idx = findRmIndex(pdfIt, rmItens);
+          const idx = findRmIndexSmart(pdfIt, rmItens);
           if (idx >= 0) {
             copy[idx] = {
               ...copy[idx],
