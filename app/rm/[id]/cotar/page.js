@@ -269,24 +269,21 @@ export default function LancarCotacaoPage({ params }) {
           if (aiIt._warning) avisos.push(aiIt._warning);
           const idx = aiIt.rmIndex;
           if (idx != null && idx >= 0 && idx < copy.length) {
-            // Estratégia de qtd: o pre-fill do form ja convereteu pra kg quando
-            // aplicavel (peso da RM). Soh sobrescreve com o que veio da IA se a
-            // unidade do AI item bater com a unidade do form (ambos KG, ou
-            // ambos em peças/barras na mesma escala — heuristica: diferenca
-            // <50%). Senao mantem o pre-fill, que e o seguro.
+            // Confia na qtd que a IA extraiu do PDF — é exatamente o que está
+            // na proposta do fornecedor (em kg, com prompt explícito).
+            // Comparação fica em "termos da proposta" (igual ao PDF). Se o
+            // comprador quiser comprar menos, edita o campo manualmente.
+            // Fallback (qtd da RM) só se a IA não devolveu nada utilizável.
+            const aiQtd = Number(aiIt.qtdCotada || aiIt.qtd || 0);
             const aiUn = String(aiIt.unidade || "").toUpperCase();
             const formUn = String(copy[idx].unidade || "").toUpperCase();
-            const aiQtd = Number(aiIt.qtdCotada || aiIt.qtd || 0);
-            const formQtd = Number(copy[idx].qtdSolicitada || 0);
-            const usarAiQtd =
-              aiUn === formUn &&
-              aiQtd > 0 &&
-              formQtd > 0 &&
-              Math.abs(aiQtd - formQtd) / formQtd < 0.5;
+            // Só ignora a IA se a unidade for claramente diferente (ex: IA
+            // devolveu UN/PC mas form é KG) — proteção contra IA captar barras.
+            const unidadesBatem = !aiUn || aiUn === formUn;
             copy[idx] = {
               ...copy[idx],
               precoUnit: aiIt.precoUnit ? String(aiIt.precoUnit) : "",
-              qtdCotada: usarAiQtd ? aiQtd : formQtd,
+              qtdCotada: aiQtd > 0 && unidadesBatem ? aiQtd : copy[idx].qtdSolicitada,
               icmsPct: aiIt.icmsPct != null ? String(aiIt.icmsPct) : copy[idx].icmsPct,
               ipiPct: aiIt.ipiPct != null ? String(aiIt.ipiPct) : copy[idx].ipiPct,
               prazoEntrega: aiIt.prazoEntrega || copy[idx].prazoEntrega,
