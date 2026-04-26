@@ -317,15 +317,20 @@ export default function RmDetail({ params }) {
         throw new Error("Fornecedores sem identificação");
       }
 
-      // Cache de CNPJ → nCodFor dentro deste loop pra evitar chamadas
-      // duplicadas ao Omie quando 2 fornecedores compartilham CNPJ
-      // (caso comum: "Soufer Industrial Ltda" e "Soufer Industrial LTDA"
-      // — duplicatas que viraram entradas separadas).
+      // Cache de CNPJ → nCodFor dentro deste loop. Pode ajudar quando
+      // matriz/filial compartilham parte da resolução, mas o principal
+      // ganho é nos casos de retry.
       const cnpjResolvidoMap = {};
+      // Helper pra espaçar chamadas (Omie tem rate limit "REDUNDANT" agressivo
+      // mesmo com payloads diferentes; 2s entre chamadas evita falso positivo)
+      const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
       const sucessos = [];
       const falhas = [];
+      let primeiroLoop = true;
       for (const fornecedorNome of Object.keys(pedidosPorFornecedor)) {
+        if (!primeiroLoop) await sleep(2000); // 2s de respiro entre fornecedores
+        primeiroLoop = false;
         const group = pedidosPorFornecedor[fornecedorNome];
         if (!group?.itens?.length) continue;
         const fornCadastrado = fornecedores.find(
