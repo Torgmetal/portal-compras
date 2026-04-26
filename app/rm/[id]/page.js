@@ -317,6 +317,12 @@ export default function RmDetail({ params }) {
         throw new Error("Fornecedores sem identificação");
       }
 
+      // Cache de CNPJ → nCodFor dentro deste loop pra evitar chamadas
+      // duplicadas ao Omie quando 2 fornecedores compartilham CNPJ
+      // (caso comum: "Soufer Industrial Ltda" e "Soufer Industrial LTDA"
+      // — duplicatas que viraram entradas separadas).
+      const cnpjResolvidoMap = {};
+
       const sucessos = [];
       const falhas = [];
       for (const fornecedorNome of Object.keys(pedidosPorFornecedor)) {
@@ -325,8 +331,13 @@ export default function RmDetail({ params }) {
         const fornCadastrado = fornecedores.find(
           (f) => f.nome && f.nome.toLowerCase().trim() === fornecedorNome.toLowerCase().trim()
         );
-        const nCodFor = Number(fornCadastrado?.nCodOmie) || 0;
         const cnpjFornecedor = fornCadastrado?.cnpj || "";
+        const cnpjLimpo = String(cnpjFornecedor).replace(/\D/g, "");
+        // Tenta cache do cadastro primeiro, depois cache do loop atual
+        const nCodFor =
+          Number(fornCadastrado?.nCodOmie) ||
+          (cnpjLimpo && cnpjResolvidoMap[cnpjLimpo]) ||
+          0;
         const nQtdeParc = Number(fornCadastrado?.parcelas) || 1;
         // Captura prazo de pagamento e tipoFrete da cotação correspondente
         const cotacao = (rm.cotacoes || []).find((c) => c.fornecedor === fornecedorNome);
@@ -362,12 +373,17 @@ export default function RmDetail({ params }) {
           const data = await resp.json();
           // Cacheia o nCodFor resolvido SEMPRE que vier (mesmo em erro do
           // IncluirPedCompra) — evita re-lookup nas retentativas e rate limit.
-          if (data.nCodFor_resolvido && fornCadastrado && !fornCadastrado.nCodOmie) {
-            setFornecedores((prev) =>
-              prev.map((f) =>
-                f.id === fornCadastrado.id ? { ...f, nCodOmie: String(data.nCodFor_resolvido) } : f
-              )
-            );
+          if (data.nCodFor_resolvido) {
+            // Cache no loop atual (pra próxima iteração com mesmo CNPJ)
+            if (cnpjLimpo) cnpjResolvidoMap[cnpjLimpo] = data.nCodFor_resolvido;
+            // Cache persistente no cadastro do fornecedor
+            if (fornCadastrado && !fornCadastrado.nCodOmie) {
+              setFornecedores((prev) =>
+                prev.map((f) =>
+                  f.id === fornCadastrado.id ? { ...f, nCodOmie: String(data.nCodFor_resolvido) } : f
+                )
+              );
+            }
           }
           if (resp.ok && data.success) {
             sucessos.push({ fornecedor: fornecedorNome, numero: data.numero_pedido || data.codigo_pedido });
