@@ -12,29 +12,30 @@ export default function ExportOmieModal({
   const [categoria, setCategoria] = useState("");
   const [localEstoque, setLocalEstoque] = useState("");
   const [locaisOpcoes, setLocaisOpcoes] = useState([]);
-  const [carregandoLocais, setCarregandoLocais] = useState(false);
-  const [erroLocais, setErroLocais] = useState("");
+  const [categoriasOpcoes, setCategoriasOpcoes] = useState([]);
+  const [carregandoOpcoes, setCarregandoOpcoes] = useState(false);
+  const [erroOpcoes, setErroOpcoes] = useState("");
   const [erro, setErro] = useState("");
   const [acaoEmCurso, setAcaoEmCurso] = useState(null); // "xlsx" | "api"
 
-  // Busca locais de estoque no Omie quando o modal abre
+  // Busca locais de estoque + categorias no Omie quando o modal abre
   useEffect(() => {
     if (!open) return;
-    if (locaisOpcoes.length > 0) return; // já tem cache da sessão
-    setCarregandoLocais(true);
-    setErroLocais("");
-    fetch("/api/omie/locais-estoque")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.locais && data.locais.length > 0) {
-          setLocaisOpcoes(data.locais);
-        } else if (data.error) {
-          setErroLocais(data.error);
-        }
+    if (locaisOpcoes.length > 0 && categoriasOpcoes.length > 0) return; // cache da sessão
+    setCarregandoOpcoes(true);
+    setErroOpcoes("");
+    Promise.all([
+      fetch("/api/omie/locais-estoque").then((r) => r.json()).catch((e) => ({ error: e?.message })),
+      fetch("/api/omie/categorias").then((r) => r.json()).catch((e) => ({ error: e?.message })),
+    ])
+      .then(([dl, dc]) => {
+        if (dl?.locais?.length) setLocaisOpcoes(dl.locais);
+        if (dc?.categorias?.length) setCategoriasOpcoes(dc.categorias);
+        const erros = [dl?.error, dc?.error].filter(Boolean);
+        if (erros.length) setErroOpcoes(erros.join(" | "));
       })
-      .catch((e) => setErroLocais(e?.message || "Falha ao carregar locais"))
-      .finally(() => setCarregandoLocais(false));
-  }, [open, locaisOpcoes.length]);
+      .finally(() => setCarregandoOpcoes(false));
+  }, [open, locaisOpcoes.length, categoriasOpcoes.length]);
 
   const grupos = useMemo(
     () => Object.values(pedidosPorFornecedor || {}),
@@ -113,20 +114,39 @@ export default function ExportOmieModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Código da Categoria de Compra <span className="text-red-500">*</span>
+              Categoria de Compra <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={categoria}
-              onChange={(e) => setCategoria(e.target.value)}
-              placeholder="Ex: 3.1 ou 2.01.02"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              disabled={ocupado}
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Apenas o <strong>código numérico</strong> da categoria (ex: "3.1", "2.01.02") — máx 20 caracteres.
-              Se colar "3.1 Compra de matéria prima", o sistema extrai só o "3.1".
-            </p>
+            {categoriasOpcoes.length > 0 ? (
+              <select
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
+                disabled={ocupado}
+              >
+                <option value="">— Selecionar —</option>
+                {categoriasOpcoes.map((c) => (
+                  <option key={c.codigo} value={c.codigo}>
+                    {c.codigo} — {c.descricao}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div>
+                <input
+                  type="text"
+                  value={categoria}
+                  onChange={(e) => setCategoria(e.target.value)}
+                  placeholder={carregandoOpcoes ? "Carregando categorias..." : "Ex: 3.1 ou 2.01.02"}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  disabled={ocupado || carregandoOpcoes}
+                />
+                {carregandoOpcoes && (
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin" /> Buscando categorias do Omie...
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
@@ -142,7 +162,10 @@ export default function ExportOmieModal({
               >
                 <option value="">— Selecionar —</option>
                 {locaisOpcoes.map((l) => (
-                  <option key={l.nCodLocal || l.cCodLocal || l.cDescricao} value={l.cDescricao}>
+                  <option
+                    key={l.nCodLocal || l.cCodLocal || l.cDescricao}
+                    value={l.cCodLocal || l.cDescricao}
+                  >
                     {l.cDescricao}
                     {l.cCodLocal ? ` (${l.cCodLocal})` : ""}
                   </option>
@@ -154,20 +177,10 @@ export default function ExportOmieModal({
                   type="text"
                   value={localEstoque}
                   onChange={(e) => setLocalEstoque(e.target.value)}
-                  placeholder={carregandoLocais ? "Carregando locais do Omie..." : "Código ou descrição"}
+                  placeholder={carregandoOpcoes ? "Carregando locais do Omie..." : "Código ou descrição"}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  disabled={ocupado || carregandoLocais}
+                  disabled={ocupado || carregandoOpcoes}
                 />
-                {carregandoLocais && (
-                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                    <Loader2 size={12} className="animate-spin" /> Buscando locais cadastrados no Omie...
-                  </p>
-                )}
-                {erroLocais && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    Não consegui listar locais ({erroLocais}) — preencha manualmente.
-                  </p>
-                )}
               </div>
             )}
           </div>
@@ -189,6 +202,12 @@ export default function ExportOmieModal({
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
               <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
               <span>{erro}</span>
+            </div>
+          )}
+          {erroOpcoes && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+              <span>Não consegui listar opções do Omie ({erroOpcoes}). Você pode preencher manualmente.</span>
             </div>
           )}
         </div>
