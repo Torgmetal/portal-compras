@@ -28,13 +28,16 @@ async function resolverProduto(codigo, appKey, appSecret) {
 }
 
 // Busca o codigo_cliente_omie de um fornecedor pelo CNPJ.
-// Omie trata clientes e fornecedores na mesma lista (clientes_cadastro), com
-// tag de classificação. Aqui tentamos só o CNPJ — funciona se o fornecedor
-// existir no cadastro do Omie.
+// Omie trata clientes e fornecedores na mesma tabela (clientes_cadastro).
+// Tenta primeiro ConsultarCliente direto; se falhar, faz ListarClientesResumido
+// filtrando por CNPJ — fallback que algumas contas Omie precisam.
+// Devolve { codigo, error? } pra caller usar a mensagem se for o caso.
 async function resolverFornecedorPorCnpj(cnpj, appKey, appSecret) {
-  if (!cnpj) return 0;
+  if (!cnpj) return { codigo: 0, error: "CNPJ não informado" };
   const cnpjLimpo = String(cnpj).replace(/\D/g, "");
-  if (cnpjLimpo.length < 11) return 0;
+  if (cnpjLimpo.length < 11) return { codigo: 0, error: "CNPJ inválido (menos de 11 dígitos)" };
+
+  // Tentativa 1: ConsultarCliente direto
   try {
     const resp = await fetch(OMIE_CLIENTES_URL, {
       method: "POST",
@@ -47,9 +50,48 @@ async function resolverFornecedorPorCnpj(cnpj, appKey, appSecret) {
       }),
     });
     const data = await resp.json();
-    return data.codigo_cliente_omie || 0;
-  } catch {
-    return 0;
+    if (data.codigo_cliente_omie) {
+      return { codigo: data.codigo_cliente_omie };
+    }
+    // Se Omie devolveu faultstring, segue pro fallback
+    var primeiraTentativa = data.faultstring || data.faultcode || `(sem codigo_cliente_omie no retorno)`;
+  } catch (e) {
+    var primeiraTentativa = e?.message || "erro de rede";
+  }
+
+  // Tentativa 2: ListarClientesResumido filtrando por CNPJ
+  try {
+    const resp = await fetch(OMIE_CLIENTES_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        call: "ListarClientesResumido",
+        app_key: appKey,
+        app_secret: appSecret,
+        param: [
+          {
+            pagina: 1,
+            registros_por_pagina: 5,
+            apenas_importado_api: "N",
+            clientesFiltro: { cnpj_cpf: cnpjLimpo },
+          },
+        ],
+      }),
+    });
+    const data = await resp.json();
+    const lista = data.clientes_cadastro_resumido || [];
+    if (lista.length > 0 && lista[0].codigo_cliente) {
+      return { codigo: lista[0].codigo_cliente };
+    }
+    return {
+      codigo: 0,
+      error: `CNPJ ${cnpjLimpo} não encontrado no Omie. Tentativas: ConsultarCliente=${primeiraTentativa}; ListarClientesResumido=${data.faultstring || "0 resultados"}`,
+    };
+  } catch (e) {
+    return {
+      codigo: 0,
+      error: `Erro buscando fornecedor: ${e?.message || "rede"}; ConsultarCliente: ${primeiraTentativa}`,
+    };
   }
 }
 
@@ -114,16 +156,20 @@ export async function POST(request) {
     }
 
     // Resolução do fornecedor: usa nCodFor diretamente se fornecido,
-    // senão busca pelo CNPJ na API Omie (ConsultarCliente).
+    // senão busca pelo CNPJ na API Omie (ConsultarCliente + fallback).
     let nCodFor = Number(nCodForInput) || 0;
+    let lookupErro = "";
     if (!nCodFor && cnpjFornecedor) {
-      nCodFor = await resolverFornecedorPorCnpj(cnpjFornecedor, appKey, appSecret);
+      const r = await resolverFornecedorPorCnpj(cnpjFornecedor, appKey, appSecret);
+      nCodFor = r.codigo;
+      lookupErro = r.error || "";
     }
     if (!nCodFor) {
       return NextResponse.json(
         {
           error:
-            "Fornecedor não identificado. Cadastre o CNPJ ou o código Omie do fornecedor antes de enviar.",
+            "Fornecedor não identificado. " +
+            (lookupErro || "Cadastre o CNPJ ou código Omie do fornecedor antes de enviar."),
         },
         { status: 400 }
       );
