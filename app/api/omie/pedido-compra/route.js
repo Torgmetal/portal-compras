@@ -162,15 +162,19 @@ export async function POST(request) {
     if (categoria.length > 20) categoria = categoria.substring(0, 20);
     if (!categoria) categoria = "2.01.02"; // default seguro
 
-    // produtos_incluir do IncluirPedCompra do Omie. Já testamos
-    // cCodLocalEstoque (longo) e cCodLocEstoq (curto) — ambos rejeitados.
-    // O endpoint não aceita local de estoque por item; o Omie aplica o
-    // local default da conta. Local escolhido pelo usuário vai pra cObsInt.
+    // produtos_incluir do IncluirPedCompra. Omie aceita local de estoque
+    // mas a tag varia. Já testamos: cCodLocalEstoque (longo), cCodLocEstoq
+    // (curto). Tentando agora cIdLocEstoq (integration ID).
+    const localEstoqueCodigo =
+      cCodLocalEstoque && String(cCodLocalEstoque).trim()
+        ? String(cCodLocalEstoque).trim()
+        : null;
+
     const produtos_incluir = [];
     for (let idx = 0; idx < itens.length; idx++) {
       const item = itens[idx];
       const nCodProd = await resolverProduto(item.codigo, appKey, appSecret);
-      produtos_incluir.push({
+      const produto = {
         cCodIntItem: codigoPedidoIntegracao + "-" + (idx + 1),
         nCodProd,
         cDescricao: String(item.descricao || "").substring(0, 255),
@@ -178,7 +182,11 @@ export async function POST(request) {
         nQtde: Number(item.qtd) || 0,
         nValUnit: Number(item.precoUnit) || 0,
         nDesconto: 0,
-      });
+      };
+      if (localEstoqueCodigo) {
+        produto.cIdLocEstoq = localEstoqueCodigo;
+      }
+      produtos_incluir.push(produto);
     }
 
     // Observação interna concentra dados que a API não aceita como tags
