@@ -14,7 +14,7 @@ import {
 
 export default function RmDetail({ params }) {
   const { id } = params;
-  const { rms, setRms, fornecedores, showToast, loaded } = useStore();
+  const { rms, setRms, fornecedores, setFornecedores, showToast, loaded } = useStore();
   const router = useRouter();
   const fileRef = useRef(null);
 
