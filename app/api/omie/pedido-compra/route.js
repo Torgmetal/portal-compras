@@ -70,7 +70,13 @@ export async function POST(request) {
 
     const codigoPedidoIntegracao = "PC-" + Date.now();
     const dataPrevisao = dDtPrevisao || hojeDDMMYYYY();
-    const categoria = cCodCateg && String(cCodCateg).trim() ? String(cCodCateg).trim() : "2.01.02";
+    // Omie aceita só o CÓDIGO da categoria (max 20 chars), não a descrição.
+    // Se o usuário digitar "3.1 Compra de matéria prima", extrai só "3.1".
+    let categoria = String(cCodCateg || "").trim();
+    const codMatch = categoria.match(/^[\d.]+/);
+    if (codMatch) categoria = codMatch[0].replace(/\.$/, ""); // tira ponto final se sobrar
+    if (categoria.length > 20) categoria = categoria.substring(0, 20);
+    if (!categoria) categoria = "2.01.02"; // default seguro
 
     // produtos_incluir aceita só campos específicos do Omie. Local de estoque
     // não vai por item — fica como observação do pedido.

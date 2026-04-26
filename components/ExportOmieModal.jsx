@@ -91,18 +91,19 @@ export default function ExportOmieModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Categoria de Compra <span className="text-red-500">*</span>
+              Código da Categoria de Compra <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
-              placeholder="Ex: 2.01.02 ou descrição da categoria"
+              placeholder="Ex: 3.1 ou 2.01.02"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               disabled={ocupado}
             />
             <p className="text-xs text-gray-400 mt-1">
-              Use o código ou nome exato como aparece no seu Omie.
+              Apenas o <strong>código numérico</strong> da categoria (ex: "3.1", "2.01.02") — máx 20 caracteres.
+              Se colar "3.1 Compra de matéria prima", o sistema extrai só o "3.1".
             </p>
           </div>
 
