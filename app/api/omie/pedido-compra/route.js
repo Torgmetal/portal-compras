@@ -37,6 +37,23 @@ function hojeDDMMYYYY() {
   );
 }
 
+// Omie aceita só 6 chars na unidade. Normaliza casos comuns brasileiros.
+function normalizeUnidade(u) {
+  if (!u) return "KG";
+  let s = String(u).trim().toUpperCase();
+  if (/M[²2]\b/.test(s)) return "M2";
+  if (/^PE[CÇ]A?S?$/.test(s) || /^P[CÇ]\(?S?\)?$/.test(s)) return "PC";
+  if (/BARRA/.test(s)) return "BR";
+  if (/TONELADA?/.test(s)) return "TON";
+  if (/PARES?/.test(s)) return "PAR";
+  // Genérico: remove acentos + não-alfanuméricos, limita 6
+  s = s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]/g, "");
+  return s.substring(0, 6) || "KG";
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -87,8 +104,8 @@ export async function POST(request) {
       produtos_incluir.push({
         cCodIntItem: codigoPedidoIntegracao + "-" + (idx + 1),
         nCodProd,
-        cDescricao: item.descricao || "",
-        cUnidade: item.unidade || "KG",
+        cDescricao: String(item.descricao || "").substring(0, 255),
+        cUnidade: normalizeUnidade(item.unidade),
         nQtde: Number(item.qtd) || 0,
         nValUnit: Number(item.precoUnit) || 0,
         nDesconto: 0,
