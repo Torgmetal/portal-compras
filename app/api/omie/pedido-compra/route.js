@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 const OMIE_URL = "https://app.omie.com.br/api/v1/produtos/pedidocompra/";
 const OMIE_PROD_URL = "https://app.omie.com.br/api/v1/geral/produtos/";
 
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
 async function resolverProduto(codigo, appKey, appSecret) {
+  if (!codigo) return 0;
   try {
     const resp = await fetch(OMIE_PROD_URL, {
       method: "POST",
@@ -22,8 +26,20 @@ async function resolverProduto(codigo, appKey, appSecret) {
   }
 }
 
+function hojeDDMMYYYY() {
+  const d = new Date();
+  return (
+    String(d.getDate()).padStart(2, "0") +
+    "/" +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    "/" +
+    d.getFullYear()
+  );
+}
+
 export async function POST(request) {
   try {
+    const body = await request.json();
     const {
       itens,
       observacao,
@@ -31,7 +47,13 @@ export async function POST(request) {
       cNumPedido,
       nQtdeParc,
       cInfAdic,
-    } = await request.json();
+      // Novos campos vindos do modal
+      cCodLocalEstoque,
+      cCodCateg,
+      dDtPrevisao,
+      cContaCorrente,
+      prazoPagamento, // texto descritivo (ex "28 DDL")
+    } = body;
 
     if (!itens || !itens.length) {
       return NextResponse.json({ error: "Nenhum item informado" }, { status: 400 });
@@ -40,31 +62,58 @@ export async function POST(request) {
     const appKey = process.env.OMIE_APP_KEY;
     const appSecret = process.env.OMIE_APP_SECRET;
     if (!appKey || !appSecret) {
-      return NextResponse.json({ error: "Credenciais Omie não configuradas" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Credenciais Omie não configuradas no servidor (OMIE_APP_KEY / OMIE_APP_SECRET)" },
+        { status: 500 }
+      );
     }
 
     const codigoPedidoIntegracao = "PC-" + Date.now();
-    const hoje = new Date();
-    const dataPrevisao =
-      String(hoje.getDate()).padStart(2, "0") +
-      "/" +
-      String(hoje.getMonth() + 1).padStart(2, "0") +
-      "/" +
-      hoje.getFullYear();
+    const dataPrevisao = dDtPrevisao || hojeDDMMYYYY();
+    const categoria = cCodCateg && String(cCodCateg).trim() ? String(cCodCateg).trim() : "2.01.02";
 
     const produtos_incluir = [];
     for (let idx = 0; idx < itens.length; idx++) {
       const item = itens[idx];
       const nCodProd = await resolverProduto(item.codigo, appKey, appSecret);
-      produtos_incluir.push({
+      const produto = {
         cCodIntItem: codigoPedidoIntegracao + "-" + (idx + 1),
-        nCodProd: nCodProd,
+        nCodProd,
         cDescricao: item.descricao || "",
         cUnidade: item.unidade || "KG",
         nQtde: Number(item.qtd) || 0,
         nValUnit: Number(item.precoUnit) || 0,
         nDesconto: 0,
-      });
+      };
+      // Local de estoque por item (Omie permite override por linha)
+      if (cCodLocalEstoque && String(cCodLocalEstoque).trim()) {
+        produto.cCodLocalEstoque = String(cCodLocalEstoque).trim();
+      }
+      // IPI por item, se informado
+      if (item.ipiPct != null && Number(item.ipiPct) > 0) {
+        produto.nValorIpi = Number(item.precoUnit) * Number(item.qtd) * (Number(item.ipiPct) / 100);
+      }
+      produtos_incluir.push(produto);
+    }
+
+    // Observação interna inclui prazo de pagamento + info adicional (RM, fornecedor, etc)
+    const obsPartes = [];
+    if (prazoPagamento) obsPartes.push(`Prazo pagamento: ${prazoPagamento}`);
+    if (observacao) obsPartes.push(observacao);
+    const obsCombinada = obsPartes.join(" | ");
+
+    const cabecalho = {
+      cCodIntPed: codigoPedidoIntegracao,
+      dDtPrevisao: dataPrevisao,
+      nCodFor: nCodFor || 0,
+      cNumPedido: cNumPedido || "",
+      cCodCateg: categoria,
+      cObsInt: obsCombinada,
+      nQtdeParc: Number(nQtdeParc) || 1,
+      cInfAdic: cInfAdic || "",
+    };
+    if (cContaCorrente && String(cContaCorrente).trim()) {
+      cabecalho.cContaCorrente = String(cContaCorrente).trim();
     }
 
     const payload = {
@@ -73,17 +122,8 @@ export async function POST(request) {
       app_secret: appSecret,
       param: [
         {
-          cabecalho_incluir: {
-            cCodIntPed: codigoPedidoIntegracao,
-            dDtPrevisao: dataPrevisao,
-            nCodFor: nCodFor || 0,
-            cNumPedido: cNumPedido || "",
-            cCodCateg: "2.01.02",
-            cObsInt: observacao || "",
-            nQtdeParc: Number(nQtdeParc) || 1,
-            cInfAdic: cInfAdic || "",
-          },
-          produtos_incluir: produtos_incluir,
+          cabecalho_incluir: cabecalho,
+          produtos_incluir,
           frete_incluir: { nCodTransp: 0, cTpFrete: "9" },
         },
       ],
@@ -115,6 +155,7 @@ export async function POST(request) {
       omie_response: data,
     });
   } catch (err) {
+    console.error("omie pedido-compra error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
-import { X, FileSpreadsheet, Download, AlertCircle } from "lucide-react";
+import { X, FileSpreadsheet, Download, AlertCircle, Send, Loader2 } from "lucide-react";
 
 export default function ExportOmieModal({
   open,
@@ -12,6 +12,7 @@ export default function ExportOmieModal({
   const [categoria, setCategoria] = useState("");
   const [localEstoque, setLocalEstoque] = useState("");
   const [erro, setErro] = useState("");
+  const [acaoEmCurso, setAcaoEmCurso] = useState(null); // "xlsx" | "api"
 
   const grupos = useMemo(
     () => Object.values(pedidosPorFornecedor || {}),
@@ -20,16 +21,36 @@ export default function ExportOmieModal({
 
   if (!open) return null;
 
-  const confirmar = async () => {
+  const validar = () => {
     setErro("");
-    if (!categoria.trim()) return setErro("Informe a Categoria de Compra.");
-    if (!localEstoque.trim()) return setErro("Informe o Local de Estoque.");
+    if (!categoria.trim()) {
+      setErro("Informe a Categoria de Compra.");
+      return false;
+    }
+    if (!localEstoque.trim()) {
+      setErro("Informe o Local de Estoque.");
+      return false;
+    }
+    return true;
+  };
+
+  const acao = async (tipo) => {
+    if (!validar()) return;
+    setAcaoEmCurso(tipo);
     try {
-      await onConfirm({ categoria: categoria.trim(), localEstoque: localEstoque.trim() });
+      await onConfirm({
+        tipo,
+        categoria: categoria.trim(),
+        localEstoque: localEstoque.trim(),
+      });
     } catch (e) {
-      setErro(e.message || "Erro ao gerar planilhas");
+      setErro(e.message || "Erro ao processar");
+    } finally {
+      setAcaoEmCurso(null);
     }
   };
+
+  const ocupado = loading || !!acaoEmCurso;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -37,12 +58,12 @@ export default function ExportOmieModal({
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             <FileSpreadsheet size={20} className="text-emerald-600" />
-            Gerar Planilhas Omie
+            Gerar Pedidos Omie
           </h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
-            disabled={loading}
+            disabled={ocupado}
           >
             <X size={18} />
           </button>
@@ -50,12 +71,12 @@ export default function ExportOmieModal({
 
         <div className="px-6 py-5 space-y-4">
           <p className="text-sm text-gray-600">
-            Será gerado <strong>1 arquivo .xlsx por fornecedor vencedor</strong>, no
-            layout oficial de importação do Omie.
+            <strong>1 pedido por fornecedor vencedor.</strong> Você pode baixar como
+            planilha (.xlsx pra importar manualmente) ou enviar direto via API do Omie.
           </p>
 
           <div className="bg-gray-50 rounded-lg p-3 text-sm">
-            <p className="text-gray-500 mb-2">Serão geradas {grupos.length} planilha(s):</p>
+            <p className="text-gray-500 mb-2">Serão criados {grupos.length} pedido(s):</p>
             <ul className="space-y-1">
               {grupos.map((g) => (
                 <li key={g.fornecedor} className="flex justify-between text-gray-700">
@@ -78,10 +99,10 @@ export default function ExportOmieModal({
               onChange={(e) => setCategoria(e.target.value)}
               placeholder="Ex: 2.01.02 ou descrição da categoria"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              disabled={loading}
+              disabled={ocupado}
             />
             <p className="text-xs text-gray-400 mt-1">
-              Varia por tipo de material. Use o código ou nome exato como está no seu Omie.
+              Use o código ou nome exato como aparece no seu Omie.
             </p>
           </div>
 
@@ -95,7 +116,7 @@ export default function ExportOmieModal({
               onChange={(e) => setLocalEstoque(e.target.value)}
               placeholder="Código ou descrição do local de estoque"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              disabled={loading}
+              disabled={ocupado}
             />
           </div>
 
@@ -117,21 +138,31 @@ export default function ExportOmieModal({
           )}
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap justify-end gap-3">
           <button
             onClick={onClose}
             className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 text-sm"
-            disabled={loading}
+            disabled={ocupado}
           >
             Cancelar
           </button>
           <button
-            onClick={confirmar}
-            className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-            disabled={loading}
+            onClick={() => acao("xlsx")}
+            className="px-5 py-2 bg-white border-2 border-emerald-600 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            disabled={ocupado}
+            title="Gera arquivos .xlsx no layout do Omie pra você importar manualmente"
           >
-            <Download size={16} />
-            {loading ? "Gerando..." : "Gerar e Baixar"}
+            {acaoEmCurso === "xlsx" ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            {acaoEmCurso === "xlsx" ? "Gerando..." : "Baixar planilhas"}
+          </button>
+          <button
+            onClick={() => acao("api")}
+            className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            disabled={ocupado}
+            title="Cria os pedidos automaticamente no Omie via API (recomendado)"
+          >
+            {acaoEmCurso === "api" ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            {acaoEmCurso === "api" ? "Enviando..." : "Criar via API Omie"}
           </button>
         </div>
       </div>

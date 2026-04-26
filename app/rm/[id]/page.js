@@ -278,20 +278,105 @@ export default function RmDetail({ params }) {
     for (const fornecedorNome of groups) { await criarPedidoOmie(fornecedorNome); }
   };
 
-  const handleExportOmie = async ({ categoria, localEstoque }) => {
+  const handleExportOmie = async ({ tipo, categoria, localEstoque }) => {
     setExportandoOmie(true);
     try {
-      const arquivos = await gerarPlanilhasOmie({
-        rm,
-        pedidosPorFornecedor,
-        fornecedores,
-        categoriaCompra: categoria,
-        localEstoque,
-      });
-      showToast(`${arquivos.length} planilha(s) Omie gerada(s)!`);
-      setShowExportOmie(false);
+      if (tipo === "xlsx") {
+        const arquivos = await gerarPlanilhasOmie({
+          rm,
+          pedidosPorFornecedor,
+          fornecedores,
+          categoriaCompra: categoria,
+          localEstoque,
+        });
+        showToast(`${arquivos.length} planilha(s) Omie gerada(s)!`);
+        setShowExportOmie(false);
+        return;
+      }
+
+      // tipo === "api": cria pedidos diretamente no Omie via API
+      const sucessos = [];
+      const falhas = [];
+      for (const fornecedorNome of Object.keys(pedidosPorFornecedor)) {
+        const group = pedidosPorFornecedor[fornecedorNome];
+        if (!group?.itens?.length) continue;
+        const fornCadastrado = fornecedores.find(
+          (f) => f.nome && f.nome.toLowerCase().trim() === fornecedorNome.toLowerCase().trim()
+        );
+        const nCodFor = Number(fornCadastrado?.nCodOmie) || 0;
+        const nQtdeParc = Number(fornCadastrado?.parcelas) || 1;
+        // Captura prazo de pagamento e tipoFrete da cotação correspondente
+        const cotacao = (rm.cotacoes || []).find((c) => c.fornecedor === fornecedorNome);
+        const prazoPagamento = cotacao?.prazoPagamento || "";
+        const opInfo = rm.op ? `OP-${rm.op}` : (rm.rmTekla || "");
+        const observacaoInterna = `Portal de Compras - RM-${rm.numero} - ${fornecedorNome}${rm.observacao ? " | " + rm.observacao : ""}`;
+
+        try {
+          const resp = await fetch("/api/omie/pedido-compra", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              itens: group.itens.map((it) => ({
+                codigo: it.codigo,
+                descricao: it.descricao || it.item,
+                unidade: it.unidade || "KG",
+                qtd: it.qtd,
+                precoUnit: it.precoUnit,
+                ipiPct: it.ipiPct || 0,
+              })),
+              nCodFor,
+              cNumPedido: `RM-${rm.numero}`,
+              nQtdeParc,
+              cInfAdic: opInfo,
+              observacao: observacaoInterna,
+              cCodLocalEstoque: localEstoque,
+              cCodCateg: categoria,
+              cContaCorrente: "Inter",
+              prazoPagamento,
+            }),
+          });
+          const data = await resp.json();
+          if (resp.ok && data.success) {
+            sucessos.push({ fornecedor: fornecedorNome, numero: data.numero_pedido || data.codigo_pedido });
+            // Adiciona à lista de pedidos gerados (UI antiga)
+            setPedidosOmie((prev) => [
+              ...prev,
+              {
+                fornecedor: fornecedorNome,
+                total: group.total,
+                itensCount: group.itens.length,
+                codigoPedido: data.codigo_pedido,
+                numeroPedido: data.numero_pedido,
+                codigoIntegracao: data.codigo_pedido_integracao,
+                itens: group.itens,
+              },
+            ]);
+          } else {
+            falhas.push({ fornecedor: fornecedorNome, erro: data.error || "Falha desconhecida" });
+          }
+        } catch (e) {
+          falhas.push({ fornecedor: fornecedorNome, erro: e.message });
+        }
+      }
+
+      if (sucessos.length > 0) {
+        updateRm({ status: "Pedido Gerado" });
+        setShowPedidos(true);
+      }
+
+      if (falhas.length === 0) {
+        showToast(`✅ ${sucessos.length} pedido(s) criado(s) no Omie: ${sucessos.map((s) => s.numero).join(", ")}`);
+        setShowExportOmie(false);
+      } else if (sucessos.length === 0) {
+        showToast(`Nenhum pedido criado. Erros: ${falhas.map((f) => `${f.fornecedor}: ${f.erro}`).join(" | ")}`, "error");
+      } else {
+        showToast(
+          `${sucessos.length} criado(s), ${falhas.length} falharam: ${falhas.map((f) => `${f.fornecedor}: ${f.erro}`).join(" | ")}`,
+          "error"
+        );
+      }
     } catch (err) {
-      showToast(err.message || "Erro ao gerar planilhas Omie", "error");
+      showToast(err.message || "Erro ao processar Omie", "error");
       throw err;
     } finally {
       setExportandoOmie(false);
@@ -974,7 +1059,7 @@ export default function RmDetail({ params }) {
             </table>
           </div>
 
-          {/* Botão para gerar pedidos */}
+          {/* Botão único — abre modal com 2 opções: planilha ou API */}
           <div className="px-6 py-4 bg-purple-50/50 border-t border-purple-100 flex flex-wrap justify-end gap-3">
             <button
               onClick={() => {
@@ -983,23 +1068,13 @@ export default function RmDetail({ params }) {
                 setShowExportOmie(true);
               }}
               disabled={exportandoOmie}
-              className="px-6 py-2.5 bg-white border-2 border-emerald-600 text-emerald-700 rounded-lg hover:bg-emerald-50 font-medium flex items-center gap-2 disabled:opacity-50"
-              title="Gera planilhas no layout oficial Omie, 1 por fornecedor vencedor"
-            >
-              <FileSpreadsheet size={18} />
-              {exportandoOmie
-                ? "Gerando planilhas..."
-                : `Gerar Planilhas Omie (${Object.keys(pedidosPorFornecedor).length})`}
-            </button>
-            <button
-              onClick={criarTodosPedidosOmie}
-              disabled={criandoPedido}
-              className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2"
+              className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 disabled:opacity-50"
+              title="Cria 1 pedido por fornecedor vencedor — escolhe entre planilha (.xlsx) ou API direta"
             >
               <ShoppingCart size={18} />
-              {criandoPedido
-                ? "Criando no Omie..."
-                : `Criar Pedido no Omie (${Object.keys(pedidosPorFornecedor).length} fornecedor${Object.keys(pedidosPorFornecedor).length !== 1 ? "es" : ""})`}
+              {exportandoOmie
+                ? "Processando..."
+                : `Gerar Pedidos Omie (${Object.keys(pedidosPorFornecedor).length})`}
             </button>
           </div>
         </div>
