@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { X, FileSpreadsheet, Download, AlertCircle, Send, Loader2 } from "lucide-react";
 
 export default function ExportOmieModal({
@@ -11,8 +11,30 @@ export default function ExportOmieModal({
 }) {
   const [categoria, setCategoria] = useState("");
   const [localEstoque, setLocalEstoque] = useState("");
+  const [locaisOpcoes, setLocaisOpcoes] = useState([]);
+  const [carregandoLocais, setCarregandoLocais] = useState(false);
+  const [erroLocais, setErroLocais] = useState("");
   const [erro, setErro] = useState("");
   const [acaoEmCurso, setAcaoEmCurso] = useState(null); // "xlsx" | "api"
+
+  // Busca locais de estoque no Omie quando o modal abre
+  useEffect(() => {
+    if (!open) return;
+    if (locaisOpcoes.length > 0) return; // já tem cache da sessão
+    setCarregandoLocais(true);
+    setErroLocais("");
+    fetch("/api/omie/locais-estoque")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.locais && data.locais.length > 0) {
+          setLocaisOpcoes(data.locais);
+        } else if (data.error) {
+          setErroLocais(data.error);
+        }
+      })
+      .catch((e) => setErroLocais(e?.message || "Falha ao carregar locais"))
+      .finally(() => setCarregandoLocais(false));
+  }, [open, locaisOpcoes.length]);
 
   const grupos = useMemo(
     () => Object.values(pedidosPorFornecedor || {}),
@@ -111,23 +133,55 @@ export default function ExportOmieModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Local de Estoque <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={localEstoque}
-              onChange={(e) => setLocalEstoque(e.target.value)}
-              placeholder="Código ou descrição do local de estoque"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              disabled={ocupado}
-            />
+            {locaisOpcoes.length > 0 ? (
+              <select
+                value={localEstoque}
+                onChange={(e) => setLocalEstoque(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
+                disabled={ocupado}
+              >
+                <option value="">— Selecionar —</option>
+                {locaisOpcoes.map((l) => (
+                  <option key={l.nCodLocal || l.cCodLocal || l.cDescricao} value={l.cDescricao}>
+                    {l.cDescricao}
+                    {l.cCodLocal ? ` (${l.cCodLocal})` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div>
+                <input
+                  type="text"
+                  value={localEstoque}
+                  onChange={(e) => setLocalEstoque(e.target.value)}
+                  placeholder={carregandoLocais ? "Carregando locais do Omie..." : "Código ou descrição"}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  disabled={ocupado || carregandoLocais}
+                />
+                {carregandoLocais && (
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin" /> Buscando locais cadastrados no Omie...
+                  </p>
+                )}
+                {erroLocais && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Não consegui listar locais ({erroLocais}) — preencha manualmente.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 space-y-1">
             <p>
               <strong>Conta Corrente:</strong> Inter
               <span className="mx-2">·</span>
               <strong>Previsão de Entrega:</strong> hoje
               <span className="mx-2">·</span>
-              <strong>Parcelas:</strong> cadastradas em cada fornecedor
+              <strong>Parcelas:</strong> do cadastro do fornecedor
+            </p>
+            <p className="text-blue-700/80">
+              ℹ️ <strong>Local de estoque</strong>: a API do Omie usa o local default da conta no pedido. Sua escolha aqui vai pra observação interna do pedido — você ajusta no Omie se precisar.
             </p>
           </div>
 
