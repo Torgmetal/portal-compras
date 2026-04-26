@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { uid, today, fmt } from "@/lib/utils";
-import { findRmIndexSmart, normalizeProduto } from "@/lib/product-matcher";
 import {
   ArrowLeft, Save, Trash2, Paperclip, AlertCircle, Info, FileText, Loader2,
   Sparkles, Image as ImageIcon, ClipboardPaste,
@@ -80,9 +79,7 @@ export default function LancarCotacaoPage({ params }) {
   const [anexo, setAnexo] = useState(null);
 
   // Importação de PDF (regex — fallback)
-  const [importingPdf, setImportingPdf] = useState(false);
   const [importInfo, setImportInfo] = useState(null);
-  const pdfRef = useRef(null);
 
   // Importação via IA
   const [importingAi, setImportingAi] = useState(false);
@@ -132,84 +129,6 @@ export default function LancarCotacaoPage({ params }) {
       setFornecedorNome(f.nome || "");
       setPrazoPagamento(f.parcelas ? `${f.parcelas}x` : "");
       if (f.icmsPadrao) setIcmsPctDefault(String(f.icmsPadrao));
-    }
-  };
-
-  // ─── Importar PDF ─────────────────────────────────────────
-  const importarPdf = async (file) => {
-    if (!file) return;
-    setImportingPdf(true);
-    setImportInfo(null);
-    try {
-      const dataUrl = await readAsDataURL(file);
-      const resp = await fetch("/api/parse-pdf-cotacao", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64: dataUrl }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.error || "Falha na API");
-
-      // Pré-preenche cabeçalho
-      if (data.fornecedor && !fornecedorNome) setFornecedorNome(data.fornecedor);
-      if (data.prazoPagamento && !prazoPagamento) setPrazoPagamento(data.prazoPagamento);
-
-      // Mapeia itens do PDF de volta pros itens da RM
-      const rmItens = rm.itens || [];
-      let casados = 0;
-      let semMatch = [];
-      setItens((prev) => {
-        const copy = [...prev];
-        for (const pdfIt of data.itens || []) {
-          const idx = findRmIndexSmart(pdfIt, rmItens);
-          if (idx >= 0) {
-            copy[idx] = {
-              ...copy[idx],
-              precoUnit: String(pdfIt.precoUnit || ""),
-              qtdCotada: Number(pdfIt.qtdCotada ?? pdfIt.qtd ?? copy[idx].qtdSolicitada),
-              icmsPct: String(pdfIt.icmsPct || ""),
-              ipiPct: String(pdfIt.ipiPct || ""),
-            };
-            casados++;
-          } else {
-            semMatch.push(pdfIt.descricao || pdfIt.item);
-          }
-        }
-        return copy;
-      });
-
-      setAnexo({ nome: file.name, tipo: "pdf", tamanho: file.size, dataUrl });
-
-      // Debug: amostras normalizadas pra diagnosticar quando o match falha
-      const debug = (data.itens || []).slice(0, 3).map((p) => ({
-        pdfDesc: p.descricao || p.item || "",
-        pdfNorm: normalizeProduto(p.descricao || p.item || "", ""),
-      }));
-      const debugRm = rmItens.slice(0, 3).map((r) => ({
-        rmDesc: r.descricao || r.item || "",
-        rmMat: r.material || r.mat || "",
-        rmNorm: normalizeProduto(r.descricao || r.item || "", r.material || r.mat || ""),
-      }));
-
-      setImportInfo({
-        formato: data.formato,
-        totalItens: (data.itens || []).length,
-        casados,
-        semMatch,
-        avisos: data.avisos || [],
-        meta: data._meta || {},
-        debug: { pdf: debug, rm: debugRm },
-      });
-      const totalIt = (data.itens || []).length;
-      if (totalIt === 0) {
-        showToast(`PDF lido mas nenhum item reconhecido (formato: ${data.formato || "?"}). Veja o banner pra detalhes.`, "error");
-      } else {
-        showToast(`PDF lido (${data.formato}): ${casados}/${totalIt} itens casados com a RM`);
-      }
-    } catch (err) {
-      showToast("Erro ao importar PDF: " + err.message, "error");
-    } finally {
-      setImportingPdf(false);
     }
   };
 
@@ -567,26 +486,6 @@ export default function LancarCotacaoPage({ params }) {
           </div>
         )}
 
-        <details className="text-xs text-torg-gray">
-          <summary className="cursor-pointer hover:text-torg-dark">Avançado — usar parser por regex (Soufer/Gerdau apenas)</summary>
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={() => pdfRef.current?.click()}
-              disabled={importingPdf}
-              className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue rounded-lg hover:bg-torg-blue-50 text-xs flex items-center gap-1 disabled:opacity-50"
-            >
-              {importingPdf ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
-              {importingPdf ? "Lendo..." : "Importar PDF (regex offline)"}
-            </button>
-            <input
-              ref={pdfRef}
-              type="file"
-              accept=".pdf"
-              className="hidden"
-              onChange={(e) => { importarPdf(e.target.files[0]); e.target.value = ""; }}
-            />
-          </div>
-        </details>
       </div>
 
       {importInfo && (
@@ -621,43 +520,6 @@ export default function LancarCotacaoPage({ params }) {
               <ul className="mt-2 text-xs text-gray-700 list-disc list-inside">
                 {importInfo.semMatch.map((d, i) => (<li key={i}>{d}</li>))}
               </ul>
-            </details>
-          )}
-          {importInfo.meta?.textPreview && (
-            <details className="mt-2">
-              <summary className="cursor-pointer text-yellow-700 hover:underline text-xs">
-                Ver preview do texto extraído (debug)
-              </summary>
-              <pre className="mt-2 text-xs bg-white border border-gray-200 p-2 rounded overflow-x-auto whitespace-pre-wrap">
-                {importInfo.meta.textPreview}
-              </pre>
-            </details>
-          )}
-          {importInfo.casados === 0 && importInfo.totalItens > 0 && importInfo.debug && (
-            <details className="mt-2" open>
-              <summary className="cursor-pointer text-orange-700 hover:underline text-xs font-medium">
-                🔍 Debug do matcher (clique pra ver amostras normalizadas)
-              </summary>
-              <div className="mt-2 text-xs bg-white border border-gray-200 p-2 rounded space-y-2">
-                <div>
-                  <p className="font-semibold text-gray-700">Amostras do PDF (3 primeiros):</p>
-                  {importInfo.debug.pdf.map((d, i) => (
-                    <div key={i} className="ml-2 mt-1 font-mono">
-                      <div>desc: <span className="text-blue-700">{d.pdfDesc}</span></div>
-                      <div>norm: <span className={d.pdfNorm ? "text-torg-orange-700" : "text-red-700"}>{d.pdfNorm ? JSON.stringify(d.pdfNorm) : "null (não reconhecido)"}</span></div>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-700 mt-2">Amostras da RM (3 primeiros):</p>
-                  {importInfo.debug.rm.map((d, i) => (
-                    <div key={i} className="ml-2 mt-1 font-mono">
-                      <div>desc: <span className="text-blue-700">{d.rmDesc}</span> | mat: <span className="text-torg-blue">{d.rmMat || "(vazio)"}</span></div>
-                      <div>norm: <span className={d.rmNorm ? "text-torg-orange-700" : "text-red-700"}>{d.rmNorm ? JSON.stringify(d.rmNorm) : "null (não reconhecido)"}</span></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </details>
           )}
         </div>

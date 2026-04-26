@@ -1226,97 +1226,64 @@ export default function RmDetail({ params }) {
         </div>
       )}
 
-      {/* ═══════════ PEDIDOS GERADOS (SPLIT POR FORNECEDOR) ═══════════ */}
+      {/* ═══════════ PEDIDOS GERADOS ═══════════ */}
       {showPedidos && pedidosOmie.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-torg-orange-700 flex items-center gap-2">
-              <Truck size={20} /> Pedidos de Compra Gerados ({pedidosOmie.length})
+        <div className="bg-white rounded-xl shadow-sm border border-torg-orange-200 overflow-hidden">
+          <div className="px-5 py-3 border-b border-torg-orange-100 bg-torg-orange-50/60 flex items-center gap-2">
+            <Truck size={16} className="text-torg-orange" />
+            <h3 className="text-sm font-semibold text-torg-orange-700">
+              Pedidos gerados ({pedidosOmie.length})
             </h3>
           </div>
-
-          {pedidosOmie.map((pedido, pidx) => (
-            <div key={pidx} className="bg-white rounded-xl shadow-sm border-2 border-torg-orange-200 overflow-hidden">
-              {/* Header do pedido */}
-              <div
-                className="px-6 py-4 bg-torg-orange-50 flex justify-between items-center cursor-pointer"
-                onClick={() => setExpandedPedido(expandedPedido === pidx ? null : pidx)}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-torg-orange-100 flex items-center justify-center">
-                    <Truck size={20} className="text-torg-orange" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-torg-orange-700">{pedido.fornecedor}</p>
-                    <p className="text-sm text-torg-orange">{pedido.itensCount} ite{pedido.itensCount === 1 ? "m" : "ns"} — Total: {fmt(pedido.total)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs bg-torg-orange-100 text-torg-orange-700 px-2 py-1 rounded-full font-medium">
-                    RM-{rm.numero}
-                  </span>
-                  {expandedPedido === pidx ? <ChevronUp size={20} className="text-torg-orange" /> : <ChevronDown size={20} className="text-torg-orange" />}
-                </div>
-              </div>
-
-              {/* Itens do pedido */}
-              {expandedPedido === pidx && (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço Unit.</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prazo</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cond. Pag.</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {pedido.itens.map((det, didx) => (
-                          <tr key={didx} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 text-gray-400">{det.ide.sequencia}</td>
-                            <td className="px-4 py-2 text-gray-800 font-medium">{det.produto.descricao}</td>
-                            <td className="px-4 py-2 text-right text-gray-700">{det.produto.quantidade}</td>
-                            <td className="px-4 py-2 text-right text-gray-700">{fmt(det.produto.valor_unitario)}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-gray-800">{fmt(det.produto.valor_total)}</td>
-                            <td className="px-4 py-2 text-gray-600 text-xs">{det.observacao.split("|")[0].replace("Prazo:", "").trim()}</td>
-                            <td className="px-4 py-2 text-gray-600 text-xs">{det.observacao.split("|")[1]?.replace("Cond:", "").trim() || "—"}</td>
+          <ul className="divide-y divide-gray-100">
+            {pedidosOmie.map((pedido, pidx) => {
+              const expanded = expandedPedido === pidx;
+              return (
+                <li key={pidx}>
+                  <button
+                    onClick={() => setExpandedPedido(expanded ? null : pidx)}
+                    className="w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 text-left"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-sm font-medium text-torg-dark truncate">{pedido.fornecedor}</span>
+                      {pedido.numeroPedido && (
+                        <span className="text-xs font-mono text-torg-gray">#{pedido.numeroPedido}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="text-torg-gray">{pedido.itensCount} ite{pedido.itensCount === 1 ? "m" : "ns"}</span>
+                      <span className="font-semibold text-torg-orange-700 tabular-nums">{fmt(pedido.total)}</span>
+                      {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                    </div>
+                  </button>
+                  {expanded && (
+                    <div className="overflow-x-auto border-t border-gray-100 bg-gray-50/40">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-gray-500">
+                            <th className="px-4 py-2 text-left font-medium">Item</th>
+                            <th className="px-4 py-2 text-right font-medium">Qtd</th>
+                            <th className="px-4 py-2 text-right font-medium">Unit.</th>
+                            <th className="px-4 py-2 text-right font-medium">Total</th>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-gray-50">
-                        <tr>
-                          <td colSpan={4} className="px-4 py-2 text-right font-semibold text-gray-700">Total do Pedido:</td>
-                          <td className="px-4 py-2 text-right font-bold text-torg-orange-700">{fmt(pedido.total)}</td>
-                          <td colSpan={2}></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-
-                  {/* JSON Omie */}
-                  <div className="px-6 py-4 border-t border-gray-100">
-                    <details className="text-sm">
-                      <summary className="cursor-pointer text-torg-orange hover:text-torg-orange-700 font-medium">
-                        Ver JSON para API Omie
-                      </summary>
-                      <pre className="mt-2 bg-gray-900 text-green-400 rounded-lg p-4 text-xs overflow-x-auto max-h-60">
-                        {JSON.stringify(pedido, null, 2)}
-                      </pre>
-                      <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
-                        <strong>Endpoint:</strong>{" "}
-                        <code className="bg-yellow-100 px-1 rounded">POST https://app.omie.com.br/api/v1/produtos/pedidocompra/</code>
-                      </div>
-                    </details>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {pedido.itens.map((det, didx) => (
+                            <tr key={didx}>
+                              <td className="px-4 py-1.5 text-gray-700">{det.produto.descricao}</td>
+                              <td className="px-4 py-1.5 text-right text-gray-700 tabular-nums">{det.produto.quantidade}</td>
+                              <td className="px-4 py-1.5 text-right text-gray-700 tabular-nums">{fmt(det.produto.valor_unitario)}</td>
+                              <td className="px-4 py-1.5 text-right font-medium text-gray-800 tabular-nums">{fmt(det.produto.valor_total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
