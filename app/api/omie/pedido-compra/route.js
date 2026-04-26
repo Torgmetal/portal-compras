@@ -72,11 +72,13 @@ export async function POST(request) {
     const dataPrevisao = dDtPrevisao || hojeDDMMYYYY();
     const categoria = cCodCateg && String(cCodCateg).trim() ? String(cCodCateg).trim() : "2.01.02";
 
+    // produtos_incluir aceita só campos específicos do Omie. Local de estoque
+    // não vai por item — fica como observação do pedido.
     const produtos_incluir = [];
     for (let idx = 0; idx < itens.length; idx++) {
       const item = itens[idx];
       const nCodProd = await resolverProduto(item.codigo, appKey, appSecret);
-      const produto = {
+      produtos_incluir.push({
         cCodIntItem: codigoPedidoIntegracao + "-" + (idx + 1),
         nCodProd,
         cDescricao: item.descricao || "",
@@ -84,25 +86,16 @@ export async function POST(request) {
         nQtde: Number(item.qtd) || 0,
         nValUnit: Number(item.precoUnit) || 0,
         nDesconto: 0,
-      };
-      // Local de estoque por item (Omie permite override por linha)
-      if (cCodLocalEstoque && String(cCodLocalEstoque).trim()) {
-        produto.cCodLocalEstoque = String(cCodLocalEstoque).trim();
-      }
-      // IPI por item, se informado
-      if (item.ipiPct != null && Number(item.ipiPct) > 0) {
-        produto.nValorIpi = Number(item.precoUnit) * Number(item.qtd) * (Number(item.ipiPct) / 100);
-      }
-      produtos_incluir.push(produto);
+      });
     }
 
-    // Observação interna concentra prazo de pagamento, conta corrente
-    // desejada, info adicional (OP) e qualquer texto do usuário.
-    // Vários desses campos não existem como tags próprias no
-    // cabecalho_incluir — vão pra cObsInt e o comprador completa no Omie.
+    // Observação interna concentra dados que a API não aceita como tags
+    // próprias (Omie é restrito sobre quais campos vão em cada estrutura).
+    // Comprador completa o que precisar dentro do Omie depois.
     const obsPartes = [];
     if (prazoPagamento) obsPartes.push(`Prazo pagto: ${prazoPagamento}`);
     if (cContaCorrente) obsPartes.push(`Conta: ${cContaCorrente}`);
+    if (cCodLocalEstoque) obsPartes.push(`Local estoque: ${cCodLocalEstoque}`);
     if (cInfAdic) obsPartes.push(`Info: ${cInfAdic}`);
     if (observacao) obsPartes.push(observacao);
     const obsCombinada = obsPartes.join(" | ");
