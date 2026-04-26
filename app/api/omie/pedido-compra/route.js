@@ -162,13 +162,19 @@ export async function POST(request) {
     if (categoria.length > 20) categoria = categoria.substring(0, 20);
     if (!categoria) categoria = "2.01.02"; // default seguro
 
-    // produtos_incluir aceita só campos específicos do Omie. Local de estoque
-    // não vai por item — fica como observação do pedido.
+    // produtos_incluir do IncluirPedCompra. Tags variam — testamos a forma
+    // curta cCodLocEstoq (singular) que aparece em outros endpoints Omie.
+    // Se falhar, voltamos a colocar só na observação.
+    const localEstoqueCodigo =
+      cCodLocalEstoque && String(cCodLocalEstoque).trim()
+        ? String(cCodLocalEstoque).trim()
+        : null;
+
     const produtos_incluir = [];
     for (let idx = 0; idx < itens.length; idx++) {
       const item = itens[idx];
       const nCodProd = await resolverProduto(item.codigo, appKey, appSecret);
-      produtos_incluir.push({
+      const produto = {
         cCodIntItem: codigoPedidoIntegracao + "-" + (idx + 1),
         nCodProd,
         cDescricao: String(item.descricao || "").substring(0, 255),
@@ -176,7 +182,12 @@ export async function POST(request) {
         nQtde: Number(item.qtd) || 0,
         nValUnit: Number(item.precoUnit) || 0,
         nDesconto: 0,
-      });
+      };
+      if (localEstoqueCodigo) {
+        // Tenta tag curta — Omie usa essa nomenclatura em IncluirRecebimento
+        produto.cCodLocEstoq = localEstoqueCodigo;
+      }
+      produtos_incluir.push(produto);
     }
 
     // Observação interna concentra dados que a API não aceita como tags
