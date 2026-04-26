@@ -96,12 +96,20 @@ export async function POST(request) {
       produtos_incluir.push(produto);
     }
 
-    // Observação interna inclui prazo de pagamento + info adicional (RM, fornecedor, etc)
+    // Observação interna inclui prazo de pagamento + conta corrente desejada
+    // + info adicional (RM, fornecedor, etc) — comprador completa no Omie.
     const obsPartes = [];
-    if (prazoPagamento) obsPartes.push(`Prazo pagamento: ${prazoPagamento}`);
+    if (prazoPagamento) obsPartes.push(`Prazo pagto: ${prazoPagamento}`);
+    if (cContaCorrente) obsPartes.push(`Conta: ${cContaCorrente}`);
     if (observacao) obsPartes.push(observacao);
     const obsCombinada = obsPartes.join(" | ");
 
+    // cabecalho_incluir do IncluirPedCompra do Omie. Atenção: cContaCorrente
+    // NÃO faz parte dessa estrutura (a API rejeita com "Tag [CCONTACORRENTE]
+    // não faz parte da estrutura..."). A conta corrente é configurada nas
+    // preferências do Omie ou na geração da NF, não no pedido de compra.
+    // Por isso recebemos cContaCorrente mas só usamos pra registrar na
+    // observação interna (cObsInt).
     const cabecalho = {
       cCodIntPed: codigoPedidoIntegracao,
       dDtPrevisao: dataPrevisao,
@@ -112,9 +120,6 @@ export async function POST(request) {
       nQtdeParc: Number(nQtdeParc) || 1,
       cInfAdic: cInfAdic || "",
     };
-    if (cContaCorrente && String(cContaCorrente).trim()) {
-      cabecalho.cContaCorrente = String(cContaCorrente).trim();
-    }
 
     const payload = {
       call: "IncluirPedCompra",
