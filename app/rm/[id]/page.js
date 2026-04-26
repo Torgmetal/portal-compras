@@ -295,6 +295,24 @@ export default function RmDetail({ params }) {
       }
 
       // tipo === "api": cria pedidos diretamente no Omie via API
+      // Pré-validação: todo fornecedor vencedor precisa ter nCodOmie cadastrado
+      const fornecedoresSemCodigo = [];
+      for (const fornecedorNome of Object.keys(pedidosPorFornecedor)) {
+        const fornCad = fornecedores.find(
+          (f) => f.nome && f.nome.toLowerCase().trim() === fornecedorNome.toLowerCase().trim()
+        );
+        if (!fornCad?.nCodOmie || !String(fornCad.nCodOmie).trim()) {
+          fornecedoresSemCodigo.push(fornecedorNome);
+        }
+      }
+      if (fornecedoresSemCodigo.length > 0) {
+        showToast(
+          `Cadastre o "Codigo Omie (nCodFor)" em Fornecedores antes de enviar via API: ${fornecedoresSemCodigo.join(", ")}`,
+          "error"
+        );
+        throw new Error("Fornecedores sem código Omie");
+      }
+
       const sucessos = [];
       const falhas = [];
       for (const fornecedorNome of Object.keys(pedidosPorFornecedor)) {
