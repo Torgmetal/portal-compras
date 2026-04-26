@@ -96,11 +96,14 @@ export async function POST(request) {
       produtos_incluir.push(produto);
     }
 
-    // Observação interna inclui prazo de pagamento + conta corrente desejada
-    // + info adicional (RM, fornecedor, etc) — comprador completa no Omie.
+    // Observação interna concentra prazo de pagamento, conta corrente
+    // desejada, info adicional (OP) e qualquer texto do usuário.
+    // Vários desses campos não existem como tags próprias no
+    // cabecalho_incluir — vão pra cObsInt e o comprador completa no Omie.
     const obsPartes = [];
     if (prazoPagamento) obsPartes.push(`Prazo pagto: ${prazoPagamento}`);
     if (cContaCorrente) obsPartes.push(`Conta: ${cContaCorrente}`);
+    if (cInfAdic) obsPartes.push(`Info: ${cInfAdic}`);
     if (observacao) obsPartes.push(observacao);
     const obsCombinada = obsPartes.join(" | ");
 
@@ -118,7 +121,6 @@ export async function POST(request) {
       cCodCateg: categoria,
       cObsInt: obsCombinada,
       nQtdeParc: Number(nQtdeParc) || 1,
-      cInfAdic: cInfAdic || "",
     };
 
     const payload = {
