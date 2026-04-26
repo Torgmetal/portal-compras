@@ -147,6 +147,7 @@ export default function RmDetail({ params }) {
         precoLiquido,
         ipiPct,
         qtd,
+        unidade: it.unidade || "KG", // unidade salva na cotação (KG p/ aço)
         total: totalComIpi,
         totalLiquido: precoLiquido * qtd,
         faturamento: cot.faturamento || "Cliente",
@@ -434,7 +435,10 @@ export default function RmDetail({ params }) {
         item: mi.item,
         descricao: mi.item,
         codigo: rmItem?.codigo || "",
-        unidade: rmItem?.unidade || "KG",
+        // Usa unidade da COTAÇÃO (KG quando aço/perfis), não da RM (que pode
+        // estar em barras/peças). Comprador vai pagar por kg, então pedido
+        // Omie tem que sair em kg também.
+        unidade: match.unidade || "KG",
         precoUnit: match.precoUnit,
         qtd: match.qtd,
         total: match.total,
