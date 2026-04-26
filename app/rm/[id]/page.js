@@ -295,22 +295,25 @@ export default function RmDetail({ params }) {
       }
 
       // tipo === "api": cria pedidos diretamente no Omie via API
-      // Pré-validação: todo fornecedor vencedor precisa ter nCodOmie cadastrado
-      const fornecedoresSemCodigo = [];
+      // Pré-validação: todo fornecedor vencedor precisa de nCodOmie OU CNPJ
+      // (a API resolve pelo CNPJ via ConsultarCliente se nCodOmie não estiver)
+      const fornecedoresSemIdent = [];
       for (const fornecedorNome of Object.keys(pedidosPorFornecedor)) {
         const fornCad = fornecedores.find(
           (f) => f.nome && f.nome.toLowerCase().trim() === fornecedorNome.toLowerCase().trim()
         );
-        if (!fornCad?.nCodOmie || !String(fornCad.nCodOmie).trim()) {
-          fornecedoresSemCodigo.push(fornecedorNome);
+        const temNCod = fornCad?.nCodOmie && String(fornCad.nCodOmie).trim();
+        const temCnpj = fornCad?.cnpj && String(fornCad.cnpj).replace(/\D/g, "").length >= 11;
+        if (!temNCod && !temCnpj) {
+          fornecedoresSemIdent.push(fornecedorNome);
         }
       }
-      if (fornecedoresSemCodigo.length > 0) {
+      if (fornecedoresSemIdent.length > 0) {
         showToast(
-          `Cadastre o "Codigo Omie (nCodFor)" em Fornecedores antes de enviar via API: ${fornecedoresSemCodigo.join(", ")}`,
+          `Cadastre CNPJ ou Código Omie em Fornecedores antes de enviar: ${fornecedoresSemIdent.join(", ")}`,
           "error"
         );
-        throw new Error("Fornecedores sem código Omie");
+        throw new Error("Fornecedores sem identificação");
       }
 
       const sucessos = [];
@@ -322,6 +325,7 @@ export default function RmDetail({ params }) {
           (f) => f.nome && f.nome.toLowerCase().trim() === fornecedorNome.toLowerCase().trim()
         );
         const nCodFor = Number(fornCadastrado?.nCodOmie) || 0;
+        const cnpjFornecedor = fornCadastrado?.cnpj || "";
         const nQtdeParc = Number(fornCadastrado?.parcelas) || 1;
         // Captura prazo de pagamento e tipoFrete da cotação correspondente
         const cotacao = (rm.cotacoes || []).find((c) => c.fornecedor === fornecedorNome);
@@ -343,6 +347,7 @@ export default function RmDetail({ params }) {
                 ipiPct: it.ipiPct || 0,
               })),
               nCodFor,
+              cnpjFornecedor,
               cNumPedido: `RM-${rm.numero}`,
               nQtdeParc,
               cInfAdic: opInfo,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 const OMIE_URL = "https://app.omie.com.br/api/v1/produtos/pedidocompra/";
 const OMIE_PROD_URL = "https://app.omie.com.br/api/v1/geral/produtos/";
+const OMIE_CLIENTES_URL = "https://app.omie.com.br/api/v1/geral/clientes/";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -21,6 +22,32 @@ async function resolverProduto(codigo, appKey, appSecret) {
     });
     const data = await resp.json();
     return data.codigo_produto || 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Busca o codigo_cliente_omie de um fornecedor pelo CNPJ.
+// Omie trata clientes e fornecedores na mesma lista (clientes_cadastro), com
+// tag de classificação. Aqui tentamos só o CNPJ — funciona se o fornecedor
+// existir no cadastro do Omie.
+async function resolverFornecedorPorCnpj(cnpj, appKey, appSecret) {
+  if (!cnpj) return 0;
+  const cnpjLimpo = String(cnpj).replace(/\D/g, "");
+  if (cnpjLimpo.length < 11) return 0;
+  try {
+    const resp = await fetch(OMIE_CLIENTES_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        call: "ConsultarCliente",
+        app_key: appKey,
+        app_secret: appSecret,
+        param: [{ cnpj_cpf: cnpjLimpo }],
+      }),
+    });
+    const data = await resp.json();
+    return data.codigo_cliente_omie || 0;
   } catch {
     return 0;
   }
@@ -60,7 +87,8 @@ export async function POST(request) {
     const {
       itens,
       observacao,
-      nCodFor,
+      nCodFor: nCodForInput,
+      cnpjFornecedor, // novo: tenta resolver via CNPJ se nCodFor não vier
       cNumPedido,
       nQtdeParc,
       cInfAdic,
@@ -82,6 +110,22 @@ export async function POST(request) {
       return NextResponse.json(
         { error: "Credenciais Omie não configuradas no servidor (OMIE_APP_KEY / OMIE_APP_SECRET)" },
         { status: 500 }
+      );
+    }
+
+    // Resolução do fornecedor: usa nCodFor diretamente se fornecido,
+    // senão busca pelo CNPJ na API Omie (ConsultarCliente).
+    let nCodFor = Number(nCodForInput) || 0;
+    if (!nCodFor && cnpjFornecedor) {
+      nCodFor = await resolverFornecedorPorCnpj(cnpjFornecedor, appKey, appSecret);
+    }
+    if (!nCodFor) {
+      return NextResponse.json(
+        {
+          error:
+            "Fornecedor não identificado. Cadastre o CNPJ ou o código Omie do fornecedor antes de enviar.",
+        },
+        { status: 400 }
       );
     }
 
