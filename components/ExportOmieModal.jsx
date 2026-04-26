@@ -8,9 +8,18 @@ export default function ExportOmieModal({
   pedidosPorFornecedor,
   onConfirm,
   loading,
+  defaultCategoria = "",
+  defaultLocalEstoque = "",
 }) {
-  const [categoria, setCategoria] = useState("");
-  const [localEstoque, setLocalEstoque] = useState("");
+  const [categoria, setCategoria] = useState(defaultCategoria);
+  const [localEstoque, setLocalEstoque] = useState(defaultLocalEstoque);
+
+  useEffect(() => {
+    if (open) {
+      setCategoria(defaultCategoria);
+      setLocalEstoque(defaultLocalEstoque);
+    }
+  }, [open, defaultCategoria, defaultLocalEstoque]);
   const [locaisOpcoes, setLocaisOpcoes] = useState([]);
   const [categoriasOpcoes, setCategoriasOpcoes] = useState([]);
   const [carregandoOpcoes, setCarregandoOpcoes] = useState(false);

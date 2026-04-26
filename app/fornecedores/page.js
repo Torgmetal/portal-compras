@@ -23,7 +23,7 @@ export default function PortalFornecedores() {
         </h2>
         <p className="text-sm text-torg-gray mb-6">
           Cada cotação tem um link único enviado para o seu email, com acesso
-          apenas ao upload da proposta — você não vê outras cotações.
+          direto ao upload da proposta.
         </p>
 
         <ol className="space-y-4 mb-7">

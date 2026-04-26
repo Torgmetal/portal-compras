@@ -3,6 +3,9 @@ import Link from "next/link";
 import TorgLogo from "@/components/TorgLogo";
 import { ClipboardList, ShoppingCart, Truck, ArrowRight } from "lucide-react";
 
+const FOOTER_LOGO_W = 180;
+const FOOTER_LOGO_H = Math.round((FOOTER_LOGO_W * 1080) / 1920);
+
 const portais = [
   {
     href: "/rm",
@@ -59,29 +62,15 @@ export default function Landing() {
           <div className="flex-1 flex items-center px-8">
             <div className="max-w-3xl text-white">
               <p className="text-torg-orange font-semibold tracking-widest text-xs uppercase mb-4">
-                Estruturas Metálicas Industriais e Residenciais
+                Estruturas Metálicas Industriais
               </p>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] mb-6">
                 Excelência em Soluções Construtivas.
               </h1>
-              <p className="text-lg sm:text-xl text-white/85 mb-8 max-w-2xl leading-relaxed">
+              <p className="text-lg sm:text-xl text-white/85 max-w-2xl leading-relaxed">
                 Cada projeto é moldado pela busca incessante por qualidade, inovação
                 e tecnologia — do corte a laser à montagem em campo.
               </p>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/compras"
-                  className="px-6 py-3 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 font-semibold inline-flex items-center gap-2 shadow-lg"
-                >
-                  Acessar Portal de Compras <ArrowRight size={18} />
-                </Link>
-                <a
-                  href="#portais"
-                  className="px-6 py-3 bg-white/10 backdrop-blur border border-white/30 text-white rounded-lg hover:bg-white/20 font-semibold"
-                >
-                  Ver todos os portais
-                </a>
-              </div>
             </div>
           </div>
         </div>
@@ -154,11 +143,13 @@ export default function Landing() {
       {/* Footer */}
       <footer className="bg-torg-dark text-white/70">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-wrap justify-between items-center gap-4 text-sm">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/10 rounded-lg px-3 py-1.5">
-              <TorgLogo size="sm" />
-            </div>
-          </div>
+          <Image
+            src="/torg-logo-white.png"
+            alt="Torg Metal"
+            width={FOOTER_LOGO_W}
+            height={FOOTER_LOGO_H}
+            className="opacity-90"
+          />
           <p>© {new Date().getFullYear()} Torg Metal — Portal Interno</p>
         </div>
       </footer>

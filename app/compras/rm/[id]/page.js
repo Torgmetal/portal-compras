@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, Fragment, useMemo } from "react";
+import { useState, useRef, Fragment, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { uid, today, fmt } from "@/lib/utils";
@@ -33,6 +33,22 @@ export default function RmDetail({ params }) {
   const [alertasEng, setAlertasEng] = useState([]);
   const [showExportOmie, setShowExportOmie] = useState(false);
   const [exportandoOmie, setExportandoOmie] = useState(false);
+  const [categoriasOpcoes, setCategoriasOpcoes] = useState([]);
+  const [locaisOpcoes, setLocaisOpcoes] = useState([]);
+  const [carregandoOmieOpts, setCarregandoOmieOpts] = useState(false);
+
+  useEffect(() => {
+    setCarregandoOmieOpts(true);
+    Promise.all([
+      fetch("/api/omie/categorias").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/omie/locais-estoque").then((r) => r.json()).catch(() => ({})),
+    ])
+      .then(([dc, dl]) => {
+        if (dc?.categorias?.length) setCategoriasOpcoes(dc.categorias);
+        if (dl?.locais?.length) setLocaisOpcoes(dl.locais);
+      })
+      .finally(() => setCarregandoOmieOpts(false));
+  }, []);
 
   const rmFound = rms.find((r) => r.id === id);
   const rm = rmFound || { itens: [], cotacoes: [], envios: [], anexos: [], status: "", numero: "", descricao: "", observacao: "", data: "", op: "", tipo: "", id: null };
@@ -647,6 +663,79 @@ export default function RmDetail({ params }) {
         {rm.arquivoOrigem && <p className="mt-1 text-xs text-gray-400">Arquivo origem: {rm.arquivoOrigem}</p>}
       </div>
 
+      {/* Configuração para pedido Omie */}
+      <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-6">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+          <h3 className="text-base font-semibold text-torg-dark flex items-center gap-2">
+            <ShoppingCart size={18} className="text-torg-blue" /> Configuração para pedido Omie
+          </h3>
+          {carregandoOmieOpts && (
+            <span className="text-xs text-torg-gray">Carregando opções do Omie...</span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Categoria de Compra</label>
+            {categoriasOpcoes.length > 0 ? (
+              <select
+                value={rm.categoriaCompra || ""}
+                onChange={(e) => updateRm({ categoriaCompra: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent bg-white"
+              >
+                <option value="">— Selecionar —</option>
+                {categoriasOpcoes.map((c) => (
+                  <option key={c.codigo} value={c.codigo}>
+                    {c.codigo} — {c.descricao}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={rm.categoriaCompra || ""}
+                onChange={(e) => updateRm({ categoriaCompra: e.target.value })}
+                placeholder="Ex: 3.1"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+                disabled={carregandoOmieOpts}
+              />
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Local de Estoque</label>
+            {locaisOpcoes.length > 0 ? (
+              <select
+                value={rm.localEstoque || ""}
+                onChange={(e) => updateRm({ localEstoque: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent bg-white"
+              >
+                <option value="">— Selecionar —</option>
+                {locaisOpcoes.map((l) => (
+                  <option
+                    key={l.nCodLocal || l.cCodLocal || l.cDescricao}
+                    value={l.cCodLocal || l.cDescricao}
+                  >
+                    {l.cDescricao}
+                    {l.cCodLocal ? ` (${l.cCodLocal})` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={rm.localEstoque || ""}
+                onChange={(e) => updateRm({ localEstoque: e.target.value })}
+                placeholder="Código ou descrição"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+                disabled={carregandoOmieOpts}
+              />
+            )}
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-torg-gray">
+          Definidos uma vez por RM e reaproveitados na criação dos pedidos no Omie.
+        </p>
+      </div>
+
       {/* Itens da RM */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
@@ -1237,6 +1326,8 @@ export default function RmDetail({ params }) {
         pedidosPorFornecedor={pedidosPorFornecedor}
         loading={exportandoOmie}
         onConfirm={handleExportOmie}
+        defaultCategoria={rm.categoriaCompra || ""}
+        defaultLocalEstoque={rm.localEstoque || ""}
       />
     </div>
   );
