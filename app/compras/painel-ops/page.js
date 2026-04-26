@@ -287,7 +287,7 @@ export default function PainelOPs() {
                             </td>
                             <td className="px-6 py-3 text-center">
                               <button
-                                onClick={() => router.push(`/rm/${rm.id}`)}
+                                onClick={() => router.push(`/compras/rm/${rm.id}`)}
                                 className="text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 text-xs font-medium"
                               >
                                 <Eye size={14} /> Ver

@@ -458,7 +458,7 @@ export default function LancarCotacaoPage({ params }) {
       )
     );
     showToast(`Cotação de ${fornecedorNome} salva com ${itensCotacao.length} item${itensCotacao.length === 1 ? "" : "s"}`);
-    router.push(`/rm/${id}`);
+    router.push(`/compras/rm/${id}`);
   };
 
   if (!loaded) return <div className="p-12 text-center text-gray-400">Carregando...</div>;
@@ -466,7 +466,7 @@ export default function LancarCotacaoPage({ params }) {
     return (
       <div className="p-12 text-center">
         <p className="text-gray-500 text-lg">RM não encontrada</p>
-        <Link href="/" className="text-blue-600 hover:underline text-sm mt-2 inline-block">Voltar</Link>
+        <Link href="/compras" className="text-blue-600 hover:underline text-sm mt-2 inline-block">Voltar</Link>
       </div>
     );
   }

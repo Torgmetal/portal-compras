@@ -5,11 +5,11 @@ import { BarChart3, PlusCircle, Truck, Package, FolderKanban } from "lucide-reac
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
-  { href: "/", label: "Painel", icon: BarChart3 },
-  { href: "/painel-ops", label: "Painel de OPs", icon: FolderKanban },
-  { href: "/nova-rm", label: "Nova RM", icon: PlusCircle },
-  { href: "/catalogo", label: "Catálogo", icon: Package },
-  { href: "/fornecedores", label: "Fornecedores", icon: Truck },
+  { href: "/compras", label: "Painel", icon: BarChart3 },
+  { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban },
+  { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
+  { href: "/compras/catalogo", label: "Catálogo", icon: Package },
+  { href: "/compras/fornecedores", label: "Fornecedores", icon: Truck },
 ];
 
 export default function Sidebar() {
@@ -28,8 +28,8 @@ export default function Sidebar() {
           const Icon = m.icon;
           const active =
             pathname === m.href ||
-            (m.href === "/" && pathname.startsWith("/rm")) ||
-            (m.href === "/painel-ops" && pathname.startsWith("/painel-ops"));
+            (m.href === "/compras" && pathname.startsWith("/compras/rm")) ||
+            (m.href !== "/compras" && pathname.startsWith(m.href));
           return (
             <Link
               key={m.href}

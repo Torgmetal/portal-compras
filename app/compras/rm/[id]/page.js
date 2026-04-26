@@ -518,7 +518,7 @@ export default function RmDetail({ params }) {
     return (
       <div className="p-12 text-center">
         <div className="text-gray-500 text-lg">RM não encontrada</div>
-        <button onClick={() => router.push("/")} className="mt-4 text-blue-600 hover:underline">Voltar ao Painel</button>
+        <button onClick={() => router.push("/compras")} className="mt-4 text-blue-600 hover:underline">Voltar ao Painel</button>
       </div>
     );
   }
@@ -608,7 +608,7 @@ export default function RmDetail({ params }) {
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <button onClick={() => router.push("/")} className="text-gray-500 hover:text-gray-700 flex items-center gap-1 text-sm">
+        <button onClick={() => router.push("/compras")} className="text-gray-500 hover:text-gray-700 flex items-center gap-1 text-sm">
           <ArrowLeft size={16} /> Voltar
         </button>
         <h2 className="text-2xl font-bold text-gray-800">RM-{rm.numero}</h2>
@@ -621,7 +621,7 @@ export default function RmDetail({ params }) {
             if (window.confirm("Tem certeza que deseja excluir a RM-" + rm.numero + "? Esta ação não pode ser desfeita.")) {
               const rmNum = rm.numero;
               const rmId = rm.id;
-              router.push("/");
+              router.push("/compras");
               setTimeout(() => {
                 setRms((prev) => prev.filter((r) => r.id !== rmId));
                 showToast("RM-" + rmNum + " excluída com sucesso!");
@@ -700,7 +700,7 @@ export default function RmDetail({ params }) {
             <div className="text-center py-6 text-gray-400">
               <AlertCircle size={32} className="mx-auto mb-2" />
               <p className="text-sm">Nenhum fornecedor cadastrado com e-mail.</p>
-              <button onClick={() => router.push("/fornecedores")} className="mt-2 text-sm text-blue-600 hover:underline">
+              <button onClick={() => router.push("/compras/fornecedores")} className="mt-2 text-sm text-blue-600 hover:underline">
                 Cadastrar fornecedores
               </button>
             </div>
@@ -796,7 +796,7 @@ export default function RmDetail({ params }) {
         </p>
         <div className="flex flex-wrap gap-3 items-stretch">
           <button
-            onClick={() => router.push(`/rm/${rm.id}/cotar`)}
+            onClick={() => router.push(`/compras/rm/${rm.id}/cotar`)}
             className="flex-1 min-w-[240px] flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
           >
             <ShoppingCart size={18} /> Lançar Cotação (manual)

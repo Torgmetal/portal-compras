@@ -239,7 +239,7 @@ export default function NovaRm() {
     };
     setRms((prev) => [novaRm, ...prev]);
     showToast("RM criada com sucesso!");
-    router.push(`/rm/${novaRm.id}`);
+    router.push(`/compras/rm/${novaRm.id}`);
   };
 
   // ─── Criar RM Importada ───
@@ -277,7 +277,7 @@ export default function NovaRm() {
     };
     setRms((prev) => [novaRm, ...prev]);
     showToast(`RM-${novaRm.numero} criada com ${itensImportados.length} itens importados!`);
-    router.push(`/rm/${novaRm.id}`);
+    router.push(`/compras/rm/${novaRm.id}`);
   };
 
   const pesoTotal = itensImportados.reduce((s, it) => s + (it.peso || 0), 0);
@@ -392,7 +392,7 @@ export default function NovaRm() {
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button onClick={() => router.push("/")} className="px-5 py-2.5 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+            <button onClick={() => router.push("/compras")} className="px-5 py-2.5 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
             <button onClick={salvarManual} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Criar RM</button>
           </div>
         </div>
