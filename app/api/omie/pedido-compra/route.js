@@ -162,9 +162,11 @@ export async function POST(request) {
     if (categoria.length > 20) categoria = categoria.substring(0, 20);
     if (!categoria) categoria = "2.01.02"; // default seguro
 
-    // produtos_incluir do IncluirPedCompra. Omie aceita local de estoque
-    // mas a tag varia. Já testamos: cCodLocalEstoque (longo), cCodLocEstoq
-    // (curto). Tentando agora cIdLocEstoq (integration ID).
+    // produtos_incluir do IncluirPedCompra. Testamos 3 variantes de tag pra
+    // local de estoque (cCodLocalEstoque, cCodLocEstoq, cIdLocEstoq) — todas
+    // rejeitadas. IncluirPedCompra simplesmente nao aceita local nesse nivel.
+    // Solucao: criar pedido sem local, depois chamar AlterarPedCompra pra
+    // ajustar o local em cada item (Plano B — feito automaticamente abaixo).
     const localEstoqueCodigo =
       cCodLocalEstoque && String(cCodLocalEstoque).trim()
         ? String(cCodLocalEstoque).trim()
@@ -174,7 +176,7 @@ export async function POST(request) {
     for (let idx = 0; idx < itens.length; idx++) {
       const item = itens[idx];
       const nCodProd = await resolverProduto(item.codigo, appKey, appSecret);
-      const produto = {
+      produtos_incluir.push({
         cCodIntItem: codigoPedidoIntegracao + "-" + (idx + 1),
         nCodProd,
         cDescricao: String(item.descricao || "").substring(0, 255),
@@ -182,11 +184,7 @@ export async function POST(request) {
         nQtde: Number(item.qtd) || 0,
         nValUnit: Number(item.precoUnit) || 0,
         nDesconto: 0,
-      };
-      if (localEstoqueCodigo) {
-        produto.cIdLocEstoq = localEstoqueCodigo;
-      }
-      produtos_incluir.push(produto);
+      });
     }
 
     // Observação interna concentra dados que a API não aceita como tags
@@ -250,6 +248,47 @@ export async function POST(request) {
       );
     }
 
+    // Plano B pra local de estoque: depois do IncluirPedCompra criar o
+    // pedido (sem local), chamamos AlterarPedCompra pra ajustar o local
+    // em cada item. AlterarPedCompra costuma aceitar mais campos que
+    // o Incluir. Testamos várias tags em fallback até alguma passar.
+    let localAplicado = false;
+    let localErro = "";
+    if (localEstoqueCodigo && data.nCodPed) {
+      // Espaça 1.5s pra evitar rate limit "REDUNDANT" no Omie
+      await new Promise((r) => setTimeout(r, 1500));
+      const tagsPossiveis = ["cCodLocEstoq", "cIdLocEstoq", "cCodLocalEstoque"];
+      for (const tag of tagsPossiveis) {
+        const produtos_alterar = produtos_incluir.map((p) => ({
+          cCodIntItem: p.cCodIntItem,
+          [tag]: localEstoqueCodigo,
+        }));
+        try {
+          const resp = await fetch(OMIE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              call: "AlterarPedCompra",
+              app_key: appKey,
+              app_secret: appSecret,
+              param: [{ cabecalho_alterar: { nCodPed: data.nCodPed }, produtos_alterar }],
+            }),
+          });
+          const altData = await resp.json();
+          if (!altData.faultstring) {
+            localAplicado = true;
+            break; // tag funcionou
+          }
+          localErro = altData.faultstring;
+          // Se erro for de tag inexistente, tenta próxima
+          if (!/não faz parte|nao faz parte/i.test(localErro)) break; // erro diferente, para de tentar
+        } catch (e) {
+          localErro = e?.message || "erro de rede";
+          break;
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       codigo_pedido: data.nCodPed || "",
@@ -258,6 +297,8 @@ export async function POST(request) {
       // Devolve o nCodFor resolvido pro client salvar no cadastro do
       // fornecedor — evita re-lookup nas próximas chamadas.
       nCodFor_resolvido: nCodFor,
+      local_aplicado: localAplicado,
+      local_erro: localAplicado ? null : localErro || null,
       omie_response: data,
     });
   } catch (err) {
