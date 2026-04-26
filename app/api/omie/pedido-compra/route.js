@@ -231,6 +231,9 @@ export async function POST(request) {
         {
           error: data.faultstring,
           codigo_pedido_integracao: codigoPedidoIntegracao,
+          // Devolve o nCodFor mesmo em erro pra o client cachear no fornecedor
+          // — assim retentativas não fazem novo lookup e evitam rate limit.
+          nCodFor_resolvido: nCodFor,
           payload_enviado: payload,
         },
         { status: 400 }
