@@ -96,11 +96,11 @@ export default function PainelOPs() {
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <FolderKanban size={24} className="text-blue-600" />
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
+          <FolderKanban size={28} className="text-torg-blue" />
           Painel de OPs
         </h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-sm text-torg-gray mt-1">
           Visão consolidada de todas as Ordens de Produção com suas RMs,
           cotações e pedidos.
         </p>
@@ -108,21 +108,21 @@ export default function PainelOPs() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-          <p className="text-2xl font-bold text-blue-600">{totalOps}</p>
-          <p className="text-xs text-gray-500 mt-1">OPs</p>
+        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 text-center">
+          <p className="text-2xl font-extrabold text-torg-blue">{totalOps}</p>
+          <p className="text-xs text-torg-gray mt-1">OPs</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-          <p className="text-2xl font-bold text-gray-800">{totalRms}</p>
-          <p className="text-xs text-gray-500 mt-1">RMs</p>
+        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 text-center">
+          <p className="text-2xl font-extrabold text-torg-dark">{totalRms}</p>
+          <p className="text-xs text-torg-gray mt-1">RMs</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-          <p className="text-2xl font-bold text-green-600">{totalCot}</p>
-          <p className="text-xs text-gray-500 mt-1">Cotações</p>
+        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 text-center">
+          <p className="text-2xl font-extrabold text-torg-orange">{totalCot}</p>
+          <p className="text-xs text-torg-gray mt-1">Cotações</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-          <p className="text-2xl font-bold text-purple-600">{totalEnv}</p>
-          <p className="text-xs text-gray-500 mt-1">Envios</p>
+        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 text-center">
+          <p className="text-2xl font-extrabold text-torg-blue-700">{totalEnv}</p>
+          <p className="text-xs text-torg-gray mt-1">Envios</p>
         </div>
       </div>
 
@@ -149,8 +149,8 @@ export default function PainelOPs() {
               onClick={() => setFilterStatus(s)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 filterStatus === s
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-torg-blue text-white"
+                  : "bg-torg-blue-50 text-torg-dark hover:bg-torg-blue-100"
               }`}
             >
               {s}
@@ -183,8 +183,8 @@ export default function PainelOPs() {
                 onClick={() => toggleOp(group.op)}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <FolderKanban size={24} className="text-blue-600" />
+                  <div className="w-12 h-12 rounded-lg bg-torg-blue-50 flex items-center justify-center">
+                    <FolderKanban size={24} className="text-torg-blue" />
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-800 text-lg">
@@ -201,7 +201,7 @@ export default function PainelOPs() {
                 </div>
                 <div className="flex items-center gap-3">
                   {group.totalPedidos > 0 && (
-                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">
+                    <span className="text-xs bg-torg-dark text-white px-2 py-1 rounded-full font-medium">
                       {group.totalPedidos} pedido
                       {group.totalPedidos !== 1 ? "s" : ""}
                     </span>
@@ -250,7 +250,7 @@ export default function PainelOPs() {
                       <tbody className="divide-y divide-gray-100">
                         {group.rms.map((rm) => (
                           <tr key={rm.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-3 font-semibold text-blue-700">
+                            <td className="px-6 py-3 font-semibold text-torg-blue">
                               RM-{rm.numero}
                             </td>
                             <td className="px-6 py-3 text-gray-700 max-w-[250px] truncate">
@@ -264,7 +264,7 @@ export default function PainelOPs() {
                             </td>
                             <td className="px-6 py-3 text-center">
                               {(rm.cotacoes || []).length > 0 ? (
-                                <span className="inline-flex items-center gap-1 text-green-700 bg-green-50 px-2 py-0.5 rounded-full text-xs font-medium">
+                                <span className="inline-flex items-center gap-1 text-torg-orange-700 bg-torg-orange-50 px-2 py-0.5 rounded-full text-xs font-medium">
                                   <FileSpreadsheet size={12} />
                                   {(rm.cotacoes || []).length}
                                 </span>
@@ -274,7 +274,7 @@ export default function PainelOPs() {
                             </td>
                             <td className="px-6 py-3 text-center">
                               {(rm.envios || []).length > 0 ? (
-                                <span className="inline-flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full text-xs font-medium">
+                                <span className="inline-flex items-center gap-1 text-torg-blue bg-torg-blue-50 px-2 py-0.5 rounded-full text-xs font-medium">
                                   <Mail size={12} />
                                   {(rm.envios || []).length}
                                 </span>
@@ -288,7 +288,7 @@ export default function PainelOPs() {
                             <td className="px-6 py-3 text-center">
                               <button
                                 onClick={() => router.push(`/rm/${rm.id}`)}
-                                className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 text-xs font-medium"
+                                className="text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 text-xs font-medium"
                               >
                                 <Eye size={14} /> Ver
                               </button>

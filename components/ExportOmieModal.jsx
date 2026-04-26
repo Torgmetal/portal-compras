@@ -80,7 +80,7 @@ export default function ExportOmieModal({
       <div className="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <FileSpreadsheet size={20} className="text-emerald-600" />
+            <FileSpreadsheet size={20} className="text-torg-blue" />
             Gerar Pedidos Omie
           </h3>
           <button
@@ -120,7 +120,7 @@ export default function ExportOmieModal({
               <select
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent bg-white"
                 disabled={ocupado}
               >
                 <option value="">— Selecionar —</option>
@@ -137,7 +137,7 @@ export default function ExportOmieModal({
                   value={categoria}
                   onChange={(e) => setCategoria(e.target.value)}
                   placeholder={carregandoOpcoes ? "Carregando categorias..." : "Ex: 3.1 ou 2.01.02"}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
                   disabled={ocupado || carregandoOpcoes}
                 />
                 {carregandoOpcoes && (
@@ -157,7 +157,7 @@ export default function ExportOmieModal({
               <select
                 value={localEstoque}
                 onChange={(e) => setLocalEstoque(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent bg-white"
                 disabled={ocupado}
               >
                 <option value="">— Selecionar —</option>
@@ -178,14 +178,14 @@ export default function ExportOmieModal({
                   value={localEstoque}
                   onChange={(e) => setLocalEstoque(e.target.value)}
                   placeholder={carregandoOpcoes ? "Carregando locais do Omie..." : "Código ou descrição"}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
                   disabled={ocupado || carregandoOpcoes}
                 />
               </div>
             )}
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 space-y-1">
+          <div className="bg-torg-blue-50 border border-torg-blue-200 rounded-lg p-3 text-xs text-torg-dark space-y-1">
             <p>
               <strong>Conta Corrente:</strong> Inter
               <span className="mx-2">·</span>
@@ -193,7 +193,7 @@ export default function ExportOmieModal({
               <span className="mx-2">·</span>
               <strong>Parcelas:</strong> do cadastro do fornecedor
             </p>
-            <p className="text-blue-700/80">
+            <p className="text-torg-blue-700/80">
               ℹ️ <strong>Local de estoque</strong>: a API do Omie usa o local default da conta no pedido. Sua escolha aqui vai pra observação interna do pedido — você ajusta no Omie se precisar.
             </p>
           </div>
@@ -222,7 +222,7 @@ export default function ExportOmieModal({
           </button>
           <button
             onClick={() => acao("xlsx")}
-            className="px-5 py-2 bg-white border-2 border-emerald-600 text-emerald-700 rounded-lg hover:bg-emerald-50 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            className="px-5 py-2 bg-white border-2 border-torg-blue text-torg-blue rounded-lg hover:bg-torg-blue-50 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
             disabled={ocupado}
             title="Gera arquivos .xlsx no layout do Omie pra você importar manualmente"
           >
@@ -231,7 +231,7 @@ export default function ExportOmieModal({
           </button>
           <button
             onClick={() => acao("api")}
-            className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            className="px-5 py-2 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
             disabled={ocupado}
             title="Cria os pedidos automaticamente no Omie via API (recomendado)"
           >

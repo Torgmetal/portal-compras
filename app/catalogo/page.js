@@ -184,7 +184,7 @@ export default function CatalogoPage() {
                     <td className="px-4 py-2 text-right font-medium">{it.estoque}</td>
                     <td className="px-4 py-2">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        it.situacao === "Ativo" ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
+                        it.situacao === "Ativo" ? "bg-torg-orange-50 text-torg-orange-700" : "bg-gray-100 text-gray-500"
                       }`}>
                         {it.situacao}
                       </span>

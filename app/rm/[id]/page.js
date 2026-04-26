@@ -733,7 +733,7 @@ export default function RmDetail({ params }) {
                         <p className="text-xs text-gray-500 truncate">{f.email}</p>
                       </div>
                       {jaEnviado && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full whitespace-nowrap">Enviado</span>
+                        <span className="text-xs bg-torg-orange-100 text-torg-orange-700 px-2 py-0.5 rounded-full whitespace-nowrap">Enviado</span>
                       )}
                     </label>
                   );
@@ -768,8 +768,8 @@ export default function RmDetail({ params }) {
               {envios.map((envio) => (
                 <div key={envio.id} className="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                      <CheckCircle2 size={16} className="text-green-600" />
+                    <div className="w-8 h-8 rounded-full bg-torg-orange-100 flex items-center justify-center">
+                      <CheckCircle2 size={16} className="text-torg-orange" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-800">{envio.fornecedorNome}</p>
@@ -820,7 +820,7 @@ export default function RmDetail({ params }) {
               onDragLeave={() => setDragActive(false)}
               onDrop={handleDrop}
             >
-              <FileSpreadsheet size={28} className="mx-auto text-green-500 mb-1" />
+              <FileSpreadsheet size={28} className="mx-auto text-torg-orange mb-1" />
               <p className="text-gray-600 text-sm">Subir Planilha (.xlsx/.csv)</p>
               <p className="text-gray-400 text-xs mt-0.5">sem impostos nem disponibilidade</p>
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
@@ -868,19 +868,19 @@ export default function RmDetail({ params }) {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center flex-wrap gap-3">
             <h3 className="text-lg font-semibold text-gray-800">
-              <FileSpreadsheet size={18} className="inline text-green-600 mr-1" />
+              <FileSpreadsheet size={18} className="inline text-torg-orange mr-1" />
               Cotações em Planilha ({cotacoes.length})
             </h3>
             {(cotacoes.length >= 1 || (rm.anexos && rm.anexos.length > 0)) && (
               <button
                 onClick={gerarMapa}
-                className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
+                className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
               >
                 <BarChart3 size={16} /> Gerar Mapa de Cotação
               </button>
             )}
               {showMapa && (
-                <button onClick={gerarXlsxMapa} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                <button onClick={gerarXlsxMapa} className="flex items-center gap-2 px-4 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium">
                   <Download size={16} /> Exportar Mapa (.xlsx)
                 </button>
               )}
@@ -907,7 +907,7 @@ export default function RmDetail({ params }) {
                   <tr key={cot.id} className="hover:bg-gray-50">
                     <td className="px-6 py-3 font-medium text-gray-800">{cot.fornecedor}</td>
                     <td className="px-6 py-3 text-gray-600 flex items-center gap-1">
-                      <FileSpreadsheet size={14} className="text-green-600" /> {cot.nomeArquivo}
+                      <FileSpreadsheet size={14} className="text-torg-orange" /> {cot.nomeArquivo}
                     </td>
                     <td className="px-6 py-3 text-gray-600">{(cot.itens || []).length}</td>
                     <td className="px-6 py-3 font-semibold text-gray-800">{fmt(cot.total)}</td>
@@ -927,13 +927,13 @@ export default function RmDetail({ params }) {
 
       {/* ═══════════ MAPA DE COTAÇÃO ═══════════ */}
       {showMapa && mapaItems.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border-2 border-purple-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-purple-100 bg-purple-50 flex justify-between items-start flex-wrap gap-3">
+        <div className="bg-white rounded-xl shadow-sm border-2 border-torg-blue-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-torg-blue-100 bg-torg-blue-50 flex justify-between items-start flex-wrap gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-purple-800 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
                 <BarChart3 size={20} /> Mapa de Cotação
               </h3>
-              <p className="text-sm text-purple-600 mt-1">
+              <p className="text-sm text-torg-blue mt-1">
                 O menor preço por item está destacado em verde. Clique em outro fornecedor para alterar a seleção.
               </p>
             </div>
@@ -957,15 +957,15 @@ export default function RmDetail({ params }) {
               )}
 
           {/* Resumo no topo — só o número total que vai sair de pedido */}
-          <div className="px-6 py-3 bg-purple-50 border-b border-purple-100 flex items-center justify-between text-sm">
-            <span className="text-purple-700 font-medium flex items-center gap-2">
+          <div className="px-6 py-3 bg-torg-blue-50 border-b border-torg-blue-100 flex items-center justify-between text-sm">
+            <span className="text-torg-blue font-medium flex items-center gap-2">
               <Award size={16} /> Pedido total (vencedores): {Object.keys(winnerStats).length} fornecedor{Object.keys(winnerStats).length !== 1 ? "es" : ""}
             </span>
-            <span className="font-bold text-purple-900 text-base">{fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}</span>
+            <span className="font-bold text-torg-dark text-base">{fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}</span>
           </div>
 
           {omieResult && (
-            <div className={`p-3 rounded-lg text-sm ${omieResult.success ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+            <div className={`p-3 rounded-lg text-sm ${omieResult.success ? "bg-torg-orange-50 text-torg-orange-700 border border-torg-orange-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
               {omieResult.success
                 ? `Pedido criado com sucesso no Omie! C\u00f3digo: ${omieResult.numero_pedido || omieResult.codigo_pedido_integracao}`
                 : `Erro: ${omieResult.error}`}
@@ -991,7 +991,7 @@ export default function RmDetail({ params }) {
                       )}
                     </th>
                   ))}
-                  <th className="px-4 py-3 text-center text-xs font-medium text-purple-600 uppercase bg-purple-50">Vencedor</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-torg-blue uppercase bg-torg-blue-50">Vencedor</th>
                 </tr>
                 <tr className="bg-gray-50">
                   <th className="px-4 py-2 sticky left-0 bg-gray-50"></th>
@@ -1008,7 +1008,7 @@ export default function RmDetail({ params }) {
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Prazo</th>
                     </Fragment>
                   ))}
-                  <th className="px-3 py-2 text-xs text-purple-400 text-center bg-purple-50">Seleção</th>
+                  <th className="px-3 py-2 text-xs text-torg-blue/40 text-center bg-torg-blue-50">Seleção</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -1035,9 +1035,9 @@ export default function RmDetail({ params }) {
                             <td
                               className={`px-3 py-3 text-center font-semibold cursor-pointer transition-colors ${
                                 isWinner
-                                  ? "bg-green-50 text-green-700 ring-2 ring-inset ring-green-300"
+                                  ? "bg-torg-orange-50 text-torg-orange-700 ring-2 ring-inset ring-torg-orange-300"
                                   : isLowest
-                                  ? "bg-green-50/50 text-green-600"
+                                  ? "bg-torg-orange-50/50 text-torg-orange"
                                   : "text-gray-700 hover:bg-blue-50"
                               }`}
                               onClick={() => match && match.precoUnit > 0 && setWinner(itemKey, cot.fornecedor)}
@@ -1048,7 +1048,7 @@ export default function RmDetail({ params }) {
                               }
                             >
                               {match && precoMostrar ? fmt(precoMostrar) : "—"}
-                              {isWinner && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
+                              {isWinner && <CheckCircle2 size={12} className="inline ml-1 text-torg-orange" />}
                             </td>
                             <td className={`px-3 py-3 text-center text-xs ${match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm ? "bg-yellow-100 text-yellow-800 font-bold" : "text-gray-600"}`}>{match ? (match.qtd || "—") : "—"}{match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm && <AlertCircle size={12} className="inline ml-1 text-yellow-600" title={`Qtd RM: ${mi.qtdRm}`} />}</td>
                       <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "—"}</td>
@@ -1056,7 +1056,7 @@ export default function RmDetail({ params }) {
                           </Fragment>
                         );
                       })}
-                      <td className="px-3 py-3 text-center bg-purple-50 text-xs font-semibold text-purple-700">
+                      <td className="px-3 py-3 text-center bg-torg-blue-50 text-xs font-semibold text-torg-blue">
                         {winner || "—"}
                       </td>
                     </tr>
@@ -1072,8 +1072,8 @@ export default function RmDetail({ params }) {
                         <div className="text-xs text-gray-400 font-normal">Valor total do PDF</div>
                       </div>
                       <div>
-                        <div className="text-[10px] uppercase tracking-wide text-emerald-700 font-medium">Vencedor</div>
-                        <div className="text-xs text-emerald-600 font-normal">Itens vencidos × qtd RM</div>
+                        <div className="text-[10px] uppercase tracking-wide text-torg-orange-700 font-medium">Vencedor</div>
+                        <div className="text-xs text-torg-orange font-normal">Itens vencidos × qtd RM</div>
                       </div>
                     </div>
                   </td>
@@ -1089,16 +1089,16 @@ export default function RmDetail({ params }) {
                       <Fragment key={cot.id + "-total"}>
                         <td className="px-3 py-4 text-center align-top" colSpan={4}>
                           <div className="space-y-2">
-                            <div className={`${isBestProp ? "text-green-700" : "text-gray-700"}`}>
+                            <div className={`${isBestProp ? "text-torg-orange-700" : "text-gray-700"}`}>
                               <div className="font-bold tabular-nums">{fmt(propTotal)}</div>
                               <div className="text-[10px] font-normal text-gray-500">
                                 {propCount} ite{propCount === 1 ? "m" : "ns"} cotado{propCount === 1 ? "" : "s"}
-                                {isBestProp && <CheckCircle2 size={10} className="inline ml-1 text-green-500" />}
+                                {isBestProp && <CheckCircle2 size={10} className="inline ml-1 text-torg-orange" />}
                               </div>
                             </div>
-                            <div className={`pt-2 border-t border-gray-200 ${winTotal > 0 ? "text-emerald-700" : "text-gray-300"}`}>
+                            <div className={`pt-2 border-t border-gray-200 ${winTotal > 0 ? "text-torg-orange-700" : "text-gray-300"}`}>
                               <div className="font-bold tabular-nums">{winTotal > 0 ? fmt(winTotal) : "—"}</div>
-                              <div className="text-[10px] font-normal text-emerald-600">
+                              <div className="text-[10px] font-normal text-torg-orange">
                                 {winCount > 0 ? `${winCount} ite${winCount === 1 ? "m" : "ns"} vencido${winCount === 1 ? "" : "s"}` : "Nenhum vencedor"}
                               </div>
                             </div>
@@ -1107,7 +1107,7 @@ export default function RmDetail({ params }) {
                       </Fragment>
                     );
                   })}
-                  <td className="px-3 py-4 text-center bg-purple-100 text-purple-800 font-bold align-top">
+                  <td className="px-3 py-4 text-center bg-torg-blue-100 text-torg-dark font-bold align-top">
                     <div className="text-[10px] uppercase tracking-wide font-medium opacity-75">Total Pedido</div>
                     <div className="text-base mt-1 tabular-nums">{fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}</div>
                   </td>
@@ -1117,7 +1117,7 @@ export default function RmDetail({ params }) {
           </div>
 
           {/* Botão único — abre modal com 2 opções: planilha ou API */}
-          <div className="px-6 py-4 bg-purple-50/50 border-t border-purple-100 flex flex-wrap justify-end gap-3">
+          <div className="px-6 py-4 bg-torg-blue-50/50 border-t border-torg-blue-100 flex flex-wrap justify-end gap-3">
             <button
               onClick={() => {
                 if (Object.keys(pedidosPorFornecedor).length === 0)
@@ -1125,7 +1125,7 @@ export default function RmDetail({ params }) {
                 setShowExportOmie(true);
               }}
               disabled={exportandoOmie}
-              className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2 disabled:opacity-50"
+              className="px-6 py-2.5 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 font-medium flex items-center gap-2 disabled:opacity-50"
               title="Cria 1 pedido por fornecedor vencedor — escolhe entre planilha (.xlsx) ou API direta"
             >
               <ShoppingCart size={18} />
@@ -1141,32 +1141,32 @@ export default function RmDetail({ params }) {
       {showPedidos && pedidosOmie.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-emerald-800 flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-torg-orange-700 flex items-center gap-2">
               <Truck size={20} /> Pedidos de Compra Gerados ({pedidosOmie.length})
             </h3>
           </div>
 
           {pedidosOmie.map((pedido, pidx) => (
-            <div key={pidx} className="bg-white rounded-xl shadow-sm border-2 border-emerald-200 overflow-hidden">
+            <div key={pidx} className="bg-white rounded-xl shadow-sm border-2 border-torg-orange-200 overflow-hidden">
               {/* Header do pedido */}
               <div
-                className="px-6 py-4 bg-emerald-50 flex justify-between items-center cursor-pointer"
+                className="px-6 py-4 bg-torg-orange-50 flex justify-between items-center cursor-pointer"
                 onClick={() => setExpandedPedido(expandedPedido === pidx ? null : pidx)}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <Truck size={20} className="text-emerald-600" />
+                  <div className="w-10 h-10 rounded-full bg-torg-orange-100 flex items-center justify-center">
+                    <Truck size={20} className="text-torg-orange" />
                   </div>
                   <div>
-                    <p className="font-semibold text-emerald-800">{pedido.fornecedor}</p>
-                    <p className="text-sm text-emerald-600">{pedido.itensCount} ite{pedido.itensCount === 1 ? "m" : "ns"} — Total: {fmt(pedido.total)}</p>
+                    <p className="font-semibold text-torg-orange-700">{pedido.fornecedor}</p>
+                    <p className="text-sm text-torg-orange">{pedido.itensCount} ite{pedido.itensCount === 1 ? "m" : "ns"} — Total: {fmt(pedido.total)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">
+                  <span className="text-xs bg-torg-orange-100 text-torg-orange-700 px-2 py-1 rounded-full font-medium">
                     RM-{rm.numero}
                   </span>
-                  {expandedPedido === pidx ? <ChevronUp size={20} className="text-emerald-600" /> : <ChevronDown size={20} className="text-emerald-600" />}
+                  {expandedPedido === pidx ? <ChevronUp size={20} className="text-torg-orange" /> : <ChevronDown size={20} className="text-torg-orange" />}
                 </div>
               </div>
 
@@ -1202,7 +1202,7 @@ export default function RmDetail({ params }) {
                       <tfoot className="bg-gray-50">
                         <tr>
                           <td colSpan={4} className="px-4 py-2 text-right font-semibold text-gray-700">Total do Pedido:</td>
-                          <td className="px-4 py-2 text-right font-bold text-emerald-700">{fmt(pedido.total)}</td>
+                          <td className="px-4 py-2 text-right font-bold text-torg-orange-700">{fmt(pedido.total)}</td>
                           <td colSpan={2}></td>
                         </tr>
                       </tfoot>
@@ -1212,7 +1212,7 @@ export default function RmDetail({ params }) {
                   {/* JSON Omie */}
                   <div className="px-6 py-4 border-t border-gray-100">
                     <details className="text-sm">
-                      <summary className="cursor-pointer text-emerald-600 hover:text-emerald-800 font-medium">
+                      <summary className="cursor-pointer text-torg-orange hover:text-torg-orange-700 font-medium">
                         Ver JSON para API Omie
                       </summary>
                       <pre className="mt-2 bg-gray-900 text-green-400 rounded-lg p-4 text-xs overflow-x-auto max-h-60">

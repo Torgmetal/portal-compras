@@ -422,7 +422,7 @@ export default function NovaRm() {
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
             </div>
             {nomeArquivo && (
-              <div className="mt-3 flex items-center gap-2 text-sm text-green-700 bg-green-50 px-4 py-2 rounded-lg">
+              <div className="mt-3 flex items-center gap-2 text-sm text-torg-orange-700 bg-torg-orange-50 px-4 py-2 rounded-lg">
                 <CheckCircle2 size={16} />
                 <span>Arquivo carregado: <strong>{nomeArquivo}</strong> — {itensImportados.length} itens</span>
               </div>

@@ -60,10 +60,10 @@ export default function Fornecedores() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Fornecedores</h2>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Fornecedores</h2>
         <button
           onClick={() => { if (showForm) { setShowForm(false); setEditingId(null); setForm(FORM_INICIAL); } else { setShowForm(true); } }}
-          className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+          className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
         >
           <PlusCircle size={18} /> Novo Fornecedor
         </button>
@@ -74,54 +74,54 @@ export default function Fornecedores() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nome / Razão Social</label>
-              <input type="text" value={form.nome} onChange={(e) => set("nome", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="text" value={form.nome} onChange={(e) => set("nome", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ</label>
-              <input type="text" value={form.cnpj} onChange={(e) => set("cnpj", e.target.value)} placeholder="00.000.000/0001-00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="text" value={form.cnpj} onChange={(e) => set("cnpj", e.target.value)} placeholder="00.000.000/0001-00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-              <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-              <input type="text" value={form.telefone} onChange={(e) => set("telefone", e.target.value)} placeholder="(00) 00000-0000" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="text" value={form.telefone} onChange={(e) => set("telefone", e.target.value)} placeholder="(00) 00000-0000" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Codigo Omie (nCodFor)</label>
-              <input type="text" value={form.nCodOmie} onChange={(e) => set("nCodOmie", e.target.value)} placeholder="Ex: 7318285259" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="text" value={form.nCodOmie} onChange={(e) => set("nCodOmie", e.target.value)} placeholder="Ex: 7318285259" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Parcelas (Cond. Pagamento)</label>
-              <input type="number" min="1" value={form.parcelas} onChange={(e) => set("parcelas", e.target.value)} placeholder="Ex: 3" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="number" min="1" value={form.parcelas} onChange={(e) => set("parcelas", e.target.value)} placeholder="Ex: 3" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">UF (Origem do fornecedor)</label>
-              <select value={form.uf} onChange={(e) => set("uf", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <select value={form.uf} onChange={(e) => set("uf", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent">
                 <option value="">—</option>
                 {UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">ICMS padrão (%)</label>
-              <input type="number" min="0" max="100" step="0.01" value={form.icmsPadrao} onChange={(e) => set("icmsPadrao", e.target.value)} placeholder="Ex: 12" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="number" min="0" max="100" step="0.01" value={form.icmsPadrao} onChange={(e) => set("icmsPadrao", e.target.value)} placeholder="Ex: 12" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
               <p className="text-xs text-gray-400 mt-1">Alíquota usada como default ao lançar cotação. Editável por cotação.</p>
             </div>
           </div>
           <div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Contato</label>
-              <input type="text" value={form.contato} onChange={(e) => set("contato", e.target.value)} placeholder="Nome do contato" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="text" value={form.contato} onChange={(e) => set("contato", e.target.value)} placeholder="Nome do contato" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Endereço</label>
-              <input type="text" value={form.endereco} onChange={(e) => set("endereco", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input type="text" value={form.endereco} onChange={(e) => set("endereco", e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
-            <textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            <textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Categorias</label>
@@ -132,7 +132,7 @@ export default function Fornecedores() {
                   onClick={() => toggleCat(cat)}
                   className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
                     form.categorias.includes(cat)
-                      ? "bg-blue-100 border-blue-300 text-blue-700"
+                      ? "bg-torg-blue-100 border-torg-blue-300 text-torg-blue-700"
                       : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                   }`}
                 >
@@ -143,7 +143,7 @@ export default function Fornecedores() {
           </div>
           <div className="flex justify-end gap-3">
             <button onClick={() => { setShowForm(false); setEditingId(null); setForm(FORM_INICIAL); }} className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm">Cancelar</button>
-            <button onClick={salvar} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">{editingId ? "Atualizar" : "Salvar"}</button>
+            <button onClick={salvar} className="px-4 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium">{editingId ? "Atualizar" : "Salvar"}</button>
           </div>
         </div>
       )}
@@ -185,7 +185,7 @@ export default function Fornecedores() {
                       </div>
                     </td>
                     <td className="px-6 py-3">
-                    <button onClick={() => editar(f)} className="text-blue-500 hover:text-blue-700 mr-2"><Pencil size={16} /></button>
+                    <button onClick={() => editar(f)} className="text-torg-blue hover:text-torg-dark mr-2"><Pencil size={16} /></button>
                     <button onClick={() => remover(f.id)} className="text-red-500 hover:text-red-700"><Trash2 size={16} />
                       </button>
                     </td>

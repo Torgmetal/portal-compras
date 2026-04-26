@@ -19,25 +19,28 @@ export default function Dashboard() {
   };
 
   const cards = [
-    { label: "Total de RMs", value: totais.total, color: "bg-blue-500", Icon: FileText },
-    { label: "Abertas", value: totais.aberta, color: "bg-yellow-500", Icon: PlusCircle },
-    { label: "Em Cotação", value: totais.cotacao, color: "bg-purple-500", Icon: BarChart3 },
-    { label: "Pedidos Gerados", value: totais.pedido, color: "bg-emerald-500", Icon: Truck },
+    { label: "Total de RMs", value: totais.total, color: "bg-torg-blue", Icon: FileText },
+    { label: "Abertas", value: totais.aberta, color: "bg-torg-orange", Icon: PlusCircle },
+    { label: "Em Cotação", value: totais.cotacao, color: "bg-torg-blue-700", Icon: BarChart3 },
+    { label: "Pedidos Gerados", value: totais.pedido, color: "bg-torg-dark", Icon: Truck },
   ];
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Painel de Compras</h2>
+      <div>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de Compras</h2>
+        <p className="text-sm text-torg-gray mt-1">Gestão de RMs, Cotações e Pedidos</p>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((c) => (
-          <div key={c.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
+          <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-5 flex items-center gap-4">
             <div className={`${c.color} p-3 rounded-lg`}>
               <c.Icon size={28} className="text-white" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">{c.label}</p>
-              <p className="text-2xl font-bold text-gray-800">{c.value}</p>
+              <p className="text-sm text-torg-gray">{c.label}</p>
+              <p className="text-2xl font-extrabold text-torg-dark">{c.value}</p>
             </div>
           </div>
         ))}
@@ -86,7 +89,7 @@ export default function Dashboard() {
                         className={`text-xs px-2 py-0.5 rounded-full ${
                           rm.tipo === "Material"
                             ? "bg-orange-100 text-orange-700"
-                            : "bg-teal-100 text-teal-700"
+                            : "bg-torg-blue-100 text-torg-blue-700"
                         }`}
                       >
                         {rm.tipo}

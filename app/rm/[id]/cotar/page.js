@@ -489,13 +489,13 @@ export default function LancarCotacaoPage({ params }) {
       </div>
 
       {/* ─── IMPORTAR VIA IA ─────────────────────────────── */}
-      <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-5 space-y-4">
+      <div className="bg-gradient-to-br from-torg-blue-50 to-torg-orange-50 border border-torg-blue-200 rounded-xl p-5 space-y-4">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-purple-900 flex items-center gap-2">
-              <Sparkles size={18} className="text-purple-600" /> Importar via IA
+            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+              <Sparkles size={18} className="text-torg-orange" /> Importar via IA
             </h3>
-            <p className="text-sm text-purple-800/80 mt-1">
+            <p className="text-sm text-torg-gray mt-1">
               Sobe um PDF, foto, print ou cola o texto do email/WhatsApp — a IA extrai os itens
               e já casa com sua RM. Funciona com qualquer formato de fornecedor.
             </p>
@@ -508,8 +508,8 @@ export default function LancarCotacaoPage({ params }) {
             onClick={() => setAiMode("file")}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               aiMode === "file"
-                ? "bg-purple-600 text-white"
-                : "bg-white border border-purple-200 text-purple-700 hover:bg-purple-50"
+                ? "bg-torg-orange text-white"
+                : "bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50"
             }`}
           >
             <FileText size={14} className="inline mr-1" /> PDF / Imagem
@@ -518,8 +518,8 @@ export default function LancarCotacaoPage({ params }) {
             onClick={() => setAiMode("text")}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               aiMode === "text"
-                ? "bg-purple-600 text-white"
-                : "bg-white border border-purple-200 text-purple-700 hover:bg-purple-50"
+                ? "bg-torg-orange text-white"
+                : "bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50"
             }`}
           >
             <ClipboardPaste size={14} className="inline mr-1" /> Colar texto
@@ -531,7 +531,7 @@ export default function LancarCotacaoPage({ params }) {
             <button
               onClick={() => aiFileRef.current?.click()}
               disabled={importingAi}
-              className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full px-4 py-3 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {importingAi ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
               {importingAi ? "Processando com IA..." : "Selecionar PDF, JPG ou PNG"}
@@ -553,13 +553,13 @@ export default function LancarCotacaoPage({ params }) {
               onChange={(e) => setAiTextPaste(e.target.value)}
               placeholder="Cole aqui o conteúdo do email, mensagem do WhatsApp, ou qualquer texto com os itens da cotação..."
               rows={6}
-              className="w-full border border-purple-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono"
+              className="w-full border border-torg-blue-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-orange focus:border-transparent font-mono"
               disabled={importingAi}
             />
             <button
               onClick={() => importarViaIa({ text: aiTextPaste })}
               disabled={importingAi || !aiTextPaste.trim()}
-              className="w-full px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full px-4 py-2.5 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 font-medium flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {importingAi ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
               {importingAi ? "Processando com IA..." : "Processar texto com IA"}
@@ -567,13 +567,13 @@ export default function LancarCotacaoPage({ params }) {
           </div>
         )}
 
-        <details className="text-xs text-purple-700/70">
-          <summary className="cursor-pointer hover:text-purple-900">Avançado — usar parser por regex (Soufer/Gerdau apenas)</summary>
+        <details className="text-xs text-torg-gray">
+          <summary className="cursor-pointer hover:text-torg-dark">Avançado — usar parser por regex (Soufer/Gerdau apenas)</summary>
           <div className="mt-2 flex gap-2">
             <button
               onClick={() => pdfRef.current?.click()}
               disabled={importingPdf}
-              className="px-3 py-1.5 bg-white border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-50 text-xs flex items-center gap-1 disabled:opacity-50"
+              className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue rounded-lg hover:bg-torg-blue-50 text-xs flex items-center gap-1 disabled:opacity-50"
             >
               {importingPdf ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
               {importingPdf ? "Lendo..." : "Importar PDF (regex offline)"}
@@ -644,7 +644,7 @@ export default function LancarCotacaoPage({ params }) {
                   {importInfo.debug.pdf.map((d, i) => (
                     <div key={i} className="ml-2 mt-1 font-mono">
                       <div>desc: <span className="text-blue-700">{d.pdfDesc}</span></div>
-                      <div>norm: <span className={d.pdfNorm ? "text-green-700" : "text-red-700"}>{d.pdfNorm ? JSON.stringify(d.pdfNorm) : "null (não reconhecido)"}</span></div>
+                      <div>norm: <span className={d.pdfNorm ? "text-torg-orange-700" : "text-red-700"}>{d.pdfNorm ? JSON.stringify(d.pdfNorm) : "null (não reconhecido)"}</span></div>
                     </div>
                   ))}
                 </div>
@@ -652,8 +652,8 @@ export default function LancarCotacaoPage({ params }) {
                   <p className="font-semibold text-gray-700 mt-2">Amostras da RM (3 primeiros):</p>
                   {importInfo.debug.rm.map((d, i) => (
                     <div key={i} className="ml-2 mt-1 font-mono">
-                      <div>desc: <span className="text-blue-700">{d.rmDesc}</span> | mat: <span className="text-purple-700">{d.rmMat || "(vazio)"}</span></div>
-                      <div>norm: <span className={d.rmNorm ? "text-green-700" : "text-red-700"}>{d.rmNorm ? JSON.stringify(d.rmNorm) : "null (não reconhecido)"}</span></div>
+                      <div>desc: <span className="text-blue-700">{d.rmDesc}</span> | mat: <span className="text-torg-blue">{d.rmMat || "(vazio)"}</span></div>
+                      <div>norm: <span className={d.rmNorm ? "text-torg-orange-700" : "text-red-700"}>{d.rmNorm ? JSON.stringify(d.rmNorm) : "null (não reconhecido)"}</span></div>
                     </div>
                   ))}
                 </div>
@@ -918,7 +918,7 @@ export default function LancarCotacaoPage({ params }) {
                     </td>
                     <td className="px-3 py-2 text-right text-gray-700 tabular-nums">{totalBruto > 0 ? fmt(totalBruto) : "—"}</td>
                     {mostrarImpostos && (
-                      <td className="px-3 py-2 text-right text-green-700 font-medium tabular-nums">{totalLiq > 0 ? fmt(totalLiq) : "—"}</td>
+                      <td className="px-3 py-2 text-right text-torg-orange-700 font-medium tabular-nums">{totalLiq > 0 ? fmt(totalLiq) : "—"}</td>
                     )}
                   </tr>
                 );
@@ -929,7 +929,7 @@ export default function LancarCotacaoPage({ params }) {
                 <td colSpan={mostrarImpostos ? 9 : 7} className="px-3 py-3 text-right text-gray-700">Totais:</td>
                 <td className="px-3 py-3 text-right text-gray-900 tabular-nums">{fmt(totais.totalBruto)}</td>
                 {mostrarImpostos && (
-                  <td className="px-3 py-3 text-right text-green-700 tabular-nums">{fmt(totais.totalLiquido)}</td>
+                  <td className="px-3 py-3 text-right text-torg-orange-700 tabular-nums">{fmt(totais.totalLiquido)}</td>
                 )}
               </tr>
               {mostrarImpostos && totais.creditoTotal > 0 && (
