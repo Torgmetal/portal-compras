@@ -29,37 +29,14 @@ async function resolverProduto(codigo, appKey, appSecret) {
 
 // Busca o codigo_cliente_omie de um fornecedor pelo CNPJ.
 // Omie trata clientes e fornecedores na mesma tabela (clientes_cadastro).
-// Tenta primeiro ConsultarCliente direto; se falhar, faz ListarClientesResumido
-// filtrando por CNPJ — fallback que algumas contas Omie precisam.
-// Devolve { codigo, error? } pra caller usar a mensagem se for o caso.
+// Usa ListarClientesResumido com filtro de CNPJ — só uma chamada, evita
+// rate limit "REDUNDANT" do Omie.
+// Devolve { codigo, error? } pra caller persistir o código resolvido.
 async function resolverFornecedorPorCnpj(cnpj, appKey, appSecret) {
   if (!cnpj) return { codigo: 0, error: "CNPJ não informado" };
   const cnpjLimpo = String(cnpj).replace(/\D/g, "");
   if (cnpjLimpo.length < 11) return { codigo: 0, error: "CNPJ inválido (menos de 11 dígitos)" };
 
-  // Tentativa 1: ConsultarCliente direto
-  try {
-    const resp = await fetch(OMIE_CLIENTES_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        call: "ConsultarCliente",
-        app_key: appKey,
-        app_secret: appSecret,
-        param: [{ cnpj_cpf: cnpjLimpo }],
-      }),
-    });
-    const data = await resp.json();
-    if (data.codigo_cliente_omie) {
-      return { codigo: data.codigo_cliente_omie };
-    }
-    // Se Omie devolveu faultstring, segue pro fallback
-    var primeiraTentativa = data.faultstring || data.faultcode || `(sem codigo_cliente_omie no retorno)`;
-  } catch (e) {
-    var primeiraTentativa = e?.message || "erro de rede";
-  }
-
-  // Tentativa 2: ListarClientesResumido filtrando por CNPJ
   try {
     const resp = await fetch(OMIE_CLIENTES_URL, {
       method: "POST",
@@ -79,19 +56,19 @@ async function resolverFornecedorPorCnpj(cnpj, appKey, appSecret) {
       }),
     });
     const data = await resp.json();
+    if (data.faultstring) {
+      return { codigo: 0, error: `Omie: ${data.faultstring}` };
+    }
     const lista = data.clientes_cadastro_resumido || [];
     if (lista.length > 0 && lista[0].codigo_cliente) {
       return { codigo: lista[0].codigo_cliente };
     }
     return {
       codigo: 0,
-      error: `CNPJ ${cnpjLimpo} não encontrado no Omie. Tentativas: ConsultarCliente=${primeiraTentativa}; ListarClientesResumido=${data.faultstring || "0 resultados"}`,
+      error: `CNPJ ${cnpjLimpo} não encontrado no Omie (0 resultados em ListarClientesResumido).`,
     };
   } catch (e) {
-    return {
-      codigo: 0,
-      error: `Erro buscando fornecedor: ${e?.message || "rede"}; ConsultarCliente: ${primeiraTentativa}`,
-    };
+    return { codigo: 0, error: `Erro de rede: ${e?.message || "desconhecido"}` };
   }
 }
 
@@ -265,6 +242,9 @@ export async function POST(request) {
       codigo_pedido: data.nCodPed || "",
       codigo_pedido_integracao: codigoPedidoIntegracao,
       numero_pedido: data.cNumero || data.cNumPedido || "",
+      // Devolve o nCodFor resolvido pro client salvar no cadastro do
+      // fornecedor — evita re-lookup nas próximas chamadas.
+      nCodFor_resolvido: nCodFor,
       omie_response: data,
     });
   } catch (err) {

@@ -361,6 +361,15 @@ export default function RmDetail({ params }) {
           const data = await resp.json();
           if (resp.ok && data.success) {
             sucessos.push({ fornecedor: fornecedorNome, numero: data.numero_pedido || data.codigo_pedido });
+            // Persiste o nCodFor resolvido no cadastro do fornecedor — economiza
+            // chamada Omie nas próximas vezes (e evita rate limit REDUNDANT)
+            if (data.nCodFor_resolvido && fornCadastrado && !fornCadastrado.nCodOmie) {
+              setFornecedores((prev) =>
+                prev.map((f) =>
+                  f.id === fornCadastrado.id ? { ...f, nCodOmie: String(data.nCodFor_resolvido) } : f
+                )
+              );
+            }
             // Adiciona à lista de pedidos gerados (UI antiga)
             setPedidosOmie((prev) => [
               ...prev,
