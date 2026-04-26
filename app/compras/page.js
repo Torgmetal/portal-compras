@@ -61,7 +61,7 @@ export default function Dashboard() {
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-800">Últimas Requisições</h3>
+            <h3 className="text-lg font-semibold text-torg-dark">Últimas Requisições</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

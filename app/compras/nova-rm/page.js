@@ -284,7 +284,10 @@ export default function NovaRm() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Nova Requisição de Material</h2>
+      <div>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Nova Requisição de Material</h2>
+        <p className="text-sm text-torg-gray mt-1">Crie a RM manualmente ou suba a planilha de requisição.</p>
+      </div>
 
       {/* ─── Tabs ─── */}
       <div className="flex border-b border-gray-200">
@@ -453,7 +456,7 @@ export default function NovaRm() {
 
               {/* Dados da RM */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-                <h3 className="text-lg font-semibold text-gray-800">Dados da RM</h3>
+                <h3 className="text-lg font-semibold text-torg-dark">Dados da RM</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">OS / OP</label>
@@ -514,7 +517,7 @@ export default function NovaRm() {
               {/* Tabela de itens importados */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center flex-wrap gap-2">
-                  <h3 className="text-lg font-semibold text-gray-800">Itens Importados ({itensImportados.length})</h3>
+                  <h3 className="text-lg font-semibold text-torg-dark">Itens Importados ({itensImportados.length})</h3>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
                     <span>Peso total: <strong className="text-gray-800">{pesoTotal.toFixed(2)} kg</strong></span>
                     <span className="text-xs text-gray-400">Origem: {nomeArquivo}</span>

@@ -96,10 +96,7 @@ export default function PainelOPs() {
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-          <FolderKanban size={28} className="text-torg-blue" />
-          Painel de OPs
-        </h2>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de OPs</h2>
         <p className="text-sm text-torg-gray mt-1">
           Visão consolidada de todas as Ordens de Produção com suas RMs,
           cotações e pedidos.
@@ -187,13 +184,13 @@ export default function PainelOPs() {
                     <FolderKanban size={24} className="text-torg-blue" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-800 text-lg">
+                    <h3 className="text-lg font-semibold text-torg-dark">
                       OP {group.op}
                     </h3>
-                    <p className="text-sm text-gray-500">
-                      {group.rms.length} RM{group.rms.length !== 1 ? "s" : ""}{" "}
-                      · {group.totalCotacoes} cotaç
-                      {group.totalCotacoes !== 1 ? "ões" : "ão"} ·{" "}
+                    <p className="text-sm text-torg-gray">
+                      {group.rms.length} RM{group.rms.length !== 1 ? "s" : ""},{" "}
+                      {group.totalCotacoes} cotaç
+                      {group.totalCotacoes !== 1 ? "ões" : "ão"},{" "}
                       {group.totalEnvios} envio
                       {group.totalEnvios !== 1 ? "s" : ""}
                     </p>
