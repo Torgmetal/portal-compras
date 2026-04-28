@@ -5,8 +5,8 @@ import { BarChart3, PlusCircle, Truck, Package, FolderKanban } from "lucide-reac
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
-  { href: "/compras", label: "Painel", icon: BarChart3 },
   { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban },
+  { href: "/compras", label: "Painel de Compras", icon: BarChart3 },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/catalogo", label: "Catálogo", icon: Package },
   { href: "/compras/fornecedores", label: "Fornecedores", icon: Truck },
