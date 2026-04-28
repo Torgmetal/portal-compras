@@ -29,6 +29,7 @@ export default function RmDetail({ params }) {
   const [overrides, setOverrides] = useState({});
   const [expandedPedido, setExpandedPedido] = useState(null);
   const [selectedFornecedores, setSelectedFornecedores] = useState([]);
+  const [emailsLivres, setEmailsLivres] = useState("");
   const [criandoPedido, setCriandoPedido] = useState(false);
   const [alertasEng, setAlertasEng] = useState([]);
   const [showExportOmie, setShowExportOmie] = useState(false);
@@ -539,21 +540,31 @@ export default function RmDetail({ params }) {
     );
   }
 
-  // ─── ENVIO DE COTAÇÃO (SIMULADO) ──────────────────────
+  // ─── ENVIO DE COTAÇÃO ─────────────────────────────────
   const toggleFornecedor = (fornId) => {
     setSelectedFornecedores((prev) =>
       prev.includes(fornId) ? prev.filter((id) => id !== fornId) : [...prev, fornId]
     );
   };
 
+  const parseEmailsLivres = (s) =>
+    (s || "")
+      .split(/[\s,;]+/)
+      .map((e) => e.trim())
+      .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+
   const enviarCotacao = () => {
-    if (!selectedFornecedores.length) return showToast("Selecione pelo menos um fornecedor", "error");
-    const destinatarios = selectedFornecedores.map(fornId => {
-      const forn = fornecedores.find(f => f.id === fornId);
-      return forn;
-    }).filter(f => f && f.email);
-    if (!destinatarios.length) return showToast("Nenhum fornecedor selecionado possui e-mail cadastrado", "error");
-    const emails = destinatarios.map(f => f.email).join(";");
+    const cadastrados = selectedFornecedores
+      .map((fornId) => fornecedores.find((f) => f.id === fornId))
+      .filter((f) => f && f.email);
+    const livres = parseEmailsLivres(emailsLivres);
+
+    if (cadastrados.length === 0 && livres.length === 0) {
+      return showToast("Selecione pelo menos um fornecedor cadastrado ou digite emails livres", "error");
+    }
+
+    // BCC garante que fornecedores nao se vejam.
+    const bccList = [...cadastrados.map((f) => f.email), ...livres].join(";");
     const assunto = encodeURIComponent("Solicitação de Cotação - RM " + (rm.numero || rm.id));
     const itensTexto = (rm.itens || []).map((it, i) =>
       (i + 1) + ". " + (it.descricao || "Item " + (i + 1)) + " - Qtd: " + (it.qtd || "-") + " " + (it.unidade || "un") + (it.material ? " - Material: " + it.material : "") + (it.comprimento ? " - Comp: " + it.comprimento : "")
@@ -570,28 +581,38 @@ export default function RmDetail({ params }) {
       "Por favor, enviar cotação com preços unitários, condições de pagamento e prazo de entrega.\n\n" +
       "Atenciosamente,\nTorg Metal"
     );
-    const mailUrl = "mailto:" + emails + "?subject=" + assunto + "&body=" + corpo;
+    const mailUrl = "mailto:?bcc=" + bccList + "&subject=" + assunto + "&body=" + corpo;
     const a = document.createElement("a");
     a.href = mailUrl;
     a.click();
-    const novosEnvios = selectedFornecedores.map(fornId => {
-      const forn = fornecedores.find(f => f.id === fornId);
-      return {
+
+    const novosEnvios = [
+      ...cadastrados.map((forn) => ({
         id: uid(),
-        fornecedorId: fornId,
+        fornecedorId: forn.id,
         fornecedorNome: forn.nome,
         fornecedorEmail: forn.email,
         data: today(),
         hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
         status: "Enviado",
-      };
-    });
+      })),
+      ...livres.map((email) => ({
+        id: uid(),
+        fornecedorId: null,
+        fornecedorNome: email,
+        fornecedorEmail: email,
+        data: today(),
+        hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        status: "Enviado",
+      })),
+    ];
     updateRm({
       envios: [...(rm.envios || []), ...novosEnvios],
       status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
     });
     setSelectedFornecedores([]);
-    showToast("E-mail aberto para " + novosEnvios.length + " fornecedor(es)");
+    setEmailsLivres("");
+    showToast("E-mail aberto para " + novosEnvios.length + " destinatário(s) — em cópia oculta");
   };
 
   const gerarXlsxItens = async () => {
@@ -784,21 +805,13 @@ export default function RmDetail({ params }) {
           </button>
         </div>
 
-        <div className="px-6 py-4">
-          {fornecedoresComEmail.length === 0 ? (
-            <div className="text-center py-6 text-gray-400">
-              <AlertCircle size={32} className="mx-auto mb-2" />
-              <p className="text-sm">Nenhum fornecedor cadastrado com e-mail.</p>
-              <button onClick={() => router.push("/compras/fornecedores")} className="mt-2 text-sm text-blue-600 hover:underline">
-                Cadastrar fornecedores
-              </button>
-            </div>
-          ) : (
-            <>
+        <div className="px-6 py-4 space-y-5">
+          {fornecedoresComEmail.length > 0 && (
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                Selecione os fornecedores ({selectedFornecedores.length} selecionado{selectedFornecedores.length !== 1 ? "s" : ""})
+                Fornecedores cadastrados ({selectedFornecedores.length} selecionado{selectedFornecedores.length !== 1 ? "s" : ""})
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {fornecedoresComEmail.map((f) => {
                   const checked = selectedFornecedores.includes(f.id);
                   const jaEnviado = envios.some((e) => e.fornecedorId === f.id);
@@ -828,21 +841,36 @@ export default function RmDetail({ params }) {
                   );
                 })}
               </div>
-              <div className="flex justify-end">
-                <button
-                  onClick={enviarCotacao}
-                  disabled={selectedFornecedores.length === 0}
-                  className={`px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors ${
-                    selectedFornecedores.length > 0
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
-                >
-                  <Send size={18} /> Enviar Cotação ({selectedFornecedores.length})
-                </button>
-              </div>
-            </>
+            </div>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Outros emails (não cadastrados)
+            </label>
+            <textarea
+              value={emailsLivres}
+              onChange={(e) => setEmailsLivres(e.target.value)}
+              placeholder="email1@fornecedor.com, email2@outrofornecedor.com"
+              rows={2}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Separe por vírgula, ponto-e-vírgula ou quebra de linha.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-gray-100">
+            <p className="text-xs text-gray-500">
+              Os destinatários vão como <strong>cópia oculta (BCC)</strong> — fornecedores não verão uns aos outros.
+            </p>
+            <button
+              onClick={enviarCotacao}
+              className="px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <Send size={18} /> Enviar Cotação
+            </button>
+          </div>
         </div>
 
         {/* Histórico de envios */}
