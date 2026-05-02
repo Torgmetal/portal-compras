@@ -253,9 +253,8 @@ enum RMStatus {
 }
 
 enum TipoRM {
-  ENGENHARIA      // vinculada a OP + categorias do escopo do comercial
-  ALMOXARIFADO    // vinculada a OP, sem vinculo a categoria especifica
-  INTERNA         // coisas internas da Torg, nao vinculada a obra
+  ENGENHARIA      // vinculada a OP + categorias (tipo de material) do escopo do comercial
+  INTERNA         // sem vinculo a OP — almoxarifado, coisas internas, etc
 }
 
 model RM {

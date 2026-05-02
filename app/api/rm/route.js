@@ -20,7 +20,7 @@ const itemSchema = z.object({
 });
 
 const schema = z.object({
-  tipoRM: z.enum(["ENGENHARIA", "ALMOXARIFADO", "INTERNA"]).default("ENGENHARIA"),
+  tipoRM: z.enum(["ENGENHARIA", "INTERNA"]).default("ENGENHARIA"),
   opId: z.string().nullable().optional(),
   categoriasOP: z.array(z.string()).default([]),
   tipo: z.string().default("Material"),

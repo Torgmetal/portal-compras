@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
-  Trash2, Upload, FileSpreadsheet, X, Wrench, Warehouse, Building2,
+  Trash2, Upload, FileSpreadsheet, X, Wrench, Building2,
 } from "lucide-react";
 import { labelCategoria, categoriasUnicasOP } from "@/lib/op-categorias";
 import { parseTekla } from "@/lib/parse-tekla";
@@ -16,21 +16,14 @@ const TIPOS_RM = [
   {
     codigo: "ENGENHARIA",
     label: "Engenharia",
-    desc: "Lista do Tekla pra fabricação. Vincula categorias do escopo.",
+    desc: "Lista do Tekla pra fabricação. Vincula OP e tipo de material do escopo.",
     icon: Wrench,
     cor: "torg-blue",
   },
   {
-    codigo: "ALMOXARIFADO",
-    label: "Almoxarifado",
-    desc: "Compras avulsas pra obra (sem vínculo a categoria).",
-    icon: Warehouse,
-    cor: "torg-orange",
-  },
-  {
     codigo: "INTERNA",
     label: "Interna Torg",
-    desc: "Coisas internas — não vinculadas a obra.",
+    desc: "Almoxarifado e demais — sem vínculo a OP.",
     icon: Building2,
     cor: "torg-dark",
   },
@@ -55,7 +48,7 @@ export default function NovaRMClient({ ops, userSetor }) {
   const op = useMemo(() => ops.find((o) => o.id === opSelecionada), [ops, opSelecionada]);
   const categoriasOpDisponiveis = useMemo(() => (op ? categoriasUnicasOP(op) : []), [op]);
 
-  const precisaOP = tipoRM === "ENGENHARIA" || tipoRM === "ALMOXARIFADO";
+  const precisaOP = tipoRM === "ENGENHARIA";
   const precisaCategorias = tipoRM === "ENGENHARIA";
 
   const toggleCategoria = (cat) => {
@@ -164,7 +157,7 @@ export default function NovaRMClient({ ops, userSetor }) {
       {/* Step 1: Tipo de RM */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h3 className="text-lg font-semibold text-torg-dark mb-4">Tipo de RM</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {TIPOS_RM.map((t) => {
             const Icon = t.icon;
             const ativo = tipoRM === t.codigo;
