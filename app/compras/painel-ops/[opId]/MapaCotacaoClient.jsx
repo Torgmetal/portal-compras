@@ -607,7 +607,7 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
                 {locaisOpcoes.map((l) => (
                   <option
                     key={l.nCodLocal || l.cCodLocal || l.cDescricao}
-                    value={l.cCodLocal || l.cDescricao}
+                    value={String(l.nCodLocal || l.cCodLocal || "")}
                   >
                     {l.cDescricao} {l.cCodLocal ? `(${l.cCodLocal})` : ""}
                   </option>
