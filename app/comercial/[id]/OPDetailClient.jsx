@@ -5,6 +5,8 @@ import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
   CheckCircle2, FileText, History,
 } from "lucide-react";
+import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
+import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -223,56 +225,90 @@ export default function OPDetailClient({ op, userRole, userId }) {
   );
 }
 
+function detalhesItem(it) {
+  if (it.tipo === "ALUGUEL") {
+    const partes = [];
+    if (it.meses) partes.push(`${it.meses} mes${it.meses !== 1 ? "es" : ""}`);
+    if (it.valorPorMes) partes.push(`${fmtMoeda(it.valorPorMes)}/mês`);
+    if (it.capacidade) partes.push(it.capacidade);
+    return partes.join(" · ") || "—";
+  }
+  if (it.tipo === "VERBA") return "Verba alocada";
+  if (it.qtdContratada) return `${it.qtdContratada} ${it.unidade || ""}`.trim();
+  return "—";
+}
+
 function ItensTabela({ itens, onSolicitarVerba, isMaster }) {
+  if (!itens || itens.length === 0) {
+    return <p className="px-6 py-4 text-sm text-torg-gray">Nenhum item.</p>;
+  }
+  const { materiais, alugueis, outros } = agruparPorGrupo(itens);
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cód. Omie</th>
-            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unid.</th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
-            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Fat. direto</th>
-            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {itens.map((it) => {
-            const temPendente = (it.solicitacoesVerba || []).length > 0;
-            return (
-              <tr key={it.id}>
-                <td className="px-4 py-2 text-torg-dark font-medium">{it.descricao}</td>
-                <td className="px-4 py-2 text-xs font-mono text-torg-gray">{it.codigoOmie || "—"}</td>
-                <td className="px-4 py-2 text-torg-gray">{it.unidade}</td>
-                <td className="px-4 py-2 text-right text-torg-gray tabular-nums">{it.qtdContratada}</td>
-                <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">
-                  {fmtMoeda(it.valorVerba)}
-                  {temPendente && (
-                    <p className="text-[10px] text-torg-orange-700 font-medium">⏳ alteração pendente</p>
-                  )}
-                </td>
-                <td className="px-4 py-2 text-center">
-                  {it.faturamentoDireto && (
-                    <span className="text-xs bg-torg-orange-100 text-torg-orange-700 px-2 py-0.5 rounded-full">Direto</span>
-                  )}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <button
-                    onClick={() => onSolicitarVerba(it)}
-                    disabled={temPendente}
-                    className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                    title={temPendente ? "Já tem solicitação pendente" : "Solicitar mudança de verba"}
-                  >
-                    <DollarSign size={12} /> {isMaster ? "Alterar verba" : "Solicitar verba"}
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="space-y-4">
+      {materiais.length > 0 && (
+        <BlocoItens titulo="Materiais" itens={materiais} onSolicitarVerba={onSolicitarVerba} isMaster={isMaster} />
+      )}
+      {alugueis.length > 0 && (
+        <BlocoItens titulo="Aluguéis e Equipamentos" itens={alugueis} onSolicitarVerba={onSolicitarVerba} isMaster={isMaster} aluguel />
+      )}
+      {outros.length > 0 && (
+        <BlocoItens titulo="Outros" itens={outros} onSolicitarVerba={onSolicitarVerba} isMaster={isMaster} />
+      )}
+    </div>
+  );
+}
+
+function BlocoItens({ titulo, itens, onSolicitarVerba, isMaster, aluguel }) {
+  return (
+    <div>
+      <p className="px-6 pt-4 text-xs font-semibold text-torg-gray uppercase tracking-wide">{titulo}</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
+              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Fat. direto</th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {itens.map((it) => {
+              const temPendente = (it.solicitacoesVerba || []).length > 0;
+              return (
+                <tr key={it.id}>
+                  <td className="px-4 py-2 text-torg-gray text-xs">{labelCategoria(it.categoria)}</td>
+                  <td className="px-4 py-2 text-torg-dark font-medium">{it.descricao}</td>
+                  <td className="px-4 py-2 text-torg-gray text-xs">{detalhesItem(it)}</td>
+                  <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">
+                    {fmtMoeda(it.valorVerba)}
+                    {temPendente && (
+                      <p className="text-[10px] text-torg-orange-700 font-medium">⏳ alteração pendente</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-center">
+                    {it.faturamentoDireto && (
+                      <span className="text-xs bg-torg-orange-100 text-torg-orange-700 px-2 py-0.5 rounded-full">Direto</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <button
+                      onClick={() => onSolicitarVerba(it)}
+                      disabled={temPendente}
+                      className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title={temPendente ? "Já tem solicitação pendente" : "Solicitar mudança de verba"}
+                    >
+                      <DollarSign size={12} /> {isMaster ? "Alterar verba" : "Solicitar verba"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -518,19 +554,15 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, onClose, onSaved 
 
 function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
   const [descricao, setDescricao] = useState("");
-  const [itens, setItens] = useState([
-    { descricao: "", unidade: "UN", qtdContratada: 1, valorVerba: 0, faturamentoDireto: false, codigoOmie: "", observacao: "" },
-  ]);
+  const [itens, setItens] = useState([novoItem()]);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
-  const setItem = (i, k, v) => setItens((p) => p.map((it, idx) => (idx === i ? { ...it, [k]: v } : it)));
-  const addItem = () =>
-    setItens((p) => [
-      ...p,
-      { descricao: "", unidade: "UN", qtdContratada: 1, valorVerba: 0, faturamentoDireto: false, codigoOmie: "", observacao: "" },
-    ]);
+  const updateItem = (i, novo) => setItens((p) => p.map((it, idx) => (idx === i ? novo : it)));
+  const addItem = (cat = "MATERIA_PRIMA") => setItens((p) => [...p, novoItem(cat)]);
   const removeItem = (i) => setItens((p) => p.filter((_, idx) => idx !== i));
+
+  const totalVerba = itens.reduce((s, it) => s + (Number(it.valorVerba) || 0), 0);
 
   const submit = async () => {
     if (!descricao.trim()) return setErro("Descreva o motivo do aditivo.");
@@ -546,7 +578,9 @@ function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
           descricao: descricao.trim(),
           itens: validos.map((it) => ({
             ...it,
-            qtdContratada: Number(it.qtdContratada),
+            qtdContratada: Number(it.qtdContratada) || null,
+            meses: Number(it.meses) || null,
+            valorPorMes: Number(it.valorPorMes) || null,
             valorVerba: Number(it.valorVerba),
           })),
         }),
@@ -575,56 +609,41 @@ function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
             rows={2}
-            placeholder="Ex: Aditivo 1 — inclusão de pipe rack adicional solicitado pelo cliente."
+            placeholder="Ex: Aditivo 1 — inclusão de pipe rack adicional."
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
           />
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <label className="block text-sm font-medium text-torg-dark">Itens do aditivo</label>
-            <button onClick={addItem} className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1">
-              <Plus size={12} /> Adicionar item
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => addItem("MATERIA_PRIMA")} className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1">
+                <Plus size={12} /> Material
+              </button>
+              <button onClick={() => addItem("ALUGUEL_PLATAFORMA")} className="text-xs text-torg-orange-700 hover:text-torg-dark font-medium inline-flex items-center gap-1">
+                <Plus size={12} /> Aluguel
+              </button>
+              <button onClick={() => addItem("OUTRO")} className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1">
+                <Plus size={12} /> Outro
+              </button>
+            </div>
           </div>
-          <div className="space-y-2">
+          <div className="border border-gray-100 rounded-lg divide-y divide-gray-100">
             {itens.map((it, i) => (
-              <div key={i} className="grid grid-cols-12 gap-2 items-start bg-gray-50 rounded p-2">
-                <input
-                  type="text"
-                  value={it.descricao}
-                  onChange={(e) => setItem(i, "descricao", e.target.value)}
-                  placeholder="Descrição"
-                  className="col-span-5 border border-gray-200 rounded px-2 py-1 text-sm"
-                />
-                <input
-                  type="text"
-                  value={it.unidade}
-                  onChange={(e) => setItem(i, "unidade", e.target.value)}
-                  placeholder="UN"
-                  className="col-span-1 border border-gray-200 rounded px-2 py-1 text-sm"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={it.qtdContratada}
-                  onChange={(e) => setItem(i, "qtdContratada", e.target.value)}
-                  placeholder="Qtd"
-                  className="col-span-2 border border-gray-200 rounded px-2 py-1 text-sm text-right tabular-nums"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={it.valorVerba}
-                  onChange={(e) => setItem(i, "valorVerba", e.target.value)}
-                  placeholder="Verba"
-                  className="col-span-3 border border-gray-200 rounded px-2 py-1 text-sm text-right tabular-nums"
-                />
-                <button onClick={() => removeItem(i)} className="col-span-1 text-red-400 hover:text-red-600 flex justify-center pt-1">
-                  <X size={16} />
-                </button>
-              </div>
+              <ItemFormRow
+                key={i}
+                item={it}
+                onChange={(novo) => updateItem(i, novo)}
+                onRemove={() => removeItem(i)}
+                canRemove={itens.length > 1}
+                compact
+              />
             ))}
+          </div>
+          <div className="mt-2 text-right text-sm">
+            <span className="text-torg-gray">Total verba do aditivo: </span>
+            <span className="font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</span>
           </div>
         </div>
       </div>

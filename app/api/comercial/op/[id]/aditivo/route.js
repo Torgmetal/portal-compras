@@ -4,10 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
 const itemSchema = z.object({
+  categoria: z.string().min(1),
+  tipo: z.enum(["VERBA", "ESTRUTURA", "AREA", "ALUGUEL", "GENERICO"]),
   descricao: z.string().min(1),
   codigoOmie: z.string().optional().nullable(),
-  unidade: z.string().min(1),
-  qtdContratada: z.number().min(0),
+  unidade: z.string().optional().nullable(),
+  qtdContratada: z.number().optional().nullable(),
+  meses: z.number().optional().nullable(),
+  valorPorMes: z.number().optional().nullable(),
+  capacidade: z.string().optional().nullable(),
   valorVerba: z.number().min(0),
   faturamentoDireto: z.boolean().default(false),
   observacao: z.string().optional().nullable(),
@@ -43,10 +48,15 @@ export async function POST(req, { params }) {
       itens: {
         create: body.itens.map((it, idx) => ({
           ordem: idx,
+          categoria: it.categoria,
+          tipo: it.tipo,
           descricao: it.descricao,
           codigoOmie: it.codigoOmie || null,
-          unidade: it.unidade,
-          qtdContratada: it.qtdContratada,
+          unidade: it.unidade || null,
+          qtdContratada: it.qtdContratada ?? null,
+          meses: it.meses ?? null,
+          valorPorMes: it.valorPorMes ?? null,
+          capacidade: it.capacidade || null,
           valorVerba: it.valorVerba,
           faturamentoDireto: it.faturamentoDireto,
           observacao: it.observacao || null,

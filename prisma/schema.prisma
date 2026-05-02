@@ -80,17 +80,35 @@ model OP {
   @@index([status])
 }
 
+enum ItemTipo {
+  VERBA       // só R$ — parafusos, tinta, galvanização
+  ESTRUTURA   // peso (KG/TON) + verba
+  AREA        // m² — telhas, steel deck, placa wall
+  ALUGUEL     // meses × valor/mês + descrição da capacidade
+  GENERICO    // qtd + unidade livre + verba
+}
+
 model OPItem {
   id              String  @id @default(cuid())
   opId            String
   op              OP      @relation(fields: [opId], references: [id], onDelete: Cascade)
 
   ordem           Int     @default(0)
+  categoria       String  // "MATERIA_PRIMA", "TINTA", "ALUGUEL_PLATAFORMA", "OUTRO", etc
+  tipo            ItemTipo @default(VERBA)
   descricao       String
   codigoOmie      String?
-  unidade         String  // KG, UN, M, etc
-  qtdContratada   Float
-  valorVerba      Float   // R$ alocado pra esse item
+
+  // Para ESTRUTURA / AREA / GENERICO
+  unidade         String?
+  qtdContratada   Float?
+
+  // Para ALUGUEL
+  meses           Int?
+  valorPorMes     Float?
+  capacidade      String?  // texto livre da capacidade do equipamento
+
+  valorVerba      Float    // sempre tem; em ALUGUEL é calculado (meses * valorPorMes)
   faturamentoDireto Boolean @default(false)
   observacao      String?
 
@@ -98,6 +116,7 @@ model OPItem {
   solicitacoesVerba   SolicitacaoVerba[]
 
   @@index([opId])
+  @@index([categoria])
 }
 
 // Revisão: registro de mudanças na OP base (cliente, descrição, qtd dos itens base, etc)
@@ -141,10 +160,18 @@ model AditivoItem {
   aditivo         Aditivo @relation(fields: [aditivoId], references: [id], onDelete: Cascade)
 
   ordem           Int     @default(0)
+  categoria       String
+  tipo            ItemTipo @default(VERBA)
   descricao       String
   codigoOmie      String?
-  unidade         String
-  qtdContratada   Float
+
+  unidade         String?
+  qtdContratada   Float?
+
+  meses           Int?
+  valorPorMes     Float?
+  capacidade      String?
+
   valorVerba      Float
   faturamentoDireto Boolean @default(false)
   observacao      String?
@@ -153,6 +180,7 @@ model AditivoItem {
   solicitacoesVerba   SolicitacaoVerba[]
 
   @@index([aditivoId])
+  @@index([categoria])
 }
 
 // Ajuste de Prazo: extensão da data fim prevista da OP. Apenas usuário master.
