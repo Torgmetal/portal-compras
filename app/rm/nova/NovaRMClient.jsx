@@ -1,11 +1,13 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, ArrowRight, Loader2, AlertCircle, AlertTriangle, CheckCircle2, Plus, Trash2,
+  Upload, FileSpreadsheet, X,
 } from "lucide-react";
 import { labelCategoria, getCategoria } from "@/lib/op-categorias";
+import { parseTekla } from "@/lib/parse-tekla";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -26,8 +28,12 @@ export default function NovaRMClient({ ops, userSetor }) {
   const [observacao, setObservacao] = useState("");
   const [setor, setSetor] = useState(userSetor);
   const [itensSelecionados, setItensSelecionados] = useState({}); // {[opItemKey]: { qtdReal, descricaoExtra }}
+  const [itensImportados, setItensImportados] = useState([]); // do xlsx
+  const [arquivoNome, setArquivoNome] = useState("");
+  const [importando, setImportando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const fileRef = useRef(null);
 
   const op = useMemo(() => ops.find((o) => o.id === opSelecionada), [ops, opSelecionada]);
 
@@ -90,11 +96,41 @@ export default function NovaRMClient({ ops, userSetor }) {
     return lista;
   }, [itensSelecionados, itensDisponiveis]);
 
+  const importarArquivo = async (file) => {
+    if (!file) return;
+    setImportando(true);
+    setErro("");
+    try {
+      const { meta, itens } = await parseTekla(file);
+      if (itens.length === 0) {
+        setErro("Nenhum item encontrado na planilha.");
+        return;
+      }
+      setItensImportados(itens);
+      setArquivoNome(file.name);
+      // Pré-preenche descrição se vazia
+      if (!descricao && (meta.cliente || meta.obra)) {
+        const parts = [meta.rmRef, meta.obra, meta.cliente].filter(Boolean);
+        if (parts.length) setDescricao(`Importação ${parts.join(" — ")}`);
+      }
+    } catch (e) {
+      setErro("Erro ao ler arquivo: " + e.message);
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  const removerImportado = (idx) => {
+    setItensImportados((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const submit = async () => {
     setErro("");
     if (!opSelecionada) return setErro("Escolha uma OP.");
     if (!descricao.trim()) return setErro("Descreva a RM.");
-    const itensValidos = Object.entries(itensSelecionados)
+
+    // Itens vinculados a OP
+    const itensManuais = Object.entries(itensSelecionados)
       .map(([chave, sel]) => {
         const it = itensDisponiveis.find((d) => d.chave === chave);
         if (!it) return null;
@@ -108,8 +144,26 @@ export default function NovaRMClient({ ops, userSetor }) {
       })
       .filter((x) => x && x.qtd > 0);
 
+    // Itens da planilha (sem vínculo direto a OPItem)
+    const itensXlsx = itensImportados.map((it) => ({
+      opItemId: null,
+      aditivoItemId: null,
+      descricao: it.descricao,
+      unidade: it.unidade || "UN",
+      qtd: Number(it.qtd) || 0,
+      codigo: it.codigo || null,
+      material: it.material || null,
+      comprimento: it.comprimento || null,
+      largura: it.largura || null,
+      tratamento: it.tratamento || null,
+      peso: Number(it.peso) || null,
+      pesoLinear: Number(it.pesoLinear) || null,
+    }));
+
+    const itensValidos = [...itensManuais, ...itensXlsx];
+
     if (itensValidos.length === 0) {
-      return setErro("Selecione pelo menos um item com quantidade real.");
+      return setErro("Adicione pelo menos um item (selecione da OP ou suba uma planilha).");
     }
 
     setSalvando(true);
@@ -229,15 +283,114 @@ export default function NovaRMClient({ ops, userSetor }) {
         </div>
       </div>
 
-      {/* Step 2: seleção de itens */}
+      {/* Step 2: importar planilha (Tekla) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+              <FileSpreadsheet size={20} className="text-torg-blue" /> Importar planilha (Tekla)
+            </h3>
+            <p className="text-sm text-torg-gray mt-1">
+              Sobe o .xlsx exportado do Tekla. Cada linha vira um item da RM com peso, perfil, etc.
+            </p>
+          </div>
+          {itensImportados.length > 0 && (
+            <span className="text-xs bg-torg-blue-50 text-torg-blue px-3 py-1 rounded-full font-medium">
+              {itensImportados.length} itens · {itensImportados.reduce((s, it) => s + (it.peso || 0), 0).toFixed(2)} kg total
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={importando}
+            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {importando ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+            {importando ? "Lendo..." : arquivoNome ? "Trocar arquivo" : "Selecionar .xlsx"}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(e) => { importarArquivo(e.target.files[0]); e.target.value = ""; }}
+          />
+          {arquivoNome && (
+            <span className="text-sm text-torg-gray flex items-center gap-2">
+              <CheckCircle2 size={14} className="text-torg-orange" />
+              {arquivoNome}
+              <button
+                type="button"
+                onClick={() => { setItensImportados([]); setArquivoNome(""); }}
+                className="text-red-400 hover:text-red-600 ml-1"
+              >
+                <X size={14} />
+              </button>
+            </span>
+          )}
+        </div>
+
+        {itensImportados.length > 0 && (
+          <div className="mt-4 max-h-[300px] overflow-y-auto border border-gray-100 rounded-lg">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase w-8">#</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Descrição</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Material</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Qtd</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Unid.</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Comp.</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Peso (kg)</th>
+                  <th className="w-8"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {itensImportados.slice(0, 200).map((it, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
+                    <td className="px-3 py-1.5 text-torg-dark font-medium">{it.descricao}</td>
+                    <td className="px-3 py-1.5 text-torg-gray">{it.material || "—"}</td>
+                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.qtd}</td>
+                    <td className="px-3 py-1.5 text-torg-gray">{it.unidade || "UN"}</td>
+                    <td className="px-3 py-1.5 text-torg-gray">{it.comprimento || "—"}</td>
+                    <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums">
+                      {it.peso > 0 ? it.peso.toFixed(2) : "—"}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => removerImportado(i)}
+                        className="text-red-400 hover:text-red-600"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {itensImportados.length > 200 && (
+              <p className="text-center text-xs text-torg-gray py-2">
+                Exibindo 200 de {itensImportados.length} itens
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Step 3: seleção de itens da OP (opcional, complementa o xlsx) */}
       {op && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100">
             <h3 className="text-lg font-semibold text-torg-dark">
-              Itens disponíveis na {op.numero} ({itensDisponiveis.length})
+              Itens da {op.numero} (opcional, {itensDisponiveis.length} disponíveis)
             </h3>
             <p className="text-sm text-torg-gray mt-1">
-              Marque o que essa RM consome e preencha a quantidade real. A estimativa do comercial fica do lado.
+              Marque os itens que essa RM consome diretamente da OP (com qtd real). Use isso quando não tem planilha — ou pra adicionar consumos extras junto com a planilha acima.
             </p>
           </div>
 

@@ -9,6 +9,14 @@ const itemSchema = z.object({
   descricao: z.string().min(1),
   unidade: z.string().min(1),
   qtd: z.number().min(0),
+  // Campos detalhados (de planilha Tekla)
+  codigo: z.string().optional().nullable(),
+  material: z.string().optional().nullable(),
+  comprimento: z.string().optional().nullable(),
+  largura: z.string().optional().nullable(),
+  tratamento: z.string().optional().nullable(),
+  peso: z.number().optional().nullable(),
+  pesoLinear: z.number().optional().nullable(),
 });
 
 const schema = z.object({
@@ -95,6 +103,13 @@ export async function POST(req) {
           descricao: it.descricao,
           unidade: it.unidade,
           qtd: it.qtd,
+          codigo: it.codigo || null,
+          material: it.material || null,
+          comprimento: it.comprimento || null,
+          largura: it.largura || null,
+          tratamento: it.tratamento || null,
+          peso: it.peso ?? null,
+          pesoLinear: it.pesoLinear ?? null,
         })),
       },
     },
