@@ -34,6 +34,25 @@ export default function MapaCotacaoClient({ op }) {
     }
   };
 
+  const marcarTodosDoFornecedor = async (cotacaoId, todosJaVencedores) => {
+    setLoading(`forn-${cotacaoId}`);
+    setErro("");
+    try {
+      const res = await fetch(`/api/cotacao/${cotacaoId}/marcar-todos-vencedores`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vencedor: !todosJaVencedores }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
   if (fornecedores.length === 0) {
     return (
       <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-6 text-center">
@@ -104,11 +123,45 @@ export default function MapaCotacaoClient({ op }) {
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
               <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
-              {fornecedores.map((f) => (
-                <th key={f.cotacaoId} className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase min-w-[140px]">
-                  {f.fornecedorNome}
-                </th>
-              ))}
+              {fornecedores.map((f) => {
+                // Conta itens dessa cotação com preço (potenciais vencedores)
+                const cellsDoForn = itens
+                  .map((it) => it.celulas.find((c) => c?.cotacaoId === f.cotacaoId))
+                  .filter((c) => c && c.precoUnit > 0);
+                const totalCells = cellsDoForn.length;
+                const vencidos = cellsDoForn.filter((c) => c.vencedor).length;
+                const todosVencedores = totalCells > 0 && vencidos === totalCells;
+                const algunsVencedores = vencidos > 0 && vencidos < totalCells;
+                const isLoading = loading === `forn-${f.cotacaoId}`;
+                return (
+                  <th
+                    key={f.cotacaoId}
+                    onClick={() => !loading && marcarTodosDoFornecedor(f.cotacaoId, todosVencedores)}
+                    className={`px-3 py-2 text-center text-xs font-medium uppercase min-w-[140px] cursor-pointer transition-colors ${
+                      todosVencedores
+                        ? "bg-torg-orange-100 text-torg-orange-700"
+                        : algunsVencedores
+                        ? "bg-torg-orange-50/50 text-torg-orange-700"
+                        : "text-gray-500 hover:bg-torg-blue-50"
+                    }`}
+                    title={
+                      todosVencedores
+                        ? "Click pra desmarcar todos os vencedores deste fornecedor"
+                        : "Click pra marcar todos os itens deste fornecedor como vencedores"
+                    }
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      {f.fornecedorNome}
+                      {isLoading && <Loader2 size={10} className="animate-spin" />}
+                    </div>
+                    {totalCells > 0 && (
+                      <p className="text-[9px] font-normal mt-0.5 normal-case">
+                        {vencidos > 0 ? `${vencidos}/${totalCells} ganhando` : "click pra marcar todos"}
+                      </p>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
