@@ -36,6 +36,10 @@ export default async function PainelOPDetalhe({ params }) {
                   icmsPct: true, ipiPct: true, vencedor: true, observacao: true,
                 },
               },
+              pedidosOmie: {
+                where: { status: "CRIADO" },
+                select: { id: true, total: true, faturamentoDireto: true },
+              },
             },
             orderBy: { createdAt: "asc" },
           },
@@ -46,12 +50,24 @@ export default async function PainelOPDetalhe({ params }) {
 
   if (!op) notFound();
 
-  // Verba total
+  // Verba estimada total (base + aditivos)
   const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);
   const verbaAditivos = op.aditivos.reduce(
     (s, a) => s + a.itens.reduce((ss, i) => ss + i.valorVerba, 0), 0
   );
   const verbaTotal = verbaBase + verbaAditivos;
+
+  // Total já em pedidos (soma dos PedidoOmie.total criados nessa OP)
+  let totalEmPedidos = 0;
+  for (const rm of op.rms) {
+    for (const cot of rm.cotacoes) {
+      for (const ped of cot.pedidosOmie || []) {
+        totalEmPedidos += ped.total || 0;
+      }
+    }
+  }
+  const saldo = verbaTotal - totalEmPedidos;
+  const consumoPct = verbaTotal > 0 ? (totalEmPedidos / verbaTotal) * 100 : 0;
 
   // Plain object pra Client Component
   const data = JSON.parse(JSON.stringify({
@@ -71,16 +87,34 @@ export default async function PainelOPDetalhe({ params }) {
       </Link>
 
       <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-6">
-        <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight font-mono">{data.numero}</h2>
+          <p className="text-torg-dark font-medium mt-1">{data.cliente}</p>
+          {data.obra && <p className="text-sm text-torg-gray">{data.obra}</p>}
+          {data.descricao && <p className="text-sm text-torg-gray mt-2">{data.descricao}</p>}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-100">
           <div>
-            <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight font-mono">{data.numero}</h2>
-            <p className="text-torg-dark font-medium mt-1">{data.cliente}</p>
-            {data.obra && <p className="text-sm text-torg-gray">{data.obra}</p>}
-            {data.descricao && <p className="text-sm text-torg-gray mt-2">{data.descricao}</p>}
+            <p className="text-xs text-torg-gray">Verba estimada</p>
+            <p className="text-2xl font-extrabold text-torg-dark tabular-nums">{fmtMoeda(verbaTotal)}</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-torg-gray">Verba contratada</p>
-            <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(verbaTotal)}</p>
+          <div>
+            <p className="text-xs text-torg-gray">Já em pedidos</p>
+            <p className="text-2xl font-extrabold text-torg-blue tabular-nums">{fmtMoeda(totalEmPedidos)}</p>
+            <p className="text-[10px] text-torg-gray mt-0.5">{consumoPct.toFixed(1)}% da verba</p>
+          </div>
+          <div>
+            <p className="text-xs text-torg-gray">Saldo restante</p>
+            <p className={`text-2xl font-extrabold tabular-nums ${saldo < 0 ? "text-red-600" : saldo < verbaTotal * 0.3 ? "text-torg-orange-700" : "text-torg-orange-700"}`}>
+              {fmtMoeda(saldo)}
+            </p>
+            {saldo < 0 && (
+              <p className="text-[10px] text-red-600 mt-0.5 font-medium">⚠ verba estourada</p>
+            )}
+            {saldo >= 0 && consumoPct >= 70 && (
+              <p className="text-[10px] text-torg-orange-700 mt-0.5 font-medium">⚠ acima de 70%</p>
+            )}
           </div>
         </div>
       </div>

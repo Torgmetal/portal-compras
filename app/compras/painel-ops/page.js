@@ -149,10 +149,6 @@ export default async function PainelOPs() {
                       {op.obra && <p className="text-xs text-torg-gray truncate">{op.obra}</p>}
                     </div>
                   </div>
-                  <div className="text-right text-sm">
-                    <p className="text-xs text-torg-gray">Verba contratada</p>
-                    <p className="text-lg font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(op.verbaTotal)}</p>
-                  </div>
                   <ChevronRight size={20} className="text-torg-gray flex-shrink-0 self-center" />
                 </div>
 
