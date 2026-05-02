@@ -234,8 +234,20 @@ function detalhesItem(it) {
     return partes.join(" · ") || "—";
   }
   if (it.tipo === "VERBA") return "Verba alocada";
-  if (it.qtdContratada) return `${it.qtdContratada} ${it.unidade || ""}`.trim();
+  if (it.qtdContratada) {
+    const base = `${it.qtdContratada} ${it.unidade || ""}`.trim();
+    if (it.cmcMedio) {
+      return `${base} × ${fmtMoeda(it.cmcMedio)}/${it.unidade || "un"}`;
+    }
+    return base;
+  }
   return "—";
+}
+
+function localLabel(codigo) {
+  if (codigo === "FABRICA") return "Fábrica";
+  if (codigo === "TERCEIRO") return "Terceiro";
+  return null;
 }
 
 function ItensTabela({ itens, onSolicitarVerba, isMaster }) {
@@ -269,6 +281,7 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, isMaster, aluguel }) {
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Local</th>
               <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
               <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Fat. direto</th>
               <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
@@ -282,6 +295,7 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, isMaster, aluguel }) {
                   <td className="px-4 py-2 text-torg-gray text-xs">{labelCategoria(it.categoria)}</td>
                   <td className="px-4 py-2 text-torg-dark font-medium">{it.descricao}</td>
                   <td className="px-4 py-2 text-torg-gray text-xs">{detalhesItem(it)}</td>
+                  <td className="px-4 py-2 text-torg-gray text-xs">{localLabel(it.localEstoque) || "—"}</td>
                   <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">
                     {fmtMoeda(it.valorVerba)}
                     {temPendente && (

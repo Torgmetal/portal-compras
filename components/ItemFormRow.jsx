@@ -1,7 +1,7 @@
 "use client";
 import { Trash2 } from "lucide-react";
 import {
-  CATEGORIAS_MATERIAL, CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO, getCategoria,
+  CATEGORIAS_MATERIAL, CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO, LOCAIS_ESTOQUE, getCategoria,
 } from "@/lib/op-categorias";
 
 export function novoItem(categoria = "MATERIA_PRIMA") {
@@ -10,9 +10,10 @@ export function novoItem(categoria = "MATERIA_PRIMA") {
     categoria,
     tipo: cat.tipo,
     descricao: "",
-    codigoOmie: "",
+    localEstoque: "FABRICA",
     unidade: cat.unidade || "",
     qtdContratada: 0,
+    cmcMedio: 0,
     meses: 0,
     valorPorMes: 0,
     capacidade: "",
@@ -22,8 +23,10 @@ export function novoItem(categoria = "MATERIA_PRIMA") {
   };
 }
 
-// Helper centralizado: ao mudar campo, ajusta dependências (categoria → tipo,
-// ALUGUEL → recalcula valorVerba auto)
+// Centraliza efeitos colaterais ao mudar um campo:
+// - categoria → reseta tipo, unidade
+// - ESTRUTURA / AREA → valorVerba = qtdContratada × cmcMedio
+// - ALUGUEL → valorVerba = meses × valorPorMes
 export function ajustarItem(item, key, value) {
   const next = { ...item, [key]: value };
   if (key === "categoria") {
@@ -31,13 +34,17 @@ export function ajustarItem(item, key, value) {
     next.tipo = c.tipo;
     next.unidade = c.unidade || "";
     if (next.tipo !== "ALUGUEL") {
-      next.meses = 0;
-      next.valorPorMes = 0;
-      next.capacidade = "";
+      next.meses = 0; next.valorPorMes = 0; next.capacidade = "";
     }
     if (next.tipo === "VERBA") {
-      next.qtdContratada = 0;
-      next.unidade = "";
+      next.qtdContratada = 0; next.cmcMedio = 0; next.unidade = "";
+    }
+  }
+  if (next.tipo === "ESTRUTURA" || next.tipo === "AREA") {
+    const qtd = Number(next.qtdContratada) || 0;
+    const cmc = Number(next.cmcMedio) || 0;
+    if (qtd > 0 && cmc > 0) {
+      next.valorVerba = qtd * cmc;
     }
   }
   if (next.tipo === "ALUGUEL") {
@@ -49,9 +56,13 @@ export function ajustarItem(item, key, value) {
 export default function ItemFormRow({ item, onChange, onRemove, canRemove, compact = false }) {
   const tipo = item.tipo;
   const setKey = (k, v) => onChange(ajustarItem(item, k, v));
+  const cmcAuto = tipo === "ESTRUTURA" || tipo === "AREA";
+  const aluguelAuto = tipo === "ALUGUEL";
+  const verbaReadonly = cmcAuto || aluguelAuto;
 
   return (
     <div className={`px-${compact ? "3" : "6"} py-${compact ? "3" : "4"} space-y-3`}>
+      {/* Linha 1: Categoria + Descrição */}
       <div className="flex items-start gap-3 flex-wrap">
         <div className="flex-1 min-w-[180px]">
           <label className="block text-xs font-medium text-torg-gray mb-1">Categoria</label>
@@ -97,6 +108,7 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
         )}
       </div>
 
+      {/* Linha 2: campos por tipo */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {(tipo === "ESTRUTURA" || tipo === "AREA" || tipo === "GENERICO") && (
           <>
@@ -120,6 +132,19 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-torg-blue"
               />
             </div>
+            {(tipo === "ESTRUTURA" || tipo === "AREA") && (
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">
+                  CMC médio (R$/{item.unidade || (tipo === "AREA" ? "m²" : "kg")})
+                </label>
+                <input
+                  type="number" step="0.01" min="0"
+                  value={item.cmcMedio}
+                  onChange={(e) => setKey("cmcMedio", parseFloat(e.target.value) || 0)}
+                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                />
+              </div>
+            )}
           </>
         )}
 
@@ -153,30 +178,40 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
           </>
         )}
 
+        {/* Verba — sempre aparece, readonly se for auto */}
         <div>
           <label className="block text-xs font-medium text-torg-gray mb-1">
-            Verba (R$) {tipo === "ALUGUEL" && <span className="text-torg-blue">(auto)</span>}
+            Verba (R$){" "}
+            {verbaReadonly && (
+              <span className="text-torg-blue text-[10px]">(auto)</span>
+            )}
           </label>
           <input
             type="number" step="0.01" min="0" value={item.valorVerba}
             onChange={(e) => setKey("valorVerba", parseFloat(e.target.value) || 0)}
-            readOnly={tipo === "ALUGUEL"}
+            readOnly={verbaReadonly}
             className={`w-full border rounded px-2 py-1.5 text-sm text-right font-medium tabular-nums focus:ring-1 focus:ring-torg-blue ${
-              tipo === "ALUGUEL" ? "bg-gray-50 border-gray-200 cursor-not-allowed" : "border-gray-300"
+              verbaReadonly ? "bg-gray-50 border-gray-200 cursor-not-allowed" : "border-gray-300"
             }`}
           />
         </div>
 
+        {/* Local de estoque */}
         <div>
-          <label className="block text-xs font-medium text-torg-gray mb-1">Cód. Omie</label>
-          <input
-            type="text" value={item.codigoOmie || ""}
-            onChange={(e) => setKey("codigoOmie", e.target.value)}
-            placeholder="—"
-            className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs font-mono focus:ring-1 focus:ring-torg-blue"
-          />
+          <label className="block text-xs font-medium text-torg-gray mb-1">Local de estoque</label>
+          <select
+            value={item.localEstoque || ""}
+            onChange={(e) => setKey("localEstoque", e.target.value)}
+            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-torg-blue bg-white"
+          >
+            <option value="">—</option>
+            {LOCAIS_ESTOQUE.map((l) => (
+              <option key={l.codigo} value={l.codigo}>{l.label}</option>
+            ))}
+          </select>
         </div>
 
+        {/* Faturamento direto */}
         <div>
           <label className="block text-xs font-medium text-torg-gray mb-1">Fat. direto</label>
           <div className="flex items-center h-[34px]">

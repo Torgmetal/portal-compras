@@ -99,16 +99,20 @@ model OPItem {
   descricao       String
   codigoOmie      String?
 
+  // Local: FABRICA ou TERCEIRO
+  localEstoque    String?
+
   // Para ESTRUTURA / AREA / GENERICO
   unidade         String?
   qtdContratada   Float?
+  cmcMedio        Float?   // R$/unidade (R$/kg, R$/m²) — opcional
 
   // Para ALUGUEL
   meses           Int?
   valorPorMes     Float?
   capacidade      String?  // texto livre da capacidade do equipamento
 
-  valorVerba      Float    // sempre tem; em ALUGUEL é calculado (meses * valorPorMes)
+  valorVerba      Float    // sempre tem; calculado auto p/ ESTRUTURA/AREA (qtd*cmc) e ALUGUEL (meses*valorMes)
   faturamentoDireto Boolean @default(false)
   observacao      String?
 
@@ -165,8 +169,11 @@ model AditivoItem {
   descricao       String
   codigoOmie      String?
 
+  localEstoque    String?
+
   unidade         String?
   qtdContratada   Float?
+  cmcMedio        Float?
 
   meses           Int?
   valorPorMes     Float?
