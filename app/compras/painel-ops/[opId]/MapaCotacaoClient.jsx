@@ -46,17 +46,31 @@ export default function MapaCotacaoClient({ op }) {
     );
   }
 
-  // Total por fornecedor (soma dos itens vencidos)
+  // Total por fornecedor (soma dos itens vencidos) + lista de itens vencidos
   const totaisPorFornecedor = {};
-  for (const f of fornecedores) totaisPorFornecedor[f.cotacaoId] = 0;
+  const itensPorFornecedor = {};
+  for (const f of fornecedores) {
+    totaisPorFornecedor[f.cotacaoId] = 0;
+    itensPorFornecedor[f.cotacaoId] = [];
+  }
   for (const it of itens) {
     for (const cell of it.celulas) {
       if (cell?.vencedor) {
-        totaisPorFornecedor[cell.cotacaoId] += (cell.precoUnit || 0) * (cell.qtdCotada || 0);
+        const valor = (cell.precoUnit || 0) * (cell.qtdCotada || 0);
+        totaisPorFornecedor[cell.cotacaoId] += valor;
+        itensPorFornecedor[cell.cotacaoId].push({
+          descricao: it.descricao,
+          qtd: cell.qtdCotada,
+          unidade: it.unidade,
+          precoUnit: cell.precoUnit,
+          total: valor,
+        });
       }
     }
   }
   const totalGeral = Object.values(totaisPorFornecedor).reduce((s, n) => s + n, 0);
+  const fornecedoresVencedores = fornecedores.filter((f) => itensPorFornecedor[f.cotacaoId].length > 0);
+  const itensSemVencedor = itens.filter((it) => !it.celulas.some((c) => c?.vencedor));
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 overflow-hidden">
@@ -169,9 +183,73 @@ export default function MapaCotacaoClient({ op }) {
         </table>
       </div>
 
+      {/* Resumo dos vencedores */}
+      {fornecedoresVencedores.length > 0 && (
+        <div className="border-t border-torg-orange-200 bg-torg-orange-50/30">
+          <div className="px-6 py-4 border-b border-torg-orange-100 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h4 className="text-base font-semibold text-torg-orange-700 flex items-center gap-2">
+                <Award size={18} /> Resumo dos pedidos a gerar
+              </h4>
+              <p className="text-xs text-torg-gray mt-0.5">
+                Cada fornecedor abaixo vai virar 1 pedido de compra. Click pra expandir os itens.
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-torg-gray">Total geral</p>
+              <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</p>
+            </div>
+          </div>
+          <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {fornecedoresVencedores.map((f) => (
+              <details key={f.cotacaoId} className="bg-white rounded-lg border border-torg-orange-100 p-4 group">
+                <summary className="cursor-pointer list-none flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-torg-dark truncate">{f.fornecedorNome}</p>
+                    <p className="text-xs text-torg-gray">
+                      {itensPorFornecedor[f.cotacaoId].length} ite{itensPorFornecedor[f.cotacaoId].length === 1 ? "m" : "ns"}
+                    </p>
+                  </div>
+                  <div className="text-right ml-3">
+                    <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totaisPorFornecedor[f.cotacaoId])}</p>
+                    <p className="text-[10px] text-torg-gray group-open:hidden">clique pra ver itens</p>
+                  </div>
+                </summary>
+                <ul className="mt-3 pt-3 border-t border-gray-100 divide-y divide-gray-100 text-sm">
+                  {itensPorFornecedor[f.cotacaoId].map((it, i) => (
+                    <li key={i} className="py-1.5 flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-torg-dark truncate">{it.descricao}</p>
+                        <p className="text-xs text-torg-gray">
+                          {it.qtd} {it.unidade} × {fmtMoeda(it.precoUnit)}
+                        </p>
+                      </div>
+                      <p className="text-torg-dark font-medium tabular-nums whitespace-nowrap">{fmtMoeda(it.total)}</p>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          </div>
+
+          {itensSemVencedor.length > 0 && (
+            <div className="mx-6 mb-4 bg-torg-blue-50 border border-torg-blue-200 rounded-lg p-3 text-sm text-torg-dark flex items-start gap-2">
+              <AlertCircle size={16} className="mt-0.5 text-torg-blue flex-shrink-0" />
+              <div>
+                <p className="font-medium">{itensSemVencedor.length} ite{itensSemVencedor.length === 1 ? "m" : "ns"} sem vencedor</p>
+                <p className="text-xs text-torg-gray mt-0.5">
+                  Escolha um vencedor pra cada item antes de gerar os pedidos. Itens sem decisão não vão pro pedido.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-wrap gap-2">
         <p className="text-xs text-torg-gray">
           {itens.length} ite{itens.length === 1 ? "m" : "ns"} cotados · {fornecedores.length} fornecedor{fornecedores.length !== 1 ? "es" : ""}
+          {fornecedoresVencedores.length > 0 && ` · ${fornecedoresVencedores.length} pedido${fornecedoresVencedores.length !== 1 ? "s" : ""} a gerar`}
         </p>
         <button
           disabled
