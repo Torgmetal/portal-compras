@@ -4,3 +4,12 @@ node_modules/
 *.tsbuildinfo
 
 .DS_Store
+
+/lib/generated/prisma
+
+# Variáveis de ambiente — NUNCA commitar (contém senhas)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
