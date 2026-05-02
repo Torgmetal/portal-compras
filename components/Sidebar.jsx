@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, PlusCircle, Truck, Package, FolderKanban } from "lucide-react";
+import { BarChart3, PlusCircle, Package, FolderKanban } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
@@ -9,7 +9,6 @@ const menu = [
   { href: "/compras", label: "Painel de Compras", icon: BarChart3 },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/catalogo", label: "Catálogo", icon: Package },
-  { href: "/compras/fornecedores", label: "Fornecedores", icon: Truck },
 ];
 
 export default function Sidebar() {
