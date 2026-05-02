@@ -19,3 +19,4 @@ node_modules/
 * 2.*
 * 2
 *\ 2.*
+.env*.local
