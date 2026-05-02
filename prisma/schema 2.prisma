@@ -32,14 +32,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  opsCriadas              OP[]                @relation("OPCreatedBy")
-  rmsCriadas              RM[]                @relation("RMCreatedBy")
-  aditivos                Aditivo[]
-  revisoesCriadas         Revisao[]           @relation("RevisaoCreatedBy")
-  ajustesPrazoCriados     AjustePrazo[]       @relation("AjustePrazoCreatedBy")
-  solicitacoesCriadas     SolicitacaoVerba[]  @relation("SolicitacaoCreatedBy")
-  solicitacoesDecididas   SolicitacaoVerba[]  @relation("SolicitacaoDecididoBy")
-  auditLogs               AuditLog[]
+  opsCriadas    OP[]       @relation("OPCreatedBy")
+  rmsCriadas    RM[]       @relation("RMCreatedBy")
+  aditivos      Aditivo[]
+  auditLogs     AuditLog[]
 }
 
 // ─── OP (ORDEM DE PRODUÇÃO) ─────────────────────────────────
@@ -48,7 +44,6 @@ enum OPStatus {
   ABERTA
   EM_EXECUCAO
   ENCERRADA
-  ATRASADA
   CANCELADA
 }
 
@@ -60,21 +55,14 @@ model OP {
   descricao   String?
   status      OPStatus @default(ABERTA)
 
-  // Cronograma
-  dataInicio       DateTime?
-  dataFimPrevista  DateTime?
-  dataFimReal      DateTime?
-
   createdById String
   createdBy   User     @relation("OPCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  itens          OPItem[]
-  aditivos       Aditivo[]
-  revisoes       Revisao[]
-  ajustesPrazo   AjustePrazo[]
-  rms            RM[]
+  itens       OPItem[]
+  aditivos    Aditivo[]
+  rms         RM[]
 
   @@index([numero])
   @@index([status])
@@ -94,117 +82,26 @@ model OPItem {
   faturamentoDireto Boolean @default(false)
   observacao      String?
 
-  rmItens             RMItem[]
-  solicitacoesVerba   SolicitacaoVerba[]
+  rmItens         RMItem[]
 
   @@index([opId])
 }
 
-// Revisão: registro de mudanças na OP base (cliente, descrição, qtd dos itens base, etc)
-// Comercial cria a revisão com motivo; alterações são aplicadas direto na OP/OPItem
-model Revisao {
-  id          String   @id @default(cuid())
-  opId        String
-  op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-  numero      Int      // Rev 1, 2, 3...
-  motivo      String
-
-  createdById String
-  createdBy   User     @relation("RevisaoCreatedBy", fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-
-  @@unique([opId, numero])
-  @@index([opId])
-}
-
-// Aditivo: acréscimo ao contrato — TEM SUAS PRÓPRIAS LINHAS DE ITENS (AditivoItem)
+// Aditivos: registram a razão da mudança em uma OP
+// O aditivo edita os itens diretamente; aqui guardamos o porquê + autor + data
 model Aditivo {
   id          String   @id @default(cuid())
   opId        String
   op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-  numero      Int      // Aditivo 1, 2, 3...
+  numero      Int      // 1, 2, 3...
   descricao   String   // razão / breve descrição
 
   createdById String
   createdBy   User     @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 
-  itens       AditivoItem[]
-
   @@unique([opId, numero])
   @@index([opId])
-}
-
-model AditivoItem {
-  id              String  @id @default(cuid())
-  aditivoId       String
-  aditivo         Aditivo @relation(fields: [aditivoId], references: [id], onDelete: Cascade)
-
-  ordem           Int     @default(0)
-  descricao       String
-  codigoOmie      String?
-  unidade         String
-  qtdContratada   Float
-  valorVerba      Float
-  faturamentoDireto Boolean @default(false)
-  observacao      String?
-
-  rmItens             RMItem[]
-  solicitacoesVerba   SolicitacaoVerba[]
-
-  @@index([aditivoId])
-}
-
-// Ajuste de Prazo: extensão da data fim prevista da OP. Apenas usuário master.
-model AjustePrazo {
-  id              String   @id @default(cuid())
-  opId            String
-  op              OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-
-  dataFimAnterior DateTime
-  dataFimNova     DateTime
-  motivo          String
-
-  createdById     String
-  createdBy       User     @relation("AjustePrazoCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime @default(now())
-
-  @@index([opId])
-}
-
-// Solicitação de mudança de verba — comercial pede, master aprova/rejeita por item
-enum SolicitacaoVerbaStatus {
-  PENDENTE
-  APROVADA
-  REJEITADA
-}
-
-model SolicitacaoVerba {
-  id              String   @id @default(cuid())
-
-  // Item afetado: pode ser de OP ou de Aditivo
-  opItemId        String?
-  opItem          OPItem?  @relation(fields: [opItemId], references: [id], onDelete: Cascade)
-  aditivoItemId   String?
-  aditivoItem     AditivoItem? @relation(fields: [aditivoItemId], references: [id], onDelete: Cascade)
-
-  valorAtual      Float
-  valorProposto   Float
-  justificativa   String
-
-  status          SolicitacaoVerbaStatus @default(PENDENTE)
-  observacaoMaster String?
-  decididoEm      DateTime?
-  decididoById    String?
-  decididoBy      User?    @relation("SolicitacaoDecididoBy", fields: [decididoById], references: [id])
-
-  createdById     String
-  createdBy       User     @relation("SolicitacaoCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime @default(now())
-
-  @@index([opItemId])
-  @@index([aditivoItemId])
-  @@index([status])
 }
 
 // ─── RM (REQUISIÇÃO DE MATERIAL) ────────────────────────────
@@ -253,11 +150,9 @@ model RMItem {
   rmId        String
   rm          RM      @relation(fields: [rmId], references: [id], onDelete: Cascade)
 
-  // Vinculo com item da OP base OU com item de Aditivo (exatamente um dos dois)
-  opItemId      String?
-  opItem        OPItem?      @relation(fields: [opItemId], references: [id])
-  aditivoItemId String?
-  aditivoItem   AditivoItem? @relation(fields: [aditivoItemId], references: [id])
+  // Vinculo com item da OP (sempre que a RM nasce de uma OP)
+  opItemId    String?
+  opItem      OPItem? @relation(fields: [opItemId], references: [id])
 
   ordem       Int     @default(0)
   descricao   String
@@ -276,7 +171,6 @@ model RMItem {
 
   @@index([rmId])
   @@index([opItemId])
-  @@index([aditivoItemId])
 }
 
 // ─── COTAÇÕES ───────────────────────────────────────────────

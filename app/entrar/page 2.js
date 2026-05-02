@@ -7,25 +7,10 @@ import Link from "next/link";
 import { Loader2, AlertCircle } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
-function homePorRole(role) {
-  switch (role) {
-    case "ADMIN":
-    case "COMERCIAL":
-      return "/comercial";
-    case "COMPRAS":
-      return "/compras";
-    case "ENGENHARIA":
-    case "ALMOXARIFADO":
-      return "/rm";
-    default:
-      return "/";
-  }
-}
-
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl");
+  const callbackUrl = params.get("callbackUrl") || "/compras";
 
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -41,23 +26,12 @@ function LoginForm() {
       password: senha,
       redirect: false,
     });
+    setCarregando(false);
     if (res?.error) {
-      setCarregando(false);
       setErro("Email ou senha inválidos.");
       return;
     }
-    // Lê a sessão pra descobrir o role e redirecionar pro portal certo
-    let destino = callbackUrl;
-    if (!destino) {
-      try {
-        const s = await fetch("/api/auth/session").then((r) => r.json());
-        destino = homePorRole(s?.user?.role);
-      } catch {
-        destino = "/";
-      }
-    }
-    setCarregando(false);
-    router.push(destino);
+    router.push(callbackUrl);
     router.refresh();
   };
 
