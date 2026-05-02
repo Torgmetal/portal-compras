@@ -291,6 +291,14 @@ model RM {
   @@index([createdById])
 }
 
+enum RMItemStatus {
+  PENDENTE        // ainda nao cotado
+  EM_COTACAO      // enviado pra fornecedor
+  COTADO          // recebeu proposta, aguarda escolha
+  PEDIDO_GERADO   // virou pedido de compra
+  CANCELADO       // decisao de nao comprar (com motivo)
+}
+
 model RMItem {
   id          String  @id @default(cuid())
   rmId        String
@@ -306,6 +314,10 @@ model RMItem {
   descricao   String
   unidade     String
   qtd         Float
+  status      RMItemStatus @default(PENDENTE)
+  canceladoMotivo String?
+  canceladoEm     DateTime?
+
   // Detalhe (do Tekla quando importado)
   material    String?
   comprimento String?
@@ -320,6 +332,7 @@ model RMItem {
   @@index([rmId])
   @@index([opItemId])
   @@index([aditivoItemId])
+  @@index([status])
 }
 
 // ─── COTAÇÕES ───────────────────────────────────────────────

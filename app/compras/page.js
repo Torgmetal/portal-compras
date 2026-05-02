@@ -1,35 +1,86 @@
-"use client";
-import { useStore } from "@/lib/store";
-import { useRouter } from "next/navigation";
-import { fmt } from "@/lib/utils";
-import Badge from "@/components/Badge";
-import { FileText, PlusCircle, BarChart3, Truck, Eye } from "lucide-react";
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { requireRole } from "@/lib/session";
+import { FileText, BarChart3, Truck, ClipboardList, AlertTriangle } from "lucide-react";
 
-export default function Dashboard() {
-  const { rms, loaded } = useStore();
-  const router = useRouter();
+const STATUS_LABELS = {
+  ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },
+  EM_COTACAO:    { label: "Em cotação",     className: "bg-torg-orange-50 text-torg-orange-700" },
+  COTADA:        { label: "Cotada",         className: "bg-torg-blue-100 text-torg-blue-800" },
+  PEDIDO_GERADO: { label: "Pedido gerado",  className: "bg-torg-dark text-white" },
+  CANCELADA:     { label: "Cancelada",      className: "bg-gray-100 text-gray-500" },
+};
 
-  if (!loaded) return <div className="p-12 text-center text-gray-400">Carregando...</div>;
+const TIPO_RM_LABELS = {
+  ENGENHARIA: "Engenharia",
+  INTERNA:    "Interna",
+};
 
-  const totais = {
-    total: rms.length,
-    aberta: rms.filter((r) => r.status === "Aberta").length,
-    cotacao: rms.filter((r) => r.status === "Em Cotação" || r.status === "Cotada").length,
-    pedido: rms.filter((r) => r.status === "Pedido Gerado").length,
-  };
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+
+export default async function PainelCompras({ searchParams }) {
+  await requireRole(["ADMIN", "COMPRAS"]);
+  const verArquivadas = searchParams?.arquivadas === "1";
+
+  const where = verArquivadas
+    ? { status: { in: ["PEDIDO_GERADO", "CANCELADA"] } }
+    : { status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] } };
+
+  const [rms, totais] = await Promise.all([
+    prisma.rM.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: {
+        op: { select: { numero: true, cliente: true } },
+        createdBy: { select: { name: true } },
+        itens: { select: { status: true } },
+        _count: { select: { cotacoes: true, itens: true } },
+      },
+    }),
+    prisma.rM.groupBy({
+      by: ["status"],
+      _count: { _all: true },
+    }),
+  ]);
+
+  const statusCount = totais.reduce((acc, t) => {
+    acc[t.status] = t._count._all;
+    return acc;
+  }, {});
 
   const cards = [
-    { label: "Total de RMs", value: totais.total, color: "bg-torg-blue", Icon: FileText },
-    { label: "Abertas", value: totais.aberta, color: "bg-torg-orange", Icon: PlusCircle },
-    { label: "Em Cotação", value: totais.cotacao, color: "bg-torg-blue-700", Icon: BarChart3 },
-    { label: "Pedidos Gerados", value: totais.pedido, color: "bg-torg-dark", Icon: Truck },
+    { label: "Total de RMs", value: Object.values(statusCount).reduce((s, n) => s + n, 0), color: "bg-torg-blue", Icon: FileText },
+    { label: "Abertas", value: statusCount.ABERTA || 0, color: "bg-torg-orange", Icon: ClipboardList },
+    { label: "Em Cotação", value: statusCount.EM_COTACAO || 0, color: "bg-torg-blue-700", Icon: BarChart3 },
+    { label: "Pedido Gerado", value: statusCount.PEDIDO_GERADO || 0, color: "bg-torg-dark", Icon: Truck },
   ];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de Compras</h2>
-        <p className="text-sm text-torg-gray mt-1">Gestão de RMs, Cotações e Pedidos</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de Compras</h2>
+          <p className="text-sm text-torg-gray mt-1">Gestão de RMs, Cotações e Pedidos</p>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            href="/compras"
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+              !verArquivadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+            }`}
+          >
+            Ativas
+          </Link>
+          <Link
+            href="/compras?arquivadas=1"
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+              verArquivadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+            }`}
+          >
+            Histórico
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -49,19 +100,16 @@ export default function Dashboard() {
       {rms.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500 text-lg">Nenhuma RM cadastrada ainda</p>
-          <p className="text-gray-400 text-sm mt-1 mb-4">Clique em &quot;Nova RM&quot; no menu para começar</p>
-          <button
-            onClick={() => router.push("/compras/nova-rm")}
-            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium inline-flex items-center gap-2"
-          >
-            <PlusCircle size={18} /> Criar Primeira RM
-          </button>
+          <p className="text-torg-gray text-lg">
+            {verArquivadas ? "Nenhuma RM arquivada" : "Nenhuma RM ativa no momento"}
+          </p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-torg-dark">Últimas Requisições</h3>
+            <h3 className="text-lg font-semibold text-torg-dark">
+              {verArquivadas ? "Histórico" : "Requisições ativas"} ({rms.length})
+            </h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -69,51 +117,65 @@ export default function Dashboard() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nº RM</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP / Cliente</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Solicitante</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Itens</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cot.</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cotações</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {rms.map((rm) => (
-                  <tr
-                    key={rm.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(`/compras/rm/${rm.id}`)}
-                  >
-                    <td className="px-6 py-4 font-mono font-semibold text-blue-600">RM-{rm.numero}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          rm.tipo === "Material"
-                            ? "bg-orange-100 text-orange-700"
-                            : "bg-torg-blue-100 text-torg-blue-700"
-                        }`}
-                      >
-                        {rm.tipo}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-700 max-w-xs truncate">{rm.descricao}</td>
-                    <td className="px-6 py-4 text-gray-500">{rm.data}</td>
-                    <td className="px-6 py-4 text-gray-700 font-medium">{rm.cotacoes?.length || 0}</td>
-                    <td className="px-6 py-4">
-                      <Badge status={rm.status} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        className="text-blue-600 hover:text-blue-800"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/compras/rm/${rm.id}`);
-                        }}
-                      >
-                        <Eye size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {rms.map((rm) => {
+                  const s = STATUS_LABELS[rm.status] || STATUS_LABELS.ABERTA;
+                  const pedidoCount = rm.itens.filter((i) => i.status === "PEDIDO_GERADO").length;
+                  const pendentes = rm.itens.filter((i) => i.status === "PENDENTE").length;
+                  return (
+                    <tr key={rm.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-3">
+                        <Link href={`/compras/rm/${rm.id}`} className="font-mono font-semibold text-torg-blue hover:underline">
+                          {rm.numero}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-3 text-xs text-torg-gray">{TIPO_RM_LABELS[rm.tipoRM]}</td>
+                      <td className="px-6 py-3 text-torg-dark">
+                        {rm.op ? (
+                          <>
+                            <span className="font-mono text-xs">{rm.op.numero}</span>
+                            <span className="text-xs text-torg-gray block">{rm.op.cliente}</span>
+                          </>
+                        ) : (
+                          <span className="text-torg-gray text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3 text-torg-dark max-w-xs truncate">{rm.descricao}</td>
+                      <td className="px-6 py-3 text-torg-gray text-xs">
+                        {rm.createdBy?.name}
+                        {rm.setor && <span className="block text-[10px]">{rm.setor}</span>}
+                      </td>
+                      <td className="px-6 py-3 text-center text-xs">
+                        {pedidoCount > 0 ? (
+                          <span>
+                            <strong>{pedidoCount}</strong> / {rm._count.itens}
+                            {pendentes > 0 && (
+                              <AlertTriangle size={12} className="inline ml-1 text-torg-orange-700" />
+                            )}
+                          </span>
+                        ) : (
+                          rm._count.itens
+                        )}
+                      </td>
+                      <td className="px-6 py-3 text-center text-torg-gray">{rm._count.cotacoes}</td>
+                      <td className="px-6 py-3 text-torg-gray text-xs">{fmtData(rm.createdAt)}</td>
+                      <td className="px-6 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
+                          {s.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
