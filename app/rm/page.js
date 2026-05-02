@@ -22,15 +22,19 @@ const TIPO_RM_LABELS = {
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
-export default async function MinhasRMs() {
+export default async function MinhasRMs({ searchParams }) {
   const user = await requireUser();
+  const verArquivadas = searchParams?.arquivadas === "1";
 
   // ADMIN e COMPRAS veem tudo; demais (engenharia, almoxarifado) veem só as suas
   const isAdminOuCompras = ["ADMIN", "COMPRAS"].includes(user.role);
-  const where = isAdminOuCompras ? {} : { createdById: user.id };
+  const baseWhere = isAdminOuCompras ? {} : { createdById: user.id };
+  const statusFilter = verArquivadas
+    ? { status: { in: ["PEDIDO_GERADO", "CANCELADA"] } }
+    : { status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] } };
 
   const rms = await prisma.rM.findMany({
-    where,
+    where: { ...baseWhere, ...statusFilter },
     orderBy: { createdAt: "desc" },
     take: 50,
     include: {
@@ -48,30 +52,58 @@ export default async function MinhasRMs() {
             {isAdminOuCompras ? "Todas as RMs" : "Minhas RMs"}
           </h2>
           <p className="text-sm text-torg-gray mt-1">
-            Requisições vinculadas a OPs. Cada RM consome verba dos itens da OP.
+            {verArquivadas
+              ? "RMs concluídas (com pedido gerado) e canceladas."
+              : "Requisições em andamento. Quando viram pedido aparecem no histórico."}
           </p>
         </div>
-        <Link
-          href="/rm/nova"
-          className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
-        >
-          <PlusCircle size={18} /> Nova RM
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex gap-1">
+            <Link
+              href="/rm"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                !verArquivadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+              }`}
+            >
+              Ativas
+            </Link>
+            <Link
+              href="/rm?arquivadas=1"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                verArquivadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+              }`}
+            >
+              Histórico
+            </Link>
+          </div>
+          <Link
+            href="/rm/nova"
+            className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+          >
+            <PlusCircle size={18} /> Nova RM
+          </Link>
+        </div>
       </div>
 
       {rms.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <ClipboardList size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-torg-gray text-lg">Nenhuma RM cadastrada</p>
-          <p className="text-sm text-torg-gray mt-1 mb-4">
-            Crie sua primeira RM escolhendo a OP de origem.
+          <p className="text-torg-gray text-lg">
+            {verArquivadas ? "Nenhuma RM no histórico ainda" : "Nenhuma RM ativa"}
           </p>
-          <Link
-            href="/rm/nova"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium"
-          >
-            <PlusCircle size={18} /> Nova RM
-          </Link>
+          {!verArquivadas && (
+            <>
+              <p className="text-sm text-torg-gray mt-1 mb-4">
+                Crie sua primeira RM escolhendo a OP de origem.
+              </p>
+              <Link
+                href="/rm/nova"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium"
+              >
+                <PlusCircle size={18} /> Nova RM
+              </Link>
+            </>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 overflow-hidden">
