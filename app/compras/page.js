@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { FileText, BarChart3, Truck, ClipboardList, AlertTriangle } from "lucide-react";
 
+// Sempre busca dados frescos do banco (sem cache de Server Component)
+export const dynamic = "force-dynamic";
+
 const STATUS_LABELS = {
   ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },
   EM_COTACAO:    { label: "Em cotação",     className: "bg-torg-orange-50 text-torg-orange-700" },
@@ -49,10 +52,14 @@ export default async function PainelCompras({ searchParams }) {
     return acc;
   }, {});
 
+  // "Em Cotação" agrega EM_COTACAO + COTADA — ambos estão no processo
+  // de cotação (aguardando proposta ou já com proposta antes do pedido).
+  const emCotacao = (statusCount.EM_COTACAO || 0) + (statusCount.COTADA || 0);
+
   const cards = [
     { label: "Total de RMs", value: Object.values(statusCount).reduce((s, n) => s + n, 0), color: "bg-torg-blue", Icon: FileText },
     { label: "Abertas", value: statusCount.ABERTA || 0, color: "bg-torg-orange", Icon: ClipboardList },
-    { label: "Em Cotação", value: statusCount.EM_COTACAO || 0, color: "bg-torg-blue-700", Icon: BarChart3 },
+    { label: "Em Cotação", value: emCotacao, color: "bg-torg-blue-700", Icon: BarChart3 },
     { label: "Pedido Gerado", value: statusCount.PEDIDO_GERADO || 0, color: "bg-torg-dark", Icon: Truck },
   ];
 

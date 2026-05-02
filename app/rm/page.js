@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { PlusCircle, ClipboardList, AlertTriangle } from "lucide-react";
 
+// Sempre busca dados frescos do banco
+export const dynamic = "force-dynamic";
+
+
 const STATUS_LABELS = {
   ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },
   EM_COTACAO:    { label: "Em cotação",     className: "bg-torg-orange-50 text-torg-orange-700" },

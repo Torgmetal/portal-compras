@@ -4,6 +4,10 @@ import { requireRole } from "@/lib/session";
 import { Inbox } from "lucide-react";
 import AprovacoesClient from "./AprovacoesClient";
 
+// Sempre busca dados frescos do banco
+export const dynamic = "force-dynamic";
+
+
 export default async function AprovacoesPage() {
   await requireRole(["ADMIN"]);
 

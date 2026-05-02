@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PlusCircle, FolderKanban } from "lucide-react";
 
+// Sempre busca dados frescos do banco
+export const dynamic = "force-dynamic";
+
+
 const STATUS_LABELS = {
   ABERTA: { label: "Aberta", className: "bg-torg-blue-50 text-torg-blue" },
   EM_EXECUCAO: { label: "Em execução", className: "bg-torg-orange-50 text-torg-orange-700" },

@@ -5,6 +5,10 @@ import { requireRole } from "@/lib/session";
 import { ArrowLeft } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
 
+// Sempre busca dados frescos do banco
+export const dynamic = "force-dynamic";
+
+
 export default async function OPDetailPage({ params }) {
   const user = await requireRole(["ADMIN", "COMERCIAL"]);
 
