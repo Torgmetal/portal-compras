@@ -14,3 +14,8 @@ node_modules/
 .env.development
 .env.production
 .vercel
+
+# Duplicatas que o iCloud Drive cria por conflito de sincronização
+* 2.*
+* 2
+*\ 2.*
