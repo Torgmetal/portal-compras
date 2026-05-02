@@ -17,12 +17,15 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Apenas Admin ou Compras pode gerar pedidos." }, { status: 403 });
   }
 
-  // Categoria + Local + CNPJs por cotacao vem do body (modal)
+  // Categoria + Local + CNPJs por cotacao + filtro opcional vem do body (modal).
+  // Se cotacoesIds vier preenchido, gera so essas cotacoes (1-a-1).
+  // Se vazio/omisso, gera todas as cotacoes da OP que tem vencedores.
   let body = {};
   try { body = await req.json(); } catch {}
   const categoriaSelecionada = String(body.categoria || "").trim();
   const localSelecionado = String(body.localEstoque || "").trim();
   const cnpjsPorCotacao = body.cnpjsPorCotacao || {};
+  const cotacoesFiltro = Array.isArray(body.cotacoesIds) ? body.cotacoesIds : null;
   if (!categoriaSelecionada) {
     return NextResponse.json({ error: "Categoria de Compra é obrigatória." }, { status: 400 });
   }
@@ -58,6 +61,8 @@ export async function POST(req, { params }) {
 
   for (const rm of op.rms) {
     for (const cot of rm.cotacoes) {
+      // Filtro: gera so as cotacoes selecionadas (modo 1-a-1)
+      if (cotacoesFiltro && !cotacoesFiltro.includes(cot.id)) continue;
       for (const ci of cot.itens) {
         if (!ci.vencedor || !ci.precoUnit || ci.precoUnit <= 0) continue;
         const rmItem = rm.itens.find((i) => i.id === ci.rmItemId);

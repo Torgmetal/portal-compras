@@ -37,26 +37,18 @@ export default function MapaCotacaoClient({ op }) {
   const [resultadosPedidos, setResultadosPedidos] = useState(null);
   const [modalGerar, setModalGerar] = useState(false);
 
-  const gerarPedidos = async ({ categoria, localEstoque, cnpjsPorCotacao }) => {
-    if (fornecedoresVencedores.length === 0) return;
-    setLoading("gerar");
+  // Gera pedidos selecionando quais cotações enviar (1 ou várias).
+  // O modal chama com cotacoesIds=[id] pra gerar 1 por vez.
+  const gerarPedidos = async ({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds }) => {
     setErro("");
-    try {
-      const res = await fetch(`/api/op/${op.id}/gerar-pedidos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoria, localEstoque, cnpjsPorCotacao }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
-      setResultadosPedidos(data.resultados || []);
-      setModalGerar(false);
-      router.refresh();
-    } catch (e) {
-      setErro(e.message);
-    } finally {
-      setLoading(null);
-    }
+    const res = await fetch(`/api/op/${op.id}/gerar-pedidos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Erro");
+    return data.resultados || [];
   };
 
   const sugerirVencedoresMenorPreco = async () => {
@@ -414,16 +406,19 @@ export default function MapaCotacaoClient({ op }) {
 // ── Modal de configuração antes de gerar pedidos ─────
 
 function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalGeral, onClose, onConfirm, loading }) {
+  const router = useRouter();
   const [categoria, setCategoria] = useState("");
   const [localEstoque, setLocalEstoque] = useState("");
   const [cnpjPorCotacao, setCnpjPorCotacao] = useState(() =>
     Object.fromEntries(fornecedoresVencedores.map((f) => [f.cotacaoId, f.cnpj || ""]))
   );
+  const [statusPorCotacao, setStatusPorCotacao] = useState({});
+  const [resultadoPorCotacao, setResultadoPorCotacao] = useState({});
   const [categoriasOpcoes, setCategoriasOpcoes] = useState([]);
   const [locaisOpcoes, setLocaisOpcoes] = useState([]);
   const [carregandoOpcoes, setCarregandoOpcoes] = useState(true);
   const [erroOpcoes, setErroOpcoes] = useState("");
-  const [erroLocal, setErroLocal] = useState("");
+  const [erroGeral, setErroGeral] = useState("");
 
   useEffect(() => {
     setCarregandoOpcoes(true);
@@ -442,26 +437,41 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
 
   const setCnpj = (cotId, val) => setCnpjPorCotacao((p) => ({ ...p, [cotId]: val }));
 
-  const submit = () => {
-    setErroLocal("");
-    if (!categoria) return setErroLocal("Selecione a Categoria de Compra.");
-    if (!localEstoque) return setErroLocal("Selecione o Local de Estoque.");
-    // Valida CNPJs: cada vencedor precisa ter 14 digitos
-    const semCnpj = [];
-    const cnpjsLimpos = {};
-    for (const f of fornecedoresVencedores) {
-      const v = (cnpjPorCotacao[f.cotacaoId] || "").replace(/\D/g, "");
-      if (v.length !== 14) {
-        semCnpj.push(f.fornecedorNome);
-      } else {
-        cnpjsLimpos[f.cotacaoId] = v;
-      }
-    }
-    if (semCnpj.length > 0) {
-      return setErroLocal(`Preencha o CNPJ (14 dígitos) de: ${semCnpj.join(", ")}`);
-    }
-    onConfirm({ categoria, localEstoque, cnpjsPorCotacao: cnpjsLimpos });
+  const validarConfig = () => {
+    setErroGeral("");
+    if (!categoria) { setErroGeral("Selecione a Categoria de Compra."); return false; }
+    if (!localEstoque) { setErroGeral("Selecione o Local de Estoque."); return false; }
+    return true;
   };
+
+  const gerarUm = async (cotacaoId, fornecedorNome) => {
+    if (!validarConfig()) return;
+    const cnpjLimpo = (cnpjPorCotacao[cotacaoId] || "").replace(/\D/g, "");
+    if (cnpjLimpo.length !== 14) {
+      setErroGeral(`Preencha o CNPJ (14 dígitos) de ${fornecedorNome}.`);
+      return;
+    }
+    setErroGeral("");
+    setStatusPorCotacao((p) => ({ ...p, [cotacaoId]: "loading" }));
+    try {
+      const resultados = await onConfirm({
+        categoria,
+        localEstoque,
+        cnpjsPorCotacao: { [cotacaoId]: cnpjLimpo },
+        cotacoesIds: [cotacaoId],
+      });
+      // Pode vir 1 ou 2 resultados (se houver FD separado pra mesma cotacao)
+      const sucesso = resultados.every((r) => r.sucesso);
+      setResultadoPorCotacao((p) => ({ ...p, [cotacaoId]: resultados }));
+      setStatusPorCotacao((p) => ({ ...p, [cotacaoId]: sucesso ? "ok" : "erro" }));
+      router.refresh();
+    } catch (e) {
+      setStatusPorCotacao((p) => ({ ...p, [cotacaoId]: "erro" }));
+      setResultadoPorCotacao((p) => ({ ...p, [cotacaoId]: [{ sucesso: false, erro: e.message }] }));
+    }
+  };
+
+  const algumOk = Object.values(statusPorCotacao).some((s) => s === "ok");
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -476,35 +486,79 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
         </div>
         <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
           <div>
-            <p className="text-sm text-torg-dark mb-2">
-              <strong>{fornecedoresVencedores.length} pedido{fornecedoresVencedores.length !== 1 ? "s" : ""}</strong> a gerar — confira ou preencha o CNPJ de cada fornecedor:
+            <p className="text-sm text-torg-dark mb-1">
+              <strong>{fornecedoresVencedores.length} pedido{fornecedoresVencedores.length !== 1 ? "s" : ""}</strong> a gerar
+            </p>
+            <p className="text-xs text-torg-gray mb-3">
+              Configure categoria + local abaixo, depois clique em "Gerar" pra cada fornecedor (1 por vez evita rate-limit do Omie).
             </p>
             <ul className="space-y-2">
-              {fornecedoresVencedores.map((f) => (
-                <li key={f.cotacaoId} className="flex items-center gap-2 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-torg-dark truncate">{f.fornecedorNome}</p>
-                    <p className="text-xs text-torg-gray">{fmtMoeda(totaisPorFornecedor[f.cotacaoId])}</p>
-                  </div>
-                  <input
-                    type="text"
-                    value={cnpjPorCotacao[f.cotacaoId] || ""}
-                    onChange={(e) => setCnpj(f.cotacaoId, e.target.value)}
-                    placeholder="00.000.000/0001-00"
-                    className="w-44 border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-mono focus:ring-2 focus:ring-torg-blue"
-                    disabled={loading}
-                  />
-                </li>
-              ))}
+              {fornecedoresVencedores.map((f) => {
+                const status = statusPorCotacao[f.cotacaoId];
+                const result = resultadoPorCotacao[f.cotacaoId];
+                return (
+                  <li key={f.cotacaoId} className="border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-torg-dark truncate">{f.fornecedorNome}</p>
+                        <p className="text-xs text-torg-gray tabular-nums">{fmtMoeda(totaisPorFornecedor[f.cotacaoId])}</p>
+                      </div>
+                      <input
+                        type="text"
+                        value={cnpjPorCotacao[f.cotacaoId] || ""}
+                        onChange={(e) => setCnpj(f.cotacaoId, e.target.value)}
+                        placeholder="00.000.000/0001-00"
+                        className="w-40 border border-gray-300 rounded-lg px-2 py-1 text-xs font-mono focus:ring-2 focus:ring-torg-blue disabled:bg-gray-50"
+                        disabled={status === "loading" || status === "ok"}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => gerarUm(f.cotacaoId, f.fornecedorNome)}
+                        disabled={status === "loading" || status === "ok"}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg inline-flex items-center gap-1 disabled:opacity-50 ${
+                          status === "ok"
+                            ? "bg-torg-orange-100 text-torg-orange-700 cursor-default"
+                            : status === "erro"
+                            ? "bg-red-100 text-red-700 hover:bg-red-200"
+                            : "bg-torg-orange text-white hover:bg-torg-orange-600"
+                        }`}
+                      >
+                        {status === "loading" ? (
+                          <><Loader2 size={12} className="animate-spin" /> Gerando...</>
+                        ) : status === "ok" ? (
+                          <><CheckCircle2 size={12} /> Gerado</>
+                        ) : status === "erro" ? (
+                          <>↻ Tentar de novo</>
+                        ) : (
+                          <><Truck size={12} /> Gerar</>
+                        )}
+                      </button>
+                    </div>
+                    {result && result.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-gray-100 text-xs space-y-1">
+                        {result.map((r, idx) => (
+                          <div key={idx} className={r.sucesso ? "text-torg-orange-700" : "text-red-700"}>
+                            {r.sucesso ? (
+                              <>✓ Pedido {r.numeroPedido || r.codigoPedido}{r.isFD ? " (Fat. Direto)" : ""} criado — {fmtMoeda(r.total)}</>
+                            ) : (
+                              <>✗ {r.erro}</>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
-            <p className="text-xs text-torg-gray mt-2">
+            <p className="text-xs text-torg-gray mt-3 text-right">
               Total geral: <strong className="text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</strong>
             </p>
           </div>
 
-          {erroLocal && (
+          {erroGeral && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
-              <AlertCircle size={14} className="mt-0.5" /> <span>{erroLocal}</span>
+              <AlertCircle size={14} className="mt-0.5" /> <span>{erroGeral}</span>
             </div>
           )}
 
@@ -588,21 +642,17 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
             </div>
           )}
         </div>
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
+          <p className="text-xs text-torg-gray">
+            {algumOk
+              ? "Pedidos criados aparecem no Omie. Pode fechar a qualquer momento."
+              : "Configure categoria e local antes de gerar o primeiro pedido."}
+          </p>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm"
-            disabled={loading}
+            className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium"
           >
-            Cancelar
-          </button>
-          <button
-            onClick={submit}
-            disabled={loading}
-            className="px-5 py-2 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-          >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
-            {loading ? "Gerando pedidos..." : `Confirmar e gerar ${fornecedoresVencedores.length}`}
+            Fechar
           </button>
         </div>
       </div>
