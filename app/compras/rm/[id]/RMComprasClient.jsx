@@ -33,6 +33,8 @@ export default function RMComprasClient({ rm, userRole }) {
 
   const [modalCancelarItem, setModalCancelarItem] = useState(null);
   const [modalEncerrarRM, setModalEncerrarRM] = useState(false);
+  const [modalEnviarCot, setModalEnviarCot] = useState(false);
+  const [linksParaEnvio, setLinksParaEnvio] = useState(null);
 
   const status = STATUS_RM_LABELS[rm.status] || STATUS_RM_LABELS.ABERTA;
   const pesoTotal = rm.itens.reduce((s, it) => s + (Number(it.peso) || 0), 0);
@@ -121,11 +123,11 @@ export default function RMComprasClient({ rm, userRole }) {
         {/* Ações */}
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
           <button
-            disabled
-            className="px-4 py-2 bg-torg-blue/40 text-white text-sm font-medium rounded-lg inline-flex items-center gap-2 cursor-not-allowed"
-            title="Em construção — vai chegar na próxima parte do Dia 4"
+            onClick={() => setModalEnviarCot(true)}
+            disabled={rm.status === "PEDIDO_GERADO" || rm.status === "CANCELADA"}
+            className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Mail size={16} /> Enviar Cotação (em breve)
+            <Mail size={16} /> Enviar Cotação
           </button>
           <button
             disabled
@@ -228,6 +230,20 @@ export default function RMComprasClient({ rm, userRole }) {
       )}
 
       {/* Modais */}
+      {modalEnviarCot && (
+        <ModalEnviarCotacao
+          rm={rm}
+          onClose={() => setModalEnviarCot(false)}
+          onSent={(links) => { setModalEnviarCot(false); setLinksParaEnvio(links); router.refresh(); }}
+        />
+      )}
+      {linksParaEnvio && (
+        <ModalLinksEnvio
+          rm={rm}
+          links={linksParaEnvio}
+          onClose={() => setLinksParaEnvio(null)}
+        />
+      )}
       {modalCancelarItem && (
         <ModalCancelarItem
           item={modalCancelarItem}
@@ -324,6 +340,246 @@ function ModalCancelarItem({ item, rmId, onClose, onSaved }) {
           className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
         >
           {salvando && <Loader2 size={14} className="animate-spin" />} Cancelar item
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function ModalEnviarCotacao({ rm, onClose, onSent }) {
+  const itensCotaveis = rm.itens.filter((it) => it.status === "PENDENTE" || it.status === "EM_COTACAO");
+  const [itensSelecionados, setItensSelecionados] = useState(
+    new Set(itensCotaveis.filter((it) => it.status === "PENDENTE").map((it) => it.id))
+  );
+  const [emailsTexto, setEmailsTexto] = useState("");
+  const [prazo, setPrazo] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 5);
+    return d.toISOString().slice(0, 10);
+  });
+  const [observacao, setObservacao] = useState("");
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const toggleItem = (id) => {
+    setItensSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const marcarTodos = () => setItensSelecionados(new Set(itensCotaveis.map((i) => i.id)));
+  const limparTodos = () => setItensSelecionados(new Set());
+
+  const parsearFornecedores = () => {
+    // Cada linha: "Nome Fornecedor <email@fornecedor.com>" ou só email
+    const linhas = emailsTexto.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+    const fornecedores = [];
+    for (const linha of linhas) {
+      const m = linha.match(/^(.+?)\s*<(.+?@.+?\..+?)>\s*$/);
+      if (m) {
+        fornecedores.push({ nome: m[1].trim(), email: m[2].trim() });
+      } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linha)) {
+        fornecedores.push({ nome: linha.split("@")[0], email: linha });
+      }
+    }
+    return fornecedores;
+  };
+
+  const submit = async () => {
+    setErro("");
+    const fornecedores = parsearFornecedores();
+    if (fornecedores.length === 0) return setErro("Adicione ao menos 1 fornecedor com email válido.");
+    if (itensSelecionados.size === 0) return setErro("Selecione ao menos 1 item.");
+
+    setSalvando(true);
+    try {
+      const res = await fetch("/api/cotacao/enviar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rmId: rm.id,
+          itensIds: Array.from(itensSelecionados),
+          fornecedores,
+          prazoResposta: prazo || null,
+          observacaoExtra: observacao.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onSent(data.cotacoes);
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal titulo="Enviar Cotação aos Fornecedores" onClose={onClose}>
+      <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+
+        {/* Itens */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-torg-dark">
+              Itens pra cotar ({itensSelecionados.size} de {itensCotaveis.length})
+            </label>
+            <div className="flex gap-2 text-xs">
+              <button onClick={marcarTodos} className="text-torg-blue hover:text-torg-dark font-medium">Todos</button>
+              <span className="text-gray-300">·</span>
+              <button onClick={limparTodos} className="text-torg-gray hover:text-torg-dark font-medium">Nenhum</button>
+            </div>
+          </div>
+          <div className="border border-gray-200 rounded-lg max-h-[200px] overflow-y-auto divide-y divide-gray-100">
+            {itensCotaveis.map((it) => (
+              <label key={it.id} className="flex items-center gap-3 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={itensSelecionados.has(it.id)}
+                  onChange={() => toggleItem(it.id)}
+                  className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                />
+                <span className="flex-1 truncate">{it.descricao}</span>
+                <span className="text-xs text-torg-gray tabular-nums">{it.qtd} {it.unidade}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Fornecedores */}
+        <div>
+          <label className="block text-sm font-medium text-torg-dark mb-1">Fornecedores</label>
+          <textarea
+            value={emailsTexto}
+            onChange={(e) => setEmailsTexto(e.target.value)}
+            rows={4}
+            placeholder={`Soufer <vendas@soufer.com.br>\nGerdau <comercial@gerdau.com.br>\n...ou só email@fornecedor.com`}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+          />
+          <p className="text-xs text-torg-gray mt-1">
+            Um por linha. Aceita "Nome &lt;email@&gt;" ou só email. Cada um receberá um link único e privado.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Prazo de resposta</label>
+            <input
+              type="date"
+              value={prazo}
+              onChange={(e) => setPrazo(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Observação (opcional)</label>
+            <input
+              type="text"
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              placeholder="Ex: Entrega urgente, frete CIF"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+          Cancelar
+        </button>
+        <button
+          onClick={submit}
+          disabled={salvando}
+          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+        >
+          {salvando && <Loader2 size={14} className="animate-spin" />} Criar cotações
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function ModalLinksEnvio({ rm, links, onClose }) {
+  const [copiado, setCopiado] = useState(null);
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  const corpoEmail = (link) => {
+    return [
+      "Olá,",
+      "",
+      `Solicitamos cotação para a Requisição ${rm.numero} (${rm.descricao}).`,
+      "",
+      `Acesse o link abaixo para visualizar os itens e enviar sua proposta diretamente:`,
+      "",
+      link,
+      "",
+      "Atenciosamente,",
+      "Torg Metal",
+    ].join("\n");
+  };
+
+  const abrirEmail = (cot) => {
+    const link = `${baseUrl}/fornecedores/c/${cot.token}`;
+    const subject = encodeURIComponent(`Solicitação de Cotação — RM ${rm.numero}`);
+    const body = encodeURIComponent(corpoEmail(link));
+    window.location.href = `mailto:${cot.fornecedorEmail}?subject=${subject}&body=${body}`;
+  };
+
+  const copiarLink = async (cot) => {
+    const link = `${baseUrl}/fornecedores/c/${cot.token}`;
+    await navigator.clipboard.writeText(link);
+    setCopiado(cot.id);
+    setTimeout(() => setCopiado(null), 2000);
+  };
+
+  return (
+    <Modal titulo={`Cotações criadas (${links.length})`} onClose={onClose}>
+      <div className="px-6 py-5 space-y-3 max-h-[70vh] overflow-y-auto">
+        <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg p-3 text-sm text-torg-dark">
+          <p className="font-medium">✓ Cotações criadas com sucesso</p>
+          <p className="text-xs text-torg-gray mt-1">
+            Clique em "Abrir email" pra cada fornecedor — vai abrir o Outlook com mensagem pré-formatada
+            e o link único de cada um. Você também pode só copiar o link e enviar por WhatsApp/outro canal.
+          </p>
+        </div>
+
+        <ul className="space-y-2">
+          {links.map((cot) => (
+            <li key={cot.id} className="border border-gray-200 rounded-lg p-3 flex items-center gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-torg-dark">{cot.fornecedorNome}</p>
+                <p className="text-xs text-torg-gray truncate">{cot.fornecedorEmail}</p>
+                <p className="text-[10px] text-torg-gray font-mono mt-0.5 truncate">
+                  /fornecedores/c/{cot.token.slice(0, 8)}...
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => copiarLink(cot)}
+                  className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 font-medium"
+                >
+                  {copiado === cot.id ? "✓ copiado" : "Copiar link"}
+                </button>
+                <button
+                  onClick={() => abrirEmail(cot)}
+                  className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
+                >
+                  <Mail size={12} /> Abrir email
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+        <button onClick={onClose} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium">
+          Fechar
         </button>
       </div>
     </Modal>

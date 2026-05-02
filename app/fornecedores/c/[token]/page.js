@@ -1,45 +1,101 @@
 import MarketingShell from "@/components/MarketingShell";
-import { Lock, ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { Lock, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import CotacaoFornecedorForm from "./CotacaoFornecedorForm";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Torg Metal — Upload de Cotação",
 };
 
-export default function UploadCotacaoPorToken({ params }) {
-  // Quando a auth de token estiver ligada, este componente vai:
-  // 1) Validar params.token contra a RM/cotação no banco
-  // 2) Se válido: mostrar form de upload (PDF/imagem/texto) + IA
-  // 3) Se inválido/expirado: mostrar mensagem de erro
-  // Por enquanto é shell de placeholder.
-  return (
-    <MarketingShell
-      image="/obras/torre-escada.jpg"
-      kicker="Upload de Cotação"
-      title="Acesso por link único"
-      lead="Token recebido por email — válido por 30 dias e específico desta cotação."
-    >
-      <div className="bg-white rounded-2xl border border-torg-blue-100 shadow-sm p-7">
-        <div className="w-12 h-12 rounded-xl bg-torg-orange/20 flex items-center justify-center mb-5">
-          <Lock size={22} className="text-torg-orange" />
-        </div>
-        <h2 className="text-xl font-bold text-torg-dark mb-2">Em breve</h2>
-        <p className="text-sm text-torg-gray mb-2">
-          Token: <code className="bg-torg-blue-50 px-2 py-0.5 rounded text-torg-dark font-mono text-xs">{params.token}</code>
-        </p>
-        <p className="text-sm text-torg-gray mb-6">
-          O upload por token único será liberado quando a integração de email
-          (Resend) estiver configurada. Por enquanto, esta página é um shell
-          de pré-visualização.
-        </p>
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
-        <Link
-          href="/fornecedores"
-          className="text-sm text-torg-blue font-medium inline-flex items-center gap-1 hover:underline"
-        >
-          <ArrowLeft size={14} /> Voltar
-        </Link>
-      </div>
-    </MarketingShell>
+export default async function CotacaoPorToken({ params }) {
+  const cotacao = await prisma.cotacao.findUnique({
+    where: { token: params.token },
+    include: {
+      rm: { select: { numero: true, descricao: true, observacao: true } },
+      itens: {
+        include: {
+          rmItem: {
+            select: { descricao: true, qtd: true, unidade: true, material: true, comprimento: true, peso: true, codigo: true },
+          },
+        },
+      },
+    },
+  });
+
+  // Token inválido
+  if (!cotacao) {
+    return (
+      <MarketingShell
+        image="/obras/torre-escada.jpg"
+        kicker="Cotação não encontrada"
+        title="Link inválido ou expirado"
+        lead="O link de acesso a essa cotação não foi reconhecido. Verifique se você abriu o link correto ou fale com o comprador."
+      >
+        <div className="bg-white rounded-2xl border border-red-200 p-7">
+          <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center mb-4">
+            <AlertTriangle size={22} className="text-red-600" />
+          </div>
+          <p className="text-sm text-torg-gray">
+            Token inválido. Se você recebeu esse link recentemente, talvez tenha sido cancelado.
+          </p>
+        </div>
+      </MarketingShell>
+    );
+  }
+
+  // Vencida
+  const vencida = cotacao.prazoResposta && new Date(cotacao.prazoResposta) < new Date();
+
+  // Já enviada
+  if (cotacao.status === "RECEBIDA") {
+    return (
+      <MarketingShell
+        image="/obras/torre-escada.jpg"
+        kicker="Proposta recebida"
+        title="Recebemos sua proposta"
+        lead={`Obrigado, ${cotacao.fornecedorNome}. A equipe de Compras vai analisar e te avisar quando houver decisão.`}
+      >
+        <div className="bg-white rounded-2xl border border-torg-blue-100 p-7">
+          <div className="w-12 h-12 rounded-xl bg-torg-orange-50 flex items-center justify-center mb-4">
+            <CheckCircle2 size={22} className="text-torg-orange" />
+          </div>
+          <p className="text-sm text-torg-gray">
+            Proposta enviada em {fmtData(cotacao.recebidaEm)}. Total registrado: <strong>{Number(cotacao.total || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong>.
+          </p>
+          <p className="text-xs text-torg-gray mt-3">
+            Se precisar atualizar a proposta, fale com o comprador da Torg que te enviou o link.
+          </p>
+        </div>
+      </MarketingShell>
+    );
+  }
+
+  if (cotacao.status === "CANCELADA") {
+    return (
+      <MarketingShell
+        image="/obras/torre-escada.jpg"
+        kicker="Cotação encerrada"
+        title="Esta cotação foi cancelada"
+        lead="O comprador da Torg cancelou esta solicitação. Em caso de dúvida, fale diretamente com ele."
+      >
+        <div className="bg-white rounded-2xl border border-gray-200 p-7">
+          <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-4">
+            <Lock size={22} className="text-torg-gray" />
+          </div>
+          <p className="text-sm text-torg-gray">Token: {params.token.slice(0, 8)}...</p>
+        </div>
+      </MarketingShell>
+    );
+  }
+
+  // Pendente — mostrar formulário
+  const data = JSON.parse(JSON.stringify(cotacao));
+
+  return (
+    <CotacaoFornecedorForm cotacao={data} vencida={vencida} />
   );
 }
