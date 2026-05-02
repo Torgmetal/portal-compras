@@ -17,11 +17,12 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Apenas Admin ou Compras pode gerar pedidos." }, { status: 403 });
   }
 
-  // Categoria + Local de Estoque vem do body (escolhidos no momento da geracao)
+  // Categoria + Local + CNPJs por cotacao vem do body (modal)
   let body = {};
   try { body = await req.json(); } catch {}
   const categoriaSelecionada = String(body.categoria || "").trim();
   const localSelecionado = String(body.localEstoque || "").trim();
+  const cnpjsPorCotacao = body.cnpjsPorCotacao || {};
   if (!categoriaSelecionada) {
     return NextResponse.json({ error: "Categoria de Compra é obrigatória." }, { status: 400 });
   }
@@ -116,6 +117,19 @@ export async function POST(req, { params }) {
     const cCodCateg = categoriaSelecionada;
     const cCodLocalEstoque = localSelecionado;
 
+    // CNPJ vem do modal (override) ou cai pro que ja estava na cotacao
+    const cnpjFinal = cnpjsPorCotacao[cotacao.id] || cotacao.cnpj || null;
+
+    // Atualiza cnpj na Cotacao se o modal trouxe um valor diferente
+    if (cnpjFinal && cnpjFinal !== cotacao.cnpj) {
+      try {
+        await prisma.cotacao.update({
+          where: { id: cotacao.id },
+          data: { cnpj: cnpjFinal },
+        });
+      } catch {}
+    }
+
     // Chama a lib server-side direto (sem fetch interno — evita problema
     // de auth do middleware bloquear chamada interna).
     let pedidoCriado = null;
@@ -125,7 +139,7 @@ export async function POST(req, { params }) {
         itens: itensPayload,
         observacao: observacaoBase,
         nCodFor: Number(cotacao.nCodOmie) || 0,
-        cnpjFornecedor: cotacao.cnpj || null,
+        cnpjFornecedor: cnpjFinal,
         cNumPedido,
         nQtdeParc: isFD ? 0 : 1,
         cCodCateg,
@@ -148,7 +162,7 @@ export async function POST(req, { params }) {
         cotacaoId: cotacao.id,
         fornecedorNome: cotacao.fornecedorNome,
         nCodFor: pedidoCriado?.nCodFor_resolvido?.toString() || cotacao.nCodOmie || null,
-        cnpj: cotacao.cnpj || null,
+        cnpj: cnpjFinal || null,
         codigoPedido: pedidoCriado?.codigo_pedido?.toString() || null,
         numeroPedido: pedidoCriado?.numero_pedido?.toString() || null,
         total,

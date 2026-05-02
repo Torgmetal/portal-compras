@@ -37,7 +37,7 @@ export default function MapaCotacaoClient({ op }) {
   const [resultadosPedidos, setResultadosPedidos] = useState(null);
   const [modalGerar, setModalGerar] = useState(false);
 
-  const gerarPedidos = async ({ categoria, localEstoque }) => {
+  const gerarPedidos = async ({ categoria, localEstoque, cnpjsPorCotacao }) => {
     if (fornecedoresVencedores.length === 0) return;
     setLoading("gerar");
     setErro("");
@@ -45,7 +45,7 @@ export default function MapaCotacaoClient({ op }) {
       const res = await fetch(`/api/op/${op.id}/gerar-pedidos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoria, localEstoque }),
+        body: JSON.stringify({ categoria, localEstoque, cnpjsPorCotacao }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
@@ -390,6 +390,9 @@ export default function MapaCotacaoClient({ op }) {
 function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalGeral, onClose, onConfirm, loading }) {
   const [categoria, setCategoria] = useState("");
   const [localEstoque, setLocalEstoque] = useState("");
+  const [cnpjPorCotacao, setCnpjPorCotacao] = useState(() =>
+    Object.fromEntries(fornecedoresVencedores.map((f) => [f.cotacaoId, f.cnpj || ""]))
+  );
   const [categoriasOpcoes, setCategoriasOpcoes] = useState([]);
   const [locaisOpcoes, setLocaisOpcoes] = useState([]);
   const [carregandoOpcoes, setCarregandoOpcoes] = useState(true);
@@ -411,13 +414,27 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
       .finally(() => setCarregandoOpcoes(false));
   }, []);
 
-  const podeGerar = !!categoria && !!localEstoque;
+  const setCnpj = (cotId, val) => setCnpjPorCotacao((p) => ({ ...p, [cotId]: val }));
 
   const submit = () => {
     setErroLocal("");
     if (!categoria) return setErroLocal("Selecione a Categoria de Compra.");
     if (!localEstoque) return setErroLocal("Selecione o Local de Estoque.");
-    onConfirm({ categoria, localEstoque });
+    // Valida CNPJs: cada vencedor precisa ter 14 digitos
+    const semCnpj = [];
+    const cnpjsLimpos = {};
+    for (const f of fornecedoresVencedores) {
+      const v = (cnpjPorCotacao[f.cotacaoId] || "").replace(/\D/g, "");
+      if (v.length !== 14) {
+        semCnpj.push(f.fornecedorNome);
+      } else {
+        cnpjsLimpos[f.cotacaoId] = v;
+      }
+    }
+    if (semCnpj.length > 0) {
+      return setErroLocal(`Preencha o CNPJ (14 dígitos) de: ${semCnpj.join(", ")}`);
+    }
+    onConfirm({ categoria, localEstoque, cnpjsPorCotacao: cnpjsLimpos });
   };
 
   return (
@@ -431,23 +448,32 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
             <X size={18} />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          <div className="bg-gray-50 rounded-lg p-3 text-sm">
-            <p className="text-torg-gray mb-2">
-              Será criado <strong className="text-torg-dark">{fornecedoresVencedores.length} pedido{fornecedoresVencedores.length !== 1 ? "s" : ""}</strong> no Omie:
+        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div>
+            <p className="text-sm text-torg-dark mb-2">
+              <strong>{fornecedoresVencedores.length} pedido{fornecedoresVencedores.length !== 1 ? "s" : ""}</strong> a gerar — confira ou preencha o CNPJ de cada fornecedor:
             </p>
-            <ul className="space-y-1 text-xs">
+            <ul className="space-y-2">
               {fornecedoresVencedores.map((f) => (
-                <li key={f.cotacaoId} className="flex justify-between text-torg-dark">
-                  <span>{f.fornecedorNome}</span>
-                  <span className="text-torg-gray tabular-nums">{fmtMoeda(totaisPorFornecedor[f.cotacaoId])}</span>
+                <li key={f.cotacaoId} className="flex items-center gap-2 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-torg-dark truncate">{f.fornecedorNome}</p>
+                    <p className="text-xs text-torg-gray">{fmtMoeda(totaisPorFornecedor[f.cotacaoId])}</p>
+                  </div>
+                  <input
+                    type="text"
+                    value={cnpjPorCotacao[f.cotacaoId] || ""}
+                    onChange={(e) => setCnpj(f.cotacaoId, e.target.value)}
+                    placeholder="00.000.000/0001-00"
+                    className="w-44 border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-mono focus:ring-2 focus:ring-torg-blue"
+                    disabled={loading}
+                  />
                 </li>
               ))}
-              <li className="flex justify-between font-bold pt-1 border-t border-gray-200 mt-1">
-                <span>Total</span>
-                <span className="text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</span>
-              </li>
             </ul>
+            <p className="text-xs text-torg-gray mt-2">
+              Total geral: <strong className="text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</strong>
+            </p>
           </div>
 
           {erroLocal && (
@@ -660,7 +686,12 @@ function buildMatriz(op) {
     for (const cot of rm.cotacoes) {
       if (cot.status !== "RECEBIDA") continue;
       if (!fornMap.has(cot.id)) {
-        fornMap.set(cot.id, { cotacaoId: cot.id, fornecedorNome: cot.fornecedorNome });
+        fornMap.set(cot.id, {
+          cotacaoId: cot.id,
+          fornecedorNome: cot.fornecedorNome,
+          cnpj: cot.cnpj || "",
+          nCodOmie: cot.nCodOmie || "",
+        });
       }
 
       for (const ci of cot.itens) {
