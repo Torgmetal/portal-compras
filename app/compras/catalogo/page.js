@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import { useStore } from "@/lib/store";
-import { Package, Upload, Search, Trash2, FileSpreadsheet, AlertCircle } from "lucide-react";
+import { Upload, Search, Trash2, FileSpreadsheet, AlertCircle } from "lucide-react";
 
 export default function CatalogoPage() {
   const { catalogo, setCatalogo, showToast, loaded } = useStore();
@@ -88,15 +88,13 @@ export default function CatalogoPage() {
     <div className="space-y-6 max-w-7xl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Package className="text-blue-600" /> Catálogo de Itens
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Importe a planilha de produtos do Omie para consultar itens ao criar RMs
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Catálogo de Itens</h2>
+          <p className="text-sm text-torg-gray mt-1">
+            Importe a planilha de produtos do Omie para consultar itens ao criar RMs.
           </p>
         </div>
         {catalogo.length > 0 && (
-          <span className="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
+          <span className="text-sm bg-torg-blue-50 text-torg-blue px-3 py-1 rounded-full font-medium">
             {catalogo.length} itens cadastrados
           </span>
         )}
@@ -104,8 +102,8 @@ export default function CatalogoPage() {
 
       {/* Upload */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">Importar Planilha de Itens</h3>
-        <p className="text-sm text-gray-500 mb-4">
+        <h3 className="text-lg font-semibold text-torg-dark mb-2">Importar Planilha de Itens</h3>
+        <p className="text-sm text-torg-gray mb-4">
           Suba a planilha exportada do Omie (.xlsx ou .csv). O sistema vai ler automaticamente as colunas como Descrição, Código, Família, Unidade, Estoque etc.
         </p>
         <div
@@ -184,7 +182,7 @@ export default function CatalogoPage() {
                     <td className="px-4 py-2 text-right font-medium">{it.estoque}</td>
                     <td className="px-4 py-2">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        it.situacao === "Ativo" ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
+                        it.situacao === "Ativo" ? "bg-torg-orange-50 text-torg-orange-700" : "bg-gray-100 text-gray-500"
                       }`}>
                         {it.situacao}
                       </span>

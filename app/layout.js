@@ -1,24 +1,23 @@
 import "./globals.css";
 import { StoreProvider } from "@/lib/store";
-import Sidebar from "@/components/Sidebar";
 import Toast from "@/components/Toast";
+import NextAuthProvider from "@/components/SessionProvider";
 
 export const metadata = {
-  title: "Portal de Compras",
-  description: "Gestão de Requisições de Material e Cotações",
+  title: "Torg Metal — Portal",
+  description: "Soluções em estruturas metálicas industriais e residenciais.",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
-      <body className="bg-gray-50">
-        <StoreProvider>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main className="flex-1 ml-64 p-8 overflow-auto">{children}</main>
-          </div>
-          <Toast />
-        </StoreProvider>
+      <body className="bg-torg-blue-50/30">
+        <NextAuthProvider>
+          <StoreProvider>
+            {children}
+            <Toast />
+          </StoreProvider>
+        </NextAuthProvider>
       </body>
     </html>
   );

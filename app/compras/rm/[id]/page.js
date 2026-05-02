@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, Fragment, useMemo } from "react";
+import { useState, useRef, Fragment, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { uid, today, fmt } from "@/lib/utils";
@@ -14,10 +14,9 @@ import {
 
 export default function RmDetail({ params }) {
   const { id } = params;
-  const { rms, setRms, fornecedores, showToast, loaded } = useStore();
+  const { rms, setRms, fornecedores, setFornecedores, showToast, loaded } = useStore();
   const router = useRouter();
   const fileRef = useRef(null);
-  const pdfRef = useRef(null);
 
   const [cotFornecedor, setCotFornecedor] = useState("");
   const [sendingOmie, setSendingOmie] = useState(false);
@@ -26,15 +25,31 @@ export default function RmDetail({ params }) {
   const [showPedidos, setShowPedidos] = useState(false);
   const [pedidosOmie, setPedidosOmie] = useState([]);
   const [dragActive, setDragActive] = useState(false);
-  const [dragActivePdf, setDragActivePdf] = useState(false);
   // Mapa: override do fornecedor vencedor por item (key = item lowercase, value = fornecedor name)
   const [overrides, setOverrides] = useState({});
   const [expandedPedido, setExpandedPedido] = useState(null);
   const [selectedFornecedores, setSelectedFornecedores] = useState([]);
+  const [emailsLivres, setEmailsLivres] = useState("");
   const [criandoPedido, setCriandoPedido] = useState(false);
   const [alertasEng, setAlertasEng] = useState([]);
   const [showExportOmie, setShowExportOmie] = useState(false);
   const [exportandoOmie, setExportandoOmie] = useState(false);
+  const [categoriasOpcoes, setCategoriasOpcoes] = useState([]);
+  const [locaisOpcoes, setLocaisOpcoes] = useState([]);
+  const [carregandoOmieOpts, setCarregandoOmieOpts] = useState(false);
+
+  useEffect(() => {
+    setCarregandoOmieOpts(true);
+    Promise.all([
+      fetch("/api/omie/categorias").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/omie/locais-estoque").then((r) => r.json()).catch(() => ({})),
+    ])
+      .then(([dc, dl]) => {
+        if (dc?.categorias?.length) setCategoriasOpcoes(dc.categorias);
+        if (dl?.locais?.length) setLocaisOpcoes(dl.locais);
+      })
+      .finally(() => setCarregandoOmieOpts(false));
+  }, []);
 
   const rmFound = rms.find((r) => r.id === id);
   const rm = rmFound || { itens: [], cotacoes: [], envios: [], anexos: [], status: "", numero: "", descricao: "", observacao: "", data: "", op: "", tipo: "", id: null };
@@ -117,176 +132,44 @@ export default function RmDetail({ params }) {
   const handleFileUpload = (e) => { processFile(e.target.files[0]); e.target.value = ""; };
   const handleDrop = (e) => { e.preventDefault(); setDragActive(false); processFile(e.dataTransfer.files[0]); };
 
-  // ─── PDF/ANEXO UPLOAD ────────────────────────────────────
-  const processPdf = async (file) => {
-    if (!file) return;
-    const fornecedorNome = cotFornecedor.trim() || "Fornecedor " + ((rm.cotacoes || []).length + 1);
-
-    // Read file as both dataURL (for anexo) and ArrayBuffer (for extraction)
-    const readAsDataURL = (f) => new Promise((res) => { const r = new FileReader(); r.onload = (e) => res(e.target.result); r.readAsDataURL(f); });
-    const readAsArrayBuffer = (f) => new Promise((res) => { const r = new FileReader(); r.onload = (e) => res(e.target.result); r.readAsArrayBuffer(f); });
-
-    const dataUrl = await readAsDataURL(file);
-    
-    // Always save as anexo
-    const novoAnexo = { id: uid(), nome: file.name, tipo: "application/pdf", tamanho: file.size, data: today(), fornecedor: fornecedorNome, url: dataUrl };
-    
-    // Try to extract prices from PDF
-    let extractedItens = [];
-    try {
-      const arrayBuf = await readAsArrayBuffer(file);
-      if (!window.pdfjsLib) {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-          s.onload = resolve;
-          s.onerror = reject;
-          document.head.appendChild(s);
-        });
-      }
-      const pdfjsLib = window.pdfjsLib;
-      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuf) }).promise;
-      let fullText = "";
-      for (let p = 1; p <= pdf.numPages; p++) {
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-        fullText += tc.items.map(i => i.str).join(" ") + "\n";
-      }
-      // Try to match RM items and extract prices
-      const rmItens = rm.itens || [];
-      extractedItens = matchPdfPrices(fullText, rmItens);
-    } catch (err) {
-      console.warn("PDF extraction failed:", err);
-    }
-
-    if (extractedItens.length > 0) {
-      const total = extractedItens.reduce((s, it) => s + (it.precoUnit * (it.qtd || 1)), 0);
-      const novaCotacao = {
-        id: uid(),
-        fornecedor: fornecedorNome,
-        nomeArquivo: file.name,
-        tipo: "pdf-extraido",
-        data: today(),
-        itens: extractedItens,
-        total,
-      };
-      updateRm({
-        cotacoes: [...(rm.cotacoes || []), novaCotacao],
-        anexos: [...(rm.anexos || []), novoAnexo],
-        status: rm.status === "Aberta" ? "Em Cota\u00e7\u00e3o" : rm.status,
-      });
-      showToast("Cota\u00e7\u00e3o extra\u00edda do PDF com " + extractedItens.length + " itens!");
-    } else {
-      updateRm({ anexos: [...(rm.anexos || []), novoAnexo] });
-      showToast("PDF salvo como anexo. N\u00e3o foi poss\u00edvel extrair pre\u00e7os automaticamente.");
-    }
-    setCotFornecedor("");
-  };
-
-  const matchPdfPrices = (text, rmItens) => {
-    const result = [];
-    const fullText = text.replace(/---PAGE \d+---/g, ' ').replace(/\n/g, ' ');
-    const stripZero = (s) => s.replace(/\.0$/, '');
-    
-    // Truncate at summary sections
-    const summaryIdx = fullText.search(/\bTOTAL\s+KG|\bPeso\s+total|\bValor\s+total|\bMensagem\b|\bDescarga\b|\bFique\s+atento/i);
-    const textToProcess = summaryIdx > 0 ? fullText.substring(0, summaryIdx) : fullText;
-    
-    // Split text into item blocks using sequence numbers (10, 20, 30...)
-    const itemRegex = /(?:^|\s)(\d{2,3})\s{2,}(?=\d{5,}|PF|PERFIL|CANT|CHAPA|BARRA|TUBO)/gi;
-    const positions = [];
-    let m;
-    while ((m = itemRegex.exec(textToProcess)) !== null) {
-      positions.push(m.index);
-    }
-    
-    const blocks = [];
-    for (let i = 0; i < positions.length; i++) {
-      const start = positions[i];
-      const end = i + 1 < positions.length ? positions[i + 1] : textToProcess.length;
-      blocks.push(fullText.substring(start, end).trim());
-    }
-    
-    const pdfItems = [];
-    for (const block of blocks) {
-      let normDesc = '';
-      const wMatch = block.match(/(?:PF\s*[IH]?\s+)?(?:PERFIL\s+)?W\s*H?\s*(\d{2,3})\s*X\s*(\d+[,.]?\d*)/i);
-      const cantMatch = block.match(/CANT(?:ONEIRA)?[\s]*(\d[\d.\/]*)\s*[Xx]\s*(\d[\d.\/]*)/i);
-      
-      if (wMatch) {
-        normDesc = stripZero('W' + wMatch[1] + 'X' + wMatch[2].replace(',', '.'));
-      } else if (cantMatch) {
-        normDesc = 'CANT' + cantMatch[1] + 'X' + cantMatch[2];
-      }
-      
-      const priceMatches = [...block.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})(?:\s*BRL)?/g)];
-      let totalPrice = 0;
-      if (priceMatches.length > 0) {
-        const last = priceMatches[priceMatches.length - 1][1];
-        totalPrice = parseFloat(last.replace(/\./g, '').replace(',', '.'));
-      }
-      
-      let qty = 1;
-      const qtyMatch = block.match(/Quantidade\s+(\d+)/i);
-      if (qtyMatch) qty = parseInt(qtyMatch[1]);
-      
-      if (normDesc && totalPrice > 0) {
-        pdfItems.push({ normDesc, totalPrice, qty });
-      }
-    }
-    
-    const usedPdf = new Set();
-    rmItens.forEach((rmItem) => {
-      const rmDesc = (rmItem.descricao || rmItem.item || '').toUpperCase().trim();
-      if (!rmDesc) return;
-      
-      let rmNorm = '';
-      const rmW = rmDesc.match(/W\s*H?\s*(\d{2,3})\s*X\s*(\d+[,.]?\d*)/i);
-      const rmCant = rmDesc.match(/CANTONEIRA[\s]*(\d[\d.\/\"]*)[\"\s]*[Xx][\"\s]*(\d[\d.\/\"]*)/i);
-      
-      if (rmW) {
-        rmNorm = stripZero('W' + rmW[1] + 'X' + rmW[2].replace(',', '.'));
-      } else if (rmCant) {
-        rmNorm = 'CANT' + rmCant[1].replace(/"/g, '') + 'X' + rmCant[2].replace(/"/g, '');
-      }
-      
-      if (!rmNorm) return;
-      
-      for (let i = 0; i < pdfItems.length; i++) {
-        if (usedPdf.has(i)) continue;
-        if (pdfItems[i].normDesc === rmNorm) {
-          usedPdf.add(i);
-          const unitPrice = pdfItems[i].totalPrice / pdfItems[i].qty;
-          result.push({
-            item: rmItem.descricao || rmItem.item,
-            precoUnit: Math.round(unitPrice * 100) / 100,
-            qtd: pdfItems[i].qty,
-            prazoEntrega: '\u2014',
-            condicao: '\u2014',
-            estoque: '\u2014',
-          });
-          return;
-        }
-      }
-    });
-    
-    return result;
-  };
-
-  const handlePdfUpload = (e) => { processPdf(e.target.files[0]); e.target.value = ""; };
-  const handleDropPdf = (e) => { e.preventDefault(); setDragActivePdf(false); processPdf(e.dataTransfer.files[0]); };
   const removeAnexo = (anexoId) => { updateRm({ anexos: (rm.anexos || []).filter((a) => a.id !== anexoId) }); showToast("Anexo removido"); };
   const removeCotacao = (cotId) => { updateRm({ cotacoes: (rm.cotacoes || []).filter((c) => c.id !== cotId) }); showToast("Cotação removida"); };
 
   const cotacoes = rm.cotacoes || [];
   const anexos = rm.anexos || [];
-  const allItems = new Map(); (rm.itens || []).forEach((ri) => { const k = (ri.descricao || ri.item || "").toLowerCase().trim(); if (k) allItems.set(k, { item: ri.descricao || ri.item, codigoOmie: ri.codigo || "", cotacoes: [] }); });
+
+  // Determina se algum fornecedor é Faturamento=Torg (muda a exibição do mapa)
+  const temFaturamentoTorg = cotacoes.some((c) => c.faturamento === "Torg");
+
+  const allItems = new Map();
+  (rm.itens || []).forEach((ri) => {
+    const k = (ri.descricao || ri.item || "").toLowerCase().trim();
+    if (k) allItems.set(k, { item: ri.descricao || ri.item, codigoOmie: ri.codigo || "", cotacoes: [] });
+  });
   cotacoes.forEach((cot) => {
     (cot.itens || []).forEach((it) => {
-      const key = it.item.toLowerCase().trim();
-      const rmItem = (rm.itens || []).find(ri => ri.descricao && ri.descricao.toLowerCase().trim() === key); if (!allItems.has(key)) allItems.set(key, { item: it.item, codigoOmie: rmItem?.codigo || "", cotacoes: [] });
-      allItems.get(key).cotacoes.push({ fornecedor: cot.fornecedor, precoUnit: it.precoUnit, qtd: it.qtd, total: it.precoUnit * it.qtd });
+      const key = (it.item || it.descricao || "").toLowerCase().trim();
+      const rmItem = (rm.itens || []).find((ri) => ri.descricao && ri.descricao.toLowerCase().trim() === key);
+      if (!allItems.has(key)) allItems.set(key, { item: it.item || it.descricao, codigoOmie: rmItem?.codigo || "", cotacoes: [] });
+      const precoUnit = Number(it.precoUnit) || 0;
+      const ipiPct = Number(it.ipiPct) || 0;
+      const qtd = Number(it.qtd) || 0;
+      // IPI por fora: total da proposta = preço × qtd × (1 + IPI%)
+      const totalComIpi = precoUnit * qtd * (1 + ipiPct / 100);
+      // Cotações antigas podem não ter precoLiquido; fallback: líquido = bruto
+      const precoLiquido = Number(it.precoLiquido) || precoUnit;
+      allItems.get(key).cotacoes.push({
+        fornecedor: cot.fornecedor,
+        precoUnit,
+        precoLiquido,
+        ipiPct,
+        qtd,
+        unidade: it.unidade || "KG", // unidade salva na cotação (KG p/ aço)
+        total: totalComIpi,
+        totalLiquido: precoLiquido * qtd,
+        faturamento: cot.faturamento || "Cliente",
+        prazoEntrega: it.prazoEntrega || "",
+      });
     });
   });
   const mapaItems = Array.from(allItems.values());
@@ -294,10 +177,12 @@ export default function RmDetail({ params }) {
   const getWinner = (mi) => {
     const key = mi.item.toLowerCase().trim();
     if (overrides[key]) return overrides[key];
-    const precos = mi.cotacoes.filter((c) => c.precoUnit > 0);
-    if (precos.length === 0) return null;
-    precos.sort((a, b) => a.precoUnit - b.precoUnit);
-    return precos[0].fornecedor;
+    // Vencedor = menor preço líquido (que considera impostos quando Faturamento=Torg)
+    // Fornecedor que não cotou um item simplesmente não aparece aqui.
+    const elegiveis = mi.cotacoes.filter((c) => c.precoLiquido > 0);
+    if (elegiveis.length === 0) return null;
+    elegiveis.sort((a, b) => a.precoLiquido - b.precoLiquido);
+    return elegiveis[0].fornecedor;
   };
 
   const setWinner = (itemKey, fornecedor) => {
@@ -305,100 +190,35 @@ export default function RmDetail({ params }) {
   };
 
   // ─── MAPA DE COTAÇÃO ─────────────────────────────────────
-  // --- Parse PDF proposal into cotacao format ---
-  const parsePdfCotacao = async (anexo) => {
-    if (!window.pdfjsLib) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-        s.onload = resolve; s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
-    const pdfjsLib = window.pdfjsLib;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-    const base64 = anexo.dataUrl.split(",")[1];
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
-    let fullText = "";
-    for (let p = 1; p <= doc.numPages; p++) {
-      const page = await doc.getPage(p);
-      const content = await page.getTextContent();
-      fullText += content.items.map(x => x.str).join(" ") + "\n";
-    }
-    // Parse items from PDF text (Gerdau format and generic)
-    const items = [];
-    const regex = /(\d+)\s+(PF [IH] [\w,.]+|CANT [\d/X\.]+)\s+([A-Z0-9]+)\s+(\d+M)\s+FX[\d,]+T\s+([\d.,]+)\s+KG\s+[\d.,]+\s+KG\s+\d+\/\d+\/\d+\s+([\d.,]+)\s+BRL\/KG[\s\S]*?([\d.,]+)\s+BRL/g;
-    let m;
-    while ((m = regex.exec(fullText)) !== null) {
-      const qtdKg = parseFloat(m[5].replace(/\./g,"").replace(",","."));
-      const precoKg = parseFloat(m[6].replace(/\./g,"").replace(",","."));
-      const totalBrl = parseFloat(m[7].replace(/\./g,"").replace(",","."));
-      // Normalize description to match RM format
-      let desc = m[2].replace("PF I ", "PERFIL ").replace("PF H ", "PERFIL ").replace(",",".");
-      desc = desc.replace("CANT ", "CANTONEIRA ");
-      items.push({
-        item: desc,
-        precoUnit: precoKg,
-        qtd: qtdKg,
-        total: totalBrl,
-        prazoEntrega: "30/45/60 dias",
-        condicao: "CIF",
-        estoque: "",
-        _pdfOrigDesc: m[2],
-        _pdfMaterial: m[3],
-        _pdfComprimento: m[4],
-        _pdfQtdKg: qtdKg,
-        _pdfPrecoKg: precoKg,
-        _unidade: "KG",
-      });
-    }
-    return { fornecedor: anexo.fornecedor || "Fornecedor PDF", itens: items };
-  };
-
   const gerarMapa = async () => {
-    const hasCotacoes = rm.cotacoes && rm.cotacoes.length > 0;
-    const hasAnexosPdf = rm.anexos && rm.anexos.some(a => a.tipo === "pdf" && a.dataUrl);
-    if (!hasCotacoes && !hasAnexosPdf) return showToast("Suba pelo menos uma cota\u00e7\u00e3o (planilha ou PDF)", "error");
-    // Parse PDF annexos into cotacao format
-    const pdfCotacoes = [];
+    const cotacoesAtuais = rm.cotacoes || [];
+    if (cotacoesAtuais.length === 0) {
+      return showToast("Lance pelo menos uma cotação antes de gerar o mapa", "error");
+    }
+
+    // Alertas: itens da RM sem cobertura em alguma cotação
     const alertas = [];
-    if (hasAnexosPdf) {
-      for (const anexo of rm.anexos.filter(a => a.tipo === "pdf" && a.dataUrl)) {
-        try {
-          const parsed = await parsePdfCotacao(anexo);
-          pdfCotacoes.push(parsed);
-          // Check for alerts
-          const rmDescs = (rm.itens || []).map(it => (it.descricao || "").toUpperCase().trim().replace(/"/g, ""));
-          // Items in RM but not in PDF
-          rmDescs.forEach(rd => {
-            const found = parsed.itens.some(pi => rd.includes(pi.item.split(" ").slice(-1)[0]) || pi.item.toUpperCase().includes(rd.split(" ").slice(-1)[0]));
-            if (!found && rd) alertas.push({ tipo: "sem_cotacao", item: rd, msg: "Item sem cota\u00e7\u00e3o no PDF: " + rd });
+    const rmDescs = (rm.itens || []).map((it) => (it.descricao || "").toUpperCase().trim().replace(/"/g, ""));
+    cotacoesAtuais.forEach((cot) => {
+      const cotDescs = (cot.itens || []).map((it) => (it.item || it.descricao || "").toUpperCase().trim());
+      rmDescs.forEach((rd) => {
+        if (!rd) return;
+        const last = rd.split(" ").slice(-1)[0];
+        const found = cotDescs.some((cd) => cd.includes(last) || (last && cd.includes(last)));
+        if (!found) {
+          alertas.push({
+            tipo: "sem_cotacao",
+            item: rd,
+            msg: `${cot.fornecedor} não cotou: ${rd}`,
           });
-// Check length differences
-          parsed.itens.forEach(pi => {
-            if (pi._pdfComprimento) {
-              const rmItem = (rm.itens || []).find(it => {
-                const rd = (it.descricao || "").toUpperCase().replace(/"/g, "");
-                const pd = pi.item.toUpperCase();
-                return rd.includes(pd.split(" ").slice(-1)[0]) || pd.includes(rd.split(" ").slice(-1)[0]);
-              });
-              if (rmItem && rmItem.comprimento && rmItem.comprimento !== pi._pdfComprimento) {
-                alertas.push({ tipo: "comprimento", item: pi.item, msg: pi.item + " - comprimento RM: " + rmItem.comprimento + " vs Proposta: " + pi._pdfComprimento });
-              }
-            }
-          });
-        } catch (e) { showToast("Erro ao ler PDF: " + e.message, "error"); }
-      }
-    }
-    // Store PDF cotacoes merged with existing cotacoes
-    if (pdfCotacoes.length) {
-      updateRm({ cotacoes: [...(rm.cotacoes || []).filter(c => !pdfCotacoes.some(p => p.fornecedor === c.fornecedor)), ...pdfCotacoes], status: rm.status === "Aberta" || rm.status === "Em Cota\u00e7\u00e3o" ? "Cotada" : rm.status, mapaGerado: true });
-    } else {
-      updateRm({ status: "Cotada", mapaGerado: true });
-    }
+        }
+      });
+    });
+
+    updateRm({
+      status: rm.status === "Aberta" || rm.status === "Em Cotação" ? "Cotada" : rm.status,
+      mapaGerado: true,
+    });
     setAlertasEng(alertas);
     setShowMapa(true);
   };
@@ -476,20 +296,158 @@ export default function RmDetail({ params }) {
     for (const fornecedorNome of groups) { await criarPedidoOmie(fornecedorNome); }
   };
 
-  const handleExportOmie = async ({ categoria, localEstoque }) => {
+  const handleExportOmie = async ({ tipo, categoria, localEstoque }) => {
     setExportandoOmie(true);
     try {
-      const arquivos = await gerarPlanilhasOmie({
-        rm,
-        pedidosPorFornecedor,
-        fornecedores,
-        categoriaCompra: categoria,
-        localEstoque,
-      });
-      showToast(`${arquivos.length} planilha(s) Omie gerada(s)!`);
-      setShowExportOmie(false);
+      if (tipo === "xlsx") {
+        const arquivos = await gerarPlanilhasOmie({
+          rm,
+          pedidosPorFornecedor,
+          fornecedores,
+          categoriaCompra: categoria,
+          localEstoque,
+        });
+        showToast(`${arquivos.length} planilha(s) Omie gerada(s)!`);
+        setShowExportOmie(false);
+        return;
+      }
+
+      // tipo === "api": cria pedidos diretamente no Omie via API
+      // Pré-validação: todo fornecedor vencedor precisa de nCodOmie OU CNPJ
+      // (a API resolve pelo CNPJ via ConsultarCliente se nCodOmie não estiver)
+      const fornecedoresSemIdent = [];
+      for (const fornecedorNome of Object.keys(pedidosPorFornecedor)) {
+        const fornCad = fornecedores.find(
+          (f) => f.nome && f.nome.toLowerCase().trim() === fornecedorNome.toLowerCase().trim()
+        );
+        const temNCod = fornCad?.nCodOmie && String(fornCad.nCodOmie).trim();
+        const temCnpj = fornCad?.cnpj && String(fornCad.cnpj).replace(/\D/g, "").length >= 11;
+        if (!temNCod && !temCnpj) {
+          fornecedoresSemIdent.push(fornecedorNome);
+        }
+      }
+      if (fornecedoresSemIdent.length > 0) {
+        showToast(
+          `Cadastre CNPJ ou Código Omie em Fornecedores antes de enviar: ${fornecedoresSemIdent.join(", ")}`,
+          "error"
+        );
+        throw new Error("Fornecedores sem identificação");
+      }
+
+      // Cache de CNPJ → nCodFor dentro deste loop. Pode ajudar quando
+      // matriz/filial compartilham parte da resolução, mas o principal
+      // ganho é nos casos de retry.
+      const cnpjResolvidoMap = {};
+      // Helper pra espaçar chamadas (Omie tem rate limit "REDUNDANT" agressivo
+      // mesmo com payloads diferentes; 2s entre chamadas evita falso positivo)
+      const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+      const sucessos = [];
+      const falhas = [];
+      let primeiroLoop = true;
+      for (const fornecedorNome of Object.keys(pedidosPorFornecedor)) {
+        if (!primeiroLoop) await sleep(2000); // 2s de respiro entre fornecedores
+        primeiroLoop = false;
+        const group = pedidosPorFornecedor[fornecedorNome];
+        if (!group?.itens?.length) continue;
+        const fornCadastrado = fornecedores.find(
+          (f) => f.nome && f.nome.toLowerCase().trim() === fornecedorNome.toLowerCase().trim()
+        );
+        const cnpjFornecedor = fornCadastrado?.cnpj || "";
+        const cnpjLimpo = String(cnpjFornecedor).replace(/\D/g, "");
+        // Tenta cache do cadastro primeiro, depois cache do loop atual
+        const nCodFor =
+          Number(fornCadastrado?.nCodOmie) ||
+          (cnpjLimpo && cnpjResolvidoMap[cnpjLimpo]) ||
+          0;
+        const nQtdeParc = Number(fornCadastrado?.parcelas) || 1;
+        // Captura prazo de pagamento e tipoFrete da cotação correspondente
+        const cotacao = (rm.cotacoes || []).find((c) => c.fornecedor === fornecedorNome);
+        const prazoPagamento = cotacao?.prazoPagamento || "";
+        const opInfo = rm.op ? `OP-${rm.op}` : (rm.rmTekla || "");
+        const observacaoInterna = `Portal de Compras - RM-${rm.numero} - ${fornecedorNome}${rm.observacao ? " | " + rm.observacao : ""}`;
+
+        try {
+          const resp = await fetch("/api/omie/pedido-compra", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              itens: group.itens.map((it) => ({
+                codigo: it.codigo,
+                descricao: it.descricao || it.item,
+                unidade: it.unidade || "KG",
+                qtd: it.qtd,
+                precoUnit: it.precoUnit,
+                ipiPct: it.ipiPct || 0,
+              })),
+              nCodFor,
+              cnpjFornecedor,
+              cNumPedido: `RM-${rm.numero}`,
+              nQtdeParc,
+              cInfAdic: opInfo,
+              observacao: observacaoInterna,
+              cCodLocalEstoque: localEstoque,
+              cCodCateg: categoria,
+              cContaCorrente: "Inter",
+              prazoPagamento,
+            }),
+          });
+          const data = await resp.json();
+          // Cacheia o nCodFor resolvido SEMPRE que vier (mesmo em erro do
+          // IncluirPedCompra) — evita re-lookup nas retentativas e rate limit.
+          if (data.nCodFor_resolvido) {
+            // Cache no loop atual (pra próxima iteração com mesmo CNPJ)
+            if (cnpjLimpo) cnpjResolvidoMap[cnpjLimpo] = data.nCodFor_resolvido;
+            // Cache persistente no cadastro do fornecedor
+            if (fornCadastrado && !fornCadastrado.nCodOmie) {
+              setFornecedores((prev) =>
+                prev.map((f) =>
+                  f.id === fornCadastrado.id ? { ...f, nCodOmie: String(data.nCodFor_resolvido) } : f
+                )
+              );
+            }
+          }
+          if (resp.ok && data.success) {
+            sucessos.push({ fornecedor: fornecedorNome, numero: data.numero_pedido || data.codigo_pedido });
+            // Adiciona à lista de pedidos gerados (UI antiga)
+            setPedidosOmie((prev) => [
+              ...prev,
+              {
+                fornecedor: fornecedorNome,
+                total: group.total,
+                itensCount: group.itens.length,
+                codigoPedido: data.codigo_pedido,
+                numeroPedido: data.numero_pedido,
+                codigoIntegracao: data.codigo_pedido_integracao,
+                itens: group.itens,
+              },
+            ]);
+          } else {
+            falhas.push({ fornecedor: fornecedorNome, erro: data.error || "Falha desconhecida" });
+          }
+        } catch (e) {
+          falhas.push({ fornecedor: fornecedorNome, erro: e.message });
+        }
+      }
+
+      if (sucessos.length > 0) {
+        updateRm({ status: "Pedido Gerado" });
+        setShowPedidos(true);
+      }
+
+      if (falhas.length === 0) {
+        showToast(`✅ ${sucessos.length} pedido(s) criado(s) no Omie: ${sucessos.map((s) => s.numero).join(", ")}`);
+        setShowExportOmie(false);
+      } else if (sucessos.length === 0) {
+        showToast(`Nenhum pedido criado. Erros: ${falhas.map((f) => `${f.fornecedor}: ${f.erro}`).join(" | ")}`, "error");
+      } else {
+        showToast(
+          `${sucessos.length} criado(s), ${falhas.length} falharam: ${falhas.map((f) => `${f.fornecedor}: ${f.erro}`).join(" | ")}`,
+          "error"
+        );
+      }
     } catch (err) {
-      showToast(err.message || "Erro ao gerar planilhas Omie", "error");
+      showToast(err.message || "Erro ao processar Omie", "error");
       throw err;
     } finally {
       setExportandoOmie(false);
@@ -515,7 +473,10 @@ export default function RmDetail({ params }) {
         item: mi.item,
         descricao: mi.item,
         codigo: rmItem?.codigo || "",
-        unidade: rmItem?.unidade || "KG",
+        // Usa unidade da COTAÇÃO (KG quando aço/perfis), não da RM (que pode
+        // estar em barras/peças). Comprador vai pagar por kg, então pedido
+        // Omie tem que sair em kg também.
+        unidade: match.unidade || "KG",
         precoUnit: match.precoUnit,
         qtd: match.qtd,
         total: match.total,
@@ -531,6 +492,8 @@ export default function RmDetail({ params }) {
   
 
   // ─── CONTAGENS POR FORNECEDOR NO MAPA ───────────────────
+  // winnerStats: total dos itens em que cada fornecedor é o vencedor
+  // (= o que a Torg vai gastar com ele)
   const winnerStats = useMemo(() => {
     const stats = {};
     mapaItems.forEach((mi) => {
@@ -546,31 +509,62 @@ export default function RmDetail({ params }) {
     return stats;
   }, [mapaItems, overrides]);
 
+  // proposalStats: total de TODA a proposta original do fornecedor (= o que
+  // ele ofereceu no PDF, independente do quanto a Torg vai comprar). Usa
+  // qtdProposta quando salvo (qtd do PDF, pode ser maior/menor que a RM);
+  // fallback: qtd cotada × preço × (1 + IPI). Inclui IPI por fora.
+  const proposalStats = useMemo(() => {
+    const stats = {};
+    (rm.cotacoes || []).forEach((cot) => {
+      if (!stats[cot.fornecedor]) stats[cot.fornecedor] = { count: 0, total: 0 };
+      (cot.itens || []).forEach((it) => {
+        const precoUnit = Number(it.precoUnit) || 0;
+        const qtdRef = Number(it.qtdProposta) || Number(it.qtd) || 0;
+        const ipiPct = Number(it.ipiPct) || 0;
+        // Usa totalProposta salvo se disponível (ja inclui IPI); senao calcula
+        const linha = Number(it.totalProposta) || precoUnit * qtdRef * (1 + ipiPct / 100);
+        stats[cot.fornecedor].count++;
+        stats[cot.fornecedor].total += linha;
+      });
+    });
+    return stats;
+  }, [rm.cotacoes]);
+
   if (!loaded) return <div className="p-12 text-center text-gray-400">Carregando...</div>;
   if (!rmFound) {
     return (
       <div className="p-12 text-center">
         <div className="text-gray-500 text-lg">RM não encontrada</div>
-        <button onClick={() => router.push("/")} className="mt-4 text-blue-600 hover:underline">Voltar ao Painel</button>
+        <button onClick={() => router.push("/compras")} className="mt-4 text-blue-600 hover:underline">Voltar ao Painel</button>
       </div>
     );
   }
 
-  // ─── ENVIO DE COTAÇÃO (SIMULADO) ──────────────────────
+  // ─── ENVIO DE COTAÇÃO ─────────────────────────────────
   const toggleFornecedor = (fornId) => {
     setSelectedFornecedores((prev) =>
       prev.includes(fornId) ? prev.filter((id) => id !== fornId) : [...prev, fornId]
     );
   };
 
+  const parseEmailsLivres = (s) =>
+    (s || "")
+      .split(/[\s,;]+/)
+      .map((e) => e.trim())
+      .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+
   const enviarCotacao = () => {
-    if (!selectedFornecedores.length) return showToast("Selecione pelo menos um fornecedor", "error");
-    const destinatarios = selectedFornecedores.map(fornId => {
-      const forn = fornecedores.find(f => f.id === fornId);
-      return forn;
-    }).filter(f => f && f.email);
-    if (!destinatarios.length) return showToast("Nenhum fornecedor selecionado possui e-mail cadastrado", "error");
-    const emails = destinatarios.map(f => f.email).join(";");
+    const cadastrados = selectedFornecedores
+      .map((fornId) => fornecedores.find((f) => f.id === fornId))
+      .filter((f) => f && f.email);
+    const livres = parseEmailsLivres(emailsLivres);
+
+    if (cadastrados.length === 0 && livres.length === 0) {
+      return showToast("Selecione pelo menos um fornecedor cadastrado ou digite emails livres", "error");
+    }
+
+    // BCC garante que fornecedores nao se vejam.
+    const bccList = [...cadastrados.map((f) => f.email), ...livres].join(";");
     const assunto = encodeURIComponent("Solicitação de Cotação - RM " + (rm.numero || rm.id));
     const itensTexto = (rm.itens || []).map((it, i) =>
       (i + 1) + ". " + (it.descricao || "Item " + (i + 1)) + " - Qtd: " + (it.qtd || "-") + " " + (it.unidade || "un") + (it.material ? " - Material: " + it.material : "") + (it.comprimento ? " - Comp: " + it.comprimento : "")
@@ -587,28 +581,38 @@ export default function RmDetail({ params }) {
       "Por favor, enviar cotação com preços unitários, condições de pagamento e prazo de entrega.\n\n" +
       "Atenciosamente,\nTorg Metal"
     );
-    const mailUrl = "mailto:" + emails + "?subject=" + assunto + "&body=" + corpo;
+    const mailUrl = "mailto:?bcc=" + bccList + "&subject=" + assunto + "&body=" + corpo;
     const a = document.createElement("a");
     a.href = mailUrl;
     a.click();
-    const novosEnvios = selectedFornecedores.map(fornId => {
-      const forn = fornecedores.find(f => f.id === fornId);
-      return {
+
+    const novosEnvios = [
+      ...cadastrados.map((forn) => ({
         id: uid(),
-        fornecedorId: fornId,
+        fornecedorId: forn.id,
         fornecedorNome: forn.nome,
         fornecedorEmail: forn.email,
         data: today(),
         hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
         status: "Enviado",
-      };
-    });
+      })),
+      ...livres.map((email) => ({
+        id: uid(),
+        fornecedorId: null,
+        fornecedorNome: email,
+        fornecedorEmail: email,
+        data: today(),
+        hora: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        status: "Enviado",
+      })),
+    ];
     updateRm({
       envios: [...(rm.envios || []), ...novosEnvios],
       status: rm.status === "Aberta" ? "Em Cotação" : rm.status,
     });
     setSelectedFornecedores([]);
-    showToast("E-mail aberto para " + novosEnvios.length + " fornecedor(es)");
+    setEmailsLivres("");
+    showToast("E-mail aberto para " + novosEnvios.length + " destinatário(s) — em cópia oculta");
   };
 
   const gerarXlsxItens = async () => {
@@ -641,7 +645,7 @@ export default function RmDetail({ params }) {
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <button onClick={() => router.push("/")} className="text-gray-500 hover:text-gray-700 flex items-center gap-1 text-sm">
+        <button onClick={() => router.push("/compras")} className="text-gray-500 hover:text-gray-700 flex items-center gap-1 text-sm">
           <ArrowLeft size={16} /> Voltar
         </button>
         <h2 className="text-2xl font-bold text-gray-800">RM-{rm.numero}</h2>
@@ -654,7 +658,7 @@ export default function RmDetail({ params }) {
             if (window.confirm("Tem certeza que deseja excluir a RM-" + rm.numero + "? Esta ação não pode ser desfeita.")) {
               const rmNum = rm.numero;
               const rmId = rm.id;
-              router.push("/");
+              router.push("/compras");
               setTimeout(() => {
                 setRms((prev) => prev.filter((r) => r.id !== rmId));
                 showToast("RM-" + rmNum + " excluída com sucesso!");
@@ -678,6 +682,79 @@ export default function RmDetail({ params }) {
         <p className="mt-3 text-gray-700 font-medium">{rm.descricao}</p>
         {rm.observacao && <p className="mt-1 text-gray-500 text-sm">{rm.observacao}</p>}
         {rm.arquivoOrigem && <p className="mt-1 text-xs text-gray-400">Arquivo origem: {rm.arquivoOrigem}</p>}
+      </div>
+
+      {/* Configuração para pedido Omie */}
+      <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-6">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+          <h3 className="text-base font-semibold text-torg-dark flex items-center gap-2">
+            <ShoppingCart size={18} className="text-torg-blue" /> Configuração para pedido Omie
+          </h3>
+          {carregandoOmieOpts && (
+            <span className="text-xs text-torg-gray">Carregando opções do Omie...</span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Categoria de Compra</label>
+            {categoriasOpcoes.length > 0 ? (
+              <select
+                value={rm.categoriaCompra || ""}
+                onChange={(e) => updateRm({ categoriaCompra: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent bg-white"
+              >
+                <option value="">— Selecionar —</option>
+                {categoriasOpcoes.map((c) => (
+                  <option key={c.codigo} value={c.codigo}>
+                    {c.codigo} — {c.descricao}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={rm.categoriaCompra || ""}
+                onChange={(e) => updateRm({ categoriaCompra: e.target.value })}
+                placeholder="Ex: 3.1"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+                disabled={carregandoOmieOpts}
+              />
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Local de Estoque</label>
+            {locaisOpcoes.length > 0 ? (
+              <select
+                value={rm.localEstoque || ""}
+                onChange={(e) => updateRm({ localEstoque: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent bg-white"
+              >
+                <option value="">— Selecionar —</option>
+                {locaisOpcoes.map((l) => (
+                  <option
+                    key={l.nCodLocal || l.cCodLocal || l.cDescricao}
+                    value={l.cCodLocal || l.cDescricao}
+                  >
+                    {l.cDescricao}
+                    {l.cCodLocal ? ` (${l.cCodLocal})` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={rm.localEstoque || ""}
+                onChange={(e) => updateRm({ localEstoque: e.target.value })}
+                placeholder="Código ou descrição"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+                disabled={carregandoOmieOpts}
+              />
+            )}
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-torg-gray">
+          Definidos uma vez por RM e reaproveitados na criação dos pedidos no Omie.
+        </p>
       </div>
 
       {/* Itens da RM */}
@@ -728,21 +805,13 @@ export default function RmDetail({ params }) {
           </button>
         </div>
 
-        <div className="px-6 py-4">
-          {fornecedoresComEmail.length === 0 ? (
-            <div className="text-center py-6 text-gray-400">
-              <AlertCircle size={32} className="mx-auto mb-2" />
-              <p className="text-sm">Nenhum fornecedor cadastrado com e-mail.</p>
-              <button onClick={() => router.push("/fornecedores")} className="mt-2 text-sm text-blue-600 hover:underline">
-                Cadastrar fornecedores
-              </button>
-            </div>
-          ) : (
-            <>
+        <div className="px-6 py-4 space-y-5">
+          {fornecedoresComEmail.length > 0 && (
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                Selecione os fornecedores ({selectedFornecedores.length} selecionado{selectedFornecedores.length !== 1 ? "s" : ""})
+                Fornecedores cadastrados ({selectedFornecedores.length} selecionado{selectedFornecedores.length !== 1 ? "s" : ""})
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {fornecedoresComEmail.map((f) => {
                   const checked = selectedFornecedores.includes(f.id);
                   const jaEnviado = envios.some((e) => e.fornecedorId === f.id);
@@ -766,27 +835,42 @@ export default function RmDetail({ params }) {
                         <p className="text-xs text-gray-500 truncate">{f.email}</p>
                       </div>
                       {jaEnviado && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full whitespace-nowrap">Enviado</span>
+                        <span className="text-xs bg-torg-orange-100 text-torg-orange-700 px-2 py-0.5 rounded-full whitespace-nowrap">Enviado</span>
                       )}
                     </label>
                   );
                 })}
               </div>
-              <div className="flex justify-end">
-                <button
-                  onClick={enviarCotacao}
-                  disabled={selectedFornecedores.length === 0}
-                  className={`px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors ${
-                    selectedFornecedores.length > 0
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
-                >
-                  <Send size={18} /> Enviar Cotação ({selectedFornecedores.length})
-                </button>
-              </div>
-            </>
+            </div>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Outros emails (não cadastrados)
+            </label>
+            <textarea
+              value={emailsLivres}
+              onChange={(e) => setEmailsLivres(e.target.value)}
+              placeholder="email1@fornecedor.com, email2@outrofornecedor.com"
+              rows={2}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Separe por vírgula, ponto-e-vírgula ou quebra de linha.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-gray-100">
+            <p className="text-xs text-gray-500">
+              Os destinatários vão como <strong>cópia oculta (BCC)</strong> — fornecedores não verão uns aos outros.
+            </p>
+            <button
+              onClick={enviarCotacao}
+              className="px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <Send size={18} /> Enviar Cotação
+            </button>
+          </div>
         </div>
 
         {/* Histórico de envios */}
@@ -801,8 +885,8 @@ export default function RmDetail({ params }) {
               {envios.map((envio) => (
                 <div key={envio.id} className="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                      <CheckCircle2 size={16} className="text-green-600" />
+                    <div className="w-8 h-8 rounded-full bg-torg-orange-100 flex items-center justify-center">
+                      <CheckCircle2 size={16} className="text-torg-orange" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-800">{envio.fornecedorNome}</p>
@@ -820,50 +904,44 @@ export default function RmDetail({ params }) {
         )}
       </div>
 
-      {/* ─── UPLOAD DE PROPOSTAS ─────────────────────────── */}
+      {/* ─── INCLUIR COTAÇÕES ─────────────────────────── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-2">Incluir Propostas / Cotações</h3>
         <p className="text-sm text-gray-500 mb-4">
-          Suba planilhas (.xlsx/.csv) para leitura automática de preços, ou PDFs de propostas recebidas como anexo.
+          Use <strong>Lançar Cotação</strong> pra digitar os preços manualmente com impostos, disponibilidade e prazo.
+          A planilha é um atalho quando o fornecedor mandou um .xlsx simples.
         </p>
-        <div className="mb-4 max-w-md">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Fornecedor</label>
-          <input
-            type="text"
-            value={cotFornecedor}
-            onChange={(e) => setCotFornecedor(e.target.value)}
-            placeholder="Ex: Tintas Coral Ltda"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-              dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"
-            }`}
-            onClick={() => fileRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={handleDrop}
+        <div className="flex flex-wrap gap-3 items-stretch">
+          <button
+            onClick={() => router.push(`/compras/rm/${rm.id}/cotar`)}
+            className="flex-1 min-w-[240px] flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
           >
-            <FileSpreadsheet size={36} className="mx-auto text-green-500 mb-2" />
-            <p className="text-gray-600 font-medium text-sm">Planilha de Cotação</p>
-            <p className="text-gray-400 text-xs mt-1">.xlsx, .xls ou .csv — leitura automática</p>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
-          </div>
-          <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-              dragActivePdf ? "border-red-500 bg-red-50" : "border-gray-300 hover:border-red-400"
-            }`}
-            onClick={() => pdfRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragActivePdf(true); }}
-            onDragLeave={() => setDragActivePdf(false)}
-            onDrop={handleDropPdf}
-          >
-            <FileText size={36} className="mx-auto text-red-500 mb-2" />
-            <p className="text-gray-600 font-medium text-sm">Proposta em PDF</p>
-            <p className="text-gray-400 text-xs mt-1">.pdf — salvo como anexo</p>
-            <input ref={pdfRef} type="file" accept=".pdf,.doc,.docx,.jpg,.png" className="hidden" onChange={handlePdfUpload} />
+            <ShoppingCart size={18} /> Lançar Cotação (manual)
+          </button>
+          <div className="flex-1 min-w-[240px]">
+            <div className="mb-2">
+              <input
+                type="text"
+                value={cotFornecedor}
+                onChange={(e) => setCotFornecedor(e.target.value)}
+                placeholder="Nome do fornecedor (p/ upload)"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div
+              className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+                dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400"
+              }`}
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={handleDrop}
+            >
+              <FileSpreadsheet size={28} className="mx-auto text-torg-orange mb-1" />
+              <p className="text-gray-600 text-sm">Subir Planilha (.xlsx/.csv)</p>
+              <p className="text-gray-400 text-xs mt-0.5">sem impostos nem disponibilidade</p>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
+            </div>
           </div>
         </div>
       </div>
@@ -907,19 +985,19 @@ export default function RmDetail({ params }) {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center flex-wrap gap-3">
             <h3 className="text-lg font-semibold text-gray-800">
-              <FileSpreadsheet size={18} className="inline text-green-600 mr-1" />
+              <FileSpreadsheet size={18} className="inline text-torg-orange mr-1" />
               Cotações em Planilha ({cotacoes.length})
             </h3>
             {(cotacoes.length >= 1 || (rm.anexos && rm.anexos.length > 0)) && (
               <button
                 onClick={gerarMapa}
-                className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
+                className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
               >
                 <BarChart3 size={16} /> Gerar Mapa de Cotação
               </button>
             )}
               {showMapa && (
-                <button onClick={gerarXlsxMapa} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium">
+                <button onClick={gerarXlsxMapa} className="flex items-center gap-2 px-4 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium">
                   <Download size={16} /> Exportar Mapa (.xlsx)
                 </button>
               )}
@@ -946,7 +1024,7 @@ export default function RmDetail({ params }) {
                   <tr key={cot.id} className="hover:bg-gray-50">
                     <td className="px-6 py-3 font-medium text-gray-800">{cot.fornecedor}</td>
                     <td className="px-6 py-3 text-gray-600 flex items-center gap-1">
-                      <FileSpreadsheet size={14} className="text-green-600" /> {cot.nomeArquivo}
+                      <FileSpreadsheet size={14} className="text-torg-orange" /> {cot.nomeArquivo}
                     </td>
                     <td className="px-6 py-3 text-gray-600">{(cot.itens || []).length}</td>
                     <td className="px-6 py-3 font-semibold text-gray-800">{fmt(cot.total)}</td>
@@ -966,13 +1044,13 @@ export default function RmDetail({ params }) {
 
       {/* ═══════════ MAPA DE COTAÇÃO ═══════════ */}
       {showMapa && mapaItems.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border-2 border-purple-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-purple-100 bg-purple-50 flex justify-between items-start flex-wrap gap-3">
+        <div className="bg-white rounded-xl shadow-sm border-2 border-torg-blue-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-torg-blue-100 bg-torg-blue-50 flex justify-between items-start flex-wrap gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-purple-800 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
                 <BarChart3 size={20} /> Mapa de Cotação
               </h3>
-              <p className="text-sm text-purple-600 mt-1">
+              <p className="text-sm text-torg-blue mt-1">
                 O menor preço por item está destacado em verde. Clique em outro fornecedor para alterar a seleção.
               </p>
             </div>
@@ -995,36 +1073,16 @@ export default function RmDetail({ params }) {
                 </div>
               )}
 
-          {/* Resumo por fornecedor vencedor */}
-          <div className="px-6 py-4 bg-purple-50/50 border-b border-purple-100">
-            <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
-              <Award size={16} /> Resumo — Itens por Fornecedor Vencedor
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {Object.entries(winnerStats).map(([forn, stats]) => (
-                <div key={forn} className="bg-white rounded-lg border border-purple-200 px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800 text-sm">{forn}</p>
-                    <p className="text-xs text-gray-500">{stats.count} ite{stats.count === 1 ? "m" : "ns"}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-green-700 text-sm">{fmt(stats.total)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 pt-3 border-t border-purple-200 flex items-center justify-between text-sm">
-              <span className="text-purple-700 font-medium">
-                Total geral (menores preços): {fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}
-              </span>
-              <span className="text-xs text-purple-500">
-                {Object.keys(winnerStats).length} fornecedor{Object.keys(winnerStats).length !== 1 ? "es" : ""}
-              </span>
-            </div>
+          {/* Resumo no topo — só o número total que vai sair de pedido */}
+          <div className="px-6 py-3 bg-torg-blue-50 border-b border-torg-blue-100 flex items-center justify-between text-sm">
+            <span className="text-torg-blue font-medium flex items-center gap-2">
+              <Award size={16} /> Pedido total (vencedores): {Object.keys(winnerStats).length} fornecedor{Object.keys(winnerStats).length !== 1 ? "es" : ""}
+            </span>
+            <span className="font-bold text-torg-dark text-base">{fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}</span>
           </div>
 
           {omieResult && (
-            <div className={`p-3 rounded-lg text-sm ${omieResult.success ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+            <div className={`p-3 rounded-lg text-sm ${omieResult.success ? "bg-torg-orange-50 text-torg-orange-700 border border-torg-orange-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
               {omieResult.success
                 ? `Pedido criado com sucesso no Omie! C\u00f3digo: ${omieResult.numero_pedido || omieResult.codigo_pedido_integracao}`
                 : `Erro: ${omieResult.error}`}
@@ -1043,9 +1101,14 @@ export default function RmDetail({ params }) {
                   {cotacoes.map((cot) => (
                     <th key={cot.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" colSpan={4}>
                       {cot.fornecedor}
+                      {cot.faturamento && (
+                        <span className={`ml-2 inline-block text-[10px] px-1.5 py-0.5 rounded-full font-normal ${cot.faturamento === "Torg" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                          {cot.faturamento}
+                        </span>
+                      )}
                     </th>
                   ))}
-                  <th className="px-4 py-3 text-center text-xs font-medium text-purple-600 uppercase bg-purple-50">Vencedor</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-torg-blue uppercase bg-torg-blue-50">Vencedor</th>
                 </tr>
                 <tr className="bg-gray-50">
                   <th className="px-4 py-2 sticky left-0 bg-gray-50"></th>
@@ -1054,13 +1117,15 @@ export default function RmDetail({ params }) {
                   <th className="px-3 py-2 text-xs text-gray-400 text-center"></th>
                   {cotacoes.map((cot) => (
                     <Fragment key={cot.id + "-sub"}>
-                      <th className="px-3 py-2 text-xs text-gray-400 text-center">Preço Un.</th>
+                      <th className="px-3 py-2 text-xs text-gray-400 text-center" title={cot.faturamento === "Torg" ? "Líquido: considera créditos de ICMS/PIS/Cofins/IPI" : "Bruto: sem dedução de impostos"}>
+                        {cot.faturamento === "Torg" ? "Preço Líq." : "Preço Un."}
+                      </th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Qtd</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Cond. Pag.</th>
                       <th className="px-3 py-2 text-xs text-gray-400 text-center">Prazo</th>
                     </Fragment>
                   ))}
-                  <th className="px-3 py-2 text-xs text-purple-400 text-center bg-purple-50">Seleção</th>
+                  <th className="px-3 py-2 text-xs text-torg-blue/40 text-center bg-torg-blue-50">Seleção</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -1079,21 +1144,28 @@ export default function RmDetail({ params }) {
                         const match = mi.cotacoes.find((c) => c.fornecedor === cot.fornecedor);
                         const isLowest = match && match.precoUnit === menorPreco && match.precoUnit > 0;
                         const isWinner = match && cot.fornecedor === winner;
+                        const precoMostrar = match && temFaturamentoTorg && cot.faturamento === "Torg"
+                          ? match.precoLiquido
+                          : match?.precoUnit;
                         return (
                           <Fragment key={cot.id + "-" + idx}>
                             <td
                               className={`px-3 py-3 text-center font-semibold cursor-pointer transition-colors ${
                                 isWinner
-                                  ? "bg-green-50 text-green-700 ring-2 ring-inset ring-green-300"
+                                  ? "bg-torg-orange-50 text-torg-orange-700 ring-2 ring-inset ring-torg-orange-300"
                                   : isLowest
-                                  ? "bg-green-50/50 text-green-600"
+                                  ? "bg-torg-orange-50/50 text-torg-orange"
                                   : "text-gray-700 hover:bg-blue-50"
                               }`}
                               onClick={() => match && match.precoUnit > 0 && setWinner(itemKey, cot.fornecedor)}
-                              title={`Clique para selecionar ${cot.fornecedor} como vencedor`}
+                              title={
+                                match
+                                  ? `${cot.fornecedor}${temFaturamentoTorg && cot.faturamento === "Torg" ? ` (bruto ${fmt(match.precoUnit)})` : ""}`
+                                  : ""
+                              }
                             >
-                              {match ? fmt(match.precoUnit) : "—"}
-                              {isWinner && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
+                              {match && precoMostrar ? fmt(precoMostrar) : "—"}
+                              {isWinner && <CheckCircle2 size={12} className="inline ml-1 text-torg-orange" />}
                             </td>
                             <td className={`px-3 py-3 text-center text-xs ${match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm ? "bg-yellow-100 text-yellow-800 font-bold" : "text-gray-600"}`}>{match ? (match.qtd || "—") : "—"}{match && match.qtd && mi.qtdRm && parseFloat(match.qtd) !== mi.qtdRm && <AlertCircle size={12} className="inline ml-1 text-yellow-600" title={`Qtd RM: ${mi.qtdRm}`} />}</td>
                       <td className="px-3 py-3 text-center text-gray-600 text-xs">{match?.condicao || "—"}</td>
@@ -1101,7 +1173,7 @@ export default function RmDetail({ params }) {
                           </Fragment>
                         );
                       })}
-                      <td className="px-3 py-3 text-center bg-purple-50 text-xs font-semibold text-purple-700">
+                      <td className="px-3 py-3 text-center bg-torg-blue-50 text-xs font-semibold text-torg-blue">
                         {winner || "—"}
                       </td>
                     </tr>
@@ -1109,32 +1181,60 @@ export default function RmDetail({ params }) {
                 })}
               </tbody>
               <tfoot className="bg-gray-50 font-semibold">
-                <tr>
-                  <td className="px-4 py-3 text-gray-700 sticky left-0 bg-gray-50">TOTAL POR FORNECEDOR</td>
+                <tr className="border-t-2 border-gray-200">
+                  <td className="px-4 py-4 text-gray-700 sticky left-0 bg-gray-50 align-top">
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-gray-500 font-medium">Proposta</div>
+                        <div className="text-xs text-gray-400 font-normal">Valor total do PDF</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-torg-orange-700 font-medium">Vencedor</div>
+                        <div className="text-xs text-torg-orange font-normal">Itens vencidos × qtd RM</div>
+                      </div>
+                    </div>
+                  </td>
                   {cotacoes.map((cot) => {
-                    const minTotal = Math.min(...cotacoes.map((c) => c.total));
-                     const isBest = cot.total === minTotal;
+                    const propTotal = proposalStats[cot.fornecedor]?.total || 0;
+                    const propCount = proposalStats[cot.fornecedor]?.count || 0;
+                    const winTotal = winnerStats[cot.fornecedor]?.total || 0;
+                    const winCount = winnerStats[cot.fornecedor]?.count || 0;
+                    const propTotals = cotacoes.map((c) => proposalStats[c.fornecedor]?.total || 0).filter((t) => t > 0);
+                    const minProp = propTotals.length ? Math.min(...propTotals) : 0;
+                    const isBestProp = propTotal > 0 && propTotal === minProp;
                     return (
                       <Fragment key={cot.id + "-total"}>
-                        <td className={`px-3 py-3 text-center ${isBest ? "bg-green-50 text-green-700" : "text-gray-700"}`}>
-                          {fmt(cot.total)}
-                          {isBest && <CheckCircle2 size={12} className="inline ml-1 text-green-500" />}
+                        <td className="px-3 py-4 text-center align-top" colSpan={4}>
+                          <div className="space-y-2">
+                            <div className={`${isBestProp ? "text-torg-orange-700" : "text-gray-700"}`}>
+                              <div className="font-bold tabular-nums">{fmt(propTotal)}</div>
+                              <div className="text-[10px] font-normal text-gray-500">
+                                {propCount} ite{propCount === 1 ? "m" : "ns"} cotado{propCount === 1 ? "" : "s"}
+                                {isBestProp && <CheckCircle2 size={10} className="inline ml-1 text-torg-orange" />}
+                              </div>
+                            </div>
+                            <div className={`pt-2 border-t border-gray-200 ${winTotal > 0 ? "text-torg-orange-700" : "text-gray-300"}`}>
+                              <div className="font-bold tabular-nums">{winTotal > 0 ? fmt(winTotal) : "—"}</div>
+                              <div className="text-[10px] font-normal text-torg-orange">
+                                {winCount > 0 ? `${winCount} ite${winCount === 1 ? "m" : "ns"} vencido${winCount === 1 ? "" : "s"}` : "Nenhum vencedor"}
+                              </div>
+                            </div>
+                          </div>
                         </td>
-                        <td></td>
-                        <td></td>
                       </Fragment>
                     );
                   })}
-                  <td className="px-3 py-3 text-center bg-purple-50 text-purple-700 font-bold">
-                    {fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}
+                  <td className="px-3 py-4 text-center bg-torg-blue-100 text-torg-dark font-bold align-top">
+                    <div className="text-[10px] uppercase tracking-wide font-medium opacity-75">Total Pedido</div>
+                    <div className="text-base mt-1 tabular-nums">{fmt(Object.values(winnerStats).reduce((s, st) => s + st.total, 0))}</div>
                   </td>
                 </tr>
               </tfoot>
             </table>
           </div>
 
-          {/* Botão para gerar pedidos */}
-          <div className="px-6 py-4 bg-purple-50/50 border-t border-purple-100 flex flex-wrap justify-end gap-3">
+          {/* Botão único — abre modal com 2 opções: planilha ou API */}
+          <div className="px-6 py-4 bg-torg-blue-50/50 border-t border-torg-blue-100 flex flex-wrap justify-end gap-3">
             <button
               onClick={() => {
                 if (Object.keys(pedidosPorFornecedor).length === 0)
@@ -1142,119 +1242,76 @@ export default function RmDetail({ params }) {
                 setShowExportOmie(true);
               }}
               disabled={exportandoOmie}
-              className="px-6 py-2.5 bg-white border-2 border-emerald-600 text-emerald-700 rounded-lg hover:bg-emerald-50 font-medium flex items-center gap-2 disabled:opacity-50"
-              title="Gera planilhas no layout oficial Omie, 1 por fornecedor vencedor"
-            >
-              <FileSpreadsheet size={18} />
-              {exportandoOmie
-                ? "Gerando planilhas..."
-                : `Gerar Planilhas Omie (${Object.keys(pedidosPorFornecedor).length})`}
-            </button>
-            <button
-              onClick={criarTodosPedidosOmie}
-              disabled={criandoPedido}
-              className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-2"
+              className="px-6 py-2.5 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 font-medium flex items-center gap-2 disabled:opacity-50"
+              title="Cria 1 pedido por fornecedor vencedor — escolhe entre planilha (.xlsx) ou API direta"
             >
               <ShoppingCart size={18} />
-              {criandoPedido
-                ? "Criando no Omie..."
-                : `Criar Pedido no Omie (${Object.keys(pedidosPorFornecedor).length} fornecedor${Object.keys(pedidosPorFornecedor).length !== 1 ? "es" : ""})`}
+              {exportandoOmie
+                ? "Processando..."
+                : `Gerar Pedidos Omie (${Object.keys(pedidosPorFornecedor).length})`}
             </button>
           </div>
         </div>
       )}
 
-      {/* ═══════════ PEDIDOS GERADOS (SPLIT POR FORNECEDOR) ═══════════ */}
+      {/* ═══════════ PEDIDOS GERADOS ═══════════ */}
       {showPedidos && pedidosOmie.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <h3 className="text-lg font-semibold text-emerald-800 flex items-center gap-2">
-              <Truck size={20} /> Pedidos de Compra Gerados ({pedidosOmie.length})
+        <div className="bg-white rounded-xl shadow-sm border border-torg-orange-200 overflow-hidden">
+          <div className="px-5 py-3 border-b border-torg-orange-100 bg-torg-orange-50/60 flex items-center gap-2">
+            <Truck size={16} className="text-torg-orange" />
+            <h3 className="text-sm font-semibold text-torg-orange-700">
+              Pedidos gerados ({pedidosOmie.length})
             </h3>
           </div>
-
-          {pedidosOmie.map((pedido, pidx) => (
-            <div key={pidx} className="bg-white rounded-xl shadow-sm border-2 border-emerald-200 overflow-hidden">
-              {/* Header do pedido */}
-              <div
-                className="px-6 py-4 bg-emerald-50 flex justify-between items-center cursor-pointer"
-                onClick={() => setExpandedPedido(expandedPedido === pidx ? null : pidx)}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <Truck size={20} className="text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-emerald-800">{pedido.fornecedor}</p>
-                    <p className="text-sm text-emerald-600">{pedido.itensCount} ite{pedido.itensCount === 1 ? "m" : "ns"} — Total: {fmt(pedido.total)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">
-                    RM-{rm.numero}
-                  </span>
-                  {expandedPedido === pidx ? <ChevronUp size={20} className="text-emerald-600" /> : <ChevronDown size={20} className="text-emerald-600" />}
-                </div>
-              </div>
-
-              {/* Itens do pedido */}
-              {expandedPedido === pidx && (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço Unit.</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prazo</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cond. Pag.</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {pedido.itens.map((det, didx) => (
-                          <tr key={didx} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 text-gray-400">{det.ide.sequencia}</td>
-                            <td className="px-4 py-2 text-gray-800 font-medium">{det.produto.descricao}</td>
-                            <td className="px-4 py-2 text-right text-gray-700">{det.produto.quantidade}</td>
-                            <td className="px-4 py-2 text-right text-gray-700">{fmt(det.produto.valor_unitario)}</td>
-                            <td className="px-4 py-2 text-right font-semibold text-gray-800">{fmt(det.produto.valor_total)}</td>
-                            <td className="px-4 py-2 text-gray-600 text-xs">{det.observacao.split("|")[0].replace("Prazo:", "").trim()}</td>
-                            <td className="px-4 py-2 text-gray-600 text-xs">{det.observacao.split("|")[1]?.replace("Cond:", "").trim() || "—"}</td>
+          <ul className="divide-y divide-gray-100">
+            {pedidosOmie.map((pedido, pidx) => {
+              const expanded = expandedPedido === pidx;
+              return (
+                <li key={pidx}>
+                  <button
+                    onClick={() => setExpandedPedido(expanded ? null : pidx)}
+                    className="w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 text-left"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-sm font-medium text-torg-dark truncate">{pedido.fornecedor}</span>
+                      {pedido.numeroPedido && (
+                        <span className="text-xs font-mono text-torg-gray">#{pedido.numeroPedido}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="text-torg-gray">{pedido.itensCount} ite{pedido.itensCount === 1 ? "m" : "ns"}</span>
+                      <span className="font-semibold text-torg-orange-700 tabular-nums">{fmt(pedido.total)}</span>
+                      {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                    </div>
+                  </button>
+                  {expanded && (
+                    <div className="overflow-x-auto border-t border-gray-100 bg-gray-50/40">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-gray-500">
+                            <th className="px-4 py-2 text-left font-medium">Item</th>
+                            <th className="px-4 py-2 text-right font-medium">Qtd</th>
+                            <th className="px-4 py-2 text-right font-medium">Unit.</th>
+                            <th className="px-4 py-2 text-right font-medium">Total</th>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-gray-50">
-                        <tr>
-                          <td colSpan={4} className="px-4 py-2 text-right font-semibold text-gray-700">Total do Pedido:</td>
-                          <td className="px-4 py-2 text-right font-bold text-emerald-700">{fmt(pedido.total)}</td>
-                          <td colSpan={2}></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-
-                  {/* JSON Omie */}
-                  <div className="px-6 py-4 border-t border-gray-100">
-                    <details className="text-sm">
-                      <summary className="cursor-pointer text-emerald-600 hover:text-emerald-800 font-medium">
-                        Ver JSON para API Omie
-                      </summary>
-                      <pre className="mt-2 bg-gray-900 text-green-400 rounded-lg p-4 text-xs overflow-x-auto max-h-60">
-                        {JSON.stringify(pedido, null, 2)}
-                      </pre>
-                      <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
-                        <strong>Endpoint:</strong>{" "}
-                        <code className="bg-yellow-100 px-1 rounded">POST https://app.omie.com.br/api/v1/produtos/pedidocompra/</code>
-                      </div>
-                    </details>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {pedido.itens.map((det, didx) => (
+                            <tr key={didx}>
+                              <td className="px-4 py-1.5 text-gray-700">{det.produto.descricao}</td>
+                              <td className="px-4 py-1.5 text-right text-gray-700 tabular-nums">{det.produto.quantidade}</td>
+                              <td className="px-4 py-1.5 text-right text-gray-700 tabular-nums">{fmt(det.produto.valor_unitario)}</td>
+                              <td className="px-4 py-1.5 text-right font-medium text-gray-800 tabular-nums">{fmt(det.produto.valor_total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
@@ -1264,6 +1321,8 @@ export default function RmDetail({ params }) {
         pedidosPorFornecedor={pedidosPorFornecedor}
         loading={exportandoOmie}
         onConfirm={handleExportOmie}
+        defaultCategoria={rm.categoriaCompra || ""}
+        defaultLocalEstoque={rm.localEstoque || ""}
       />
     </div>
   );

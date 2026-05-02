@@ -8,24 +8,24 @@ import {
   AlertCircle, Edit3, PlusCircle,
 } from "lucide-react";
 
-const UNIDADES = ["UN", "KG", "LT", "M", "MÂ²", "CX", "PC", "GL", "TB", "RL", "PAR", "JG", "SC", "VB", "CJ", "PCT", "TON", "barra(s)"];
+const UNIDADES = ["UN", "KG", "LT", "M", "M²", "CX", "PC", "GL", "TB", "RL", "PAR", "JG", "SC", "VB", "CJ", "PCT", "TON", "barra(s)"];
 
 export default function NovaRm() {
   const { rms, setRms, showToast } = useStore();
   const router = useRouter();
   const fileRef = useRef(null);
 
-  // âââ Aba ativa: "manual" ou "importar" âââ
+  // ─── Aba ativa: "manual" ou "importar" ───
   const [tab, setTab] = useState("manual");
 
-  // âââ Estado comum âââ
+  // ─── Estado comum ───
   const [form, setForm] = useState({
     tipo: "Material",
     descricao: "",
     observacao: "",
     solicitante: "",
     centroCusto: "",
-    // Campos importaÃ§Ã£o:
+    // Campos importação:
     os: "",
     rmTekla: "",
     cliente: "",
@@ -38,7 +38,7 @@ export default function NovaRm() {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setBatch = (updates) => setForm((f) => ({ ...f, ...updates }));
 
-  // âââ Estado manual âââ
+  // ─── Estado manual ───
   const setItem = (i, k, v) => {
     const itens = [...form.itens];
     itens[i] = { ...itens[i], [k]: v };
@@ -47,14 +47,14 @@ export default function NovaRm() {
   const addItem = () => set("itens", [...form.itens, { descricao: "", qtd: 1, unidade: "UN" }]);
   const removeItemManual = (i) => set("itens", form.itens.filter((_, idx) => idx !== i));
 
-  // âââ Estado importaÃ§Ã£o âââ
+  // ─── Estado importação ───
   const [dragActive, setDragActive] = useState(false);
   const [nomeArquivo, setNomeArquivo] = useState("");
   const [itensImportados, setItensImportados] = useState([]);
   const [meta, setMeta] = useState(null);
   const [opExtraida, setOpExtraida] = useState("");
 
-  // âââ Extrai metadados do cabeÃ§alho Tekla âââ
+  // ─── Extrai metadados do cabeçalho Tekla ───
   const extractMeta = (rawRows) => {
     const meta = {};
     const totalRows = rawRows.length;
@@ -76,7 +76,7 @@ export default function NovaRm() {
           if (cell === "Obra:" && next) meta.obra = next;
           if (cell === "C. de Custo:" && next) meta.centroCusto = next;
           if (cell === "Finalidade:" && next) meta.finalidade = next;
-          if ((cell === "RevisÃ£o:" || cell === "Revisao:") && next) meta.revisao = next;
+          if ((cell === "Revisão:" || cell === "Revisao:") && next) meta.revisao = next;
           if (cell.toLowerCase().startsWith("requisitante:")) {
             meta.solicitante = cell.replace(/requisitante:\s*/i, "").trim();
           }
@@ -90,7 +90,7 @@ export default function NovaRm() {
       if (!row) continue;
       const first = String(row[0] ?? "").trim().toLowerCase();
       if (first.startsWith("observa")) {
-        const obsText = String(row[0] ?? "").replace(/observa[Ã§c][oÃµ]es:\s*/i, "").trim();
+        const obsText = String(row[0] ?? "").replace(/observa[çc][oõ]es:\s*/i, "").trim();
         if (obsText && obsText.toLowerCase() !== first) {
           meta.observacao = obsText;
         } else {
@@ -137,8 +137,8 @@ export default function NovaRm() {
         if (teklaInfo.obra) parts.push(teklaInfo.obra);
         if (teklaInfo.cliente) parts.push(teklaInfo.cliente);
         updates.descricao = parts.length > 0
-          ? `ImportaÃ§Ã£o ${parts.join(" â ")}`
-          : `ImportaÃ§Ã£o â ${file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")}`;
+          ? `Importação ${parts.join(" — ")}`
+          : `Importação — ${file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")}`;
 
         setBatch(updates);
 
@@ -174,16 +174,16 @@ export default function NovaRm() {
             return terms.every((t) => kl.includes(t));
           });
 
-          const descricao = String(row[find(["descri", "nome", "produto", "peÃ§a", "peca"])] || row[keys[0]] || "").trim();
-          const codigo = String(row[find(["codigo", "cÃ³digo", "cod"])] || "").trim();
+          const descricao = String(row[find(["descri", "nome", "produto", "peça", "peca"])] || row[keys[0]] || "").trim();
+          const codigo = String(row[find(["codigo", "código", "cod"])] || "").trim();
           const qtdRaw = String(row[find(["qtd", "quant", "quantidade", "qty"])] || "1");
           const qtd = parseFloat(qtdRaw.replace(/[^\d.,]/g, "").replace(",", ".")) || 1;
           const unidade = String(row[find(["unid", "und", "un", "uom"])] || "UN").trim();
           const comprimento = String(row[find(["comp", "length", "tamanho"])] || "").trim();
-          const material = String(row[find(["mat", "grade", "aÃ§o", "aco"])] || "").trim();
+          const material = String(row[find(["mat", "grade", "aço", "aco"])] || "").trim();
           const largura = String(row[find(["larg", "width"])] || "").trim();
           const tratamento = String(row[find(["tratamento", "treat", "acabamento"])] || "").trim();
-          const pesoLinearRaw = String(row[find(["peso/m", "peso linear", "peso/mÂ²"])] || "0");
+          const pesoLinearRaw = String(row[find(["peso/m", "peso linear", "peso/m²"])] || "0");
           const pesoLinear = parseFloat(pesoLinearRaw.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
           const pesoTotalKey = findExact(["peso", "total"]) || findExact(["peso", "kg"]);
           const pesoTotalRaw = String(row[pesoTotalKey] || "0");
@@ -219,9 +219,9 @@ export default function NovaRm() {
     });
   };
 
-  // âââ Salvar RM Manual âââ
+  // ─── Salvar RM Manual ───
   const salvarManual = () => {
-    if (!form.descricao.trim()) return showToast("Preencha a descriÃ§Ã£o da RM", "error");
+    if (!form.descricao.trim()) return showToast("Preencha a descrição da RM", "error");
     if (form.itens.some((it) => !it.descricao.trim())) return showToast("Preencha todos os itens", "error");
     const novaRm = {
       id: uid(),
@@ -239,12 +239,12 @@ export default function NovaRm() {
     };
     setRms((prev) => [novaRm, ...prev]);
     showToast("RM criada com sucesso!");
-    router.push(`/rm/${novaRm.id}`);
+    router.push(`/compras/rm/${novaRm.id}`);
   };
 
-  // âââ Criar RM Importada âââ
+  // ─── Criar RM Importada ───
   const criarRmImportada = () => {
-    if (!form.descricao.trim()) return showToast("Preencha a descriÃ§Ã£o da RM", "error");
+    if (!form.descricao.trim()) return showToast("Preencha a descrição da RM", "error");
     if (itensImportados.length === 0) return showToast("Importe um arquivo primeiro", "error");
     const novaRm = {
       id: uid(),
@@ -277,16 +277,19 @@ export default function NovaRm() {
     };
     setRms((prev) => [novaRm, ...prev]);
     showToast(`RM-${novaRm.numero} criada com ${itensImportados.length} itens importados!`);
-    router.push(`/rm/${novaRm.id}`);
+    router.push(`/compras/rm/${novaRm.id}`);
   };
 
   const pesoTotal = itensImportados.reduce((s, it) => s + (it.peso || 0), 0);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Nova RequisiÃ§Ã£o de Material</h2>
+      <div>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Nova Requisição de Material</h2>
+        <p className="text-sm text-torg-gray mt-1">Crie a RM manualmente ou suba a planilha de requisição.</p>
+      </div>
 
-      {/* âââ Tabs âââ */}
+      {/* ─── Tabs ─── */}
       <div className="flex border-b border-gray-200">
         <button
           onClick={() => setTab("manual")}
@@ -310,7 +313,7 @@ export default function NovaRm() {
         </button>
       </div>
 
-      {/* âââââââââââ ABA MANUAL âââââââââââ */}
+      {/* ═══════════ ABA MANUAL ═══════════ */}
       {tab === "manual" && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -319,7 +322,7 @@ export default function NovaRm() {
               <select value={form.tipo} onChange={(e) => set("tipo", e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option>Material</option>
-                <option>ConsumÃ­vel</option>
+                <option>Consumível</option>
               </select>
             </div>
             <div>
@@ -338,27 +341,27 @@ export default function NovaRm() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo</label>
               <input type="text" value={form.centroCusto} onChange={(e) => set("centroCusto", e.target.value)}
-                placeholder="Ex: Obra EdifÃ­cio Central"
+                placeholder="Ex: Obra Edifício Central"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">DescriÃ§Ã£o da RM</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição da RM</label>
             <input type="text" value={form.descricao} onChange={(e) => set("descricao", e.target.value)}
-              placeholder="Ex: Compra de tintas para obra EdifÃ­cio Central"
+              placeholder="Ex: Compra de tintas para obra Edifício Central"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ObservaÃ§Ã£o</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Observação</label>
             <textarea value={form.observacao} onChange={(e) => set("observacao", e.target.value)} rows={2}
-              placeholder="ObservaÃ§Ãµes adicionais..."
+              placeholder="Observações adicionais..."
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
 
           {/* Itens manuais */}
           <div>
             <div className="flex justify-between items-center mb-3">
-              <label className="text-sm font-medium text-gray-700">Itens da RequisiÃ§Ã£o</label>
+              <label className="text-sm font-medium text-gray-700">Itens da Requisição</label>
               <button onClick={addItem} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
                 <Plus size={16} /> Adicionar item
               </button>
@@ -368,7 +371,7 @@ export default function NovaRm() {
                 <div key={i} className="flex gap-3 items-start bg-gray-50 rounded-lg p-3">
                   <div className="flex-1">
                     <input type="text" value={it.descricao} onChange={(e) => setItem(i, "descricao", e.target.value)}
-                      placeholder="DescriÃ§Ã£o do item"
+                      placeholder="Descrição do item"
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                   </div>
                   <div className="w-24">
@@ -392,17 +395,17 @@ export default function NovaRm() {
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button onClick={() => router.push("/")} className="px-5 py-2.5 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+            <button onClick={() => router.push("/compras")} className="px-5 py-2.5 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
             <button onClick={salvarManual} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Criar RM</button>
           </div>
         </div>
       )}
 
-      {/* âââââââââââ ABA IMPORTAR âââââââââââ */}
+      {/* ═══════════ ABA IMPORTAR ═══════════ */}
       {tab === "importar" && (
         <div className="space-y-6">
           <p className="text-sm text-gray-500">
-            Suba a planilha de requisiÃ§Ã£o (.xlsx) para criar uma RM automaticamente com todos os itens.
+            Suba a planilha de requisição (.xlsx) para criar uma RM automaticamente com todos os itens.
           </p>
 
           {/* Upload */}
@@ -422,9 +425,9 @@ export default function NovaRm() {
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.tsv" className="hidden" onChange={handleFileUpload} />
             </div>
             {nomeArquivo && (
-              <div className="mt-3 flex items-center gap-2 text-sm text-green-700 bg-green-50 px-4 py-2 rounded-lg">
+              <div className="mt-3 flex items-center gap-2 text-sm text-torg-orange-700 bg-torg-orange-50 px-4 py-2 rounded-lg">
                 <CheckCircle2 size={16} />
-                <span>Arquivo carregado: <strong>{nomeArquivo}</strong> â {itensImportados.length} itens</span>
+                <span>Arquivo carregado: <strong>{nomeArquivo}</strong> — {itensImportados.length} itens</span>
               </div>
             )}
           </div>
@@ -444,7 +447,7 @@ export default function NovaRm() {
                     {meta.obra && <div><span className="text-orange-600 font-medium">Obra:</span><span className="ml-1 text-orange-900">{meta.obra}</span></div>}
                     {meta.finalidade && <div><span className="text-orange-600 font-medium">Finalidade:</span><span className="ml-1 text-orange-900">{meta.finalidade}</span></div>}
                     {meta.solicitante && <div><span className="text-orange-600 font-medium">Requisitante:</span><span className="ml-1 text-orange-900">{meta.solicitante}</span></div>}
-                    {meta.revisao && <div><span className="text-orange-600 font-medium">RevisÃ£o:</span><span className="ml-1 text-orange-900">{meta.revisao}</span></div>}
+                    {meta.revisao && <div><span className="text-orange-600 font-medium">Revisão:</span><span className="ml-1 text-orange-900">{meta.revisao}</span></div>}
                     {meta.centroCusto && <div><span className="text-orange-600 font-medium">C. Custo:</span><span className="ml-1 text-orange-900">{meta.centroCusto}</span></div>}
                   </div>
                   {meta.observacao && <p className="mt-2 text-xs text-orange-700 italic">Obs: {meta.observacao}</p>}
@@ -453,7 +456,7 @@ export default function NovaRm() {
 
               {/* Dados da RM */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-                <h3 className="text-lg font-semibold text-gray-800">Dados da RM</h3>
+                <h3 className="text-lg font-semibold text-torg-dark">Dados da RM</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">OS / OP</label>
@@ -470,7 +473,7 @@ export default function NovaRm() {
                     <select value={form.tipo} onChange={(e) => set("tipo", e.target.value)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                       <option>Material</option>
-                      <option>ConsumÃ­vel</option>
+                      <option>Consumível</option>
                     </select>
                   </div>
                 </div>
@@ -487,9 +490,9 @@ export default function NovaRm() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">DescriÃ§Ã£o da RM</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descrição da RM</label>
                   <input type="text" value={form.descricao} onChange={(e) => set("descricao", e.target.value)}
-                    placeholder="Ex: Estrutura metÃ¡lica â GalpÃ£o Industrial"
+                    placeholder="Ex: Estrutura metálica — Galpão Industrial"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -500,12 +503,12 @@ export default function NovaRm() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo</label>
-                    <input type="text" value={form.centroCusto} onChange={(e) => set("centroCusto", e.target.value)} placeholder="Ex: Obra GalpÃ£o Central"
+                    <input type="text" value={form.centroCusto} onChange={(e) => set("centroCusto", e.target.value)} placeholder="Ex: Obra Galpão Central"
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ObservaÃ§Ã£o</label>
-                    <input type="text" value={form.observacao} onChange={(e) => set("observacao", e.target.value)} placeholder="ObservaÃ§Ãµes..."
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Observação</label>
+                    <input type="text" value={form.observacao} onChange={(e) => set("observacao", e.target.value)} placeholder="Observações..."
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                   </div>
                 </div>
@@ -514,7 +517,7 @@ export default function NovaRm() {
               {/* Tabela de itens importados */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center flex-wrap gap-2">
-                  <h3 className="text-lg font-semibold text-gray-800">Itens Importados ({itensImportados.length})</h3>
+                  <h3 className="text-lg font-semibold text-torg-dark">Itens Importados ({itensImportados.length})</h3>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
                     <span>Peso total: <strong className="text-gray-800">{pesoTotal.toFixed(2)} kg</strong></span>
                     <span className="text-xs text-gray-400">Origem: {nomeArquivo}</span>
@@ -525,9 +528,9 @@ export default function NovaRm() {
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-8">#</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">DescriÃ§Ã£o</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          <span className="flex items-center gap-1">CÃ³d. Omie <Edit3 size={10} className="text-blue-400" /></span>
+                          <span className="flex items-center gap-1">Cód. Omie <Edit3 size={10} className="text-blue-400" /></span>
                         </th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
                         <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
@@ -545,9 +548,9 @@ export default function NovaRm() {
                           <td className="px-3 py-2 text-gray-800 font-medium">{it.descricao}</td>
                           <td className="px-3 py-2">
                             <input type="text" value={it.codigo} onChange={(e) => updateImportItem(i, "codigo", e.target.value)}
-                              placeholder="â" className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-400" />
+                              placeholder="—" className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:border-blue-400" />
                           </td>
-                          <td className="px-3 py-2 text-gray-600 text-xs">{it.material || "â"}</td>
+                          <td className="px-3 py-2 text-gray-600 text-xs">{it.material || "—"}</td>
                           <td className="px-3 py-2 text-right">
                             <input type="number" value={it.qtd} min={0.01} step={0.01} onChange={(e) => updateImportItem(i, "qtd", parseFloat(e.target.value) || 0)}
                               className="w-20 border border-gray-200 rounded px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500" />
@@ -558,9 +561,9 @@ export default function NovaRm() {
                               {UNIDADES.map((u) => <option key={u}>{u}</option>)}
                             </select>
                           </td>
-                          <td className="px-3 py-2 text-gray-500 text-xs">{it.comprimento || "â"}</td>
-                          <td className="px-3 py-2 text-right text-gray-500">{it.pesoLinear > 0 ? it.pesoLinear.toFixed(2) : "â"}</td>
-                          <td className="px-3 py-2 text-right text-gray-700 font-medium">{it.peso > 0 ? it.peso.toFixed(2) : "â"}</td>
+                          <td className="px-3 py-2 text-gray-500 text-xs">{it.comprimento || "—"}</td>
+                          <td className="px-3 py-2 text-right text-gray-500">{it.pesoLinear > 0 ? it.pesoLinear.toFixed(2) : "—"}</td>
+                          <td className="px-3 py-2 text-right text-gray-700 font-medium">{it.peso > 0 ? it.peso.toFixed(2) : "—"}</td>
                           <td className="px-3 py-2">
                             <button onClick={() => removeImportItem(i)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
                           </td>
@@ -574,7 +577,7 @@ export default function NovaRm() {
                 </div>
               </div>
 
-              {/* BotÃ£o Criar RM */}
+              {/* Botão Criar RM */}
               <div className="flex justify-end gap-3">
                 <button onClick={() => { setItensImportados([]); setNomeArquivo(""); setMeta(null); }}
                   className="px-5 py-2.5 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
@@ -589,7 +592,7 @@ export default function NovaRm() {
           {itensImportados.length === 0 && !nomeArquivo && (
             <div className="text-center py-8 text-gray-400">
               <AlertCircle size={40} className="mx-auto mb-3" />
-              <p>Suba o arquivo para prÃ©-visualizar os itens antes de criar a RM.</p>
+              <p>Suba o arquivo para pré-visualizar os itens antes de criar a RM.</p>
             </div>
           )}
         </div>
