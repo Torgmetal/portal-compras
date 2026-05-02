@@ -71,7 +71,10 @@ export async function POST(req, { params }) {
 
         const isFD =
           rmItem.opItem?.faturamentoDireto || rmItem.aditivoItem?.faturamentoDireto || false;
-        const codigoOmieItem = rmItem.opItem?.codigoOmie || rmItem.aditivoItem?.codigoOmie || null;
+        // Prioridade: codigo do RMItem (vem do xlsx do Tekla, mais especifico) >
+        // codigo do OPItem/AditivoItem (cadastrado pelo Comercial) > produto generico
+        const codigoOmieItem =
+          rmItem.codigo || rmItem.opItem?.codigoOmie || rmItem.aditivoItem?.codigoOmie || null;
         const chave = `${cot.id}|${isFD ? "FD" : "NORMAL"}`;
 
         if (!grupos.has(chave)) {
