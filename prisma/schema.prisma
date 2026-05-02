@@ -299,6 +299,37 @@ enum RMItemStatus {
   CANCELADO       // decisao de nao comprar (com motivo)
 }
 
+// Pedido de compra gerado no Omie. Cada pedido representa 1 fornecedor
+// vencedor de N itens da OP (agrupamento de RMItens por cotacao).
+model PedidoOmie {
+  id                String   @id @default(cuid())
+  cotacaoId         String?
+  cotacao           Cotacao? @relation(fields: [cotacaoId], references: [id])
+
+  fornecedorNome    String
+  nCodFor           String?  // codigo do fornecedor no Omie
+  cnpj              String?
+
+  codigoPedido      String?  // codigo_pedido retornado pelo Omie
+  numeroPedido      String?  // numero_pedido (mais legivel)
+  total             Float    @default(0)
+  faturamentoDireto Boolean  @default(false)
+  status            String   @default("CRIADO")  // CRIADO | ERRO
+
+  observacao        String?
+  erroOmie          String?
+  payload           Json?    // payload enviado (auditoria)
+  resposta          Json?    // resposta do Omie
+
+  createdById       String?
+  createdAt         DateTime @default(now())
+
+  rmItens           RMItem[]
+
+  @@index([cotacaoId])
+  @@index([status])
+}
+
 model RMItem {
   id          String  @id @default(cuid())
   rmId        String
@@ -318,6 +349,10 @@ model RMItem {
   canceladoMotivo String?
   canceladoEm     DateTime?
 
+  // Quando o item vira pedido, vincula o pedido Omie aqui
+  pedidoOmieId String?
+  pedidoOmie   PedidoOmie? @relation(fields: [pedidoOmieId], references: [id])
+
   // Detalhe (do Tekla quando importado)
   material    String?
   comprimento String?
@@ -333,6 +368,7 @@ model RMItem {
   @@index([opItemId])
   @@index([aditivoItemId])
   @@index([status])
+  @@index([pedidoOmieId])
 }
 
 // ─── COTAÇÕES ───────────────────────────────────────────────
@@ -373,6 +409,7 @@ model Cotacao {
 
   itens           CotacaoItem[]
   anexos          Anexo[]
+  pedidosOmie     PedidoOmie[]
 
   @@index([rmId])
   @@index([status])

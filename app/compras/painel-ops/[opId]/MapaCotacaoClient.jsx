@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2 } from "lucide-react";
+import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2, X, XCircle } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
 const fmtMoeda = (v) =>
@@ -26,6 +26,25 @@ export default function MapaCotacaoClient({ op }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const [resultadosPedidos, setResultadosPedidos] = useState(null);
+
+  const gerarPedidos = async () => {
+    if (fornecedoresVencedores.length === 0) return;
+    setLoading("gerar");
+    setErro("");
+    try {
+      const res = await fetch(`/api/op/${op.id}/gerar-pedidos`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setResultadosPedidos(data.resultados || []);
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -107,6 +126,7 @@ export default function MapaCotacaoClient({ op }) {
   const itensSemVencedor = itens.filter((it) => !it.celulas.some((c) => c?.vencedor));
 
   return (
+    <>
     <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 overflow-hidden">
       <div className="px-6 py-4 border-b border-torg-blue-100 flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -331,12 +351,105 @@ export default function MapaCotacaoClient({ op }) {
           {fornecedoresVencedores.length > 0 && ` · ${fornecedoresVencedores.length} pedido${fornecedoresVencedores.length !== 1 ? "s" : ""} a gerar`}
         </p>
         <button
-          disabled
-          className="px-4 py-2 bg-torg-dark/40 text-white text-sm font-medium rounded-lg inline-flex items-center gap-2 cursor-not-allowed"
-          title="Em construção — vai gerar os pedidos no Omie agrupando por fornecedor vencedor"
+          onClick={gerarPedidos}
+          disabled={loading === "gerar" || fornecedoresVencedores.length === 0}
+          className="px-4 py-2 bg-torg-orange text-white text-sm font-medium rounded-lg hover:bg-torg-orange-600 inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+          title={fornecedoresVencedores.length === 0 ? "Marque vencedores antes de gerar" : "Cria os pedidos no Omie"}
         >
-          <Truck size={16} /> Gerar Pedidos Omie (em breve)
+          {loading === "gerar" ? <Loader2 size={16} className="animate-spin" /> : <Truck size={16} />}
+          {loading === "gerar" ? "Gerando..." : "Gerar Pedidos Omie"}
         </button>
+      </div>
+    </div>
+
+    {resultadosPedidos && (
+      <ModalResultados resultados={resultadosPedidos} onClose={() => setResultadosPedidos(null)} />
+    )}
+    </>
+  );
+}
+
+function ModalResultados({ resultados, onClose }) {
+  const sucesso = resultados.filter((r) => r.sucesso);
+  const erros = resultados.filter((r) => !r.sucesso);
+  const totalSucesso = sucesso.reduce((s, r) => s + r.total, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+          <h3 className="text-lg font-semibold text-torg-dark">Pedidos Omie gerados</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-torg-orange-50 rounded-lg p-3">
+              <p className="text-xs text-torg-gray">Sucesso</p>
+              <p className="text-xl font-extrabold text-torg-orange-700">{sucesso.length}</p>
+            </div>
+            <div className="bg-red-50 rounded-lg p-3">
+              <p className="text-xs text-torg-gray">Erro</p>
+              <p className="text-xl font-extrabold text-red-700">{erros.length}</p>
+            </div>
+            <div className="bg-torg-blue-50 rounded-lg p-3">
+              <p className="text-xs text-torg-gray">Total enviado</p>
+              <p className="text-xl font-extrabold text-torg-blue tabular-nums">{fmtMoeda(totalSucesso)}</p>
+            </div>
+          </div>
+
+          <ul className="space-y-2">
+            {resultados.map((r, i) => (
+              <li
+                key={i}
+                className={`p-3 rounded-lg border ${
+                  r.sucesso ? "border-torg-orange-200 bg-torg-orange-50/50" : "border-red-200 bg-red-50"
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  {r.sucesso ? (
+                    <CheckCircle2 size={18} className="text-torg-orange-700 mt-0.5 flex-shrink-0" />
+                  ) : (
+                    <XCircle size={18} className="text-red-600 mt-0.5 flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <p className="font-semibold text-torg-dark">
+                        {r.fornecedor}
+                        {r.isFD && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-torg-orange-100 text-torg-orange-700 font-medium">FAT. DIRETO</span>}
+                      </p>
+                      <p className="text-sm font-bold tabular-nums">{fmtMoeda(r.total)}</p>
+                    </div>
+                    <p className="text-xs text-torg-gray mt-0.5">
+                      {r.itens} ite{r.itens === 1 ? "m" : "ns"}
+                      {r.numeroPedido && ` · pedido #${r.numeroPedido}`}
+                      {r.codigoPedido && !r.numeroPedido && ` · cód ${r.codigoPedido}`}
+                    </p>
+                    {r.erro && (
+                      <p className="text-xs text-red-700 mt-1 font-mono break-words">{r.erro}</p>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {erros.length > 0 && (
+            <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg p-3 text-xs text-torg-dark">
+              <p className="font-medium">{erros.length} pedido{erros.length !== 1 ? "s" : ""} com erro</p>
+              <p className="text-torg-gray mt-1">
+                Os itens dos pedidos com sucesso já foram marcados como Pedido Gerado. Os pedidos com erro
+                deixaram os itens disponíveis pra você ajustar e tentar gerar novamente.
+              </p>
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <button onClick={onClose} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium">
+            Fechar
+          </button>
+        </div>
       </div>
     </div>
   );
