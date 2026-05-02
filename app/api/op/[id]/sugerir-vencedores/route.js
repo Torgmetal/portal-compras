@@ -20,7 +20,7 @@ export async function POST(req, { params }) {
           cotacoes: {
             where: { status: "RECEBIDA" },
             include: {
-              itens: { select: { id: true, rmItemId: true, precoUnit: true } },
+              itens: { select: { id: true, rmItemId: true, precoUnit: true, icmsPct: true, ipiPct: true } },
             },
           },
         },
@@ -34,10 +34,16 @@ export async function POST(req, { params }) {
   for (const rm of op.rms) {
     for (const rmItem of rm.itens) {
       let melhor = null;
+      let melhorLiquido = null;
       for (const cot of rm.cotacoes) {
         const ci = cot.itens.find((i) => i.rmItemId === rmItem.id && i.precoUnit > 0);
         if (!ci) continue;
-        if (!melhor || ci.precoUnit < melhor.precoUnit) {
+        const icms = Number(ci.icmsPct) || 0;
+        const ipi = Number(ci.ipiPct) || 0;
+        // Compara pelo líquido (custo Torg) — ICMS por dentro + IPI por fora
+        const liquido = ci.precoUnit * (1 - icms / 100) * (1 + ipi / 100);
+        if (melhorLiquido === null || liquido < melhorLiquido) {
+          melhorLiquido = liquido;
           melhor = ci;
         }
       }

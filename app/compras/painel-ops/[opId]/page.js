@@ -30,7 +30,12 @@ export default async function PainelOPDetalhe({ params }) {
           },
           cotacoes: {
             include: {
-              itens: { select: { id: true, rmItemId: true, precoUnit: true, qtdCotada: true, vencedor: true, observacao: true } },
+              itens: {
+                select: {
+                  id: true, rmItemId: true, precoUnit: true, qtdCotada: true,
+                  icmsPct: true, ipiPct: true, vencedor: true, observacao: true,
+                },
+              },
             },
             orderBy: { createdAt: "asc" },
           },

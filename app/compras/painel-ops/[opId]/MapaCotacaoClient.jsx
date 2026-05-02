@@ -106,6 +106,8 @@ export default function MapaCotacaoClient({ op }) {
   }
 
   // Total por fornecedor (soma dos itens vencidos) + lista de itens vencidos
+  // Usa preço líquido (já considera ICMS por dentro + IPI por fora) pra
+  // comparação justa entre fornecedores de regimes diferentes.
   const totaisPorFornecedor = {};
   const itensPorFornecedor = {};
   for (const f of fornecedores) {
@@ -115,13 +117,16 @@ export default function MapaCotacaoClient({ op }) {
   for (const it of itens) {
     for (const cell of it.celulas) {
       if (cell?.vencedor) {
-        const valor = (cell.precoUnit || 0) * (cell.qtdCotada || 0);
+        const valor = (cell.precoLiquido || cell.precoUnit || 0) * (cell.qtdCotada || 0);
         totaisPorFornecedor[cell.cotacaoId] += valor;
         itensPorFornecedor[cell.cotacaoId].push({
           descricao: it.descricao,
           qtd: cell.qtdCotada,
           unidade: it.unidade,
           precoUnit: cell.precoUnit,
+          precoLiquido: cell.precoLiquido,
+          icmsPct: cell.icmsPct,
+          ipiPct: cell.ipiPct,
           total: valor,
         });
       }
@@ -218,8 +223,13 @@ export default function MapaCotacaoClient({ op }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {itens.map((it) => {
-              const precos = it.celulas.filter(Boolean).map((c) => c.precoUnit).filter((p) => p > 0);
-              const menorPreco = precos.length ? Math.min(...precos) : null;
+              // Compara pelo líquido pra ser justo entre regimes diferentes.
+              // Cai pro bruto quando líquido não calculado (sem ICMS/IPI).
+              const liquidos = it.celulas
+                .filter(Boolean)
+                .map((c) => c.precoLiquido || c.precoUnit)
+                .filter((p) => p > 0);
+              const menorLiquido = liquidos.length ? Math.min(...liquidos) : null;
               return (
                 <tr key={it.rmItemId} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-xs font-mono text-torg-blue sticky left-0 bg-white">{it.rmNumero}</td>
@@ -239,9 +249,11 @@ export default function MapaCotacaoClient({ op }) {
                         </td>
                       );
                     }
-                    const isMenor = cell.precoUnit === menorPreco;
+                    const liquido = cell.precoLiquido || cell.precoUnit;
+                    const isMenor = liquido === menorLiquido;
                     const isVencedor = cell.vencedor;
-                    const total = cell.precoUnit * cell.qtdCotada;
+                    const totalLiquido = liquido * cell.qtdCotada;
+                    const temImposto = cell.icmsPct > 0 || cell.ipiPct > 0;
                     return (
                       <td
                         key={f.cotacaoId}
@@ -253,13 +265,27 @@ export default function MapaCotacaoClient({ op }) {
                             : "hover:bg-gray-50"
                         }`}
                         onClick={() => !loading && marcarVencedor(cell.id, isVencedor)}
+                        title={
+                          temImposto
+                            ? `Bruto ${fmtMoeda(cell.precoUnit)} | ICMS ${cell.icmsPct}% | IPI ${cell.ipiPct}% | Líquido ${fmtMoeda(liquido)}`
+                            : `Preço bruto ${fmtMoeda(cell.precoUnit)}`
+                        }
                       >
                         <div className={`text-sm font-medium tabular-nums ${isVencedor ? "text-torg-orange-700" : isMenor ? "text-torg-orange-700" : "text-torg-dark"}`}>
-                          {fmtMoeda(cell.precoUnit)}
+                          {fmtMoeda(liquido)}
                         </div>
-                        <div className="text-[10px] text-torg-gray tabular-nums">
-                          total {fmtMoeda(total)}
+                        <div className="text-[10px] text-torg-gray tabular-nums leading-tight">
+                          {temImposto ? (
+                            <>bruto {fmtMoeda(cell.precoUnit)}</>
+                          ) : (
+                            <>total {fmtMoeda(totalLiquido)}</>
+                          )}
                         </div>
+                        {temImposto && (
+                          <div className="text-[9px] text-torg-gray tabular-nums leading-tight">
+                            ICMS {cell.icmsPct}% · IPI {cell.ipiPct}%
+                          </div>
+                        )}
                         {isVencedor && (
                           <Award size={12} className="inline text-torg-orange-700 mt-0.5" />
                         )}
@@ -710,10 +736,17 @@ function buildMatriz(op) {
             celulas: [],
           });
         }
+        const icms = Number(ci.icmsPct) || 0;
+        const ipi = Number(ci.ipiPct) || 0;
+        // Preço líquido (custo Torg): ICMS por dentro (subtrai) + IPI por fora (soma)
+        const precoLiquido = ci.precoUnit * (1 - icms / 100) * (1 + ipi / 100);
         itensMap.get(ci.rmItemId).celulas.push({
           id: ci.id,
           cotacaoId: cot.id,
           precoUnit: ci.precoUnit,
+          precoLiquido,
+          icmsPct: icms,
+          ipiPct: ipi,
           qtdCotada: ci.qtdCotada,
           vencedor: ci.vencedor,
         });

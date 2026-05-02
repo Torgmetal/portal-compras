@@ -7,6 +7,8 @@ const itemSchema = z.object({
   cotacaoItemId: z.string().min(1),
   precoUnit: z.number().min(0),
   qtdCotada: z.number().min(0),
+  icmsPct: z.number().min(0).optional().nullable(),
+  ipiPct: z.number().min(0).optional().nullable(),
   observacao: z.string().optional().nullable(),
 });
 
@@ -76,6 +78,8 @@ export async function POST(req, { params }) {
         data: {
           precoUnit: it.precoUnit,
           qtdCotada: it.qtdCotada,
+          icmsPct: it.icmsPct ?? null,
+          ipiPct: it.ipiPct ?? null,
           observacao: it.observacao || null,
         },
       });

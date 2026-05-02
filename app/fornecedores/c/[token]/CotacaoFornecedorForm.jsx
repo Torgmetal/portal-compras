@@ -45,6 +45,8 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
         // Pre-popula com valores ja enviados se existirem
         precoUnit: it.precoUnit > 0 ? String(it.precoUnit) : "",
         qtdCotada: it.qtdCotada > 0 ? it.qtdCotada : (usaKg ? peso : it.qtdCotada),
+        icmsPct: it.icmsPct != null ? String(it.icmsPct) : "",
+        ipiPct: it.ipiPct != null ? String(it.ipiPct) : "",
         observacao: it.observacao || "",
       };
     })
@@ -62,12 +64,28 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
     setLinhas((prev) => prev.map((l) => (l.id === id ? { ...l, [k]: v } : l)));
   };
 
+  // Total bruto: soma de preço × qtd de cada linha
   const total = useMemo(
     () =>
       linhas.reduce((s, l) => {
         const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
         const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
         return s + p * q;
+      }, 0),
+    [linhas]
+  );
+
+  // Total líquido: ICMS por dentro (subtrai), IPI por fora (soma)
+  // Fórmula: bruto × (1 − icms/100) × (1 + ipi/100)
+  const totalLiquido = useMemo(
+    () =>
+      linhas.reduce((s, l) => {
+        const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
+        const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
+        const icms = parseFloat(String(l.icmsPct).replace(",", ".")) || 0;
+        const ipi = parseFloat(String(l.ipiPct).replace(",", ".")) || 0;
+        const bruto = p * q;
+        return s + bruto * (1 - icms / 100) * (1 + ipi / 100);
       }, 0),
     [linhas]
   );
@@ -80,6 +98,8 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
         cotacaoItemId: l.id,
         precoUnit: parseFloat(String(l.precoUnit).replace(",", ".")) || 0,
         qtdCotada: parseFloat(String(l.qtdCotada).replace(",", ".")) || 0,
+        icmsPct: parseFloat(String(l.icmsPct).replace(",", ".")) || 0,
+        ipiPct: parseFloat(String(l.ipiPct).replace(",", ".")) || 0,
         observacao: l.observacao || null,
       }))
       .filter((l) => l.precoUnit > 0);
@@ -218,50 +238,66 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd RM</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd cotada *</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. (R$) *</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                    <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd RM</th>
+                    <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd cotada *</th>
+                    <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. *</th>
+                    <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">ICMS %</th>
+                    <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">IPI %</th>
+                    <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total bruto</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {linhas.map((l, i) => {
-                    const total = (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0);
+                    const totalBruto = (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0);
                     return (
                       <tr key={l.id}>
-                        <td className="px-3 py-2 text-gray-400">{i + 1}</td>
-                        <td className="px-3 py-2">
-                          <p className="text-torg-dark font-medium">{l.descricao}</p>
-                          {l.material && <p className="text-xs text-torg-gray">{l.material}</p>}
+                        <td className="px-2 py-2 text-gray-400">{i + 1}</td>
+                        <td className="px-2 py-2">
+                          <p className="text-torg-dark font-medium text-xs">{l.descricao}</p>
+                          {l.material && <p className="text-[10px] text-torg-gray">{l.material}</p>}
                         </td>
-                        <td className="px-3 py-2 text-right text-torg-gray text-xs tabular-nums">
+                        <td className="px-2 py-2 text-right text-torg-gray text-xs tabular-nums whitespace-nowrap">
                           {l.qtdRm} {l.unidade}
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-2 py-2 text-right">
                           <input
-                            type="number"
-                            step="0.01"
-                            min="0"
+                            type="number" step="0.01" min="0"
                             value={l.qtdCotada}
                             onChange={(e) => setLinha(l.id, "qtdCotada", e.target.value)}
-                            className="w-24 border border-gray-300 rounded px-2 py-1 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                            className="w-20 border border-gray-300 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
                           />
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-2 py-2 text-right">
                           <input
-                            type="number"
-                            step="0.01"
-                            min="0"
+                            type="number" step="0.01" min="0"
                             value={l.precoUnit}
                             onChange={(e) => setLinha(l.id, "precoUnit", e.target.value)}
                             placeholder="0,00"
-                            className="w-28 border border-gray-300 rounded px-2 py-1 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                            className="w-24 border border-gray-300 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
                           />
                         </td>
-                        <td className="px-3 py-2 text-right text-torg-dark font-medium tabular-nums">
-                          {total > 0 ? fmtMoeda(total) : "—"}
+                        <td className="px-2 py-2 text-right">
+                          <input
+                            type="number" step="0.01" min="0" max="100"
+                            value={l.icmsPct}
+                            onChange={(e) => setLinha(l.id, "icmsPct", e.target.value)}
+                            placeholder="0"
+                            className="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <input
+                            type="number" step="0.01" min="0" max="100"
+                            value={l.ipiPct}
+                            onChange={(e) => setLinha(l.id, "ipiPct", e.target.value)}
+                            placeholder="0"
+                            className="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </td>
+                        <td className="px-2 py-2 text-right text-torg-dark font-medium tabular-nums text-xs">
+                          {totalBruto > 0 ? fmtMoeda(totalBruto) : "—"}
                         </td>
                       </tr>
                     );
@@ -269,8 +305,14 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={5} className="px-3 py-3 text-right font-semibold text-torg-dark">Total da proposta:</td>
-                    <td className="px-3 py-3 text-right font-bold text-torg-orange-700 text-base tabular-nums">{fmtMoeda(total)}</td>
+                    <td colSpan={7} className="px-3 py-2 text-right text-xs text-torg-gray">Total bruto da proposta:</td>
+                    <td className="px-3 py-2 text-right font-medium text-torg-dark tabular-nums text-sm">{fmtMoeda(total)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={7} className="px-3 py-3 text-right text-sm font-semibold text-torg-dark">
+                      Total líquido (custo Torg, ICMS por dentro + IPI por fora):
+                    </td>
+                    <td className="px-3 py-3 text-right font-bold text-torg-orange-700 text-base tabular-nums">{fmtMoeda(totalLiquido)}</td>
                   </tr>
                 </tfoot>
               </table>
