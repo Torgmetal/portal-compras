@@ -366,6 +366,7 @@ model Cotacao {
 
   // Token único para acesso do fornecedor (uploads via /fornecedores/c/[token])
   token           String?       @unique
+  numeroRevisao   Int           @default(0) // incrementa a cada re-submissao do fornecedor
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt

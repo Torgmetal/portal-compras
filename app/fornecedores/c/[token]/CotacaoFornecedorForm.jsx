@@ -3,19 +3,38 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, AlertCircle, Send, AlertTriangle, Truck } from "lucide-react";
+import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
+// Extrai prazo/pagamento da observacao salva (formato "Prazo de entrega: X | Pagamento: Y | <obs>")
+function parseObservacao(obs) {
+  if (!obs) return { prazoEntrega: "", condicaoPagamento: "", observacao: "" };
+  const partes = obs.split(" | ");
+  let prazoEntrega = "";
+  let condicaoPagamento = "";
+  const restos = [];
+  for (const p of partes) {
+    const m1 = p.match(/^Prazo de entrega:\s*(.+)$/);
+    const m2 = p.match(/^Pagamento:\s*(.+)$/);
+    if (m1) prazoEntrega = m1[1];
+    else if (m2) condicaoPagamento = m2[1];
+    else restos.push(p);
+  }
+  return { prazoEntrega, condicaoPagamento, observacao: restos.join(" | ") };
+}
+
 export default function CotacaoFornecedorForm({ cotacao, vencida }) {
   const router = useRouter();
+  const jaEnviou = cotacao.status === "RECEBIDA";
+  const obsParsed = parseObservacao(cotacao.observacao);
+
   const [linhas, setLinhas] = useState(() =>
     cotacao.itens.map((it) => {
       const peso = Number(it.rmItem.peso) || 0;
-      // Usa peso (kg) quando disponivel — fornecedor cota por kg em estrutura
       const usaKg = peso > 0;
       return {
         id: it.id,
@@ -23,17 +42,19 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
         material: it.rmItem.material,
         qtdRm: usaKg ? peso : it.rmItem.qtd,
         unidade: usaKg ? "KG" : it.rmItem.unidade,
-        precoUnit: "",
-        qtdCotada: usaKg ? peso : it.qtdCotada,
-        observacao: "",
+        // Pre-popula com valores ja enviados se existirem
+        precoUnit: it.precoUnit > 0 ? String(it.precoUnit) : "",
+        qtdCotada: it.qtdCotada > 0 ? it.qtdCotada : (usaKg ? peso : it.qtdCotada),
+        observacao: it.observacao || "",
       };
     })
   );
-  const [prazoEntrega, setPrazoEntrega] = useState("");
-  const [condicaoPagamento, setCondicaoPagamento] = useState("");
-  const [observacaoGeral, setObservacaoGeral] = useState("");
+  const [prazoEntrega, setPrazoEntrega] = useState(jaEnviou ? obsParsed.prazoEntrega : "");
+  const [condicaoPagamento, setCondicaoPagamento] = useState(jaEnviou ? obsParsed.condicaoPagamento : "");
+  const [observacaoGeral, setObservacaoGeral] = useState(jaEnviou ? obsParsed.observacao : "");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [enviadoAgora, setEnviadoAgora] = useState(false);
 
   const setLinha = (id, k, v) => {
     setLinhas((prev) => prev.map((l) => (l.id === id ? { ...l, [k]: v } : l)));
@@ -64,6 +85,7 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
       return setErro("Preencha pelo menos um preço unitário maior que zero.");
     }
     setEnviando(true);
+    setEnviadoAgora(false);
     try {
       const res = await fetch(`/api/cotacao/submeter/${cotacao.token}`, {
         method: "POST",
@@ -77,6 +99,9 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao enviar");
+      setEnviadoAgora(true);
+      setEnviando(false);
+      // Refresh em segundo plano pra sincronizar com novo numero de revisao
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -133,6 +158,34 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
             <div>
               <p className="font-medium">Esse pedido está fora do prazo</p>
               <p className="text-xs">Você ainda pode enviar a proposta, mas talvez o comprador já tenha decidido com outros fornecedores. Sugerimos contatar o comprador antes.</p>
+            </div>
+          </div>
+        )}
+
+        {jaEnviou && !enviadoAgora && (
+          <div className="bg-torg-blue-50 border border-torg-blue-200 rounded-lg p-4 text-sm text-torg-dark flex items-start gap-2">
+            <RotateCcw size={18} className="mt-0.5 flex-shrink-0 text-torg-blue" />
+            <div>
+              <p className="font-medium">
+                Você já enviou esta proposta em {fmtData(cotacao.recebidaEm)}
+                {cotacao.numeroRevisao > 0 && ` (revisão ${cotacao.numeroRevisao})`}
+              </p>
+              <p className="text-xs text-torg-gray">
+                Os valores abaixo são os que você nos enviou. Pode editar e reenviar — a Torg vai considerar a versão mais recente.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {enviadoAgora && (
+          <div className="bg-torg-orange-50 border border-torg-orange-200 rounded-lg p-4 text-sm text-torg-dark flex items-start gap-2">
+            <CheckCircle2 size={18} className="mt-0.5 flex-shrink-0 text-torg-orange" />
+            <div>
+              <p className="font-medium">Proposta {jaEnviou ? "atualizada" : "enviada"} com sucesso</p>
+              <p className="text-xs text-torg-gray">
+                Total: <strong>{fmtMoeda(linhas.reduce((s, l) => s + (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0), 0))}</strong>.
+                Você pode revisar novamente se precisar — basta editar e clicar em "Atualizar proposta".
+              </p>
             </div>
           </div>
         )}
@@ -260,7 +313,11 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
               className="px-6 py-2.5 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 font-semibold flex items-center gap-2 disabled:opacity-50"
             >
               {enviando ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-              {enviando ? "Enviando..." : "Enviar proposta"}
+              {enviando
+                ? "Enviando..."
+                : jaEnviou
+                ? "Atualizar proposta"
+                : "Enviar proposta"}
             </button>
           </div>
         </form>

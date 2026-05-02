@@ -29,12 +29,11 @@ export async function POST(req, { params }) {
     include: { itens: { select: { id: true } } },
   });
   if (!cotacao) return NextResponse.json({ error: "Token inválido." }, { status: 404 });
-  if (cotacao.status === "RECEBIDA") {
-    return NextResponse.json({ error: "Proposta já foi enviada." }, { status: 409 });
-  }
   if (cotacao.status === "CANCELADA") {
     return NextResponse.json({ error: "Cotação cancelada." }, { status: 409 });
   }
+
+  const eRevisao = cotacao.status === "RECEBIDA";
 
   // Filtra apenas itens válidos da própria cotação
   const idsValidos = new Set(cotacao.itens.map((i) => i.id));
@@ -72,6 +71,7 @@ export async function POST(req, { params }) {
         total,
         prazoPagamento: body.condicaoPagamento || null,
         observacao: obsCombinada,
+        ...(eRevisao ? { numeroRevisao: { increment: 1 } } : {}),
       },
     });
 
@@ -97,13 +97,18 @@ export async function POST(req, { params }) {
     await tx.auditLog.create({
       data: {
         userId: null,
-        action: "submeter_cotacao_fornecedor",
+        action: eRevisao ? "revisar_cotacao_fornecedor" : "submeter_cotacao_fornecedor",
         entity: "Cotacao",
         entityId: cotacao.id,
-        diff: { total, fornecedor: cotacao.fornecedorNome, itens: itensValidos.length },
+        diff: {
+          total,
+          fornecedor: cotacao.fornecedorNome,
+          itens: itensValidos.length,
+          revisao: eRevisao ? cotacao.numeroRevisao + 1 : 0,
+        },
       },
     });
   });
 
-  return NextResponse.json({ ok: true, total });
+  return NextResponse.json({ ok: true, total, revisao: eRevisao });
 }

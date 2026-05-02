@@ -50,30 +50,6 @@ export default async function CotacaoPorToken({ params }) {
   // Vencida
   const vencida = cotacao.prazoResposta && new Date(cotacao.prazoResposta) < new Date();
 
-  // Já enviada
-  if (cotacao.status === "RECEBIDA") {
-    return (
-      <MarketingShell
-        image="/obras/torre-escada.jpg"
-        kicker="Proposta recebida"
-        title="Recebemos sua proposta"
-        lead={`Obrigado, ${cotacao.fornecedorNome}. A equipe de Compras vai analisar e te avisar quando houver decisão.`}
-      >
-        <div className="bg-white rounded-2xl border border-torg-blue-100 p-7">
-          <div className="w-12 h-12 rounded-xl bg-torg-orange-50 flex items-center justify-center mb-4">
-            <CheckCircle2 size={22} className="text-torg-orange" />
-          </div>
-          <p className="text-sm text-torg-gray">
-            Proposta enviada em {fmtData(cotacao.recebidaEm)}. Total registrado: <strong>{Number(cotacao.total || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong>.
-          </p>
-          <p className="text-xs text-torg-gray mt-3">
-            Se precisar atualizar a proposta, fale com o comprador da Torg que te enviou o link.
-          </p>
-        </div>
-      </MarketingShell>
-    );
-  }
-
   if (cotacao.status === "CANCELADA") {
     return (
       <MarketingShell
