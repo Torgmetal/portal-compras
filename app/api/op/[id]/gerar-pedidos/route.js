@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { criarPedidoOmie } from "@/lib/omie-pedido-compra";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -75,7 +76,6 @@ export async function POST(req, { params }) {
     );
   }
 
-  const baseUrl = req.nextUrl.origin;
   const resultados = [];
 
   for (const grupo of grupos.values()) {
@@ -104,28 +104,25 @@ export async function POST(req, { params }) {
     const cCodCateg = rm.categoriaCompra || "";
     const cCodLocalEstoque = rm.localEstoque || "";
 
+    // Chama a lib server-side direto (sem fetch interno — evita problema
+    // de auth do middleware bloquear chamada interna).
     let pedidoCriado = null;
     let erroPedido = null;
     try {
-      const omieRes = await fetch(`${baseUrl}/api/omie/pedido-compra`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itens: itensPayload,
-          observacao: observacaoBase,
-          nCodFor: Number(cotacao.nCodOmie) || 0,
-          cnpjFornecedor: cotacao.cnpj || null,
-          cNumPedido,
-          // FD: 0 parcelas (Omie nao gera contas a pagar)
-          nQtdeParc: isFD ? 0 : 1,
-          cCodCateg,
-          cCodLocalEstoque,
-          cInfAdic: `OP ${op.numero}`,
-        }),
+      const data = await criarPedidoOmie({
+        itens: itensPayload,
+        observacao: observacaoBase,
+        nCodFor: Number(cotacao.nCodOmie) || 0,
+        cnpjFornecedor: cotacao.cnpj || null,
+        cNumPedido,
+        nQtdeParc: isFD ? 0 : 1,
+        cCodCateg,
+        cCodLocalEstoque,
+        cInfAdic: `OP ${op.numero}`,
       });
-      const data = await omieRes.json();
-      if (!omieRes.ok || data.error) {
-        erroPedido = data.error || "Erro desconhecido do Omie";
+      if (data.error) {
+        erroPedido = data.error;
+        pedidoCriado = data; // pra preservar nCodFor_resolvido se houver
       } else {
         pedidoCriado = data;
       }
