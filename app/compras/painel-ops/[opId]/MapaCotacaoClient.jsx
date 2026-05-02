@@ -1,0 +1,237 @@
+"use client";
+import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award } from "lucide-react";
+import { labelCategoria } from "@/lib/op-categorias";
+
+const fmtMoeda = (v) =>
+  v != null && v > 0 ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
+
+export default function MapaCotacaoClient({ op }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(null);
+  const [erro, setErro] = useState("");
+
+  // Constrói matriz: cada linha é um RMItem, cada coluna é uma Cotação RECEBIDA
+  const { itens, fornecedores } = useMemo(() => buildMatriz(op), [op]);
+
+  const marcarVencedor = async (cotacaoItemId, jaVencedor) => {
+    setLoading(cotacaoItemId);
+    setErro("");
+    try {
+      const res = await fetch(`/api/cotacao-item/${cotacaoItemId}/vencedor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vencedor: !jaVencedor }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  if (fornecedores.length === 0) {
+    return (
+      <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-6 text-center">
+        <BarChart3 size={36} className="mx-auto text-torg-blue/40 mb-2" />
+        <p className="text-torg-dark font-medium">Sem cotações recebidas ainda</p>
+        <p className="text-xs text-torg-gray mt-1">
+          Quando os fornecedores responderem as cotações dessas RMs, o mapa comparativo aparece aqui.
+        </p>
+      </div>
+    );
+  }
+
+  // Total por fornecedor (soma dos itens vencidos)
+  const totaisPorFornecedor = {};
+  for (const f of fornecedores) totaisPorFornecedor[f.cotacaoId] = 0;
+  for (const it of itens) {
+    for (const cell of it.celulas) {
+      if (cell?.vencedor) {
+        totaisPorFornecedor[cell.cotacaoId] += (cell.precoUnit || 0) * (cell.qtdCotada || 0);
+      }
+    }
+  }
+  const totalGeral = Object.values(totaisPorFornecedor).reduce((s, n) => s + n, 0);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-torg-blue-100 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <BarChart3 size={20} className="text-torg-blue" /> Mapa Comparativo
+          </h3>
+          <p className="text-xs text-torg-gray mt-1">
+            Cada linha é um item, cada coluna é um fornecedor que cotou. Clique no preço pra escolher o vencedor.
+            O menor preço por item está em laranja.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-torg-gray">Total dos vencedores</p>
+          <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</p>
+        </div>
+      </div>
+
+      {erro && (
+        <div className="m-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+          <AlertCircle size={16} className="mt-0.5" /> <span>{erro}</span>
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50">RM</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
+              {fornecedores.map((f) => (
+                <th key={f.cotacaoId} className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase min-w-[140px]">
+                  {f.fornecedorNome}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {itens.map((it) => {
+              const precos = it.celulas.filter(Boolean).map((c) => c.precoUnit).filter((p) => p > 0);
+              const menorPreco = precos.length ? Math.min(...precos) : null;
+              return (
+                <tr key={it.rmItemId} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-xs font-mono text-torg-blue sticky left-0 bg-white">{it.rmNumero}</td>
+                  <td className="px-3 py-2 text-xs text-torg-gray">
+                    {it.categoria ? labelCategoria(it.categoria) : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-torg-dark font-medium">{it.descricao}</td>
+                  <td className="px-3 py-2 text-right text-torg-gray text-xs tabular-nums">
+                    {it.qtd} {it.unidade}
+                  </td>
+                  {fornecedores.map((f) => {
+                    const cell = it.celulas.find((c) => c?.cotacaoId === f.cotacaoId);
+                    if (!cell || cell.precoUnit <= 0) {
+                      return (
+                        <td key={f.cotacaoId} className="px-3 py-2 text-center text-torg-gray text-xs">
+                          —
+                        </td>
+                      );
+                    }
+                    const isMenor = cell.precoUnit === menorPreco;
+                    const isVencedor = cell.vencedor;
+                    const total = cell.precoUnit * cell.qtdCotada;
+                    return (
+                      <td
+                        key={f.cotacaoId}
+                        className={`px-3 py-2 text-center cursor-pointer transition-colors ${
+                          isVencedor
+                            ? "bg-torg-orange-100 ring-1 ring-inset ring-torg-orange-300"
+                            : isMenor
+                            ? "bg-torg-orange-50/40 hover:bg-torg-orange-50"
+                            : "hover:bg-gray-50"
+                        }`}
+                        onClick={() => !loading && marcarVencedor(cell.id, isVencedor)}
+                      >
+                        <div className={`text-sm font-medium tabular-nums ${isVencedor ? "text-torg-orange-700" : isMenor ? "text-torg-orange-700" : "text-torg-dark"}`}>
+                          {fmtMoeda(cell.precoUnit)}
+                        </div>
+                        <div className="text-[10px] text-torg-gray tabular-nums">
+                          total {fmtMoeda(total)}
+                        </div>
+                        {isVencedor && (
+                          <Award size={12} className="inline text-torg-orange-700 mt-0.5" />
+                        )}
+                        {loading === cell.id && (
+                          <Loader2 size={12} className="inline animate-spin text-torg-blue mt-0.5" />
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+            <tr>
+              <td colSpan={4} className="px-3 py-2 text-right text-xs font-semibold text-torg-dark">
+                Total se vencer:
+              </td>
+              {fornecedores.map((f) => (
+                <td key={f.cotacaoId} className="px-3 py-2 text-center text-sm font-bold text-torg-orange-700 tabular-nums">
+                  {fmtMoeda(totaisPorFornecedor[f.cotacaoId])}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs text-torg-gray">
+          {itens.length} ite{itens.length === 1 ? "m" : "ns"} cotados · {fornecedores.length} fornecedor{fornecedores.length !== 1 ? "es" : ""}
+        </p>
+        <button
+          disabled
+          className="px-4 py-2 bg-torg-dark/40 text-white text-sm font-medium rounded-lg inline-flex items-center gap-2 cursor-not-allowed"
+          title="Em construção — vai gerar os pedidos no Omie agrupando por fornecedor vencedor"
+        >
+          <Truck size={16} /> Gerar Pedidos Omie (em breve)
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Constrói matriz: lista de itens (linhas) × fornecedores (colunas)
+function buildMatriz(op) {
+  const fornMap = new Map(); // cotacaoId -> { cotacaoId, fornecedorNome }
+  const itensMap = new Map(); // rmItemId -> { ...item, celulas: [] }
+
+  for (const rm of op.rms) {
+    // Mapeia categoria por rmItem (vem do opItem ou aditivoItem)
+    const catByRmItem = new Map();
+    for (const it of rm.itens) {
+      const cat = it.opItem?.categoria || it.aditivoItem?.categoria || null;
+      catByRmItem.set(it.id, cat);
+    }
+
+    for (const cot of rm.cotacoes) {
+      if (cot.status !== "RECEBIDA") continue;
+      if (!fornMap.has(cot.id)) {
+        fornMap.set(cot.id, { cotacaoId: cot.id, fornecedorNome: cot.fornecedorNome });
+      }
+
+      for (const ci of cot.itens) {
+        if (!ci.precoUnit || ci.precoUnit <= 0) continue;
+        // Garante que o RMItem está na matriz
+        if (!itensMap.has(ci.rmItemId)) {
+          const rmItem = rm.itens.find((i) => i.id === ci.rmItemId);
+          if (!rmItem) continue;
+          itensMap.set(ci.rmItemId, {
+            rmItemId: rmItem.id,
+            rmNumero: rm.numero,
+            descricao: rmItem.descricao,
+            qtd: rmItem.peso > 0 ? Number(rmItem.peso).toFixed(2) : rmItem.qtd,
+            unidade: rmItem.peso > 0 ? "KG" : rmItem.unidade,
+            categoria: catByRmItem.get(rmItem.id),
+            celulas: [],
+          });
+        }
+        itensMap.get(ci.rmItemId).celulas.push({
+          id: ci.id,
+          cotacaoId: cot.id,
+          precoUnit: ci.precoUnit,
+          qtdCotada: ci.qtdCotada,
+          vencedor: ci.vencedor,
+        });
+      }
+    }
+  }
+
+  const fornecedores = Array.from(fornMap.values());
+  const itens = Array.from(itensMap.values());
+  return { fornecedores, itens };
+}

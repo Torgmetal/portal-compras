@@ -1,304 +1,190 @@
-"use client";
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { useStore } from "@/lib/store";
-import { fmt } from "@/lib/utils";
-import Badge from "@/components/Badge";
-import {
-  FolderKanban,
-  ChevronDown,
-  ChevronUp,
-  FileSpreadsheet,
-  Mail,
-  ShoppingCart,
-  ArrowRight,
-  Search,
-  Filter,
-  Eye,
-} from "lucide-react";
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { requireRole } from "@/lib/session";
+import { FolderKanban, FileText, Mail, Truck, ChevronRight } from "lucide-react";
 
-export default function PainelOPs() {
-  const { rms, loaded } = useStore();
-  const router = useRouter();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [expandedOp, setExpandedOp] = useState(null);
-  const [filterStatus, setFilterStatus] = useState("Todas");
+export const dynamic = "force-dynamic";
 
-  // Group RMs by OP number
-  const opGroups = useMemo(() => {
-    const groups = {};
-    rms.forEach((rm) => {
-      const op = rm.op || "Sem OP";
-      if (!groups[op])
-        groups[op] = {
-          op,
-          rms: [],
-          totalCotacoes: 0,
-          totalEnvios: 0,
-          totalPedidos: 0,
-        };
-      groups[op].rms.push(rm);
-      groups[op].totalCotacoes += (rm.cotacoes || []).length;
-      groups[op].totalEnvios += (rm.envios || []).length;
-      groups[op].totalPedidos += rm.status === "Pedido Gerado" ? 1 : 0;
-    });
-    return Object.values(groups).sort((a, b) => {
-      if (a.op === "Sem OP") return 1;
-      if (b.op === "Sem OP") return -1;
-      return a.op.localeCompare(b.op);
-    });
-  }, [rms]);
+const STATUS_OP = {
+  ABERTA:      { label: "Aberta",       className: "bg-torg-blue-50 text-torg-blue" },
+  EM_EXECUCAO: { label: "Em execução",  className: "bg-torg-orange-50 text-torg-orange-700" },
+  ENCERRADA:   { label: "Encerrada",    className: "bg-gray-100 text-gray-600" },
+  ATRASADA:    { label: "Atrasada",     className: "bg-red-50 text-red-700" },
+  CANCELADA:   { label: "Cancelada",    className: "bg-gray-100 text-gray-500" },
+};
 
-  // Filter
-  const filtered = useMemo(() => {
-    let result = opGroups;
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(
-        (g) =>
-          g.op.toLowerCase().includes(term) ||
-          g.rms.some(
-            (rm) =>
-              rm.numero?.toLowerCase().includes(term) ||
-              rm.descricao?.toLowerCase().includes(term)
-          )
-      );
-    }
-    if (filterStatus !== "Todas") {
-      result = result.filter((g) =>
-        g.rms.some((rm) => rm.status === filterStatus)
-      );
-    }
-    return result;
-  }, [opGroups, searchTerm, filterStatus]);
+function calcStatus(op) {
+  if (op.status === "CANCELADA") return "CANCELADA";
+  if (op.status === "ENCERRADA" || op.dataFimReal) return "ENCERRADA";
+  if (op.dataFimPrevista && new Date(op.dataFimPrevista) < new Date()) return "ATRASADA";
+  if (op.dataInicio && new Date(op.dataInicio) <= new Date()) return "EM_EXECUCAO";
+  return "ABERTA";
+}
 
-  if (!loaded)
-    return (
-      <div className="p-12 text-center text-gray-400">Carregando...</div>
+const fmtMoeda = (v) =>
+  v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+
+export default async function PainelOPs() {
+  await requireRole(["ADMIN", "COMPRAS"]);
+
+  const ops = await prisma.oP.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      itens: { select: { valorVerba: true } },
+      aditivos: { include: { itens: { select: { valorVerba: true } } } },
+      rms: {
+        select: {
+          id: true, numero: true, status: true,
+          itens: { select: { status: true } },
+          cotacoes: { select: { status: true } },
+        },
+      },
+    },
+  });
+
+  const opsComStats = ops.map((op) => {
+    const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);
+    const verbaAditivos = op.aditivos.reduce(
+      (s, a) => s + a.itens.reduce((ss, i) => ss + i.valorVerba, 0),
+      0
     );
 
-  const allStatuses = [
-    "Todas",
-    "Aberta",
-    "Em Cotação",
-    "Cotada",
-    "Pedido Gerado",
-  ];
-  const toggleOp = (op) => setExpandedOp(expandedOp === op ? null : op);
+    const totalRMs = op.rms.length;
+    const totalCotacoesEnviadas = op.rms.reduce((s, r) => s + r.cotacoes.length, 0);
+    const totalCotacoesRecebidas = op.rms.reduce(
+      (s, r) => s + r.cotacoes.filter((c) => c.status === "RECEBIDA").length,
+      0
+    );
+    const itensPedido = op.rms.reduce(
+      (s, r) => s + r.itens.filter((i) => i.status === "PEDIDO_GERADO").length,
+      0
+    );
+    const itensTotais = op.rms.reduce((s, r) => s + r.itens.length, 0);
 
-  // Summary stats
-  const totalOps = opGroups.length;
-  const totalRms = rms.length;
-  const totalCot = rms.reduce((s, rm) => s + (rm.cotacoes || []).length, 0);
-  const totalEnv = rms.reduce((s, rm) => s + (rm.envios || []).length, 0);
+    return {
+      ...op,
+      verbaTotal: verbaBase + verbaAditivos,
+      statusCalc: calcStatus(op),
+      stats: {
+        rms: totalRMs,
+        cotacoesEnviadas: totalCotacoesEnviadas,
+        cotacoesRecebidas: totalCotacoesRecebidas,
+        itensPedido,
+        itensTotais,
+      },
+    };
+  });
+
+  const totaisGerais = opsComStats.reduce(
+    (acc, op) => {
+      acc.ops += 1;
+      acc.rms += op.stats.rms;
+      acc.cotacoesRecebidas += op.stats.cotacoesRecebidas;
+      acc.itensPedido += op.stats.itensPedido;
+      return acc;
+    },
+    { ops: 0, rms: 0, cotacoesRecebidas: 0, itensPedido: 0 }
+  );
 
   return (
     <div className="space-y-6 max-w-7xl">
-      {/* Header */}
       <div>
         <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de OPs</h2>
         <p className="text-sm text-torg-gray mt-1">
-          Visão consolidada de todas as Ordens de Produção com suas RMs,
-          cotações e pedidos.
+          Visão por contrato — cada OP traz suas RMs, cotações e pedidos. Clique pra abrir o mapa de cotação.
         </p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 text-center">
-          <p className="text-2xl font-extrabold text-torg-blue">{totalOps}</p>
-          <p className="text-xs text-torg-gray mt-1">OPs</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 text-center">
-          <p className="text-2xl font-extrabold text-torg-dark">{totalRms}</p>
-          <p className="text-xs text-torg-gray mt-1">RMs</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 text-center">
-          <p className="text-2xl font-extrabold text-torg-orange">{totalCot}</p>
-          <p className="text-xs text-torg-gray mt-1">Cotações</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 text-center">
-          <p className="text-2xl font-extrabold text-torg-blue-700">{totalEnv}</p>
-          <p className="text-xs text-torg-gray mt-1">Envios</p>
-        </div>
+        {[
+          { label: "OPs ativas",          value: totaisGerais.ops,                color: "bg-torg-blue",     Icon: FolderKanban },
+          { label: "RMs vinculadas",      value: totaisGerais.rms,                color: "bg-torg-blue-700", Icon: FileText },
+          { label: "Cotações recebidas",  value: totaisGerais.cotacoesRecebidas,  color: "bg-torg-orange",   Icon: Mail },
+          { label: "Itens em pedido",     value: totaisGerais.itensPedido,        color: "bg-torg-dark",     Icon: Truck },
+        ].map((c) => (
+          <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+            <div className={`${c.color} p-2.5 rounded-lg`}>
+              <c.Icon size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">{c.label}</p>
+              <p className="text-xl font-extrabold text-torg-dark tabular-nums">{c.value}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Search & Filter */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Buscar OP, RM ou descrição..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Filter size={16} className="text-gray-400" />
-          {allStatuses.map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilterStatus(s)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filterStatus === s
-                  ? "bg-torg-blue text-white"
-                  : "bg-torg-blue-50 text-torg-dark hover:bg-torg-blue-100"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* OP Cards */}
-      {filtered.length === 0 ? (
+      {opsComStats.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <FolderKanban size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500 text-lg">Nenhuma OP encontrada</p>
-          <p className="text-gray-400 text-sm mt-1">
-            {rms.length === 0
-              ? "Crie uma RM para começar. O número da OP será extraído automaticamente do arquivo importado."
-              : "Ajuste os filtros de busca."}
+          <p className="text-torg-gray text-lg">Nenhuma OP cadastrada</p>
+          <p className="text-sm text-torg-gray mt-1">
+            Quando o Comercial cadastrar OPs, elas vão aparecer aqui agrupadas com suas RMs e cotações.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((group) => (
-            <div
-              key={group.op}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
-            >
-              {/* OP Header */}
-              <div
-                className="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => toggleOp(group.op)}
+          {opsComStats.map((op) => {
+            const s = STATUS_OP[op.statusCalc] || STATUS_OP.ABERTA;
+            return (
+              <Link
+                key={op.id}
+                href={`/compras/painel-ops/${op.id}`}
+                className="block bg-white rounded-xl shadow-sm border border-torg-blue-100 hover:shadow-md transition-shadow p-5"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-torg-blue-50 flex items-center justify-center">
-                    <FolderKanban size={24} className="text-torg-blue" />
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-12 h-12 rounded-lg bg-torg-blue-50 flex items-center justify-center flex-shrink-0">
+                      <FolderKanban size={22} className="text-torg-blue" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-mono font-semibold text-torg-blue text-lg">{op.numero}</h3>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
+                          {s.label}
+                        </span>
+                      </div>
+                      <p className="text-sm text-torg-dark font-medium truncate">{op.cliente}</p>
+                      {op.obra && <p className="text-xs text-torg-gray truncate">{op.obra}</p>}
+                    </div>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="text-xs text-torg-gray">Verba contratada</p>
+                    <p className="text-lg font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(op.verbaTotal)}</p>
+                  </div>
+                  <ChevronRight size={20} className="text-torg-gray flex-shrink-0 self-center" />
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-4 border-t border-gray-100 text-sm">
+                  <div>
+                    <p className="text-xs text-torg-gray">Início</p>
+                    <p className="text-torg-dark font-medium">{fmtData(op.dataInicio)}</p>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-torg-dark">
-                      OP {group.op}
-                    </h3>
-                    <p className="text-sm text-torg-gray">
-                      {group.rms.length} RM{group.rms.length !== 1 ? "s" : ""},{" "}
-                      {group.totalCotacoes} cotaç
-                      {group.totalCotacoes !== 1 ? "ões" : "ão"},{" "}
-                      {group.totalEnvios} envio
-                      {group.totalEnvios !== 1 ? "s" : ""}
+                    <p className="text-xs text-torg-gray">Fim previsto</p>
+                    <p className="text-torg-dark font-medium">{fmtData(op.dataFimPrevista)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-torg-gray">RMs</p>
+                    <p className="text-torg-dark font-medium">{op.stats.rms}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-torg-gray">Cotações</p>
+                    <p className="text-torg-dark font-medium">
+                      {op.stats.cotacoesRecebidas}/{op.stats.cotacoesEnviadas}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-torg-gray">Itens em pedido</p>
+                    <p className="text-torg-dark font-medium">
+                      {op.stats.itensPedido}/{op.stats.itensTotais}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  {group.totalPedidos > 0 && (
-                    <span className="text-xs bg-torg-dark text-white px-2 py-1 rounded-full font-medium">
-                      {group.totalPedidos} pedido
-                      {group.totalPedidos !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                  {expandedOp === group.op ? (
-                    <ChevronUp size={20} className="text-gray-400" />
-                  ) : (
-                    <ChevronDown size={20} className="text-gray-400" />
-                  )}
-                </div>
-              </div>
-
-              {/* Expanded: list RMs */}
-              {expandedOp === group.op && (
-                <div className="border-t border-gray-100">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            RM
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Descrição
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Itens
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                            Cotações
-                          </th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                            Envios
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Data
-                          </th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                            Ações
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {group.rms.map((rm) => (
-                          <tr key={rm.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-3 font-semibold text-torg-blue">
-                              RM-{rm.numero}
-                            </td>
-                            <td className="px-6 py-3 text-gray-700 max-w-[250px] truncate">
-                              {rm.descricao}
-                            </td>
-                            <td className="px-6 py-3 text-gray-600">
-                              {(rm.itens || []).length}
-                            </td>
-                            <td className="px-6 py-3">
-                              <Badge status={rm.status} />
-                            </td>
-                            <td className="px-6 py-3 text-center">
-                              {(rm.cotacoes || []).length > 0 ? (
-                                <span className="inline-flex items-center gap-1 text-torg-orange-700 bg-torg-orange-50 px-2 py-0.5 rounded-full text-xs font-medium">
-                                  <FileSpreadsheet size={12} />
-                                  {(rm.cotacoes || []).length}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">—</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-3 text-center">
-                              {(rm.envios || []).length > 0 ? (
-                                <span className="inline-flex items-center gap-1 text-torg-blue bg-torg-blue-50 px-2 py-0.5 rounded-full text-xs font-medium">
-                                  <Mail size={12} />
-                                  {(rm.envios || []).length}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">—</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-3 text-gray-500 text-xs">
-                              {rm.data}
-                            </td>
-                            <td className="px-6 py-3 text-center">
-                              <button
-                                onClick={() => router.push(`/compras/rm/${rm.id}`)}
-                                className="text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 text-xs font-medium"
-                              >
-                                <Eye size={14} /> Ver
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
