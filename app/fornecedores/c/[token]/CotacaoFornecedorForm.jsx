@@ -49,6 +49,8 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
       };
     })
   );
+  const [cnpj, setCnpj] = useState(cotacao.cnpj || "");
+  const [razaoSocial, setRazaoSocial] = useState(cotacao.fornecedorNome || "");
   const [prazoEntrega, setPrazoEntrega] = useState(jaEnviou ? obsParsed.prazoEntrega : "");
   const [condicaoPagamento, setCondicaoPagamento] = useState(jaEnviou ? obsParsed.condicaoPagamento : "");
   const [observacaoGeral, setObservacaoGeral] = useState(jaEnviou ? obsParsed.observacao : "");
@@ -84,6 +86,10 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
     if (itens.length === 0) {
       return setErro("Preencha pelo menos um preço unitário maior que zero.");
     }
+    const cnpjLimpo = cnpj.replace(/\D/g, "");
+    if (cnpjLimpo.length !== 14) {
+      return setErro("Informe o CNPJ da sua empresa (14 dígitos).");
+    }
     setEnviando(true);
     setEnviadoAgora(false);
     try {
@@ -92,6 +98,8 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itens,
+          cnpj: cnpjLimpo,
+          razaoSocial: razaoSocial.trim() || null,
           prazoEntrega: prazoEntrega || null,
           condicaoPagamento: condicaoPagamento || null,
           observacao: observacaoGeral || null,
@@ -266,6 +274,37 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          </div>
+
+          {/* Identificação fiscal */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-torg-dark">Identificação da empresa</h2>
+            <p className="text-xs text-torg-gray -mt-2">
+              Necessário pra emissão do pedido de compra. Preencha uma vez — fica salvo pras próximas cotações.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-torg-dark mb-1">CNPJ *</label>
+                <input
+                  type="text"
+                  value={cnpj}
+                  onChange={(e) => setCnpj(e.target.value)}
+                  placeholder="00.000.000/0001-00"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-torg-dark mb-1">Razão Social</label>
+                <input
+                  type="text"
+                  value={razaoSocial}
+                  onChange={(e) => setRazaoSocial(e.target.value)}
+                  placeholder="Nome completo da empresa"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+                />
+              </div>
             </div>
           </div>
 

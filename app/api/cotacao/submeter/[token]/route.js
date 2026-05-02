@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
 
 const itemSchema = z.object({
   cotacaoItemId: z.string().min(1),
@@ -11,6 +12,8 @@ const itemSchema = z.object({
 
 const schema = z.object({
   itens: z.array(itemSchema).min(1),
+  cnpj: z.string().optional().nullable(),
+  razaoSocial: z.string().optional().nullable(),
   prazoEntrega: z.string().optional().nullable(),
   condicaoPagamento: z.string().optional().nullable(),
   observacao: z.string().optional().nullable(),
@@ -44,6 +47,28 @@ export async function POST(req, { params }) {
 
   const total = itensValidos.reduce((s, it) => s + it.precoUnit * it.qtdCotada, 0);
 
+  // Tenta resolver o fornecedor no Omie pelo CNPJ — se achar, ja salva nCodOmie
+  // pra que a geracao de pedido saiba pra quem mandar.
+  const cnpjLimpo = body.cnpj ? body.cnpj.replace(/\D/g, "") : "";
+  let nCodOmieResolvido = cotacao.nCodOmie || null;
+  let omieLookupErro = null;
+  if (cnpjLimpo && cnpjLimpo.length === 14 && !nCodOmieResolvido) {
+    try {
+      const r = await resolverFornecedorPorCnpj(
+        cnpjLimpo,
+        process.env.OMIE_APP_KEY,
+        process.env.OMIE_APP_SECRET
+      );
+      if (r.codigo) {
+        nCodOmieResolvido = String(r.codigo);
+      } else {
+        omieLookupErro = r.error;
+      }
+    } catch (e) {
+      omieLookupErro = e?.message || "erro de rede";
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     for (const it of itensValidos) {
       await tx.cotacaoItem.update({
@@ -71,6 +96,9 @@ export async function POST(req, { params }) {
         total,
         prazoPagamento: body.condicaoPagamento || null,
         observacao: obsCombinada,
+        cnpj: cnpjLimpo || cotacao.cnpj,
+        nCodOmie: nCodOmieResolvido || cotacao.nCodOmie,
+        fornecedorNome: body.razaoSocial?.trim() || cotacao.fornecedorNome,
         ...(eRevisao ? { numeroRevisao: { increment: 1 } } : {}),
       },
     });
@@ -110,5 +138,11 @@ export async function POST(req, { params }) {
     });
   });
 
-  return NextResponse.json({ ok: true, total, revisao: eRevisao });
+  return NextResponse.json({
+    ok: true,
+    total,
+    revisao: eRevisao,
+    omieResolvido: !!nCodOmieResolvido,
+    omieLookupErro,
+  });
 }
