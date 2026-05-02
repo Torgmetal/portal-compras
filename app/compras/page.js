@@ -55,9 +55,12 @@ export default async function PainelCompras({ searchParams }) {
   // "Em Cotação" agrega EM_COTACAO + COTADA — ambos estão no processo
   // de cotação (aguardando proposta ou já com proposta antes do pedido).
   const emCotacao = (statusCount.EM_COTACAO || 0) + (statusCount.COTADA || 0);
+  // "Total de RMs" considera só ativas (Aberta + Em Cotação + Cotada).
+  // RMs com pedido gerado ou canceladas saem da contagem (estão arquivadas).
+  const totalAtivas = (statusCount.ABERTA || 0) + emCotacao;
 
   const cards = [
-    { label: "Total de RMs", value: Object.values(statusCount).reduce((s, n) => s + n, 0), color: "bg-torg-blue", Icon: FileText },
+    { label: "RMs ativas", value: totalAtivas, color: "bg-torg-blue", Icon: FileText },
     { label: "Abertas", value: statusCount.ABERTA || 0, color: "bg-torg-orange", Icon: ClipboardList },
     { label: "Em Cotação", value: emCotacao, color: "bg-torg-blue-700", Icon: BarChart3 },
     { label: "Pedido Gerado", value: statusCount.PEDIDO_GERADO || 0, color: "bg-torg-dark", Icon: Truck },
