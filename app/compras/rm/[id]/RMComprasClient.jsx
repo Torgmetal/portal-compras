@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
-  CheckCircle2, Truck, Mail, Edit2, Settings,
+  CheckCircle2, Truck, Mail, Edit2, Settings, Edit3,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
@@ -380,6 +380,7 @@ function ConfigPedidoOmie({ rm }) {
 
 function CotacoesList({ rm }) {
   const [copiado, setCopiado] = useState(null);
+  const [modalManual, setModalManual] = useState(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const corpoEmail = (link, fornecedorNome) => [
@@ -461,6 +462,13 @@ function CotacoesList({ rm }) {
                   </span>
                 )}
                 <button
+                  onClick={() => setModalManual(c)}
+                  className="px-3 py-1.5 text-xs bg-white border border-torg-orange-200 text-torg-orange-700 rounded-lg hover:bg-torg-orange-50 font-medium inline-flex items-center gap-1"
+                  title="Lançar a proposta manualmente (quando recebida fora do portal)"
+                >
+                  <Edit3 size={12} /> {c.recebidaEm ? "Editar" : "Lançar manual"}
+                </button>
+                <button
                   onClick={() => copiarLink(c)}
                   className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 font-medium"
                   title="Copiar o link único do fornecedor"
@@ -479,6 +487,225 @@ function CotacoesList({ rm }) {
           );
         })}
       </ul>
+      {modalManual && (
+        <ModalLancarManual cotacao={modalManual} rm={rm} onClose={() => setModalManual(null)} />
+      )}
+    </div>
+  );
+}
+
+function ModalLancarManual({ cotacao, rm, onClose }) {
+  const router = useRouter();
+  const [cnpj, setCnpj] = useState(cotacao.cnpj || "");
+  const [razaoSocial, setRazaoSocial] = useState(cotacao.fornecedorNome || "");
+  const [linhas, setLinhas] = useState(() =>
+    rm.itens
+      .filter((it) => it.status === "PENDENTE" || it.status === "EM_COTACAO" || it.status === "COTADO")
+      .map((it) => {
+        const peso = Number(it.peso) || 0;
+        const usaKg = peso > 0;
+        return {
+          rmItemId: it.id,
+          descricao: it.descricao,
+          unidade: usaKg ? "KG" : it.unidade,
+          qtdRm: usaKg ? peso : it.qtd,
+          precoUnit: "",
+          qtdCotada: usaKg ? peso : it.qtd,
+          icmsPct: "",
+          ipiPct: "",
+        };
+      })
+  );
+  const [prazoEntrega, setPrazoEntrega] = useState("");
+  const [condicaoPagamento, setCondicaoPagamento] = useState("");
+  const [observacao, setObservacao] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const setLinha = (id, k, v) => setLinhas((p) => p.map((l) => (l.rmItemId === id ? { ...l, [k]: v } : l)));
+
+  const total = linhas.reduce((s, l) => {
+    const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
+    const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
+    return s + p * q;
+  }, 0);
+
+  const submit = async () => {
+    setErro("");
+    const cnpjLimpo = cnpj.replace(/\D/g, "");
+    if (cnpjLimpo.length !== 14) return setErro("Informe o CNPJ (14 dígitos).");
+    // Itens: o cotacaoItem precisa ser identificado. Como o admin pode lancar pra
+    // RMItens que talvez nao estejam na cotacao original, mapeamos pelo rmItemId
+    // → busca/cria cotacaoItem correspondente no submit (API ja faz match).
+    const itens = linhas
+      .map((l) => ({
+        rmItemId: l.rmItemId,
+        precoUnit: parseFloat(String(l.precoUnit).replace(",", ".")) || 0,
+        qtdCotada: parseFloat(String(l.qtdCotada).replace(",", ".")) || 0,
+        icmsPct: parseFloat(String(l.icmsPct).replace(",", ".")) || 0,
+        ipiPct: parseFloat(String(l.ipiPct).replace(",", ".")) || 0,
+      }))
+      .filter((l) => l.precoUnit > 0);
+    if (itens.length === 0) return setErro("Preencha ao menos um preço unitário.");
+
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/cotacao/${cotacao.id}/lancar-manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cnpj: cnpjLimpo,
+          razaoSocial: razaoSocial.trim() || null,
+          itens,
+          prazoEntrega: prazoEntrega || null,
+          condicaoPagamento: condicaoPagamento || null,
+          observacao: observacao || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+      onClose();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-auto">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <Edit3 size={20} className="text-torg-orange" /> Lançar proposta manualmente
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <p className="text-xs text-torg-gray">
+            Use quando o fornecedor mandou a proposta por email/telefone e você está digitando manualmente.
+            Os valores vão pro Mapa Comparativo igual aos lançados pelo portal.
+          </p>
+
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1">CNPJ *</label>
+              <input
+                type="text" value={cnpj} onChange={(e) => setCnpj(e.target.value)}
+                placeholder="00.000.000/0001-00"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1">Razão Social</label>
+              <input
+                type="text" value={razaoSocial} onChange={(e) => setRazaoSocial(e.target.value)}
+                placeholder="Nome do fornecedor"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+              />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-torg-gray mb-2">Itens ({linhas.length})</p>
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left font-medium text-gray-500 uppercase">Descrição</th>
+                    <th className="px-2 py-1.5 text-right font-medium text-gray-500 uppercase">Qtd</th>
+                    <th className="px-2 py-1.5 text-right font-medium text-gray-500 uppercase">Preço *</th>
+                    <th className="px-2 py-1.5 text-right font-medium text-gray-500 uppercase">ICMS%</th>
+                    <th className="px-2 py-1.5 text-right font-medium text-gray-500 uppercase">IPI%</th>
+                    <th className="px-2 py-1.5 text-right font-medium text-gray-500 uppercase">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {linhas.map((l) => {
+                    const t = (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0);
+                    return (
+                      <tr key={l.rmItemId}>
+                        <td className="px-2 py-1.5 text-torg-dark">{l.descricao}</td>
+                        <td className="px-2 py-1.5 text-right">
+                          <input type="number" step="0.01" value={l.qtdCotada}
+                            onChange={(e) => setLinha(l.rmItemId, "qtdCotada", e.target.value)}
+                            className="w-20 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-right tabular-nums" />
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          <input type="number" step="0.01" value={l.precoUnit}
+                            onChange={(e) => setLinha(l.rmItemId, "precoUnit", e.target.value)}
+                            placeholder="0,00"
+                            className="w-24 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-right tabular-nums" />
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          <input type="number" step="0.01" value={l.icmsPct}
+                            onChange={(e) => setLinha(l.rmItemId, "icmsPct", e.target.value)}
+                            placeholder="0"
+                            className="w-14 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-right tabular-nums" />
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          <input type="number" step="0.01" value={l.ipiPct}
+                            onChange={(e) => setLinha(l.rmItemId, "ipiPct", e.target.value)}
+                            placeholder="0"
+                            className="w-14 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-right tabular-nums" />
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums text-torg-dark font-medium">
+                          {t > 0 ? fmtMoeda(t) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-gray-50">
+                  <tr>
+                    <td colSpan={5} className="px-2 py-2 text-right text-torg-gray">Total bruto:</td>
+                    <td className="px-2 py-2 text-right font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1">Prazo de entrega</label>
+              <input type="text" value={prazoEntrega} onChange={(e) => setPrazoEntrega(e.target.value)}
+                placeholder="Ex: 15 dias úteis"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1">Condição de pagamento</label>
+              <input type="text" value={condicaoPagamento} onChange={(e) => setCondicaoPagamento(e.target.value)}
+                placeholder="Ex: 30 dias"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-gray mb-1">Observação</label>
+            <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} rows={2}
+              placeholder="Observações da proposta"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
+          </div>
+        </div>
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+            Cancelar
+          </button>
+          <button onClick={submit} disabled={salvando}
+            className="px-5 py-2 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 text-sm font-medium flex items-center gap-2 disabled:opacity-50">
+            {salvando && <Loader2 size={14} className="animate-spin" />}
+            Salvar proposta
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
