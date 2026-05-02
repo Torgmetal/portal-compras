@@ -347,9 +347,12 @@ function ModalCancelarItem({ item, rmId, onClose, onSaved }) {
 }
 
 function ModalEnviarCotacao({ rm, onClose, onSent }) {
-  const itensCotaveis = rm.itens.filter((it) => it.status === "PENDENTE" || it.status === "EM_COTACAO");
+  // Aceita re-cotação de itens em qualquer status que ainda não virou pedido / cancelado
+  const itensCotaveis = rm.itens.filter(
+    (it) => it.status === "PENDENTE" || it.status === "EM_COTACAO" || it.status === "COTADO"
+  );
   const [itensSelecionados, setItensSelecionados] = useState(
-    new Set(itensCotaveis.filter((it) => it.status === "PENDENTE").map((it) => it.id))
+    new Set(itensCotaveis.map((it) => it.id))
   );
   const [emailsTexto, setEmailsTexto] = useState("");
   const [prazo, setPrazo] = useState(() => {
@@ -441,6 +444,9 @@ function ModalEnviarCotacao({ rm, onClose, onSent }) {
               const peso = Number(it.peso) || 0;
               const usaKg = peso > 0;
               const qtdMostrada = usaKg ? `${peso.toFixed(2)} KG` : `${it.qtd} ${it.unidade}`;
+              const statusBadge =
+                it.status === "EM_COTACAO" ? "Em cotação" :
+                it.status === "COTADO" ? "Já cotado" : null;
               return (
                 <label key={it.id} className="flex items-center gap-3 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm">
                   <input
@@ -450,6 +456,15 @@ function ModalEnviarCotacao({ rm, onClose, onSent }) {
                     className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
                   />
                   <span className="flex-1 truncate">{it.descricao}</span>
+                  {statusBadge && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                      it.status === "COTADO"
+                        ? "bg-torg-blue-100 text-torg-blue-800"
+                        : "bg-torg-orange-50 text-torg-orange-700"
+                    }`}>
+                      {statusBadge}
+                    </span>
+                  )}
                   <span className="text-xs text-torg-gray tabular-nums">{qtdMostrada}</span>
                 </label>
               );

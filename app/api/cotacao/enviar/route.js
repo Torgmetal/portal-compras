@@ -46,10 +46,16 @@ export async function POST(req) {
     return NextResponse.json({ error: "Nenhum item válido pra cotar." }, { status: 400 });
   }
 
-  // Filtra apenas itens em status que permitem cotação
-  const itensCotaveis = itensValidos.filter((it) => it.status === "PENDENTE" || it.status === "EM_COTACAO");
+  // Permite re-cotar itens que ainda não viraram pedido nem foram cancelados.
+  // (PENDENTE, EM_COTACAO, COTADO — todos aceitam novas rodadas de cotacao)
+  const itensCotaveis = itensValidos.filter(
+    (it) => it.status === "PENDENTE" || it.status === "EM_COTACAO" || it.status === "COTADO"
+  );
   if (itensCotaveis.length === 0) {
-    return NextResponse.json({ error: "Itens selecionados já estão fora de cotação." }, { status: 409 });
+    return NextResponse.json(
+      { error: "Itens selecionados já viraram pedido ou foram cancelados — não dá pra cotar de novo." },
+      { status: 409 }
+    );
   }
 
   const prazo = body.prazoResposta ? new Date(body.prazoResposta) : null;
@@ -99,9 +105,12 @@ export async function POST(req) {
       });
     }
 
-    // Marca itens como EM_COTACAO
+    // Marca itens PENDENTES como EM_COTACAO (não mexe nos COTADO/EM_COTACAO existentes)
     await tx.rMItem.updateMany({
-      where: { id: { in: itensCotaveis.map((i) => i.id) } },
+      where: {
+        id: { in: itensCotaveis.map((i) => i.id) },
+        status: "PENDENTE",
+      },
       data: { status: "EM_COTACAO" },
     });
 
