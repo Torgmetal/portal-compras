@@ -1,9 +1,9 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
-  CheckCircle2, Truck, Mail, Edit2,
+  CheckCircle2, Truck, Mail, Edit2, Settings,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
@@ -147,6 +147,9 @@ export default function RMComprasClient({ rm, userRole }) {
         </div>
       </div>
 
+      {/* Configuração para pedido Omie */}
+      <ConfigPedidoOmie rm={rm} />
+
       {/* Itens */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
@@ -245,6 +248,134 @@ export default function RMComprasClient({ rm, userRole }) {
         />
       )}
     </>
+  );
+}
+
+// ─── CONFIG PEDIDO OMIE (categoria + local de estoque) ──
+
+function ConfigPedidoOmie({ rm }) {
+  const router = useRouter();
+  const [categoria, setCategoria] = useState(rm.categoriaCompra || "");
+  const [local, setLocal] = useState(rm.localEstoque || "");
+  const [categoriasOpcoes, setCategoriasOpcoes] = useState([]);
+  const [locaisOpcoes, setLocaisOpcoes] = useState([]);
+  const [carregando, setCarregando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    setCarregando(true);
+    Promise.all([
+      fetch("/api/omie/categorias").then((r) => r.json()).catch(() => ({})),
+      fetch("/api/omie/locais-estoque").then((r) => r.json()).catch(() => ({})),
+    ])
+      .then(([dc, dl]) => {
+        if (dc?.categorias?.length) setCategoriasOpcoes(dc.categorias);
+        if (dl?.locais?.length) setLocaisOpcoes(dl.locais);
+      })
+      .finally(() => setCarregando(false));
+  }, []);
+
+  const salvar = async (campo, valor) => {
+    setSalvando(true);
+    setErro("");
+    setMsg("");
+    try {
+      const res = await fetch(`/api/rm/${rm.id}/config-omie`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [campo]: valor }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setMsg("Salvo");
+      setTimeout(() => setMsg(""), 1500);
+      router.refresh();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const completo = !!categoria && !!local;
+
+  return (
+    <div className={`bg-white rounded-xl shadow-sm p-5 border ${
+      completo ? "border-torg-blue-100" : "border-torg-orange-200 bg-torg-orange-50/20"
+    }`}>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <h3 className="text-base font-semibold text-torg-dark flex items-center gap-2">
+          <Settings size={18} className="text-torg-blue" /> Configuração para pedido Omie
+        </h3>
+        <div className="text-xs">
+          {carregando && <span className="text-torg-gray">carregando opções...</span>}
+          {salvando && <span className="text-torg-blue inline-flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> salvando</span>}
+          {msg && <span className="text-torg-orange-700 font-medium">✓ {msg}</span>}
+          {erro && <span className="text-red-600">{erro}</span>}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-torg-gray mb-1">Categoria de Compra</label>
+          {categoriasOpcoes.length > 0 ? (
+            <select
+              value={categoria}
+              onChange={(e) => { setCategoria(e.target.value); salvar("categoriaCompra", e.target.value); }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+            >
+              <option value="">— Selecionar —</option>
+              {categoriasOpcoes.map((c) => (
+                <option key={c.codigo} value={c.codigo}>
+                  {c.codigo} — {c.descricao}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value)}
+              onBlur={(e) => salvar("categoriaCompra", e.target.value)}
+              placeholder="Ex: 3.1"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          )}
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-torg-gray mb-1">Local de Estoque</label>
+          {locaisOpcoes.length > 0 ? (
+            <select
+              value={local}
+              onChange={(e) => { setLocal(e.target.value); salvar("localEstoque", e.target.value); }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+            >
+              <option value="">— Selecionar —</option>
+              {locaisOpcoes.map((l) => (
+                <option key={l.nCodLocal || l.cCodLocal || l.cDescricao} value={l.cCodLocal || l.cDescricao}>
+                  {l.cDescricao} {l.cCodLocal ? `(${l.cCodLocal})` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={local}
+              onChange={(e) => setLocal(e.target.value)}
+              onBlur={(e) => salvar("localEstoque", e.target.value)}
+              placeholder="Código ou descrição"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          )}
+        </div>
+      </div>
+      {!completo && (
+        <p className="text-xs text-torg-orange-700 mt-2">
+          ⚠ Preencha categoria e local de estoque antes de gerar o pedido — esses campos viajam pro Omie.
+        </p>
+      )}
+    </div>
   );
 }
 
