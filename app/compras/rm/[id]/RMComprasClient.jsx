@@ -437,18 +437,23 @@ function ModalEnviarCotacao({ rm, onClose, onSent }) {
             </div>
           </div>
           <div className="border border-gray-200 rounded-lg max-h-[200px] overflow-y-auto divide-y divide-gray-100">
-            {itensCotaveis.map((it) => (
-              <label key={it.id} className="flex items-center gap-3 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm">
-                <input
-                  type="checkbox"
-                  checked={itensSelecionados.has(it.id)}
-                  onChange={() => toggleItem(it.id)}
-                  className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
-                />
-                <span className="flex-1 truncate">{it.descricao}</span>
-                <span className="text-xs text-torg-gray tabular-nums">{it.qtd} {it.unidade}</span>
-              </label>
-            ))}
+            {itensCotaveis.map((it) => {
+              const peso = Number(it.peso) || 0;
+              const usaKg = peso > 0;
+              const qtdMostrada = usaKg ? `${peso.toFixed(2)} KG` : `${it.qtd} ${it.unidade}`;
+              return (
+                <label key={it.id} className="flex items-center gap-3 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={itensSelecionados.has(it.id)}
+                    onChange={() => toggleItem(it.id)}
+                    className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                  />
+                  <span className="flex-1 truncate">{it.descricao}</span>
+                  <span className="text-xs text-torg-gray tabular-nums">{qtdMostrada}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
 

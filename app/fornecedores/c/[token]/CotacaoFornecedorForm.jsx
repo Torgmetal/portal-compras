@@ -13,16 +13,21 @@ const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 export default function CotacaoFornecedorForm({ cotacao, vencida }) {
   const router = useRouter();
   const [linhas, setLinhas] = useState(() =>
-    cotacao.itens.map((it) => ({
-      id: it.id,
-      descricao: it.rmItem.descricao,
-      material: it.rmItem.material,
-      qtdRm: it.rmItem.qtd,
-      unidade: it.rmItem.unidade,
-      precoUnit: "",
-      qtdCotada: it.qtdCotada,
-      observacao: "",
-    }))
+    cotacao.itens.map((it) => {
+      const peso = Number(it.rmItem.peso) || 0;
+      // Usa peso (kg) quando disponivel — fornecedor cota por kg em estrutura
+      const usaKg = peso > 0;
+      return {
+        id: it.id,
+        descricao: it.rmItem.descricao,
+        material: it.rmItem.material,
+        qtdRm: usaKg ? peso : it.rmItem.qtd,
+        unidade: usaKg ? "KG" : it.rmItem.unidade,
+        precoUnit: "",
+        qtdCotada: usaKg ? peso : it.qtdCotada,
+        observacao: "",
+      };
+    })
   );
   const [prazoEntrega, setPrazoEntrega] = useState("");
   const [condicaoPagamento, setCondicaoPagamento] = useState("");

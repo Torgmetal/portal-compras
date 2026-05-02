@@ -71,11 +71,15 @@ export async function POST(req) {
           token,
           status: "PENDENTE",
           itens: {
-            create: itensCotaveis.map((it) => ({
-              rmItemId: it.id,
-              precoUnit: 0,
-              qtdCotada: it.qtd,
-            })),
+            create: itensCotaveis.map((it) => {
+              const peso = Number(it.peso) || 0;
+              // Usa peso (kg) como quantidade default quando disponivel
+              return {
+                rmItemId: it.id,
+                precoUnit: 0,
+                qtdCotada: peso > 0 ? peso : it.qtd,
+              };
+            }),
           },
         },
       });
