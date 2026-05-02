@@ -202,29 +202,14 @@ export default function RMComprasClient({ rm, userRole }) {
         </div>
       </div>
 
-      {/* Cotações (placeholder) */}
+      {/* Cotações */}
       {rm.cotacoes.length > 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-torg-dark">Cotações ({rm.cotacoes.length})</h3>
-          </div>
-          <ul className="divide-y divide-gray-100">
-            {rm.cotacoes.map((c) => (
-              <li key={c.id} className="px-6 py-3 flex items-center justify-between">
-                <div>
-                  <p className="text-torg-dark font-medium">{c.fornecedorNome}</p>
-                  <p className="text-xs text-torg-gray">{fmtData(c.createdAt)} · status {c.status}</p>
-                </div>
-                <p className="text-torg-orange-700 font-semibold tabular-nums">{fmtMoeda(c.total)}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <CotacoesList rm={rm} />
       ) : (
         <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-4 text-sm text-torg-dark">
-          <p className="font-medium">Cotações ainda não disponíveis</p>
+          <p className="font-medium">Nenhuma cotação enviada ainda</p>
           <p className="text-torg-gray text-xs mt-1">
-            O fluxo completo de cotação (envio pra fornecedores, lançamento de propostas, geração de pedido Omie) chega na próxima parte do Dia 4.
+            Use o botão &quot;Enviar Cotação&quot; acima pra solicitar propostas aos fornecedores.
           </p>
         </div>
       )}
@@ -260,6 +245,113 @@ export default function RMComprasClient({ rm, userRole }) {
         />
       )}
     </>
+  );
+}
+
+// ─── LISTA DE COTAÇÕES ──────────────────────────────
+
+function CotacoesList({ rm }) {
+  const [copiado, setCopiado] = useState(null);
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  const corpoEmail = (link, fornecedorNome) => [
+    `Olá, ${fornecedorNome},`,
+    "",
+    `Solicitamos cotação para a Requisição ${rm.numero} (${rm.descricao}).`,
+    "",
+    "Acesse o link abaixo para visualizar os itens e enviar (ou atualizar) sua proposta:",
+    "",
+    link,
+    "",
+    "Atenciosamente,",
+    "Torg Metal",
+  ].join("\n");
+
+  const abrirEmail = (cot) => {
+    const link = `${baseUrl}/fornecedores/c/${cot.token}`;
+    const subject = encodeURIComponent(`Solicitação de Cotação — RM ${rm.numero}`);
+    const body = encodeURIComponent(corpoEmail(link, cot.fornecedorNome));
+    window.location.href = `mailto:${cot.fornecedorEmail}?subject=${subject}&body=${body}`;
+  };
+
+  const copiarLink = async (cot) => {
+    const link = `${baseUrl}/fornecedores/c/${cot.token}`;
+    await navigator.clipboard.writeText(link);
+    setCopiado(cot.id);
+    setTimeout(() => setCopiado(null), 2000);
+  };
+
+  const STATUS_COT = {
+    PENDENTE: { label: "Aguardando", className: "bg-torg-blue-50 text-torg-blue" },
+    RECEBIDA: { label: "Recebida",   className: "bg-torg-orange-50 text-torg-orange-700" },
+    VENCIDA:  { label: "Vencida",    className: "bg-red-50 text-red-700" },
+    CANCELADA:{ label: "Cancelada",  className: "bg-gray-100 text-gray-500" },
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100">
+        <h3 className="text-lg font-semibold text-torg-dark">Cotações ({rm.cotacoes.length})</h3>
+        <p className="text-xs text-torg-gray mt-1">
+          Use os botões pra reenviar o link ao fornecedor (mesmo após ele responder).
+        </p>
+      </div>
+      <ul className="divide-y divide-gray-100">
+        {rm.cotacoes.map((c) => {
+          const s = STATUS_COT[c.status] || STATUS_COT.PENDENTE;
+          const vencida = c.prazoResposta && new Date(c.prazoResposta) < new Date() && c.status === "PENDENTE";
+          return (
+            <li key={c.id} className="px-6 py-4 flex items-center gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-torg-dark font-medium">{c.fornecedorNome}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
+                    {s.label}
+                  </span>
+                  {vencida && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-medium">
+                      vencida
+                    </span>
+                  )}
+                  {c.numeroRevisao > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-torg-blue-100 text-torg-blue-800 font-medium">
+                      rev {c.numeroRevisao}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-torg-gray truncate mt-0.5">
+                  {c.fornecedorEmail}
+                  {" · enviada em "}{fmtData(c.createdAt)}
+                  {c.recebidaEm && ` · respondida em ${fmtData(c.recebidaEm)}`}
+                  {c.prazoResposta && ` · prazo ${fmtData(c.prazoResposta)}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {c.total > 0 && (
+                  <span className="text-torg-orange-700 font-semibold tabular-nums text-sm">
+                    {fmtMoeda(c.total)}
+                  </span>
+                )}
+                <button
+                  onClick={() => copiarLink(c)}
+                  className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 font-medium"
+                  title="Copiar o link único do fornecedor"
+                >
+                  {copiado === c.id ? "✓ copiado" : "Copiar link"}
+                </button>
+                <button
+                  onClick={() => abrirEmail(c)}
+                  className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
+                  title="Abrir o email no Outlook com mensagem pré-formatada"
+                >
+                  <Mail size={12} /> {c.recebidaEm ? "Reenviar" : "Enviar email"}
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

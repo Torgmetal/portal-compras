@@ -27,7 +27,11 @@ export default async function RMComprasDetail({ params }) {
         },
       },
       cotacoes: {
-        select: { id: true, fornecedorNome: true, status: true, total: true, createdAt: true, prazoResposta: true },
+        select: {
+          id: true, fornecedorNome: true, fornecedorEmail: true, token: true,
+          status: true, total: true, numeroRevisao: true,
+          createdAt: true, prazoResposta: true, recebidaEm: true,
+        },
         orderBy: { createdAt: "desc" },
       },
     },
