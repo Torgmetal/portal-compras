@@ -203,7 +203,7 @@ export default function LancarCotacaoPage({ params }) {
             if (qtdProposta != null) {
               const qtdRm = Number(copy[idx].qtdSolicitada) || 0;
               const diffPct = qtdRm > 0 ? Math.abs(qtdProposta - qtdRm) / qtdRm : 0;
-              if (diffPct > 0.01 && Math.abs(qtdProposta - qtdRm) > 0.5) {
+              if (diffPct > 0.05 && Math.abs(qtdProposta - qtdRm) > 0.5) {
                 const sinal = qtdProposta > qtdRm ? "↑" : "↓";
                 divergenciasQtd.push(
                   `${copy[idx].descricao}: RM pediu ${qtdRm.toLocaleString("pt-BR")} ${copy[idx].unidade}, proposta ${sinal} ${qtdProposta.toLocaleString("pt-BR")} ${copy[idx].unidade}`
