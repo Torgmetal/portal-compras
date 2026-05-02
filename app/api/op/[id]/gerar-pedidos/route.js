@@ -17,6 +17,18 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Apenas Admin ou Compras pode gerar pedidos." }, { status: 403 });
   }
 
+  // Categoria + Local de Estoque vem do body (escolhidos no momento da geracao)
+  let body = {};
+  try { body = await req.json(); } catch {}
+  const categoriaSelecionada = String(body.categoria || "").trim();
+  const localSelecionado = String(body.localEstoque || "").trim();
+  if (!categoriaSelecionada) {
+    return NextResponse.json({ error: "Categoria de Compra é obrigatória." }, { status: 400 });
+  }
+  if (!localSelecionado) {
+    return NextResponse.json({ error: "Local de Estoque é obrigatório." }, { status: 400 });
+  }
+
   const op = await prisma.oP.findUnique({
     where: { id: params.id },
     include: {
@@ -100,9 +112,9 @@ export async function POST(req, { params }) {
       .filter(Boolean)
       .join(" | ");
 
-    // Categoria e local de estoque vem da RM (escolhidos pelo Compras)
-    const cCodCateg = rm.categoriaCompra || "";
-    const cCodLocalEstoque = rm.localEstoque || "";
+    // Categoria e local de estoque vem do modal de geracao (uma vez pra todos)
+    const cCodCateg = categoriaSelecionada;
+    const cCodLocalEstoque = localSelecionado;
 
     // Chama a lib server-side direto (sem fetch interno — evita problema
     // de auth do middleware bloquear chamada interna).

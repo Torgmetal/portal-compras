@@ -147,9 +147,6 @@ export default function RMComprasClient({ rm, userRole }) {
         </div>
       </div>
 
-      {/* Configuração para pedido Omie */}
-      <ConfigPedidoOmie rm={rm} />
-
       {/* Itens */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2, X, XCircle } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
@@ -35,16 +35,22 @@ export default function MapaCotacaoClient({ op }) {
   };
 
   const [resultadosPedidos, setResultadosPedidos] = useState(null);
+  const [modalGerar, setModalGerar] = useState(false);
 
-  const gerarPedidos = async () => {
+  const gerarPedidos = async ({ categoria, localEstoque }) => {
     if (fornecedoresVencedores.length === 0) return;
     setLoading("gerar");
     setErro("");
     try {
-      const res = await fetch(`/api/op/${op.id}/gerar-pedidos`, { method: "POST" });
+      const res = await fetch(`/api/op/${op.id}/gerar-pedidos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoria, localEstoque }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
       setResultadosPedidos(data.resultados || []);
+      setModalGerar(false);
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -351,7 +357,7 @@ export default function MapaCotacaoClient({ op }) {
           {fornecedoresVencedores.length > 0 && ` · ${fornecedoresVencedores.length} pedido${fornecedoresVencedores.length !== 1 ? "s" : ""} a gerar`}
         </p>
         <button
-          onClick={gerarPedidos}
+          onClick={() => setModalGerar(true)}
           disabled={loading === "gerar" || fornecedoresVencedores.length === 0}
           className="px-4 py-2 bg-torg-orange text-white text-sm font-medium rounded-lg hover:bg-torg-orange-600 inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           title={fornecedoresVencedores.length === 0 ? "Marque vencedores antes de gerar" : "Cria os pedidos no Omie"}
@@ -362,10 +368,193 @@ export default function MapaCotacaoClient({ op }) {
       </div>
     </div>
 
+    {modalGerar && (
+      <ModalGerarPedidos
+        fornecedoresVencedores={fornecedoresVencedores}
+        totaisPorFornecedor={totaisPorFornecedor}
+        totalGeral={totalGeral}
+        onClose={() => setModalGerar(false)}
+        onConfirm={gerarPedidos}
+        loading={loading === "gerar"}
+      />
+    )}
     {resultadosPedidos && (
       <ModalResultados resultados={resultadosPedidos} onClose={() => setResultadosPedidos(null)} />
     )}
     </>
+  );
+}
+
+// ── Modal de configuração antes de gerar pedidos ─────
+
+function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalGeral, onClose, onConfirm, loading }) {
+  const [categoria, setCategoria] = useState("");
+  const [localEstoque, setLocalEstoque] = useState("");
+  const [categoriasOpcoes, setCategoriasOpcoes] = useState([]);
+  const [locaisOpcoes, setLocaisOpcoes] = useState([]);
+  const [carregandoOpcoes, setCarregandoOpcoes] = useState(true);
+  const [erroOpcoes, setErroOpcoes] = useState("");
+  const [erroLocal, setErroLocal] = useState("");
+
+  useEffect(() => {
+    setCarregandoOpcoes(true);
+    Promise.all([
+      fetch("/api/omie/categorias").then((r) => r.json()).catch((e) => ({ error: e?.message })),
+      fetch("/api/omie/locais-estoque").then((r) => r.json()).catch((e) => ({ error: e?.message })),
+    ])
+      .then(([dc, dl]) => {
+        if (dc?.categorias?.length) setCategoriasOpcoes(dc.categorias);
+        if (dl?.locais?.length) setLocaisOpcoes(dl.locais);
+        const erros = [dc?.error, dl?.error].filter(Boolean);
+        if (erros.length) setErroOpcoes(erros.join(" | "));
+      })
+      .finally(() => setCarregandoOpcoes(false));
+  }, []);
+
+  const podeGerar = !!categoria && !!localEstoque;
+
+  const submit = () => {
+    setErroLocal("");
+    if (!categoria) return setErroLocal("Selecione a Categoria de Compra.");
+    if (!localEstoque) return setErroLocal("Selecione o Local de Estoque.");
+    onConfirm({ categoria, localEstoque });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <Truck size={20} className="text-torg-orange" /> Gerar Pedidos Omie
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600" disabled={loading}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div className="bg-gray-50 rounded-lg p-3 text-sm">
+            <p className="text-torg-gray mb-2">
+              Será criado <strong className="text-torg-dark">{fornecedoresVencedores.length} pedido{fornecedoresVencedores.length !== 1 ? "s" : ""}</strong> no Omie:
+            </p>
+            <ul className="space-y-1 text-xs">
+              {fornecedoresVencedores.map((f) => (
+                <li key={f.cotacaoId} className="flex justify-between text-torg-dark">
+                  <span>{f.fornecedorNome}</span>
+                  <span className="text-torg-gray tabular-nums">{fmtMoeda(totaisPorFornecedor[f.cotacaoId])}</span>
+                </li>
+              ))}
+              <li className="flex justify-between font-bold pt-1 border-t border-gray-200 mt-1">
+                <span>Total</span>
+                <span className="text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</span>
+              </li>
+            </ul>
+          </div>
+
+          {erroLocal && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5" /> <span>{erroLocal}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">
+              Categoria de Compra <span className="text-red-500">*</span>
+            </label>
+            {categoriasOpcoes.length > 0 ? (
+              <select
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+                disabled={loading}
+              >
+                <option value="">— Selecionar —</option>
+                {categoriasOpcoes.map((c) => (
+                  <option key={c.codigo} value={c.codigo}>
+                    {c.codigo} — {c.descricao}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                placeholder={carregandoOpcoes ? "Carregando categorias do Omie..." : "Ex: 3.1"}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+                disabled={loading || carregandoOpcoes}
+              />
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">
+              Local de Estoque <span className="text-red-500">*</span>
+            </label>
+            {locaisOpcoes.length > 0 ? (
+              <select
+                value={localEstoque}
+                onChange={(e) => setLocalEstoque(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+                disabled={loading}
+              >
+                <option value="">— Selecionar —</option>
+                {locaisOpcoes.map((l) => (
+                  <option
+                    key={l.nCodLocal || l.cCodLocal || l.cDescricao}
+                    value={l.cCodLocal || l.cDescricao}
+                  >
+                    {l.cDescricao} {l.cCodLocal ? `(${l.cCodLocal})` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={localEstoque}
+                onChange={(e) => setLocalEstoque(e.target.value)}
+                placeholder={carregandoOpcoes ? "Carregando locais..." : "Código ou descrição"}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+                disabled={loading || carregandoOpcoes}
+              />
+            )}
+          </div>
+
+          <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg p-3 text-xs text-torg-dark">
+            <p>
+              <strong>Conta Corrente:</strong> Inter (busca automática no Omie)
+              <span className="mx-2">·</span>
+              <strong>Parcelas:</strong> 1 parcela
+              <span className="mx-2">·</span>
+              <strong>Previsão de entrega:</strong> hoje
+            </p>
+          </div>
+
+          {erroOpcoes && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5" />
+              <span>Não consegui listar opções do Omie ({erroOpcoes}). Você pode digitar manualmente.</span>
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm"
+            disabled={loading}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={submit}
+            disabled={loading || !podeGerar}
+            className="px-5 py-2 bg-torg-orange text-white rounded-lg hover:bg-torg-orange-600 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+            {loading ? "Gerando pedidos..." : `Confirmar e gerar ${fornecedoresVencedores.length}`}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
