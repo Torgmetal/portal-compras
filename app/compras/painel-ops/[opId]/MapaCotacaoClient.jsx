@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award } from "lucide-react";
+import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
 const fmtMoeda = (v) =>
@@ -24,6 +24,21 @@ export default function MapaCotacaoClient({ op }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ vencedor: !jaVencedor }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const sugerirVencedoresMenorPreco = async () => {
+    setLoading("sugerir");
+    setErro("");
+    try {
+      const res = await fetch(`/api/op/${op.id}/sugerir-vencedores`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
       router.refresh();
@@ -99,13 +114,24 @@ export default function MapaCotacaoClient({ op }) {
             <BarChart3 size={20} className="text-torg-blue" /> Mapa Comparativo
           </h3>
           <p className="text-xs text-torg-gray mt-1">
-            Cada linha é um item, cada coluna é um fornecedor que cotou. Clique no preço pra escolher o vencedor.
-            O menor preço por item está em laranja.
+            Click na célula pra escolher vencedor por item, ou no nome do fornecedor pra marcar todos dele.
+            Use "Sugerir menor preço" pra preencher rapidamente.
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-torg-gray">Total dos vencedores</p>
-          <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={sugerirVencedoresMenorPreco}
+            disabled={loading === "sugerir"}
+            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-2 disabled:opacity-50"
+            title="Marca o menor preço de cada item como vencedor automaticamente"
+          >
+            {loading === "sugerir" ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+            Sugerir menor preço
+          </button>
+          <div className="text-right">
+            <p className="text-xs text-torg-gray">Total dos vencedores</p>
+            <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</p>
+          </div>
         </div>
       </div>
 
