@@ -127,6 +127,47 @@ export default function OPDetailClient({ op, userRole, userId }) {
         </div>
       </div>
 
+      {/* Cobertura por categoria (gaps de RM da Engenharia) */}
+      {op.cobertura && Object.keys(op.cobertura).length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-torg-dark mb-1">Cobertura por categoria</h3>
+          <p className="text-sm text-torg-gray mb-4">
+            RMs de Engenharia vinculadas a cada categoria do escopo. Categorias sem RM podem indicar item esquecido.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {Object.entries(op.cobertura).map(([cat, rms]) => {
+              const tem = rms.length > 0;
+              return (
+                <div
+                  key={cat}
+                  className={`p-3 rounded-lg border ${
+                    tem ? "border-torg-orange-200 bg-torg-orange-50/30" : "border-gray-200 bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-torg-dark">
+                      {cat === "OUTRO" ? "Outro" : cat.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                    </p>
+                    {tem ? (
+                      <span className="text-xs font-medium text-torg-orange-700">
+                        {rms.length} RM{rms.length !== 1 ? "s" : ""}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-gray-500">Sem RM</span>
+                    )}
+                  </div>
+                  {tem && (
+                    <p className="text-xs text-torg-gray mt-1 font-mono">
+                      {rms.map((r) => r.numero).join(", ")}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Itens base */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">

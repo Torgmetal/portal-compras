@@ -252,11 +252,20 @@ enum RMStatus {
   CANCELADA
 }
 
+enum TipoRM {
+  ENGENHARIA      // vinculada a OP + categorias do escopo do comercial
+  ALMOXARIFADO    // vinculada a OP, sem vinculo a categoria especifica
+  INTERNA         // coisas internas da Torg, nao vinculada a obra
+}
+
 model RM {
   id          String   @id @default(cuid())
   numero      String   @unique // RM-0001
-  opId        String
-  op          OP       @relation(fields: [opId], references: [id])
+  tipoRM      TipoRM   @default(ENGENHARIA)
+  opId        String?
+  op          OP?      @relation(fields: [opId], references: [id])
+  // categorias da OP cobertas por essa RM (so pra ENGENHARIA)
+  categoriasOP String[] @default([])
   tipo        String   @default("Material") // Material, Consumível
   descricao   String
   observacao  String?

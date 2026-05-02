@@ -11,6 +11,12 @@ const STATUS_LABELS = {
   CANCELADA:     { label: "Cancelada",      className: "bg-gray-100 text-gray-500" },
 };
 
+const TIPO_RM_LABELS = {
+  ENGENHARIA:   { label: "Engenharia",   className: "bg-torg-blue-50 text-torg-blue" },
+  ALMOXARIFADO: { label: "Almoxarifado", className: "bg-torg-orange-50 text-torg-orange-700" },
+  INTERNA:      { label: "Interna",      className: "bg-gray-100 text-gray-700" },
+};
+
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
 export default async function MinhasRMs() {
@@ -25,7 +31,7 @@ export default async function MinhasRMs() {
     orderBy: { createdAt: "desc" },
     take: 50,
     include: {
-      op: { select: { numero: true, cliente: true } },
+      op: { select: { numero: true, cliente: true, obra: true } },
       createdBy: { select: { name: true } },
       _count: { select: { itens: true, cotacoes: true } },
     },
@@ -71,8 +77,8 @@ export default async function MinhasRMs() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nº RM</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP / Obra</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Itens</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cotações</th>
@@ -84,6 +90,7 @@ export default async function MinhasRMs() {
               <tbody className="divide-y divide-gray-100">
                 {rms.map((rm) => {
                   const s = STATUS_LABELS[rm.status] || STATUS_LABELS.ABERTA;
+                  const t = TIPO_RM_LABELS[rm.tipoRM] || TIPO_RM_LABELS.ENGENHARIA;
                   return (
                     <tr key={rm.id} className="hover:bg-gray-50">
                       <td className="px-6 py-3">
@@ -91,8 +98,21 @@ export default async function MinhasRMs() {
                           {rm.numero}
                         </Link>
                       </td>
-                      <td className="px-6 py-3 font-mono text-torg-dark">{rm.op?.numero || "—"}</td>
-                      <td className="px-6 py-3 text-torg-gray">{rm.op?.cliente || "—"}</td>
+                      <td className="px-6 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.className}`}>
+                          {t.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-torg-dark">
+                        {rm.op ? (
+                          <>
+                            <span className="font-mono">{rm.op.numero}</span>
+                            <span className="text-xs text-torg-gray block">{rm.op.cliente}</span>
+                          </>
+                        ) : (
+                          <span className="text-torg-gray text-xs">—</span>
+                        )}
+                      </td>
                       <td className="px-6 py-3 text-torg-dark max-w-xs truncate">{rm.descricao}</td>
                       <td className="px-6 py-3 text-center text-torg-gray">{rm._count.itens}</td>
                       <td className="px-6 py-3 text-center text-torg-gray">{rm._count.cotacoes}</td>

@@ -3,32 +3,49 @@ import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Loader2, AlertCircle, AlertTriangle, CheckCircle2, Plus, Trash2,
-  Upload, FileSpreadsheet, X,
+  ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
+  Trash2, Upload, FileSpreadsheet, X, Wrench, Warehouse, Building2,
 } from "lucide-react";
-import { labelCategoria, getCategoria } from "@/lib/op-categorias";
+import { labelCategoria, categoriasUnicasOP } from "@/lib/op-categorias";
 import { parseTekla } from "@/lib/parse-tekla";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-const TIPOS = [
-  { value: "Material", label: "Material" },
-  { value: "Consumível", label: "Consumível" },
+const TIPOS_RM = [
+  {
+    codigo: "ENGENHARIA",
+    label: "Engenharia",
+    desc: "Lista do Tekla pra fabricação. Vincula categorias do escopo.",
+    icon: Wrench,
+    cor: "torg-blue",
+  },
+  {
+    codigo: "ALMOXARIFADO",
+    label: "Almoxarifado",
+    desc: "Compras avulsas pra obra (sem vínculo a categoria).",
+    icon: Warehouse,
+    cor: "torg-orange",
+  },
+  {
+    codigo: "INTERNA",
+    label: "Interna Torg",
+    desc: "Coisas internas — não vinculadas a obra.",
+    icon: Building2,
+    cor: "torg-dark",
+  },
 ];
-
-// Threshold pra alerta de divergência: qty real > 1.05 × qty estimada
-const THRESHOLD_DIVERGENCIA = 0.05;
 
 export default function NovaRMClient({ ops, userSetor }) {
   const router = useRouter();
+  const [tipoRM, setTipoRM] = useState("ENGENHARIA");
   const [opSelecionada, setOpSelecionada] = useState("");
+  const [categoriasCobertas, setCategoriasCobertas] = useState([]);
   const [tipo, setTipo] = useState("Material");
   const [descricao, setDescricao] = useState("");
   const [observacao, setObservacao] = useState("");
   const [setor, setSetor] = useState(userSetor);
-  const [itensSelecionados, setItensSelecionados] = useState({}); // {[opItemKey]: { qtdReal, descricaoExtra }}
-  const [itensImportados, setItensImportados] = useState([]); // do xlsx
+  const [itensImportados, setItensImportados] = useState([]);
   const [arquivoNome, setArquivoNome] = useState("");
   const [importando, setImportando] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -36,65 +53,16 @@ export default function NovaRMClient({ ops, userSetor }) {
   const fileRef = useRef(null);
 
   const op = useMemo(() => ops.find((o) => o.id === opSelecionada), [ops, opSelecionada]);
+  const categoriasOpDisponiveis = useMemo(() => (op ? categoriasUnicasOP(op) : []), [op]);
 
-  // Combina base + aditivos numa lista plana com identificação da origem
-  const itensDisponiveis = useMemo(() => {
-    if (!op) return [];
-    const lista = [];
-    for (const i of op.itens) {
-      lista.push({
-        chave: `op:${i.id}`,
-        opItemId: i.id,
-        aditivoItemId: null,
-        origem: "Base",
-        ...i,
-      });
-    }
-    for (const ad of op.aditivos) {
-      for (const i of ad.itens) {
-        lista.push({
-          chave: `ad:${i.id}`,
-          opItemId: null,
-          aditivoItemId: i.id,
-          origem: `Aditivo ${ad.numero}`,
-          ...i,
-        });
-      }
-    }
-    return lista;
-  }, [op]);
+  const precisaOP = tipoRM === "ENGENHARIA" || tipoRM === "ALMOXARIFADO";
+  const precisaCategorias = tipoRM === "ENGENHARIA";
 
-  const setItem = (chave, key, value) => {
-    setItensSelecionados((prev) => {
-      const atual = prev[chave] || { qtdReal: 0, descricaoExtra: "" };
-      return { ...prev, [chave]: { ...atual, [key]: value } };
-    });
+  const toggleCategoria = (cat) => {
+    setCategoriasCobertas((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
   };
-  const toggleItem = (chave) => {
-    setItensSelecionados((prev) => {
-      const next = { ...prev };
-      if (next[chave]) delete next[chave];
-      else next[chave] = { qtdReal: 0, descricaoExtra: "" };
-      return next;
-    });
-  };
-
-  const itensComDivergencia = useMemo(() => {
-    const lista = [];
-    for (const [chave, sel] of Object.entries(itensSelecionados)) {
-      const it = itensDisponiveis.find((d) => d.chave === chave);
-      if (!it) continue;
-      const estimado = Number(it.qtdContratada) || 0;
-      const real = Number(sel.qtdReal) || 0;
-      if (estimado > 0 && real > 0) {
-        const diff = (real - estimado) / estimado;
-        if (Math.abs(diff) > THRESHOLD_DIVERGENCIA) {
-          lista.push({ chave, descricao: it.descricao, estimado, real, diffPct: diff * 100, unidade: it.unidade });
-        }
-      }
-    }
-    return lista;
-  }, [itensSelecionados, itensDisponiveis]);
 
   const importarArquivo = async (file) => {
     if (!file) return;
@@ -108,7 +76,6 @@ export default function NovaRMClient({ ops, userSetor }) {
       }
       setItensImportados(itens);
       setArquivoNome(file.name);
-      // Pré-preenche descrição se vazia
       if (!descricao && (meta.cliente || meta.obra)) {
         const parts = [meta.rmRef, meta.obra, meta.cliente].filter(Boolean);
         if (parts.length) setDescricao(`Importação ${parts.join(" — ")}`);
@@ -126,26 +93,16 @@ export default function NovaRMClient({ ops, userSetor }) {
 
   const submit = async () => {
     setErro("");
-    if (!opSelecionada) return setErro("Escolha uma OP.");
+    if (precisaOP && !opSelecionada) return setErro("Escolha uma OP.");
+    if (precisaCategorias && categoriasCobertas.length === 0) {
+      return setErro("Marque pelo menos uma categoria do escopo coberta por essa RM.");
+    }
     if (!descricao.trim()) return setErro("Descreva a RM.");
+    if (itensImportados.length === 0) {
+      return setErro("Suba a planilha com os itens da RM.");
+    }
 
-    // Itens vinculados a OP
-    const itensManuais = Object.entries(itensSelecionados)
-      .map(([chave, sel]) => {
-        const it = itensDisponiveis.find((d) => d.chave === chave);
-        if (!it) return null;
-        return {
-          opItemId: it.opItemId,
-          aditivoItemId: it.aditivoItemId,
-          descricao: sel.descricaoExtra || it.descricao,
-          unidade: it.unidade || "UN",
-          qtd: Number(sel.qtdReal) || 0,
-        };
-      })
-      .filter((x) => x && x.qtd > 0);
-
-    // Itens da planilha (sem vínculo direto a OPItem)
-    const itensXlsx = itensImportados.map((it) => ({
+    const itens = itensImportados.map((it) => ({
       opItemId: null,
       aditivoItemId: null,
       descricao: it.descricao,
@@ -160,24 +117,20 @@ export default function NovaRMClient({ ops, userSetor }) {
       pesoLinear: Number(it.pesoLinear) || null,
     }));
 
-    const itensValidos = [...itensManuais, ...itensXlsx];
-
-    if (itensValidos.length === 0) {
-      return setErro("Adicione pelo menos um item (selecione da OP ou suba uma planilha).");
-    }
-
     setSalvando(true);
     try {
       const res = await fetch("/api/rm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          opId: opSelecionada,
+          tipoRM,
+          opId: precisaOP ? opSelecionada : null,
+          categoriasOP: precisaCategorias ? categoriasCobertas : [],
           tipo,
           descricao: descricao.trim(),
           observacao: observacao.trim() || null,
           setor: setor || null,
-          itens: itensValidos,
+          itens,
         }),
       });
       const data = await res.json();
@@ -197,7 +150,7 @@ export default function NovaRMClient({ ops, userSetor }) {
         </Link>
         <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Nova RM</h2>
         <p className="text-sm text-torg-gray mt-1">
-          Escolha a OP, selecione os itens e preencha as quantidades reais. Divergências serão sinalizadas pra Compras.
+          Solicitação de compra. Escolha o tipo conforme a origem.
         </p>
       </div>
 
@@ -208,16 +161,53 @@ export default function NovaRMClient({ ops, userSetor }) {
         </div>
       )}
 
-      {/* Step 1: dados gerais */}
+      {/* Step 1: Tipo de RM */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 className="text-lg font-semibold text-torg-dark mb-4">Tipo de RM</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {TIPOS_RM.map((t) => {
+            const Icon = t.icon;
+            const ativo = tipoRM === t.codigo;
+            return (
+              <button
+                key={t.codigo}
+                type="button"
+                onClick={() => {
+                  setTipoRM(t.codigo);
+                  if (t.codigo === "INTERNA") setOpSelecionada("");
+                  if (t.codigo !== "ENGENHARIA") setCategoriasCobertas([]);
+                }}
+                className={`text-left p-4 rounded-lg border-2 transition-colors ${
+                  ativo
+                    ? "border-torg-blue bg-torg-blue-50/50"
+                    : "border-gray-200 hover:border-torg-blue-200"
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${
+                  ativo ? "bg-torg-blue text-white" : "bg-gray-100 text-torg-gray"
+                }`}>
+                  <Icon size={20} />
+                </div>
+                <p className="font-semibold text-torg-dark">{t.label}</p>
+                <p className="text-xs text-torg-gray mt-1">{t.desc}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Step 2: dados gerais */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
         <h3 className="text-lg font-semibold text-torg-dark">Dados gerais</h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {precisaOP && (
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Ordem de Produção (OP) *</label>
+            <label className="block text-sm font-medium text-torg-dark mb-1">
+              Ordem de Produção (OP) *
+            </label>
             <select
               value={opSelecionada}
-              onChange={(e) => { setOpSelecionada(e.target.value); setItensSelecionados({}); }}
+              onChange={(e) => { setOpSelecionada(e.target.value); setCategoriasCobertas([]); }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
             >
               <option value="">— Escolher —</option>
@@ -229,24 +219,44 @@ export default function NovaRMClient({ ops, userSetor }) {
             </select>
             {ops.length === 0 && (
               <p className="mt-1 text-xs text-torg-orange-700">
-                Nenhuma OP ativa no momento. Solicite ao Comercial criar uma OP.
+                Nenhuma OP ativa. Solicite ao Comercial criar uma OP.
               </p>
             )}
           </div>
+        )}
 
+        {precisaCategorias && op && (
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Tipo</label>
-            <select
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
-            >
-              {TIPOS.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-torg-dark mb-2">
+              Categorias do escopo cobertas por essa RM *
+            </label>
+            <p className="text-xs text-torg-gray mb-2">
+              Marque o que essa RM compra. Ajuda a Compras a saber se o escopo todo está coberto.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {categoriasOpDisponiveis.map((cat) => {
+                const selecionada = categoriasCobertas.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => toggleCategoria(cat)}
+                    className={`px-3 py-1.5 rounded-full text-sm border-2 transition-colors ${
+                      selecionada
+                        ? "border-torg-blue bg-torg-blue text-white"
+                        : "border-gray-200 text-torg-dark hover:border-torg-blue-200"
+                    }`}
+                  >
+                    {labelCategoria(cat)}
+                  </button>
+                );
+              })}
+            </div>
+            {categoriasOpDisponiveis.length === 0 && (
+              <p className="text-xs text-torg-gray italic">A OP escolhida não tem itens cadastrados.</p>
+            )}
           </div>
-        </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-torg-dark mb-1">Descrição da RM *</label>
@@ -259,7 +269,18 @@ export default function NovaRMClient({ ops, userSetor }) {
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Tipo de material</label>
+            <select
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+            >
+              <option>Material</option>
+              <option>Consumível</option>
+            </select>
+          </div>
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Setor</label>
             <input
@@ -283,15 +304,15 @@ export default function NovaRMClient({ ops, userSetor }) {
         </div>
       </div>
 
-      {/* Step 2: importar planilha (Tekla) */}
+      {/* Step 3: importar planilha */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <div>
             <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
-              <FileSpreadsheet size={20} className="text-torg-blue" /> Importar planilha (Tekla)
+              <FileSpreadsheet size={20} className="text-torg-blue" /> Itens da RM (planilha)
             </h3>
             <p className="text-sm text-torg-gray mt-1">
-              Sobe o .xlsx exportado do Tekla. Cada linha vira um item da RM com peso, perfil, etc.
+              Suba o .xlsx com a lista de itens dessa requisição.
             </p>
           </div>
           {itensImportados.length > 0 && (
@@ -334,7 +355,7 @@ export default function NovaRMClient({ ops, userSetor }) {
         </div>
 
         {itensImportados.length > 0 && (
-          <div className="mt-4 max-h-[300px] overflow-y-auto border border-gray-100 rounded-lg">
+          <div className="mt-4 max-h-[400px] overflow-y-auto border border-gray-100 rounded-lg">
             <table className="w-full text-xs">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
@@ -382,118 +403,6 @@ export default function NovaRMClient({ ops, userSetor }) {
         )}
       </div>
 
-      {/* Step 3: seleção de itens da OP (opcional, complementa o xlsx) */}
-      {op && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-torg-dark">
-              Itens da {op.numero} (opcional, {itensDisponiveis.length} disponíveis)
-            </h3>
-            <p className="text-sm text-torg-gray mt-1">
-              Marque os itens que essa RM consome diretamente da OP (com qtd real). Use isso quando não tem planilha — ou pra adicionar consumos extras junto com a planilha acima.
-            </p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 w-10"></th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Origem</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Estimativa</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd real *</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhe (opcional)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {itensDisponiveis.map((it) => {
-                  const sel = itensSelecionados[it.chave];
-                  const checked = !!sel;
-                  return (
-                    <tr key={it.chave} className={checked ? "bg-torg-blue-50/30" : ""}>
-                      <td className="px-3 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleItem(it.chave)}
-                          className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        <span className={`px-2 py-0.5 rounded-full font-medium text-[10px] ${
-                          it.origem === "Base" ? "bg-gray-100 text-gray-700" : "bg-torg-orange-50 text-torg-orange-700"
-                        }`}>
-                          {it.origem}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-torg-gray">{labelCategoria(it.categoria)}</td>
-                      <td className="px-3 py-2 text-torg-dark font-medium">{it.descricao}</td>
-                      <td className="px-3 py-2 text-right text-torg-gray text-xs tabular-nums">
-                        {it.qtdContratada
-                          ? `${it.qtdContratada} ${it.unidade || ""}`
-                          : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={sel?.qtdReal ?? ""}
-                          onChange={(e) => setItem(it.chave, "qtdReal", parseFloat(e.target.value) || 0)}
-                          disabled={!checked}
-                          placeholder={it.unidade || ""}
-                          className="w-24 border border-gray-200 rounded px-2 py-1 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue disabled:bg-gray-50"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={sel?.descricaoExtra ?? ""}
-                          onChange={(e) => setItem(it.chave, "descricaoExtra", e.target.value)}
-                          disabled={!checked}
-                          placeholder="Especifique se precisar"
-                          className="w-full min-w-[160px] border border-gray-200 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-torg-blue disabled:bg-gray-50"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Aviso de divergência */}
-          {itensComDivergencia.length > 0 && (
-            <div className="mx-6 my-4 bg-torg-orange-50 border border-torg-orange-200 rounded-lg p-4">
-              <div className="flex items-start gap-2 text-torg-orange-700">
-                <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-sm">
-                    {itensComDivergencia.length} ite{itensComDivergencia.length === 1 ? "m" : "ns"} com divergência {">"}{" "}
-                    {(THRESHOLD_DIVERGENCIA * 100).toFixed(0)}% da estimativa do comercial
-                  </p>
-                  <p className="text-xs text-torg-orange-700/80 mt-1">
-                    Compras será notificada pra revisar com o comercial. Detalhe quando puder no campo &quot;Detalhe&quot;.
-                  </p>
-                  <ul className="mt-2 space-y-1 text-xs">
-                    {itensComDivergencia.map((d) => (
-                      <li key={d.chave} className="text-torg-dark">
-                        <strong>{d.descricao}</strong>: estimado {d.estimado} {d.unidade}, real {d.real} {d.unidade}{" "}
-                        <span className={d.diffPct > 0 ? "text-red-600 font-bold" : "text-torg-orange-700 font-bold"}>
-                          ({d.diffPct > 0 ? "+" : ""}{d.diffPct.toFixed(1)}%)
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="flex justify-end gap-3">
         <Link
           href="/rm"
@@ -503,7 +412,7 @@ export default function NovaRMClient({ ops, userSetor }) {
         </Link>
         <button
           onClick={submit}
-          disabled={salvando || !opSelecionada}
+          disabled={salvando}
           className="px-6 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50"
         >
           {salvando && <Loader2 size={16} className="animate-spin" />}

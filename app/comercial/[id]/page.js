@@ -45,13 +45,31 @@ export default async function OPDetailPage({ params }) {
         include: { createdBy: { select: { name: true } } },
       },
       _count: { select: { rms: true } },
+      rms: {
+        select: { id: true, numero: true, tipoRM: true, categoriasOP: true, status: true },
+      },
     },
   });
 
   if (!op) notFound();
 
+  // Cobertura por categoria: pra cada categoria da OP, lista RMs (apenas ENGENHARIA) que cobrem
+  const categoriasNoEscopo = new Set();
+  for (const it of op.itens) categoriasNoEscopo.add(it.categoria);
+  for (const ad of op.aditivos) for (const it of ad.itens) categoriasNoEscopo.add(it.categoria);
+
+  const cobertura = {};
+  for (const cat of categoriasNoEscopo) cobertura[cat] = [];
+  for (const rm of op.rms) {
+    if (rm.tipoRM !== "ENGENHARIA") continue;
+    for (const cat of rm.categoriasOP || []) {
+      if (cobertura[cat]) cobertura[cat].push({ id: rm.id, numero: rm.numero, status: rm.status });
+    }
+  }
+
   // Transformar pra plain object (Date → string)
   const opData = JSON.parse(JSON.stringify(op));
+  opData.cobertura = cobertura;
 
   return (
     <div className="space-y-6 max-w-7xl">
