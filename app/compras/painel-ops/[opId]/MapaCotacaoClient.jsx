@@ -338,19 +338,49 @@ export default function MapaCotacaoClient({ op }) {
                     <p className="text-[10px] text-torg-gray group-open:hidden">clique pra ver itens</p>
                   </div>
                 </summary>
-                <ul className="mt-3 pt-3 border-t border-gray-100 divide-y divide-gray-100 text-sm">
-                  {itensPorFornecedor[f.cotacaoId].map((it, i) => (
-                    <li key={i} className="py-1.5 flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-torg-dark truncate">{it.descricao}</p>
-                        <p className="text-xs text-torg-gray">
-                          {it.qtd} {it.unidade} × {fmtMoeda(it.precoUnit)}
-                        </p>
-                      </div>
-                      <p className="text-torg-dark font-medium tabular-nums whitespace-nowrap">{fmtMoeda(it.total)}</p>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-3 pt-3 border-t border-gray-100 overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-torg-gray">
+                        <th className="px-1 py-1 text-left font-medium">Item</th>
+                        <th className="px-1 py-1 text-right font-medium">Qtd</th>
+                        <th className="px-1 py-1 text-right font-medium">Bruto</th>
+                        <th className="px-1 py-1 text-right font-medium">ICMS</th>
+                        <th className="px-1 py-1 text-right font-medium">IPI</th>
+                        <th className="px-1 py-1 text-right font-medium">Líquido</th>
+                        <th className="px-1 py-1 text-right font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {itensPorFornecedor[f.cotacaoId].map((it, i) => (
+                        <tr key={i}>
+                          <td className="px-1 py-1.5 text-torg-dark truncate max-w-[200px]" title={it.descricao}>{it.descricao}</td>
+                          <td className="px-1 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap">
+                            {it.qtd} {it.unidade}
+                          </td>
+                          <td className="px-1 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap">
+                            {fmtMoeda(it.precoUnit)}
+                          </td>
+                          <td className="px-1 py-1.5 text-right text-torg-gray tabular-nums">
+                            {it.icmsPct > 0 ? `−${it.icmsPct}%` : "—"}
+                          </td>
+                          <td className="px-1 py-1.5 text-right text-torg-gray tabular-nums">
+                            {it.ipiPct > 0 ? `+${it.ipiPct}%` : "—"}
+                          </td>
+                          <td className="px-1 py-1.5 text-right text-torg-orange-700 font-medium tabular-nums whitespace-nowrap">
+                            {fmtMoeda(it.precoLiquido || it.precoUnit)}
+                          </td>
+                          <td className="px-1 py-1.5 text-right text-torg-dark font-bold tabular-nums whitespace-nowrap">
+                            {fmtMoeda(it.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="text-[10px] text-torg-gray italic mt-2 px-1">
+                    Líquido = Bruto × (1 − ICMS%) × (1 + IPI%) — ICMS recuperado como crédito, IPI somado por fora.
+                  </p>
+                </div>
               </details>
             ))}
           </div>
