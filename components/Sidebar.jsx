@@ -1,34 +1,36 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, PlusCircle, Package, FolderKanban } from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
+import { BarChart3, PlusCircle, Package, FolderKanban, LogOut } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
   { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban },
-  { href: "/compras", label: "Painel de Compras", icon: BarChart3 },
+  { href: "/compras", label: "Painel de Compras", icon: BarChart3, exact: true },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/catalogo", label: "Catálogo", icon: Package },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   return (
     <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col min-h-screen fixed left-0 top-0">
       <div className="px-5 py-5 border-b border-torg-blue-100">
-        <TorgLogo size="md" />
+        <TorgLogo size="sm" />
         <p className="text-[10px] text-torg-gray mt-1 tracking-wider uppercase">
           Portal de Compras
         </p>
       </div>
+
       <nav className="flex-1 px-3 py-4 space-y-1">
         {menu.map((m) => {
           const Icon = m.icon;
-          const active =
-            pathname === m.href ||
-            (m.href === "/compras" && pathname.startsWith("/compras/rm")) ||
-            (m.href !== "/compras" && pathname.startsWith(m.href));
+          const active = m.exact
+            ? pathname === m.href || pathname.startsWith("/compras/rm/")
+            : pathname.startsWith(m.href);
           return (
             <Link
               key={m.href}
@@ -45,13 +47,23 @@ export default function Sidebar() {
           );
         })}
       </nav>
-      <div className="px-5 py-4 border-t border-torg-blue-100 text-xs text-torg-gray">
-        <div className="flex items-center justify-between">
-          <span>Integração Omie</span>
-          <span className="px-2 py-0.5 bg-torg-blue-50 text-torg-blue rounded-full text-[10px] font-semibold">
-            v1.2
-          </span>
-        </div>
+
+      <div className="px-5 py-4 border-t border-torg-blue-100 text-xs">
+        {session?.user && (
+          <div className="mb-3">
+            <p className="text-torg-dark font-medium truncate">{session.user.name}</p>
+            <p className="text-torg-gray truncate">{session.user.email}</p>
+            <p className="text-[10px] text-torg-gray uppercase tracking-wide mt-0.5">
+              {session.user.role}
+            </p>
+          </div>
+        )}
+        <button
+          onClick={() => signOut({ callbackUrl: "/entrar" })}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-torg-gray hover:bg-gray-50 hover:text-torg-dark transition-colors"
+        >
+          <LogOut size={14} /> Sair
+        </button>
       </div>
     </aside>
   );

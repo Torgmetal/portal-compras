@@ -62,12 +62,12 @@ export default async function PainelCompras({ searchParams }) {
   const cards = [
     { label: "RMs ativas", value: totalAtivas, color: "bg-torg-blue", Icon: FileText },
     { label: "Abertas", value: statusCount.ABERTA || 0, color: "bg-torg-orange", Icon: ClipboardList },
-    { label: "Em Cotação", value: emCotacao, color: "bg-torg-blue-700", Icon: BarChart3 },
-    { label: "Pedido Gerado", value: statusCount.PEDIDO_GERADO || 0, color: "bg-torg-dark", Icon: Truck },
+    { label: "Em cotação", value: emCotacao, color: "bg-torg-blue-700", Icon: BarChart3 },
+    { label: "Pedido gerado", value: statusCount.PEDIDO_GERADO || 0, color: "bg-torg-dark", Icon: Truck },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de Compras</h2>
@@ -93,15 +93,15 @@ export default async function PainelCompras({ searchParams }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {cards.map((c) => (
-          <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-5 flex items-center gap-4">
-            <div className={`${c.color} p-3 rounded-lg`}>
-              <c.Icon size={28} className="text-white" />
+          <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+            <div className={`${c.color} p-2.5 rounded-lg`}>
+              <c.Icon size={20} className="text-white" />
             </div>
-            <div>
-              <p className="text-sm text-torg-gray">{c.label}</p>
-              <p className="text-2xl font-extrabold text-torg-dark">{c.value}</p>
+            <div className="min-w-0">
+              <p className="text-xs text-torg-gray truncate">{c.label}</p>
+              <p className="text-xl font-extrabold text-torg-dark tabular-nums">{c.value}</p>
             </div>
           </div>
         ))}
@@ -116,11 +116,6 @@ export default async function PainelCompras({ searchParams }) {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-torg-dark">
-              {verArquivadas ? "Histórico" : "Requisições ativas"} ({rms.length})
-            </h3>
-          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">

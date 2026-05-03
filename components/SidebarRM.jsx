@@ -19,7 +19,7 @@ export default function SidebarRM() {
       <div className="px-5 py-5 border-b border-torg-blue-100">
         <TorgLogo size="sm" />
         <p className="text-[10px] text-torg-gray mt-1 tracking-wider uppercase">
-          Portal RM
+          Portal de RMs
         </p>
       </div>
 

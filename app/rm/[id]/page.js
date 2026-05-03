@@ -49,7 +49,7 @@ export default async function RMDetail({ params }) {
       </Link>
 
       {/* Cabeçalho */}
-      <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -117,6 +117,7 @@ export default async function RMDetail({ params }) {
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase w-8">#</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cód. Omie</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unid.</th>
@@ -129,6 +130,7 @@ export default async function RMDetail({ params }) {
                 <tr key={it.id} className="hover:bg-gray-50">
                   <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
                   <td className="px-3 py-1.5 text-torg-dark font-medium">{it.descricao}</td>
+                  <td className="px-3 py-1.5 text-torg-gray text-xs font-mono">{it.codigo || "—"}</td>
                   <td className="px-3 py-1.5 text-torg-gray text-xs">{it.material || "—"}</td>
                   <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.qtd}</td>
                   <td className="px-3 py-1.5 text-torg-gray">{it.unidade}</td>

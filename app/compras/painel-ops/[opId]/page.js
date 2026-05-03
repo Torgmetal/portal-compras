@@ -11,6 +11,14 @@ export const dynamic = "force-dynamic";
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 
+const STATUS_RM_BADGE = {
+  ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },
+  EM_COTACAO:    { label: "Em cotação",     className: "bg-torg-orange-50 text-torg-orange-700" },
+  COTADA:        { label: "Cotada",         className: "bg-torg-blue-100 text-torg-blue-800" },
+  PEDIDO_GERADO: { label: "Pedido gerado",  className: "bg-torg-dark text-white" },
+  CANCELADA:     { label: "Cancelada",      className: "bg-gray-100 text-gray-500" },
+};
+
 export default async function PainelOPDetalhe({ params }) {
   await requireRole(["ADMIN", "COMPRAS"]);
 
@@ -86,7 +94,7 @@ export default async function PainelOPDetalhe({ params }) {
         <ArrowLeft size={14} /> Voltar pro Painel de OPs
       </Link>
 
-      <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight font-mono">{data.numero}</h2>
           <p className="text-torg-dark font-medium mt-1">{data.cliente}</p>
@@ -106,7 +114,13 @@ export default async function PainelOPDetalhe({ params }) {
           </div>
           <div>
             <p className="text-xs text-torg-gray">Saldo restante</p>
-            <p className={`text-2xl font-extrabold tabular-nums ${saldo < 0 ? "text-red-600" : saldo < verbaTotal * 0.3 ? "text-torg-orange-700" : "text-torg-orange-700"}`}>
+            <p className={`text-2xl font-extrabold tabular-nums ${
+              saldo < 0
+                ? "text-red-600"
+                : consumoPct >= 70
+                ? "text-torg-orange-700"
+                : "text-torg-dark"
+            }`}>
               {fmtMoeda(saldo)}
             </p>
             {saldo < 0 && (
@@ -138,7 +152,14 @@ export default async function PainelOPDetalhe({ params }) {
                 <div className="flex items-center gap-3 text-xs text-torg-gray">
                   <span>{rm.itens.length} itens</span>
                   <span>{rm.cotacoes.length} cotações</span>
-                  <span className="px-2 py-0.5 rounded-full bg-gray-100">{rm.status}</span>
+                  {(() => {
+                    const s = STATUS_RM_BADGE[rm.status] || STATUS_RM_BADGE.ABERTA;
+                    return (
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${s.className}`}>
+                        {s.label}
+                      </span>
+                    );
+                  })()}
                 </div>
               </li>
             ))}

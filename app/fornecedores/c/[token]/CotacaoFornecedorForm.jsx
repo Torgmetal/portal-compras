@@ -152,7 +152,7 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
 
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         {/* Boas-vindas + dados da RM */}
-        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <p className="text-sm text-torg-gray">Olá, <strong className="text-torg-dark">{cotacao.fornecedorNome}</strong></p>
           <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight mt-1">
             Solicitação de Cotação — RM {cotacao.rm.numero}

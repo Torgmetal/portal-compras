@@ -52,7 +52,7 @@ export default function RMComprasClient({ rm, userRole }) {
   return (
     <>
       {/* Cabeçalho */}
-      <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <div className="flex items-center gap-2 flex-wrap">

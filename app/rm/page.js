@@ -106,7 +106,7 @@ export default async function MinhasRMs({ searchParams }) {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">

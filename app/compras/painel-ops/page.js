@@ -131,7 +131,7 @@ export default async function PainelOPs() {
               <Link
                 key={op.id}
                 href={`/compras/painel-ops/${op.id}`}
-                className="block bg-white rounded-xl shadow-sm border border-torg-blue-100 hover:shadow-md transition-shadow p-5"
+                className="block bg-white rounded-xl shadow-sm border border-gray-100 hover:border-torg-blue-200 hover:shadow-md transition-all p-5"
               >
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-3 min-w-0 flex-1">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { PlusCircle, FolderKanban } from "lucide-react";
+import { PlusCircle, FolderKanban, Activity, AlertTriangle, DollarSign } from "lucide-react";
 
 // Sempre busca dados frescos do banco
 export const dynamic = "force-dynamic";
@@ -52,6 +52,26 @@ export default async function ComercialHome() {
     };
   });
 
+  const kpis = opsComTotais.reduce(
+    (acc, op) => {
+      acc.total += 1;
+      if (op.statusCalc === "EM_EXECUCAO") acc.emExecucao += 1;
+      if (op.statusCalc === "ATRASADA") acc.atrasadas += 1;
+      if (op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA") {
+        acc.verbaAtiva += op.verbaTotal;
+      }
+      return acc;
+    },
+    { total: 0, emExecucao: 0, atrasadas: 0, verbaAtiva: 0 }
+  );
+
+  const cards = [
+    { label: "Total OPs",    value: kpis.total,                 color: "bg-torg-blue",     Icon: FolderKanban },
+    { label: "Em execução",  value: kpis.emExecucao,            color: "bg-torg-orange",   Icon: Activity },
+    { label: "Atrasadas",    value: kpis.atrasadas,             color: "bg-red-500",       Icon: AlertTriangle },
+    { label: "Verba ativa",  value: fmtMoeda(kpis.verbaAtiva),  color: "bg-torg-dark",     Icon: DollarSign },
+  ];
+
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -69,6 +89,22 @@ export default async function ComercialHome() {
         </Link>
       </div>
 
+      {opsComTotais.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {cards.map((c) => (
+            <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+              <div className={`${c.color} p-2.5 rounded-lg`}>
+                <c.Icon size={20} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-torg-gray truncate">{c.label}</p>
+                <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate">{c.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {opsComTotais.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <FolderKanban size={48} className="mx-auto text-gray-300 mb-4" />
@@ -84,7 +120,7 @@ export default async function ComercialHome() {
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
