@@ -572,8 +572,9 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, onClose, onSaved 
             type="number"
             step="0.01"
             min="0"
-            value={valorProposto}
+            value={valorProposto || ""}
             onChange={(e) => setValorProposto(e.target.value)}
+            placeholder="R$ 0,00"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
           />
         </div>

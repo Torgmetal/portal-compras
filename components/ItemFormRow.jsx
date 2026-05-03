@@ -118,8 +118,9 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
               </label>
               <input
                 type="number" step="0.01" min="0"
-                value={item.qtdContratada}
+                value={item.qtdContratada || ""}
                 onChange={(e) => setKey("qtdContratada", parseFloat(e.target.value) || 0)}
+                placeholder="0,00"
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
               />
             </div>
@@ -139,8 +140,9 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
                 </label>
                 <input
                   type="number" step="0.01" min="0"
-                  value={item.cmcMedio}
+                  value={item.cmcMedio || ""}
                   onChange={(e) => setKey("cmcMedio", parseFloat(e.target.value) || 0)}
+                  placeholder="R$ 0,00"
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
                 />
               </div>
@@ -153,16 +155,18 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
             <div>
               <label className="block text-xs font-medium text-torg-gray mb-1">Meses</label>
               <input
-                type="number" step="1" min="0" value={item.meses}
+                type="number" step="1" min="0" value={item.meses || ""}
                 onChange={(e) => setKey("meses", parseInt(e.target.value) || 0)}
+                placeholder="0"
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-gray mb-1">Valor / mês (R$)</label>
               <input
-                type="number" step="0.01" min="0" value={item.valorPorMes}
+                type="number" step="0.01" min="0" value={item.valorPorMes || ""}
                 onChange={(e) => setKey("valorPorMes", parseFloat(e.target.value) || 0)}
+                placeholder="R$ 0,00"
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
               />
             </div>
@@ -187,9 +191,10 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
             )}
           </label>
           <input
-            type="number" step="0.01" min="0" value={item.valorVerba}
+            type="number" step="0.01" min="0" value={item.valorVerba || ""}
             onChange={(e) => setKey("valorVerba", parseFloat(e.target.value) || 0)}
             readOnly={verbaReadonly}
+            placeholder="R$ 0,00"
             className={`w-full border rounded px-2 py-1.5 text-sm text-right font-medium tabular-nums focus:ring-1 focus:ring-torg-blue ${
               verbaReadonly ? "bg-gray-50 border-gray-200 cursor-not-allowed" : "border-gray-300"
             }`}
