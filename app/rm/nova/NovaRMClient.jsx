@@ -35,6 +35,7 @@ export default function NovaRMClient({ ops, userSetor }) {
   const [opSelecionada, setOpSelecionada] = useState("");
   const [categoriasCobertas, setCategoriasCobertas] = useState([]);
   const [tipo, setTipo] = useState("Material");
+  const [numero, setNumero] = useState("");
   const [descricao, setDescricao] = useState("");
   const [observacao, setObservacao] = useState("");
   const [setor, setSetor] = useState(userSetor);
@@ -69,6 +70,8 @@ export default function NovaRMClient({ ops, userSetor }) {
       }
       setItensImportados(itens);
       setArquivoNome(file.name);
+      // Pre-popula numero da RM com o rmRef do cabecalho do Tekla (ex: "T83-001")
+      if (!numero && meta.rmRef) setNumero(meta.rmRef);
       if (!descricao && (meta.cliente || meta.obra)) {
         const parts = [meta.rmRef, meta.obra, meta.cliente].filter(Boolean);
         if (parts.length) setDescricao(`Importação ${parts.join(" — ")}`);
@@ -101,6 +104,7 @@ export default function NovaRMClient({ ops, userSetor }) {
     if (precisaCategorias && categoriasCobertas.length === 0) {
       return setErro("Marque pelo menos uma categoria do escopo coberta por essa RM.");
     }
+    if (!numero.trim()) return setErro("Informe o número da RM.");
     if (!descricao.trim()) return setErro("Descreva a RM.");
     // Filtra itens manuais vazios (descricao em branco)
     const itensValidos = itensImportados.filter((it) => it.descricao && it.descricao.trim());
@@ -129,6 +133,7 @@ export default function NovaRMClient({ ops, userSetor }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          numero: numero.trim(),
           tipoRM,
           opId: precisaOP ? opSelecionada : null,
           categoriasOP: precisaCategorias ? categoriasCobertas : [],
@@ -264,15 +269,30 @@ export default function NovaRMClient({ ops, userSetor }) {
           </div>
         )}
 
-        <div>
-          <label className="block text-sm font-medium text-torg-dark mb-1">Descrição da RM *</label>
-          <input
-            type="text"
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            placeholder="Ex: Compra inicial de chapas pra início da fabricação"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Nº RM *</label>
+            <input
+              type="text"
+              value={numero}
+              onChange={(e) => setNumero(e.target.value.toUpperCase())}
+              placeholder="Ex: T83-001"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono font-semibold focus:ring-2 focus:ring-torg-blue"
+            />
+            <p className="text-[10px] text-torg-gray mt-1">
+              Pré-preenchido com o número do Tekla quando você sobe a planilha. Pode editar.
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-torg-dark mb-1">Descrição da RM *</label>
+            <input
+              type="text"
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              placeholder="Ex: Compra inicial de chapas"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

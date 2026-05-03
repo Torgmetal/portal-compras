@@ -20,6 +20,7 @@ const itemSchema = z.object({
 });
 
 const schema = z.object({
+  numero: z.string().optional().nullable(),
   tipoRM: z.enum(["ENGENHARIA", "INTERNA"]).default("ENGENHARIA"),
   opId: z.string().nullable().optional(),
   categoriasOP: z.array(z.string()).default([]),
@@ -45,14 +46,26 @@ export async function POST(req) {
     return NextResponse.json({ error: "Dados inválidos: " + (e.message || "") }, { status: 400 });
   }
 
-  // Próximo número de RM (RM-0001, RM-0002, etc) — global
-  const ultima = await prisma.rM.findFirst({ orderBy: { createdAt: "desc" }, select: { numero: true } });
-  let proximoNumero = "0001";
-  if (ultima?.numero) {
-    const m = ultima.numero.match(/^(?:RM-)?(\d+)$/);
-    if (m) proximoNumero = String(parseInt(m[1]) + 1).padStart(4, "0");
+  // Numero da RM: usa o que o usuario informou (geralmente vem do Tekla,
+  // tipo "T83-001"). Se nao vier, gera sequencial como fallback.
+  let numeroRM = (body.numero || "").trim().toUpperCase();
+  if (!numeroRM) {
+    const ultima = await prisma.rM.findFirst({ orderBy: { createdAt: "desc" }, select: { numero: true } });
+    let proximoNumero = "0001";
+    if (ultima?.numero) {
+      const m = ultima.numero.match(/^(?:RM-)?(\d+)$/);
+      if (m) proximoNumero = String(parseInt(m[1]) + 1).padStart(4, "0");
+    }
+    numeroRM = `RM-${proximoNumero}`;
   }
-  const numeroRM = `RM-${proximoNumero}`;
+  // Valida unicidade
+  const existe = await prisma.rM.findUnique({ where: { numero: numeroRM } });
+  if (existe) {
+    return NextResponse.json(
+      { error: `Já existe uma RM com o número "${numeroRM}". Use outro número.` },
+      { status: 409 }
+    );
+  }
 
   const rm = await prisma.rM.create({
     data: {
