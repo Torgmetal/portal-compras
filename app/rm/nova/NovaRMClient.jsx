@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
-  Trash2, Upload, FileSpreadsheet, X, Wrench, Building2,
+  Trash2, Upload, FileSpreadsheet, X, Wrench, Building2, Plus,
 } from "lucide-react";
 import { labelCategoria, categoriasUnicasOP } from "@/lib/op-categorias";
 import { parseTekla } from "@/lib/parse-tekla";
@@ -84,6 +84,17 @@ export default function NovaRMClient({ ops, userSetor }) {
     setItensImportados((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const adicionarItemManual = () => {
+    setItensImportados((prev) => [
+      ...prev,
+      { descricao: "", codigo: "", material: "", qtd: 1, unidade: "UN", peso: 0, comprimento: "", manual: true },
+    ]);
+  };
+
+  const editarItem = (idx, campo, valor) => {
+    setItensImportados((prev) => prev.map((it, i) => (i === idx ? { ...it, [campo]: valor } : it)));
+  };
+
   const submit = async () => {
     setErro("");
     if (precisaOP && !opSelecionada) return setErro("Escolha uma OP.");
@@ -91,11 +102,13 @@ export default function NovaRMClient({ ops, userSetor }) {
       return setErro("Marque pelo menos uma categoria do escopo coberta por essa RM.");
     }
     if (!descricao.trim()) return setErro("Descreva a RM.");
-    if (itensImportados.length === 0) {
-      return setErro("Suba a planilha com os itens da RM.");
+    // Filtra itens manuais vazios (descricao em branco)
+    const itensValidos = itensImportados.filter((it) => it.descricao && it.descricao.trim());
+    if (itensValidos.length === 0) {
+      return setErro("Adicione ao menos um item — pela planilha ou manualmente.");
     }
 
-    const itens = itensImportados.map((it) => ({
+    const itens = itensValidos.map((it) => ({
       opItemId: null,
       aditivoItemId: null,
       descricao: it.descricao,
@@ -297,20 +310,20 @@ export default function NovaRMClient({ ops, userSetor }) {
         </div>
       </div>
 
-      {/* Step 3: importar planilha */}
+      {/* Step 3: itens da RM (planilha ou manual) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <div>
             <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
-              <FileSpreadsheet size={20} className="text-torg-blue" /> Itens da RM (planilha)
+              <FileSpreadsheet size={20} className="text-torg-blue" /> Itens da RM
             </h3>
             <p className="text-sm text-torg-gray mt-1">
-              Suba o .xlsx com a lista de itens dessa requisição.
+              Suba a planilha .xlsx ou adicione itens manualmente.
             </p>
           </div>
           {itensImportados.length > 0 && (
             <span className="text-xs bg-torg-blue-50 text-torg-blue px-3 py-1 rounded-full font-medium">
-              {itensImportados.length} itens · {itensImportados.reduce((s, it) => s + (it.peso || 0), 0).toFixed(2)} kg total
+              {itensImportados.length} itens · {itensImportados.reduce((s, it) => s + (Number(it.peso) || 0), 0).toFixed(2)} kg total
             </span>
           )}
         </div>
@@ -324,6 +337,13 @@ export default function NovaRMClient({ ops, userSetor }) {
           >
             {importando ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
             {importando ? "Lendo..." : arquivoNome ? "Trocar arquivo" : "Selecionar .xlsx"}
+          </button>
+          <button
+            type="button"
+            onClick={adicionarItemManual}
+            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+          >
+            <Plus size={16} /> Adicionar item manual
           </button>
           <input
             ref={fileRef}
@@ -364,16 +384,70 @@ export default function NovaRMClient({ ops, userSetor }) {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {itensImportados.slice(0, 200).map((it, i) => (
-                  <tr key={i} className="hover:bg-gray-50">
+                  <tr key={i} className={`hover:bg-gray-50 ${it.manual ? "bg-torg-blue-50/30" : ""}`}>
                     <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
-                    <td className="px-3 py-1.5 text-torg-dark font-medium">{it.descricao}</td>
-                    <td className="px-3 py-1.5 text-torg-gray">{it.material || "—"}</td>
-                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.qtd}</td>
-                    <td className="px-3 py-1.5 text-torg-gray">{it.unidade || "UN"}</td>
-                    <td className="px-3 py-1.5 text-torg-gray">{it.comprimento || "—"}</td>
-                    <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums">
-                      {it.peso > 0 ? it.peso.toFixed(2) : "—"}
-                    </td>
+                    {it.manual ? (
+                      <>
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="text" value={it.descricao}
+                            onChange={(e) => editarItem(i, "descricao", e.target.value)}
+                            placeholder="Descrição do item"
+                            className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="text" value={it.material || ""}
+                            onChange={(e) => editarItem(i, "material", e.target.value)}
+                            placeholder="—"
+                            className="w-24 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <input
+                            type="number" step="0.01" min="0" value={it.qtd || ""}
+                            onChange={(e) => editarItem(i, "qtd", parseFloat(e.target.value) || 0)}
+                            className="w-16 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="text" value={it.unidade || ""}
+                            onChange={(e) => editarItem(i, "unidade", e.target.value.toUpperCase())}
+                            placeholder="UN"
+                            className="w-12 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="text" value={it.comprimento || ""}
+                            onChange={(e) => editarItem(i, "comprimento", e.target.value)}
+                            placeholder="—"
+                            className="w-16 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <input
+                            type="number" step="0.01" min="0" value={it.peso || ""}
+                            onChange={(e) => editarItem(i, "peso", parseFloat(e.target.value) || 0)}
+                            placeholder="—"
+                            className="w-16 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-3 py-1.5 text-torg-dark font-medium">{it.descricao}</td>
+                        <td className="px-3 py-1.5 text-torg-gray">{it.material || "—"}</td>
+                        <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.qtd}</td>
+                        <td className="px-3 py-1.5 text-torg-gray">{it.unidade || "UN"}</td>
+                        <td className="px-3 py-1.5 text-torg-gray">{it.comprimento || "—"}</td>
+                        <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums">
+                          {it.peso > 0 ? Number(it.peso).toFixed(2) : "—"}
+                        </td>
+                      </>
+                    )}
                     <td className="px-3 py-1.5">
                       <button
                         type="button"
