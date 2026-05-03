@@ -1,7 +1,7 @@
 import SidebarRM from "@/components/SidebarRM";
 
 export const metadata = {
-  title: "Torg Metal — Portal de Requisições",
+  title: "Workspace Torg — Portal de RMs",
   description: "Lançamento de Requisições de Material vinculadas a OPs.",
 };
 

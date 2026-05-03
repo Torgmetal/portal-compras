@@ -1,18 +1,25 @@
 import Image from "next/image";
 import Link from "next/link";
 import TorgLogo from "@/components/TorgLogo";
-import { ClipboardList, ShoppingCart, Truck, ArrowRight } from "lucide-react";
+import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight } from "lucide-react";
 
 const FOOTER_LOGO_W = 180;
 const FOOTER_LOGO_H = Math.round((FOOTER_LOGO_W * 1080) / 1920);
 
 const portais = [
   {
+    href: "/comercial",
+    label: "Comercial",
+    desc: "Cadastro de Ordens de Produção, revisões, aditivos e prazos.",
+    Icon: FolderKanban,
+    bg: "bg-torg-blue",
+  },
+  {
     href: "/rm",
     label: "Requisições (RM)",
     desc: "Equipe interna lança requisições de material e consumíveis.",
     Icon: ClipboardList,
-    bg: "bg-torg-blue",
+    bg: "bg-torg-blue-700",
   },
   {
     href: "/compras",
@@ -80,13 +87,16 @@ export default function Landing() {
       <section id="portais" className="max-w-6xl mx-auto px-6 py-20">
         <div className="text-center mb-12">
           <p className="text-torg-orange font-semibold tracking-widest text-xs uppercase mb-2">
-            Acesso por perfil
+            Workspace Torg
           </p>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-torg-dark tracking-tight">
             Escolha o portal que você usa
           </h2>
+          <p className="text-torg-gray text-sm mt-3 max-w-xl mx-auto">
+            O Workspace reúne os portais internos da Torg Metal — cada perfil acessa o seu.
+          </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {portais.map(({ href, label, desc, Icon, bg }) => (
             <Link
               key={href}
@@ -150,7 +160,7 @@ export default function Landing() {
             height={FOOTER_LOGO_H}
             className="opacity-90"
           />
-          <p>© {new Date().getFullYear()} Torg Metal — Portal Interno</p>
+          <p>© {new Date().getFullYear()} Torg Metal — Workspace Torg</p>
         </div>
       </footer>
     </div>

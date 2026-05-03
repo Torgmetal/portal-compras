@@ -1,7 +1,7 @@
 import Sidebar from "@/components/Sidebar";
 
 export const metadata = {
-  title: "Torg Metal — Portal de Compras",
+  title: "Workspace Torg — Portal de Compras",
   description: "Gestão de RMs, Cotações e Pedidos de Compra.",
 };
 

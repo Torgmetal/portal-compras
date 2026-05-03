@@ -1,7 +1,7 @@
 import SidebarComercial from "@/components/SidebarComercial";
 
 export const metadata = {
-  title: "Torg Metal — Portal Comercial",
+  title: "Workspace Torg — Portal Comercial",
   description: "Gestão de Ordens de Produção, revisões e aditivos.",
 };
 

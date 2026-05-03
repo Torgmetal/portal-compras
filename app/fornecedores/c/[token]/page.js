@@ -6,7 +6,7 @@ import CotacaoFornecedorForm from "./CotacaoFornecedorForm";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Torg Metal — Upload de Cotação",
+  title: "Workspace Torg — Upload de Cotação",
 };
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");

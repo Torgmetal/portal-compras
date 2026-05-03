@@ -83,8 +83,11 @@ function LoginForm() {
               Acesso interno
             </p>
             <h1 className="text-3xl xl:text-4xl font-extrabold tracking-tight leading-tight">
-              Portal Torg Metal
+              Workspace Torg
             </h1>
+            <p className="text-white/80 text-sm mt-3">
+              Portais de Comercial, Compras e Requisições integrados.
+            </p>
           </div>
         </div>
       </div>

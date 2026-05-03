@@ -4,8 +4,8 @@ import Toast from "@/components/Toast";
 import NextAuthProvider from "@/components/SessionProvider";
 
 export const metadata = {
-  title: "Torg Metal — Portal",
-  description: "Soluções em estruturas metálicas industriais e residenciais.",
+  title: "Workspace Torg",
+  description: "Workspace interno da Torg Metal — Comercial, Compras e Requisições.",
 };
 
 export default function RootLayout({ children }) {

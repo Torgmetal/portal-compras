@@ -113,7 +113,7 @@ export async function POST(req, { params }) {
     const total = itensPayload.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
     const cNumPedido = `${rm.numero}${isFD ? "-FD" : ""}`;
     const observacaoBase = [
-      `Pedido via Portal Torg — RM ${rm.numero}`,
+      `Pedido via Workspace Torg — RM ${rm.numero}`,
       `Cliente: ${op.cliente}`,
       isFD ? "FATURAMENTO DIRETO — encerrar sem contas a pagar" : null,
       cotacao.observacao || null,
