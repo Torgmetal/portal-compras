@@ -394,6 +394,7 @@ export default function NovaRMClient({ ops, userSetor }) {
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase w-8">#</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Descrição</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Cód. Omie</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Material</th>
                   <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Qtd</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Unid.</th>
@@ -414,6 +415,14 @@ export default function NovaRMClient({ ops, userSetor }) {
                             onChange={(e) => editarItem(i, "descricao", e.target.value)}
                             placeholder="Descrição do item"
                             className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="text" value={it.codigo || ""}
+                            onChange={(e) => editarItem(i, "codigo", e.target.value)}
+                            placeholder="—"
+                            className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono focus:ring-1 focus:ring-torg-blue"
                           />
                         </td>
                         <td className="px-3 py-1.5">
@@ -459,6 +468,7 @@ export default function NovaRMClient({ ops, userSetor }) {
                     ) : (
                       <>
                         <td className="px-3 py-1.5 text-torg-dark font-medium">{it.descricao}</td>
+                        <td className="px-3 py-1.5 text-torg-gray font-mono">{it.codigo || "—"}</td>
                         <td className="px-3 py-1.5 text-torg-gray">{it.material || "—"}</td>
                         <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.qtd}</td>
                         <td className="px-3 py-1.5 text-torg-gray">{it.unidade || "UN"}</td>
