@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/session";
 import { ArrowLeft, FileText } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import MapaCotacaoClient from "./MapaCotacaoClient";
+import OPAcoesClient from "./OPAcoesClient";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ const STATUS_RM_BADGE = {
 };
 
 export default async function PainelOPDetalhe({ params }) {
-  await requireRole(["ADMIN", "COMPRAS"]);
+  const user = await requireRole(["ADMIN", "COMPRAS"]);
 
   const op = await prisma.oP.findUnique({
     where: { id: params.opId },
@@ -131,6 +132,14 @@ export default async function PainelOPDetalhe({ params }) {
             )}
           </div>
         </div>
+
+        <OPAcoesClient
+          opId={op.id}
+          numero={op.numero}
+          status={op.status}
+          qtdRMs={op.rms.length}
+          isAdmin={user.role === "ADMIN"}
+        />
       </div>
 
       {/* RMs vinculadas */}
