@@ -1,17 +1,44 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, XCircle, Loader2, AlertCircle } from "lucide-react";
+import { Trash2, XCircle, Loader2, AlertCircle, Unlink } from "lucide-react";
 
 // Botoes maiores pra usar nas paginas de detalhe da RM (/rm/[id] e /compras/rm/[id])
-export default function RMHeaderActions({ rmId, numero, status, isAdmin, onDeleteRedirect = "/rm" }) {
+export default function RMHeaderActions({ rmId, numero, status, isAdmin, temOP = false, onDeleteRedirect = "/rm" }) {
   const router = useRouter();
   const [loading, setLoading] = useState(null);
   const [erro, setErro] = useState("");
 
   const podeCancelar = status !== "PEDIDO_GERADO" && status !== "CANCELADA";
+  const podeDesvincular = temOP && (isAdmin || true /* COMPRAS pode pelo /compras/rm/ */);
 
-  if (!isAdmin && !podeCancelar) return null;
+  if (!isAdmin && !podeCancelar && !podeDesvincular) return null;
+
+  async function desvincularDaOP() {
+    if (!window.confirm(
+      `Desvincular a RM ${numero} da OP atual?\n\n` +
+      `A RM permanece, mas deixa de estar ligada a essa OP. ` +
+      `Os vinculos de itens (com itens da OP/aditivo) tambem serao limpos.\n\n` +
+      `Use isso quando quiser excluir a OP — depois de desvincular ` +
+      `todas as RMs, a OP fica liberada pra exclusao.`
+    )) return;
+    setErro("");
+    setLoading("desvincular");
+    try {
+      const res = await fetch(`/api/rm/${rmId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "desvincular" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(null);
+    }
+  }
 
   async function cancelarRM() {
     const motivo = window.prompt(
@@ -59,6 +86,18 @@ export default function RMHeaderActions({ rmId, numero, status, isAdmin, onDelet
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
+        {podeDesvincular && (
+          <button
+            type="button"
+            onClick={desvincularDaOP}
+            disabled={!!loading}
+            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {loading === "desvincular" ? <Loader2 size={16} className="animate-spin" /> : <Unlink size={16} />}
+            Desvincular da OP
+          </button>
+        )}
+
         {podeCancelar && (
           <button
             type="button"

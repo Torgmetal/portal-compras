@@ -1,6 +1,71 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+
+const patchSchema = z.object({
+  acao: z.enum(["desvincular"]),
+});
+
+// PATCH — acoes pontuais sobre a RM. Hoje suporta 'desvincular' (tira a RM da OP).
+export async function PATCH(req, { params }) {
+  let user;
+  try {
+    user = await requireRole(["ADMIN", "COMPRAS"]);
+  } catch {
+    return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
+  }
+
+  let body;
+  try {
+    body = patchSchema.parse(await req.json());
+  } catch {
+    return NextResponse.json({ error: "Dados invalidos" }, { status: 400 });
+  }
+
+  const rm = await prisma.rM.findUnique({
+    where: { id: params.id },
+    include: { itens: { select: { id: true, opItemId: true, aditivoItemId: true } } },
+  });
+  if (!rm) return NextResponse.json({ error: "RM nao encontrada" }, { status: 404 });
+
+  if (body.acao === "desvincular") {
+    if (!rm.opId) {
+      return NextResponse.json({ error: "Essa RM nao esta vinculada a nenhuma OP." }, { status: 400 });
+    }
+
+    const itensComRef = rm.itens.filter((it) => it.opItemId || it.aditivoItemId);
+
+    await prisma.$transaction(async (tx) => {
+      // Limpa referencias dos itens da RM aos itens da OP/aditivo
+      if (itensComRef.length > 0) {
+        await tx.rMItem.updateMany({
+          where: { rmId: rm.id },
+          data: { opItemId: null, aditivoItemId: null },
+        });
+      }
+      // Desvincula a RM da OP e zera as categorias cobertas
+      await tx.rM.update({
+        where: { id: rm.id },
+        data: { opId: null, categoriasOP: [] },
+      });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "desvincular_rm",
+        entity: "RM",
+        entityId: rm.id,
+        diff: { numero: rm.numero, opIdAnterior: rm.opId, itensDesvinculados: itensComRef.length },
+      },
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "Acao desconhecida" }, { status: 400 });
+}
 
 // DELETE — exclusao definitiva da RM. Bloqueia se ja gerou pedido no Omie (status="CRIADO").
 // Cascateia: itens, cotacoes (e seus itens, anexos), envios, anexos da RM, pedidos com status="ERRO".

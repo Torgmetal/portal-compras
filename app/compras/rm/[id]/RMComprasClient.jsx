@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
-  CheckCircle2, Truck, Mail, Edit2, Settings, Edit3, Trash2,
+  CheckCircle2, Truck, Mail, Edit2, Settings, Edit3, Trash2, Unlink,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
@@ -37,6 +37,33 @@ export default function RMComprasClient({ rm, userRole }) {
   const [linksParaEnvio, setLinksParaEnvio] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
   const [erroExcluir, setErroExcluir] = useState("");
+  const [desvinculando, setDesvinculando] = useState(false);
+
+  async function desvincularDaOP() {
+    if (!window.confirm(
+      `Desvincular a RM ${rm.numero} da OP atual?\n\n` +
+      `A RM permanece, mas deixa de estar ligada a essa OP. ` +
+      `Os vinculos de itens (com itens da OP/aditivo) tambem serao limpos.\n\n` +
+      `Use isso quando quiser excluir a OP — depois de desvincular ` +
+      `todas as RMs, a OP fica liberada pra exclusao.`
+    )) return;
+    setErroExcluir("");
+    setDesvinculando(true);
+    try {
+      const res = await fetch(`/api/rm/${rm.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "desvincular" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      setErroExcluir(e.message);
+    } finally {
+      setDesvinculando(false);
+    }
+  }
 
   async function excluirRM() {
     if (!window.confirm(
@@ -159,6 +186,16 @@ export default function RMComprasClient({ rm, userRole }) {
             <Truck size={16} /> Gerar Pedido Omie (em breve)
           </button>
           <div className="ml-auto flex gap-2 flex-wrap">
+            {rm.opId && rm.status !== "PEDIDO_GERADO" && (
+              <button
+                onClick={desvincularDaOP}
+                disabled={desvinculando}
+                className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-2 disabled:opacity-50"
+              >
+                {desvinculando ? <Loader2 size={16} className="animate-spin" /> : <Unlink size={16} />}
+                Desvincular da OP
+              </button>
+            )}
             {podeEncerrar && (
               <button
                 onClick={() => setModalEncerrarRM(true)}

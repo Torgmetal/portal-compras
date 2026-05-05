@@ -112,6 +112,7 @@ export default async function RMDetail({ params }) {
             numero={rm.numero}
             status={rm.status}
             isAdmin={user.role === "ADMIN"}
+            temOP={!!rm.opId}
             onDeleteRedirect="/rm"
           />
         </div>
