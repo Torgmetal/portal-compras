@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { PlusCircle, ClipboardList, AlertTriangle } from "lucide-react";
+import RMRowActions from "@/components/RMRowActions";
 
 // Sempre busca dados frescos do banco
 export const dynamic = "force-dynamic";
@@ -120,6 +121,7 @@ export default async function MinhasRMs({ searchParams }) {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Solicitante</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-3 py-3 w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -160,6 +162,14 @@ export default async function MinhasRMs({ searchParams }) {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
                           {s.label}
                         </span>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <RMRowActions
+                          rmId={rm.id}
+                          numero={rm.numero}
+                          status={rm.status}
+                          isAdmin={user.role === "ADMIN"}
+                        />
                       </td>
                     </tr>
                   );

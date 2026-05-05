@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
-  CheckCircle2, Truck, Mail, Edit2, Settings, Edit3,
+  CheckCircle2, Truck, Mail, Edit2, Settings, Edit3, Trash2,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
@@ -35,6 +35,28 @@ export default function RMComprasClient({ rm, userRole }) {
   const [modalEncerrarRM, setModalEncerrarRM] = useState(false);
   const [modalEnviarCot, setModalEnviarCot] = useState(false);
   const [linksParaEnvio, setLinksParaEnvio] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroExcluir, setErroExcluir] = useState("");
+
+  async function excluirRM() {
+    if (!window.confirm(
+      `EXCLUIR DEFINITIVAMENTE a RM ${rm.numero}?\n\n` +
+      `Apaga itens, cotações, envios e anexos.\n` +
+      `Não funciona se a RM já gerou pedido no Omie.\n\n` +
+      `Essa ação NÃO PODE ser desfeita.`
+    )) return;
+    setErroExcluir("");
+    setExcluindo(true);
+    try {
+      const res = await fetch(`/api/rm/${rm.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao excluir");
+      router.push("/compras");
+    } catch (e) {
+      setErroExcluir(e.message);
+      setExcluindo(false);
+    }
+  }
 
   const status = STATUS_RM_LABELS[rm.status] || STATUS_RM_LABELS.ABERTA;
   const pesoTotal = rm.itens.reduce((s, it) => s + (Number(it.peso) || 0), 0);
@@ -136,15 +158,33 @@ export default function RMComprasClient({ rm, userRole }) {
           >
             <Truck size={16} /> Gerar Pedido Omie (em breve)
           </button>
-          {podeEncerrar && (
-            <button
-              onClick={() => setModalEncerrarRM(true)}
-              className="ml-auto px-4 py-2 bg-white border border-red-200 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 inline-flex items-center gap-2"
-            >
-              <Lock size={16} /> Encerrar RM
-            </button>
-          )}
+          <div className="ml-auto flex gap-2 flex-wrap">
+            {podeEncerrar && (
+              <button
+                onClick={() => setModalEncerrarRM(true)}
+                className="px-4 py-2 bg-white border border-torg-orange-200 text-torg-orange-700 text-sm font-medium rounded-lg hover:bg-torg-orange-50 inline-flex items-center gap-2"
+              >
+                <XCircle size={16} /> Cancelar RM
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={excluirRM}
+                disabled={excluindo}
+                className="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 inline-flex items-center gap-2 disabled:opacity-50"
+              >
+                {excluindo ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                Excluir
+              </button>
+            )}
+          </div>
         </div>
+        {erroExcluir && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2 flex items-start gap-2 mt-3">
+            <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+            <span>{erroExcluir}</span>
+          </div>
+        )}
       </div>
 
       {/* Itens */}

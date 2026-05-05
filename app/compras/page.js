@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { FileText, BarChart3, Truck, ClipboardList, AlertTriangle } from "lucide-react";
+import RMRowActions from "@/components/RMRowActions";
 
 // Sempre busca dados frescos do banco (sem cache de Server Component)
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ const TIPO_RM_LABELS = {
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
 export default async function PainelCompras({ searchParams }) {
-  await requireRole(["ADMIN", "COMPRAS"]);
+  const user = await requireRole(["ADMIN", "COMPRAS"]);
   const verArquivadas = searchParams?.arquivadas === "1";
 
   const where = verArquivadas
@@ -129,6 +130,7 @@ export default async function PainelCompras({ searchParams }) {
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cot.</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-3 py-3 w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -177,6 +179,14 @@ export default async function PainelCompras({ searchParams }) {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
                           {s.label}
                         </span>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <RMRowActions
+                          rmId={rm.id}
+                          numero={rm.numero}
+                          status={rm.status}
+                          isAdmin={user.role === "ADMIN"}
+                        />
                       </td>
                     </tr>
                   );

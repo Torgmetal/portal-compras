@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { ArrowLeft, ClipboardList } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
+import RMHeaderActions from "@/components/RMHeaderActions";
 
 // Sempre busca dados frescos do banco
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ const TIPO_RM_LABELS = {
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
 export default async function RMDetail({ params }) {
-  await requireUser();
+  const user = await requireUser();
 
   const rm = await prisma.rM.findUnique({
     where: { id: params.id },
@@ -104,6 +105,16 @@ export default async function RMDetail({ params }) {
             </div>
           </div>
         )}
+
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <RMHeaderActions
+            rmId={rm.id}
+            numero={rm.numero}
+            status={rm.status}
+            isAdmin={user.role === "ADMIN"}
+            onDeleteRedirect="/rm"
+          />
+        </div>
       </div>
 
       {/* Itens */}
