@@ -25,8 +25,9 @@ const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
-export default async function PainelOPs() {
+export default async function PainelOPs({ searchParams }) {
   await requireRole(["ADMIN", "COMPRAS"]);
+  const verFinalizadas = searchParams?.finalizadas === "1";
 
   const ops = await prisma.oP.findMany({
     orderBy: { createdAt: "desc" },
@@ -76,7 +77,11 @@ export default async function PainelOPs() {
     };
   });
 
-  const totaisGerais = opsComStats.reduce(
+  // KPIs sempre consideram so OPs ativas (independente do filtro de aba)
+  const opsAtivasParaKpis = opsComStats.filter(
+    (op) => op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
+  );
+  const totaisGerais = opsAtivasParaKpis.reduce(
     (acc, op) => {
       acc.ops += 1;
       acc.rms += op.stats.rms;
@@ -87,45 +92,82 @@ export default async function PainelOPs() {
     { ops: 0, rms: 0, cotacoesRecebidas: 0, itensPedido: 0 }
   );
 
+  // Filtro por aba
+  const opsFiltradas = opsComStats.filter((op) =>
+    verFinalizadas
+      ? op.statusCalc === "ENCERRADA" || op.statusCalc === "CANCELADA"
+      : op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
+  );
+  const totalAtivas = opsAtivasParaKpis.length;
+  const totalFinalizadas = opsComStats.length - totalAtivas;
+
   return (
     <div className="space-y-6 max-w-7xl">
-      <div>
-        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de OPs</h2>
-        <p className="text-sm text-torg-gray mt-1">
-          Visão por contrato — cada OP traz suas RMs, cotações e pedidos. Clique pra abrir o mapa de cotação.
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Painel de OPs</h2>
+          <p className="text-sm text-torg-gray mt-1">
+            {verFinalizadas
+              ? "OPs encerradas e canceladas — histórico de obras concluídas."
+              : "Visão por contrato — cada OP traz suas RMs, cotações e pedidos. Clique pra abrir o mapa de cotação."}
+          </p>
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          <Link
+            href="/compras/painel-ops"
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+              !verFinalizadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+            }`}
+          >
+            Ativas ({totalAtivas})
+          </Link>
+          <Link
+            href="/compras/painel-ops?finalizadas=1"
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+              verFinalizadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+            }`}
+          >
+            Finalizadas ({totalFinalizadas})
+          </Link>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: "OPs ativas",          value: totaisGerais.ops,                color: "bg-torg-blue",     Icon: FolderKanban },
-          { label: "RMs vinculadas",      value: totaisGerais.rms,                color: "bg-torg-blue-700", Icon: FileText },
-          { label: "Cotações recebidas",  value: totaisGerais.cotacoesRecebidas,  color: "bg-torg-orange",   Icon: Mail },
-          { label: "Itens em pedido",     value: totaisGerais.itensPedido,        color: "bg-torg-dark",     Icon: Truck },
-        ].map((c) => (
-          <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
-            <div className={`${c.color} p-2.5 rounded-lg`}>
-              <c.Icon size={20} className="text-white" />
+      {!verFinalizadas && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: "OPs ativas",          value: totaisGerais.ops,                color: "bg-torg-blue",     Icon: FolderKanban },
+            { label: "RMs vinculadas",      value: totaisGerais.rms,                color: "bg-torg-blue-700", Icon: FileText },
+            { label: "Cotações recebidas",  value: totaisGerais.cotacoesRecebidas,  color: "bg-torg-orange",   Icon: Mail },
+            { label: "Itens em pedido",     value: totaisGerais.itensPedido,        color: "bg-torg-dark",     Icon: Truck },
+          ].map((c) => (
+            <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+              <div className={`${c.color} p-2.5 rounded-lg`}>
+                <c.Icon size={20} className="text-white" />
+              </div>
+              <div>
+                <p className="text-xs text-torg-gray">{c.label}</p>
+                <p className="text-xl font-extrabold text-torg-dark tabular-nums">{c.value}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-torg-gray">{c.label}</p>
-              <p className="text-xl font-extrabold text-torg-dark tabular-nums">{c.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {opsComStats.length === 0 ? (
+      {opsFiltradas.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <FolderKanban size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-torg-gray text-lg">Nenhuma OP cadastrada</p>
+          <p className="text-torg-gray text-lg">
+            {verFinalizadas ? "Nenhuma OP finalizada ainda" : "Nenhuma OP ativa"}
+          </p>
           <p className="text-sm text-torg-gray mt-1">
-            Quando o Comercial cadastrar OPs, elas vão aparecer aqui agrupadas com suas RMs e cotações.
+            {verFinalizadas
+              ? "Quando uma OP for encerrada, ela aparece aqui."
+              : "Quando o Comercial cadastrar OPs, elas vão aparecer aqui agrupadas com suas RMs e cotações."}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {opsComStats.map((op) => {
+          {opsFiltradas.map((op) => {
             const s = STATUS_OP[op.statusCalc] || STATUS_OP.ABERTA;
             return (
               <Link

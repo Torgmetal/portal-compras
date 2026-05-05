@@ -28,8 +28,9 @@ const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
-export default async function ComercialHome() {
+export default async function ComercialHome({ searchParams }) {
   const user = await requireRole(["ADMIN", "COMERCIAL"]);
+  const verFinalizadas = searchParams?.finalizadas === "1";
 
   const ops = await prisma.oP.findMany({
     orderBy: { createdAt: "desc" },
@@ -40,7 +41,7 @@ export default async function ComercialHome() {
     },
   });
 
-  const opsComTotais = ops.map((op) => {
+  const opsComTotaisRaw = ops.map((op) => {
     const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);
     const verbaAditivos = op.aditivos.reduce(
       (s, a) => s + a.itens.reduce((ss, i) => ss + i.valorVerba, 0),
@@ -53,7 +54,8 @@ export default async function ComercialHome() {
     };
   });
 
-  const kpis = opsComTotais.reduce(
+  // KPIs sempre consideram TODAS as OPs (independente do filtro) pra dar visao geral
+  const kpis = opsComTotaisRaw.reduce(
     (acc, op) => {
       acc.total += 1;
       if (op.statusCalc === "EM_EXECUCAO") acc.emExecucao += 1;
@@ -65,6 +67,19 @@ export default async function ComercialHome() {
     },
     { total: 0, emExecucao: 0, atrasadas: 0, verbaAtiva: 0 }
   );
+
+  // Filtro: aba 'Ativas' = todas que nao estao encerradas/canceladas;
+  //         aba 'Finalizadas' = ENCERRADA + CANCELADA
+  const opsComTotais = opsComTotaisRaw.filter((op) =>
+    verFinalizadas
+      ? op.statusCalc === "ENCERRADA" || op.statusCalc === "CANCELADA"
+      : op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
+  );
+
+  const totalAtivas = opsComTotaisRaw.filter(
+    (op) => op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
+  ).length;
+  const totalFinalizadas = opsComTotaisRaw.length - totalAtivas;
 
   const cards = [
     { label: "Total OPs",    value: kpis.total,                 color: "bg-torg-blue",     Icon: FolderKanban },
@@ -79,18 +94,40 @@ export default async function ComercialHome() {
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Ordens de Produção</h2>
           <p className="text-sm text-torg-gray mt-1">
-            Cadastro, revisões e aditivos de cada contrato.
+            {verFinalizadas
+              ? "OPs encerradas e canceladas — histórico de obras concluídas."
+              : "Cadastro, revisões e aditivos de cada contrato."}
           </p>
         </div>
-        <Link
-          href="/comercial/nova"
-          className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
-        >
-          <PlusCircle size={18} /> Nova OP
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex gap-1">
+            <Link
+              href="/comercial"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                !verFinalizadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+              }`}
+            >
+              Ativas ({totalAtivas})
+            </Link>
+            <Link
+              href="/comercial?finalizadas=1"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+                verFinalizadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+              }`}
+            >
+              Finalizadas ({totalFinalizadas})
+            </Link>
+          </div>
+          <Link
+            href="/comercial/nova"
+            className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+          >
+            <PlusCircle size={18} /> Nova OP
+          </Link>
+        </div>
       </div>
 
-      {opsComTotais.length > 0 && (
+      {!verFinalizadas && opsComTotaisRaw.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {cards.map((c) => (
             <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
@@ -109,16 +146,20 @@ export default async function ComercialHome() {
       {opsComTotais.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <FolderKanban size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-torg-gray text-lg">Nenhuma OP cadastrada</p>
-          <p className="text-sm text-torg-gray mt-1 mb-4">
-            Cadastre a primeira OP pra começar.
+          <p className="text-torg-gray text-lg">
+            {verFinalizadas ? "Nenhuma OP finalizada ainda" : "Nenhuma OP ativa"}
           </p>
-          <Link
-            href="/comercial/nova"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium"
-          >
-            <PlusCircle size={18} /> Criar primeira OP
-          </Link>
+          <p className="text-sm text-torg-gray mt-1 mb-4">
+            {verFinalizadas ? "Quando uma OP for encerrada, ela aparece aqui." : "Cadastre a primeira OP pra começar."}
+          </p>
+          {!verFinalizadas && (
+            <Link
+              href="/comercial/nova"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium"
+            >
+              <PlusCircle size={18} /> Criar primeira OP
+            </Link>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
