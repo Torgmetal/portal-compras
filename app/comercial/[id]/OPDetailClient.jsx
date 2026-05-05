@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History,
+  CheckCircle2, FileText, History, Trash2, RotateCcw,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
@@ -36,9 +36,57 @@ export default function OPDetailClient({ op, userRole, userId }) {
   const [modalRevisao, setModalRevisao] = useState(false);
   const [modalPrazo, setModalPrazo] = useState(false);
   const [modalVerba, setModalVerba] = useState(null); // { tipo: "op"|"aditivo", itemId, atual }
+  const [acaoStatus, setAcaoStatus] = useState(null); // 'finalizar' | 'reabrir' | 'excluir'
+  const [erroAcao, setErroAcao] = useState("");
 
   const status = calcStatus(op);
   const s = STATUS_LABELS[status];
+  const encerradaOuCancelada = op.status === "ENCERRADA" || op.status === "CANCELADA";
+
+  async function executarAcaoStatus(acao) {
+    const confirms = {
+      finalizar: `Finalizar a OP ${op.numero}? Ela some das listas ativas mas continua acessivel pelo historico.`,
+      reabrir: `Reabrir a OP ${op.numero}? Ela volta pra lista ativa.`,
+      cancelar: `Cancelar a OP ${op.numero}? Diferente de finalizar — usa quando a obra nao vai acontecer.`,
+    };
+    if (!window.confirm(confirms[acao])) return;
+    setErroAcao("");
+    setAcaoStatus(acao);
+    try {
+      const res = await fetch(`/api/comercial/op/${op.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      setErroAcao(e.message);
+    } finally {
+      setAcaoStatus(null);
+    }
+  }
+
+  async function excluirOP() {
+    if (!window.confirm(
+      `EXCLUIR DEFINITIVAMENTE a OP ${op.numero}?\n\n` +
+      `Apaga itens, aditivos, revisoes e ajustes de prazo.\n` +
+      `So funciona se a OP nao tiver RMs vinculadas.\n\n` +
+      `Essa acao NAO PODE ser desfeita.`
+    )) return;
+    setErroAcao("");
+    setAcaoStatus("excluir");
+    try {
+      const res = await fetch(`/api/comercial/op/${op.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao excluir");
+      router.push("/comercial");
+    } catch (e) {
+      setErroAcao(e.message);
+      setAcaoStatus(null);
+    }
+  }
 
   const verbaTotal = useMemo(() => {
     const base = op.itens.reduce((s, i) => s + i.valorVerba, 0);
@@ -106,25 +154,69 @@ export default function OPDetailClient({ op, userRole, userId }) {
         <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-gray-100">
           <button
             onClick={() => setModalAditivo(true)}
-            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+            disabled={encerradaOuCancelada}
+            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={16} /> Novo Aditivo
           </button>
           <button
             onClick={() => setModalRevisao(true)}
-            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+            disabled={encerradaOuCancelada}
+            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Edit3 size={16} /> Registrar Revisão
           </button>
           {isMaster && (
             <button
               onClick={() => setModalPrazo(true)}
-              className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+              disabled={encerradaOuCancelada}
+              className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Clock size={16} /> Ajustar Prazo
             </button>
           )}
+
+          <div className="flex-1" />
+
+          {encerradaOuCancelada ? (
+            <button
+              onClick={() => executarAcaoStatus("reabrir")}
+              disabled={!!acaoStatus}
+              className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50"
+            >
+              {acaoStatus === "reabrir" ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+              Reabrir OP
+            </button>
+          ) : (
+            <button
+              onClick={() => executarAcaoStatus("finalizar")}
+              disabled={!!acaoStatus}
+              className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange-700 font-medium flex items-center gap-2 disabled:opacity-50"
+            >
+              {acaoStatus === "finalizar" ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              Finalizar OP
+            </button>
+          )}
+
+          {isMaster && (
+            <button
+              onClick={excluirOP}
+              disabled={!!acaoStatus}
+              title={op._count.rms > 0 ? "OP tem RMs vinculadas — use Cancelar pra arquivar" : "Excluir definitivamente"}
+              className="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm rounded-lg hover:bg-red-50 font-medium flex items-center gap-2 disabled:opacity-50"
+            >
+              {acaoStatus === "excluir" ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              Excluir
+            </button>
+          )}
         </div>
+
+        {erroAcao && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2 mt-3">
+            <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+            <span>{erroAcao}</span>
+          </div>
+        )}
       </div>
 
       {/* Cobertura por categoria (gaps de RM da Engenharia) */}
