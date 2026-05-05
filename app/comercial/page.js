@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PlusCircle, FolderKanban, Activity, AlertTriangle, DollarSign } from "lucide-react";
+import OPRowActions from "./OPRowActions";
 
 // Sempre busca dados frescos do banco
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ const fmtMoeda = (v) =>
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
 export default async function ComercialHome() {
-  await requireRole(["ADMIN", "COMERCIAL"]);
+  const user = await requireRole(["ADMIN", "COMERCIAL"]);
 
   const ops = await prisma.oP.findMany({
     orderBy: { createdAt: "desc" },
@@ -133,6 +134,7 @@ export default async function ComercialHome() {
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">RMs</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-3 py-3 w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -155,6 +157,15 @@ export default async function ComercialHome() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
                           {s.label}
                         </span>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <OPRowActions
+                          opId={op.id}
+                          numero={op.numero}
+                          status={op.status}
+                          qtdRMs={op._count.rms}
+                          isAdmin={user.role === "ADMIN"}
+                        />
                       </td>
                     </tr>
                   );
