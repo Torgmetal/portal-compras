@@ -141,9 +141,17 @@ function LoginForm() {
             {carregando ? "Entrando..." : "Entrar"}
           </button>
 
-          <p className="text-xs text-center text-torg-gray pt-2 border-t border-gray-100">
-            Não tem acesso? Fale com o administrador do portal.
-          </p>
+          <div className="pt-3 border-t border-gray-100 space-y-2 text-center">
+            <Link
+              href="/trocar-senha"
+              className="block text-sm text-torg-blue hover:text-torg-blue-700 font-medium"
+            >
+              Trocar senha
+            </Link>
+            <p className="text-xs text-torg-gray">
+              Não tem acesso? Fale com o administrador do portal.
+            </p>
+          </div>
         </form>
       </div>
     </div>

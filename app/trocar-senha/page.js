@@ -1,36 +1,12 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
-import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, KeyRound, User as UserIcon, Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
+import { Loader2, AlertCircle, CheckCircle2, ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
-const ROLE_LABELS = {
-  ADMIN:        "Administrador",
-  COMERCIAL:    "Comercial",
-  COMPRAS:      "Compras",
-  ENGENHARIA:   "Engenharia",
-  ALMOXARIFADO: "Almoxarifado",
-};
-
-function homePorRole(role) {
-  switch (role) {
-    case "ADMIN":
-    case "COMERCIAL":
-      return "/comercial";
-    case "COMPRAS":
-      return "/compras";
-    case "ENGENHARIA":
-    case "ALMOXARIFADO":
-      return "/rm";
-    default:
-      return "/";
-  }
-}
-
-export default function PerfilClient({ user }) {
-  const router = useRouter();
+export default function TrocarSenhaPage() {
+  const [email, setEmail] = useState("");
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmar, setConfirmar] = useState("");
@@ -41,7 +17,7 @@ export default function PerfilClient({ user }) {
 
   const senhaForteOk = novaSenha.length >= 8;
   const baterConfirmacao = novaSenha === confirmar && confirmar.length > 0;
-  const podeEnviar = senhaAtual && senhaForteOk && baterConfirmacao && !salvando;
+  const podeEnviar = email && senhaAtual && senhaForteOk && baterConfirmacao && !salvando;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -50,10 +26,10 @@ export default function PerfilClient({ user }) {
     if (!podeEnviar) return;
     setSalvando(true);
     try {
-      const res = await fetch("/api/perfil/senha", {
+      const res = await fetch("/api/trocar-senha", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ senhaAtual, novaSenha, confirmar }),
+        body: JSON.stringify({ email: email.trim(), senhaAtual, novaSenha, confirmar }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao trocar a senha");
@@ -61,8 +37,6 @@ export default function PerfilClient({ user }) {
       setSenhaAtual("");
       setNovaSenha("");
       setConfirmar("");
-      // Por seguranca, desloga depois de 2s pra obrigar novo login com a senha nova
-      setTimeout(() => signOut({ callbackUrl: "/entrar" }), 2000);
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -70,56 +44,47 @@ export default function PerfilClient({ user }) {
     }
   };
 
-  const homeHref = homePorRole(user.role);
-
   return (
-    <div className="min-h-screen bg-torg-blue-50/30 flex flex-col">
-      <header className="bg-white border-b border-torg-blue-100">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href={homeHref} className="flex items-center gap-3">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-white">
+      {/* Imagem hero */}
+      <div className="relative lg:w-1/2 h-48 lg:h-auto lg:min-h-screen overflow-hidden">
+        <Image
+          src="/obras/ponte-sunset.jpg"
+          alt="Torg Metal"
+          fill
+          priority
+          className="object-cover"
+          sizes="(max-width: 1024px) 100vw, 50vw"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-torg-dark/85 via-torg-dark/40 to-torg-dark/10" />
+        <div className="relative z-10 h-full flex flex-col justify-between p-8">
+          <Link href="/" className="bg-white/95 backdrop-blur rounded-xl px-4 py-2 shadow-lg w-fit">
             <TorgLogo size="sm" />
-            <span className="text-xs text-torg-gray hidden sm:inline">Workspace Torg</span>
           </Link>
-          <Link
-            href={homeHref}
-            className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1"
-          >
-            <ArrowLeft size={14} /> Voltar
-          </Link>
-        </div>
-      </header>
-
-      <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-8 space-y-6">
-        <div>
-          <h1 className="text-3xl font-extrabold text-torg-dark tracking-tight">Meu perfil</h1>
-          <p className="text-sm text-torg-gray mt-1">
-            Veja seus dados de acesso e troque sua senha.
-          </p>
-        </div>
-
-        {/* Card do usuario */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-torg-blue-50 flex items-center justify-center flex-shrink-0">
-              <UserIcon size={26} className="text-torg-blue" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg font-bold text-torg-dark truncate">{user.name}</p>
-              <p className="text-sm text-torg-gray truncate">{user.email}</p>
-              <p className="text-[10px] text-torg-gray uppercase tracking-wide mt-0.5">
-                {ROLE_LABELS[user.role] || user.role}
-                {user.setor ? ` · ${user.setor}` : ""}
-              </p>
-            </div>
+          <div className="text-white max-w-md hidden lg:block">
+            <p className="text-torg-orange font-semibold tracking-widest text-xs uppercase mb-3">
+              Acesso interno
+            </p>
+            <h1 className="text-3xl xl:text-4xl font-extrabold tracking-tight leading-tight">
+              Trocar senha
+            </h1>
+            <p className="text-white/80 text-sm mt-3">
+              Use sua senha atual pra definir uma nova.
+            </p>
           </div>
         </div>
+      </div>
 
-        {/* Card de troca de senha */}
-        <form onSubmit={submit} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+      {/* Form */}
+      <div className="lg:w-1/2 flex items-center justify-center p-8 lg:p-12">
+        <form onSubmit={submit} className="w-full max-w-md bg-white rounded-2xl border border-torg-blue-100 shadow-sm p-7 space-y-5">
           <div className="flex items-center gap-2">
-            <KeyRound size={18} className="text-torg-blue" />
-            <h2 className="text-lg font-semibold text-torg-dark">Trocar senha</h2>
+            <KeyRound size={20} className="text-torg-blue" />
+            <h2 className="text-2xl font-extrabold text-torg-dark tracking-tight">Trocar senha</h2>
           </div>
+          <p className="text-sm text-torg-gray -mt-3">
+            Digite seu email e a senha atual pra definir uma nova.
+          </p>
 
           {erro && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
@@ -131,9 +96,27 @@ export default function PerfilClient({ user }) {
           {sucesso && (
             <div className="bg-torg-blue-50 border border-torg-blue-200 text-torg-dark text-sm rounded-lg px-3 py-2 flex items-start gap-2">
               <CheckCircle2 size={16} className="mt-0.5 flex-shrink-0 text-torg-blue" />
-              <span>Senha trocada com sucesso. Você será deslogado em instantes — entre de novo com a nova senha.</span>
+              <span>
+                Senha trocada com sucesso!{" "}
+                <Link href="/entrar" className="font-semibold text-torg-blue underline">
+                  Entrar agora
+                </Link>
+              </span>
             </div>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+              autoComplete="email"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+            />
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Senha atual</label>
@@ -192,18 +175,23 @@ export default function PerfilClient({ user }) {
             {mostrar ? "Esconder senhas" : "Mostrar senhas"}
           </button>
 
-          <div className="flex justify-end pt-2 border-t border-gray-100">
-            <button
-              type="submit"
-              disabled={!podeEnviar}
-              className="px-6 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {salvando && <Loader2 size={16} className="animate-spin" />}
-              {salvando ? "Salvando..." : "Trocar senha"}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={!podeEnviar}
+            className="w-full py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {salvando && <Loader2 size={16} className="animate-spin" />}
+            {salvando ? "Salvando..." : "Trocar senha"}
+          </button>
+
+          <Link
+            href="/entrar"
+            className="block text-center text-sm text-torg-gray hover:text-torg-dark pt-2 border-t border-gray-100 inline-flex items-center gap-1 justify-center w-full"
+          >
+            <ArrowLeft size={14} /> Voltar pra tela de login
+          </Link>
         </form>
-      </main>
+      </div>
     </div>
   );
 }
