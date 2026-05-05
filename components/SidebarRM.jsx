@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { ClipboardList, PlusCircle, LogOut } from "lucide-react";
+import { ClipboardList, PlusCircle, LogOut, KeyRound } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
@@ -51,6 +51,12 @@ export default function SidebarRM() {
             <p className="text-[10px] text-torg-gray uppercase tracking-wide mt-0.5">{session.user.role}</p>
           </div>
         )}
+        <Link
+          href="/perfil"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-torg-gray hover:bg-gray-50 hover:text-torg-dark transition-colors"
+        >
+          <KeyRound size={14} /> Trocar senha
+        </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/entrar" })}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-torg-gray hover:bg-gray-50 hover:text-torg-dark transition-colors"
