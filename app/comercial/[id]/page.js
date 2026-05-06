@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { ArrowLeft } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
+import PedidosOmieSection from "@/components/PedidosOmieSection";
 
 // Sempre busca dados frescos do banco
 export const dynamic = "force-dynamic";
@@ -71,6 +72,36 @@ export default async function OPDetailPage({ params }) {
     }
   }
 
+  // Pedidos no Omie vinculados a essa OP (via cotacao -> rm -> opId)
+  const pedidosRaw = await prisma.pedidoOmie.findMany({
+    where: { cotacao: { rm: { opId: params.id } } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      codigoPedido: true,
+      numeroPedido: true,
+      total: true,
+      faturamentoDireto: true,
+      status: true,
+      erroOmie: true,
+      fornecedorNome: true,
+      createdAt: true,
+      cotacao: { select: { rm: { select: { numero: true } } } },
+    },
+  });
+  const pedidos = pedidosRaw.map((p) => ({
+    id: p.id,
+    codigoPedido: p.codigoPedido,
+    numeroPedido: p.numeroPedido,
+    total: p.total,
+    faturamentoDireto: p.faturamentoDireto,
+    status: p.status,
+    erroOmie: p.erroOmie,
+    fornecedorNome: p.fornecedorNome,
+    createdAt: p.createdAt.toISOString(),
+    rmNumero: p.cotacao?.rm?.numero || null,
+  }));
+
   // Transformar pra plain object (Date → string)
   const opData = JSON.parse(JSON.stringify(op));
   opData.cobertura = cobertura;
@@ -82,6 +113,8 @@ export default async function OPDetailPage({ params }) {
       </Link>
 
       <OPDetailClient op={opData} userRole={user.role} userId={user.id} />
+
+      <PedidosOmieSection pedidos={pedidos} />
     </div>
   );
 }

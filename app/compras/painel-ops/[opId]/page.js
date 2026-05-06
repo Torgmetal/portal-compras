@@ -6,6 +6,7 @@ import { ArrowLeft, FileText } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import MapaCotacaoClient from "./MapaCotacaoClient";
 import OPAcoesClient from "./OPAcoesClient";
+import PedidosOmieSection from "@/components/PedidosOmieSection";
 
 export const dynamic = "force-dynamic";
 
@@ -46,8 +47,18 @@ export default async function PainelOPDetalhe({ params }) {
                 },
               },
               pedidosOmie: {
-                where: { status: "CRIADO" },
-                select: { id: true, total: true, faturamentoDireto: true },
+                orderBy: { createdAt: "desc" },
+                select: {
+                  id: true,
+                  codigoPedido: true,
+                  numeroPedido: true,
+                  total: true,
+                  faturamentoDireto: true,
+                  status: true,
+                  erroOmie: true,
+                  fornecedorNome: true,
+                  createdAt: true,
+                },
               },
             },
             orderBy: { createdAt: "asc" },
@@ -66,15 +77,30 @@ export default async function PainelOPDetalhe({ params }) {
   );
   const verbaTotal = verbaBase + verbaAditivos;
 
-  // Total já em pedidos (soma dos PedidoOmie.total criados nessa OP)
+  // Total já em pedidos (soma dos PedidoOmie.total CRIADOS nessa OP) + lista flat
   let totalEmPedidos = 0;
+  const pedidosFlat = [];
   for (const rm of op.rms) {
     for (const cot of rm.cotacoes) {
       for (const ped of cot.pedidosOmie || []) {
-        totalEmPedidos += ped.total || 0;
+        if (ped.status === "CRIADO") totalEmPedidos += ped.total || 0;
+        pedidosFlat.push({
+          id: ped.id,
+          codigoPedido: ped.codigoPedido,
+          numeroPedido: ped.numeroPedido,
+          total: ped.total,
+          faturamentoDireto: ped.faturamentoDireto,
+          status: ped.status,
+          erroOmie: ped.erroOmie,
+          fornecedorNome: ped.fornecedorNome,
+          createdAt: ped.createdAt.toISOString(),
+          rmNumero: rm.numero,
+          cotacaoId: cot.id,
+        });
       }
     }
   }
+  pedidosFlat.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const saldo = verbaTotal - totalEmPedidos;
   const consumoPct = verbaTotal > 0 ? (totalEmPedidos / verbaTotal) * 100 : 0;
 
@@ -178,6 +204,9 @@ export default async function PainelOPDetalhe({ params }) {
 
       {/* Mapa de Cotação */}
       <MapaCotacaoClient op={data} />
+
+      {/* Pedidos no Omie vinculados a essa OP */}
+      <PedidosOmieSection pedidos={pedidosFlat} />
     </div>
   );
 }
