@@ -1,9 +1,9 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const fmtMoeda = (v) =>
@@ -59,10 +59,106 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [enviadoAgora, setEnviadoAgora] = useState(false);
+  const [arquivoNome, setArquivoNome] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [parseInfo, setParseInfo] = useState(null); // { match: N, total: M, fornecedor, prazo }
+  const fileRef = useRef(null);
 
   const setLinha = (id, k, v) => {
     setLinhas((prev) => prev.map((l) => (l.id === id ? { ...l, [k]: v } : l)));
   };
+
+  // Normaliza descricao pra comparacao (lowercase, sem acento, sem pontuacao)
+  function normalizar(s) {
+    return (s || "")
+      .toString()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9 ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // Score: % de tokens da descricao do PDF que aparecem na descricao da RM
+  function scoreMatch(descPdf, descRm) {
+    const a = normalizar(descPdf).split(" ").filter((t) => t.length >= 3);
+    const b = normalizar(descRm);
+    if (a.length === 0 || !b) return 0;
+    const hits = a.filter((tok) => b.includes(tok)).length;
+    return hits / a.length;
+  }
+
+  // Casa os itens extraidos do PDF com as linhas da RM
+  function casarItens(itensPdf) {
+    const linhasNovas = [...linhas];
+    const usados = new Set();
+    let casados = 0;
+
+    for (const itPdf of itensPdf) {
+      let melhorIdx = -1;
+      let melhorScore = 0.5; // limiar minimo
+      for (let i = 0; i < linhasNovas.length; i++) {
+        if (usados.has(i)) continue;
+        const sc = scoreMatch(itPdf.descricao, linhasNovas[i].descricao);
+        if (sc > melhorScore) { melhorScore = sc; melhorIdx = i; }
+      }
+      if (melhorIdx >= 0) {
+        usados.add(melhorIdx);
+        casados++;
+        const l = linhasNovas[melhorIdx];
+        if (itPdf.precoUnit) l.precoUnit = String(itPdf.precoUnit);
+        if (itPdf.qtd) l.qtdCotada = itPdf.qtd;
+        if (itPdf.icmsPct != null) l.icmsPct = String(itPdf.icmsPct);
+        if (itPdf.ipiPct != null) l.ipiPct = String(itPdf.ipiPct);
+      }
+    }
+    setLinhas(linhasNovas);
+    return casados;
+  }
+
+  async function uploadPDF(file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setErro("Arquivo muito grande (limite 10MB).");
+      return;
+    }
+    setErro("");
+    setParseInfo(null);
+    setParsing(true);
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      const res = await fetch("/api/parse-pdf-cotacao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao ler PDF");
+
+      const itensPdf = data.itens || [];
+      const casados = casarItens(itensPdf);
+      setArquivoNome(file.name);
+      setParseInfo({
+        match: casados,
+        total: itensPdf.length,
+        fornecedor: data.fornecedor,
+        prazo: data.prazoPagamento,
+      });
+      // Se PDF traz fornecedor/prazo, pre-preenche
+      if (data.fornecedor && !razaoSocial) setRazaoSocial(data.fornecedor);
+      if (data.prazoPagamento && !condicaoPagamento) setCondicaoPagamento(data.prazoPagamento);
+    } catch (e) {
+      setErro("Falha ao processar PDF: " + e.message);
+    } finally {
+      setParsing(false);
+    }
+  }
 
   // Total bruto: soma de preço × qtd de cada linha
   const total = useMemo(
@@ -226,6 +322,76 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
         )}
 
         <form onSubmit={submit} className="space-y-6">
+          {/* Anexar proposta (PDF) */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-start justify-between flex-wrap gap-3">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+                  <Sparkles size={18} className="text-torg-orange" />
+                  Tem a proposta em PDF?
+                </h2>
+                <p className="text-xs text-torg-gray mt-1">
+                  Anexe o PDF e a gente tenta preencher os preços automaticamente. Você revisa antes de enviar.
+                </p>
+              </div>
+              <div className="flex gap-2 items-center flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={parsing}
+                  className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50"
+                >
+                  {parsing ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                  {parsing ? "Lendo PDF..." : arquivoNome ? "Trocar PDF" : "Anexar proposta (PDF)"}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="hidden"
+                  onChange={(e) => { uploadPDF(e.target.files?.[0]); e.target.value = ""; }}
+                />
+              </div>
+            </div>
+
+            {arquivoNome && (
+              <div className="mt-4 flex items-center gap-2 bg-torg-blue-50/50 border border-torg-blue-100 rounded-lg px-3 py-2">
+                <FileText size={16} className="text-torg-blue flex-shrink-0" />
+                <p className="text-sm text-torg-dark flex-1 truncate">{arquivoNome}</p>
+                <button
+                  type="button"
+                  onClick={() => { setArquivoNome(""); setParseInfo(null); }}
+                  className="text-gray-400 hover:text-red-600 flex-shrink-0"
+                  title="Remover"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {parseInfo && (
+              <div className="mt-3 bg-torg-orange-50/40 border border-torg-orange-100 rounded-lg px-3 py-2 text-sm">
+                {parseInfo.match > 0 ? (
+                  <p className="text-torg-dark">
+                    ✓ <strong>{parseInfo.match}</strong> {parseInfo.match === 1 ? "item preenchido" : "itens preenchidos"} automaticamente
+                    {parseInfo.total > parseInfo.match && (
+                      <span className="text-torg-gray"> ({parseInfo.total - parseInfo.match} item(s) do PDF não casaram com a RM — preencha manualmente)</span>
+                    )}.
+                    Confira os preços abaixo antes de enviar.
+                  </p>
+                ) : (
+                  <p className="text-torg-orange-700">
+                    ⚠ O PDF foi lido mas não conseguimos casar os itens automaticamente. Pode preencher os preços abaixo manualmente.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <p className="text-[11px] text-torg-gray mt-3">
+              Aceita PDF de até 10MB. Por enquanto o arquivo não é armazenado — apenas usado pra ler os valores. Se preferir, preencha direto na tabela abaixo.
+            </p>
+          </div>
+
           {/* Itens */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100">
