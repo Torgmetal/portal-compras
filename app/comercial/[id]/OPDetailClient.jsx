@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History, Trash2, RotateCcw,
+  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
@@ -36,6 +36,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
   const [modalRevisao, setModalRevisao] = useState(false);
   const [modalPrazo, setModalPrazo] = useState(false);
   const [modalVerba, setModalVerba] = useState(null); // { tipo: "op"|"aditivo", itemId, atual }
+  const [modalEditarItem, setModalEditarItem] = useState(null); // { tipo: 'op'|'aditivo', item }
   const [acaoStatus, setAcaoStatus] = useState(null); // 'finalizar' | 'reabrir' | 'excluir'
   const [erroAcao, setErroAcao] = useState("");
 
@@ -272,6 +273,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
           onSolicitarVerba={(item) =>
             setModalVerba({ tipo: "op", itemId: item.id, atual: item.valorVerba, descricao: item.descricao })
           }
+          onEditar={(item) => setModalEditarItem({ tipo: "op", item })}
           isMaster={isMaster}
         />
       </div>
@@ -298,6 +300,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
                 onSolicitarVerba={(item) =>
                   setModalVerba({ tipo: "aditivo", itemId: item.id, atual: item.valorVerba, descricao: item.descricao })
                 }
+                onEditar={(item) => setModalEditarItem({ tipo: "aditivo", item })}
                 isMaster={isMaster}
               />
             </div>
@@ -354,6 +357,14 @@ export default function OPDetailClient({ op, userRole, userId }) {
           onSaved={() => router.refresh()}
         />
       )}
+      {modalEditarItem && (
+        <ModalEditarItem
+          tipo={modalEditarItem.tipo}
+          item={modalEditarItem.item}
+          onClose={() => setModalEditarItem(null)}
+          onSaved={() => { setModalEditarItem(null); router.refresh(); }}
+        />
+      )}
     </>
   );
 }
@@ -383,7 +394,7 @@ function localLabel(codigo) {
   return null;
 }
 
-function ItensTabela({ itens, onSolicitarVerba, isMaster }) {
+function ItensTabela({ itens, onSolicitarVerba, onEditar, isMaster }) {
   if (!itens || itens.length === 0) {
     return <p className="px-6 py-4 text-sm text-torg-gray">Nenhum item.</p>;
   }
@@ -391,19 +402,19 @@ function ItensTabela({ itens, onSolicitarVerba, isMaster }) {
   return (
     <div className="space-y-4">
       {materiais.length > 0 && (
-        <BlocoItens titulo="Materiais" itens={materiais} onSolicitarVerba={onSolicitarVerba} isMaster={isMaster} />
+        <BlocoItens titulo="Materiais" itens={materiais} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} />
       )}
       {alugueis.length > 0 && (
-        <BlocoItens titulo="Aluguéis e Equipamentos" itens={alugueis} onSolicitarVerba={onSolicitarVerba} isMaster={isMaster} aluguel />
+        <BlocoItens titulo="Aluguéis e Equipamentos" itens={alugueis} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} aluguel />
       )}
       {outros.length > 0 && (
-        <BlocoItens titulo="Outros" itens={outros} onSolicitarVerba={onSolicitarVerba} isMaster={isMaster} />
+        <BlocoItens titulo="Outros" itens={outros} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} />
       )}
     </div>
   );
 }
 
-function BlocoItens({ titulo, itens, onSolicitarVerba, isMaster, aluguel }) {
+function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, isMaster, aluguel }) {
   return (
     <div>
       <p className="px-6 pt-4 text-xs font-semibold text-torg-gray uppercase tracking-wide">{titulo}</p>
@@ -441,14 +452,25 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, isMaster, aluguel }) {
                     )}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <button
-                      onClick={() => onSolicitarVerba(it)}
-                      disabled={temPendente}
-                      className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                      title={temPendente ? "Já tem solicitação pendente" : "Solicitar mudança de verba"}
-                    >
-                      <DollarSign size={12} /> {isMaster ? "Alterar verba" : "Solicitar verba"}
-                    </button>
+                    <div className="inline-flex items-center gap-3 justify-end">
+                      {isMaster && onEditar && (
+                        <button
+                          onClick={() => onEditar(it)}
+                          className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1"
+                          title="Editar item (ADMIN — edição direta)"
+                        >
+                          <Pencil size={12} /> Editar
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onSolicitarVerba(it)}
+                        disabled={temPendente}
+                        className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={temPendente ? "Já tem solicitação pendente" : "Solicitar mudança de verba"}
+                      >
+                        <DollarSign size={12} /> {isMaster ? "Alterar verba" : "Solicitar verba"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -694,6 +716,99 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, onClose, onSaved 
           className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
         >
           {salvando && <Loader2 size={14} className="animate-spin" />} Enviar solicitação
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// Modal de edicao direta de item (so ADMIN). Reusa ItemFormRow + ajustarItem.
+function ModalEditarItem({ tipo, item, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    categoria: item.categoria,
+    tipo: item.tipo,
+    descricao: item.descricao || "",
+    codigoOmie: item.codigoOmie || "",
+    localEstoque: item.localEstoque || "",
+    unidade: item.unidade || "",
+    qtdContratada: item.qtdContratada || 0,
+    cmcMedio: item.cmcMedio || 0,
+    meses: item.meses || 0,
+    valorPorMes: item.valorPorMes || 0,
+    capacidade: item.capacidade || "",
+    valorVerba: item.valorVerba || 0,
+    faturamentoDireto: !!item.faturamentoDireto,
+    observacao: item.observacao || "",
+  });
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const submit = async () => {
+    setErro("");
+    if (!form.descricao.trim()) return setErro("Descrição é obrigatória.");
+    setSalvando(true);
+    try {
+      const endpoint = tipo === "op"
+        ? `/api/comercial/op-item/${item.id}`
+        : `/api/comercial/aditivo-item/${item.id}`;
+      const payload = {
+        descricao: form.descricao.trim(),
+        codigoOmie: form.codigoOmie || null,
+        localEstoque: form.localEstoque || null,
+        unidade: form.unidade || null,
+        qtdContratada: Number(form.qtdContratada) || null,
+        cmcMedio: Number(form.cmcMedio) || null,
+        meses: Number(form.meses) || null,
+        valorPorMes: Number(form.valorPorMes) || null,
+        capacidade: form.capacidade || null,
+        valorVerba: Number(form.valorVerba) || 0,
+        faturamentoDireto: !!form.faturamentoDireto,
+        observacao: form.observacao || null,
+      };
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal titulo="Editar item (ADMIN)" onClose={onClose}>
+      <div className="px-2 py-2">
+        <div className="bg-torg-orange-50/40 border border-torg-orange-100 rounded px-3 py-2 text-xs text-torg-dark mx-4 mt-2">
+          ⚠️ Edição direta de ADMIN — bypass do fluxo de Solicitação de Verba.
+          Use só pra correção de erro de digitação. Tudo fica registrado em audit log.
+        </div>
+        <ItemFormRow
+          item={form}
+          onChange={setForm}
+          onRemove={() => {}}
+          canRemove={false}
+          compact
+        />
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2 mx-4 mb-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+          Cancelar
+        </button>
+        <button
+          onClick={submit}
+          disabled={salvando}
+          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+        >
+          {salvando && <Loader2 size={14} className="animate-spin" />} Salvar
         </button>
       </div>
     </Modal>
