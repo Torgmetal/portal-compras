@@ -68,44 +68,49 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
     setLinhas((prev) => prev.map((l) => (l.id === id ? { ...l, [k]: v } : l)));
   };
 
-  // Normaliza descricao pra comparacao (lowercase, sem acento, sem pontuacao)
-  function normalizar(s) {
-    return (s || "")
-      .toString()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9 ]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+  // Aplica os itens vindos da IA usando rmIndex (que ja casa com a RM)
+  function aplicarItensIA(itensIA) {
+    const linhasNovas = [...linhas];
+    let casados = 0;
+    for (const itPdf of itensIA) {
+      const idx = itPdf.rmIndex;
+      if (idx == null || idx < 0 || idx >= linhasNovas.length) continue;
+      const l = linhasNovas[idx];
+      if (itPdf.precoUnit) l.precoUnit = String(itPdf.precoUnit);
+      if (itPdf.qtdCotada || itPdf.qtd) l.qtdCotada = itPdf.qtdCotada || itPdf.qtd;
+      if (itPdf.icmsPct != null) l.icmsPct = String(itPdf.icmsPct);
+      if (itPdf.ipiPct != null) l.ipiPct = String(itPdf.ipiPct);
+      if (itPdf.observacao && !l.observacao) l.observacao = itPdf.observacao;
+      casados++;
+    }
+    setLinhas(linhasNovas);
+    return casados;
   }
 
-  // Score: % de tokens da descricao do PDF que aparecem na descricao da RM
-  function scoreMatch(descPdf, descRm) {
-    const a = normalizar(descPdf).split(" ").filter((t) => t.length >= 3);
-    const b = normalizar(descRm);
+  // Fallback: se IA falhar, usa parser regex e casa via score local
+  function scoreMatchTokens(descPdf, descRm) {
+    const norm = (s) => (s || "")
+      .toString().toLowerCase().normalize("NFD")
+      .replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, " ")
+      .replace(/\s+/g, " ").trim();
+    const a = norm(descPdf).split(" ").filter((t) => t.length >= 3);
+    const b = norm(descRm);
     if (a.length === 0 || !b) return 0;
-    const hits = a.filter((tok) => b.includes(tok)).length;
-    return hits / a.length;
+    return a.filter((tok) => b.includes(tok)).length / a.length;
   }
-
-  // Casa os itens extraidos do PDF com as linhas da RM
-  function casarItens(itensPdf) {
+  function aplicarItensFallback(itensPdf) {
     const linhasNovas = [...linhas];
     const usados = new Set();
     let casados = 0;
-
     for (const itPdf of itensPdf) {
-      let melhorIdx = -1;
-      let melhorScore = 0.5; // limiar minimo
+      let melhorIdx = -1, melhorScore = 0.5;
       for (let i = 0; i < linhasNovas.length; i++) {
         if (usados.has(i)) continue;
-        const sc = scoreMatch(itPdf.descricao, linhasNovas[i].descricao);
+        const sc = scoreMatchTokens(itPdf.descricao, linhasNovas[i].descricao);
         if (sc > melhorScore) { melhorScore = sc; melhorIdx = i; }
       }
       if (melhorIdx >= 0) {
-        usados.add(melhorIdx);
-        casados++;
+        usados.add(melhorIdx); casados++;
         const l = linhasNovas[melhorIdx];
         if (itPdf.precoUnit) l.precoUnit = String(itPdf.precoUnit);
         if (itPdf.qtd) l.qtdCotada = itPdf.qtd;
@@ -133,24 +138,56 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
         r.onerror = reject;
         r.readAsDataURL(file);
       });
-      const res = await fetch("/api/parse-pdf-cotacao", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64 }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao ler PDF");
 
-      const itensPdf = data.itens || [];
-      const casados = casarItens(itensPdf);
+      // Contexto da RM pra IA fazer o matching
+      const rmItensCtx = linhas.map((l) => ({
+        descricao: l.descricao,
+        material: l.material,
+        qtd: l.qtdRm,
+        unidade: l.unidade,
+        pesoKg: l.unidade === "KG" ? l.qtdRm : null,
+      }));
+
+      // 1. Tenta IA (Claude — entende variacoes brasileiras + faz matching automatico)
+      let usouIA = false;
+      let data = null;
+      try {
+        const resIA = await fetch("/api/parse-cotacao-ai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pdfBase64: base64, rmItens: rmItensCtx }),
+        });
+        if (resIA.ok) {
+          data = await resIA.json();
+          usouIA = true;
+        }
+      } catch (_) { /* cai no fallback */ }
+
+      // 2. Fallback regex se IA falhou
+      if (!usouIA) {
+        const resFb = await fetch("/api/parse-pdf-cotacao", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64 }),
+        });
+        if (!resFb.ok) {
+          const e = await resFb.json().catch(() => ({}));
+          throw new Error(e.error || "Falha ao ler PDF");
+        }
+        data = await resFb.json();
+      }
+
+      const itensExtra = data.itens || [];
+      const casados = usouIA ? aplicarItensIA(itensExtra) : aplicarItensFallback(itensExtra);
       setArquivoNome(file.name);
       setParseInfo({
         match: casados,
-        total: itensPdf.length,
+        total: itensExtra.length,
         fornecedor: data.fornecedor,
         prazo: data.prazoPagamento,
+        usouIA,
       });
-      // Se PDF traz fornecedor/prazo, pre-preenche
+      // Pre-preenche identificacao se vier no PDF
       if (data.fornecedor && !razaoSocial) setRazaoSocial(data.fornecedor);
       if (data.prazoPagamento && !condicaoPagamento) setCondicaoPagamento(data.prazoPagamento);
     } catch (e) {
@@ -377,7 +414,8 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
                     {parseInfo.total > parseInfo.match && (
                       <span className="text-torg-gray"> ({parseInfo.total - parseInfo.match} item(s) do PDF não casaram com a RM — preencha manualmente)</span>
                     )}.
-                    Confira os preços abaixo antes de enviar.
+                    {parseInfo.usouIA && <span className="text-[10px] text-torg-blue ml-1">via IA</span>}
+                    {" "}Confira os preços abaixo antes de enviar.
                   </p>
                 ) : (
                   <p className="text-torg-orange-700">
