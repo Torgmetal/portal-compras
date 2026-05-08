@@ -90,9 +90,75 @@ model OP {
   rms            RM[]
   receitas       OPReceita[]
   medicoes       OPMedicao[]
+  producaoSemanal ProducaoSemanal[]
+  fluxoCaixa     FluxoCaixa[]
 
   @@index([numero])
   @@index([status])
+}
+
+// ─── PRODUÇÃO (PCP / FÁBRICA) ─────────────────────────────────
+// Pesos previstos x realizados de estruturas, por semana e por OP.
+// Inputado manualmente pelo time de PCP/Produção (ou via import xlsx).
+
+model ProducaoSemanal {
+  id              String   @id @default(cuid())
+
+  semana          String   // ISO week, ex: "2026-W19"
+  dataInicio      DateTime // segunda-feira da semana
+  dataFim         DateTime // sabado da semana
+
+  // Producao em estrutura (kg)
+  pesoPrevistoKg  Float    @default(0)
+  pesoRealizadoKg Float    @default(0)
+
+  // Valor associado (R$, opcional — pra fluxo financeiro)
+  valorPrevisto   Float    @default(0)
+  valorRealizado  Float    @default(0)
+
+  // Quebrado por OP (opcional — null = total geral da semana)
+  opId            String?
+  op              OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
+
+  observacao      String?
+
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([semana, opId])
+  @@index([dataInicio])
+  @@index([opId])
+}
+
+// Fluxo de caixa previsto (entradas e saidas)
+model FluxoCaixa {
+  id            String   @id @default(cuid())
+
+  data          DateTime // data prevista de entrada/saida
+  tipo          String   // 'ENTRADA' | 'SAIDA'
+  categoria     String   // FATURAMENTO_MEDICAO | RECEBIMENTO | SALARIO | IMPOSTO | COMPRA | TRIBUTO | OUTROS
+  descricao     String
+  valor         Float    // sempre positivo (tipo define se entra ou sai)
+
+  // Realizado: quando entrou/saiu efetivo
+  realizado     Boolean  @default(false)
+  dataRealizado DateTime?
+
+  // Vinculo opcional com OP
+  opId          String?
+  op            OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
+
+  observacao    String?
+
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([data])
+  @@index([tipo])
+  @@index([categoria])
+  @@index([opId])
 }
 
 // ─── MEDIÇÕES (Pedidos de Venda do Omie vinculados à OP) ──────
