@@ -37,6 +37,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
   const [modalPrazo, setModalPrazo] = useState(false);
   const [modalVerba, setModalVerba] = useState(null); // { tipo: "op"|"aditivo", itemId, atual }
   const [modalEditarItem, setModalEditarItem] = useState(null); // { tipo: 'op'|'aditivo', item }
+  const [modalAddItens, setModalAddItens] = useState(false);
   const [acaoStatus, setAcaoStatus] = useState(null); // 'finalizar' | 'reabrir' | 'excluir'
   const [erroAcao, setErroAcao] = useState("");
 
@@ -263,10 +264,19 @@ export default function OPDetailClient({ op, userRole, userId }) {
 
       {/* Itens base */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-lg font-semibold text-torg-dark">
             Itens base do contrato ({op.itens.length})
           </h3>
+          {isMaster && !encerradaOuCancelada && (
+            <button
+              onClick={() => setModalAddItens(true)}
+              className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1"
+              title="Adicionar mais itens à OP base (ADMIN)"
+            >
+              <Plus size={14} /> Adicionar itens
+            </button>
+          )}
         </div>
         <ItensTabela
           itens={op.itens}
@@ -363,6 +373,13 @@ export default function OPDetailClient({ op, userRole, userId }) {
           item={modalEditarItem.item}
           onClose={() => setModalEditarItem(null)}
           onSaved={() => { setModalEditarItem(null); router.refresh(); }}
+        />
+      )}
+      {modalAddItens && (
+        <ModalAdicionarItens
+          opId={op.id}
+          onClose={() => setModalAddItens(false)}
+          onSaved={() => { setModalAddItens(false); router.refresh(); }}
         />
       )}
     </>
@@ -809,6 +826,119 @@ function ModalEditarItem({ tipo, item, onClose, onSaved }) {
           className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
         >
           {salvando && <Loader2 size={14} className="animate-spin" />} Salvar
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// Modal de adicionar itens NOVOS a uma OP existente (ADMIN-only).
+// Mesma UX do ModalAditivo mas vai pra OP base, sem criar aditivo.
+function ModalAdicionarItens({ opId, onClose, onSaved }) {
+  const [itens, setItens] = useState([novoItem()]);
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const updateItem = (i, novo) => setItens((p) => p.map((it, idx) => (idx === i ? novo : it)));
+  const addItem = (cat = "MATERIA_PRIMA") => setItens((p) => [...p, novoItem(cat)]);
+  const removeItem = (i) => setItens((p) => p.filter((_, idx) => idx !== i));
+
+  const totalVerba = itens.reduce((s, it) => s + (Number(it.valorVerba) || 0), 0);
+
+  const submit = async () => {
+    setErro("");
+    const validos = itens.filter((it) => it.descricao.trim());
+    if (validos.length === 0) return setErro("Adicione pelo menos um item.");
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/comercial/op/${opId}/itens`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itens: validos.map((it) => ({
+            categoria: it.categoria,
+            tipo: it.tipo,
+            descricao: it.descricao,
+            codigoOmie: it.codigoOmie || null,
+            localEstoque: it.localEstoque || null,
+            unidade: it.unidade || null,
+            qtdContratada: Number(it.qtdContratada) || null,
+            cmcMedio: Number(it.cmcMedio) || null,
+            meses: Number(it.meses) || null,
+            valorPorMes: Number(it.valorPorMes) || null,
+            capacidade: it.capacidade || null,
+            valorVerba: Number(it.valorVerba) || 0,
+            faturamentoDireto: !!it.faturamentoDireto,
+            observacao: it.observacao || null,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal titulo="Adicionar itens à OP base" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+
+        <div className="bg-torg-orange-50/40 border border-torg-orange-100 rounded px-3 py-2 text-xs text-torg-dark">
+          ⚠️ Edição direta de ADMIN — adiciona itens à OP base sem criar aditivo.
+          Use só pra completar OPs que esqueceram itens. Tudo registrado em audit log.
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <label className="block text-sm font-medium text-torg-dark">Novos itens ({itens.length})</label>
+            <div className="flex gap-2">
+              <button onClick={() => addItem("MATERIA_PRIMA")} className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1">
+                <Plus size={12} /> Material
+              </button>
+              <button onClick={() => addItem("ALUGUEL_PLATAFORMA")} className="text-xs text-torg-orange-700 hover:text-torg-dark font-medium inline-flex items-center gap-1">
+                <Plus size={12} /> Aluguel
+              </button>
+              <button onClick={() => addItem("OUTRO")} className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1">
+                <Plus size={12} /> Outro
+              </button>
+            </div>
+          </div>
+          <div className="border border-gray-100 rounded-lg divide-y divide-gray-100">
+            {itens.map((it, i) => (
+              <ItemFormRow
+                key={i}
+                item={it}
+                onChange={(novo) => updateItem(i, novo)}
+                onRemove={() => removeItem(i)}
+                canRemove={itens.length > 1}
+                compact
+              />
+            ))}
+          </div>
+          <div className="mt-2 text-right text-sm">
+            <span className="text-torg-gray">Total verba a adicionar: </span>
+            <span className="font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</span>
+          </div>
+        </div>
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+          Cancelar
+        </button>
+        <button
+          onClick={submit}
+          disabled={salvando}
+          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+        >
+          {salvando && <Loader2 size={14} className="animate-spin" />} Adicionar {itens.length > 1 ? `${itens.length} itens` : "item"}
         </button>
       </div>
     </Modal>
