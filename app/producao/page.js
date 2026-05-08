@@ -33,13 +33,6 @@ export default async function PainelProducao() {
     include: { op: { select: { numero: true } } },
   });
 
-  // Romaneios nessa janela (peso REAL produzido/expedido)
-  const romaneios = await prisma.romaneio.findMany({
-    where: { data: { gte: inicioJanela, lte: fimJanela } },
-    orderBy: { data: "desc" },
-    include: { op: { select: { numero: true, cliente: true } } },
-  });
-
   // Lista de semanas (ultimas 8 + atual + 4 prox = 13 semanas)
   const semanas = [];
   for (let i = 8; i >= -4; i--) {
@@ -71,7 +64,6 @@ export default async function PainelProducao() {
       semanas={semanasUnicas}
       semanaAtual={semanaAtual}
       producoes={JSON.parse(JSON.stringify(producoes))}
-      romaneios={JSON.parse(JSON.stringify(romaneios))}
       userRole={user.role}
     />
   );

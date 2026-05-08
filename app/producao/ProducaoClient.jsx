@@ -1,10 +1,9 @@
 "use client";
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity, Plus, Loader2, AlertCircle, X,
-  Package, Pencil, Trash2, FileText, ExternalLink,
+  Package, Pencil, Trash2,
 } from "lucide-react";
 import { fmtSemana } from "@/lib/semana";
 
@@ -12,9 +11,8 @@ const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtKg = (v) =>
   v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kg` : "—";
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
-export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, romaneios }) {
+export default function ProducaoClient({ ops, semanas, semanaAtual, producoes }) {
   const router = useRouter();
   const [modalProd, setModalProd] = useState(null);
 
@@ -32,31 +30,9 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
     return Object.values(map);
   }, [producoes, semanas]);
 
-  // Agrega ROMANEIOS (peso real expedido) por semana
-  const romaneiosPorSemana = useMemo(() => {
-    const map = {};
-    for (const s of semanas) map[s.semana] = { ...s, kg: 0, valor: 0, items: [] };
-    for (const r of romaneios) {
-      const dt = new Date(r.data);
-      let achou = null;
-      for (const s of semanas) {
-        if (dt >= new Date(s.dataInicio) && dt <= new Date(s.dataFim)) {
-          achou = s.semana; break;
-        }
-      }
-      if (!achou) continue;
-      map[achou].kg += r.pesoRealKg || 0;
-      map[achou].valor += r.valorTotal || 0;
-      map[achou].items.push(r);
-    }
-    return Object.values(map);
-  }, [romaneios, semanas]);
-
   // KPIs da semana atual
   const kpiSemana = producaoPorSemana.find((s) => s.semana === semanaAtual) || { prevKg: 0, realKg: 0 };
-  const romSemana = romaneiosPorSemana.find((s) => s.semana === semanaAtual) || { kg: 0, valor: 0 };
   const aderencia = kpiSemana.prevKg > 0 ? (kpiSemana.realKg / kpiSemana.prevKg) * 100 : 0;
-  const aderRomaneio = kpiSemana.prevKg > 0 ? (romSemana.kg / kpiSemana.prevKg) * 100 : 0;
 
   // KPIs do mes
   const hoje = new Date();
@@ -73,16 +49,11 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
         realKg += p.pesoRealizadoKg || 0;
       }
     }
-    let romKg = 0;
-    for (const r of romaneios) {
-      if (noMesAtual(r.data)) romKg += r.pesoRealKg || 0;
-    }
-    return { prevKg, realKg, romKg };
-  }, [producoes, romaneios]);
+    return { prevKg, realKg };
+  }, [producoes]);
 
   const maxKg = Math.max(
     ...producaoPorSemana.map((s) => Math.max(s.prevKg, s.realKg)),
-    ...romaneiosPorSemana.map((s) => s.kg),
     1
   );
 
@@ -94,23 +65,15 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
             Painel de Produção
           </h2>
           <p className="text-sm text-torg-gray mt-1">
-            PCP — pesos previstos × realizados, validados pelos Romaneios de expedição.
+            PCP — pesos previstos × realizados de estruturas, planejados pela equipe de produção.
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Link
-            href="/expedicao"
-            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
-          >
-            <ExternalLink size={16} /> Romaneios (Expedição)
-          </Link>
-          <button
-            onClick={() => setModalProd("novo")}
-            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
-          >
-            <Plus size={16} /> Produção semanal
-          </button>
-        </div>
+        <button
+          onClick={() => setModalProd("novo")}
+          className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+        >
+          <Plus size={16} /> Produção semanal
+        </button>
       </div>
 
       {/* KPIs */}
@@ -124,43 +87,39 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
         <KpiCard
           label="Peso realizado (semana)"
           value={fmtKg(kpiSemana.realKg)}
-          subtitle={`${aderencia.toFixed(1)}% aderência (PCP)`}
+          subtitle={`${aderencia.toFixed(1)}% aderência`}
           color={aderencia >= 90 ? "bg-torg-blue" : aderencia >= 70 ? "bg-torg-orange" : "bg-red-500"}
           Icon={Activity}
         />
         <KpiCard
-          label="Romaneios da semana"
-          value={fmtKg(romSemana.kg)}
-          subtitle={`${aderRomaneio.toFixed(1)}% do previsto`}
-          color={aderRomaneio >= 90 ? "bg-torg-blue" : aderRomaneio >= 70 ? "bg-torg-orange" : "bg-red-500"}
-          Icon={FileText}
+          label="Peso previsto (mês)"
+          value={fmtKg(kpiMes.prevKg)}
+          color="bg-torg-blue"
+          Icon={Package}
         />
         <KpiCard
-          label="Romaneios do mês"
-          value={fmtKg(kpiMes.romKg)}
-          subtitle={`Previsto: ${fmtKg(kpiMes.prevKg)}`}
-          color="bg-torg-dark"
-          Icon={FileText}
+          label="Peso realizado (mês)"
+          value={fmtKg(kpiMes.realKg)}
+          subtitle={kpiMes.prevKg > 0 ? `${((kpiMes.realKg / kpiMes.prevKg) * 100).toFixed(1)}% aderência` : ""}
+          color="bg-torg-orange"
+          Icon={Activity}
         />
       </div>
 
-      {/* Gráfico: peso previsto / realizado / romaneio por semana */}
+      {/* Gráfico: peso previsto × realizado por semana */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-torg-dark">Pesos por semana</h3>
           <p className="text-xs text-torg-gray mt-0.5">
-            <span className="inline-block w-3 h-2 bg-torg-blue-700 align-middle mr-1" /> Previsto (PCP)
-            <span className="inline-block w-3 h-2 bg-torg-orange align-middle ml-3 mr-1" /> Realizado (PCP)
-            <span className="inline-block w-3 h-2 bg-torg-dark align-middle ml-3 mr-1" /> Romaneio (real expedido)
+            <span className="inline-block w-3 h-2 bg-torg-blue-700 align-middle mr-1" /> Previsto
+            <span className="inline-block w-3 h-2 bg-torg-orange align-middle ml-3 mr-1" /> Realizado
           </p>
         </div>
         <div className="px-6 py-5">
           <div className="space-y-4">
             {producaoPorSemana.map((s) => {
-              const rom = romaneiosPorSemana.find((r) => r.semana === s.semana) || { kg: 0 };
               const prevPct = (s.prevKg / maxKg) * 100;
               const realPct = (s.realKg / maxKg) * 100;
-              const romPct = (rom.kg / maxKg) * 100;
               const isAtual = s.semana === semanaAtual;
               return (
                 <div key={s.semana} className={`grid grid-cols-12 gap-3 items-center ${isAtual ? "bg-torg-blue-50/30 -mx-6 px-6 py-2" : ""}`}>
@@ -171,7 +130,6 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
                   <div className="col-span-9 sm:col-span-10 space-y-1">
                     <Bar pct={prevPct} color="bg-torg-blue-700" label={`Prev: ${fmtKg(s.prevKg)}`} />
                     <Bar pct={realPct} color="bg-torg-orange" label={`Real: ${fmtKg(s.realKg)}`} />
-                    <Bar pct={romPct} color="bg-torg-dark" label={`Rom: ${fmtKg(rom.kg)}`} />
                   </div>
                 </div>
               );
@@ -226,62 +184,6 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Tabela: Romaneios (read-only — gerenciados pela Expedição) */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h3 className="text-lg font-semibold text-torg-dark">Romaneios de expedição</h3>
-            <p className="text-xs text-torg-gray mt-0.5">
-              Visualização. Cadastro e edição é feito no <Link href="/expedicao" className="text-torg-blue hover:underline">Portal de Expedição</Link>.
-            </p>
-          </div>
-          <Link
-            href="/expedicao"
-            className="text-xs text-torg-blue hover:text-torg-blue-700 inline-flex items-center gap-1 font-medium"
-          >
-            Abrir Expedição <ExternalLink size={12} />
-          </Link>
-        </div>
-        {romaneios.length === 0 ? (
-          <p className="px-6 py-6 text-sm text-torg-gray text-center">
-            Nenhum romaneio emitido ainda. A Expedição cadastra os romaneios em <Link href="/expedicao" className="text-torg-blue hover:underline">/expedicao</Link>.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nº</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Peso real</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">R$/kg</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {romaneios.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 font-mono text-torg-dark text-xs">{r.numero}</td>
-                    <td className="px-4 py-2 text-xs text-torg-gray">{fmtData(r.data)}</td>
-                    <td className="px-4 py-2 text-xs font-mono text-torg-blue">{r.op?.numero || "—"}</td>
-                    <td className="px-4 py-2 text-torg-dark text-xs max-w-[280px] truncate">{r.descricao || "—"}</td>
-                    <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{fmtKg(r.pesoRealKg)}</td>
-                    <td className="px-4 py-2 text-right text-torg-gray tabular-nums text-xs">
-                      {r.valorPorKg ? fmtMoeda(r.valorPorKg) : "—"}
-                    </td>
-                    <td className="px-4 py-2 text-right text-torg-blue font-medium tabular-nums">
-                      {r.valorTotal ? fmtMoeda(r.valorTotal) : "—"}
-                    </td>
-                  </tr>
-                ))}
               </tbody>
             </table>
           </div>
