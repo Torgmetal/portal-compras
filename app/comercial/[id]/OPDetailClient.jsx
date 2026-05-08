@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil,
+  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
@@ -140,7 +140,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-100 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-5 border-t border-gray-100 text-sm">
           <div className="flex items-center gap-2">
             <Calendar size={16} className="text-torg-blue" />
             <div>
@@ -162,6 +162,25 @@ export default function OPDetailClient({ op, userRole, userId }) {
               <p className="text-torg-dark font-medium">{op._count.rms}</p>
             </div>
           </div>
+          <a href="#pedidos-omie" className="flex items-center gap-2 hover:bg-torg-blue-50 -mx-2 px-2 py-1 rounded transition-colors">
+            <Truck size={16} className="text-torg-blue" />
+            <div>
+              <p className="text-torg-gray text-xs">Pedidos vinculados</p>
+              <p className="text-torg-dark font-medium">
+                {op.resumoPedidos?.criados || 0}
+                {op.resumoPedidos?.erros > 0 && (
+                  <span className="text-[10px] text-red-600 font-medium ml-1">
+                    +{op.resumoPedidos.erros} c/erro
+                  </span>
+                )}
+              </p>
+              {op.resumoPedidos?.valorTotal > 0 && (
+                <p className="text-[10px] text-torg-orange-700 font-medium tabular-nums">
+                  {fmtMoeda(op.resumoPedidos.valorTotal)}
+                </p>
+              )}
+            </div>
+          </a>
         </div>
 
         {/* Ações */}

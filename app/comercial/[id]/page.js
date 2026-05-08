@@ -142,6 +142,15 @@ export default async function OPDetailPage({ params }) {
   const totalFD = op.itens.filter((i) => i.faturamentoDireto).reduce((s, i) => s + (i.valorVerba || 0), 0)
     + op.aditivos.reduce((s, a) => s + a.itens.filter((i) => i.faturamentoDireto).reduce((ss, i) => ss + (i.valorVerba || 0), 0), 0);
 
+  // Resumo de pedidos vinculados (count + total de criados)
+  const pedidosCriados = pedidos.filter((p) => p.status === "CRIADO");
+  const resumoPedidos = {
+    total: pedidos.length,
+    criados: pedidosCriados.length,
+    erros: pedidos.length - pedidosCriados.length,
+    valorTotal: pedidosCriados.reduce((s, p) => s + (p.total || 0), 0),
+  };
+
   // Transformar pra plain object (Date → string)
   const opData = JSON.parse(JSON.stringify(op));
   opData.cobertura = cobertura;
@@ -152,6 +161,7 @@ export default async function OPDetailPage({ params }) {
     impostosDetalhados,
   };
   opData.faturamento = { temFD, totalFD };
+  opData.resumoPedidos = resumoPedidos;
 
   return (
     <div className="space-y-6 max-w-7xl">

@@ -39,7 +39,7 @@ function PedidoNumeroCell({ pedido }) {
 export default function PedidosOmieSection({ pedidos }) {
   if (!pedidos || pedidos.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div id="pedidos-omie" className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 scroll-mt-4">
         <div className="flex items-center gap-2 mb-2">
           <Truck size={18} className="text-torg-blue" />
           <h3 className="text-lg font-semibold text-torg-dark">Pedidos no Omie</h3>
@@ -56,7 +56,7 @@ export default function PedidosOmieSection({ pedidos }) {
   const qtdErros = pedidos.filter((p) => p.status !== "CRIADO").length;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div id="pedidos-omie" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden scroll-mt-4">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <Truck size={18} className="text-torg-blue" />

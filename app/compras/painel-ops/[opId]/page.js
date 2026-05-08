@@ -170,12 +170,25 @@ export default async function PainelOPDetalhe({ params }) {
 
       {/* RMs vinculadas */}
       {data.rms.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
+        <div id="rms-vinculadas" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden scroll-mt-4">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-lg font-semibold text-torg-dark">RMs vinculadas ({data.rms.length})</h3>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-torg-gray">
+                {pedidosFlat.filter((p) => p.status === "CRIADO").length} pedidos no Omie
+              </span>
+              {pedidosFlat.filter((p) => p.status === "CRIADO").length > 0 && (
+                <span className="text-torg-orange-700 font-medium tabular-nums">
+                  {fmtMoeda(pedidosFlat.filter((p) => p.status === "CRIADO").reduce((s, p) => s + (p.total || 0), 0))}
+                </span>
+              )}
+            </div>
           </div>
           <ul className="divide-y divide-gray-100">
-            {data.rms.map((rm) => (
+            {data.rms.map((rm) => {
+              const pedidosDaRm = pedidosFlat.filter((p) => p.rmNumero === rm.numero && p.status === "CRIADO");
+              const totalPedidosRm = pedidosDaRm.reduce((s, p) => s + (p.total || 0), 0);
+              return (
               <li key={rm.id} className="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
                 <div className="flex items-center gap-3">
                   <FileText size={16} className="text-torg-gray" />
@@ -187,6 +200,11 @@ export default async function PainelOPDetalhe({ params }) {
                 <div className="flex items-center gap-3 text-xs text-torg-gray">
                   <span>{rm.itens.length} itens</span>
                   <span>{rm.cotacoes.length} cotações</span>
+                  {pedidosDaRm.length > 0 && (
+                    <span className="text-torg-blue font-medium" title={`${pedidosDaRm.length} pedido(s) — ${fmtMoeda(totalPedidosRm)}`}>
+                      {pedidosDaRm.length} pedido{pedidosDaRm.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
                   {(() => {
                     const s = STATUS_RM_BADGE[rm.status] || STATUS_RM_BADGE.ABERTA;
                     return (
@@ -197,7 +215,8 @@ export default async function PainelOPDetalhe({ params }) {
                   })()}
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       )}
