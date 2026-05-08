@@ -21,6 +21,8 @@ function homePorRole(role) {
       return "/producao";
     case "FINANCEIRO":
       return "/financeiro";
+    case "EXPEDICAO":
+      return "/expedicao";
     default:
       return "/";
   }

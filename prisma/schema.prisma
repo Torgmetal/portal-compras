@@ -21,6 +21,7 @@ enum Role {
   COMPRAS
   PRODUCAO
   FINANCEIRO
+  EXPEDICAO
 }
 
 model User {

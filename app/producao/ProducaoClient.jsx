@@ -1,9 +1,10 @@
 "use client";
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity, Plus, Loader2, AlertCircle, X,
-  Package, Pencil, Trash2, FileText,
+  Package, Pencil, Trash2, FileText, ExternalLink,
 } from "lucide-react";
 import { fmtSemana } from "@/lib/semana";
 
@@ -16,7 +17,6 @@ const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, romaneios }) {
   const router = useRouter();
   const [modalProd, setModalProd] = useState(null);
-  const [modalRomaneio, setModalRomaneio] = useState(null);
 
   // Agrega producao por semana
   const producaoPorSemana = useMemo(() => {
@@ -98,12 +98,12 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setModalRomaneio("novo")}
-            className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange-700 font-medium flex items-center gap-2"
+          <Link
+            href="/expedicao"
+            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
           >
-            <FileText size={16} /> + Romaneio
-          </button>
+            <ExternalLink size={16} /> Romaneios (Expedição)
+          </Link>
           <button
             onClick={() => setModalProd("novo")}
             className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
@@ -232,17 +232,25 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
         )}
       </div>
 
-      {/* Tabela: Romaneios */}
+      {/* Tabela: Romaneios (read-only — gerenciados pela Expedição) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-torg-dark">Romaneios de expedição</h3>
-          <p className="text-xs text-torg-gray mt-0.5">
-            Cada romaneio = peso REAL produzido/expedido. R$/kg gera receita no Portal Financeiro.
-          </p>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark">Romaneios de expedição</h3>
+            <p className="text-xs text-torg-gray mt-0.5">
+              Visualização. Cadastro e edição é feito no <Link href="/expedicao" className="text-torg-blue hover:underline">Portal de Expedição</Link>.
+            </p>
+          </div>
+          <Link
+            href="/expedicao"
+            className="text-xs text-torg-blue hover:text-torg-blue-700 inline-flex items-center gap-1 font-medium"
+          >
+            Abrir Expedição <ExternalLink size={12} />
+          </Link>
         </div>
         {romaneios.length === 0 ? (
           <p className="px-6 py-6 text-sm text-torg-gray text-center">
-            Nenhum romaneio ainda. Clique em "+ Romaneio" pra registrar uma expedição.
+            Nenhum romaneio emitido ainda. A Expedição cadastra os romaneios em <Link href="/expedicao" className="text-torg-blue hover:underline">/expedicao</Link>.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -256,7 +264,6 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Peso real</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">R$/kg</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -273,12 +280,6 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
                     <td className="px-4 py-2 text-right text-torg-blue font-medium tabular-nums">
                       {r.valorTotal ? fmtMoeda(r.valorTotal) : "—"}
                     </td>
-                    <td className="px-4 py-2 text-right">
-                      <button onClick={() => setModalRomaneio(r)}
-                        className="text-xs text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
-                        <Pencil size={12} /> Editar
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -292,12 +293,6 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes, r
           item={modalProd === "novo" ? null : modalProd}
           onClose={() => setModalProd(null)}
           onSaved={() => { setModalProd(null); router.refresh(); }} />
-      )}
-      {modalRomaneio && (
-        <ModalRomaneio ops={ops}
-          item={modalRomaneio === "novo" ? null : modalRomaneio}
-          onClose={() => setModalRomaneio(null)}
-          onSaved={() => { setModalRomaneio(null); router.refresh(); }} />
       )}
     </div>
   );
@@ -478,148 +473,3 @@ function ModalProducao({ ops, semanas, item, onClose, onSaved }) {
   );
 }
 
-function ModalRomaneio({ ops, item, onClose, onSaved }) {
-  const isEdit = !!item;
-  const hoje = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({
-    numero: item?.numero || "",
-    data: item?.data ? new Date(item.data).toISOString().slice(0, 10) : hoje,
-    opId: item?.opId || "",
-    pesoRealKg: item?.pesoRealKg ?? 0,
-    valorPorKg: item?.valorPorKg ?? "",
-    descricao: item?.descricao || "",
-    observacao: item?.observacao || "",
-  });
-  const [erro, setErro] = useState("");
-  const [salvando, setSalvando] = useState(false);
-  const [excluindo, setExcluindo] = useState(false);
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const peso = Number(form.pesoRealKg) || 0;
-  const vpk = Number(form.valorPorKg) || 0;
-  const total = peso * vpk;
-
-  const submit = async () => {
-    setErro("");
-    if (!form.numero.trim()) return setErro("Informe o número do romaneio.");
-    if (!peso || peso <= 0) return setErro("Peso real deve ser maior que zero.");
-    setSalvando(true);
-    try {
-      const payload = {
-        numero: form.numero.trim(),
-        data: form.data,
-        opId: form.opId || null,
-        pesoRealKg: peso,
-        valorPorKg: vpk || null,
-        descricao: form.descricao || null,
-        observacao: form.observacao || null,
-      };
-      const res = isEdit
-        ? await fetch(`/api/producao/romaneio/${item.id}`, {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await fetch(`/api/producao/romaneio`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
-      onSaved();
-    } catch (e) { setErro(e.message); setSalvando(false); }
-  };
-
-  const excluir = async () => {
-    if (!isEdit || !window.confirm("Excluir esse romaneio?")) return;
-    setExcluindo(true);
-    try {
-      const res = await fetch(`/api/producao/romaneio/${item.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
-      onSaved();
-    } catch (e) { setErro(e.message); setExcluindo(false); }
-  };
-
-  return (
-    <Modal titulo={isEdit ? "Editar romaneio" : "Novo romaneio"} onClose={onClose}>
-      <div className="px-6 py-5 space-y-4">
-        {erro && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
-            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
-          </div>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">Nº romaneio *</label>
-            <input type="text" value={form.numero}
-              onChange={(e) => set("numero", e.target.value)}
-              placeholder="Ex: R-001/2026"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">Data *</label>
-            <input type="date" value={form.data}
-              onChange={(e) => set("data", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">OP</label>
-            <select value={form.opId} onChange={(e) => set("opId", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-              <option value="">— Sem OP —</option>
-              {ops.map((o) => <option key={o.id} value={o.id}>{o.numero} — {o.cliente}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">Peso real (kg) *</label>
-            <input type="number" step="0.01" min="0" value={form.pesoRealKg || ""}
-              onChange={(e) => set("pesoRealKg", e.target.value)} placeholder="0,00"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">Valor por kg (R$)</label>
-            <input type="number" step="0.01" min="0" value={form.valorPorKg || ""}
-              onChange={(e) => set("valorPorKg", e.target.value)} placeholder="R$ 0,00"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">Total (calculado)</label>
-            <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-right font-bold tabular-nums text-torg-blue">
-              {fmtMoeda(total)}
-            </div>
-          </div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-torg-dark mb-1">Descrição</label>
-          <input type="text" value={form.descricao}
-            onChange={(e) => set("descricao", e.target.value)}
-            placeholder="Ex: Estrutura mezanino — etapa 1"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-torg-dark mb-1">Observação</label>
-          <textarea value={form.observacao} onChange={(e) => set("observacao", e.target.value)}
-            rows={2} placeholder="Opcional"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-        </div>
-      </div>
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between flex-wrap gap-3">
-        {isEdit ? (
-          <button onClick={excluir} disabled={excluindo || salvando}
-            className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm font-medium flex items-center gap-2 disabled:opacity-50">
-            {excluindo ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Excluir
-          </button>
-        ) : <span />}
-        <div className="flex gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</button>
-          <button onClick={submit} disabled={salvando || excluindo}
-            className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50">
-            {salvando && <Loader2 size={14} className="animate-spin" />} Salvar
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
