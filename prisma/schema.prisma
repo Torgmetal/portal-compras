@@ -20,6 +20,7 @@ enum Role {
   ALMOXARIFADO
   COMPRAS
   PRODUCAO
+  FINANCEIRO
 }
 
 model User {
@@ -93,6 +94,7 @@ model OP {
   medicoes       OPMedicao[]
   producaoSemanal ProducaoSemanal[]
   fluxoCaixa     FluxoCaixa[]
+  romaneios      Romaneio[]
 
   @@index([numero])
   @@index([status])
@@ -130,6 +132,33 @@ model ProducaoSemanal {
   @@unique([semana, opId])
   @@index([dataInicio])
   @@index([opId])
+}
+
+// Romaneio = nota de expedicao com peso REAL produzido/expedido.
+// Usado pra validar peso previsto vs realizado e calcular receita gerada.
+model Romaneio {
+  id          String   @id @default(cuid())
+  numero      String   // numero do romaneio (ex: "R-001/2026")
+
+  opId        String?
+  op          OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
+
+  data        DateTime // data de emissao/expedicao
+  pesoRealKg  Float    // peso real produzido/expedido (kg)
+
+  descricao   String?  // descricao do que foi produzido
+  observacao  String?
+
+  // Snapshot do valor unitario (R$/kg) usado pra calcular receita gerada
+  valorPorKg  Float?
+  valorTotal  Float?   // pesoRealKg * valorPorKg (calculado e armazenado)
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([opId])
+  @@index([data])
 }
 
 // Fluxo de caixa previsto (entradas e saidas)

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import TorgLogo from "@/components/TorgLogo";
-import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity } from "lucide-react";
+import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity, DollarSign } from "lucide-react";
 
 const FOOTER_LOGO_W = 180;
 const FOOTER_LOGO_H = Math.round((FOOTER_LOGO_W * 1080) / 1920);
@@ -31,16 +31,23 @@ const portais = [
   {
     href: "/producao",
     label: "Produção",
-    desc: "PCP, pesos previstos × realizados, fluxo de caixa semanal.",
+    desc: "PCP, pesos previstos × realizados, romaneios de expedição.",
     Icon: Activity,
     bg: "bg-torg-orange-700",
+  },
+  {
+    href: "/financeiro",
+    label: "Financeiro",
+    desc: "Fluxo de caixa, receita gerada por produção e validação.",
+    Icon: DollarSign,
+    bg: "bg-torg-orange",
   },
   {
     href: "/fornecedores",
     label: "Fornecedores",
     desc: "Envio de propostas e cotações via link único.",
     Icon: Truck,
-    bg: "bg-torg-orange",
+    bg: "bg-torg-dark",
   },
 ];
 
