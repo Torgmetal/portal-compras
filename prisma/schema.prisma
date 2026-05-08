@@ -75,9 +75,46 @@ model OP {
   revisoes       Revisao[]
   ajustesPrazo   AjustePrazo[]
   rms            RM[]
+  receitas       OPReceita[]
 
   @@index([numero])
   @@index([status])
+}
+
+// ─── RECEITAS DA OP ──────────────────────────────────────────
+// Linhas de receita do contrato (projeto, montagem, fabricacao, etc.)
+// com aliquotas de impostos por linha pra controle financeiro.
+
+model OPReceita {
+  id          String   @id @default(cuid())
+  opId        String
+  op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  ordem       Int      @default(0)
+  categoria   String   // PROJETO | MONTAGEM | FABRICACAO | MATERIAL | OUTRO
+  descricao   String
+  cfop        String?  // codigo CFOP (ex: "5101", "5933", "6101")
+  codigoServico String? // codigo de servico ISS quando aplicavel
+
+  valor       Float    // valor bruto da receita
+
+  // Aliquotas tributarias em % (cada linha pode ter regime/CFOP diferente)
+  icmsPct     Float?
+  ipiPct      Float?
+  pisPct      Float?
+  cofinsPct   Float?
+  issPct      Float?
+  irrfPct     Float?
+  csllPct     Float?
+
+  observacao  String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([opId])
+  @@index([categoria])
 }
 
 enum ItemTipo {

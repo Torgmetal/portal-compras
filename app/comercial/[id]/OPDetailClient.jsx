@@ -38,6 +38,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
   const [modalVerba, setModalVerba] = useState(null); // { tipo: "op"|"aditivo", itemId, atual }
   const [modalEditarItem, setModalEditarItem] = useState(null); // { tipo: 'op'|'aditivo', item }
   const [modalAddItens, setModalAddItens] = useState(false);
+  const [modalReceita, setModalReceita] = useState(null); // null | 'nova' | { ...receita }
   const [acaoStatus, setAcaoStatus] = useState(null); // 'finalizar' | 'reabrir' | 'excluir'
   const [erroAcao, setErroAcao] = useState("");
 
@@ -221,45 +222,106 @@ export default function OPDetailClient({ op, userRole, userId }) {
         )}
       </div>
 
-      {/* KPIs financeiros: Verba estimada x Em pedidos x Saldo */}
+      {/* KPIs financeiros: Receita / Verba / Saldo / Margem */}
       {op.kpisFinanceiros && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs text-torg-gray">Verba estimada</p>
-              <p className="text-2xl font-extrabold text-torg-dark tabular-nums">
-                {fmtMoeda(op.kpisFinanceiros.verbaTotal)}
-              </p>
-              <p className="text-[10px] text-torg-gray mt-0.5">Base + aditivos</p>
-            </div>
-            <div>
-              <p className="text-xs text-torg-gray">Já em pedidos</p>
-              <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
-                {fmtMoeda(op.kpisFinanceiros.totalEmPedidos)}
-              </p>
-              <p className="text-[10px] text-torg-gray mt-0.5">
-                {op.kpisFinanceiros.consumoPct.toFixed(1)}% da verba
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-torg-gray">Saldo restante</p>
-              <p className={`text-2xl font-extrabold tabular-nums ${
-                op.kpisFinanceiros.saldo < 0
-                  ? "text-red-600"
-                  : op.kpisFinanceiros.consumoPct >= 70
-                  ? "text-torg-orange-700"
-                  : "text-torg-dark"
-              }`}>
-                {fmtMoeda(op.kpisFinanceiros.saldo)}
-              </p>
-              {op.kpisFinanceiros.saldo < 0 && (
-                <p className="text-[10px] text-red-600 mt-0.5 font-medium">⚠ verba estourada</p>
-              )}
-              {op.kpisFinanceiros.saldo >= 0 && op.kpisFinanceiros.consumoPct >= 70 && (
-                <p className="text-[10px] text-torg-orange-700 mt-0.5 font-medium">⚠ acima de 70%</p>
-              )}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
+          {/* Linha 1: Receita */}
+          <div>
+            <p className="text-xs uppercase tracking-wide text-torg-gray font-semibold mb-3">Receita do contrato</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-torg-gray">Receita bruta total</p>
+                <p className="text-2xl font-extrabold text-torg-dark tabular-nums">
+                  {fmtMoeda(op.kpisFinanceiros.receitaBruta)}
+                </p>
+                <p className="text-[10px] text-torg-gray mt-0.5">
+                  {(op.receitas || []).length} {((op.receitas || []).length === 1) ? "receita" : "receitas"} cadastrada(s)
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-torg-gray">Impostos estimados</p>
+                <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
+                  − {fmtMoeda(op.kpisFinanceiros.totalImpostos)}
+                </p>
+                <p className="text-[10px] text-torg-gray mt-0.5">
+                  ICMS + IPI + PIS + COFINS + ISS + IRRF + CSLL
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-torg-gray">Receita líquida</p>
+                <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
+                  {fmtMoeda(op.kpisFinanceiros.receitaLiquida)}
+                </p>
+                <p className="text-[10px] text-torg-gray mt-0.5">Bruto − impostos</p>
+              </div>
             </div>
           </div>
+
+          <div className="border-t border-gray-100" />
+
+          {/* Linha 2: Verba pra compras x Pedidos x Saldo */}
+          <div>
+            <p className="text-xs uppercase tracking-wide text-torg-gray font-semibold mb-3">Verba pra compras (custo)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-torg-gray">Verba estimada</p>
+                <p className="text-2xl font-extrabold text-torg-dark tabular-nums">
+                  {fmtMoeda(op.kpisFinanceiros.verbaTotal)}
+                </p>
+                <p className="text-[10px] text-torg-gray mt-0.5">Base + aditivos</p>
+              </div>
+              <div>
+                <p className="text-xs text-torg-gray">Já em pedidos</p>
+                <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
+                  {fmtMoeda(op.kpisFinanceiros.totalEmPedidos)}
+                </p>
+                <p className="text-[10px] text-torg-gray mt-0.5">
+                  {op.kpisFinanceiros.consumoPct.toFixed(1)}% da verba
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-torg-gray">Saldo restante</p>
+                <p className={`text-2xl font-extrabold tabular-nums ${
+                  op.kpisFinanceiros.saldo < 0
+                    ? "text-red-600"
+                    : op.kpisFinanceiros.consumoPct >= 70
+                    ? "text-torg-orange-700"
+                    : "text-torg-dark"
+                }`}>
+                  {fmtMoeda(op.kpisFinanceiros.saldo)}
+                </p>
+                {op.kpisFinanceiros.saldo < 0 && (
+                  <p className="text-[10px] text-red-600 mt-0.5 font-medium">⚠ verba estourada</p>
+                )}
+                {op.kpisFinanceiros.saldo >= 0 && op.kpisFinanceiros.consumoPct >= 70 && (
+                  <p className="text-[10px] text-torg-orange-700 mt-0.5 font-medium">⚠ acima de 70%</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Margem prevista (so se ja tem receita) */}
+          {op.kpisFinanceiros.receitaBruta > 0 && (
+            <div className="border-t border-gray-100 pt-4 flex items-center justify-between flex-wrap gap-2">
+              <p className="text-xs text-torg-gray uppercase tracking-wide font-semibold">
+                Margem prevista (líquido − verba)
+              </p>
+              <div className="text-right">
+                <p className={`text-xl font-extrabold tabular-nums ${
+                  op.kpisFinanceiros.margemPrevista < 0
+                    ? "text-red-600"
+                    : op.kpisFinanceiros.margemPct < 10
+                    ? "text-torg-orange-700"
+                    : "text-torg-dark"
+                }`}>
+                  {fmtMoeda(op.kpisFinanceiros.margemPrevista)}
+                  <span className="text-sm text-torg-gray font-medium ml-2">
+                    ({op.kpisFinanceiros.margemPct.toFixed(1)}%)
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -303,6 +365,32 @@ export default function OPDetailClient({ op, userRole, userId }) {
           </div>
         </div>
       )}
+
+      {/* Receitas do contrato */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark">
+              Receitas do contrato ({(op.receitas || []).length})
+            </h3>
+            <p className="text-xs text-torg-gray mt-0.5">
+              Linhas de receita por categoria (projeto, montagem, fabricação, etc.) com impostos por CFOP.
+            </p>
+          </div>
+          {!encerradaOuCancelada && (
+            <button
+              onClick={() => setModalReceita("nova")}
+              className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1"
+            >
+              <Plus size={14} /> Adicionar receita
+            </button>
+          )}
+        </div>
+        <ReceitasTabela
+          receitas={op.receitas || []}
+          onEditar={(r) => setModalReceita(r)}
+        />
+      </div>
 
       {/* Itens base */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -424,7 +512,342 @@ export default function OPDetailClient({ op, userRole, userId }) {
           onSaved={() => { setModalAddItens(false); router.refresh(); }}
         />
       )}
+      {modalReceita && (
+        <ModalReceita
+          opId={op.id}
+          receita={modalReceita === "nova" ? null : modalReceita}
+          onClose={() => setModalReceita(null)}
+          onSaved={() => { setModalReceita(null); router.refresh(); }}
+        />
+      )}
     </>
+  );
+}
+
+// Tabela das receitas no detalhe da OP
+function ReceitasTabela({ receitas, onEditar }) {
+  if (!receitas || receitas.length === 0) {
+    return (
+      <p className="px-6 py-4 text-sm text-torg-gray">
+        Nenhuma receita cadastrada. Clique em "Adicionar receita" pra começar.
+      </p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">CFOP</th>
+            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Bruto</th>
+            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Impostos</th>
+            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Líquido</th>
+            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {receitas.map((r) => {
+            const aliqTotal = (r.icmsPct || 0) + (r.ipiPct || 0) + (r.pisPct || 0)
+              + (r.cofinsPct || 0) + (r.issPct || 0) + (r.irrfPct || 0) + (r.csllPct || 0);
+            const impostosVal = (r.valor || 0) * (aliqTotal / 100);
+            const liq = (r.valor || 0) - impostosVal;
+            return (
+              <tr key={r.id} className="hover:bg-gray-50">
+                <td className="px-4 py-2 text-torg-dark text-xs">
+                  <span className="font-medium">{labelCategoriaReceita(r.categoria)}</span>
+                </td>
+                <td className="px-4 py-2 text-torg-dark">{r.descricao}</td>
+                <td className="px-4 py-2 text-torg-gray text-xs font-mono">{r.cfop || "—"}</td>
+                <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{fmtMoeda(r.valor)}</td>
+                <td className="px-4 py-2 text-right text-torg-orange-700 tabular-nums text-xs">
+                  − {fmtMoeda(impostosVal)}
+                  <span className="text-[10px] text-torg-gray block">
+                    {aliqTotal > 0 ? `${aliqTotal.toFixed(2)}%` : "sem impostos"}
+                  </span>
+                </td>
+                <td className="px-4 py-2 text-right text-torg-blue font-bold tabular-nums">{fmtMoeda(liq)}</td>
+                <td className="px-4 py-2 text-right">
+                  <button
+                    onClick={() => onEditar(r)}
+                    className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1"
+                  >
+                    <Pencil size={12} /> Editar
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const CATEGORIAS_RECEITA = [
+  { codigo: "PROJETO", label: "Projeto / Engenharia" },
+  { codigo: "FABRICACAO", label: "Fabricação" },
+  { codigo: "MONTAGEM", label: "Montagem em campo" },
+  { codigo: "MATERIAL", label: "Venda de Material" },
+  { codigo: "OUTRO", label: "Outro" },
+];
+
+function labelCategoriaReceita(cod) {
+  return CATEGORIAS_RECEITA.find((c) => c.codigo === cod)?.label || cod;
+}
+
+// CFOPs sugeridos (Brasil)
+const CFOPS_SUGERIDOS = [
+  { cfop: "5101", label: "Venda mercadoria de produção própria (estado)" },
+  { cfop: "6101", label: "Venda mercadoria de produção própria (interestadual)" },
+  { cfop: "5117", label: "Venda industrialização sob encomenda (estado)" },
+  { cfop: "6117", label: "Venda industrialização sob encomenda (interestadual)" },
+  { cfop: "5933", label: "Prestação de serviço tributado pelo ICMS (estado)" },
+  { cfop: "6933", label: "Prestação de serviço tributado pelo ICMS (interestadual)" },
+  { cfop: "5949", label: "Outras saídas (estado)" },
+  { cfop: "6949", label: "Outras saídas (interestadual)" },
+];
+
+// Modal de criar/editar receita
+function ModalReceita({ opId, receita, onClose, onSaved }) {
+  const isEdit = !!receita;
+  const [form, setForm] = useState({
+    categoria: receita?.categoria || "PROJETO",
+    descricao: receita?.descricao || "",
+    valor: receita?.valor ?? 0,
+    cfop: receita?.cfop || "",
+    codigoServico: receita?.codigoServico || "",
+    icmsPct: receita?.icmsPct ?? "",
+    ipiPct: receita?.ipiPct ?? "",
+    pisPct: receita?.pisPct ?? "",
+    cofinsPct: receita?.cofinsPct ?? "",
+    issPct: receita?.issPct ?? "",
+    irrfPct: receita?.irrfPct ?? "",
+    csllPct: receita?.csllPct ?? "",
+    observacao: receita?.observacao || "",
+  });
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Calculos em tempo real
+  const valorNum = Number(form.valor) || 0;
+  const aliquotas = ["icmsPct","ipiPct","pisPct","cofinsPct","issPct","irrfPct","csllPct"];
+  const aliqTotal = aliquotas.reduce((s, k) => s + (Number(form[k]) || 0), 0);
+  const impostosVal = valorNum * (aliqTotal / 100);
+  const liquido = valorNum - impostosVal;
+
+  const submit = async () => {
+    setErro("");
+    if (!form.descricao.trim()) return setErro("Descrição é obrigatória.");
+    if (!valorNum || valorNum <= 0) return setErro("Valor da receita deve ser maior que zero.");
+    setSalvando(true);
+    try {
+      const payload = {
+        categoria: form.categoria,
+        descricao: form.descricao.trim(),
+        valor: valorNum,
+        cfop: form.cfop || null,
+        codigoServico: form.codigoServico || null,
+        icmsPct: form.icmsPct === "" ? null : Number(form.icmsPct),
+        ipiPct: form.ipiPct === "" ? null : Number(form.ipiPct),
+        pisPct: form.pisPct === "" ? null : Number(form.pisPct),
+        cofinsPct: form.cofinsPct === "" ? null : Number(form.cofinsPct),
+        issPct: form.issPct === "" ? null : Number(form.issPct),
+        irrfPct: form.irrfPct === "" ? null : Number(form.irrfPct),
+        csllPct: form.csllPct === "" ? null : Number(form.csllPct),
+        observacao: form.observacao || null,
+      };
+      const res = await fetch(
+        isEdit ? `/api/comercial/receita/${receita.id}` : `/api/comercial/op/${opId}/receita`,
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  const excluir = async () => {
+    if (!isEdit) return;
+    if (!window.confirm(`Excluir essa receita?\n\nValor: ${fmtMoeda(receita.valor)}`)) return;
+    setExcluindo(true);
+    try {
+      const res = await fetch(`/api/comercial/receita/${receita.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setExcluindo(false);
+    }
+  };
+
+  return (
+    <Modal titulo={isEdit ? "Editar receita" : "Adicionar receita"} onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Categoria *</label>
+            <select
+              value={form.categoria}
+              onChange={(e) => set("categoria", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+            >
+              {CATEGORIAS_RECEITA.map((c) => (
+                <option key={c.codigo} value={c.codigo}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Valor bruto (R$) *</label>
+            <input
+              type="number" step="0.01" min="0"
+              value={form.valor || ""}
+              onChange={(e) => set("valor", e.target.value)}
+              placeholder="R$ 0,00"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Descrição *</label>
+          <input
+            type="text" value={form.descricao}
+            onChange={(e) => set("descricao", e.target.value)}
+            placeholder="Ex: Projeto executivo de estrutura metálica"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">CFOP</label>
+            <input
+              type="text"
+              list="cfop-suggest"
+              value={form.cfop}
+              onChange={(e) => set("cfop", e.target.value)}
+              placeholder="Ex: 5101"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+            />
+            <datalist id="cfop-suggest">
+              {CFOPS_SUGERIDOS.map((c) => (
+                <option key={c.cfop} value={c.cfop}>{c.label}</option>
+              ))}
+            </datalist>
+            <p className="text-[10px] text-torg-gray mt-0.5">Comece a digitar pra ver sugestões</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Código de serviço (ISS)</label>
+            <input
+              type="text" value={form.codigoServico}
+              onChange={(e) => set("codigoServico", e.target.value)}
+              placeholder="Ex: 7.02 (montagem)"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+
+        {/* Impostos */}
+        <div>
+          <p className="text-xs font-semibold text-torg-dark mb-2 uppercase tracking-wide">
+            Alíquotas tributárias (%)
+          </p>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {[
+              { key: "icmsPct", label: "ICMS" },
+              { key: "ipiPct", label: "IPI" },
+              { key: "pisPct", label: "PIS" },
+              { key: "cofinsPct", label: "COFINS" },
+              { key: "issPct", label: "ISS" },
+              { key: "irrfPct", label: "IRRF" },
+              { key: "csllPct", label: "CSLL" },
+            ].map((imp) => (
+              <div key={imp.key}>
+                <label className="block text-[11px] font-medium text-torg-gray mb-1">{imp.label}</label>
+                <input
+                  type="number" step="0.01" min="0" max="100"
+                  value={form[imp.key]}
+                  onChange={(e) => set(imp.key, e.target.value)}
+                  placeholder="0"
+                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Resumo de calculo */}
+        <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-3 text-sm space-y-1">
+          <div className="flex justify-between">
+            <span className="text-torg-gray">Bruto:</span>
+            <span className="font-medium text-torg-dark tabular-nums">{fmtMoeda(valorNum)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-torg-gray">Impostos ({aliqTotal.toFixed(2)}%):</span>
+            <span className="text-torg-orange-700 tabular-nums">− {fmtMoeda(impostosVal)}</span>
+          </div>
+          <div className="flex justify-between pt-1 border-t border-torg-blue-100">
+            <span className="font-semibold text-torg-dark">Líquido:</span>
+            <span className="font-bold text-torg-blue tabular-nums">{fmtMoeda(liquido)}</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Observação</label>
+          <textarea
+            value={form.observacao}
+            onChange={(e) => set("observacao", e.target.value)}
+            rows={2}
+            placeholder="Opcional"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+        </div>
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between flex-wrap gap-3">
+        {isEdit ? (
+          <button
+            onClick={excluir}
+            disabled={excluindo || salvando}
+            className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {excluindo ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Excluir
+          </button>
+        ) : <span />}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+            Cancelar
+          </button>
+          <button
+            onClick={submit}
+            disabled={salvando || excluindo}
+            className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {salvando && <Loader2 size={14} className="animate-spin" />}
+            {isEdit ? "Salvar alterações" : "Adicionar receita"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

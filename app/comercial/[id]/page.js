@@ -53,6 +53,7 @@ export default async function OPDetailPage({ params }) {
       rms: {
         select: { id: true, numero: true, tipoRM: true, categoriasOP: true, status: true },
       },
+      receitas: { orderBy: { ordem: "asc" } },
     },
   });
 
@@ -115,10 +116,27 @@ export default async function OPDetailPage({ params }) {
   const saldo = verbaTotal - totalEmPedidos;
   const consumoPct = verbaTotal > 0 ? (totalEmPedidos / verbaTotal) * 100 : 0;
 
+  // KPIs de receita: bruto + impostos por receita -> liquida
+  const receitaBruta = op.receitas.reduce((s, r) => s + (r.valor || 0), 0);
+  const totalImpostos = op.receitas.reduce((s, r) => {
+    const v = r.valor || 0;
+    const aliq = (r.icmsPct || 0) + (r.ipiPct || 0) + (r.pisPct || 0)
+      + (r.cofinsPct || 0) + (r.issPct || 0) + (r.irrfPct || 0) + (r.csllPct || 0);
+    return s + v * (aliq / 100);
+  }, 0);
+  const receitaLiquida = receitaBruta - totalImpostos;
+  // Margem prevista: receita liquida - verba pra compras (custo previsto)
+  const margemPrevista = receitaLiquida - verbaTotal;
+  const margemPct = receitaLiquida > 0 ? (margemPrevista / receitaLiquida) * 100 : 0;
+
   // Transformar pra plain object (Date → string)
   const opData = JSON.parse(JSON.stringify(op));
   opData.cobertura = cobertura;
-  opData.kpisFinanceiros = { verbaTotal, totalEmPedidos, saldo, consumoPct };
+  opData.kpisFinanceiros = {
+    verbaTotal, totalEmPedidos, saldo, consumoPct,
+    receitaBruta, totalImpostos, receitaLiquida,
+    margemPrevista, margemPct,
+  };
 
   return (
     <div className="space-y-6 max-w-7xl">
