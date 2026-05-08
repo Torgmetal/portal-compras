@@ -1,50 +1,35 @@
 "use client";
 import { useState } from "react";
-import { Truck, ExternalLink, AlertCircle, Copy, Check } from "lucide-react";
+import { Truck, ExternalLink, AlertCircle, FileText, Loader2 } from "lucide-react";
 import { omiePedidoCompraUrl } from "@/lib/omie-urls";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
-// Componente cliente — botao de copiar numero do pedido pra clipboard
+// Numero do pedido = link que abre o PDF do Omie em nova aba.
+// Por baixo, chama /api/omie/pedido-compra-pdf/[codigoPedido] que pede pra API
+// do Omie gerar o link temporario e redireciona pro PDF.
 function PedidoNumeroCell({ pedido }) {
-  const [copiado, setCopiado] = useState(false);
   const numero = pedido.numeroPedido || pedido.codigoPedido || "";
+  const podeAbrir = pedido.status === "CRIADO" && pedido.codigoPedido;
 
-  const copiar = async () => {
-    try {
-      await navigator.clipboard.writeText(numero);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 1500);
-    } catch {
-      // fallback se clipboard API nao funcionar
-      const ta = document.createElement("textarea");
-      ta.value = numero;
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand("copy"); setCopiado(true); setTimeout(() => setCopiado(false), 1500); }
-      catch {}
-      document.body.removeChild(ta);
-    }
-  };
-
-  if (pedido.status !== "CRIADO" || !numero) {
+  if (!podeAbrir) {
     return <span className="font-mono text-torg-gray">{numero || "—"}</span>;
   }
 
+  const url = `/api/omie/pedido-compra-pdf/${pedido.codigoPedido}`;
   return (
-    <div className="inline-flex items-center gap-2">
-      <span className="font-mono font-semibold text-torg-blue">{numero}</span>
-      <button
-        type="button"
-        onClick={copiar}
-        title="Copiar número"
-        className="text-torg-gray hover:text-torg-blue p-1 rounded hover:bg-torg-blue-50 transition-colors"
-      >
-        {copiado ? <Check size={12} className="text-torg-blue" /> : <Copy size={12} />}
-      </button>
-    </div>
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Abrir PDF do pedido no Omie"
+      className="inline-flex items-center gap-1 font-mono font-semibold text-torg-blue hover:text-torg-blue-700 hover:underline"
+    >
+      {numero}
+      <FileText size={12} />
+    </a>
   );
 }
 
@@ -102,7 +87,7 @@ export default function PedidosOmieSection({ pedidos }) {
       </div>
 
       <div className="px-6 py-2 bg-torg-blue-50/40 border-b border-torg-blue-100 text-xs text-torg-dark">
-        💡 Clique no <Copy size={11} className="inline mx-1 text-torg-gray" /> ao lado do número pra copiar, depois cole no Omie em <strong>Estoque → Pedido de Compra</strong> pra abrir o pedido específico.
+        💡 Clique no <strong>número do pedido</strong> pra abrir o PDF direto no Omie (gerado em tempo real via API).
       </div>
 
       <div className="overflow-x-auto">
