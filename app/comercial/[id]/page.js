@@ -116,18 +116,31 @@ export default async function OPDetailPage({ params }) {
   const saldo = verbaTotal - totalEmPedidos;
   const consumoPct = verbaTotal > 0 ? (totalEmPedidos / verbaTotal) * 100 : 0;
 
-  // KPIs de receita: bruto + impostos por receita -> liquida
+  // KPIs de receita: bruto + impostos detalhados por tipo -> liquida
   const receitaBruta = op.receitas.reduce((s, r) => s + (r.valor || 0), 0);
-  const totalImpostos = op.receitas.reduce((s, r) => {
+
+  // Soma cada imposto separadamente (R$) pra abrir no detalhe
+  const impostosDetalhados = op.receitas.reduce((acc, r) => {
     const v = r.valor || 0;
-    const aliq = (r.icmsPct || 0) + (r.ipiPct || 0) + (r.pisPct || 0)
-      + (r.cofinsPct || 0) + (r.issPct || 0) + (r.irrfPct || 0) + (r.csllPct || 0);
-    return s + v * (aliq / 100);
-  }, 0);
+    acc.icms   += v * ((r.icmsPct   || 0) / 100);
+    acc.ipi    += v * ((r.ipiPct    || 0) / 100);
+    acc.pis    += v * ((r.pisPct    || 0) / 100);
+    acc.cofins += v * ((r.cofinsPct || 0) / 100);
+    acc.iss    += v * ((r.issPct    || 0) / 100);
+    acc.irrf   += v * ((r.irrfPct   || 0) / 100);
+    acc.csll   += v * ((r.csllPct   || 0) / 100);
+    return acc;
+  }, { icms: 0, ipi: 0, pis: 0, cofins: 0, iss: 0, irrf: 0, csll: 0 });
+  const totalImpostos = Object.values(impostosDetalhados).reduce((s, v) => s + v, 0);
   const receitaLiquida = receitaBruta - totalImpostos;
-  // Margem prevista: receita liquida - verba pra compras (custo previsto)
   const margemPrevista = receitaLiquida - verbaTotal;
   const margemPct = receitaLiquida > 0 ? (margemPrevista / receitaLiquida) * 100 : 0;
+
+  // Detecta se OP tem itens em Faturamento Direto (FD)
+  const temFD = op.itens.some((i) => i.faturamentoDireto)
+    || op.aditivos.some((a) => a.itens.some((i) => i.faturamentoDireto));
+  const totalFD = op.itens.filter((i) => i.faturamentoDireto).reduce((s, i) => s + (i.valorVerba || 0), 0)
+    + op.aditivos.reduce((s, a) => s + a.itens.filter((i) => i.faturamentoDireto).reduce((ss, i) => ss + (i.valorVerba || 0), 0), 0);
 
   // Transformar pra plain object (Date → string)
   const opData = JSON.parse(JSON.stringify(op));
@@ -136,7 +149,9 @@ export default async function OPDetailPage({ params }) {
     verbaTotal, totalEmPedidos, saldo, consumoPct,
     receitaBruta, totalImpostos, receitaLiquida,
     margemPrevista, margemPct,
+    impostosDetalhados,
   };
+  opData.faturamento = { temFD, totalFD };
 
   return (
     <div className="space-y-6 max-w-7xl">

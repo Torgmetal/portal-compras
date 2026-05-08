@@ -65,6 +65,19 @@ model OP {
   dataFimPrevista  DateTime?
   dataFimReal      DateTime?
 
+  // Dados fiscais do cliente (necessario quando OP tem itens em
+  // Faturamento Direto — Omie precisa emitir nota direto pro cliente)
+  clienteRazaoSocial String?
+  clienteCnpj        String?
+  clienteIE          String?  // Inscricao Estadual
+  clienteEndereco    String?
+  clienteCidade      String?
+  clienteUF          String?
+  clienteCep         String?
+  clienteContato     String?
+  clienteEmail       String?
+  clienteTelefone    String?
+
   createdById String
   createdBy   User     @relation("OPCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())

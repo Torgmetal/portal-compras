@@ -39,6 +39,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
   const [modalEditarItem, setModalEditarItem] = useState(null); // { tipo: 'op'|'aditivo', item }
   const [modalAddItens, setModalAddItens] = useState(false);
   const [modalReceita, setModalReceita] = useState(null); // null | 'nova' | { ...receita }
+  const [modalCliente, setModalCliente] = useState(false);
   const [acaoStatus, setAcaoStatus] = useState(null); // 'finalizar' | 'reabrir' | 'excluir'
   const [erroAcao, setErroAcao] = useState("");
 
@@ -222,16 +223,18 @@ export default function OPDetailClient({ op, userRole, userId }) {
         )}
       </div>
 
-      {/* KPIs financeiros: Receita / Verba / Saldo / Margem */}
+      {/* KPIs financeiros: Receita / Verba / Margem com impostos detalhados */}
       {op.kpisFinanceiros && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
-          {/* Linha 1: Receita */}
+          {/* Linha 1: RECEITA — em AZUL (entrada) */}
           <div>
-            <p className="text-xs uppercase tracking-wide text-torg-gray font-semibold mb-3">Receita do contrato</p>
+            <p className="text-xs uppercase tracking-wide text-torg-blue font-semibold mb-3">
+              Receita do contrato (entrada)
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <p className="text-xs text-torg-gray">Receita bruta total</p>
-                <p className="text-2xl font-extrabold text-torg-dark tabular-nums">
+                <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
                   {fmtMoeda(op.kpisFinanceiros.receitaBruta)}
                 </p>
                 <p className="text-[10px] text-torg-gray mt-0.5">
@@ -244,7 +247,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
                   − {fmtMoeda(op.kpisFinanceiros.totalImpostos)}
                 </p>
                 <p className="text-[10px] text-torg-gray mt-0.5">
-                  ICMS + IPI + PIS + COFINS + ISS + IRRF + CSLL
+                  Detalhado por tipo abaixo
                 </p>
               </div>
               <div>
@@ -255,24 +258,56 @@ export default function OPDetailClient({ op, userRole, userId }) {
                 <p className="text-[10px] text-torg-gray mt-0.5">Bruto − impostos</p>
               </div>
             </div>
+
+            {/* Detalhe dos impostos por tipo */}
+            {op.kpisFinanceiros.impostosDetalhados && op.kpisFinanceiros.totalImpostos > 0 && (
+              <div className="mt-4 bg-torg-orange-50/30 border border-torg-orange-100 rounded-lg p-3">
+                <p className="text-[11px] uppercase tracking-wide text-torg-orange-700 font-semibold mb-2">
+                  Detalhamento dos impostos
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {[
+                    { key: "icms", label: "ICMS" },
+                    { key: "ipi", label: "IPI" },
+                    { key: "pis", label: "PIS" },
+                    { key: "cofins", label: "COFINS" },
+                    { key: "iss", label: "ISS" },
+                    { key: "irrf", label: "IRRF" },
+                    { key: "csll", label: "CSLL" },
+                  ].map((imp) => {
+                    const valor = op.kpisFinanceiros.impostosDetalhados[imp.key] || 0;
+                    return (
+                      <div key={imp.key}>
+                        <p className="text-[10px] text-torg-gray font-semibold uppercase">{imp.label}</p>
+                        <p className={`text-sm font-bold tabular-nums ${valor > 0 ? "text-torg-orange-700" : "text-gray-300"}`}>
+                          {valor > 0 ? fmtMoeda(valor) : "—"}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-gray-100" />
 
-          {/* Linha 2: Verba pra compras x Pedidos x Saldo */}
+          {/* Linha 2: VERBA — em LARANJA (despesa) */}
           <div>
-            <p className="text-xs uppercase tracking-wide text-torg-gray font-semibold mb-3">Verba pra compras (custo)</p>
+            <p className="text-xs uppercase tracking-wide text-torg-orange-700 font-semibold mb-3">
+              Verba pra compras (despesa)
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <p className="text-xs text-torg-gray">Verba estimada</p>
-                <p className="text-2xl font-extrabold text-torg-dark tabular-nums">
+                <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
                   {fmtMoeda(op.kpisFinanceiros.verbaTotal)}
                 </p>
                 <p className="text-[10px] text-torg-gray mt-0.5">Base + aditivos</p>
               </div>
               <div>
                 <p className="text-xs text-torg-gray">Já em pedidos</p>
-                <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
+                <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
                   {fmtMoeda(op.kpisFinanceiros.totalEmPedidos)}
                 </p>
                 <p className="text-[10px] text-torg-gray mt-0.5">
@@ -300,7 +335,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
             </div>
           </div>
 
-          {/* Margem prevista (so se ja tem receita) */}
+          {/* Margem prevista */}
           {op.kpisFinanceiros.receitaBruta > 0 && (
             <div className="border-t border-gray-100 pt-4 flex items-center justify-between flex-wrap gap-2">
               <p className="text-xs text-torg-gray uppercase tracking-wide font-semibold">
@@ -324,6 +359,14 @@ export default function OPDetailClient({ op, userRole, userId }) {
           )}
         </div>
       )}
+
+      {/* Faturamento e Dados Fiscais do Cliente */}
+      <FaturamentoCard
+        op={op}
+        temFD={op.faturamento?.temFD}
+        totalFD={op.faturamento?.totalFD}
+        onEditar={() => setModalCliente(true)}
+      />
 
       {/* Cobertura por categoria (gaps de RM da Engenharia) */}
       {op.cobertura && Object.keys(op.cobertura).length > 0 && (
@@ -520,7 +563,307 @@ export default function OPDetailClient({ op, userRole, userId }) {
           onSaved={() => { setModalReceita(null); router.refresh(); }}
         />
       )}
+      {modalCliente && (
+        <ModalClienteFiscal
+          opId={op.id}
+          op={op}
+          onClose={() => setModalCliente(false)}
+          onSaved={() => { setModalCliente(false); router.refresh(); }}
+        />
+      )}
     </>
+  );
+}
+
+// Card 'Faturamento e Dados Fiscais do Cliente'.
+// Muda de comportamento conforme a OP tem ou nao itens em FD.
+function FaturamentoCard({ op, temFD, totalFD, onEditar }) {
+  const dadosPreenchidos = !!(op.clienteRazaoSocial || op.clienteCnpj || op.clienteEndereco);
+  const cnpjFmt = (v) => {
+    const d = (v || "").replace(/\D/g, "");
+    if (d.length !== 14) return v || "—";
+    return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h3 className="text-lg font-semibold text-torg-dark">Faturamento e Dados Fiscais</h3>
+          <p className="text-xs text-torg-gray mt-0.5">
+            {temFD
+              ? "Esta OP tem itens em Faturamento Direto — preencha os dados pra Omie emitir nota correta."
+              : "Faturamento padrão pra Torg Metal. Dados do cliente são opcionais aqui."}
+          </p>
+        </div>
+        <button
+          onClick={onEditar}
+          className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1"
+        >
+          <Pencil size={14} /> Editar dados
+        </button>
+      </div>
+
+      <div className="px-6 py-5 space-y-4">
+        {/* Banner do tipo de faturamento */}
+        {temFD ? (
+          <div className="bg-torg-orange-50 border border-torg-orange-200 rounded-lg px-4 py-3 flex items-start gap-3">
+            <AlertCircle size={18} className="text-torg-orange-700 mt-0.5 flex-shrink-0" />
+            <div className="text-sm">
+              <p className="font-semibold text-torg-orange-700">
+                Considerar faturamento para os dados do CLIENTE
+              </p>
+              <p className="text-torg-dark mt-0.5">
+                Esta OP tem <strong>{fmtMoeda(totalFD || 0)}</strong> em itens marcados como Faturamento Direto (FD).
+                A nota fiscal desses itens vai direto pro cliente — preencha os dados cadastrais abaixo
+                pra que o Omie consiga emitir a nota correta.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-torg-blue-50 border border-torg-blue-200 rounded-lg px-4 py-3 flex items-start gap-3">
+            <CheckCircle2 size={18} className="text-torg-blue mt-0.5 flex-shrink-0" />
+            <div className="text-sm">
+              <p className="font-semibold text-torg-blue">
+                Faturamento padrão para a TORG METAL
+              </p>
+              <p className="text-torg-dark mt-0.5">
+                Todos os pedidos desta OP serão faturados pra Torg. Os dados do cliente abaixo
+                ficam apenas como referência cadastral — não são obrigatórios.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Dados do cliente */}
+        {!dadosPreenchidos ? (
+          <div className="text-center py-6">
+            <p className="text-torg-gray text-sm">
+              Nenhum dado cadastral do cliente preenchido ainda.
+            </p>
+            <button
+              onClick={onEditar}
+              className={`mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg ${
+                temFD
+                  ? "bg-torg-orange text-white hover:bg-torg-orange-700"
+                  : "bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50"
+              }`}
+            >
+              <Plus size={14} /> {temFD ? "Preencher dados (obrigatório)" : "Preencher dados (opcional)"}
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <div>
+              <p className="text-xs text-torg-gray">Razão Social</p>
+              <p className="text-torg-dark font-medium">{op.clienteRazaoSocial || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">CNPJ</p>
+              <p className="text-torg-dark font-mono">{cnpjFmt(op.clienteCnpj)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Inscrição Estadual</p>
+              <p className="text-torg-dark font-mono">{op.clienteIE || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Endereço</p>
+              <p className="text-torg-dark">{op.clienteEndereco || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Cidade / UF</p>
+              <p className="text-torg-dark">
+                {op.clienteCidade || "—"}{op.clienteUF ? ` / ${op.clienteUF}` : ""}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">CEP</p>
+              <p className="text-torg-dark font-mono">{op.clienteCep || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Contato</p>
+              <p className="text-torg-dark">{op.clienteContato || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Email / Telefone</p>
+              <p className="text-torg-dark">
+                {op.clienteEmail || "—"}{op.clienteTelefone ? ` · ${op.clienteTelefone}` : ""}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Modal pra editar dados fiscais do cliente
+function ModalClienteFiscal({ opId, op, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    clienteRazaoSocial: op.clienteRazaoSocial || "",
+    clienteCnpj: op.clienteCnpj || "",
+    clienteIE: op.clienteIE || "",
+    clienteEndereco: op.clienteEndereco || "",
+    clienteCidade: op.clienteCidade || "",
+    clienteUF: op.clienteUF || "",
+    clienteCep: op.clienteCep || "",
+    clienteContato: op.clienteContato || "",
+    clienteEmail: op.clienteEmail || "",
+    clienteTelefone: op.clienteTelefone || "",
+  });
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    setErro("");
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/comercial/op/${opId}/cliente`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal titulo="Dados fiscais do cliente" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+
+        <p className="text-xs text-torg-gray">
+          Necessário pra emissão de nota fiscal direta ao cliente (faturamento direto).
+          Pode preencher só o que tiver agora — atualiza depois.
+        </p>
+
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Razão Social</label>
+          <input
+            type="text" value={form.clienteRazaoSocial}
+            onChange={(e) => set("clienteRazaoSocial", e.target.value)}
+            placeholder="Ex: Construtora ABC LTDA"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">CNPJ</label>
+            <input
+              type="text" value={form.clienteCnpj}
+              onChange={(e) => set("clienteCnpj", e.target.value)}
+              placeholder="00.000.000/0001-00"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Inscrição Estadual</label>
+            <input
+              type="text" value={form.clienteIE}
+              onChange={(e) => set("clienteIE", e.target.value)}
+              placeholder="Opcional"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Endereço completo</label>
+          <input
+            type="text" value={form.clienteEndereco}
+            onChange={(e) => set("clienteEndereco", e.target.value)}
+            placeholder="Rua, número, complemento, bairro"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-torg-dark mb-1">Cidade</label>
+            <input
+              type="text" value={form.clienteCidade}
+              onChange={(e) => set("clienteCidade", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">UF</label>
+            <input
+              type="text" value={form.clienteUF} maxLength={2}
+              onChange={(e) => set("clienteUF", e.target.value.toUpperCase())}
+              placeholder="SP"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">CEP</label>
+            <input
+              type="text" value={form.clienteCep}
+              onChange={(e) => set("clienteCep", e.target.value)}
+              placeholder="00000-000"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Contato (nome)</label>
+            <input
+              type="text" value={form.clienteContato}
+              onChange={(e) => set("clienteContato", e.target.value)}
+              placeholder="Pessoa responsável"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Email</label>
+            <input
+              type="email" value={form.clienteEmail}
+              onChange={(e) => set("clienteEmail", e.target.value)}
+              placeholder="contato@cliente.com.br"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Telefone</label>
+            <input
+              type="text" value={form.clienteTelefone}
+              onChange={(e) => set("clienteTelefone", e.target.value)}
+              placeholder="(00) 0000-0000"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+          Cancelar
+        </button>
+        <button
+          onClick={submit}
+          disabled={salvando}
+          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+        >
+          {salvando && <Loader2 size={14} className="animate-spin" />} Salvar
+        </button>
+      </div>
+    </Modal>
   );
 }
 
