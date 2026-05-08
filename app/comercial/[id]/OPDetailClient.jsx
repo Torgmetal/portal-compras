@@ -221,6 +221,48 @@ export default function OPDetailClient({ op, userRole, userId }) {
         )}
       </div>
 
+      {/* KPIs financeiros: Verba estimada x Em pedidos x Saldo */}
+      {op.kpisFinanceiros && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-torg-gray">Verba estimada</p>
+              <p className="text-2xl font-extrabold text-torg-dark tabular-nums">
+                {fmtMoeda(op.kpisFinanceiros.verbaTotal)}
+              </p>
+              <p className="text-[10px] text-torg-gray mt-0.5">Base + aditivos</p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Já em pedidos</p>
+              <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
+                {fmtMoeda(op.kpisFinanceiros.totalEmPedidos)}
+              </p>
+              <p className="text-[10px] text-torg-gray mt-0.5">
+                {op.kpisFinanceiros.consumoPct.toFixed(1)}% da verba
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-torg-gray">Saldo restante</p>
+              <p className={`text-2xl font-extrabold tabular-nums ${
+                op.kpisFinanceiros.saldo < 0
+                  ? "text-red-600"
+                  : op.kpisFinanceiros.consumoPct >= 70
+                  ? "text-torg-orange-700"
+                  : "text-torg-dark"
+              }`}>
+                {fmtMoeda(op.kpisFinanceiros.saldo)}
+              </p>
+              {op.kpisFinanceiros.saldo < 0 && (
+                <p className="text-[10px] text-red-600 mt-0.5 font-medium">⚠ verba estourada</p>
+              )}
+              {op.kpisFinanceiros.saldo >= 0 && op.kpisFinanceiros.consumoPct >= 70 && (
+                <p className="text-[10px] text-torg-orange-700 mt-0.5 font-medium">⚠ acima de 70%</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cobertura por categoria (gaps de RM da Engenharia) */}
       {op.cobertura && Object.keys(op.cobertura).length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

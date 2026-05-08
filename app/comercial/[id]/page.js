@@ -102,9 +102,23 @@ export default async function OPDetailPage({ params }) {
     rmNumero: p.cotacao?.rm?.numero || null,
   }));
 
+  // KPIs de verba: estimada (base + aditivos) vs ja em pedidos (Omie status=CRIADO)
+  const verbaBase = op.itens.reduce((s, i) => s + (i.valorVerba || 0), 0);
+  const verbaAditivos = op.aditivos.reduce(
+    (s, a) => s + a.itens.reduce((ss, i) => ss + (i.valorVerba || 0), 0),
+    0
+  );
+  const verbaTotal = verbaBase + verbaAditivos;
+  const totalEmPedidos = pedidos
+    .filter((p) => p.status === "CRIADO")
+    .reduce((s, p) => s + (p.total || 0), 0);
+  const saldo = verbaTotal - totalEmPedidos;
+  const consumoPct = verbaTotal > 0 ? (totalEmPedidos / verbaTotal) * 100 : 0;
+
   // Transformar pra plain object (Date → string)
   const opData = JSON.parse(JSON.stringify(op));
   opData.cobertura = cobertura;
+  opData.kpisFinanceiros = { verbaTotal, totalEmPedidos, saldo, consumoPct };
 
   return (
     <div className="space-y-6 max-w-7xl">
