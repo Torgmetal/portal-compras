@@ -10,7 +10,7 @@ export const metadata = {
 };
 
 export default async function PainelProducao() {
-  const user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS"]);
+  const user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
 
   // Janela: 8 semanas pra tras + atual + 4 semanas pra frente
   const hoje = new Date();

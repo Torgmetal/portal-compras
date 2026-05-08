@@ -19,6 +19,7 @@ enum Role {
   ENGENHARIA
   ALMOXARIFADO
   COMPRAS
+  PRODUCAO
 }
 
 model User {

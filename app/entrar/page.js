@@ -17,6 +17,8 @@ function homePorRole(role) {
     case "ENGENHARIA":
     case "ALMOXARIFADO":
       return "/rm";
+    case "PRODUCAO":
+      return "/producao";
     default:
       return "/";
   }

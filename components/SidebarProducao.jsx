@@ -2,17 +2,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { BarChart3, PlusCircle, Package, FolderKanban, LogOut } from "lucide-react";
+import { Activity, BarChart3, DollarSign, LogOut } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
-  { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban },
-  { href: "/compras", label: "Painel de Compras", icon: BarChart3, exact: true },
-  { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
-  { href: "/compras/catalogo", label: "Catálogo", icon: Package },
+  { href: "/producao", label: "Painel de Produção", icon: Activity, exact: true },
+  // Futuro: separar abas (Pesos, Fluxo de caixa, Importação, etc)
 ];
 
-export default function Sidebar() {
+export default function SidebarProducao() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
@@ -21,16 +19,14 @@ export default function Sidebar() {
       <div className="px-5 py-5 border-b border-torg-blue-100">
         <TorgLogo size="sm" />
         <p className="text-[10px] text-torg-gray mt-1 tracking-wider uppercase">
-          Portal de Compras
+          Portal de Produção
         </p>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {menu.map((m) => {
           const Icon = m.icon;
-          const active = m.exact
-            ? pathname === m.href || pathname.startsWith("/compras/rm/")
-            : pathname.startsWith(m.href);
+          const active = m.exact ? pathname === m.href : pathname.startsWith(m.href);
           return (
             <Link
               key={m.href}
@@ -41,8 +37,7 @@ export default function Sidebar() {
                   : "text-torg-dark hover:bg-torg-blue-50 hover:text-torg-blue"
               }`}
             >
-              <Icon size={18} />
-              {m.label}
+              <Icon size={18} /> {m.label}
             </Link>
           );
         })}

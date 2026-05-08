@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import TorgLogo from "@/components/TorgLogo";
-import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight } from "lucide-react";
+import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity } from "lucide-react";
 
 const FOOTER_LOGO_W = 180;
 const FOOTER_LOGO_H = Math.round((FOOTER_LOGO_W * 1080) / 1920);
@@ -27,6 +27,13 @@ const portais = [
     desc: "Gestão de RMs, cotações, mapa comparativo e pedidos no Omie.",
     Icon: ShoppingCart,
     bg: "bg-torg-dark",
+  },
+  {
+    href: "/producao",
+    label: "Produção",
+    desc: "PCP, pesos previstos × realizados, fluxo de caixa semanal.",
+    Icon: Activity,
+    bg: "bg-torg-orange-700",
   },
   {
     href: "/fornecedores",

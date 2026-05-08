@@ -14,7 +14,7 @@ const schema = z.object({
 
 export async function PATCH(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
@@ -30,7 +30,7 @@ export async function PATCH(req, { params }) {
 
 export async function DELETE(_req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
