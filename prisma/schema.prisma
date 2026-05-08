@@ -89,9 +89,45 @@ model OP {
   ajustesPrazo   AjustePrazo[]
   rms            RM[]
   receitas       OPReceita[]
+  medicoes       OPMedicao[]
 
   @@index([numero])
   @@index([status])
+}
+
+// ─── MEDIÇÕES (Pedidos de Venda do Omie vinculados à OP) ──────
+// Cada medição = 1 Pedido de Venda no Omie, com vários produtos.
+// Aqui guardamos só o snapshot dos dados pra mostrar no portal.
+
+model OPMedicao {
+  id          String   @id @default(cuid())
+  opId        String
+  op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  // Identificadores no Omie
+  numeroPedidoOmie String  // Numero visivel (ex: "1500")
+  codigoPedidoOmie String? // codigo_pedido interno do Omie
+
+  // Snapshot dos dados (sincronizado via API Omie)
+  descricao        String?
+  data             DateTime?
+  valorBruto       Float    @default(0)
+  valorLiquido     Float?
+  status           String?  // ABERTO | FATURADO | CANCELADO | etc
+  etapa            String?  // codigo da etapa do pedido no Omie
+  qtdItens         Int      @default(0)
+
+  // Sincronizacao
+  ultimoSync       DateTime?
+  syncErro         String?
+  payload          Json?    // Resposta do Omie (auditoria)
+
+  createdById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([opId])
+  @@unique([opId, numeroPedidoOmie])
 }
 
 // ─── RECEITAS DA OP ──────────────────────────────────────────

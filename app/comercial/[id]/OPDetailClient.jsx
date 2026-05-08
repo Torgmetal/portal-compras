@@ -41,6 +41,8 @@ export default function OPDetailClient({ op, userRole, userId }) {
   const [modalReceita, setModalReceita] = useState(null); // null | 'nova' | { ...receita }
   const [modalCliente, setModalCliente] = useState(false);
   const [modalEditarOP, setModalEditarOP] = useState(false);
+  const [modalMedicao, setModalMedicao] = useState(false);
+  const [syncMedicaoId, setSyncMedicaoId] = useState(null);
   const [acaoStatus, setAcaoStatus] = useState(null); // 'finalizar' | 'reabrir' | 'excluir'
   const [erroAcao, setErroAcao] = useState("");
 
@@ -397,6 +399,34 @@ export default function OPDetailClient({ op, userRole, userId }) {
         onEditar={() => setModalCliente(true)}
       />
 
+      {/* Medições (Pedidos de Venda do Omie) */}
+      <MedicoesCard
+        medicoes={op.medicoes || []}
+        resumo={op.resumoMedicoes}
+        receitaBruta={op.kpisFinanceiros?.receitaBruta || 0}
+        encerrada={encerradaOuCancelada}
+        syncId={syncMedicaoId}
+        onAdicionar={() => setModalMedicao(true)}
+        onSync={async (id) => {
+          setSyncMedicaoId(id);
+          try {
+            const res = await fetch(`/api/comercial/medicao/${id}`, { method: "POST" });
+            const d = await res.json();
+            if (!res.ok) alert(d.error || "Erro ao sincronizar");
+            router.refresh();
+          } finally {
+            setSyncMedicaoId(null);
+          }
+        }}
+        onRemover={async (id, numero) => {
+          if (!window.confirm(`Desvincular medição ${numero}?\n\nIsso só remove o vínculo no portal — o pedido continua intacto no Omie.`)) return;
+          const res = await fetch(`/api/comercial/medicao/${id}`, { method: "DELETE" });
+          const d = await res.json();
+          if (!res.ok) return alert(d.error || "Erro");
+          router.refresh();
+        }}
+      />
+
       {/* Cobertura por categoria (gaps de RM da Engenharia) */}
       {op.cobertura && Object.keys(op.cobertura).length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -608,7 +638,239 @@ export default function OPDetailClient({ op, userRole, userId }) {
           onSaved={() => { setModalEditarOP(false); router.refresh(); }}
         />
       )}
+      {modalMedicao && (
+        <ModalMedicao
+          opId={op.id}
+          onClose={() => setModalMedicao(false)}
+          onSaved={() => { setModalMedicao(false); router.refresh(); }}
+        />
+      )}
     </>
+  );
+}
+
+// Card 'Medicoes' — lista pedidos de venda do Omie vinculados a OP
+function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdicionar, onSync, onRemover }) {
+  const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h3 className="text-lg font-semibold text-torg-dark">
+            Medições no Omie ({medicoes.length})
+          </h3>
+          <p className="text-xs text-torg-gray mt-0.5">
+            Pedidos de Venda do Omie vinculados a esta OP. Cada medição traz produtos cotados/faturados.
+          </p>
+        </div>
+        {!encerrada && (
+          <button
+            onClick={onAdicionar}
+            className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1"
+          >
+            <Plus size={14} /> Vincular medição
+          </button>
+        )}
+      </div>
+
+      {/* Resumo */}
+      {medicoes.length > 0 && (
+        <div className="px-6 py-3 bg-torg-blue-50/30 border-b border-torg-blue-100 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+          <div>
+            <p className="text-[10px] text-torg-gray uppercase tracking-wide">Total medido (bruto)</p>
+            <p className="text-lg font-extrabold text-torg-blue tabular-nums">{fmtMoeda(resumo?.totalMedido || 0)}</p>
+            <p className="text-[10px] text-torg-gray">{(resumo?.pctMedido || 0).toFixed(1)}% da receita do contrato</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-torg-gray uppercase tracking-wide">Receita do contrato</p>
+            <p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtMoeda(receitaBruta)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-torg-gray uppercase tracking-wide">Saldo a medir</p>
+            <p className={`text-lg font-extrabold tabular-nums ${
+              (resumo?.saldoAMedir || 0) < 0 ? "text-red-600" : "text-torg-dark"
+            }`}>
+              {fmtMoeda(resumo?.saldoAMedir || 0)}
+            </p>
+            {(resumo?.saldoAMedir || 0) < 0 && (
+              <p className="text-[10px] text-red-600 font-medium">⚠ medido acima do contrato</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tabela */}
+      {medicoes.length === 0 ? (
+        <p className="px-6 py-6 text-sm text-torg-gray text-center">
+          Nenhuma medição vinculada ainda. Clique em "Vincular medição" e informe o número do Pedido de Venda do Omie.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Pedido</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Itens</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {medicoes.map((m) => (
+                <tr key={m.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2">
+                    <a
+                      href={`/api/omie/pedido-compra-pdf/${m.codigoPedidoOmie || m.numeroPedidoOmie}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono font-semibold text-torg-blue hover:underline"
+                      title="Abrir no Omie"
+                    >
+                      {m.numeroPedidoOmie}
+                    </a>
+                  </td>
+                  <td className="px-4 py-2 text-torg-dark text-xs max-w-xs truncate" title={m.descricao || ""}>
+                    {m.descricao || "—"}
+                  </td>
+                  <td className="px-4 py-2 text-torg-gray text-xs">{fmtData(m.data)}</td>
+                  <td className="px-4 py-2 text-center text-torg-gray text-xs">{m.qtdItens || 0}</td>
+                  <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">
+                    {fmtMoeda(m.valorBruto)}
+                  </td>
+                  <td className="px-4 py-2 text-xs">
+                    {m.status ? (
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${statusMedicaoClasses(m.etapa)}`}>
+                        {m.status}
+                      </span>
+                    ) : (
+                      <span className="text-torg-gray">—</span>
+                    )}
+                    {m.syncErro && (
+                      <p className="text-[10px] text-red-600 mt-1" title={m.syncErro}>⚠ erro no sync</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <div className="inline-flex items-center gap-2">
+                      <button
+                        onClick={() => onSync(m.id)}
+                        disabled={syncId === m.id}
+                        className="text-xs text-torg-gray hover:text-torg-blue disabled:opacity-50 inline-flex items-center gap-1"
+                        title="Sincronizar com o Omie"
+                      >
+                        {syncId === m.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                        Sync
+                      </button>
+                      <button
+                        onClick={() => onRemover(m.id, m.numeroPedidoOmie)}
+                        className="text-xs text-red-600 hover:text-red-700 inline-flex items-center gap-1"
+                        title="Desvincular medição"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function statusMedicaoClasses(etapa) {
+  const e = String(etapa || "");
+  if (e === "60" || e === "80") return "bg-torg-blue text-white"; // Faturado
+  if (e === "50") return "bg-torg-blue-100 text-torg-blue-800"; // Faturado parcial
+  if (e === "20") return "bg-torg-orange-50 text-torg-orange-700"; // Pre-faturado
+  if (e === "70") return "bg-gray-200 text-gray-500 line-through"; // Cancelado
+  return "bg-torg-blue-50 text-torg-blue"; // Default (nao faturado)
+}
+
+// Modal pra vincular medicao
+function ModalMedicao({ opId, onClose, onSaved }) {
+  const [numero, setNumero] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const submit = async () => {
+    setErro("");
+    if (!numero.trim()) return setErro("Informe o número do Pedido de Venda no Omie.");
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/comercial/op/${opId}/medicao`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ numeroPedido: numero.trim(), descricao: descricao.trim() || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal titulo="Vincular medição (Pedido de Venda do Omie)" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+
+        <p className="text-xs text-torg-gray">
+          Digite o número do Pedido de Venda que você criou no Omie (ex: 1500). O portal busca os
+          dados via API: data, valor total, status e quantidade de itens.
+        </p>
+
+        <div>
+          <label className="block text-sm font-medium text-torg-dark mb-1">Nº do Pedido de Venda no Omie *</label>
+          <input
+            type="text"
+            value={numero}
+            onChange={(e) => setNumero(e.target.value.replace(/\D/g, ""))}
+            placeholder="Ex: 1500"
+            autoFocus
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-torg-dark mb-1">Descrição da medição (opcional)</label>
+          <input
+            type="text"
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            placeholder="Ex: Medição 01 — março/2026"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+          <p className="text-[10px] text-torg-gray mt-0.5">
+            Se vazio, usamos a observação do pedido no Omie.
+          </p>
+        </div>
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+          Cancelar
+        </button>
+        <button
+          onClick={submit}
+          disabled={salvando}
+          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+        >
+          {salvando && <Loader2 size={14} className="animate-spin" />} Buscar e vincular
+        </button>
+      </div>
+    </Modal>
   );
 }
 

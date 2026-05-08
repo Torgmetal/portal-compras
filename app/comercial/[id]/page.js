@@ -54,6 +54,7 @@ export default async function OPDetailPage({ params }) {
         select: { id: true, numero: true, tipoRM: true, categoriasOP: true, status: true },
       },
       receitas: { orderBy: { ordem: "asc" } },
+      medicoes: { orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -142,6 +143,17 @@ export default async function OPDetailPage({ params }) {
   const totalFD = op.itens.filter((i) => i.faturamentoDireto).reduce((s, i) => s + (i.valorVerba || 0), 0)
     + op.aditivos.reduce((s, a) => s + a.itens.filter((i) => i.faturamentoDireto).reduce((ss, i) => ss + (i.valorVerba || 0), 0), 0);
 
+  // Resumo de medicoes (Pedidos de Venda do Omie)
+  const totalMedido = (op.medicoes || []).reduce((s, m) => s + (m.valorBruto || 0), 0);
+  const saldoAMedir = receitaBruta - totalMedido;
+  const pctMedido = receitaBruta > 0 ? (totalMedido / receitaBruta) * 100 : 0;
+  const resumoMedicoes = {
+    qtd: (op.medicoes || []).length,
+    totalMedido,
+    saldoAMedir,
+    pctMedido,
+  };
+
   // Resumo de pedidos vinculados (count + total de criados)
   const pedidosCriados = pedidos.filter((p) => p.status === "CRIADO");
   const resumoPedidos = {
@@ -162,6 +174,7 @@ export default async function OPDetailPage({ params }) {
   };
   opData.faturamento = { temFD, totalFD };
   opData.resumoPedidos = resumoPedidos;
+  opData.resumoMedicoes = resumoMedicoes;
 
   return (
     <div className="space-y-6 max-w-7xl">
