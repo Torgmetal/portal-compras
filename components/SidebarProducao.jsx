@@ -2,12 +2,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { Activity, BarChart3, DollarSign, LogOut } from "lucide-react";
+import { Activity, FileText, LogOut } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
   { href: "/producao", label: "Painel de Produção", icon: Activity, exact: true },
-  // Futuro: separar abas (Pesos, Fluxo de caixa, Importação, etc)
+  { href: "/producao/romaneios", label: "Romaneios", icon: FileText },
 ];
 
 export default function SidebarProducao() {
