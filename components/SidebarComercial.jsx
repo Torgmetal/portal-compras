@@ -8,7 +8,7 @@ import TorgLogo from "@/components/TorgLogo";
 const menu = [
   { href: "/comercial", label: "OPs", icon: FolderKanban, exact: true },
   { href: "/comercial/nova", label: "Nova OP", icon: PlusCircle },
-  { href: "/comercial/producao", label: "Produção", icon: Activity },
+  { href: "/producao", label: "Produção", icon: Activity },
   { href: "/comercial/aprovacoes", label: "Aprovações", icon: Inbox, masterOnly: true },
 ];
 

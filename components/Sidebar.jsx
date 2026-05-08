@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { BarChart3, PlusCircle, Package, FolderKanban, LogOut } from "lucide-react";
+import { BarChart3, PlusCircle, Package, FolderKanban, LogOut, Activity } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
   { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban },
   { href: "/compras", label: "Painel de Compras", icon: BarChart3, exact: true },
+  { href: "/producao", label: "Painel de Produção", icon: Activity },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/catalogo", label: "Catálogo", icon: Package },
 ];
