@@ -1,9 +1,9 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Activity, Plus, Loader2, AlertCircle, X,
-  Package, Pencil, Trash2,
+  Activity, Plus, Loader2, AlertCircle, X, Upload,
+  Package, Pencil, Trash2, FileSpreadsheet, CheckCircle2, FileText,
 } from "lucide-react";
 import { fmtSemana } from "@/lib/semana";
 
@@ -15,6 +15,7 @@ const fmtKg = (v) =>
 export default function ProducaoClient({ ops, semanas, semanaAtual, producoes }) {
   const router = useRouter();
   const [modalProd, setModalProd] = useState(null);
+  const [modalImport, setModalImport] = useState(false);
 
   // Agrega producao por semana
   const producaoPorSemana = useMemo(() => {
@@ -68,12 +69,20 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
             PCP — pesos previstos × realizados de estruturas, planejados pela equipe de produção.
           </p>
         </div>
-        <button
-          onClick={() => setModalProd("novo")}
-          className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
-        >
-          <Plus size={16} /> Produção semanal
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setModalImport(true)}
+            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+          >
+            <Upload size={16} /> Importar planilha
+          </button>
+          <button
+            onClick={() => setModalProd("novo")}
+            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+          >
+            <Plus size={16} /> Produção semanal
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -196,6 +205,246 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
           onClose={() => setModalProd(null)}
           onSaved={() => { setModalProd(null); router.refresh(); }} />
       )}
+      {modalImport && (
+        <ModalImportarPCP ops={ops}
+          onClose={() => setModalImport(false)}
+          onSaved={() => { setModalImport(false); router.refresh(); }} />
+      )}
+    </div>
+  );
+}
+
+// Modal de importação de planilha/PDF/imagem
+function ModalImportarPCP({ ops, onClose, onSaved }) {
+  const [arquivoNome, setArquivoNome] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [itens, setItens] = useState([]);
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const fileRef = useRef(null);
+
+  const opMap = useMemo(() => Object.fromEntries(ops.map((o) => [o.numero, o.id])), [ops]);
+
+  async function uploadFile(file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setErro("Arquivo muito grande (limite 10MB).");
+      return;
+    }
+    setErro("");
+    setItens([]);
+    setParsing(true);
+    setArquivoNome(file.name);
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const resp = await fetch("/api/producao/importar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileBase64: base64, mimeType: file.type, fileName: file.name }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Erro ao processar arquivo");
+      if (!data.itens || data.itens.length === 0) {
+        setErro("Nenhum item extraído. Verifique o formato do arquivo.");
+        return;
+      }
+      setItens(data.itens);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  function setLinha(i, k, v) {
+    setItens((prev) => prev.map((it, idx) => (idx === i ? { ...it, [k]: v } : it)));
+  }
+  function removerLinha(i) {
+    setItens((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function submit() {
+    setErro("");
+    const validos = itens.filter((it) => it.semana && (it.pesoPrevistoKg > 0 || it.pesoRealizadoKg > 0));
+    if (validos.length === 0) {
+      return setErro("Nenhum item válido pra importar (precisa de semana e algum peso).");
+    }
+    setSalvando(true);
+    try {
+      const payload = {
+        itens: validos.map((it) => ({
+          semana: it.semana,
+          dataInicio: it.dataInicio,
+          dataFim: it.dataFim,
+          pesoPrevistoKg: Number(it.pesoPrevistoKg) || 0,
+          pesoRealizadoKg: Number(it.pesoRealizadoKg) || 0,
+          valorPrevisto: 0,
+          valorRealizado: 0,
+          opId: it.opId || null,
+          observacao: it.observacao || null,
+        })),
+      };
+      const resp = await fetch("/api/producao/semanal/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Erro ao salvar");
+      alert(`✓ ${data.criados} criados, ${data.atualizados} atualizados`);
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <Upload size={18} className="text-torg-blue" /> Importar planejamento PCP
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+            </div>
+          )}
+
+          {/* Upload area */}
+          <div className="bg-torg-blue-50/30 border border-torg-blue-100 rounded-lg p-5 text-center">
+            <FileSpreadsheet size={32} className="mx-auto text-torg-blue mb-2" />
+            <p className="text-sm text-torg-dark font-medium mb-1">
+              Suba uma planilha (xlsx), PDF ou imagem do PCP
+            </p>
+            <p className="text-xs text-torg-gray mb-4">
+              Excel: colunas <strong>Semana</strong>, <strong>OP</strong> (opcional), <strong>Peso Previsto</strong>, <strong>Peso Realizado</strong>.<br />
+              PDF/imagem: a IA extrai os pesos automaticamente.
+            </p>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={parsing}
+              className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {parsing ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+              {parsing ? "Lendo..." : arquivoNome ? "Trocar arquivo" : "Selecionar arquivo"}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,application/pdf,image/*"
+              className="hidden"
+              onChange={(e) => { uploadFile(e.target.files?.[0]); e.target.value = ""; }}
+            />
+            {arquivoNome && (
+              <p className="text-xs text-torg-gray mt-2 inline-flex items-center gap-1">
+                <FileText size={12} /> {arquivoNome}
+              </p>
+            )}
+          </div>
+
+          {/* Preview editável */}
+          {itens.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <p className="text-sm font-medium text-torg-dark">
+                  <CheckCircle2 size={14} className="inline text-torg-blue mr-1" />
+                  {itens.length} {itens.length === 1 ? "linha extraída" : "linhas extraídas"} — confira antes de salvar
+                </p>
+                <p className="text-[11px] text-torg-gray">
+                  Linhas com OP em vermelho não foram encontradas — vão ficar como "geral"
+                </p>
+              </div>
+              <div className="overflow-x-auto border border-gray-100 rounded-lg max-h-[400px] overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">#</th>
+                      <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Semana</th>
+                      <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">OP</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Prev (kg)</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Real (kg)</th>
+                      <th className="px-2 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {itens.map((it, i) => {
+                      const opNotFound = it.opNumero && !it.opId;
+                      return (
+                        <tr key={i}>
+                          <td className="px-2 py-1.5 text-gray-400">{i + 1}</td>
+                          <td className="px-2 py-1.5">
+                            <input type="text" value={it.semana || ""}
+                              onChange={(e) => setLinha(i, "semana", e.target.value)}
+                              className="w-24 border border-gray-200 rounded px-1.5 py-1 text-xs font-mono" />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <select value={it.opId || ""}
+                              onChange={(e) => setLinha(i, "opId", e.target.value || null)}
+                              className={`border rounded px-1.5 py-1 text-xs bg-white ${opNotFound ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                              <option value="">— Geral —</option>
+                              {ops.map((o) => (
+                                <option key={o.id} value={o.id}>{o.numero}</option>
+                              ))}
+                            </select>
+                            {opNotFound && (
+                              <p className="text-[10px] text-red-600 mt-0.5" title={`OP ${it.opNumero} não cadastrada`}>
+                                {it.opNumero}?
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-right">
+                            <input type="number" step="0.01" min="0"
+                              value={it.pesoPrevistoKg || ""}
+                              onChange={(e) => setLinha(i, "pesoPrevistoKg", parseFloat(e.target.value) || 0)}
+                              className="w-24 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums" />
+                          </td>
+                          <td className="px-2 py-1.5 text-right">
+                            <input type="number" step="0.01" min="0"
+                              value={it.pesoRealizadoKg || ""}
+                              onChange={(e) => setLinha(i, "pesoRealizadoKg", parseFloat(e.target.value) || 0)}
+                              className="w-24 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums" />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <button onClick={() => removerLinha(i)} className="text-red-400 hover:text-red-600">
+                              <X size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0">
+          <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+            Cancelar
+          </button>
+          <button
+            onClick={submit}
+            disabled={salvando || itens.length === 0}
+            className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {salvando && <Loader2 size={14} className="animate-spin" />}
+            Salvar {itens.length > 0 ? `${itens.length} ${itens.length === 1 ? "linha" : "linhas"}` : ""}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
