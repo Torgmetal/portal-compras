@@ -87,7 +87,8 @@ export default function PedidosOmieSection({ pedidos }) {
       </div>
 
       <div className="px-6 py-2 bg-torg-blue-50/40 border-b border-torg-blue-100 text-xs text-torg-dark">
-        💡 Clique no <strong>número do pedido</strong> pra abrir o PDF direto no Omie (gerado em tempo real via API).
+        💡 Clique no <strong>número do pedido</strong> pra abrir no Omie. Se a API gerar o PDF, abre direto;
+        senão, abre o módulo Compras pra você localizar pelo número.
       </div>
 
       <div className="overflow-x-auto">
