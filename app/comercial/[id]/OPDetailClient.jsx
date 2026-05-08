@@ -40,6 +40,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
   const [modalAddItens, setModalAddItens] = useState(false);
   const [modalReceita, setModalReceita] = useState(null); // null | 'nova' | { ...receita }
   const [modalCliente, setModalCliente] = useState(false);
+  const [modalEditarOP, setModalEditarOP] = useState(false);
   const [acaoStatus, setAcaoStatus] = useState(null); // 'finalizar' | 'reabrir' | 'excluir'
   const [erroAcao, setErroAcao] = useState("");
 
@@ -114,6 +115,15 @@ export default function OPDetailClient({ op, userRole, userId }) {
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.className}`}>
                 {s.label}
               </span>
+              {!encerradaOuCancelada && (
+                <button
+                  onClick={() => setModalEditarOP(true)}
+                  className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-torg-blue-50 transition-colors"
+                  title="Editar dados da OP (número, cliente, obra, datas)"
+                >
+                  <Pencil size={12} /> Editar
+                </button>
+              )}
             </div>
             <p className="text-torg-dark font-medium mt-1">{op.cliente}</p>
             {op.obra && <p className="text-sm text-torg-gray">{op.obra}</p>}
@@ -571,7 +581,164 @@ export default function OPDetailClient({ op, userRole, userId }) {
           onSaved={() => { setModalCliente(false); router.refresh(); }}
         />
       )}
+      {modalEditarOP && (
+        <ModalEditarOP
+          opId={op.id}
+          op={op}
+          onClose={() => setModalEditarOP(false)}
+          onSaved={() => { setModalEditarOP(false); router.refresh(); }}
+        />
+      )}
     </>
+  );
+}
+
+// Modal pra editar dados cadastrais da OP (numero, cliente, obra, datas)
+function ModalEditarOP({ opId, op, onClose, onSaved }) {
+  const fmtDateInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+  const [form, setForm] = useState({
+    numero: op.numero || "",
+    cliente: op.cliente || "",
+    obra: op.obra || "",
+    descricao: op.descricao || "",
+    dataInicio: fmtDateInput(op.dataInicio),
+    dataFimPrevista: fmtDateInput(op.dataFimPrevista),
+  });
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const numeroMudou = form.numero.trim().toUpperCase() !== op.numero;
+
+  const submit = async () => {
+    setErro("");
+    if (!form.numero.trim()) return setErro("Número da OP é obrigatório.");
+    if (!form.cliente.trim()) return setErro("Cliente é obrigatório.");
+    if (numeroMudou) {
+      const ok = window.confirm(
+        `Você está alterando o NÚMERO da OP de ${op.numero} para ${form.numero.trim().toUpperCase()}.\n\n` +
+        `RMs, cotações e pedidos vinculados continuam ligados (são por ID, não por número), ` +
+        `mas relatórios e referências em texto que mencionam o número antigo precisarão ser ajustados manualmente.\n\n` +
+        `Deseja continuar?`
+      );
+      if (!ok) return;
+    }
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/comercial/op/${opId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          numero: form.numero.trim().toUpperCase(),
+          cliente: form.cliente.trim(),
+          obra: form.obra.trim() || null,
+          descricao: form.descricao.trim() || null,
+          dataInicio: form.dataInicio || null,
+          dataFimPrevista: form.dataFimPrevista || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal titulo="Editar OP" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4">
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+
+        {numeroMudou && (
+          <div className="bg-torg-orange-50 border border-torg-orange-200 text-torg-orange-700 text-xs rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" />
+            <span>
+              Você está alterando o número da OP. Isso muda em toda a plataforma —
+              relatórios e referências em texto antigos não serão atualizados automaticamente.
+            </span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Nº OP *</label>
+            <input
+              type="text" value={form.numero}
+              onChange={(e) => set("numero", e.target.value.toUpperCase())}
+              placeholder="Ex: T083"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono font-semibold focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-torg-dark mb-1">Cliente *</label>
+            <input
+              type="text" value={form.cliente}
+              onChange={(e) => set("cliente", e.target.value)}
+              placeholder="Ex: JHSF"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Obra</label>
+          <input
+            type="text" value={form.obra}
+            onChange={(e) => set("obra", e.target.value)}
+            placeholder="Ex: Mezanino Industrial"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Descrição</label>
+          <textarea
+            value={form.descricao}
+            onChange={(e) => set("descricao", e.target.value)}
+            rows={2}
+            placeholder="Escopo geral do contrato"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Data de início</label>
+            <input
+              type="date" value={form.dataInicio}
+              onChange={(e) => set("dataInicio", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Data de fim prevista</label>
+            <input
+              type="date" value={form.dataFimPrevista}
+              onChange={(e) => set("dataFimPrevista", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+          Cancelar
+        </button>
+        <button
+          onClick={submit}
+          disabled={salvando}
+          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+        >
+          {salvando && <Loader2 size={14} className="animate-spin" />} Salvar alterações
+        </button>
+      </div>
+    </Modal>
   );
 }
 

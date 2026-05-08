@@ -3,11 +3,21 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
-const patchSchema = z.object({
+// Aceita 2 modos:
+// 1. Status change: { acao: "finalizar" | "reabrir" | "cancelar" }
+// 2. Edit cadastral: { numero?, cliente?, obra?, descricao?, dataInicio?, dataFimPrevista? }
+const patchAcaoSchema = z.object({
   acao: z.enum(["finalizar", "reabrir", "cancelar"]),
 });
+const patchEditSchema = z.object({
+  numero: z.string().min(1).optional(),
+  cliente: z.string().min(1).optional(),
+  obra: z.string().nullable().optional(),
+  descricao: z.string().nullable().optional(),
+  dataInicio: z.string().nullable().optional(),
+  dataFimPrevista: z.string().nullable().optional(),
+});
 
-// PATCH — muda status (finalizar / reabrir / cancelar)
 export async function PATCH(req, { params }) {
   let user;
   try {
@@ -16,41 +26,101 @@ export async function PATCH(req, { params }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body;
-  try {
-    body = patchSchema.parse(await req.json());
-  } catch (e) {
-    return NextResponse.json({ error: "Dados invalidos" }, { status: 400 });
-  }
+  const body = await req.json().catch(() => ({}));
 
   const op = await prisma.oP.findUnique({ where: { id: params.id } });
   if (!op) return NextResponse.json({ error: "OP nao encontrada" }, { status: 404 });
 
-  let dataUpdate = {};
-  if (body.acao === "finalizar") {
-    dataUpdate = { status: "ENCERRADA", dataFimReal: new Date() };
-  } else if (body.acao === "reabrir") {
-    dataUpdate = { status: op.dataInicio ? "EM_EXECUCAO" : "ABERTA", dataFimReal: null };
-  } else if (body.acao === "cancelar") {
-    dataUpdate = { status: "CANCELADA" };
+  // ── Modo 1: mudanca de status ──
+  if (body.acao) {
+    let parsed;
+    try {
+      parsed = patchAcaoSchema.parse(body);
+    } catch {
+      return NextResponse.json({ error: "Acao invalida" }, { status: 400 });
+    }
+
+    let dataUpdate = {};
+    if (parsed.acao === "finalizar") {
+      dataUpdate = { status: "ENCERRADA", dataFimReal: new Date() };
+    } else if (parsed.acao === "reabrir") {
+      dataUpdate = { status: op.dataInicio ? "EM_EXECUCAO" : "ABERTA", dataFimReal: null };
+    } else if (parsed.acao === "cancelar") {
+      dataUpdate = { status: "CANCELADA" };
+    }
+
+    const updated = await prisma.oP.update({ where: { id: params.id }, data: dataUpdate });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: `op_${parsed.acao}`,
+        entity: "OP",
+        entityId: op.id,
+        diff: { numero: op.numero, statusAnterior: op.status, statusNovo: updated.status },
+      },
+    });
+
+    return NextResponse.json({ ok: true, status: updated.status });
   }
 
-  const updated = await prisma.oP.update({
-    where: { id: params.id },
-    data: dataUpdate,
-  });
+  // ── Modo 2: edicao de campos cadastrais ──
+  let edit;
+  try {
+    edit = patchEditSchema.parse(body);
+  } catch (e) {
+    return NextResponse.json({ error: "Dados invalidos" }, { status: 400 });
+  }
+
+  const dataUpdate = {};
+  if (edit.numero !== undefined) {
+    const novoNumero = edit.numero.trim().toUpperCase();
+    if (novoNumero !== op.numero) {
+      // Garante unicidade
+      const existe = await prisma.oP.findUnique({ where: { numero: novoNumero } });
+      if (existe && existe.id !== op.id) {
+        return NextResponse.json(
+          { error: `Já existe outra OP com o número ${novoNumero}.` },
+          { status: 409 }
+        );
+      }
+      dataUpdate.numero = novoNumero;
+    }
+  }
+  if (edit.cliente !== undefined) dataUpdate.cliente = edit.cliente.trim();
+  if (edit.obra !== undefined) dataUpdate.obra = edit.obra?.trim() || null;
+  if (edit.descricao !== undefined) dataUpdate.descricao = edit.descricao?.trim() || null;
+  if (edit.dataInicio !== undefined) {
+    dataUpdate.dataInicio = edit.dataInicio ? new Date(edit.dataInicio) : null;
+  }
+  if (edit.dataFimPrevista !== undefined) {
+    dataUpdate.dataFimPrevista = edit.dataFimPrevista ? new Date(edit.dataFimPrevista) : null;
+  }
+
+  if (Object.keys(dataUpdate).length === 0) {
+    return NextResponse.json({ ok: true, semMudancas: true });
+  }
+
+  await prisma.oP.update({ where: { id: op.id }, data: dataUpdate });
 
   await prisma.auditLog.create({
     data: {
       userId: user.id,
-      action: `op_${body.acao}`,
+      action: "edit_op",
       entity: "OP",
       entityId: op.id,
-      diff: { numero: op.numero, statusAnterior: op.status, statusNovo: updated.status },
+      diff: {
+        antes: {
+          numero: op.numero,
+          cliente: op.cliente,
+          obra: op.obra,
+        },
+        depois: dataUpdate,
+      },
     },
   });
 
-  return NextResponse.json({ ok: true, status: updated.status });
+  return NextResponse.json({ ok: true });
 }
 
 // DELETE — exclusao definitiva, so permite se nao tiver RMs vinculadas
