@@ -16,7 +16,14 @@ export default withAuth(
           path.startsWith("/fornecedores") ||
           path.startsWith("/api/auth") ||
           path.startsWith("/_next") ||
-          path === "/entrar"
+          path === "/entrar" ||
+          path === "/trocar-senha" ||
+          path === "/api/trocar-senha" ||
+          // Endpoints que o portal do fornecedor consome (sem login)
+          path === "/api/parse-pdf-cotacao" ||
+          path === "/api/parse-cotacao-ai" ||
+          path.startsWith("/api/cotacao/submeter/") ||
+          path.startsWith("/api/cotacao/anexar/")
         ) {
           return true;
         }
