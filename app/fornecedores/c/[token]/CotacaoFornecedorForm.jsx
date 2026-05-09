@@ -62,15 +62,30 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
   const [arquivoNome, setArquivoNome] = useState("");
   const [parsing, setParsing] = useState(false);
   const [parseInfo, setParseInfo] = useState(null); // { match: N, total: M, fornecedor, prazo }
+  // IDs de linhas preenchidas automaticamente que o fornecedor ainda NÃO revisou
+  const [autoFilled, setAutoFilled] = useState(new Set());
+  // IDs de linhas que o fornecedor JÁ confirmou/revisou
+  const [revisado, setRevisado] = useState(new Set());
   const fileRef = useRef(null);
 
   const setLinha = (id, k, v) => {
     setLinhas((prev) => prev.map((l) => (l.id === id ? { ...l, [k]: v } : l)));
+    // Se o usuario editou, considera revisado e tira do auto-filled
+    if (autoFilled.has(id)) {
+      setAutoFilled((prev) => { const n = new Set(prev); n.delete(id); return n; });
+      setRevisado((prev) => new Set(prev).add(id));
+    }
+  };
+
+  const marcarRevisado = (id) => {
+    setAutoFilled((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    setRevisado((prev) => new Set(prev).add(id));
   };
 
   // Aplica os itens vindos da IA usando rmIndex (que ja casa com a RM)
   function aplicarItensIA(itensIA) {
     const linhasNovas = [...linhas];
+    const idsAuto = new Set();
     let casados = 0;
     for (const itPdf of itensIA) {
       const idx = itPdf.rmIndex;
@@ -81,9 +96,12 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
       if (itPdf.icmsPct != null) l.icmsPct = String(itPdf.icmsPct);
       if (itPdf.ipiPct != null) l.ipiPct = String(itPdf.ipiPct);
       if (itPdf.observacao && !l.observacao) l.observacao = itPdf.observacao;
+      idsAuto.add(l.id);
       casados++;
     }
     setLinhas(linhasNovas);
+    setAutoFilled(idsAuto);
+    setRevisado(new Set());
     return casados;
   }
 
@@ -101,6 +119,7 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
   function aplicarItensFallback(itensPdf) {
     const linhasNovas = [...linhas];
     const usados = new Set();
+    const idsAuto = new Set();
     let casados = 0;
     for (const itPdf of itensPdf) {
       let melhorIdx = -1, melhorScore = 0.5;
@@ -116,9 +135,12 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
         if (itPdf.qtd) l.qtdCotada = itPdf.qtd;
         if (itPdf.icmsPct != null) l.icmsPct = String(itPdf.icmsPct);
         if (itPdf.ipiPct != null) l.ipiPct = String(itPdf.ipiPct);
+        idsAuto.add(l.id);
       }
     }
     setLinhas(linhasNovas);
+    setAutoFilled(idsAuto);
+    setRevisado(new Set());
     return casados;
   }
 
@@ -409,17 +431,49 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
             {parseInfo && (
               <div className="mt-3 bg-torg-orange-50/40 border border-torg-orange-100 rounded-lg px-3 py-2 text-sm">
                 {parseInfo.match > 0 ? (
-                  <p className="text-torg-dark">
-                    ✓ <strong>{parseInfo.match}</strong> {parseInfo.match === 1 ? "item preenchido" : "itens preenchidos"} automaticamente
-                    {parseInfo.total > parseInfo.match && (
-                      <span className="text-torg-gray"> ({parseInfo.total - parseInfo.match} item(s) do PDF não casaram com a RM — preencha manualmente)</span>
-                    )}.
-                    {parseInfo.usouIA && <span className="text-[10px] text-torg-blue ml-1">via IA</span>}
-                    {" "}Confira os preços abaixo antes de enviar.
-                  </p>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <p className="text-torg-dark">
+                      ✓ <strong>{parseInfo.match}</strong> {parseInfo.match === 1 ? "item preenchido" : "itens preenchidos"} automaticamente
+                      {parseInfo.total > parseInfo.match && (
+                        <span className="text-torg-gray"> ({parseInfo.total - parseInfo.match} item(s) do PDF não casaram com a RM — preencha manualmente)</span>
+                      )}.
+                      {parseInfo.usouIA && <span className="text-[10px] text-torg-blue ml-1">via IA</span>}
+                    </p>
+                    {autoFilled.size > 0 && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-torg-orange-700 font-medium">
+                          {autoFilled.size} pendente{autoFilled.size !== 1 ? "s" : ""} de revisão
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Marca todas como revisadas de uma vez
+                            const ids = Array.from(autoFilled);
+                            setRevisado((prev) => {
+                              const n = new Set(prev);
+                              ids.forEach((id) => n.add(id));
+                              return n;
+                            });
+                            setAutoFilled(new Set());
+                          }}
+                          className="px-2 py-1 bg-torg-blue text-white text-xs rounded hover:bg-torg-blue-700 font-medium"
+                        >
+                          ✓ Conferi todos
+                        </button>
+                      </div>
+                    )}
+                    {autoFilled.size === 0 && parseInfo.match > 0 && (
+                      <span className="text-xs text-torg-blue font-medium">✓ Tudo conferido</span>
+                    )}
+                  </div>
                 ) : (
                   <p className="text-torg-orange-700">
                     ⚠ O PDF foi lido mas não conseguimos casar os itens automaticamente. Pode preencher os preços abaixo manualmente.
+                  </p>
+                )}
+                {parseInfo.match > 0 && autoFilled.size > 0 && (
+                  <p className="text-[11px] text-torg-gray mt-1">
+                    💡 Linhas em laranja = preenchidas pela IA. Clique no aviso da linha pra confirmar, edite o valor pra ajustar, ou clique &quot;Conferi todos&quot; se está tudo certo.
                   </p>
                 )}
               </div>
@@ -455,52 +509,72 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
                 <tbody className="divide-y divide-gray-100">
                   {linhas.map((l, i) => {
                     const totalBruto = (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0);
+                    const isAuto = autoFilled.has(l.id);
+                    const isRevisado = revisado.has(l.id);
+                    const inputCls = isAuto
+                      ? "border-torg-orange-300 bg-torg-orange-50/40"
+                      : isRevisado
+                      ? "border-torg-blue-200 bg-torg-blue-50/30"
+                      : "border-gray-300";
                     return (
-                      <tr key={l.id}>
-                        <td className="px-2 py-2 text-gray-400">{i + 1}</td>
-                        <td className="px-2 py-2">
+                      <tr key={l.id} className={isAuto ? "bg-torg-orange-50/20" : ""}>
+                        <td className="px-2 py-2 text-gray-400 align-top">{i + 1}</td>
+                        <td className="px-2 py-2 align-top">
                           <p className="text-torg-dark font-medium text-xs">{l.descricao}</p>
                           {l.material && <p className="text-[10px] text-torg-gray">{l.material}</p>}
+                          {isAuto && (
+                            <button
+                              type="button"
+                              onClick={() => marcarRevisado(l.id)}
+                              className="mt-1 text-[10px] text-torg-orange-700 hover:text-torg-orange-700 font-medium inline-flex items-center gap-1"
+                              title="Marcar como conferido"
+                            >
+                              ⚠ preenchido pelo PDF — clique pra confirmar
+                            </button>
+                          )}
+                          {isRevisado && (
+                            <p className="mt-1 text-[10px] text-torg-blue font-medium">✓ conferido</p>
+                          )}
                         </td>
-                        <td className="px-2 py-2 text-right text-torg-gray text-xs tabular-nums whitespace-nowrap">
+                        <td className="px-2 py-2 text-right text-torg-gray text-xs tabular-nums whitespace-nowrap align-top pt-3">
                           {l.qtdRm} {l.unidade}
                         </td>
-                        <td className="px-2 py-2 text-right">
+                        <td className="px-2 py-2 text-right align-top">
                           <input
                             type="number" step="0.01" min="0"
                             value={l.qtdCotada}
                             onChange={(e) => setLinha(l.id, "qtdCotada", e.target.value)}
-                            className="w-20 border border-gray-300 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                            className={`w-20 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
                           />
                         </td>
-                        <td className="px-2 py-2 text-right">
+                        <td className="px-2 py-2 text-right align-top">
                           <input
                             type="number" step="0.01" min="0"
                             value={l.precoUnit}
                             onChange={(e) => setLinha(l.id, "precoUnit", e.target.value)}
                             placeholder="0,00"
-                            className="w-24 border border-gray-300 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                            className={`w-24 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
                           />
                         </td>
-                        <td className="px-2 py-2 text-right">
+                        <td className="px-2 py-2 text-right align-top">
                           <input
                             type="number" step="0.01" min="0" max="100"
                             value={l.icmsPct}
                             onChange={(e) => setLinha(l.id, "icmsPct", e.target.value)}
                             placeholder="0"
-                            className="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                            className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
                           />
                         </td>
-                        <td className="px-2 py-2 text-right">
+                        <td className="px-2 py-2 text-right align-top">
                           <input
                             type="number" step="0.01" min="0" max="100"
                             value={l.ipiPct}
                             onChange={(e) => setLinha(l.id, "ipiPct", e.target.value)}
                             placeholder="0"
-                            className="w-16 border border-gray-300 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                            className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
                           />
                         </td>
-                        <td className="px-2 py-2 text-right text-torg-dark font-medium tabular-nums text-xs">
+                        <td className="px-2 py-2 text-right text-torg-dark font-medium tabular-nums text-xs align-top pt-3">
                           {totalBruto > 0 ? fmtMoeda(totalBruto) : "—"}
                         </td>
                       </tr>
