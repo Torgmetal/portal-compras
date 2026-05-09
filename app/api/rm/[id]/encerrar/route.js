@@ -8,12 +8,18 @@ const schema = z.object({ motivo: z.string().min(1) });
 export async function POST(req, { params }) {
   let user;
   try {
-    user = await requireRole(["ADMIN"]);
+    // Permite ADMIN, COMPRAS, COMERCIAL e o criador da RM (ENGENHARIA/ALMOXARIFADO)
+    user = await requireRole(["ADMIN", "COMPRAS", "COMERCIAL", "ENGENHARIA", "ALMOXARIFADO"]);
   } catch {
-    return NextResponse.json({ error: "Apenas Admin pode encerrar RM." }, { status: 403 });
+    return NextResponse.json({ error: "Sem permissao pra cancelar RM." }, { status: 403 });
   }
 
-  const body = schema.parse(await req.json());
+  let body;
+  try {
+    body = schema.parse(await req.json());
+  } catch (e) {
+    return NextResponse.json({ error: "Motivo do cancelamento e obrigatorio." }, { status: 400 });
+  }
 
   const rm = await prisma.rM.findUnique({
     where: { id: params.id },
@@ -22,6 +28,17 @@ export async function POST(req, { params }) {
   if (!rm) return NextResponse.json({ error: "RM não encontrada." }, { status: 404 });
   if (rm.status === "PEDIDO_GERADO" || rm.status === "CANCELADA") {
     return NextResponse.json({ error: "RM já encerrada." }, { status: 409 });
+  }
+
+  // ENGENHARIA/ALMOXARIFADO so pode cancelar a propria RM
+  if (
+    (user.role === "ENGENHARIA" || user.role === "ALMOXARIFADO") &&
+    rm.createdById !== user.id
+  ) {
+    return NextResponse.json(
+      { error: "Voce so pode cancelar RMs criadas por voce mesmo. Peca pra Compras/Admin." },
+      { status: 403 }
+    );
   }
 
   // Itens ainda nao finalizados sao cancelados com o motivo do encerramento
