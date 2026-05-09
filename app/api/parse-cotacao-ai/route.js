@@ -8,30 +8,48 @@ export const maxDuration = 60;
 
 const SYSTEM_PROMPT = `Você é um assistente de compras de uma siderúrgica (Torg Metal). Seu trabalho é extrair os itens cotados em propostas de fornecedores brasileiros (aço, perfis, chapas, cantoneiras, tubos) e casá-los com os itens de uma RM (Requisição de Materiais).
 
-REGRAS DE EXTRAÇÃO:
-- Reconhece notação brasileira: vírgula é decimal, ponto é separador de milhar (ex: "11.737,95" = 11737.95)
-- Identifica preço unitário em R$/KG, R$/UN, R$/PÇ, R$/M conforme a unidade
-- IMPORTANTE: a "qtd" e "unidade" devem ser SEMPRE como o FORNECEDOR cotou no documento
-  (tipicamente KG para aço/perfis/chapas). NÃO converta pra unidade da RM. Se o PDF
-  diz "1.440 KG", devolva qtd=1440 e unidade="KG", mesmo que a RM diga "8 barra(s)".
-- Captura ICMS%, IPI% por item quando disponíveis (geralmente em colunas separadas)
-- Captura prazo de pagamento (ex: "28 DDL", "30/60/90", "à vista")
-- Ignora cabeçalho, rodapé, dados de transporte, observações genéricas
+═══ REGRAS DE EXTRAÇÃO DE PREÇO (LEIA COM ATENÇÃO) ═══
+
+NOTAÇÃO BRASILEIRA — vírgula é decimal, ponto é milhar:
+  • "7,50" → 7.50      (sete reais e cinquenta centavos)
+  • "1.234,56" → 1234.56
+  • "11.737,95" → 11737.95
+  • "750" sem vírgula → 750.00 (verifique se faz sentido pra unidade!)
+
+PREÇO UNITÁRIO ≠ TOTAL DA LINHA — extraia SEMPRE o UNITÁRIO:
+  Em planilhas de cotação tem geralmente colunas como:
+    QTD | UNIT | PREÇO UNITÁRIO (R$) | DESCONTO | TOTAL (R$) | ICMS% | IPI%
+    100 | KG   | 7,50                |          | 750,00     | 18    | 5
+  → precoUnit = 7.50, qtd = 100, totalBruto = 750.00
+  NUNCA confunda PREÇO UNITÁRIO com TOTAL — mesmo que sejam parecidos.
+
+VALIDE ARITMETICAMENTE quando possível:
+  • Se você tem qtd, precoUnit e totalBruto, confira que precoUnit × qtd ≈ totalBruto
+    (com pequena tolerância de arredondamento). Se NÃO bater, há erro de leitura — use null.
+  • Ex: qtd=100, total=750 → unit não pode ser 750. Tem que ser 7,50.
+
+OUTROS:
+- "qtd" e "unidade" devem ser SEMPRE como o FORNECEDOR cotou (tipicamente KG pra aço/perfis).
+  Se PDF diz "1.440 KG", devolva qtd=1440, unidade="KG", mesmo que RM diga "8 barras".
+- Captura ICMS%, IPI% por item (em colunas separadas, geralmente em %).
+- Captura prazo de pagamento ("28 DDL", "30/60/90", "à vista").
+- Ignora cabeçalho, rodapé, transporte, observações genéricas.
 
 REGRAS DE MATCHING (rmIndex):
-- Para cada item cotado, retorne o índice (0-based) do item RM correspondente, ou null se não houver
-- Considere variações comuns no Brasil:
-  • "CHAPA 6.40" da RM = "CHP GR 6,30..." do fornecedor (mesmo produto, diferenças de cadastro/notação de espessura)
-  • "L3''X1/4''" = "CANT 3X1/4" (cantoneira em polegadas)
-  • "W150X13" = "PF I W150X13" = "PERFIL W 150 X 13" (mesmo perfil)
-  • "A572-GR.50" = "A572GR50" = "A572" = "CIVIL 300" (sinônimos brasileiros para A572 grau 50)
-- Se o produto for da mesma CATEGORIA, MESMA dimensão principal (com ±0,5mm tolerância pra chapas) e GRADE compatível → considere match
-- Se houver dúvida razoável, prefira null e deixe o comprador decidir manualmente
+- Pra cada item cotado, retorne o índice (0-based) do item RM correspondente, OU null.
+- Variações brasileiras comuns:
+  • "CHAPA 6.40" da RM ↔ "CHP GR 6,30..." (mesma chapa, notação diferente de espessura)
+  • "L3''X1/4''" ↔ "CANT 3X1/4" (cantoneira em polegadas)
+  • "W150X13" ↔ "PF I W150X13" ↔ "PERFIL W 150 X 13" (mesmo perfil)
+  • "A572-GR.50" ↔ "A572GR50" ↔ "CIVIL 300" (mesmo grau de aço)
+- Mesma CATEGORIA + mesma dimensão principal (tolerância ±0,5mm pra chapas) + grade compatível → match
+- Em dúvida, prefira null (deixar o comprador decidir).
 
-REGRA DE CONFIABILIDADE:
-- Não invente valores. Se não conseguir identificar com certeza, use null
-- Se o documento não for uma cotação, devolva itens=[] com fornecedor=""
-- Preço unitário > R$ 10.000 quase certamente é erro de leitura — prefira null
+REGRAS DE CONFIABILIDADE:
+- Não invente valores. Em dúvida, use null em vez de chutar.
+- Se o documento não for cotação, devolva itens=[].
+- Preço unitário > R$ 10.000/kg quase certamente é erro de leitura — use null.
+- Se 2 itens da RM podem casar com o mesmo item do fornecedor, escolha o que tem dimensões mais próximas.
 
 FORMATO DE SAÍDA:
 Devolva APENAS um JSON válido envolvido em <json></json>, sem comentários adicionais antes ou depois das tags. Schema:
@@ -72,20 +90,49 @@ function extractJsonFromResponse(text) {
 
 function sanitizeItens(itens, rmCount) {
   return (itens || []).map((it) => {
-    const precoUnit = Number(it.precoUnit) || 0;
+    let precoUnit = Number(it.precoUnit) || 0;
     const qtd = Number(it.qtd) || 0;
-    let warning = null;
+    const totalDeclarado = it.totalBruto != null ? Number(it.totalBruto) : null;
+    const warnings = [];
     let safePrec = precoUnit;
-    // Reject preços absurdos (> R$ 10.000 por unidade — improvável pra aço)
+
+    // 1. Reject precos absurdos (> R$ 10.000 por unidade — improvavel pra aco)
     if (precoUnit > 10000) {
-      warning = `Preço unitário R$ ${precoUnit.toFixed(2)} suspeito — ignorado`;
+      warnings.push(`Preco unitario R$ ${precoUnit.toFixed(2)} suspeito (>10k/un)`);
       safePrec = 0;
     }
-    // rmIndex válido?
+
+    // 2. VALIDA ARITMETICA: se tem qtd, preco e total, todos > 0,
+    //    o preco x qtd deve bater com o total (tolerancia 1%).
+    if (qtd > 0 && safePrec > 0 && totalDeclarado != null && totalDeclarado > 0) {
+      const calculado = safePrec * qtd;
+      const diff = Math.abs(calculado - totalDeclarado);
+      const tolerancia = Math.max(totalDeclarado * 0.01, 0.5); // 1% ou 50 centavos
+      if (diff > tolerancia) {
+        // O preco nao bate. Tenta corrigir: o "preco unit" extraido provavelmente e
+        // o TOTAL da linha. Recalcula como total/qtd.
+        const sugerido = totalDeclarado / qtd;
+        if (sugerido > 0 && sugerido < 10000) {
+          warnings.push(
+            `Preco corrigido: ${precoUnit.toFixed(2)} -> ${sugerido.toFixed(4)} ` +
+            `(${precoUnit} parecia ser o total; total/qtd = ${sugerido.toFixed(4)})`
+          );
+          safePrec = sugerido;
+        } else {
+          warnings.push(
+            `Preco e total nao batem: ${precoUnit} x ${qtd} = ${calculado.toFixed(2)} ` +
+            `mas total declarado e ${totalDeclarado.toFixed(2)}`
+          );
+        }
+      }
+    }
+
+    // rmIndex valido?
     let rmIndex = it.rmIndex;
     if (rmIndex != null && (typeof rmIndex !== "number" || rmIndex < 0 || rmIndex >= rmCount)) {
       rmIndex = null;
     }
+
     return {
       rmIndex,
       descricao: String(it.descricao || ""),
@@ -95,10 +142,10 @@ function sanitizeItens(itens, rmCount) {
       precoUnit: safePrec,
       icmsPct: it.icmsPct != null ? Number(it.icmsPct) : null,
       ipiPct: it.ipiPct != null ? Number(it.ipiPct) : null,
-      totalBruto: it.totalBruto != null ? Number(it.totalBruto) : safePrec * qtd,
+      totalBruto: totalDeclarado != null ? totalDeclarado : safePrec * qtd,
       prazoEntrega: it.prazoEntrega || "",
       observacao: it.observacao || "",
-      _warning: warning,
+      _warning: warnings.length > 0 ? warnings.join(" | ") : null,
     };
   });
 }
