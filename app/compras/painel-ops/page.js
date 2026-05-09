@@ -29,8 +29,7 @@ export default async function PainelOPs({ searchParams }) {
   await requireRole(["ADMIN", "COMPRAS"]);
   const verFinalizadas = searchParams?.finalizadas === "1";
 
-  const ops = await prisma.oP.findMany({
-    orderBy: { createdAt: "desc" },
+  const opsRaw = await prisma.oP.findMany({
     include: {
       itens: { select: { valorVerba: true } },
       aditivos: { include: { itens: { select: { valorVerba: true } } } },
@@ -43,6 +42,10 @@ export default async function PainelOPs({ searchParams }) {
       },
     },
   });
+  // Ordena numericamente pelo numero (T8 < T84 < T100), descendente
+  const ops = opsRaw.sort((a, b) =>
+    (b.numero || "").localeCompare(a.numero || "", undefined, { numeric: true, sensitivity: "base" })
+  );
 
   const opsComStats = ops.map((op) => {
     const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);

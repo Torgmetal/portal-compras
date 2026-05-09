@@ -18,10 +18,9 @@ export default async function PainelFinanceiro() {
   const fimJanela = new Date(hoje);
   fimJanela.setDate(fimJanela.getDate() + 12 * 7);
 
-  const [ops, fluxos, romaneios] = await Promise.all([
+  const [opsRaw, fluxos, romaneios] = await Promise.all([
     prisma.oP.findMany({
       where: { status: { notIn: ["ENCERRADA", "CANCELADA"] } },
-      orderBy: { numero: "asc" },
       select: { id: true, numero: true, cliente: true, obra: true },
     }),
     prisma.fluxoCaixa.findMany({
@@ -35,6 +34,10 @@ export default async function PainelFinanceiro() {
       include: { op: { select: { numero: true, cliente: true } } },
     }),
   ]);
+  // Ordena OPs numericamente
+  const ops = opsRaw.sort((a, b) =>
+    (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
+  );
 
   // Janela de semanas
   const semanas = [];

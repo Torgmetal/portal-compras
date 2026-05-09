@@ -32,14 +32,17 @@ export default async function ComercialHome({ searchParams }) {
   const user = await requireRole(["ADMIN", "COMERCIAL"]);
   const verFinalizadas = searchParams?.finalizadas === "1";
 
-  const ops = await prisma.oP.findMany({
-    orderBy: { createdAt: "desc" },
+  const opsRaw = await prisma.oP.findMany({
     include: {
       itens: { select: { valorVerba: true } },
       aditivos: { include: { itens: { select: { valorVerba: true } } } },
       _count: { select: { rms: true } },
     },
   });
+  // Ordena numericamente pelo número (T8 < T84 < T100), descendente
+  const ops = opsRaw.sort((a, b) =>
+    (b.numero || "").localeCompare(a.numero || "", undefined, { numeric: true, sensitivity: "base" })
+  );
 
   const opsComTotaisRaw = ops.map((op) => {
     const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);

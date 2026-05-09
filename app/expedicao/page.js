@@ -18,10 +18,9 @@ export default async function PainelExpedicao() {
   const fimJanela = new Date(hoje);
   fimJanela.setDate(fimJanela.getDate() + 4 * 7);
 
-  const [ops, romaneios] = await Promise.all([
+  const [opsRaw, romaneios] = await Promise.all([
     prisma.oP.findMany({
       where: { status: { notIn: ["ENCERRADA", "CANCELADA"] } },
-      orderBy: { numero: "asc" },
       select: { id: true, numero: true, cliente: true, obra: true },
     }),
     prisma.romaneio.findMany({
@@ -30,6 +29,10 @@ export default async function PainelExpedicao() {
       include: { op: { select: { numero: true, cliente: true } } },
     }),
   ]);
+  // Ordena numericamente pelo numero
+  const ops = opsRaw.sort((a, b) =>
+    (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
+  );
 
   return (
     <ExpedicaoClient

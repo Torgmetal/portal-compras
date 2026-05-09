@@ -19,12 +19,14 @@ export default async function PainelProducao() {
   const fimJanela = new Date(hoje);
   fimJanela.setDate(fimJanela.getDate() + 12 * 7);
 
-  // OPs ativas pra dropdown
-  const ops = await prisma.oP.findMany({
+  // OPs ativas pra dropdown — ordenadas numericamente
+  const opsRaw = await prisma.oP.findMany({
     where: { status: { notIn: ["ENCERRADA", "CANCELADA"] } },
-    orderBy: { numero: "asc" },
     select: { id: true, numero: true, cliente: true, obra: true },
   });
+  const ops = opsRaw.sort((a, b) =>
+    (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
+  );
 
   // Producao semanal nessa janela
   const producoes = await prisma.producaoSemanal.findMany({

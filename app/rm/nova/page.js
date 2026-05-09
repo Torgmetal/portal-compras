@@ -8,9 +8,8 @@ export default async function NovaRMPage() {
   const user = await requireUser();
 
   // OPs ativas com itens (base + aditivos) pra alimentar a tela
-  const ops = await prisma.oP.findMany({
+  const opsRaw = await prisma.oP.findMany({
     where: { status: { in: ["ABERTA", "EM_EXECUCAO"] } },
-    orderBy: { createdAt: "desc" },
     include: {
       itens: { orderBy: { ordem: "asc" } },
       aditivos: {
@@ -19,6 +18,10 @@ export default async function NovaRMPage() {
       },
     },
   });
+  // Ordena numericamente pelo numero (T8 < T84 < T100), ascendente
+  const ops = opsRaw.sort((a, b) =>
+    (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
+  );
 
   // Plain object pra Client Component
   const opsData = JSON.parse(JSON.stringify(ops));
