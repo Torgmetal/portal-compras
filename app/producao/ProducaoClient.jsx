@@ -120,6 +120,9 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
         />
       </div>
 
+      {/* Análise diária — últimos 30 dias */}
+      <AnaliseDiaria producoes={producoes} />
+
       {/* Gráfico: peso previsto × realizado por semana */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
@@ -453,6 +456,231 @@ function ModalImportarPCP({ ops, onClose, onSaved }) {
             {salvando && <Loader2 size={14} className="animate-spin" />}
             Salvar {itens.length > 0 ? `${itens.length} ${itens.length === 1 ? "linha" : "linhas"}` : ""}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Análise diária — gráfico dia a dia + KPIs dos últimos 30 dias
+function AnaliseDiaria({ producoes }) {
+  const [dias, setDias] = useState(30); // 14 ou 30
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const hojeStr = hoje.toISOString().slice(0, 10);
+
+  // Constrói array com cada dia (mesmo sem lançamento)
+  const dataset = useMemo(() => {
+    const map = {};
+    for (const p of producoes) {
+      const k = new Date(p.data).toISOString().slice(0, 10);
+      if (!map[k]) map[k] = { data: k, prevKg: 0, realKg: 0, count: 0 };
+      map[k].prevKg += p.pesoPrevistoKg || 0;
+      map[k].realKg += p.pesoRealizadoKg || 0;
+      map[k].count += 1;
+    }
+    const out = [];
+    for (let i = dias - 1; i >= 0; i--) {
+      const d = new Date(hoje);
+      d.setDate(d.getDate() - i);
+      const k = d.toISOString().slice(0, 10);
+      out.push(map[k] || { data: k, prevKg: 0, realKg: 0, count: 0 });
+    }
+    return out;
+  }, [producoes, dias]);
+
+  // KPIs
+  const kpis = useMemo(() => {
+    const comPrev = dataset.filter((d) => d.prevKg > 0);
+    const comReal = dataset.filter((d) => d.realKg > 0);
+    const totalPrev = dataset.reduce((s, d) => s + d.prevKg, 0);
+    const totalReal = dataset.reduce((s, d) => s + d.realKg, 0);
+
+    let melhorDia = null, piorDia = null;
+    for (const d of comReal) {
+      if (!melhorDia || d.realKg > melhorDia.realKg) melhorDia = d;
+      if (!piorDia || d.realKg < piorDia.realKg) piorDia = d;
+    }
+
+    const mediaPrev = comPrev.length > 0 ? totalPrev / comPrev.length : 0;
+    const mediaReal = comReal.length > 0 ? totalReal / comReal.length : 0;
+    const aderencia = totalPrev > 0 ? (totalReal / totalPrev) * 100 : 0;
+
+    return { totalPrev, totalReal, mediaPrev, mediaReal, melhorDia, piorDia, aderencia, diasComProducao: comReal.length };
+  }, [dataset]);
+
+  const maxKg = Math.max(...dataset.map((d) => Math.max(d.prevKg, d.realKg)), 1);
+
+  // Análise por dia da semana (média)
+  const porDiaSemana = useMemo(() => {
+    const dias = [
+      { dia: "Segunda", idx: 1 },
+      { dia: "Terça", idx: 2 },
+      { dia: "Quarta", idx: 3 },
+      { dia: "Quinta", idx: 4 },
+      { dia: "Sexta", idx: 5 },
+      { dia: "Sábado", idx: 6 },
+    ];
+    return dias.map((d) => {
+      const items = dataset.filter((x) => new Date(x.data + "T12:00:00").getDay() === d.idx && x.prevKg > 0);
+      const prev = items.reduce((s, x) => s + x.prevKg, 0);
+      const real = items.reduce((s, x) => s + x.realKg, 0);
+      return {
+        ...d,
+        prevKg: items.length > 0 ? prev / items.length : 0,
+        realKg: items.length > 0 ? real / items.length : 0,
+        ader: prev > 0 ? (real / prev) * 100 : 0,
+        n: items.length,
+      };
+    });
+  }, [dataset]);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-torg-dark">Análise diária</h3>
+          <p className="text-xs text-torg-gray mt-0.5">
+            Comportamento da produção dia a dia. Útil pra identificar dias parados, picos e variações na semana.
+          </p>
+        </div>
+        <div className="flex gap-1">
+          {[7, 14, 30, 60].map((n) => (
+            <button
+              key={n}
+              onClick={() => setDias(n)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium ${
+                dias === n
+                  ? "bg-torg-blue text-white"
+                  : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+              }`}
+            >
+              {n} dias
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPIs do período */}
+      <div className="px-6 py-4 bg-torg-blue-50/30 border-b border-torg-blue-100 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+        <div>
+          <p className="text-[10px] text-torg-gray uppercase tracking-wide">Aderência geral</p>
+          <p className={`text-lg font-extrabold tabular-nums ${
+            kpis.aderencia >= 90 ? "text-torg-blue" : kpis.aderencia >= 70 ? "text-torg-orange-700" : "text-red-600"
+          }`}>
+            {kpis.totalPrev > 0 ? `${kpis.aderencia.toFixed(1)}%` : "—"}
+          </p>
+          <p className="text-[10px] text-torg-gray">{fmtKg(kpis.totalReal)} de {fmtKg(kpis.totalPrev)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-torg-gray uppercase tracking-wide">Média diária</p>
+          <p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtKg(kpis.mediaReal)}</p>
+          <p className="text-[10px] text-torg-gray">Previsto: {fmtKg(kpis.mediaPrev)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-torg-gray uppercase tracking-wide">Melhor dia</p>
+          <p className="text-lg font-extrabold text-torg-blue tabular-nums">{kpis.melhorDia ? fmtKg(kpis.melhorDia.realKg) : "—"}</p>
+          {kpis.melhorDia && (
+            <p className="text-[10px] text-torg-gray">{fmtData(kpis.melhorDia.data)} · {diaSemana(kpis.melhorDia.data + "T12:00:00")}</p>
+          )}
+        </div>
+        <div>
+          <p className="text-[10px] text-torg-gray uppercase tracking-wide">Dias com produção</p>
+          <p className="text-lg font-extrabold text-torg-dark tabular-nums">{kpis.diasComProducao} <span className="text-xs text-torg-gray font-medium">/ {dias}</span></p>
+          <p className="text-[10px] text-torg-gray">{(kpis.diasComProducao / dias * 100).toFixed(0)}% dos dias</p>
+        </div>
+      </div>
+
+      {/* Gráfico dia a dia */}
+      <div className="px-6 py-5">
+        <div className="space-y-2">
+          {dataset.map((d) => {
+            const ds = new Date(d.data + "T12:00:00");
+            const dia = ds.getDay();
+            const isFds = dia === 0 || dia === 6;
+            const isHoje = d.data === hojeStr;
+            const prevPct = (d.prevKg / maxKg) * 100;
+            const realPct = (d.realKg / maxKg) * 100;
+            const ader = d.prevKg > 0 ? (d.realKg / d.prevKg) * 100 : 0;
+
+            return (
+              <div key={d.data} className={`grid grid-cols-12 gap-2 items-center text-xs ${isHoje ? "bg-torg-blue-50/40 -mx-6 px-6 py-1 rounded" : ""} ${isFds ? "opacity-50" : ""}`}>
+                <div className="col-span-3 sm:col-span-2">
+                  <p className={`font-medium ${isHoje ? "text-torg-blue" : "text-torg-dark"}`}>
+                    {fmtData(d.data)}
+                  </p>
+                  <p className="text-[10px] text-torg-gray">{diaSemana(d.data + "T12:00:00")}{isHoje && " · hoje"}</p>
+                </div>
+                <div className="col-span-7 sm:col-span-8 space-y-0.5">
+                  <div className="flex items-center gap-1">
+                    <div className="flex-1 bg-gray-100 rounded h-2 overflow-hidden">
+                      <div className="h-full bg-torg-blue-700" style={{ width: `${prevPct}%` }} />
+                    </div>
+                    <span className="text-[10px] text-torg-gray w-20 text-right tabular-nums">{d.prevKg > 0 ? fmtKg(d.prevKg) : "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="flex-1 bg-gray-100 rounded h-2 overflow-hidden">
+                      <div className="h-full bg-torg-orange" style={{ width: `${realPct}%` }} />
+                    </div>
+                    <span className="text-[10px] text-torg-gray w-20 text-right tabular-nums">{d.realKg > 0 ? fmtKg(d.realKg) : "—"}</span>
+                  </div>
+                </div>
+                <div className="col-span-2 text-right">
+                  {d.prevKg > 0 ? (
+                    <span className={`text-[10px] font-bold ${
+                      ader >= 90 ? "text-torg-blue" : ader >= 70 ? "text-torg-orange-700" : "text-red-600"
+                    }`}>
+                      {ader.toFixed(0)}%
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-gray-300">—</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-torg-gray text-center mt-3">
+          <span className="inline-block w-3 h-2 bg-torg-blue-700 align-middle mr-1" /> Previsto
+          <span className="inline-block w-3 h-2 bg-torg-orange align-middle ml-3 mr-1" /> Realizado · finais de semana acinzentados
+        </p>
+      </div>
+
+      {/* Análise por dia da semana */}
+      <div className="border-t border-gray-100">
+        <div className="px-6 py-3 bg-gray-50 border-b border-gray-100">
+          <h4 className="text-sm font-semibold text-torg-dark">Comportamento por dia da semana (média)</h4>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-white">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dia</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Média prev.</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Média real.</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Aderência</th>
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">N° dias</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {porDiaSemana.map((d) => (
+                <tr key={d.idx} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 text-torg-dark font-medium">{d.dia}</td>
+                  <td className="px-4 py-2 text-right text-torg-gray tabular-nums">{d.n > 0 ? fmtKg(d.prevKg) : "—"}</td>
+                  <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{d.n > 0 ? fmtKg(d.realKg) : "—"}</td>
+                  <td className={`px-4 py-2 text-right tabular-nums font-medium text-xs ${
+                    d.n === 0 ? "text-gray-300" :
+                    d.ader >= 90 ? "text-torg-blue" :
+                    d.ader >= 70 ? "text-torg-orange-700" : "text-red-600"
+                  }`}>
+                    {d.n > 0 ? `${d.ader.toFixed(1)}%` : "—"}
+                  </td>
+                  <td className="px-4 py-2 text-center text-torg-gray text-xs">{d.n}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
