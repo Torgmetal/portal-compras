@@ -64,9 +64,10 @@ export default function RMRowActions({ rmId, numero, status, isAdmin, onAfterCha
     }
   }
 
-  const podeCancelar = status !== "PEDIDO_GERADO" && status !== "CANCELADA";
+  // Cancelar e excluir são exclusivos do ADMIN
+  const podeCancelar = isAdmin && status !== "PEDIDO_GERADO" && status !== "CANCELADA";
 
-  if (!isAdmin && !podeCancelar) return null;
+  if (!isAdmin) return null;
 
   return (
     <div className="relative inline-block" ref={ref}>

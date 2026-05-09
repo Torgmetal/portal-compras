@@ -9,10 +9,12 @@ export default function RMHeaderActions({ rmId, numero, status, isAdmin, temOP =
   const [loading, setLoading] = useState(null);
   const [erro, setErro] = useState("");
 
-  const podeCancelar = status !== "PEDIDO_GERADO" && status !== "CANCELADA";
-  const podeDesvincular = temOP && (isAdmin || true /* COMPRAS pode pelo /compras/rm/ */);
+  // Cancelar e excluir são exclusivos do ADMIN
+  const podeCancelar = isAdmin && status !== "PEDIDO_GERADO" && status !== "CANCELADA";
+  // Desvincular da OP pode ser feito por todos com acesso à RM
+  const podeDesvincular = temOP;
 
-  if (!isAdmin && !podeCancelar && !podeDesvincular) return null;
+  if (!isAdmin && !podeDesvincular) return null;
 
   async function desvincularDaOP() {
     if (!window.confirm(

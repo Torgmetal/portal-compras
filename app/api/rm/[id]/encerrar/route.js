@@ -8,10 +8,9 @@ const schema = z.object({ motivo: z.string().min(1) });
 export async function POST(req, { params }) {
   let user;
   try {
-    // Permite ADMIN, COMPRAS, COMERCIAL e o criador da RM (ENGENHARIA/ALMOXARIFADO)
-    user = await requireRole(["ADMIN", "COMPRAS", "COMERCIAL", "ENGENHARIA", "ALMOXARIFADO"]);
+    user = await requireRole(["ADMIN"]);
   } catch {
-    return NextResponse.json({ error: "Sem permissao pra cancelar RM." }, { status: 403 });
+    return NextResponse.json({ error: "Apenas Admin pode cancelar RM." }, { status: 403 });
   }
 
   let body;
@@ -28,17 +27,6 @@ export async function POST(req, { params }) {
   if (!rm) return NextResponse.json({ error: "RM não encontrada." }, { status: 404 });
   if (rm.status === "PEDIDO_GERADO" || rm.status === "CANCELADA") {
     return NextResponse.json({ error: "RM já encerrada." }, { status: 409 });
-  }
-
-  // ENGENHARIA/ALMOXARIFADO so pode cancelar a propria RM
-  if (
-    (user.role === "ENGENHARIA" || user.role === "ALMOXARIFADO") &&
-    rm.createdById !== user.id
-  ) {
-    return NextResponse.json(
-      { error: "Voce so pode cancelar RMs criadas por voce mesmo. Peca pra Compras/Admin." },
-      { status: 403 }
-    );
   }
 
   // Itens ainda nao finalizados sao cancelados com o motivo do encerramento
