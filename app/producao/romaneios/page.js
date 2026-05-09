@@ -199,17 +199,7 @@ export default async function RomaneiosProducao() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {[...romaneios].sort((a, b) => {
-                  // 1° por OP (numericamente)
-                  const opA = a.op?.numero || "";
-                  const opB = b.op?.numero || "";
-                  if (!opA && opB) return 1;
-                  if (opA && !opB) return -1;
-                  const cmp = opA.localeCompare(opB, undefined, { numeric: true, sensitivity: "base" });
-                  if (cmp !== 0) return cmp;
-                  // 2° data desc
-                  return new Date(a.data) < new Date(b.data) ? 1 : -1;
-                }).map((r) => (
+                {romaneios.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 font-mono text-torg-dark text-xs">{r.numero}</td>
                     <td className="px-4 py-2 text-xs text-torg-gray">{fmtData(r.data)}</td>

@@ -183,17 +183,7 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {[...producoes].sort((a, b) => {
-                  // 1° por OP (numericamente: T8 < T84 < T100), itens sem OP no fim
-                  const opA = a.op?.numero || "";
-                  const opB = b.op?.numero || "";
-                  if (!opA && opB) return 1;
-                  if (opA && !opB) return -1;
-                  const cmp = opA.localeCompare(opB, undefined, { numeric: true, sensitivity: "base" });
-                  if (cmp !== 0) return cmp;
-                  // 2° dentro da mesma OP: data desc (mais recente em cima)
-                  return new Date(a.data) < new Date(b.data) ? 1 : -1;
-                }).map((p) => {
+                {[...producoes].sort((a, b) => (new Date(a.data) < new Date(b.data) ? 1 : -1)).map((p) => {
                   const ader = p.pesoPrevistoKg > 0 ? (p.pesoRealizadoKg / p.pesoPrevistoKg) * 100 : 0;
                   return (
                     <tr key={p.id} className="hover:bg-gray-50">
