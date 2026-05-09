@@ -28,12 +28,24 @@ export default function RMRowActions({ rmId, numero, status, isAdmin, onAfterCha
     setLoading("cancelar");
     setAberto(false);
     try {
-      const res = await fetch(`/api/rm/${rmId}/encerrar`, {
+      let res = await fetch(`/api/rm/${rmId}/encerrar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ motivo: motivo.trim() }),
       });
-      const data = await res.json();
+      let data = await res.json();
+      if (!res.ok && data.requiresForce) {
+        const ok = window.confirm(
+          `${data.error}\n\nConfirma que os pedidos no Omie já foram CANCELADOS POR LÁ?`
+        );
+        if (!ok) return;
+        res = await fetch(`/api/rm/${rmId}/encerrar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ motivo: motivo.trim(), force: true }),
+        });
+        data = await res.json();
+      }
       if (!res.ok) throw new Error(data.error || "Erro");
       onAfterChange ? onAfterChange() : router.refresh();
     } catch (e) {
@@ -46,15 +58,22 @@ export default function RMRowActions({ rmId, numero, status, isAdmin, onAfterCha
   async function excluirRM() {
     if (!window.confirm(
       `EXCLUIR DEFINITIVAMENTE a RM ${numero}?\n\n` +
-      `Apaga itens, cotações, envios e anexos.\n` +
-      `Não funciona se a RM já gerou pedido no Omie — nesse caso use Cancelar.\n\n` +
+      `Apaga itens, cotações, envios e anexos.\n\n` +
       `Essa ação NÃO PODE ser desfeita.`
     )) return;
     setLoading("excluir");
     setAberto(false);
     try {
-      const res = await fetch(`/api/rm/${rmId}`, { method: "DELETE" });
-      const data = await res.json();
+      let res = await fetch(`/api/rm/${rmId}`, { method: "DELETE" });
+      let data = await res.json();
+      if (!res.ok && data.requiresForce) {
+        const ok = window.confirm(
+          `${data.error}\n\nConfirma que os pedidos foram CANCELADOS no Omie?`
+        );
+        if (!ok) return;
+        res = await fetch(`/api/rm/${rmId}?force=1`, { method: "DELETE" });
+        data = await res.json();
+      }
       if (!res.ok) throw new Error(data.error || "Erro ao excluir");
       onAfterChange ? onAfterChange() : router.refresh();
     } catch (e) {
@@ -64,8 +83,9 @@ export default function RMRowActions({ rmId, numero, status, isAdmin, onAfterCha
     }
   }
 
-  // Cancelar e excluir são exclusivos do ADMIN
-  const podeCancelar = isAdmin && status !== "PEDIDO_GERADO" && status !== "CANCELADA";
+  // Cancelar e excluir são exclusivos do ADMIN. PEDIDO_GERADO mostra
+  // o botao mas a API pede confirmação extra antes de prosseguir.
+  const podeCancelar = isAdmin && status !== "CANCELADA";
 
   if (!isAdmin) return null;
 

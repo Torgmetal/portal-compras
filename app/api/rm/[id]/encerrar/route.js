@@ -3,7 +3,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
-const schema = z.object({ motivo: z.string().min(1) });
+const schema = z.object({
+  motivo: z.string().min(1),
+  force: z.boolean().optional(),
+});
 
 export async function POST(req, { params }) {
   let user;
@@ -25,8 +28,15 @@ export async function POST(req, { params }) {
     include: { itens: { select: { id: true, status: true } } },
   });
   if (!rm) return NextResponse.json({ error: "RM não encontrada." }, { status: 404 });
-  if (rm.status === "PEDIDO_GERADO" || rm.status === "CANCELADA") {
-    return NextResponse.json({ error: "RM já encerrada." }, { status: 409 });
+  if (rm.status === "CANCELADA") {
+    return NextResponse.json({ error: "RM já está cancelada." }, { status: 409 });
+  }
+  // PEDIDO_GERADO bloqueia por padrao, mas com force=true ADMIN pode cancelar
+  if (rm.status === "PEDIDO_GERADO" && !body.force) {
+    return NextResponse.json({
+      error: "Esta RM já gerou pedido no Omie. Cancelar aqui não cancela no Omie — você precisa cancelar manualmente lá também.",
+      requiresForce: true,
+    }, { status: 409 });
   }
 
   // Itens ainda nao finalizados sao cancelados com o motivo do encerramento

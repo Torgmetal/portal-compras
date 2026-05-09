@@ -67,8 +67,10 @@ export async function PATCH(req, { params }) {
   return NextResponse.json({ error: "Acao desconhecida" }, { status: 400 });
 }
 
-// DELETE — exclusao definitiva da RM. Bloqueia se ja gerou pedido no Omie (status="CRIADO").
-// Cascateia: itens, cotacoes (e seus itens, anexos), envios, anexos da RM, pedidos com status="ERRO".
+// DELETE — exclusao definitiva da RM. Por padrao bloqueia se ja gerou pedido no Omie (status="CRIADO").
+// Aceita ?force=1 (query param) pra ADMIN forcar mesmo com pedidos criados — uso quando os pedidos
+// foram cancelados manualmente no Omie.
+// Cascateia: itens, cotacoes (e seus itens, anexos), envios, anexos da RM, todos os pedidos vinculados.
 export async function DELETE(req, { params }) {
   let user;
   try {
@@ -76,6 +78,9 @@ export async function DELETE(req, { params }) {
   } catch {
     return NextResponse.json({ error: "Apenas Admin pode excluir RMs." }, { status: 403 });
   }
+
+  const force = req.nextUrl?.searchParams?.get("force") === "1"
+    || new URL(req.url).searchParams.get("force") === "1";
 
   const rm = await prisma.rM.findUnique({
     where: { id: params.id },
@@ -91,26 +96,26 @@ export async function DELETE(req, { params }) {
   });
   if (!rm) return NextResponse.json({ error: "RM nao encontrada." }, { status: 404 });
 
-  // Bloqueia se algum pedido foi efetivamente criado no Omie
+  // Bloqueia se algum pedido foi efetivamente criado no Omie — exceto se force=1
   const pedidosCriados = rm.cotacoes.flatMap((c) =>
     c.pedidosOmie.filter((p) => p.status === "CRIADO")
   );
-  if (pedidosCriados.length > 0) {
+  if (pedidosCriados.length > 0 && !force) {
     const numeros = pedidosCriados.map((p) => p.numeroPedido || p.id).join(", ");
     return NextResponse.json(
       {
         error:
-          `Nao da pra excluir: a RM ${rm.numero} ja gerou ${pedidosCriados.length} pedido(s) no Omie ` +
-          `(${numeros}). Use 'Cancelar' pra arquivar mantendo o historico.`,
+          `A RM ${rm.numero} já gerou ${pedidosCriados.length} pedido(s) no Omie ` +
+          `(${numeros}). Confirme se eles foram cancelados no Omie antes de continuar.`,
+        requiresForce: true,
+        pedidosCriados: pedidosCriados.map((p) => p.numeroPedido || p.id),
       },
       { status: 409 }
     );
   }
 
-  // IDs de pedidos com status="ERRO" (vinculados as cotacoes dessa RM) — vamos apagar tambem
-  const pedidosErroIds = rm.cotacoes.flatMap((c) =>
-    c.pedidosOmie.filter((p) => p.status !== "CRIADO").map((p) => p.id)
-  );
+  // IDs de TODOS pedidos vinculados (com force, apaga inclusive os CRIADOs do banco local)
+  const pedidosErroIds = rm.cotacoes.flatMap((c) => c.pedidosOmie.map((p) => p.id));
 
   try {
     await prisma.$transaction(async (tx) => {
