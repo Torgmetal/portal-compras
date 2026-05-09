@@ -39,9 +39,9 @@ export default async function ComercialHome({ searchParams }) {
       _count: { select: { rms: true } },
     },
   });
-  // Ordena numericamente pelo número (T8 < T84 < T100), descendente
+  // Ordena numericamente pelo número em ordem crescente (00, 060, 064, 067, 088...)
   const ops = opsRaw.sort((a, b) =>
-    (b.numero || "").localeCompare(a.numero || "", undefined, { numeric: true, sensitivity: "base" })
+    (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
   );
 
   const opsComTotaisRaw = ops.map((op) => {

@@ -42,9 +42,9 @@ export default async function PainelOPs({ searchParams }) {
       },
     },
   });
-  // Ordena numericamente pelo numero (T8 < T84 < T100), descendente
+  // Ordena numericamente pelo numero em ordem crescente
   const ops = opsRaw.sort((a, b) =>
-    (b.numero || "").localeCompare(a.numero || "", undefined, { numeric: true, sensitivity: "base" })
+    (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
   );
 
   const opsComStats = ops.map((op) => {
