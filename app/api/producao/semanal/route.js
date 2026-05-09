@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { isoWeekString, parseSemana, semanaInicio, semanaFim } from "@/lib/semana";
 
+// POST — cria/atualiza um lancamento DIARIO de producao.
+// Mantém o nome /semanal pra retrocompatibilidade — agora cada linha = 1 dia.
 const schema = z.object({
-  semana: z.string().regex(/^\d{4}-W\d{2}$/, "Formato esperado: 2026-W19"),
-  dataInicio: z.string(), // ISO date
-  dataFim: z.string(),
+  data: z.string(),
   pesoPrevistoKg: z.number().min(0).default(0),
   pesoRealizadoKg: z.number().min(0).default(0),
   valorPrevisto: z.number().min(0).default(0),
@@ -30,12 +31,23 @@ export async function POST(req) {
     return NextResponse.json({ error: "Dados invalidos: " + (e.message || "") }, { status: 400 });
   }
 
-  // Upsert pra evitar duplicidade (semana + opId)
-  const where = { semana_opId: { semana: body.semana, opId: body.opId || null } };
-  const data = {
-    semana: body.semana,
-    dataInicio: new Date(body.dataInicio),
-    dataFim: new Date(body.dataFim),
+  // Calcula semana ISO + dataInicio/Fim a partir da data
+  const dataDia = new Date(body.data);
+  if (isNaN(dataDia)) {
+    return NextResponse.json({ error: "Data invalida" }, { status: 400 });
+  }
+  const semana = isoWeekString(dataDia);
+  const p = parseSemana(semana);
+  const dataInicio = p ? semanaInicio(p.ano, p.semana) : dataDia;
+  const dataFim = p ? semanaFim(p.ano, p.semana) : dataDia;
+
+  // Upsert por (data, opId)
+  const where = { data_opId: { data: dataDia, opId: body.opId || null } };
+  const dataPayload = {
+    data: dataDia,
+    semana,
+    dataInicio,
+    dataFim,
     pesoPrevistoKg: body.pesoPrevistoKg,
     pesoRealizadoKg: body.pesoRealizadoKg,
     valorPrevisto: body.valorPrevisto,
@@ -47,7 +59,7 @@ export async function POST(req) {
 
   const created = await prisma.producaoSemanal.upsert({
     where,
-    create: data,
+    create: dataPayload,
     update: {
       pesoPrevistoKg: body.pesoPrevistoKg,
       pesoRealizadoKg: body.pesoRealizadoKg,

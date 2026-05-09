@@ -5,12 +5,17 @@ import {
   Activity, Plus, Loader2, AlertCircle, X, Upload,
   Package, Pencil, Trash2, FileSpreadsheet, CheckCircle2, FileText,
 } from "lucide-react";
-import { fmtSemana } from "@/lib/semana";
+import { fmtSemana, isoWeekString } from "@/lib/semana";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtKg = (v) =>
   v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kg` : "—";
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+const diaSemana = (d) => {
+  const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  return dias[new Date(d).getDay()];
+};
 
 export default function ProducaoClient({ ops, semanas, semanaAtual, producoes }) {
   const router = useRouter();
@@ -147,12 +152,12 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
         </div>
       </div>
 
-      {/* Tabela: Lançamentos PCP */}
+      {/* Tabela: Lançamentos diários do PCP */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-torg-dark">Lançamentos do PCP</h3>
+          <h3 className="text-lg font-semibold text-torg-dark">Lançamentos diários do PCP</h3>
           <p className="text-xs text-torg-gray mt-0.5">
-            Pesos previstos vs realizados por OP, inputados pelo PCP. Cada linha pode ser editada.
+            Pesos previstos vs realizados por dia e por OP. Cada linha pode ser editada.
           </p>
         </div>
         {producoes.length === 0 ? (
@@ -160,10 +165,12 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
             Nenhum lançamento ainda. Clique em "+ Produção semanal" pra começar.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0">
                 <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dia</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Semana</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Prev (kg)</th>
@@ -173,16 +180,21 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {[...producoes].sort((a, b) => (a.semana < b.semana ? 1 : -1)).map((p) => {
+                {[...producoes].sort((a, b) => (new Date(a.data) < new Date(b.data) ? 1 : -1)).map((p) => {
                   const ader = p.pesoPrevistoKg > 0 ? (p.pesoRealizadoKg / p.pesoPrevistoKg) * 100 : 0;
                   return (
                     <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-xs font-mono text-torg-dark" title={fmtSemana(p.semana)}>{p.semana}</td>
+                      <td className="px-4 py-2 text-xs text-torg-dark font-medium">{fmtData(p.data)}</td>
+                      <td className="px-4 py-2 text-xs text-torg-gray">{diaSemana(p.data)}</td>
+                      <td className="px-4 py-2 text-xs font-mono text-torg-gray">{p.semana}</td>
                       <td className="px-4 py-2 text-xs font-mono text-torg-blue">{p.op?.numero || "—"}</td>
                       <td className="px-4 py-2 text-right text-torg-gray tabular-nums">{fmtKg(p.pesoPrevistoKg)}</td>
                       <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{fmtKg(p.pesoRealizadoKg)}</td>
-                      <td className={`px-4 py-2 text-right tabular-nums font-medium ${ader >= 90 ? "text-torg-blue" : ader >= 70 ? "text-torg-orange-700" : "text-red-600"}`}>
-                        {ader.toFixed(1)}%
+                      <td className={`px-4 py-2 text-right tabular-nums font-medium ${
+                        p.pesoPrevistoKg === 0 ? "text-torg-gray" :
+                        ader >= 90 ? "text-torg-blue" : ader >= 70 ? "text-torg-orange-700" : "text-red-600"
+                      }`}>
+                        {p.pesoPrevistoKg === 0 ? "—" : `${ader.toFixed(1)}%`}
                       </td>
                       <td className="px-4 py-2 text-right">
                         <button onClick={() => setModalProd(p)}
@@ -270,17 +282,15 @@ function ModalImportarPCP({ ops, onClose, onSaved }) {
 
   async function submit() {
     setErro("");
-    const validos = itens.filter((it) => it.semana && (it.pesoPrevistoKg > 0 || it.pesoRealizadoKg > 0));
+    const validos = itens.filter((it) => it.data && (it.pesoPrevistoKg > 0 || it.pesoRealizadoKg > 0));
     if (validos.length === 0) {
-      return setErro("Nenhum item válido pra importar (precisa de semana e algum peso).");
+      return setErro("Nenhum item válido pra importar (precisa de data e algum peso).");
     }
     setSalvando(true);
     try {
       const payload = {
         itens: validos.map((it) => ({
-          semana: it.semana,
-          dataInicio: it.dataInicio,
-          dataFim: it.dataFim,
+          data: it.data,
           pesoPrevistoKg: Number(it.pesoPrevistoKg) || 0,
           pesoRealizadoKg: Number(it.pesoRealizadoKg) || 0,
           valorPrevisto: 0,
@@ -371,7 +381,7 @@ function ModalImportarPCP({ ops, onClose, onSaved }) {
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
                       <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">#</th>
-                      <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Semana</th>
+                      <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Data</th>
                       <th className="px-2 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">OP</th>
                       <th className="px-2 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Prev (kg)</th>
                       <th className="px-2 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Real (kg)</th>
@@ -385,9 +395,9 @@ function ModalImportarPCP({ ops, onClose, onSaved }) {
                         <tr key={i}>
                           <td className="px-2 py-1.5 text-gray-400">{i + 1}</td>
                           <td className="px-2 py-1.5">
-                            <input type="text" value={it.semana || ""}
-                              onChange={(e) => setLinha(i, "semana", e.target.value)}
-                              className="w-24 border border-gray-200 rounded px-1.5 py-1 text-xs font-mono" />
+                            <input type="date" value={it.data || ""}
+                              onChange={(e) => setLinha(i, "data", e.target.value)}
+                              className="w-32 border border-gray-200 rounded px-1.5 py-1 text-xs" />
                           </td>
                           <td className="px-2 py-1.5">
                             <select value={it.opId || ""}
@@ -491,8 +501,9 @@ function Modal({ titulo, onClose, children }) {
 
 function ModalProducao({ ops, semanas, item, onClose, onSaved }) {
   const isEdit = !!item;
+  const hojeStr = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
-    semana: item?.semana || semanas[8]?.semana || "",
+    data: item?.data ? new Date(item.data).toISOString().slice(0, 10) : hojeStr,
     pesoPrevistoKg: item?.pesoPrevistoKg ?? 0,
     pesoRealizadoKg: item?.pesoRealizadoKg ?? 0,
     opId: item?.opId || "",
@@ -503,15 +514,16 @@ function ModalProducao({ ops, semanas, item, onClose, onSaved }) {
   const [excluindo, setExcluindo] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const semanaCalculada = form.data ? isoWeekString(new Date(form.data + "T12:00:00")) : "";
+  const diaCalculado = form.data ? diaSemana(form.data + "T12:00:00") : "";
+
   const submit = async () => {
     setErro("");
+    if (!form.data) return setErro("Escolha a data.");
     setSalvando(true);
     try {
-      const sel = semanas.find((s) => s.semana === form.semana);
       const payload = {
-        semana: form.semana,
-        dataInicio: sel?.dataInicio,
-        dataFim: sel?.dataFim,
+        data: form.data,
         pesoPrevistoKg: Number(form.pesoPrevistoKg) || 0,
         pesoRealizadoKg: Number(form.pesoRealizadoKg) || 0,
         valorPrevisto: 0,
@@ -552,7 +564,7 @@ function ModalProducao({ ops, semanas, item, onClose, onSaved }) {
     ? (Number(form.pesoRealizadoKg) / Number(form.pesoPrevistoKg)) * 100 : 0;
 
   return (
-    <Modal titulo={isEdit ? "Editar produção semanal" : "Nova produção semanal"} onClose={onClose}>
+    <Modal titulo={isEdit ? "Editar produção" : "Nova produção diária"} onClose={onClose}>
       <div className="px-6 py-5 space-y-4">
         {erro && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
@@ -561,11 +573,15 @@ function ModalProducao({ ops, semanas, item, onClose, onSaved }) {
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">Semana *</label>
-            <select value={form.semana} disabled={isEdit} onChange={(e) => set("semana", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono bg-white disabled:bg-gray-50">
-              {semanas.map((s) => <option key={s.semana} value={s.semana}>{fmtSemana(s.semana)}</option>)}
-            </select>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Data *</label>
+            <input type="date" value={form.data} disabled={isEdit}
+              onChange={(e) => set("data", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue disabled:bg-gray-50" />
+            {form.data && (
+              <p className="text-[10px] text-torg-gray mt-1">
+                {diaCalculado} · semana <span className="font-mono">{semanaCalculada}</span>
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">OP (opcional)</label>

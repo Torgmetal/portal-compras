@@ -108,8 +108,11 @@ model OP {
 model ProducaoSemanal {
   id              String   @id @default(cuid())
 
-  semana          String   // ISO week, ex: "2026-W19"
-  dataInicio      DateTime // segunda-feira da semana
+  // DIA especifico — chave principal
+  data            DateTime
+  // Cache: semana ISO (ex: "2026-W19") + range pra agrupamento
+  semana          String
+  dataInicio      DateTime // segunda da semana
   dataFim         DateTime // sabado da semana
 
   // Producao em estrutura (kg)
@@ -120,7 +123,7 @@ model ProducaoSemanal {
   valorPrevisto   Float    @default(0)
   valorRealizado  Float    @default(0)
 
-  // Quebrado por OP (opcional — null = total geral da semana)
+  // Quebrado por OP (opcional — null = total geral do dia)
   opId            String?
   op              OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
 
@@ -130,8 +133,9 @@ model ProducaoSemanal {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([semana, opId])
-  @@index([dataInicio])
+  @@unique([data, opId])
+  @@index([data])
+  @@index([semana])
   @@index([opId])
 }
 

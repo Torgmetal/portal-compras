@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { isoWeekString, parseSemana, semanaInicio, semanaFim } from "@/lib/semana";
 
 const itemSchema = z.object({
-  semana: z.string().regex(/^\d{4}-W\d{2}$/),
-  dataInicio: z.string(),
-  dataFim: z.string(),
+  data: z.string(),
   pesoPrevistoKg: z.number().min(0).default(0),
   pesoRealizadoKg: z.number().min(0).default(0),
   valorPrevisto: z.number().min(0).default(0),
@@ -19,8 +18,7 @@ const schema = z.object({
   itens: z.array(itemSchema).min(1),
 });
 
-// POST — cria/atualiza N lancamentos de producao em batch
-// (upsert por semana+opId pra evitar duplicidade)
+// POST — cria/atualiza N lancamentos DIARIOS em batch (upsert por (data, opId))
 export async function POST(req) {
   let user;
   try {
@@ -38,11 +36,19 @@ export async function POST(req) {
 
   let criados = 0, atualizados = 0;
   for (const it of body.itens) {
-    const where = { semana_opId: { semana: it.semana, opId: it.opId || null } };
-    const data = {
-      semana: it.semana,
-      dataInicio: new Date(it.dataInicio),
-      dataFim: new Date(it.dataFim),
+    const dataDia = new Date(it.data);
+    if (isNaN(dataDia)) continue;
+    const semana = isoWeekString(dataDia);
+    const p = parseSemana(semana);
+    const dataInicio = p ? semanaInicio(p.ano, p.semana) : dataDia;
+    const dataFim = p ? semanaFim(p.ano, p.semana) : dataDia;
+
+    const where = { data_opId: { data: dataDia, opId: it.opId || null } };
+    const dataPayload = {
+      data: dataDia,
+      semana,
+      dataInicio,
+      dataFim,
       pesoPrevistoKg: it.pesoPrevistoKg,
       pesoRealizadoKg: it.pesoRealizadoKg,
       valorPrevisto: it.valorPrevisto,
@@ -51,6 +57,7 @@ export async function POST(req) {
       observacao: it.observacao || null,
       createdById: user.id,
     };
+
     const existente = await prisma.producaoSemanal.findUnique({ where });
     if (existente) {
       await prisma.producaoSemanal.update({
@@ -65,7 +72,7 @@ export async function POST(req) {
       });
       atualizados++;
     } else {
-      await prisma.producaoSemanal.create({ data });
+      await prisma.producaoSemanal.create({ data: dataPayload });
       criados++;
     }
   }

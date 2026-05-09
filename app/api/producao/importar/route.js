@@ -9,15 +9,15 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const SYSTEM_PROMPT = `Você é um assistente de PCP (Planejamento e Controle de Produção) de uma siderúrgica/serralheria (Torg Metal).
-Seu trabalho é extrair, de planilhas/PDFs/imagens, o planejamento semanal de produção:
+Seu trabalho é extrair, de planilhas/PDFs/imagens, o planejamento DIÁRIO de produção:
 
-- Quantos kg de estrutura prevê produzir por semana
-- Quantos kg foram efetivamente produzidos (se já houver)
+- Quantos kg de estrutura prevê produzir POR DIA
+- Quantos kg foram efetivamente produzidos POR DIA (se já houver)
 - Por OP (Ordem de Produção, ex: "T083") quando informado
 
 REGRAS:
-- A "semana" pode vir como "Semana 19", "S19", "19/2026", data inicial (ex: 06/05/2026), etc. Converta pra ISO: "AAAA-WNN" (ex: "2026-W19").
-- Se vier só data (segunda-feira): converta pra semana ISO daquela data.
+- A "data" pode vir como "06/05/2026", "2026-05-06", "Seg 06", etc. Converta pra ISO date "AAAA-MM-DD".
+- Se a planilha tem semana mas não dia: distribua igualmente nos 5 dias úteis da semana (segunda a sexta).
 - Reconhece notação brasileira: vírgula é decimal.
 - Pesos sempre em kg. Se vier em toneladas (t/ton), multiplique por 1000.
 - Se uma linha não tem OP especificada, devolva opNumero=null (será lançamento geral).
@@ -28,10 +28,10 @@ FORMATO DE SAÍDA — APENAS JSON em <json></json>:
 {
   "itens": [
     {
-      "semana": "2026-W19",
+      "data": "2026-05-06",
       "opNumero": "T083" | null,
-      "pesoPrevistoKg": 5000,
-      "pesoRealizadoKg": 4800,
+      "pesoPrevistoKg": 1000,
+      "pesoRealizadoKg": 950,
       "observacao": "string ou null"
     }
   ]
@@ -57,6 +57,7 @@ function parseXlsx(buffer) {
 
   // Detecta colunas pela primeira linha
   const sample = rows[0];
+  const colData = findCol(sample, ["data", "dia"]);
   const colSemana = findCol(sample, ["semana", "sem"]);
   const colOp = findCol(sample, ["numop", "op", "ordem"]);
   const colPesoPrev = findCol(sample, ["pesoprev", "previsto", "planejado", "prev"]);
@@ -64,45 +65,95 @@ function parseXlsx(buffer) {
   const colObs = findCol(sample, ["observacao", "obs"]);
 
   const itens = [];
-  for (const r of rows) {
-    const semanaRaw = r[colSemana];
-    if (!semanaRaw) continue;
 
-    let semana = null;
-    // Se for Date (Excel converteu)
-    if (semanaRaw instanceof Date) {
-      semana = isoWeekString(semanaRaw);
-    } else {
-      const s = String(semanaRaw).trim();
-      // Formatos: "2026-W19" / "W19" / "S19" / "19/2026"
-      let m = s.match(/^(\d{4})[-_W ]*W?(\d{1,2})$/i);
-      if (m) semana = `${m[1]}-W${String(m[2]).padStart(2, "0")}`;
-      else if ((m = s.match(/^[WS](\d{1,2})\/?(\d{4})?$/i))) {
-        const ano = m[2] || new Date().getFullYear();
-        semana = `${ano}-W${String(m[1]).padStart(2, "0")}`;
-      } else if ((m = s.match(/^(\d{1,2})\/(\d{4})$/))) {
-        semana = `${m[2]}-W${String(m[1]).padStart(2, "0")}`;
-      } else {
-        // Tenta parsear como data
-        const d = new Date(s);
-        if (!isNaN(d)) semana = isoWeekString(d);
+  // Helper pra parsear data brasileira
+  const parseData = (v) => {
+    if (!v) return null;
+    if (v instanceof Date) return v;
+    const s = String(v).trim();
+    // dd/mm/yyyy
+    let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return new Date(`${m[3]}-${String(m[2]).padStart(2, "0")}-${String(m[1]).padStart(2, "0")}T12:00:00`);
+    // yyyy-mm-dd
+    m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return new Date(`${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}T12:00:00`);
+    // tenta parsing nativo
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  };
+
+  // Helper pra parsear semana ISO
+  const parseSemanaStr = (v) => {
+    if (!v) return null;
+    if (v instanceof Date) return isoWeekString(v);
+    const s = String(v).trim();
+    let m = s.match(/^(\d{4})[-_W ]*W?(\d{1,2})$/i);
+    if (m) return `${m[1]}-W${String(m[2]).padStart(2, "0")}`;
+    m = s.match(/^[WS](\d{1,2})\/?(\d{4})?$/i);
+    if (m) {
+      const ano = m[2] || new Date().getFullYear();
+      return `${ano}-W${String(m[1]).padStart(2, "0")}`;
+    }
+    m = s.match(/^(\d{1,2})\/(\d{4})$/);
+    if (m) return `${m[2]}-W${String(m[1]).padStart(2, "0")}`;
+    const d = new Date(s);
+    return isNaN(d) ? null : isoWeekString(d);
+  };
+
+  const peso = (v) => {
+    const n = parseFloat(String(v || "0").replace(",", "."));
+    return isNaN(n) ? 0 : n;
+  };
+
+  for (const r of rows) {
+    const opNum = colOp ? String(r[colOp] || "").trim() || null : null;
+    const pesoPrev = colPesoPrev ? peso(r[colPesoPrev]) : 0;
+    const pesoReal = colPesoReal ? peso(r[colPesoReal]) : 0;
+    const obs = colObs ? String(r[colObs] || "").trim() || null : null;
+
+    // Caso 1: tem coluna 'Data' — 1 linha = 1 dia
+    if (colData) {
+      const d = parseData(r[colData]);
+      if (!d) continue;
+      itens.push({
+        data: d.toISOString().slice(0, 10),
+        opNumero: opNum,
+        pesoPrevistoKg: pesoPrev,
+        pesoRealizadoKg: pesoReal,
+        observacao: obs,
+      });
+      continue;
+    }
+
+    // Caso 2: só tem coluna 'Semana' — distribui em 5 dias uteis (seg a sex)
+    if (colSemana) {
+      const sem = parseSemanaStr(r[colSemana]);
+      if (!sem) continue;
+      const m = sem.match(/^(\d{4})-W(\d{2})$/);
+      if (!m) continue;
+      const inicio = (() => {
+        const ano = Number(m[1]), wk = Number(m[2]);
+        const simple = new Date(Date.UTC(ano, 0, 1 + (wk - 1) * 7));
+        const day = simple.getUTCDay();
+        const out = new Date(simple);
+        if (day <= 4) out.setUTCDate(simple.getUTCDate() - day + 1);
+        else out.setUTCDate(simple.getUTCDate() + 8 - day);
+        return out;
+      })();
+      const pesoPrevDia = pesoPrev / 5;
+      const pesoRealDia = pesoReal / 5;
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(inicio);
+        d.setDate(inicio.getDate() + i);
+        itens.push({
+          data: d.toISOString().slice(0, 10),
+          opNumero: opNum,
+          pesoPrevistoKg: pesoPrevDia,
+          pesoRealizadoKg: pesoRealDia,
+          observacao: obs,
+        });
       }
     }
-    if (!semana) continue;
-
-    const opNum = colOp ? String(r[colOp] || "").trim() || null : null;
-    const peso = (v) => {
-      const n = parseFloat(String(v || "0").replace(",", "."));
-      return isNaN(n) ? 0 : n;
-    };
-
-    itens.push({
-      semana,
-      opNumero: opNum,
-      pesoPrevistoKg: colPesoPrev ? peso(r[colPesoPrev]) : 0,
-      pesoRealizadoKg: colPesoReal ? peso(r[colPesoReal]) : 0,
-      observacao: colObs ? String(r[colObs] || "").trim() || null : null,
-    });
   }
 
   return { itens };
@@ -195,17 +246,12 @@ export async function POST(req) {
     : [];
   const opMap = Object.fromEntries(ops.map((o) => [o.numero, o.id]));
 
-  // Adiciona dataInicio/Fim e opId
-  const itensComDatas = itens.map((it) => {
-    const p = parseSemana(it.semana);
-    return {
-      ...it,
-      opId: it.opNumero ? opMap[it.opNumero] || null : null,
-      opEncontrada: it.opNumero ? !!opMap[it.opNumero] : null,
-      dataInicio: p ? semanaInicio(p.ano, p.semana).toISOString() : null,
-      dataFim: p ? semanaFim(p.ano, p.semana).toISOString() : null,
-    };
-  });
+  // Resolve opId pra cada item
+  const itensComOp = itens.map((it) => ({
+    ...it,
+    opId: it.opNumero ? opMap[it.opNumero] || null : null,
+    opEncontrada: it.opNumero ? !!opMap[it.opNumero] : null,
+  }));
 
-  return NextResponse.json({ itens: itensComDatas });
+  return NextResponse.json({ itens: itensComOp });
 }
