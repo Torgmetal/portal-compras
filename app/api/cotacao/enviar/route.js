@@ -11,11 +11,14 @@ const fornecedorSchema = z.object({
   nCodOmie: z.string().optional().nullable(),
 });
 
+// Aceita 1 ou mais RMs (consolida itens de várias RMs num envio só pro fornecedor).
 const schema = z.object({
-  rmId: z.string().min(1),
+  // Pode vir só rmId (legado) ou rmIds (multi-RM)
+  rmId: z.string().optional(),
+  rmIds: z.array(z.string()).optional(),
   itensIds: z.array(z.string()).min(1),
   fornecedores: z.array(fornecedorSchema).min(1),
-  prazoResposta: z.string().optional().nullable(), // ISO date
+  prazoResposta: z.string().optional().nullable(),
   observacaoExtra: z.string().optional().nullable(),
 });
 
@@ -34,20 +37,31 @@ export async function POST(req) {
     return NextResponse.json({ error: "Dados inválidos: " + e.message }, { status: 400 });
   }
 
-  // Verifica RM e itens
-  const rm = await prisma.rM.findUnique({
-    where: { id: body.rmId },
+  // Normaliza rmIds: aceita rmIds[] OU rmId único
+  const rmIds = body.rmIds && body.rmIds.length > 0
+    ? body.rmIds
+    : (body.rmId ? [body.rmId] : []);
+  if (rmIds.length === 0) {
+    return NextResponse.json({ error: "Informe ao menos uma RM (rmId ou rmIds)." }, { status: 400 });
+  }
+
+  // Busca todas as RMs envolvidas
+  const rms = await prisma.rM.findMany({
+    where: { id: { in: rmIds } },
     include: { itens: true },
   });
-  if (!rm) return NextResponse.json({ error: "RM não encontrada." }, { status: 404 });
+  if (rms.length === 0) return NextResponse.json({ error: "RM(s) não encontrada(s)." }, { status: 404 });
+  if (rms.length !== rmIds.length) {
+    return NextResponse.json({ error: "Alguma RM não foi encontrada." }, { status: 404 });
+  }
 
-  const itensValidos = rm.itens.filter((it) => body.itensIds.includes(it.id));
+  // Coleta todos os itens das RMs e filtra os selecionados
+  const todosItens = rms.flatMap((r) => r.itens);
+  const itensValidos = todosItens.filter((it) => body.itensIds.includes(it.id));
   if (itensValidos.length === 0) {
     return NextResponse.json({ error: "Nenhum item válido pra cotar." }, { status: 400 });
   }
 
-  // Permite re-cotar itens que ainda não viraram pedido nem foram cancelados.
-  // (PENDENTE, EM_COTACAO, COTADO — todos aceitam novas rodadas de cotacao)
   const itensCotaveis = itensValidos.filter(
     (it) => it.status === "PENDENTE" || it.status === "EM_COTACAO" || it.status === "COTADO"
   );
@@ -59,15 +73,17 @@ export async function POST(req) {
   }
 
   const prazo = body.prazoResposta ? new Date(body.prazoResposta) : null;
+  // RM principal (1ª da lista — a Cotacao guarda só uma referência direta de RM,
+  // as demais ficam vinculadas via os CotacaoItens que apontam pra rmItemId delas).
+  const rmPrincipal = rms.find((r) => r.id === rmIds[0]) || rms[0];
 
-  // Cria 1 cotação por fornecedor com token único
   const cotacoesCriadas = [];
   await prisma.$transaction(async (tx) => {
     for (const f of body.fornecedores) {
       const token = randomUUID();
       const cot = await tx.cotacao.create({
         data: {
-          rmId: rm.id,
+          rmId: rmPrincipal.id,
           fornecedorNome: f.nome,
           fornecedorEmail: f.email,
           cnpj: f.cnpj || null,
@@ -79,7 +95,6 @@ export async function POST(req) {
           itens: {
             create: itensCotaveis.map((it) => {
               const peso = Number(it.peso) || 0;
-              // Usa peso (kg) como quantidade default quando disponivel
               return {
                 rmItemId: it.id,
                 precoUnit: 0,
@@ -89,23 +104,22 @@ export async function POST(req) {
           },
         },
       });
-      // Registra envio
-      await tx.envio.create({
-        data: {
-          rmId: rm.id,
-          fornecedorNome: f.nome,
-          fornecedorEmail: f.email,
-        },
-      });
+      // Registra envio em todas as RMs envolvidas
+      for (const rm of rms) {
+        await tx.envio.create({
+          data: { rmId: rm.id, fornecedorNome: f.nome, fornecedorEmail: f.email },
+        });
+      }
       cotacoesCriadas.push({
         id: cot.id,
         token: cot.token,
         fornecedorNome: f.nome,
         fornecedorEmail: f.email,
+        rmsVinculadas: rms.map((r) => r.numero),
       });
     }
 
-    // Marca itens PENDENTES como EM_COTACAO (não mexe nos COTADO/EM_COTACAO existentes)
+    // Marca itens PENDENTES como EM_COTACAO
     await tx.rMItem.updateMany({
       where: {
         id: { in: itensCotaveis.map((i) => i.id) },
@@ -114,9 +128,11 @@ export async function POST(req) {
       data: { status: "EM_COTACAO" },
     });
 
-    // Atualiza status da RM
-    if (rm.status === "ABERTA") {
-      await tx.rM.update({ where: { id: rm.id }, data: { status: "EM_COTACAO" } });
+    // Atualiza status das RMs envolvidas
+    for (const rm of rms) {
+      if (rm.status === "ABERTA") {
+        await tx.rM.update({ where: { id: rm.id }, data: { status: "EM_COTACAO" } });
+      }
     }
 
     await tx.auditLog.create({
@@ -124,8 +140,9 @@ export async function POST(req) {
         userId: user.id,
         action: "enviar_cotacao",
         entity: "RM",
-        entityId: rm.id,
+        entityId: rmPrincipal.id,
         diff: {
+          rmsVinculadas: rms.map((r) => r.numero),
           fornecedores: body.fornecedores.length,
           itens: itensCotaveis.length,
           prazo: body.prazoResposta || null,

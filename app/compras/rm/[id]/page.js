@@ -42,16 +42,42 @@ export default async function RMComprasDetail({ params }) {
   });
   if (!rm) notFound();
 
-  // Calcula consumo agregado por categoria — vai pra parte 2 (Compras integrado).
-  // Por enquanto só serializa pra client.
+  // Outras RMs ativas (mesma OP em primeiro lugar; depois outras)
+  // pra opcao de "vincular mais RMs no envio de cotacao"
+  const outrasRMsAtivas = await prisma.rM.findMany({
+    where: {
+      id: { not: rm.id },
+      status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] },
+    },
+    orderBy: { numero: "asc" },
+    include: {
+      op: { select: { numero: true, cliente: true } },
+      itens: {
+        orderBy: { ordem: "asc" },
+        select: {
+          id: true, descricao: true, status: true, qtd: true, unidade: true, peso: true,
+        },
+      },
+    },
+  });
+
+  // Ordena: mesma OP primeiro, depois resto numericamente
+  outrasRMsAtivas.sort((a, b) => {
+    const sameOpA = a.opId === rm.opId ? 0 : 1;
+    const sameOpB = b.opId === rm.opId ? 0 : 1;
+    if (sameOpA !== sameOpB) return sameOpA - sameOpB;
+    return (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true });
+  });
+
   const data = JSON.parse(JSON.stringify(rm));
+  const outrasRMs = JSON.parse(JSON.stringify(outrasRMsAtivas));
 
   return (
     <div className="space-y-6 max-w-7xl">
       <Link href="/compras" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
         <ArrowLeft size={14} /> Voltar pro Painel
       </Link>
-      <RMComprasClient rm={data} userRole={user.role} />
+      <RMComprasClient rm={data} outrasRMs={outrasRMs} userRole={user.role} />
     </div>
   );
 }

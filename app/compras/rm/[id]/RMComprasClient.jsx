@@ -27,7 +27,7 @@ const STATUS_ITEM_LABELS = {
   CANCELADO:     { label: "Cancelado",     className: "bg-gray-200 text-gray-500 line-through" },
 };
 
-export default function RMComprasClient({ rm, userRole }) {
+export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
   const router = useRouter();
   const isAdmin = userRole === "ADMIN";
 
@@ -295,6 +295,7 @@ export default function RMComprasClient({ rm, userRole }) {
       {modalEnviarCot && (
         <ModalEnviarCotacao
           rm={rm}
+          outrasRMs={outrasRMs}
           onClose={() => setModalEnviarCot(false)}
           onSent={(links) => { setModalEnviarCot(false); setLinksParaEnvio(links); router.refresh(); }}
         />
@@ -870,14 +871,62 @@ function ModalCancelarItem({ item, rmId, onClose, onSaved }) {
   );
 }
 
-function ModalEnviarCotacao({ rm, onClose, onSent }) {
-  // Aceita re-cotação de itens em qualquer status que ainda não virou pedido / cancelado
-  const itensCotaveis = rm.itens.filter(
-    (it) => it.status === "PENDENTE" || it.status === "EM_COTACAO" || it.status === "COTADO"
-  );
+function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent }) {
+  // RMs incluidas no envio: a atual sempre, mais as escolhidas via checkbox
+  const [rmsExtrasIds, setRmsExtrasIds] = useState(new Set());
+  // Itens cotaveis (RM atual + extras selecionadas), recalculado quando muda extras
+  const todosItensCotaveis = useMemo(() => {
+    const base = rm.itens
+      .filter((it) => ["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status))
+      .map((it) => ({ ...it, _rm: { id: rm.id, numero: rm.numero, principal: true } }));
+    const extras = outrasRMs
+      .filter((r) => rmsExtrasIds.has(r.id))
+      .flatMap((r) =>
+        r.itens
+          .filter((it) => ["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status))
+          .map((it) => ({ ...it, _rm: { id: r.id, numero: r.numero, principal: false } }))
+      );
+    return [...base, ...extras];
+  }, [rm, outrasRMs, rmsExtrasIds]);
+
+  // Itens selecionados — começa com tudo, mantem os ids ainda válidos
   const [itensSelecionados, setItensSelecionados] = useState(
-    new Set(itensCotaveis.map((it) => it.id))
+    new Set(rm.itens.filter((it) => ["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status)).map((it) => it.id))
   );
+  // Quando uma RM extra é incluída, marca os itens dela automaticamente.
+  // Quando é removida, desmarca os ids dela.
+  const toggleRmExtra = (rmExtraId) => {
+    setRmsExtrasIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rmExtraId)) {
+        next.delete(rmExtraId);
+        // Tira itens dessa RM do selecionado
+        const rmExtra = outrasRMs.find((r) => r.id === rmExtraId);
+        if (rmExtra) {
+          setItensSelecionados((sel) => {
+            const out = new Set(sel);
+            for (const it of rmExtra.itens) out.delete(it.id);
+            return out;
+          });
+        }
+      } else {
+        next.add(rmExtraId);
+        // Adiciona itens cotáveis dessa RM
+        const rmExtra = outrasRMs.find((r) => r.id === rmExtraId);
+        if (rmExtra) {
+          setItensSelecionados((sel) => {
+            const out = new Set(sel);
+            for (const it of rmExtra.itens) {
+              if (["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status)) out.add(it.id);
+            }
+            return out;
+          });
+        }
+      }
+      return next;
+    });
+  };
+
   const [emailsTexto, setEmailsTexto] = useState("");
   const [prazo, setPrazo] = useState(() => {
     const d = new Date();
@@ -896,20 +945,16 @@ function ModalEnviarCotacao({ rm, onClose, onSent }) {
       return next;
     });
   };
-  const marcarTodos = () => setItensSelecionados(new Set(itensCotaveis.map((i) => i.id)));
+  const marcarTodos = () => setItensSelecionados(new Set(todosItensCotaveis.map((i) => i.id)));
   const limparTodos = () => setItensSelecionados(new Set());
 
   const parsearFornecedores = () => {
-    // Cada linha: "Nome Fornecedor <email@fornecedor.com>" ou só email
     const linhas = emailsTexto.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
     const fornecedores = [];
     for (const linha of linhas) {
       const m = linha.match(/^(.+?)\s*<(.+?@.+?\..+?)>\s*$/);
-      if (m) {
-        fornecedores.push({ nome: m[1].trim(), email: m[2].trim() });
-      } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linha)) {
-        fornecedores.push({ nome: linha.split("@")[0], email: linha });
-      }
+      if (m) fornecedores.push({ nome: m[1].trim(), email: m[2].trim() });
+      else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linha)) fornecedores.push({ nome: linha.split("@")[0], email: linha });
     }
     return fornecedores;
   };
@@ -920,13 +965,16 @@ function ModalEnviarCotacao({ rm, onClose, onSent }) {
     if (fornecedores.length === 0) return setErro("Adicione ao menos 1 fornecedor com email válido.");
     if (itensSelecionados.size === 0) return setErro("Selecione ao menos 1 item.");
 
+    // Lista de RMs envolvidas: a atual + as extras selecionadas
+    const rmIds = [rm.id, ...Array.from(rmsExtrasIds)];
+
     setSalvando(true);
     try {
       const res = await fetch("/api/cotacao/enviar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          rmId: rm.id,
+          rmIds,
           itensIds: Array.from(itensSelecionados),
           fornecedores,
           prazoResposta: prazo || null,
@@ -951,11 +999,47 @@ function ModalEnviarCotacao({ rm, onClose, onSent }) {
           </div>
         )}
 
-        {/* Itens */}
+        {/* Vincular outras RMs (consolidar) */}
+        {outrasRMs.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">
+              Vincular outras RMs (opcional)
+            </label>
+            <p className="text-[11px] text-torg-gray mb-2">
+              Marque RMs adicionais pra mandar todos os itens delas pro mesmo fornecedor numa proposta só.
+            </p>
+            <div className="border border-gray-200 rounded-lg max-h-[150px] overflow-y-auto divide-y divide-gray-100">
+              {outrasRMs.map((r) => {
+                const checked = rmsExtrasIds.has(r.id);
+                const mesmoOp = r.opId === rm.opId;
+                return (
+                  <label key={r.id} className="flex items-center gap-3 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-xs">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleRmExtra(r.id)}
+                      className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                    />
+                    <span className="font-mono font-semibold text-torg-blue">{r.numero}</span>
+                    <span className="text-torg-dark truncate flex-1">{r.descricao}</span>
+                    {r.op && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${mesmoOp ? "bg-torg-blue-50 text-torg-blue" : "bg-gray-100 text-torg-gray"}`}>
+                        OP {r.op.numero}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-torg-gray">{r.itens.length} itens</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Itens (consolidados das RMs marcadas) */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-torg-dark">
-              Itens pra cotar ({itensSelecionados.size} de {itensCotaveis.length})
+              Itens pra cotar ({itensSelecionados.size} de {todosItensCotaveis.length})
             </label>
             <div className="flex gap-2 text-xs">
               <button onClick={marcarTodos} className="text-torg-blue hover:text-torg-dark font-medium">Todos</button>
@@ -963,8 +1047,8 @@ function ModalEnviarCotacao({ rm, onClose, onSent }) {
               <button onClick={limparTodos} className="text-torg-gray hover:text-torg-dark font-medium">Nenhum</button>
             </div>
           </div>
-          <div className="border border-gray-200 rounded-lg max-h-[200px] overflow-y-auto divide-y divide-gray-100">
-            {itensCotaveis.map((it) => {
+          <div className="border border-gray-200 rounded-lg max-h-[280px] overflow-y-auto divide-y divide-gray-100">
+            {todosItensCotaveis.map((it) => {
               const peso = Number(it.peso) || 0;
               const usaKg = peso > 0;
               const qtdMostrada = usaKg ? `${peso.toFixed(2)} KG` : `${it.qtd} ${it.unidade}`;
@@ -979,6 +1063,11 @@ function ModalEnviarCotacao({ rm, onClose, onSent }) {
                     onChange={() => toggleItem(it.id)}
                     className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
                   />
+                  {!it._rm.principal && (
+                    <span className="font-mono text-[10px] text-torg-blue bg-torg-blue-50 px-1.5 py-0.5 rounded">
+                      {it._rm.numero}
+                    </span>
+                  )}
                   <span className="flex-1 truncate">{it.descricao}</span>
                   {statusBadge && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
