@@ -112,38 +112,55 @@ export async function DELETE(req, { params }) {
     c.pedidosOmie.filter((p) => p.status !== "CRIADO").map((p) => p.id)
   );
 
-  await prisma.$transaction(async (tx) => {
-    // 1. Limpa referencia de RMItem -> PedidoOmie pra nao quebrar FK
-    await tx.rMItem.updateMany({
-      where: { rmId: rm.id, pedidoOmieId: { not: null } },
-      data: { pedidoOmieId: null },
+  try {
+    await prisma.$transaction(async (tx) => {
+      // 1. Limpa referencia de RMItem -> PedidoOmie pra nao quebrar FK
+      await tx.rMItem.updateMany({
+        where: { rmId: rm.id, pedidoOmieId: { not: null } },
+        data: { pedidoOmieId: null },
+      });
+
+      // 2. Apaga CotacaoItens manualmente — eles referenciam RMItem SEM
+      // onDelete:Cascade, então o cascade da RM falha se nao limparmos antes.
+      await tx.cotacaoItem.deleteMany({
+        where: { cotacao: { rmId: rm.id } },
+      });
+
+      // 3. Apaga pedidos com erro vinculados a essa RM
+      if (pedidosErroIds.length > 0) {
+        await tx.pedidoOmie.deleteMany({ where: { id: { in: pedidosErroIds } } });
+      }
+
+      // 4. Apaga a RM — cascades cuidam do resto (RMItem, Cotacao, Envio, Anexo)
+      await tx.rM.delete({ where: { id: rm.id } });
     });
 
-    // 2. Apaga pedidos com erro vinculados a essa RM (auditoria preservada nos pedidos CRIADOs, mas aqui nao tem)
-    if (pedidosErroIds.length > 0) {
-      await tx.pedidoOmie.deleteMany({ where: { id: { in: pedidosErroIds } } });
-    }
-
-    // 3. Apaga a RM — cascades cuidam de RMItem, Cotacao (e seus itens/anexos), Envio, Anexo
-    await tx.rM.delete({ where: { id: rm.id } });
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      userId: user.id,
-      action: "delete_rm",
-      entity: "RM",
-      entityId: rm.id,
-      diff: {
-        numero: rm.numero,
-        opId: rm.opId,
-        itens: rm._count.itens,
-        cotacoes: rm._count.cotacoes,
-        envios: rm._count.envios,
-        anexos: rm._count.anexos,
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "delete_rm",
+        entity: "RM",
+        entityId: rm.id,
+        diff: {
+          numero: rm.numero,
+          opId: rm.opId,
+          itens: rm._count.itens,
+          cotacoes: rm._count.cotacoes,
+          envios: rm._count.envios,
+          anexos: rm._count.anexos,
+        },
       },
-    },
-  });
+    });
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("Erro ao excluir RM:", e);
+    return NextResponse.json(
+      {
+        error: `Falha ao excluir RM ${rm.numero}: ${e.message || "erro desconhecido"}`,
+        code: e.code,
+      },
+      { status: 500 }
+    );
+  }
 }
