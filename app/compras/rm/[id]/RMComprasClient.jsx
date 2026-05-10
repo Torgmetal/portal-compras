@@ -526,7 +526,18 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                       rev {c.numeroRevisao}
                     </span>
                   )}
+                  {c.ehPrimaria === false && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-torg-orange-50 text-torg-orange-700 font-medium" title="Esta RM é apenas uma das incluídas — a cotação foi criada a partir de outra RM principal">
+                      RM extra
+                    </span>
+                  )}
                 </div>
+                {c.rmsVinculadas && c.rmsVinculadas.length > 1 && (
+                  <p className="text-[10px] text-torg-gray mt-1">
+                    Consolidada com {c.rmsVinculadas.length} RMs:{" "}
+                    {c.rmsVinculadas.map((r) => r.numero).join(" + ")}
+                  </p>
+                )}
                 <p className="text-xs text-torg-gray truncate mt-0.5">
                   {c.fornecedorEmail}
                   {" · enviada em "}{fmtData(c.createdAt)}
@@ -704,8 +715,25 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
   const router = useRouter();
   const [cnpj, setCnpj] = useState(cotacao.cnpj || "");
   const [razaoSocial, setRazaoSocial] = useState(cotacao.fornecedorNome || "");
-  const [linhas, setLinhas] = useState(() =>
-    rm.itens
+  // Se a cotacao tem itensCotaveis (vem do server enriquecido), usa eles —
+  // assim o modal mostra TODOS os itens da cotacao consolidada (de varias RMs).
+  // Fallback: itens da RM atual (compatibilidade).
+  const [linhas, setLinhas] = useState(() => {
+    if (cotacao.itensCotaveis && cotacao.itensCotaveis.length > 0) {
+      return cotacao.itensCotaveis.map((it) => ({
+        rmItemId: it.rmItemId,
+        descricao: it.descricao,
+        unidade: it.unidade,
+        qtdRm: it.qtdRm,
+        precoUnit: it.precoUnit || "",
+        qtdCotada: it.qtdCotada,
+        icmsPct: it.icmsPct || "",
+        ipiPct: it.ipiPct || "",
+        _rmNumero: it._rmNumero,
+        _ehDestaRM: it._ehDestaRM,
+      }));
+    }
+    return rm.itens
       .filter((it) => it.status === "PENDENTE" || it.status === "EM_COTACAO" || it.status === "COTADO")
       .map((it) => {
         const peso = Number(it.peso) || 0;
@@ -720,8 +748,8 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
           icmsPct: "",
           ipiPct: "",
         };
-      })
-  );
+      });
+  });
   const [prazoEntrega, setPrazoEntrega] = useState("");
   const [condicaoPagamento, setCondicaoPagamento] = useState("");
   const [observacao, setObservacao] = useState("");
@@ -839,7 +867,14 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
                     const t = (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0);
                     return (
                       <tr key={l.rmItemId}>
-                        <td className="px-2 py-1.5 text-torg-dark">{l.descricao}</td>
+                        <td className="px-2 py-1.5 text-torg-dark">
+                          {l._rmNumero && !l._ehDestaRM && (
+                            <span className="font-mono text-[10px] text-torg-blue bg-torg-blue-50 px-1.5 py-0.5 rounded mr-1.5">
+                              {l._rmNumero}
+                            </span>
+                          )}
+                          {l.descricao}
+                        </td>
                         <td className="px-2 py-1.5 text-right">
                           <input type="number" step="0.01" value={l.qtdCotada}
                             onChange={(e) => setLinha(l.rmItemId, "qtdCotada", e.target.value)}
