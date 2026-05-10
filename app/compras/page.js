@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { FileText, BarChart3, Truck, ClipboardList, AlertTriangle } from "lucide-react";
-import RMRowActions from "@/components/RMRowActions";
+import { FileText, BarChart3, Truck, ClipboardList } from "lucide-react";
+import RMsTabelaSeletor from "./RMsTabelaSeletor";
 
 // Sempre busca dados frescos do banco (sem cache de Server Component)
 export const dynamic = "force-dynamic";
@@ -38,7 +38,10 @@ export default async function PainelCompras({ searchParams }) {
       include: {
         op: { select: { numero: true, cliente: true } },
         createdBy: { select: { name: true } },
-        itens: { select: { status: true } },
+        itens: {
+          orderBy: { ordem: "asc" },
+          select: { id: true, descricao: true, status: true, qtd: true, unidade: true, peso: true },
+        },
         _count: { select: { cotacoes: true, itens: true } },
       },
     }),
@@ -116,85 +119,10 @@ export default async function PainelCompras({ searchParams }) {
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nº RM</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP / Cliente</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Solicitante</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Itens</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cot.</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-3 py-3 w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {rms.map((rm) => {
-                  const s = STATUS_LABELS[rm.status] || STATUS_LABELS.ABERTA;
-                  const pedidoCount = rm.itens.filter((i) => i.status === "PEDIDO_GERADO").length;
-                  const pendentes = rm.itens.filter((i) => i.status === "PENDENTE").length;
-                  return (
-                    <tr key={rm.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-3">
-                        <Link href={`/compras/rm/${rm.id}`} className="font-mono font-semibold text-torg-blue hover:underline">
-                          {rm.numero}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-3 text-xs text-torg-gray">{TIPO_RM_LABELS[rm.tipoRM]}</td>
-                      <td className="px-6 py-3 text-torg-dark">
-                        {rm.op ? (
-                          <>
-                            <span className="font-mono text-xs">{rm.op.numero}</span>
-                            <span className="text-xs text-torg-gray block">{rm.op.cliente}</span>
-                          </>
-                        ) : (
-                          <span className="text-torg-gray text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-3 text-torg-dark max-w-xs truncate">{rm.descricao}</td>
-                      <td className="px-6 py-3 text-torg-gray text-xs">
-                        {rm.createdBy?.name}
-                        {rm.setor && <span className="block text-[10px]">{rm.setor}</span>}
-                      </td>
-                      <td className="px-6 py-3 text-center text-xs">
-                        {pedidoCount > 0 ? (
-                          <span>
-                            <strong>{pedidoCount}</strong> / {rm._count.itens}
-                            {pendentes > 0 && (
-                              <AlertTriangle size={12} className="inline ml-1 text-torg-orange-700" />
-                            )}
-                          </span>
-                        ) : (
-                          rm._count.itens
-                        )}
-                      </td>
-                      <td className="px-6 py-3 text-center text-torg-gray">{rm._count.cotacoes}</td>
-                      <td className="px-6 py-3 text-torg-gray text-xs">{fmtData(rm.createdAt)}</td>
-                      <td className="px-6 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
-                          {s.label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <RMRowActions
-                          rmId={rm.id}
-                          numero={rm.numero}
-                          status={rm.status}
-                          isAdmin={user.role === "ADMIN"}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <RMsTabelaSeletor
+          rms={JSON.parse(JSON.stringify(rms))}
+          isAdmin={user.role === "ADMIN"}
+        />
       )}
     </div>
   );
