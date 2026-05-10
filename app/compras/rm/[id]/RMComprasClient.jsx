@@ -1,9 +1,10 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
   CheckCircle2, Truck, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
+  Upload, Sparkles,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
@@ -755,8 +756,96 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
   const [observacao, setObservacao] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [arquivoNome, setArquivoNome] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [parseInfo, setParseInfo] = useState(null);
+  const [autoFilled, setAutoFilled] = useState(new Set());
+  const [revisado, setRevisado] = useState(new Set());
+  const fileRef = useRef(null);
 
-  const setLinha = (id, k, v) => setLinhas((p) => p.map((l) => (l.rmItemId === id ? { ...l, [k]: v } : l)));
+  const setLinha = (id, k, v) => {
+    setLinhas((p) => p.map((l) => (l.rmItemId === id ? { ...l, [k]: v } : l)));
+    if (autoFilled.has(id)) {
+      setAutoFilled((prev) => { const n = new Set(prev); n.delete(id); return n; });
+      setRevisado((prev) => new Set(prev).add(id));
+    }
+  };
+  const marcarRevisado = (id) => {
+    setAutoFilled((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    setRevisado((prev) => new Set(prev).add(id));
+  };
+
+  // Upload de PDF/imagem do fornecedor — usa mesmo endpoint /api/parse-cotacao-ai
+  async function uploadProposta(file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setErro("Arquivo muito grande (limite 10MB).");
+      return;
+    }
+    setErro("");
+    setParseInfo(null);
+    setParsing(true);
+    setArquivoNome(file.name);
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      const isImg = (file.type || "").startsWith("image/");
+      if (!isPdf && !isImg) {
+        throw new Error("Formato não suportado. Use PDF ou imagem.");
+      }
+      const body = isPdf
+        ? { pdfBase64: base64, rmItens: linhas.map((l) => ({
+            descricao: l.descricao, qtd: l.qtdRm, unidade: l.unidade,
+            pesoKg: l.unidade === "KG" ? l.qtdRm : null,
+          })) }
+        : { imageBase64: base64, imageType: file.type, rmItens: linhas.map((l) => ({
+            descricao: l.descricao, qtd: l.qtdRm, unidade: l.unidade,
+            pesoKg: l.unidade === "KG" ? l.qtdRm : null,
+          })) };
+
+      const res = await fetch("/api/parse-cotacao-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao processar");
+
+      // Aplica os itens via rmIndex (a IA ja casou com a RM)
+      const itensIA = data.itens || [];
+      const linhasNovas = [...linhas];
+      const idsAuto = new Set();
+      let casados = 0;
+      for (const it of itensIA) {
+        const idx = it.rmIndex;
+        if (idx == null || idx < 0 || idx >= linhasNovas.length) continue;
+        const l = linhasNovas[idx];
+        if (it.precoUnit) l.precoUnit = String(it.precoUnit);
+        if (it.qtdCotada || it.qtd) l.qtdCotada = it.qtdCotada || it.qtd;
+        if (it.icmsPct != null) l.icmsPct = String(it.icmsPct);
+        if (it.ipiPct != null) l.ipiPct = String(it.ipiPct);
+        idsAuto.add(l.rmItemId);
+        casados++;
+      }
+      setLinhas(linhasNovas);
+      setAutoFilled(idsAuto);
+      setRevisado(new Set());
+      setParseInfo({ match: casados, total: itensIA.length, fornecedor: data.fornecedor, prazo: data.prazoPagamento });
+
+      // Pre-popula identificacao se vier no PDF
+      if (data.fornecedor && !razaoSocial) setRazaoSocial(data.fornecedor);
+      if (data.prazoPagamento && !condicaoPagamento) setCondicaoPagamento(data.prazoPagamento);
+    } catch (e) {
+      setErro("Falha ao processar: " + e.message);
+    } finally {
+      setParsing(false);
+    }
+  }
 
   const total = linhas.reduce((s, l) => {
     const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
@@ -829,6 +918,76 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
             </div>
           )}
 
+          {/* Upload de PDF/imagem do fornecedor (auto-preenchimento via IA) */}
+          <div className="bg-torg-blue-50/30 border border-torg-blue-100 rounded-lg p-3">
+            <div className="flex items-start justify-between flex-wrap gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-torg-dark inline-flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-torg-orange" /> Tem a proposta em PDF ou imagem?
+                </p>
+                <p className="text-xs text-torg-gray mt-0.5">
+                  Anexe o arquivo e a IA preenche os preços automaticamente. Você revisa antes de salvar.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={parsing}
+                className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1 disabled:opacity-50 whitespace-nowrap"
+              >
+                {parsing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                {parsing ? "Lendo..." : arquivoNome ? "Trocar arquivo" : "Anexar PDF/imagem"}
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/pdf,.pdf,image/*"
+                className="hidden"
+                onChange={(e) => { uploadProposta(e.target.files?.[0]); e.target.value = ""; }}
+              />
+            </div>
+            {arquivoNome && (
+              <div className="mt-2 flex items-center gap-2 bg-white border border-torg-blue-100 rounded px-2 py-1">
+                <FileText size={12} className="text-torg-blue flex-shrink-0" />
+                <p className="text-xs text-torg-dark flex-1 truncate">{arquivoNome}</p>
+                <button
+                  type="button"
+                  onClick={() => { setArquivoNome(""); setParseInfo(null); setAutoFilled(new Set()); }}
+                  className="text-gray-400 hover:text-red-600"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+            {parseInfo && (
+              <div className="mt-2 flex items-center justify-between flex-wrap gap-2 text-xs">
+                {parseInfo.match > 0 ? (
+                  <p className="text-torg-dark">
+                    ✓ <strong>{parseInfo.match}</strong> {parseInfo.match === 1 ? "item preenchido" : "itens preenchidos"} via IA
+                    {parseInfo.total > parseInfo.match && (
+                      <span className="text-torg-gray"> ({parseInfo.total - parseInfo.match} do PDF não casaram — preencha manualmente)</span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-torg-orange-700">⚠ Lemos o arquivo mas não conseguimos casar os itens. Preencha manualmente.</p>
+                )}
+                {autoFilled.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ids = Array.from(autoFilled);
+                      setRevisado((prev) => { const n = new Set(prev); ids.forEach((id) => n.add(id)); return n; });
+                      setAutoFilled(new Set());
+                    }}
+                    className="px-2 py-1 bg-torg-blue text-white text-xs rounded hover:bg-torg-blue-700 font-medium"
+                  >
+                    ✓ Conferi todos ({autoFilled.size})
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-torg-gray mb-1">CNPJ *</label>
@@ -865,8 +1024,15 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
                 <tbody className="divide-y divide-gray-100">
                   {linhas.map((l) => {
                     const t = (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0);
+                    const isAuto = autoFilled.has(l.rmItemId);
+                    const isRevisado = revisado.has(l.rmItemId);
+                    const inputCls = isAuto
+                      ? "border-torg-orange-300 bg-torg-orange-50/40"
+                      : isRevisado
+                      ? "border-torg-blue-200 bg-torg-blue-50/30"
+                      : "border-gray-200";
                     return (
-                      <tr key={l.rmItemId}>
+                      <tr key={l.rmItemId} className={isAuto ? "bg-torg-orange-50/20" : ""}>
                         <td className="px-2 py-1.5 text-torg-dark">
                           {l._rmNumero && !l._ehDestaRM && (
                             <span className="font-mono text-[10px] text-torg-blue bg-torg-blue-50 px-1.5 py-0.5 rounded mr-1.5">
@@ -874,17 +1040,30 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
                             </span>
                           )}
                           {l.descricao}
+                          {isAuto && (
+                            <button
+                              type="button"
+                              onClick={() => marcarRevisado(l.rmItemId)}
+                              className="ml-2 text-[10px] text-torg-orange-700 hover:text-torg-orange-800 font-medium inline-flex items-center gap-0.5"
+                              title="Marcar como conferido"
+                            >
+                              ⚠ via IA
+                            </button>
+                          )}
+                          {isRevisado && (
+                            <span className="ml-2 text-[10px] text-torg-blue font-medium">✓</span>
+                          )}
                         </td>
                         <td className="px-2 py-1.5 text-right">
                           <input type="number" step="0.01" value={l.qtdCotada}
                             onChange={(e) => setLinha(l.rmItemId, "qtdCotada", e.target.value)}
-                            className="w-20 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-right tabular-nums" />
+                            className={`w-20 border rounded px-1.5 py-0.5 text-xs text-right tabular-nums ${inputCls}`} />
                         </td>
                         <td className="px-2 py-1.5 text-right">
                           <input type="number" step="0.01" value={l.precoUnit}
                             onChange={(e) => setLinha(l.rmItemId, "precoUnit", e.target.value)}
                             placeholder="0,00"
-                            className="w-24 border border-gray-200 rounded px-1.5 py-0.5 text-xs text-right tabular-nums" />
+                            className={`w-24 border rounded px-1.5 py-0.5 text-xs text-right tabular-nums ${inputCls}`} />
                         </td>
                         <td className="px-2 py-1.5 text-right">
                           <input type="number" step="0.01" value={l.icmsPct}
