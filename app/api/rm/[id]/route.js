@@ -125,10 +125,17 @@ export async function DELETE(req, { params }) {
         data: { pedidoOmieId: null },
       });
 
-      // 2. Apaga CotacaoItens manualmente — eles referenciam RMItem SEM
-      // onDelete:Cascade, então o cascade da RM falha se nao limparmos antes.
+      // 2. Apaga CotacaoItens que referenciam itens dessa RM — pega TODOS,
+      // mesmo os que estao em cotacoes de OUTRAS RMs (caso multi-RM via
+      // /api/cotacao/[id]/adicionar-rm). FK CotacaoItem_rmItemId_fkey
+      // nao tem onDelete:Cascade entao temos que limpar manual.
       await tx.cotacaoItem.deleteMany({
-        where: { cotacao: { rmId: rm.id } },
+        where: {
+          OR: [
+            { cotacao: { rmId: rm.id } },         // CotacaoItens de cotacoes da RM
+            { rmItem: { rmId: rm.id } },          // CotacaoItens de cotacoes externas que ref itens dessa RM
+          ],
+        },
       });
 
       // 3. Apaga pedidos com erro vinculados a essa RM
