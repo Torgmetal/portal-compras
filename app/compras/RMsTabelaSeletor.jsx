@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, AlertCircle, Loader2, Mail, X, FileText, Send } from "lucide-react";
+import { AlertTriangle, AlertCircle, Loader2, Mail, X, FileText, Send, Copy, Check, ExternalLink, CheckCircle2 } from "lucide-react";
 import RMRowActions from "@/components/RMRowActions";
 
 const STATUS_LABELS = {
@@ -20,6 +20,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
   const router = useRouter();
   const [selecionadas, setSelecionadas] = useState(new Set());
   const [modalEnviar, setModalEnviar] = useState(false);
+  const [linksGerados, setLinksGerados] = useState(null); // { cotacoes, rmsNumeros }
 
   // Só permite cotar RMs que ainda estão em fluxo ativo
   const cotaveis = useMemo(
@@ -173,10 +174,125 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
         <ModalEnviarConsolidada
           rms={rmsSelecionadas}
           onClose={() => setModalEnviar(false)}
-          onSent={() => { setModalEnviar(false); limpar(); router.refresh(); }}
+          onSent={(payload) => {
+            setModalEnviar(false);
+            setLinksGerados(payload);
+            limpar();
+            router.refresh();
+          }}
+        />
+      )}
+      {linksGerados && (
+        <ModalLinksGerados
+          payload={linksGerados}
+          onClose={() => setLinksGerados(null)}
         />
       )}
     </>
+  );
+}
+
+// Modal mostrando os links únicos gerados pra cada fornecedor (após envio)
+function ModalLinksGerados({ payload, onClose }) {
+  const cotacoes = payload?.cotacoes || [];
+  const rmsNumeros = payload?.rmsNumeros || [];
+  const [copiado, setCopiado] = useState(null);
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  const linkOf = (cot) => `${baseUrl}/fornecedores/c/${cot.token}`;
+
+  const copiarLink = async (cot) => {
+    try {
+      await navigator.clipboard.writeText(linkOf(cot));
+      setCopiado(cot.id);
+      setTimeout(() => setCopiado(null), 2000);
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = linkOf(cot);
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); setCopiado(cot.id); setTimeout(() => setCopiado(null), 2000); } catch {}
+      document.body.removeChild(ta);
+    }
+  };
+
+  const abrirEmail = (cot) => {
+    const subject = `Solicitação de Cotação — RMs ${rmsNumeros.join(" + ")}`;
+    const body = `Olá ${cot.fornecedorNome},\n\nSegue link único pra envio da proposta:\n\n${linkOf(cot)}\n\nNo link você verá os itens consolidados das RMs ${rmsNumeros.join(", ")}.\n\nObrigado!\nTorg Metal`;
+    window.location.href = `mailto:${cot.fornecedorEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark inline-flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-torg-blue" />
+              {cotacoes.length} cotação{cotacoes.length !== 1 ? "ões" : ""} criada{cotacoes.length !== 1 ? "s" : ""}
+            </h3>
+            <p className="text-xs text-torg-gray mt-0.5">
+              RMs incluídas: {rmsNumeros.join(", ")}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3">
+          <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-3 text-xs text-torg-dark">
+            💡 Cada fornecedor abaixo recebe um link <strong>único</strong> e <strong>privado</strong>.
+            Copie o link ou clique em &quot;Email&quot; pra abrir o Outlook com mensagem pré-pronta.
+          </div>
+
+          {cotacoes.map((cot) => (
+            <div key={cot.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-torg-dark truncate">{cot.fornecedorNome}</p>
+                  <p className="text-xs text-torg-gray truncate">{cot.fornecedorEmail}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => copiarLink(cot)}
+                    className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray hover:text-torg-dark hover:bg-gray-50 rounded font-medium inline-flex items-center gap-1"
+                  >
+                    {copiado === cot.id ? <Check size={12} className="text-torg-blue" /> : <Copy size={12} />}
+                    {copiado === cot.id ? "Copiado!" : "Copiar link"}
+                  </button>
+                  <a
+                    href={linkOf(cot)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 text-xs bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50 rounded font-medium inline-flex items-center gap-1"
+                  >
+                    <ExternalLink size={12} /> Abrir
+                  </a>
+                  <button
+                    onClick={() => abrirEmail(cot)}
+                    className="px-3 py-1.5 text-xs bg-torg-blue text-white hover:bg-torg-blue-700 rounded font-medium inline-flex items-center gap-1"
+                  >
+                    <Mail size={12} /> Email
+                  </button>
+                </div>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 font-mono text-[11px] text-torg-gray break-all">
+                {linkOf(cot)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end sticky bottom-0">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -244,8 +360,10 @@ function ModalEnviarConsolidada({ rms, onClose, onSent }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
-      alert(`✓ ${data.cotacoes.length} cotação(ões) criadas pra ${data.cotacoes.length === 1 ? "1 fornecedor" : `${data.cotacoes.length} fornecedores`} (RMs: ${data.cotacoes[0]?.rmsVinculadas?.join(", ")})`);
-      onSent();
+      onSent({
+        cotacoes: data.cotacoes || [],
+        rmsNumeros: data.cotacoes?.[0]?.rmsVinculadas || rms.map((r) => r.numero),
+      });
     } catch (e) {
       setErro(e.message);
       setSalvando(false);
