@@ -101,11 +101,11 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
 
   // RM tem itens PEDIDO_GERADO mas a RM em si nao virou PEDIDO_GERADO ainda —
   // mostra botao pra fechar (cancela itens leftover).
-  const itensPedidoGerado = statusCounts.PEDIDO_GERADO || 0;
+  const itensPedidoGerado = stats.PEDIDO_GERADO || 0;
   const itensLeftover =
-    (statusCounts.PENDENTE || 0) +
-    (statusCounts.EM_COTACAO || 0) +
-    (statusCounts.COTADO || 0);
+    (stats.PENDENTE || 0) +
+    (stats.EM_COTACAO || 0) +
+    (stats.COTADO || 0);
   const podeFecharComoPedido =
     rm.status !== "PEDIDO_GERADO" &&
     rm.status !== "CANCELADA" &&
