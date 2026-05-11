@@ -112,31 +112,50 @@ export default function MapaCotacaoClient({ op }) {
   // Total por fornecedor (soma dos itens vencidos) + lista de itens vencidos
   // Usa preço líquido (já considera ICMS por dentro + IPI por fora) pra
   // comparação justa entre fornecedores de regimes diferentes.
+  // IMPORTANTE: usa itensTodos (nao o filtrado por mostrarPedidos) — totais devem
+  // refletir TUDO que foi decidido, incluindo o que ja virou pedido.
   const totaisPorFornecedor = {};
   const itensPorFornecedor = {};
+  let totalEmPedidos = 0;
+  let totalAGerar = 0;
   for (const f of fornecedores) {
     totaisPorFornecedor[f.cotacaoId] = 0;
     itensPorFornecedor[f.cotacaoId] = [];
   }
-  for (const it of itens) {
+  for (const it of itensTodos) {
     for (const cell of it.celulas) {
       if (cell?.vencedor) {
         const valor = (cell.precoLiquido || cell.precoUnit || 0) * (cell.qtdCotada || 0);
         totaisPorFornecedor[cell.cotacaoId] += valor;
-        itensPorFornecedor[cell.cotacaoId].push({
-          descricao: it.descricao,
-          qtd: cell.qtdCotada,
-          unidade: it.unidade,
-          precoUnit: cell.precoUnit,
-          precoLiquido: cell.precoLiquido,
-          icmsPct: cell.icmsPct,
-          ipiPct: cell.ipiPct,
-          total: valor,
-        });
+        if (it.jaPedido) totalEmPedidos += valor;
+        else if (!it.cancelado) totalAGerar += valor;
+        // So inclui em itensPorFornecedor (lista pra gerar pedido) o que ainda
+        // nao virou pedido nem foi cancelado — gerar de novo daria duplicidade.
+        if (!it.jaPedido && !it.cancelado) {
+          itensPorFornecedor[cell.cotacaoId].push({
+            descricao: it.descricao,
+            qtd: cell.qtdCotada,
+            unidade: it.unidade,
+            precoUnit: cell.precoUnit,
+            precoLiquido: cell.precoLiquido,
+            icmsPct: cell.icmsPct,
+            ipiPct: cell.ipiPct,
+            total: valor,
+          });
+        }
       }
     }
   }
   const totalGeral = Object.values(totaisPorFornecedor).reduce((s, n) => s + n, 0);
+  // Totais apenas dos itens que ainda nao viraram pedido — usado em
+  // "Resumo dos pedidos a gerar" e no Modal de gerar pedidos.
+  const totaisAGerarPorFornecedor = {};
+  for (const f of fornecedores) {
+    totaisAGerarPorFornecedor[f.cotacaoId] = itensPorFornecedor[f.cotacaoId].reduce(
+      (s, it) => s + (it.total || 0),
+      0
+    );
+  }
   const fornecedoresVencedores = fornecedores.filter((f) => itensPorFornecedor[f.cotacaoId].length > 0);
   const itensSemVencedor = itens.filter((it) => !it.celulas.some((c) => c?.vencedor));
 
@@ -184,6 +203,11 @@ export default function MapaCotacaoClient({ op }) {
           <div className="text-right">
             <p className="text-xs text-torg-gray">Total dos vencedores</p>
             <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</p>
+            {totalEmPedidos > 0 && totalAGerar > 0 && (
+              <p className="text-[10px] text-torg-gray mt-0.5 tabular-nums">
+                {fmtMoeda(totalEmPedidos)} em pedidos · {fmtMoeda(totalAGerar)} a gerar
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -349,8 +373,8 @@ export default function MapaCotacaoClient({ op }) {
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-torg-gray">Total geral</p>
-              <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</p>
+              <p className="text-xs text-torg-gray">Total a gerar</p>
+              <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalAGerar)}</p>
             </div>
           </div>
           <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -364,7 +388,7 @@ export default function MapaCotacaoClient({ op }) {
                     </p>
                   </div>
                   <div className="text-right ml-3">
-                    <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totaisPorFornecedor[f.cotacaoId])}</p>
+                    <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totaisAGerarPorFornecedor[f.cotacaoId])}</p>
                     <p className="text-[10px] text-torg-gray group-open:hidden">clique pra ver itens</p>
                   </div>
                 </summary>
@@ -449,8 +473,8 @@ export default function MapaCotacaoClient({ op }) {
     {modalGerar && (
       <ModalGerarPedidos
         fornecedoresVencedores={fornecedoresVencedores}
-        totaisPorFornecedor={totaisPorFornecedor}
-        totalGeral={totalGeral}
+        totaisPorFornecedor={totaisAGerarPorFornecedor}
+        totalGeral={totalAGerar}
         onClose={() => setModalGerar(false)}
         onConfirm={gerarPedidos}
         loading={loading === "gerar"}
@@ -825,17 +849,20 @@ function buildMatriz(op) {
   for (const rm of op.rms) {
     for (const cot of rm.cotacoes) {
       if (cot.status !== "RECEBIDA") continue;
-      if (!fornMap.has(cot.id)) {
-        fornMap.set(cot.id, {
-          cotacaoId: cot.id,
-          fornecedorNome: cot.fornecedorNome,
-          cnpj: cot.cnpj || "",
-          nCodOmie: cot.nCodOmie || "",
-        });
-      }
 
       for (const ci of cot.itens) {
         if (!ci.precoUnit || ci.precoUnit <= 0) continue;
+        // So registra o fornecedor quando tiver pelo menos um item com preco —
+        // evita coluna vazia quando o fornecedor foi marcado RECEBIDA mas nao
+        // precificou nada (ex: respondeu so com observacao).
+        if (!fornMap.has(cot.id)) {
+          fornMap.set(cot.id, {
+            cotacaoId: cot.id,
+            fornecedorNome: cot.fornecedorNome,
+            cnpj: cot.cnpj || "",
+            nCodOmie: cot.nCodOmie || "",
+          });
+        }
         // Garante que o RMItem está na matriz (lookup global — multi-RM)
         if (!itensMap.has(ci.rmItemId)) {
           const entry = itemPorId.get(ci.rmItemId);
