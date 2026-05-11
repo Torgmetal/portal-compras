@@ -19,7 +19,9 @@ export async function POST(req, { params }) {
   if (!item || item.rmId !== params.id) {
     return NextResponse.json({ error: "Item não encontrado nessa RM." }, { status: 404 });
   }
-  if (item.status !== "PENDENTE") {
+  // Permite cancelar itens ainda nao consumidos em pedido — PENDENTE,
+  // EM_COTACAO ou COTADO. Bloqueia apenas PEDIDO_GERADO e CANCELADO.
+  if (item.status === "PEDIDO_GERADO" || item.status === "CANCELADO") {
     return NextResponse.json({ error: `Item em status "${item.status}" não pode ser cancelado.` }, { status: 409 });
   }
 

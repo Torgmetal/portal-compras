@@ -28,6 +28,10 @@ const STATUS_ITEM_LABELS = {
   CANCELADO:     { label: "Cancelado",     className: "bg-gray-200 text-gray-500 line-through" },
 };
 
+// Variante: item marcado como COTADO mas fornecedor nao deu preço pra ele —
+// mostra como "Sem proposta" pro usuario perceber que precisa re-cotar.
+const STATUS_SEM_PROPOSTA = { label: "Sem proposta", className: "bg-amber-50 text-amber-700" };
+
 export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
   const router = useRouter();
   const isAdmin = userRole === "ADMIN";
@@ -290,8 +294,15 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {rm.itens.map((it, i) => {
-                const statusItem = STATUS_ITEM_LABELS[it.status] || STATUS_ITEM_LABELS.PENDENTE;
-                const podeCancelar = (isAdmin || userRole === "COMPRAS") && it.status === "PENDENTE";
+                // Item marcado como COTADO mas sem proposta com preço — fornecedor
+                // nao cotou. Mostra label "Sem proposta" pro usuario perceber.
+                const semProposta = it.status === "COTADO" && it.temPropostaComPreco === false;
+                const statusItem = semProposta
+                  ? STATUS_SEM_PROPOSTA
+                  : (STATUS_ITEM_LABELS[it.status] || STATUS_ITEM_LABELS.PENDENTE);
+                const podeCancelar =
+                  (isAdmin || userRole === "COMPRAS") &&
+                  ["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status);
                 return (
                   <tr key={it.id} className={it.status === "CANCELADO" ? "opacity-60" : "hover:bg-gray-50"}>
                     <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>

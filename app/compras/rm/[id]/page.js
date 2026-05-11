@@ -103,6 +103,20 @@ export default async function RMComprasDetail({ params }) {
   });
   rm.cotacoes = cotacoes;
 
+  // Marca cada item da RM: tem ou nao proposta de fornecedor com preco > 0?
+  // Usado pra distinguir COTADO real (com proposta) de "marcado COTADO mas
+  // fornecedor nao deu preço pra esse item" — usuario ve status correto.
+  const rmItemIdsComProposta = new Set();
+  for (const c of cotacoesRelacionadas) {
+    if (c.status !== "RECEBIDA") continue;
+    for (const ci of c.itens || []) {
+      if ((ci.precoUnit || 0) > 0) rmItemIdsComProposta.add(ci.rmItemId);
+    }
+  }
+  for (const it of rm.itens) {
+    it.temPropostaComPreco = rmItemIdsComProposta.has(it.id);
+  }
+
   // Outras RMs ativas (mesma OP em primeiro lugar; depois outras)
   // pra opcao de "vincular mais RMs no envio de cotacao"
   const outrasRMsAtivas = await prisma.rM.findMany({
