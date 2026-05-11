@@ -14,30 +14,46 @@ export async function POST(req, { params }) {
   const op = await prisma.oP.findUnique({
     where: { id: params.id },
     include: {
-      rms: {
-        include: {
-          itens: { select: { id: true } },
-          cotacoes: {
-            where: { status: "RECEBIDA" },
-            include: {
-              itens: { select: { id: true, rmItemId: true, precoUnit: true, icmsPct: true, ipiPct: true } },
-            },
-          },
-        },
-      },
+      rms: { include: { itens: { select: { id: true } } } },
     },
   });
   if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
 
-  // Pra cada RMItem, encontra o CotacaoItem com menor preço (precoUnit > 0)
+  // Busca cotacoes RECEBIDAS que tocam essa OP — primaria por rmId OU
+  // por qualquer item ligado a uma RM dessa OP (consolidadas).
+  const rmIdsDaOP = op.rms.map((r) => r.id);
+  const cotacoes = await prisma.cotacao.findMany({
+    where: {
+      status: "RECEBIDA",
+      OR: [
+        { rmId: { in: rmIdsDaOP } },
+        { itens: { some: { rmItem: { rmId: { in: rmIdsDaOP } } } } },
+      ],
+    },
+    include: {
+      itens: { select: { id: true, rmItemId: true, precoUnit: true, icmsPct: true, ipiPct: true } },
+    },
+  });
+
+  // Mapa rmItemId -> lista de CotacaoItens (de qualquer cotacao que tem esse item)
+  const cotItensPorRmItem = new Map();
+  for (const cot of cotacoes) {
+    for (const ci of cot.itens) {
+      if (!ci.precoUnit || ci.precoUnit <= 0) continue;
+      if (!cotItensPorRmItem.has(ci.rmItemId)) cotItensPorRmItem.set(ci.rmItemId, []);
+      cotItensPorRmItem.get(ci.rmItemId).push(ci);
+    }
+  }
+
+  // Pra cada RMItem, encontra o CotacaoItem com menor preço líquido
   const escolhas = []; // { rmItemId, cotacaoItemIdVencedor }
   for (const rm of op.rms) {
     for (const rmItem of rm.itens) {
+      const candidatos = cotItensPorRmItem.get(rmItem.id) || [];
+      if (candidatos.length === 0) continue;
       let melhor = null;
       let melhorLiquido = null;
-      for (const cot of rm.cotacoes) {
-        const ci = cot.itens.find((i) => i.rmItemId === rmItem.id && i.precoUnit > 0);
-        if (!ci) continue;
+      for (const ci of candidatos) {
         const icms = Number(ci.icmsPct) || 0;
         const ipi = Number(ci.ipiPct) || 0;
         // Compara pelo líquido (custo Torg) — ICMS por dentro + IPI por fora
