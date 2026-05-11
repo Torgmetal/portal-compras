@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
-  CheckCircle2, Truck, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
+  CheckCircle2, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
   Upload, Sparkles,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
@@ -232,13 +232,6 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
               <Mail size={16} /> Re-cotar Sem Proposta ({qtdSemPropostaRm})
             </button>
           )}
-          <button
-            disabled
-            className="px-4 py-2 bg-white border border-gray-300 text-torg-gray text-sm font-medium rounded-lg inline-flex items-center gap-2 cursor-not-allowed"
-            title="Em construção"
-          >
-            <Truck size={16} /> Gerar Pedido Omie (em breve)
-          </button>
           <div className="ml-auto flex gap-2 flex-wrap">
             {rm.opId && rm.status !== "PEDIDO_GERADO" && (
               <button
