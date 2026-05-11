@@ -53,20 +53,31 @@ export default async function PainelCompras({ searchParams }) {
 
   // Conta cotacoes por RM considerando consolidadas: uma cotacao consolidada
   // que tem itens de varias RMs conta pra cada RM envolvida (nao so a primaria).
-  const rmIdsListados = rms.map((r) => r.id);
-  const cotItensRelacionados = await prisma.cotacaoItem.findMany({
-    where: { rmItem: { rmId: { in: rmIdsListados } } },
-    select: { cotacaoId: true, rmItem: { select: { rmId: true } } },
-  });
-  const cotacoesPorRm = new Map();
-  for (const ci of cotItensRelacionados) {
-    const rid = ci.rmItem.rmId;
-    if (!cotacoesPorRm.has(rid)) cotacoesPorRm.set(rid, new Set());
-    cotacoesPorRm.get(rid).add(ci.cotacaoId);
-  }
-  // Sobrescreve _count.cotacoes considerando consolidadas
-  for (const rm of rms) {
-    rm._count.cotacoes = cotacoesPorRm.get(rm.id)?.size ?? rm._count.cotacoes;
+  // Wrap em try/catch defensivo — se a query falhar por algum motivo, cai pro
+  // _count.cotacoes original (pode ficar errado pra consolidadas mas pelo
+  // menos a pagina nao crasha).
+  try {
+    const rmIdsListados = rms.map((r) => r.id);
+    if (rmIdsListados.length > 0) {
+      const cotItensRelacionados = await prisma.cotacaoItem.findMany({
+        where: { rmItem: { rmId: { in: rmIdsListados } } },
+        select: { cotacaoId: true, rmItem: { select: { rmId: true } } },
+      });
+      const cotacoesPorRm = new Map();
+      for (const ci of cotItensRelacionados) {
+        const rid = ci.rmItem?.rmId;
+        if (!rid) continue;
+        if (!cotacoesPorRm.has(rid)) cotacoesPorRm.set(rid, new Set());
+        cotacoesPorRm.get(rid).add(ci.cotacaoId);
+      }
+      for (const rm of rms) {
+        if (rm._count) {
+          rm._count.cotacoes = cotacoesPorRm.get(rm.id)?.size ?? rm._count.cotacoes;
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[/compras] Falha contando cotacoes multi-RM:", e?.message);
   }
 
   const statusCount = totais.reduce((acc, t) => {
