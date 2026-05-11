@@ -14,7 +14,7 @@ export default function MapaCotacaoClient({ op }) {
   const [mostrarPedidos, setMostrarPedidos] = useState(false);
 
   // Constrói matriz: cada linha é um RMItem, cada coluna é uma Cotação RECEBIDA
-  const { itens: itensTodos, fornecedores } = useMemo(() => buildMatriz(op), [op]);
+  const { itens: itensTodos, fornecedores: fornecedoresTodos } = useMemo(() => buildMatriz(op), [op]);
 
   // Filtra: por padrao esconde itens que ja viraram pedido — interface fica focada
   // no que ainda precisa de decisao. Toggle no header pra ver os ja resolvidos.
@@ -22,6 +22,19 @@ export default function MapaCotacaoClient({ op }) {
     if (mostrarPedidos) return itensTodos;
     return itensTodos.filter((it) => !it.jaPedido && !it.cancelado);
   }, [itensTodos, mostrarPedidos]);
+
+  // Filtra fornecedores pra mostrar somente os que tem celula nos itens visiveis.
+  // Sem isso, um fornecedor que so cotou itens ja pedidos (escondidos) ficava
+  // como coluna fantasma com "—" em tudo.
+  const fornecedores = useMemo(() => {
+    const ids = new Set();
+    for (const it of itens) {
+      for (const cell of it.celulas) {
+        if (cell?.precoUnit > 0) ids.add(cell.cotacaoId);
+      }
+    }
+    return fornecedoresTodos.filter((f) => ids.has(f.cotacaoId));
+  }, [itens, fornecedoresTodos]);
 
   const qtdPedido = itensTodos.filter((it) => it.jaPedido).length;
   const qtdCancelado = itensTodos.filter((it) => it.cancelado).length;
