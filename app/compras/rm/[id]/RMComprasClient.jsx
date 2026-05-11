@@ -1840,9 +1840,23 @@ function ModalEditarCategorias({ rm, onClose, onSaved }) {
             <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
           </div>
         )}
-        <p className="text-xs text-torg-gray">
-          Marque as categorias do escopo da OP que essa RM cobre. Usada pra controle de verba e relatórios.
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-torg-gray">
+            Marque/desmarque as categorias que essa RM cobre.
+          </p>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-torg-gray font-medium">{selecionadas.size} marcadas</span>
+            {selecionadas.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelecionadas(new Set())}
+                className="text-torg-blue hover:text-torg-dark font-medium"
+              >
+                Limpar tudo
+              </button>
+            )}
+          </div>
+        </div>
         {grupos.map((g) => (
           <div key={g.titulo}>
             <p className="text-xs font-semibold text-torg-dark mb-1.5 uppercase tracking-wide">{g.titulo}</p>
