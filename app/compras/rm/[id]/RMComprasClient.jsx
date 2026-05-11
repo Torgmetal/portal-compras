@@ -1345,6 +1345,18 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent }) {
   };
   const marcarTodos = () => setItensSelecionados(new Set(todosItensCotaveis.map((i) => i.id)));
   const limparTodos = () => setItensSelecionados(new Set());
+  // Marca apenas itens "Sem proposta" (status COTADO mas sem precoUnit > 0 em
+  // nenhuma cotacao RECEBIDA) — fornecedor anterior nao precificou.
+  const marcarSemProposta = () => {
+    setItensSelecionados(new Set(
+      todosItensCotaveis
+        .filter((it) => it.status === "COTADO" && it.temPropostaComPreco === false)
+        .map((it) => it.id)
+    ));
+  };
+  const qtdSemProposta = todosItensCotaveis.filter(
+    (it) => it.status === "COTADO" && it.temPropostaComPreco === false
+  ).length;
 
   const parsearFornecedores = () => {
     const linhas = emailsTexto.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
@@ -1439,10 +1451,22 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent }) {
             <label className="text-sm font-medium text-torg-dark">
               Itens pra cotar ({itensSelecionados.size} de {todosItensCotaveis.length})
             </label>
-            <div className="flex gap-2 text-xs">
+            <div className="flex gap-2 text-xs items-center">
               <button onClick={marcarTodos} className="text-torg-blue hover:text-torg-dark font-medium">Todos</button>
               <span className="text-gray-300">·</span>
               <button onClick={limparTodos} className="text-torg-gray hover:text-torg-dark font-medium">Nenhum</button>
+              {qtdSemProposta > 0 && (
+                <>
+                  <span className="text-gray-300">·</span>
+                  <button
+                    onClick={marcarSemProposta}
+                    className="text-amber-700 hover:text-amber-900 font-medium"
+                    title="Marca apenas itens sem proposta de fornecedor"
+                  >
+                    Apenas sem proposta ({qtdSemProposta})
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <div className="border border-gray-200 rounded-lg max-h-[280px] overflow-y-auto divide-y divide-gray-100">
@@ -1450,7 +1474,9 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent }) {
               const peso = Number(it.peso) || 0;
               const usaKg = peso > 0;
               const qtdMostrada = usaKg ? `${peso.toFixed(2)} KG` : `${it.qtd} ${it.unidade}`;
+              const semProposta = it.status === "COTADO" && it.temPropostaComPreco === false;
               const statusBadge =
+                semProposta ? "Sem proposta" :
                 it.status === "EM_COTACAO" ? "Em cotação" :
                 it.status === "COTADO" ? "Já cotado" : null;
               return (
@@ -1468,8 +1494,10 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent }) {
                   )}
                   <span className="flex-1 truncate">{it.descricao}</span>
                   {statusBadge && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                      it.status === "COTADO"
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${
+                      semProposta
+                        ? "bg-amber-50 text-amber-700"
+                        : it.status === "COTADO"
                         ? "bg-torg-blue-100 text-torg-blue-800"
                         : "bg-torg-orange-50 text-torg-orange-700"
                     }`}>
