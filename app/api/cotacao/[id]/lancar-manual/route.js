@@ -74,13 +74,25 @@ export async function POST(req, { params }) {
   const cotItemPorRm = new Map();
   for (const ci of cotacao.itens) cotItemPorRm.set(ci.rmItemId, ci.id);
 
+  // Arredonda valores numericos pra 2 casas decimais — evita "lixo" do parser IA
+  // ou de inputs do form que possam ter casas extras.
+  const round2 = (n) => (n == null ? n : Math.round(Number(n) * 100) / 100);
+
   // Itens validos: precoUnit > 0
-  const itensValidos = body.itens.filter((it) => it.precoUnit > 0);
+  const itensValidos = body.itens
+    .filter((it) => it.precoUnit > 0)
+    .map((it) => ({
+      ...it,
+      precoUnit: round2(it.precoUnit),
+      qtdCotada: round2(it.qtdCotada),
+      icmsPct: it.icmsPct != null ? round2(it.icmsPct) : null,
+      ipiPct: it.ipiPct != null ? round2(it.ipiPct) : null,
+    }));
   if (itensValidos.length === 0) {
     return NextResponse.json({ error: "Preencha ao menos um preço unitário." }, { status: 400 });
   }
 
-  const total = itensValidos.reduce((s, it) => s + it.precoUnit * it.qtdCotada, 0);
+  const total = round2(itensValidos.reduce((s, it) => s + it.precoUnit * it.qtdCotada, 0));
   const eRevisao = cotacao.status === "RECEBIDA";
 
   await prisma.$transaction(async (tx) => {

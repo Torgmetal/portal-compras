@@ -40,14 +40,26 @@ export async function POST(req, { params }) {
 
   const eRevisao = cotacao.status === "RECEBIDA";
 
+  // Arredonda valores numericos pra 2 casas decimais — evita "lixo" do parser IA
+  // ou de inputs do form que possam ter casas extras.
+  const round2 = (n) => (n == null ? n : Math.round(Number(n) * 100) / 100);
+
   // Filtra apenas itens válidos da própria cotação
   const idsValidos = new Set(cotacao.itens.map((i) => i.id));
-  const itensValidos = body.itens.filter((it) => idsValidos.has(it.cotacaoItemId) && it.precoUnit > 0);
+  const itensValidos = body.itens
+    .filter((it) => idsValidos.has(it.cotacaoItemId) && it.precoUnit > 0)
+    .map((it) => ({
+      ...it,
+      precoUnit: round2(it.precoUnit),
+      qtdCotada: round2(it.qtdCotada),
+      icmsPct: it.icmsPct != null ? round2(it.icmsPct) : null,
+      ipiPct: it.ipiPct != null ? round2(it.ipiPct) : null,
+    }));
   if (itensValidos.length === 0) {
     return NextResponse.json({ error: "Preencha ao menos um preço unitário." }, { status: 400 });
   }
 
-  const total = itensValidos.reduce((s, it) => s + it.precoUnit * it.qtdCotada, 0);
+  const total = round2(itensValidos.reduce((s, it) => s + it.precoUnit * it.qtdCotada, 0));
 
   // Tenta resolver o fornecedor no Omie pelo CNPJ — se achar, ja salva nCodOmie
   // pra que a geracao de pedido saiba pra quem mandar.

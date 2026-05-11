@@ -88,6 +88,13 @@ function extractJsonFromResponse(text) {
   return text;
 }
 
+// Arredonda pra N casas decimais — evita problemas com inputs step="0.01"
+// e bate com a precisao mostrada nas propostas (PDF, Omie, etc).
+function round2(n) {
+  if (n == null || isNaN(n)) return n;
+  return Math.round(Number(n) * 100) / 100;
+}
+
 function sanitizeItens(itens, rmCount) {
   return (itens || []).map((it) => {
     let precoUnit = Number(it.precoUnit) || 0;
@@ -133,16 +140,20 @@ function sanitizeItens(itens, rmCount) {
       rmIndex = null;
     }
 
+    // Arredonda tudo pra 2 casas — o input do form tem step="0.01" e rejeita
+    // valores com mais casas (ex: 6.4823). E nem o PDF nem o Omie usam mais
+    // que 2 casas, entao a precisao extra so atrapalha.
+    const qtdRound = round2(qtd);
     return {
       rmIndex,
       descricao: String(it.descricao || ""),
-      qtd,
-      qtdCotada: qtd,
+      qtd: qtdRound,
+      qtdCotada: qtdRound,
       unidade: String(it.unidade || "").toUpperCase(),
-      precoUnit: safePrec,
-      icmsPct: it.icmsPct != null ? Number(it.icmsPct) : null,
-      ipiPct: it.ipiPct != null ? Number(it.ipiPct) : null,
-      totalBruto: totalDeclarado != null ? totalDeclarado : safePrec * qtd,
+      precoUnit: round2(safePrec),
+      icmsPct: it.icmsPct != null ? round2(Number(it.icmsPct)) : null,
+      ipiPct: it.ipiPct != null ? round2(Number(it.ipiPct)) : null,
+      totalBruto: round2(totalDeclarado != null ? totalDeclarado : safePrec * qtd),
       prazoEntrega: it.prazoEntrega || "",
       observacao: it.observacao || "",
       _warning: warnings.length > 0 ? warnings.join(" | ") : null,
