@@ -852,9 +852,15 @@ function buildMatriz(op) {
 
       for (const ci of cot.itens) {
         if (!ci.precoUnit || ci.precoUnit <= 0) continue;
-        // So registra o fornecedor quando tiver pelo menos um item com preco —
-        // evita coluna vazia quando o fornecedor foi marcado RECEBIDA mas nao
-        // precificou nada (ex: respondeu so com observacao).
+
+        // Pula itens que nao pertencem a essa OP (ex: cotacao consolidada
+        // com itens de outra OP, ou cotacao deslocada por outro motivo).
+        // Sem item valido nessa OP, fornecedor nao deve nem aparecer.
+        const entry = itemPorId.get(ci.rmItemId);
+        if (!entry) continue;
+
+        // So agora registra o fornecedor — apos confirmar que ele tem
+        // pelo menos um item com preco DENTRO dessa OP.
         if (!fornMap.has(cot.id)) {
           fornMap.set(cot.id, {
             cotacaoId: cot.id,
@@ -865,8 +871,6 @@ function buildMatriz(op) {
         }
         // Garante que o RMItem está na matriz (lookup global — multi-RM)
         if (!itensMap.has(ci.rmItemId)) {
-          const entry = itemPorId.get(ci.rmItemId);
-          if (!entry) continue;
           const { rmItem, rmNumero, categoria } = entry;
           itensMap.set(ci.rmItemId, {
             rmItemId: rmItem.id,
