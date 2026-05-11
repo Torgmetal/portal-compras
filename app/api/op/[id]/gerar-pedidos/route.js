@@ -132,7 +132,7 @@ export async function POST(req, { params }) {
     // bata com o valor da nota fiscal que o fornecedor vai emitir.
     // ICMS nao entra (ele vem implicito no preco bruto e e creditado pela Torg).
     // PedidoOmie.total armazena o mesmo valor (com IPI), facilitando conciliacao.
-    const itensPayload = linhas.map((l) => {
+    const itensPayloadBase = linhas.map((l) => {
       const ipiPct = Number(l.cotItem.ipiPct) || 0;
       const precoBruto = Number(l.cotItem.precoUnit) || 0;
       const precoComIPI = precoBruto * (1 + ipiPct / 100);
@@ -141,10 +141,25 @@ export async function POST(req, { params }) {
         descricao: l.rmItem.descricao,
         unidade: l.rmItem.unidade,
         qtd: Number(l.cotItem.qtdCotada) || 0,
-        // Preco unitario com IPI ja incluso — total do Omie = total da NF do fornecedor
         precoUnit: precoComIPI,
       };
     });
+    const totalCalculado = itensPayloadBase.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
+
+    // Se a cotacao tem totalProposta setado (valor exato do PDF do fornecedor),
+    // escala todos os precos proporcionalmente pra bater com esse total.
+    // Garante que o pedido no Omie = total da NF do fornecedor.
+    const totalProposta = Number(cotacao.totalProposta) || 0;
+    let itensPayload = itensPayloadBase;
+    let totalAjustado = false;
+    if (totalProposta > 0 && totalCalculado > 0 && Math.abs(totalCalculado - totalProposta) > 0.01) {
+      const fator = totalProposta / totalCalculado;
+      itensPayload = itensPayloadBase.map((it) => ({
+        ...it,
+        precoUnit: Math.round(it.precoUnit * fator * 10000) / 10000, // 4 casas pra precisao
+      }));
+      totalAjustado = true;
+    }
 
     const total = itensPayload.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
 
@@ -162,6 +177,7 @@ export async function POST(req, { params }) {
       `Cliente: ${op.cliente}`,
       isFD ? "FATURAMENTO DIRETO — encerrar sem contas a pagar" : null,
       temIPI ? "Preço unitário inclui IPI (para bater total com NF do fornecedor)" : null,
+      totalAjustado ? `Preços ajustados pro total bater com proposta do fornecedor (R$ ${totalProposta.toFixed(2)})` : null,
       cotacao.observacao || null,
     ]
       .filter(Boolean)

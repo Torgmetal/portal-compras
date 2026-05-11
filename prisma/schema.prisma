@@ -582,6 +582,10 @@ model Cotacao {
   prazoPagamento  String?
   observacao      String?
   total           Float         @default(0)
+  // Total declarado pelo fornecedor (do PDF da proposta). Quando setado, vira
+  // a "fonte da verdade" do valor da NF — usado pra ajustar precos no Omie
+  // proporcionalmente, garantindo que o pedido bata com a proposta.
+  totalProposta   Float?
 
   prazoResposta   DateTime?     // limite pra fornecedor responder
   recebidaEm      DateTime?

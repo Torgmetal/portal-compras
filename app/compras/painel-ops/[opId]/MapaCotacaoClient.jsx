@@ -91,6 +91,38 @@ export default function MapaCotacaoClient({ op }) {
     }
   };
 
+  // Sobrescreve o total da proposta — usado quando ha pequena divergencia
+  // entre o total computado dos itens e o valor da NF que o fornecedor vai
+  // emitir. gerar-pedidos vai escalar os precos pra bater com esse valor.
+  const ajustarTotalProposta = async (cotacaoId, atual) => {
+    const promptMsg = atual
+      ? `Total da proposta atual: R$ ${Number(atual).toFixed(2)}\n\nDigite o novo valor (ou apague tudo pra remover):`
+      : "Digite o valor total da proposta do fornecedor (do PDF):\n\nEx: 110837.39\n\nO sistema vai ajustar os preços proporcionalmente pra bater com esse total no Omie.";
+    const input = window.prompt(promptMsg, atual ? String(atual) : "");
+    if (input === null) return;
+    const valor = input.trim() === "" ? null : parseFloat(input.replace(",", "."));
+    if (valor !== null && (isNaN(valor) || valor < 0)) {
+      setErro("Valor inválido");
+      return;
+    }
+    setLoading(`tp-${cotacaoId}`);
+    setErro("");
+    try {
+      const res = await fetch(`/api/cotacao/${cotacaoId}/total-proposta`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totalProposta: valor }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const marcarTodosDoFornecedor = async (cotacaoId, todosJaVencedores) => {
     setLoading(`forn-${cotacaoId}`);
     setErro("");
@@ -421,7 +453,13 @@ export default function MapaCotacaoClient({ op }) {
             </div>
           </div>
           <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {fornecedoresVencedores.map((f) => (
+            {fornecedoresVencedores.map((f) => {
+              const totalCalculado = totaisAGerarPorFornecedor[f.cotacaoId];
+              const totalProposta = f.totalProposta;
+              const temProposta = totalProposta != null && totalProposta > 0;
+              const diff = temProposta ? Math.abs(totalCalculado - totalProposta) : 0;
+              const mostrarAvisoDivergencia = !temProposta || diff > 0.05;
+              return (
               <details key={f.cotacaoId} className="bg-white rounded-lg border border-torg-orange-100 p-4 group">
                 <summary className="cursor-pointer list-none flex items-center justify-between">
                   <div className="min-w-0 flex-1">
@@ -431,8 +469,23 @@ export default function MapaCotacaoClient({ op }) {
                     </p>
                   </div>
                   <div className="text-right ml-3">
-                    <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totaisAGerarPorFornecedor[f.cotacaoId])}</p>
-                    <p className="text-[10px] text-torg-gray group-open:hidden">clique pra ver itens</p>
+                    <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">
+                      {fmtMoeda(temProposta ? totalProposta : totalCalculado)}
+                    </p>
+                    {temProposta && diff > 0.05 && (
+                      <p className="text-[10px] text-torg-gray tabular-nums" title="Total calculado dos itens">
+                        calc: {fmtMoeda(totalCalculado)}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); ajustarTotalProposta(f.cotacaoId, totalProposta); }}
+                      disabled={loading === `tp-${f.cotacaoId}`}
+                      className="text-[10px] text-torg-blue hover:underline mt-0.5 inline-block disabled:opacity-50"
+                      title="Sobrescrever total com valor exato do PDF do fornecedor"
+                    >
+                      {temProposta ? "✓ Total da proposta fixado · editar" : "Fixar total da proposta (PDF)"}
+                    </button>
                   </div>
                 </summary>
                 <div className="mt-3 pt-3 border-t border-gray-100 overflow-x-auto">
@@ -479,7 +532,8 @@ export default function MapaCotacaoClient({ op }) {
                   </p>
                 </div>
               </details>
-            ))}
+              );
+            })}
           </div>
 
           {itensSemVencedor.length > 0 && (
@@ -910,6 +964,7 @@ function buildMatriz(op) {
             fornecedorNome: cot.fornecedorNome,
             cnpj: cot.cnpj || "",
             nCodOmie: cot.nCodOmie || "",
+            totalProposta: cot.totalProposta || null,
           });
         }
         // Garante que o RMItem está na matriz (lookup global — multi-RM)

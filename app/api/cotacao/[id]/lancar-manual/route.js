@@ -26,6 +26,9 @@ const schema = z.object({
   prazoEntrega: z.string().optional().nullable(),
   condicaoPagamento: z.string().optional().nullable(),
   observacao: z.string().optional().nullable(),
+  // Total declarado pelo fornecedor (PDF). Quando preenchido, vira fonte da
+  // verdade — gerar-pedidos ajusta precos no Omie pra bater com esse valor.
+  totalProposta: z.number().min(0).optional().nullable(),
 });
 
 export async function POST(req, { params }) {
@@ -136,6 +139,7 @@ export async function POST(req, { params }) {
         status: "RECEBIDA",
         recebidaEm: new Date(),
         total,
+        totalProposta: body.totalProposta != null ? round2(body.totalProposta) : null,
         cnpj: cnpjLimpo,
         nCodOmie: nCodOmieResolvido || cotacao.nCodOmie,
         fornecedorNome: body.razaoSocial?.trim() || cotacao.fornecedorNome,
