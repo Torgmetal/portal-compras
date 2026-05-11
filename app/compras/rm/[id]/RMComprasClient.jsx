@@ -39,6 +39,9 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
   const [modalCancelarItem, setModalCancelarItem] = useState(null);
   const [modalEncerrarRM, setModalEncerrarRM] = useState(false);
   const [modalEnviarCot, setModalEnviarCot] = useState(false);
+  // Quando o usuario clica "Re-cotar Sem Proposta", o modal abre ja filtrando
+  // os itens. Reseta pro modo normal ao fechar.
+  const [preSelecionarMode, setPreSelecionarMode] = useState(null);
   const [linksParaEnvio, setLinksParaEnvio] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
   const [erroExcluir, setErroExcluir] = useState("");
@@ -114,6 +117,12 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
     rm.status !== "PEDIDO_GERADO" &&
     rm.status !== "CANCELADA" &&
     itensPedidoGerado > 0;
+
+  // Quantidade de itens "Sem proposta" (COTADO mas sem precoUnit > 0 em
+  // nenhuma cotacao recebida) — usado pra mostrar atalho de re-cotacao.
+  const qtdSemPropostaRm = rm.itens.filter(
+    (it) => it.status === "COTADO" && it.temPropostaComPreco === false
+  ).length;
 
   const [fechandoComoPedido, setFechandoComoPedido] = useState(false);
   const fecharComoPedidoGerado = async () => {
@@ -208,12 +217,21 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
         {/* Ações */}
         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
           <button
-            onClick={() => setModalEnviarCot(true)}
+            onClick={() => { setPreSelecionarMode(null); setModalEnviarCot(true); }}
             disabled={rm.status === "PEDIDO_GERADO" || rm.status === "CANCELADA"}
             className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Mail size={16} /> Enviar Cotação
           </button>
+          {qtdSemPropostaRm > 0 && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA" && (
+            <button
+              onClick={() => { setPreSelecionarMode("sem-proposta"); setModalEnviarCot(true); }}
+              className="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 inline-flex items-center gap-2"
+              title={`Envia cotação só pros ${qtdSemPropostaRm} itens que ficaram sem proposta`}
+            >
+              <Mail size={16} /> Re-cotar Sem Proposta ({qtdSemPropostaRm})
+            </button>
+          )}
           <button
             disabled
             className="px-4 py-2 bg-white border border-gray-300 text-torg-gray text-sm font-medium rounded-lg inline-flex items-center gap-2 cursor-not-allowed"
@@ -351,6 +369,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
       {/* Modais */}
       {modalEnviarCot && (
         <ModalEnviarCotacao
+          preSelecionarMode={preSelecionarMode}
           rm={rm}
           outrasRMs={outrasRMs}
           onClose={() => setModalEnviarCot(false)}
@@ -1269,7 +1288,7 @@ function ModalCancelarItem({ item, rmId, onClose, onSaved }) {
   );
 }
 
-function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent }) {
+function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionarMode = null }) {
   // RMs incluidas no envio: a atual sempre, mais as escolhidas via checkbox
   const [rmsExtrasIds, setRmsExtrasIds] = useState(new Set());
   // Itens cotaveis (RM atual + extras selecionadas), recalculado quando muda extras
@@ -1287,10 +1306,23 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent }) {
     return [...base, ...extras];
   }, [rm, outrasRMs, rmsExtrasIds]);
 
-  // Itens selecionados — começa com tudo, mantem os ids ainda válidos
-  const [itensSelecionados, setItensSelecionados] = useState(
-    new Set(rm.itens.filter((it) => ["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status)).map((it) => it.id))
-  );
+  // Itens selecionados — começa de acordo com o preSelecionarMode:
+  // - "sem-proposta": só itens marcados COTADO sem proposta com preço
+  // - null/default: todos os itens cotaveis (comportamento normal)
+  const [itensSelecionados, setItensSelecionados] = useState(() => {
+    if (preSelecionarMode === "sem-proposta") {
+      return new Set(
+        rm.itens
+          .filter((it) => it.status === "COTADO" && it.temPropostaComPreco === false)
+          .map((it) => it.id)
+      );
+    }
+    return new Set(
+      rm.itens
+        .filter((it) => ["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status))
+        .map((it) => it.id)
+    );
+  });
   // Quando uma RM extra é incluída, marca os itens dela automaticamente.
   // Quando é removida, desmarca os ids dela.
   const toggleRmExtra = (rmExtraId) => {
@@ -1406,6 +1438,18 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent }) {
         {erro && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
             <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+
+        {preSelecionarMode === "sem-proposta" && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">Modo: Re-cotar itens sem proposta</p>
+              <p className="text-xs mt-0.5">
+                Já marcamos só os itens que o fornecedor anterior não precificou. Adicione um novo fornecedor abaixo pra enviar.
+              </p>
+            </div>
           </div>
         )}
 
