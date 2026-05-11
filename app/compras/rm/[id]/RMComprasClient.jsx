@@ -6,7 +6,7 @@ import {
   CheckCircle2, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
   Upload, Sparkles,
 } from "lucide-react";
-import { labelCategoria } from "@/lib/op-categorias";
+import { labelCategoria, CATEGORIAS_MATERIAL, CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO } from "@/lib/op-categorias";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -39,6 +39,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
   const [modalCancelarItem, setModalCancelarItem] = useState(null);
   const [modalEncerrarRM, setModalEncerrarRM] = useState(false);
   const [modalEnviarCot, setModalEnviarCot] = useState(false);
+  const [modalEditarCategorias, setModalEditarCategorias] = useState(false);
   // Quando o usuario clica "Re-cotar Sem Proposta", o modal abre ja filtrando
   // os itens. Reseta pro modo normal ao fechar.
   const [preSelecionarMode, setPreSelecionarMode] = useState(null);
@@ -201,15 +202,30 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
           ))}
         </div>
 
-        {rm.tipoRM === "ENGENHARIA" && rm.categoriasOP?.length > 0 && (
+        {rm.tipoRM === "ENGENHARIA" && (
           <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-xs text-torg-gray mb-2">Cobre as categorias do escopo</p>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-xs text-torg-gray">Cobre as categorias do escopo</p>
+              {(isAdmin || userRole === "COMPRAS") && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA" && (
+                <button
+                  onClick={() => setModalEditarCategorias(true)}
+                  className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"
+                  title="Editar as categorias cobertas por essa RM"
+                >
+                  <Edit2 size={12} /> Editar
+                </button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
-              {rm.categoriasOP.map((cat) => (
-                <span key={cat} className="text-xs px-2 py-1 rounded-full bg-torg-blue text-white font-medium">
-                  {labelCategoria(cat)}
-                </span>
-              ))}
+              {(rm.categoriasOP || []).length > 0 ? (
+                rm.categoriasOP.map((cat) => (
+                  <span key={cat} className="text-xs px-2 py-1 rounded-full bg-torg-blue text-white font-medium">
+                    {labelCategoria(cat)}
+                  </span>
+                ))
+              ) : (
+                <span className="text-xs text-torg-gray italic">Nenhuma categoria selecionada</span>
+              )}
             </div>
           </div>
         )}
@@ -403,6 +419,13 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
           rm={rm}
           onClose={() => setModalEncerrarRM(false)}
           onSaved={() => { router.refresh(); router.push("/compras"); }}
+        />
+      )}
+      {modalEditarCategorias && (
+        <ModalEditarCategorias
+          rm={rm}
+          onClose={() => setModalEditarCategorias(false)}
+          onSaved={() => { setModalEditarCategorias(false); router.refresh(); }}
         />
       )}
     </>
@@ -1760,6 +1783,105 @@ function ModalEncerrarRM({ rm, onClose, onSaved }) {
           className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
         >
           {salvando && <Loader2 size={14} className="animate-spin" />} Encerrar RM
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// Modal de edicao das categorias da OP que essa RM cobre. Permite (des)marcar
+// categorias de Material / Aluguel / Outro. Mudancas vao via PATCH na RM.
+function ModalEditarCategorias({ rm, onClose, onSaved }) {
+  const [selecionadas, setSelecionadas] = useState(new Set(rm.categoriasOP || []));
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const toggle = (codigo) => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(codigo)) next.delete(codigo);
+      else next.add(codigo);
+      return next;
+    });
+  };
+
+  const salvar = async () => {
+    setErro("");
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/rm/${rm.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          acao: "atualizar_categorias",
+          categoriasOP: Array.from(selecionadas),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  const grupos = [
+    { titulo: "Material", itens: CATEGORIAS_MATERIAL },
+    { titulo: "Aluguel", itens: CATEGORIAS_ALUGUEL },
+    { titulo: "Outro", itens: [CATEGORIA_OUTRO] },
+  ];
+
+  return (
+    <Modal titulo="Editar categorias do escopo" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+        <p className="text-xs text-torg-gray">
+          Marque as categorias do escopo da OP que essa RM cobre. Usada pra controle de verba e relatórios.
+        </p>
+        {grupos.map((g) => (
+          <div key={g.titulo}>
+            <p className="text-xs font-semibold text-torg-dark mb-1.5 uppercase tracking-wide">{g.titulo}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {g.itens.map((cat) => {
+                const checked = selecionadas.has(cat.codigo);
+                return (
+                  <label
+                    key={cat.codigo}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm ${
+                      checked
+                        ? "bg-torg-blue-50 border-torg-blue-200 text-torg-dark"
+                        : "bg-white border-gray-200 text-torg-gray hover:bg-gray-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggle(cat.codigo)}
+                      className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                    />
+                    <span className="flex-1">{cat.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+          Cancelar
+        </button>
+        <button
+          onClick={salvar}
+          disabled={salvando}
+          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+        >
+          {salvando && <Loader2 size={14} className="animate-spin" />} Salvar
         </button>
       </div>
     </Modal>

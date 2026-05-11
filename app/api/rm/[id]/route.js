@@ -3,9 +3,13 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
-const patchSchema = z.object({
-  acao: z.enum(["desvincular"]),
-});
+const patchSchema = z.discriminatedUnion("acao", [
+  z.object({ acao: z.literal("desvincular") }),
+  z.object({
+    acao: z.literal("atualizar_categorias"),
+    categoriasOP: z.array(z.string()),
+  }),
+]);
 
 // PATCH — acoes pontuais sobre a RM. Hoje suporta 'desvincular' (tira a RM da OP).
 export async function PATCH(req, { params }) {
@@ -62,6 +66,24 @@ export async function PATCH(req, { params }) {
     });
 
     return NextResponse.json({ ok: true });
+  }
+
+  if (body.acao === "atualizar_categorias") {
+    const novasCategorias = body.categoriasOP || [];
+    await prisma.rM.update({
+      where: { id: rm.id },
+      data: { categoriasOP: novasCategorias },
+    });
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "atualizar_categorias_rm",
+        entity: "RM",
+        entityId: rm.id,
+        diff: { numero: rm.numero, de: rm.categoriasOP, para: novasCategorias },
+      },
+    });
+    return NextResponse.json({ ok: true, categoriasOP: novasCategorias });
   }
 
   return NextResponse.json({ error: "Acao desconhecida" }, { status: 400 });
