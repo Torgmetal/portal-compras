@@ -206,11 +206,11 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
           <div className="mt-4 pt-4 border-t border-gray-100">
             <div className="flex items-center justify-between gap-2 mb-2">
               <p className="text-xs text-torg-gray">Cobre as categorias do escopo</p>
-              {(isAdmin || userRole === "COMPRAS") && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA" && (
+              {(isAdmin || userRole === "COMPRAS") && (
                 <button
                   onClick={() => setModalEditarCategorias(true)}
                   className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"
-                  title="Editar as categorias cobertas por essa RM"
+                  title="Editar as categorias cobertas por essa RM (metadata — não afeta pedidos já gerados)"
                 >
                   <Edit2 size={12} /> Editar
                 </button>
