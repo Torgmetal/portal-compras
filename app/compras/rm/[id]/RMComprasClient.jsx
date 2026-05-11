@@ -214,68 +214,84 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
           </div>
         )}
 
-        {/* Ações */}
-        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+        {/* Ações — 3 grupos: Próximas ações | Vínculo | Destrutivas */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 mt-4 pt-4 border-t border-gray-100">
+          {/* Grupo 1: Próximas ações (cotação / fechar pedido) */}
           <button
             onClick={() => { setPreSelecionarMode(null); setModalEnviarCot(true); }}
             disabled={rm.status === "PEDIDO_GERADO" || rm.status === "CANCELADA"}
-            className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-9 px-3.5 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Mail size={16} /> Enviar Cotação
+            <Mail size={15} /> Enviar Cotação
           </button>
           {qtdSemPropostaRm > 0 && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA" && (
             <button
               onClick={() => { setPreSelecionarMode("sem-proposta"); setModalEnviarCot(true); }}
-              className="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 inline-flex items-center gap-2"
+              className="h-9 px-3.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 inline-flex items-center gap-1.5"
               title={`Envia cotação só pros ${qtdSemPropostaRm} itens que ficaram sem proposta`}
             >
-              <Mail size={16} /> Re-cotar Sem Proposta ({qtdSemPropostaRm})
+              <Mail size={15} /> Re-cotar Sem Proposta
+              <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full ml-0.5">{qtdSemPropostaRm}</span>
             </button>
           )}
-          <div className="ml-auto flex gap-2 flex-wrap">
-            {rm.opId && rm.status !== "PEDIDO_GERADO" && (
-              <button
-                onClick={desvincularDaOP}
-                disabled={desvinculando}
-                className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-2 disabled:opacity-50"
-              >
-                {desvinculando ? <Loader2 size={16} className="animate-spin" /> : <Unlink size={16} />}
-                Desvincular da OP
-              </button>
-            )}
-            {podeFecharComoPedido && (
-              <button
-                onClick={fecharComoPedidoGerado}
-                disabled={fechandoComoPedido}
-                className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2 disabled:opacity-50"
-                title={itensLeftover > 0
-                  ? `Marca RM como Pedido Gerado e cancela ${itensLeftover} item(ns) leftover`
-                  : "Marca RM como Pedido Gerado"}
-              >
-                {fechandoComoPedido ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                Fechar como Pedido Gerado
-                {itensLeftover > 0 && <span className="text-[10px] opacity-80">({itensPedidoGerado}+{itensLeftover} cancelar)</span>}
-              </button>
-            )}
-            {podeEncerrar && (
-              <button
-                onClick={() => setModalEncerrarRM(true)}
-                className="px-4 py-2 bg-white border border-torg-orange-200 text-torg-orange-700 text-sm font-medium rounded-lg hover:bg-torg-orange-50 inline-flex items-center gap-2"
-              >
-                <XCircle size={16} /> Cancelar RM
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                onClick={excluirRM}
-                disabled={excluindo}
-                className="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 inline-flex items-center gap-2 disabled:opacity-50"
-              >
-                {excluindo ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                Excluir
-              </button>
-            )}
-          </div>
+          {podeFecharComoPedido && (
+            <button
+              onClick={fecharComoPedidoGerado}
+              disabled={fechandoComoPedido}
+              className="h-9 px-3.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 inline-flex items-center gap-1.5 disabled:opacity-50"
+              title={itensLeftover > 0
+                ? `Marca RM como Pedido Gerado: ${itensPedidoGerado} ja em pedido + ${itensLeftover} serao cancelados`
+                : `Marca RM como Pedido Gerado (${itensPedidoGerado} itens)`}
+            >
+              {fechandoComoPedido ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+              Fechar como Pedido Gerado
+              {itensLeftover > 0 && (
+                <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full ml-0.5">+{itensLeftover}</span>
+              )}
+            </button>
+          )}
+
+          {/* Spacer empurra os secundarios pra direita */}
+          <div className="flex-1 min-w-[12px]" />
+
+          {/* Grupo 2: Vinculo (sutil) */}
+          {rm.opId && rm.status !== "PEDIDO_GERADO" && (
+            <button
+              onClick={desvincularDaOP}
+              disabled={desvinculando}
+              className="h-9 px-3 text-torg-gray text-sm font-medium rounded-lg hover:bg-gray-100 inline-flex items-center gap-1.5 disabled:opacity-50"
+              title="Desvincula a RM da OP — itens voltam pro estado original"
+            >
+              {desvinculando ? <Loader2 size={15} className="animate-spin" /> : <Unlink size={15} />}
+              Desvincular
+            </button>
+          )}
+
+          {/* Grupo 3: Destrutivas */}
+          {(podeEncerrar || isAdmin) && (
+            <div className="flex items-center gap-2 pl-2 ml-1 border-l border-gray-200">
+              {podeEncerrar && (
+                <button
+                  onClick={() => setModalEncerrarRM(true)}
+                  className="h-9 px-3 text-torg-orange-700 text-sm font-medium rounded-lg hover:bg-torg-orange-50 inline-flex items-center gap-1.5"
+                  title="Cancela a RM"
+                >
+                  <XCircle size={15} /> Cancelar RM
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={excluirRM}
+                  disabled={excluindo}
+                  className="h-9 px-3 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 inline-flex items-center gap-1.5 disabled:opacity-50"
+                  title="Exclui a RM permanentemente"
+                >
+                  {excluindo ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
+                  Excluir
+                </button>
+              )}
+            </div>
+          )}
         </div>
         {erroExcluir && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2 flex items-start gap-2 mt-3">
