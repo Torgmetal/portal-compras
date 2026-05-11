@@ -859,6 +859,11 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
   const [prazoEntrega, setPrazoEntrega] = useState("");
   const [condicaoPagamento, setCondicaoPagamento] = useState("");
   const [observacao, setObservacao] = useState("");
+  // Total da nota declarado pelo fornecedor (PDF). Quando preenchido, vira
+  // a "fonte da verdade" do total — gerar-pedidos vai escalar precos pra bater.
+  const [totalPropostaInput, setTotalPropostaInput] = useState(
+    cotacao.totalProposta ? String(cotacao.totalProposta) : ""
+  );
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [arquivoNome, setArquivoNome] = useState("");
@@ -978,6 +983,7 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
 
     setSalvando(true);
     try {
+      const totalPropostaNum = parseFloat(String(totalPropostaInput).replace(",", "."));
       const res = await fetch(`/api/cotacao/${cotacao.id}/lancar-manual`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -988,6 +994,7 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
           prazoEntrega: prazoEntrega || null,
           condicaoPagamento: condicaoPagamento || null,
           observacao: observacao || null,
+          totalProposta: !isNaN(totalPropostaNum) && totalPropostaNum > 0 ? totalPropostaNum : null,
         }),
       });
       const data = await res.json();
@@ -1191,11 +1198,43 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={5} className="px-2 py-2 text-right text-torg-gray">Total bruto:</td>
+                    <td colSpan={5} className="px-2 py-2 text-right text-torg-gray">Total bruto (calculado):</td>
                     <td className="px-2 py-2 text-right font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(total)}</td>
                   </tr>
                 </tfoot>
               </table>
+            </div>
+            {/* Total da NF do fornecedor — ajuste pra bater com o PDF da proposta */}
+            <div className="mt-3 bg-amber-50/60 border border-amber-200 rounded-lg p-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-torg-dark inline-flex items-center gap-1.5">
+                    <FileText size={14} className="text-amber-700" /> Total da nota (PDF do fornecedor)
+                  </p>
+                  <p className="text-xs text-torg-gray mt-0.5">
+                    Preencha o valor total exato do PDF do fornecedor. Se preenchido, os preços vão ser ajustados proporcionalmente na hora de gerar o pedido no Omie pra bater com esse total. Deixe vazio pra usar o calculado.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="inline-flex items-center bg-white border border-amber-300 rounded-lg overflow-hidden">
+                    <span className="px-2 text-xs text-torg-gray">R$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={totalPropostaInput}
+                      onChange={(e) => setTotalPropostaInput(e.target.value)}
+                      placeholder="0,00"
+                      className="w-32 px-2 py-1.5 text-right text-sm font-bold text-amber-700 tabular-nums focus:outline-none"
+                    />
+                  </div>
+                  {totalPropostaInput && parseFloat(String(totalPropostaInput).replace(",", ".")) > 0 && (
+                    <p className="text-[10px] text-torg-gray mt-1 tabular-nums">
+                      Diff calc: {fmtMoeda(parseFloat(String(totalPropostaInput).replace(",", ".")) - total)}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
