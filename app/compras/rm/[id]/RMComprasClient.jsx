@@ -254,21 +254,8 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
           {/* Spacer empurra os secundarios pra direita */}
           <div className="flex-1 min-w-[12px]" />
 
-          {/* Grupo 2: Vinculo (sutil) */}
-          {rm.opId && rm.status !== "PEDIDO_GERADO" && (
-            <button
-              onClick={desvincularDaOP}
-              disabled={desvinculando}
-              className="h-9 px-3 text-torg-gray text-sm font-medium rounded-lg hover:bg-gray-100 inline-flex items-center gap-1.5 disabled:opacity-50"
-              title="Desvincula a RM da OP — itens voltam pro estado original"
-            >
-              {desvinculando ? <Loader2 size={15} className="animate-spin" /> : <Unlink size={15} />}
-              Desvincular
-            </button>
-          )}
-
-          {/* Grupo 3: Destrutivas */}
-          {(podeEncerrar || isAdmin) && (
+          {/* Grupo 2: Destrutivas + Desvincular (todas ghost/sutis) */}
+          {(podeEncerrar || isAdmin || rm.opId) && (
             <div className="flex items-center gap-2 pl-2 ml-1 border-l border-gray-200">
               {podeEncerrar && (
                 <button
@@ -288,6 +275,17 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
                 >
                   {excluindo ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                   Excluir
+                </button>
+              )}
+              {rm.opId && rm.status !== "PEDIDO_GERADO" && (
+                <button
+                  onClick={desvincularDaOP}
+                  disabled={desvinculando}
+                  className="h-9 px-3 text-torg-gray text-sm font-medium rounded-lg hover:bg-gray-100 inline-flex items-center gap-1.5 disabled:opacity-50"
+                  title="Desvincula a RM da OP — itens voltam pro estado original"
+                >
+                  {desvinculando ? <Loader2 size={15} className="animate-spin" /> : <Unlink size={15} />}
+                  Desvincular
                 </button>
               )}
             </div>
