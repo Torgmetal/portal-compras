@@ -70,6 +70,20 @@ export default async function PainelOPDetalhe({ params }) {
 
   if (!op) notFound();
 
+  // Conta cotações por RM considerando consolidadas: uma cotação consolidada
+  // que tem itens de varias RMs conta pra cada RM envolvida (nao so a primaria).
+  const rmIdsDaOP = op.rms.map((r) => r.id);
+  const cotItensDaOP = await prisma.cotacaoItem.findMany({
+    where: { rmItem: { rmId: { in: rmIdsDaOP } } },
+    select: { cotacaoId: true, rmItem: { select: { rmId: true } } },
+  });
+  const cotacoesPorRm = new Map();
+  for (const ci of cotItensDaOP) {
+    const rid = ci.rmItem.rmId;
+    if (!cotacoesPorRm.has(rid)) cotacoesPorRm.set(rid, new Set());
+    cotacoesPorRm.get(rid).add(ci.cotacaoId);
+  }
+
   // Verba estimada total (base + aditivos)
   const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);
   const verbaAditivos = op.aditivos.reduce(
@@ -188,6 +202,8 @@ export default async function PainelOPDetalhe({ params }) {
             {data.rms.map((rm) => {
               const pedidosDaRm = pedidosFlat.filter((p) => p.rmNumero === rm.numero && p.status === "CRIADO");
               const totalPedidosRm = pedidosDaRm.reduce((s, p) => s + (p.total || 0), 0);
+              // Contagem considera cotacoes consolidadas que tocam essa RM
+              const qtdCotacoes = cotacoesPorRm.get(rm.id)?.size ?? rm.cotacoes.length;
               return (
               <li key={rm.id} className="px-6 py-3 flex items-center justify-between hover:bg-gray-50">
                 <div className="flex items-center gap-3">
@@ -199,7 +215,7 @@ export default async function PainelOPDetalhe({ params }) {
                 </div>
                 <div className="flex items-center gap-3 text-xs text-torg-gray">
                   <span>{rm.itens.length} itens</span>
-                  <span>{rm.cotacoes.length} cotações</span>
+                  <span>{qtdCotacoes} cotações</span>
                   {pedidosDaRm.length > 0 && (
                     <span className="text-torg-blue font-medium" title={`${pedidosDaRm.length} pedido(s) — ${fmtMoeda(totalPedidosRm)}`}>
                       {pedidosDaRm.length} pedido{pedidosDaRm.length !== 1 ? "s" : ""}

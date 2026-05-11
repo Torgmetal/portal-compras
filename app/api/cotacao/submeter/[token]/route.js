@@ -107,22 +107,24 @@ export async function POST(req, { params }) {
       },
     });
 
-    // Atualiza RMItens dessa cotação pra status COTADO (se ainda EM_COTACAO)
-    const rmItemIds = await tx.cotacaoItem.findMany({
+    // Atualiza RMItens dessa cotação pra status COTADO (se ainda EM_COTACAO).
+    // Cotação pode ser consolidada (rmItens de varias RMs) — pega todos.
+    const cotItens = await tx.cotacaoItem.findMany({
       where: { cotacaoId: cotacao.id },
-      select: { rmItemId: true },
+      select: { rmItemId: true, rmItem: { select: { rmId: true } } },
     });
     await tx.rMItem.updateMany({
       where: {
-        id: { in: rmItemIds.map((c) => c.rmItemId) },
+        id: { in: cotItens.map((c) => c.rmItemId) },
         status: "EM_COTACAO",
       },
       data: { status: "COTADO" },
     });
 
-    // Atualiza status da RM se ainda EM_COTACAO
+    // Atualiza status de TODAS as RMs envolvidas (multi-RM consolidada)
+    const rmIdsEnvolvidas = [...new Set(cotItens.map((c) => c.rmItem.rmId))];
     await tx.rM.updateMany({
-      where: { id: cotacao.rmId, status: "EM_COTACAO" },
+      where: { id: { in: rmIdsEnvolvidas }, status: "EM_COTACAO" },
       data: { status: "COTADA" },
     });
 

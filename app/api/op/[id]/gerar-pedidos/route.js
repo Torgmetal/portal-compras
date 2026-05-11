@@ -44,49 +44,69 @@ export async function POST(req, { params }) {
               aditivoItem: { select: { faturamentoDireto: true, codigoOmie: true, categoria: true } },
             },
           },
-          cotacoes: {
-            where: { status: "RECEBIDA" },
-            include: {
-              itens: { where: { vencedor: true } },
-            },
-          },
         },
       },
     },
   });
   if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
 
-  // Agrupa: { [cotacaoId × isFD]: { cotacao, isFD, rmItens[], cotItens[] } }
+  // Mapa global de RMItem por id — inclui itens de todas as RMs da OP.
+  // Usado pra resolver itens de cotacoes consolidadas (multi-RM) onde
+  // o rmItem pode pertencer a uma RM diferente da rmId primaria da cotacao.
+  const rmIdsDaOP = op.rms.map((r) => r.id);
+  const itemPorId = new Map(); // rmItemId -> { rmItem, rm }
+  for (const rm of op.rms) {
+    for (const item of rm.itens) {
+      itemPorId.set(item.id, { rmItem: item, rm });
+    }
+  }
+
+  // Busca todas as cotacoes RECEBIDAS que tocam essa OP — primaria por rmId
+  // OU por qualquer item ligado a uma RM dessa OP (consolidadas).
+  const cotacoesRecebidas = await prisma.cotacao.findMany({
+    where: {
+      status: "RECEBIDA",
+      OR: [
+        { rmId: { in: rmIdsDaOP } },
+        { itens: { some: { rmItem: { rmId: { in: rmIdsDaOP } } } } },
+      ],
+    },
+    include: {
+      itens: { where: { vencedor: true } },
+    },
+  });
+
+  // Agrupa: { [cotacaoId × isFD]: { cotacao, isFD, linhas[], rmIdsEnvolvidas } }
   const grupos = new Map();
 
-  for (const rm of op.rms) {
-    for (const cot of rm.cotacoes) {
-      // Filtro: gera so as cotacoes selecionadas (modo 1-a-1)
-      if (cotacoesFiltro && !cotacoesFiltro.includes(cot.id)) continue;
-      for (const ci of cot.itens) {
-        if (!ci.vencedor || !ci.precoUnit || ci.precoUnit <= 0) continue;
-        const rmItem = rm.itens.find((i) => i.id === ci.rmItemId);
-        if (!rmItem) continue;
-        if (rmItem.status === "PEDIDO_GERADO" || rmItem.status === "CANCELADO") continue;
+  for (const cot of cotacoesRecebidas) {
+    // Filtro: gera so as cotacoes selecionadas (modo 1-a-1)
+    if (cotacoesFiltro && !cotacoesFiltro.includes(cot.id)) continue;
+    for (const ci of cot.itens) {
+      if (!ci.vencedor || !ci.precoUnit || ci.precoUnit <= 0) continue;
+      const entry = itemPorId.get(ci.rmItemId);
+      if (!entry) continue; // item de RM fora dessa OP — pula
+      const { rmItem, rm } = entry;
+      if (rmItem.status === "PEDIDO_GERADO" || rmItem.status === "CANCELADO") continue;
 
-        const isFD =
-          rmItem.opItem?.faturamentoDireto || rmItem.aditivoItem?.faturamentoDireto || false;
-        // Prioridade: codigo do RMItem (vem do xlsx do Tekla, mais especifico) >
-        // codigo do OPItem/AditivoItem (cadastrado pelo Comercial) > produto generico
-        const codigoOmieItem =
-          rmItem.codigo || rmItem.opItem?.codigoOmie || rmItem.aditivoItem?.codigoOmie || null;
-        const chave = `${cot.id}|${isFD ? "FD" : "NORMAL"}`;
+      const isFD =
+        rmItem.opItem?.faturamentoDireto || rmItem.aditivoItem?.faturamentoDireto || false;
+      // Prioridade: codigo do RMItem (vem do xlsx do Tekla, mais especifico) >
+      // codigo do OPItem/AditivoItem (cadastrado pelo Comercial) > produto generico
+      const codigoOmieItem =
+        rmItem.codigo || rmItem.opItem?.codigoOmie || rmItem.aditivoItem?.codigoOmie || null;
+      const chave = `${cot.id}|${isFD ? "FD" : "NORMAL"}`;
 
-        if (!grupos.has(chave)) {
-          grupos.set(chave, {
-            cotacao: cot,
-            rm,
-            isFD,
-            linhas: [],
-          });
-        }
-        grupos.get(chave).linhas.push({ rmItem, cotItem: ci, codigoOmieItem });
+      if (!grupos.has(chave)) {
+        grupos.set(chave, {
+          cotacao: cot,
+          isFD,
+          linhas: [],
+          rmIdsEnvolvidas: new Set(),
+        });
       }
+      grupos.get(chave).rmIdsEnvolvidas.add(rm.id);
+      grupos.get(chave).linhas.push({ rmItem, cotItem: ci, codigoOmieItem, rm });
     }
   }
 
@@ -100,7 +120,13 @@ export async function POST(req, { params }) {
   const resultados = [];
 
   for (const grupo of grupos.values()) {
-    const { cotacao, rm, isFD, linhas } = grupo;
+    const { cotacao, isFD, linhas, rmIdsEnvolvidas } = grupo;
+
+    // Lista de RMs envolvidas — pode ser mais de uma em cotacao consolidada
+    const rmNumeros = [...rmIdsEnvolvidas]
+      .map((id) => op.rms.find((r) => r.id === id)?.numero)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
     const itensPayload = linhas.map((l) => ({
       codigo: l.codigoOmieItem || null,
@@ -111,9 +137,15 @@ export async function POST(req, { params }) {
     }));
 
     const total = itensPayload.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
-    const cNumPedido = `${rm.numero}${isFD ? "-FD" : ""}`;
+    // cNumPedido tem limite de tamanho no Omie — quando multi-RM, usa "RM1+N"
+    const cNumPedido =
+      rmNumeros.length === 1
+        ? `${rmNumeros[0]}${isFD ? "-FD" : ""}`
+        : `${rmNumeros[0]}+${rmNumeros.length - 1}${isFD ? "-FD" : ""}`;
     const observacaoBase = [
-      `Pedido via Workspace Torg — RM ${rm.numero}`,
+      rmNumeros.length === 1
+        ? `Pedido via Workspace Torg — RM ${rmNumeros[0]}`
+        : `Pedido via Workspace Torg — RMs ${rmNumeros.join(", ")}`,
       `Cliente: ${op.cliente}`,
       isFD ? "FATURAMENTO DIRETO — encerrar sem contas a pagar" : null,
       cotacao.observacao || null,

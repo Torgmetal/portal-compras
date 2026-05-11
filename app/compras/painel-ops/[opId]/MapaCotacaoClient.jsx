@@ -811,14 +811,18 @@ function buildMatriz(op) {
   const fornMap = new Map(); // cotacaoId -> { cotacaoId, fornecedorNome }
   const itensMap = new Map(); // rmItemId -> { ...item, celulas: [] }
 
+  // Mapa global: rmItemId -> { rmItem, rmNumero, categoria }
+  // Necessario pra cotacoes consolidadas onde rm.cotacoes inclui itens
+  // que pertencem a outras RMs da mesma OP.
+  const itemPorId = new Map();
   for (const rm of op.rms) {
-    // Mapeia categoria por rmItem (vem do opItem ou aditivoItem)
-    const catByRmItem = new Map();
     for (const it of rm.itens) {
       const cat = it.opItem?.categoria || it.aditivoItem?.categoria || null;
-      catByRmItem.set(it.id, cat);
+      itemPorId.set(it.id, { rmItem: it, rmNumero: rm.numero, categoria: cat });
     }
+  }
 
+  for (const rm of op.rms) {
     for (const cot of rm.cotacoes) {
       if (cot.status !== "RECEBIDA") continue;
       if (!fornMap.has(cot.id)) {
@@ -832,17 +836,18 @@ function buildMatriz(op) {
 
       for (const ci of cot.itens) {
         if (!ci.precoUnit || ci.precoUnit <= 0) continue;
-        // Garante que o RMItem está na matriz
+        // Garante que o RMItem está na matriz (lookup global — multi-RM)
         if (!itensMap.has(ci.rmItemId)) {
-          const rmItem = rm.itens.find((i) => i.id === ci.rmItemId);
-          if (!rmItem) continue;
+          const entry = itemPorId.get(ci.rmItemId);
+          if (!entry) continue;
+          const { rmItem, rmNumero, categoria } = entry;
           itensMap.set(ci.rmItemId, {
             rmItemId: rmItem.id,
-            rmNumero: rm.numero,
+            rmNumero,
             descricao: rmItem.descricao,
             qtd: rmItem.peso > 0 ? Number(rmItem.peso).toFixed(2) : rmItem.qtd,
             unidade: rmItem.peso > 0 ? "KG" : rmItem.unidade,
-            categoria: catByRmItem.get(rmItem.id),
+            categoria,
             // Status do RMItem — se ja virou pedido, podemos esconder/destacar
             itemStatus: rmItem.status,
             jaPedido: rmItem.status === "PEDIDO_GERADO",

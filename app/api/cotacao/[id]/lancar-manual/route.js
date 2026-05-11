@@ -142,8 +142,15 @@ export async function POST(req, { params }) {
       data: { status: "COTADO" },
     });
 
+    // Atualiza status de TODAS as RMs envolvidas (multi-RM consolidada).
+    // Descobre rmIds via rmItens lancados nessa proposta.
+    const rmIdsEnvolvidas = await tx.rMItem.findMany({
+      where: { id: { in: itensValidos.map((it) => it.rmItemId) } },
+      select: { rmId: true },
+    });
+    const rmIdsUnicos = [...new Set(rmIdsEnvolvidas.map((r) => r.rmId))];
     await tx.rM.updateMany({
-      where: { id: cotacao.rmId, status: { in: ["ABERTA", "EM_COTACAO"] } },
+      where: { id: { in: rmIdsUnicos }, status: { in: ["ABERTA", "EM_COTACAO"] } },
       data: { status: "COTADA" },
     });
 
