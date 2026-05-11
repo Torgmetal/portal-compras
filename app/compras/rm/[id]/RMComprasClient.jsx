@@ -319,8 +319,8 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
                     <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
                     <td className="px-3 py-1.5 text-torg-dark font-medium">{it.descricao}</td>
                     <td className="px-3 py-1.5 text-torg-gray text-xs">{it.material || "—"}</td>
-                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.qtd} {it.unidade}</td>
-                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.peso ? Number(it.peso).toFixed(2) : "—"}</td>
+                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap">{it.qtd} {it.unidade}</td>
+                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap">{it.peso ? Number(it.peso).toFixed(2) : "—"}</td>
                     <td className="px-3 py-1.5">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap inline-block ${statusItem.className}`}>
                         {statusItem.label}
