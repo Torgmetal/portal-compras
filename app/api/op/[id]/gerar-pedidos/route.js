@@ -128,15 +128,28 @@ export async function POST(req, { params }) {
       .filter(Boolean)
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-    const itensPayload = linhas.map((l) => ({
-      codigo: l.codigoOmieItem || null,
-      descricao: l.rmItem.descricao,
-      unidade: l.rmItem.unidade,
-      qtd: Number(l.cotItem.qtdCotada) || 0,
-      precoUnit: Number(l.cotItem.precoUnit) || 0,
-    }));
+    // Embute IPI no preco unitario enviado ao Omie pra que o TOTAL do pedido
+    // bata com o valor da nota fiscal que o fornecedor vai emitir.
+    // ICMS nao entra (ele vem implicito no preco bruto e e creditado pela Torg).
+    // PedidoOmie.total armazena o mesmo valor (com IPI), facilitando conciliacao.
+    const itensPayload = linhas.map((l) => {
+      const ipiPct = Number(l.cotItem.ipiPct) || 0;
+      const precoBruto = Number(l.cotItem.precoUnit) || 0;
+      const precoComIPI = precoBruto * (1 + ipiPct / 100);
+      return {
+        codigo: l.codigoOmieItem || null,
+        descricao: l.rmItem.descricao,
+        unidade: l.rmItem.unidade,
+        qtd: Number(l.cotItem.qtdCotada) || 0,
+        // Preco unitario com IPI ja incluso — total do Omie = total da NF do fornecedor
+        precoUnit: precoComIPI,
+      };
+    });
 
     const total = itensPayload.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
+
+    // Indica se houve algum item com IPI > 0 — pra adicionar nota na observacao
+    const temIPI = linhas.some((l) => Number(l.cotItem.ipiPct) > 0);
     // cNumPedido tem limite de tamanho no Omie — quando multi-RM, usa "RM1+N"
     const cNumPedido =
       rmNumeros.length === 1
@@ -148,6 +161,7 @@ export async function POST(req, { params }) {
         : `Pedido via Workspace Torg — RMs ${rmNumeros.join(", ")}`,
       `Cliente: ${op.cliente}`,
       isFD ? "FATURAMENTO DIRETO — encerrar sem contas a pagar" : null,
+      temIPI ? "Preço unitário inclui IPI (para bater total com NF do fornecedor)" : null,
       cotacao.observacao || null,
     ]
       .filter(Boolean)
