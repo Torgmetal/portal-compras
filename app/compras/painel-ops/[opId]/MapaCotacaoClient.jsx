@@ -123,25 +123,37 @@ export default function MapaCotacaoClient({ op }) {
   }
 
   // Total por fornecedor (soma dos itens vencidos) + lista de itens vencidos
-  // Usa preço líquido (já considera ICMS por dentro + IPI por fora) pra
-  // comparação justa entre fornecedores de regimes diferentes.
+  // Mostra o VALOR DA NOTA (bruto + IPI) pra bater com o PDF da proposta
+  // do fornecedor. ICMS recuperado como credito fica em "Custo liquido" como
+  // info secundaria pra acompanhar o custo real Torg.
   // IMPORTANTE: usa itensTodos (nao o filtrado por mostrarPedidos) — totais devem
   // refletir TUDO que foi decidido, incluindo o que ja virou pedido.
-  const totaisPorFornecedor = {};
+  const totaisPorFornecedor = {}; // valor da nota (bruto + IPI)
+  const totaisLiquidoPorFornecedor = {}; // custo real Torg apos credito ICMS
   const itensPorFornecedor = {};
   let totalEmPedidos = 0;
   let totalAGerar = 0;
+  let totalLiquidoGeral = 0;
   for (const f of fornecedores) {
     totaisPorFornecedor[f.cotacaoId] = 0;
+    totaisLiquidoPorFornecedor[f.cotacaoId] = 0;
     itensPorFornecedor[f.cotacaoId] = [];
   }
   for (const it of itensTodos) {
     for (const cell of it.celulas) {
       if (cell?.vencedor) {
-        const valor = (cell.precoLiquido || cell.precoUnit || 0) * (cell.qtdCotada || 0);
-        totaisPorFornecedor[cell.cotacaoId] += valor;
-        if (it.jaPedido) totalEmPedidos += valor;
-        else if (!it.cancelado) totalAGerar += valor;
+        const ipiPct = Number(cell.ipiPct) || 0;
+        const qtd = Number(cell.qtdCotada) || 0;
+        const precoUnit = Number(cell.precoUnit) || 0;
+        // Valor da nota = bruto × (1 + IPI%) — bate com "Preço total" do PDF
+        const valorNota = precoUnit * qtd * (1 + ipiPct / 100);
+        // Valor liquido = custo real Torg apos creditar ICMS
+        const valorLiquido = (cell.precoLiquido || precoUnit) * qtd;
+        totaisPorFornecedor[cell.cotacaoId] += valorNota;
+        totaisLiquidoPorFornecedor[cell.cotacaoId] += valorLiquido;
+        if (it.jaPedido) totalEmPedidos += valorNota;
+        else if (!it.cancelado) totalAGerar += valorNota;
+        totalLiquidoGeral += valorLiquido;
         // So inclui em itensPorFornecedor (lista pra gerar pedido) o que ainda
         // nao virou pedido nem foi cancelado — gerar de novo daria duplicidade.
         if (!it.jaPedido && !it.cancelado) {
@@ -153,7 +165,8 @@ export default function MapaCotacaoClient({ op }) {
             precoLiquido: cell.precoLiquido,
             icmsPct: cell.icmsPct,
             ipiPct: cell.ipiPct,
-            total: valor,
+            total: valorNota,
+            totalLiquido: valorLiquido,
           });
         }
       }
@@ -162,13 +175,20 @@ export default function MapaCotacaoClient({ op }) {
   const totalGeral = Object.values(totaisPorFornecedor).reduce((s, n) => s + n, 0);
   // Totais apenas dos itens que ainda nao viraram pedido — usado em
   // "Resumo dos pedidos a gerar" e no Modal de gerar pedidos.
+  // Inclui valor da nota (pra mostrar) e liquido (pra info secundaria).
   const totaisAGerarPorFornecedor = {};
+  const totaisAGerarLiquidoPorFornecedor = {};
   for (const f of fornecedores) {
     totaisAGerarPorFornecedor[f.cotacaoId] = itensPorFornecedor[f.cotacaoId].reduce(
       (s, it) => s + (it.total || 0),
       0
     );
+    totaisAGerarLiquidoPorFornecedor[f.cotacaoId] = itensPorFornecedor[f.cotacaoId].reduce(
+      (s, it) => s + (it.totalLiquido || 0),
+      0
+    );
   }
+  const totalAGerarLiquido = Object.values(totaisAGerarLiquidoPorFornecedor).reduce((s, n) => s + n, 0);
   const fornecedoresVencedores = fornecedores.filter((f) => itensPorFornecedor[f.cotacaoId].length > 0);
   const itensSemVencedor = itens.filter((it) => !it.celulas.some((c) => c?.vencedor));
 
@@ -215,7 +235,12 @@ export default function MapaCotacaoClient({ op }) {
           </button>
           <div className="text-right">
             <p className="text-xs text-torg-gray">Total dos vencedores</p>
-            <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalGeral)}</p>
+            <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums" title="Valor da nota fiscal — bruto + IPI">
+              {fmtMoeda(totalGeral)}
+            </p>
+            <p className="text-[10px] text-torg-gray mt-0.5 tabular-nums" title="Custo real Torg apos creditar ICMS">
+              Custo líquido: {fmtMoeda(totalLiquidoGeral)}
+            </p>
             {totalEmPedidos > 0 && totalAGerar > 0 && (
               <p className="text-[10px] text-torg-gray mt-0.5 tabular-nums">
                 {fmtMoeda(totalEmPedidos)} em pedidos · {fmtMoeda(totalAGerar)} a gerar
@@ -386,8 +411,13 @@ export default function MapaCotacaoClient({ op }) {
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-torg-gray">Total a gerar</p>
-              <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalAGerar)}</p>
+              <p className="text-xs text-torg-gray">Total a gerar (valor da nota)</p>
+              <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums" title="Soma bruto + IPI dos itens vencedores ainda nao em pedido — bate com o PDF do fornecedor">
+                {fmtMoeda(totalAGerar)}
+              </p>
+              <p className="text-[10px] text-torg-gray mt-0.5 tabular-nums" title="Custo real Torg apos creditar ICMS">
+                Custo líquido: {fmtMoeda(totalAGerarLiquido)}
+              </p>
             </div>
           </div>
           <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-3">
