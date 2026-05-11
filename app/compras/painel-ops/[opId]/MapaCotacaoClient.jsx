@@ -11,9 +11,21 @@ export default function MapaCotacaoClient({ op }) {
   const router = useRouter();
   const [loading, setLoading] = useState(null);
   const [erro, setErro] = useState("");
+  const [mostrarPedidos, setMostrarPedidos] = useState(false);
 
   // Constrói matriz: cada linha é um RMItem, cada coluna é uma Cotação RECEBIDA
-  const { itens, fornecedores } = useMemo(() => buildMatriz(op), [op]);
+  const { itens: itensTodos, fornecedores } = useMemo(() => buildMatriz(op), [op]);
+
+  // Filtra: por padrao esconde itens que ja viraram pedido — interface fica focada
+  // no que ainda precisa de decisao. Toggle no header pra ver os ja resolvidos.
+  const itens = useMemo(() => {
+    if (mostrarPedidos) return itensTodos;
+    return itensTodos.filter((it) => !it.jaPedido && !it.cancelado);
+  }, [itensTodos, mostrarPedidos]);
+
+  const qtdPedido = itensTodos.filter((it) => it.jaPedido).length;
+  const qtdCancelado = itensTodos.filter((it) => it.cancelado).length;
+  const qtdAtivo = itensTodos.length - qtdPedido - qtdCancelado;
 
   const marcarVencedor = async (cotacaoItemId, jaVencedor) => {
     setLoading(cotacaoItemId);
@@ -135,13 +147,31 @@ export default function MapaCotacaoClient({ op }) {
         <div>
           <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
             <BarChart3 size={20} className="text-torg-blue" /> Mapa Comparativo
+            <span className="text-xs text-torg-gray font-normal ml-1">
+              ({qtdAtivo} {qtdAtivo === 1 ? "item ativo" : "itens ativos"}
+              {qtdPedido > 0 && <span> · {qtdPedido} já em pedido</span>}
+              {qtdCancelado > 0 && <span> · {qtdCancelado} cancelado(s)</span>})
+            </span>
           </h3>
           <p className="text-xs text-torg-gray mt-1">
             Click na célula pra escolher vencedor por item, ou no nome do fornecedor pra marcar todos dele.
             Use "Sugerir menor preço" pra preencher rapidamente.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {qtdPedido > 0 && (
+            <button
+              onClick={() => setMostrarPedidos((v) => !v)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg border inline-flex items-center gap-1 ${
+                mostrarPedidos
+                  ? "bg-torg-blue text-white border-torg-blue"
+                  : "bg-white text-torg-gray border-gray-300 hover:bg-gray-50"
+              }`}
+              title={mostrarPedidos ? "Ocultar itens já pedidos" : `Mostrar os ${qtdPedido} itens que já viraram pedido`}
+            >
+              {mostrarPedidos ? "Ocultar pedidos" : `Mostrar pedidos (${qtdPedido})`}
+            </button>
+          )}
           <button
             onClick={sugerirVencedoresMenorPreco}
             disabled={loading === "sugerir"}
@@ -813,6 +843,10 @@ function buildMatriz(op) {
             qtd: rmItem.peso > 0 ? Number(rmItem.peso).toFixed(2) : rmItem.qtd,
             unidade: rmItem.peso > 0 ? "KG" : rmItem.unidade,
             categoria: catByRmItem.get(rmItem.id),
+            // Status do RMItem — se ja virou pedido, podemos esconder/destacar
+            itemStatus: rmItem.status,
+            jaPedido: rmItem.status === "PEDIDO_GERADO",
+            cancelado: rmItem.status === "CANCELADO",
             celulas: [],
           });
         }
