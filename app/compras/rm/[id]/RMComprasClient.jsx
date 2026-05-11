@@ -300,7 +300,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
                     <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.qtd} {it.unidade}</td>
                     <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.peso ? Number(it.peso).toFixed(2) : "—"}</td>
                     <td className="px-3 py-1.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusItem.className}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap inline-block ${statusItem.className}`}>
                         {statusItem.label}
                       </span>
                       {it.status === "CANCELADO" && it.canceladoMotivo && (
