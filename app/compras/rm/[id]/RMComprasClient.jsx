@@ -99,6 +99,37 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
   const podeEncerrar =
     isAdmin && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA";
 
+  // RM tem itens PEDIDO_GERADO mas a RM em si nao virou PEDIDO_GERADO ainda —
+  // mostra botao pra fechar (cancela itens leftover).
+  const itensPedidoGerado = statusCounts.PEDIDO_GERADO || 0;
+  const itensLeftover =
+    (statusCounts.PENDENTE || 0) +
+    (statusCounts.EM_COTACAO || 0) +
+    (statusCounts.COTADO || 0);
+  const podeFecharComoPedido =
+    rm.status !== "PEDIDO_GERADO" &&
+    rm.status !== "CANCELADA" &&
+    itensPedidoGerado > 0;
+
+  const [fechandoComoPedido, setFechandoComoPedido] = useState(false);
+  const fecharComoPedidoGerado = async () => {
+    const msg = itensLeftover > 0
+      ? `Atenção: vai marcar a RM como Pedido Gerado e CANCELAR ${itensLeftover} item(ns) que ainda não viraram pedido. Continuar?`
+      : `Marcar RM como Pedido Gerado?`;
+    if (!window.confirm(msg)) return;
+    setFechandoComoPedido(true);
+    try {
+      const res = await fetch(`/api/rm/${rm.id}/fechar-como-pedido`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setFechandoComoPedido(false);
+    }
+  };
+
   return (
     <>
       {/* Cabeçalho */}
@@ -195,6 +226,20 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
               >
                 {desvinculando ? <Loader2 size={16} className="animate-spin" /> : <Unlink size={16} />}
                 Desvincular da OP
+              </button>
+            )}
+            {podeFecharComoPedido && (
+              <button
+                onClick={fecharComoPedidoGerado}
+                disabled={fechandoComoPedido}
+                className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2 disabled:opacity-50"
+                title={itensLeftover > 0
+                  ? `Marca RM como Pedido Gerado e cancela ${itensLeftover} item(ns) leftover`
+                  : "Marca RM como Pedido Gerado"}
+              >
+                {fechandoComoPedido ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Fechar como Pedido Gerado
+                {itensLeftover > 0 && <span className="text-[10px] opacity-80">({itensPedidoGerado}+{itensLeftover} cancelar)</span>}
               </button>
             )}
             {podeEncerrar && (
