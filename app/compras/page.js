@@ -51,6 +51,24 @@ export default async function PainelCompras({ searchParams }) {
     }),
   ]);
 
+  // Conta cotacoes por RM considerando consolidadas: uma cotacao consolidada
+  // que tem itens de varias RMs conta pra cada RM envolvida (nao so a primaria).
+  const rmIdsListados = rms.map((r) => r.id);
+  const cotItensRelacionados = await prisma.cotacaoItem.findMany({
+    where: { rmItem: { rmId: { in: rmIdsListados } } },
+    select: { cotacaoId: true, rmItem: { select: { rmId: true } } },
+  });
+  const cotacoesPorRm = new Map();
+  for (const ci of cotItensRelacionados) {
+    const rid = ci.rmItem.rmId;
+    if (!cotacoesPorRm.has(rid)) cotacoesPorRm.set(rid, new Set());
+    cotacoesPorRm.get(rid).add(ci.cotacaoId);
+  }
+  // Sobrescreve _count.cotacoes considerando consolidadas
+  for (const rm of rms) {
+    rm._count.cotacoes = cotacoesPorRm.get(rm.id)?.size ?? rm._count.cotacoes;
+  }
+
   const statusCount = totais.reduce((acc, t) => {
     acc[t.status] = t._count._all;
     return acc;
