@@ -78,19 +78,35 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
     }
   }
 
-  async function excluirRM() {
-    if (!window.confirm(
+  async function excluirRM(force = false) {
+    if (!force && !window.confirm(
       `EXCLUIR DEFINITIVAMENTE a RM ${rm.numero}?\n\n` +
       `Apaga itens, cotações, envios e anexos.\n` +
-      `Não funciona se a RM já gerou pedido no Omie.\n\n` +
+      `Não funciona se a RM já gerou pedido no Omie (a menos que voce confirme que cancelou la).\n\n` +
       `Essa ação NÃO PODE ser desfeita.`
     )) return;
     setErroExcluir("");
     setExcluindo(true);
     try {
-      const res = await fetch(`/api/rm/${rm.id}`, { method: "DELETE" });
+      const url = force ? `/api/rm/${rm.id}?force=1` : `/api/rm/${rm.id}`;
+      const res = await fetch(url, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao excluir");
+      if (!res.ok) {
+        // Backend bloqueia quando ha pedido CRIADO no Omie. Oferece forcar.
+        if (data.requiresForce) {
+          setExcluindo(false);
+          const numeros = (data.pedidosCriados || []).join(", ");
+          const ok = window.confirm(
+            `${data.error}\n\n` +
+            `Pedido(s): ${numeros}\n\n` +
+            `Confirma que voce JA cancelou esse(s) pedido(s) no Omie?\n` +
+            `Se sim, vou forcar a exclusao da RM no Workspace (so afeta nosso historico, nao reabre nada no Omie).`
+          );
+          if (ok) return excluirRM(true);
+          return;
+        }
+        throw new Error(data.error || "Erro ao excluir");
+      }
       router.push("/compras");
     } catch (e) {
       setErroExcluir(e.message);
@@ -1880,17 +1896,32 @@ function ModalEncerrarRM({ rm, onClose, onSaved }) {
 
   const itensPendentes = rm.itens.filter((i) => i.status === "PENDENTE" || i.status === "EM_COTACAO" || i.status === "COTADO");
 
-  const submit = async () => {
+  const submit = async (force = false) => {
     if (!motivo.trim()) return setErro("Descreva o motivo do encerramento.");
+    setErro("");
     setSalvando(true);
     try {
       const res = await fetch(`/api/rm/${rm.id}/encerrar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ motivo: motivo.trim() }),
+        body: JSON.stringify({ motivo: motivo.trim(), force: !!force }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) {
+        // Quando ha pedido CRIADO no Omie, backend bloqueia e devolve
+        // requiresForce. Oferece confirmar pra forcar.
+        if (data.requiresForce) {
+          setSalvando(false);
+          const ok = window.confirm(
+            `${data.error}\n\n` +
+            `Confirma que voce JA cancelou o(s) pedido(s) no Omie?\n` +
+            `Se sim, vou cancelar a RM no Workspace (so afeta nosso historico).`
+          );
+          if (ok) return submit(true);
+          return;
+        }
+        throw new Error(data.error || "Erro");
+      }
       onSaved();
       onClose();
     } catch (e) {
