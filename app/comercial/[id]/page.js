@@ -182,7 +182,7 @@ export default async function OPDetailPage({ params }) {
         <ArrowLeft size={14} /> Voltar pra lista de OPs
       </Link>
 
-      <OPDetailClient op={opData} userRole={user.role} userId={user.id} />
+      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} />
 
       <PedidosOmieSection pedidos={pedidos} />
     </div>

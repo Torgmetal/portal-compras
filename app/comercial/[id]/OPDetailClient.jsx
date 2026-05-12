@@ -28,9 +28,12 @@ function calcStatus(op) {
   return "ABERTA";
 }
 
-export default function OPDetailClient({ op, userRole, userId }) {
+export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
+  // Permissao pra aplicar alteracao de verba direto, sem virar solicitacao
+  // pendente. Inclui ADMIN e COMERCIAL com a flag podeAlterarVerba.
+  const podeAlterarVerbaDireto = isMaster || podeAlterarVerba;
 
   const [modalAditivo, setModalAditivo] = useState(false);
   const [modalRevisao, setModalRevisao] = useState(false);
@@ -517,6 +520,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
           }
           onEditar={(item) => setModalEditarItem({ tipo: "op", item })}
           isMaster={isMaster}
+          podeAlterarVerbaDireto={podeAlterarVerbaDireto}
         />
       </div>
 
@@ -544,6 +548,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
                 }
                 onEditar={(item) => setModalEditarItem({ tipo: "aditivo", item })}
                 isMaster={isMaster}
+                podeAlterarVerbaDireto={podeAlterarVerbaDireto}
               />
             </div>
           ))}
@@ -595,6 +600,7 @@ export default function OPDetailClient({ op, userRole, userId }) {
       {modalVerba && (
         <ModalSolicitarVerba
           {...modalVerba}
+          podeAlterarVerbaDireto={podeAlterarVerbaDireto}
           onClose={() => setModalVerba(null)}
           onSaved={() => router.refresh()}
         />
@@ -1667,7 +1673,7 @@ function localLabel(codigo) {
   return null;
 }
 
-function ItensTabela({ itens, onSolicitarVerba, onEditar, isMaster }) {
+function ItensTabela({ itens, onSolicitarVerba, onEditar, isMaster, podeAlterarVerbaDireto = false }) {
   if (!itens || itens.length === 0) {
     return <p className="px-6 py-4 text-sm text-torg-gray">Nenhum item.</p>;
   }
@@ -1675,19 +1681,19 @@ function ItensTabela({ itens, onSolicitarVerba, onEditar, isMaster }) {
   return (
     <div className="space-y-4">
       {materiais.length > 0 && (
-        <BlocoItens titulo="Materiais" itens={materiais} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} />
+        <BlocoItens titulo="Materiais" itens={materiais} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
       )}
       {alugueis.length > 0 && (
-        <BlocoItens titulo="Aluguéis e Equipamentos" itens={alugueis} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} aluguel />
+        <BlocoItens titulo="Aluguéis e Equipamentos" itens={alugueis} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} aluguel />
       )}
       {outros.length > 0 && (
-        <BlocoItens titulo="Outros" itens={outros} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} />
+        <BlocoItens titulo="Outros" itens={outros} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
       )}
     </div>
   );
 }
 
-function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, isMaster, aluguel }) {
+function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, isMaster, podeAlterarVerbaDireto = false, aluguel }) {
   return (
     <div>
       <p className="px-6 pt-4 text-xs font-semibold text-torg-gray uppercase tracking-wide">{titulo}</p>
@@ -1739,9 +1745,15 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, isMaster, alugu
                         onClick={() => onSolicitarVerba(it)}
                         disabled={temPendente}
                         className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={temPendente ? "Já tem solicitação pendente" : "Solicitar mudança de verba"}
+                        title={
+                          temPendente
+                            ? "Já tem solicitação pendente"
+                            : podeAlterarVerbaDireto
+                            ? "Alterar verba direto"
+                            : "Solicitar mudança de verba"
+                        }
                       >
-                        <DollarSign size={12} /> {isMaster ? "Alterar verba" : "Solicitar verba"}
+                        <DollarSign size={12} /> {podeAlterarVerbaDireto ? "Alterar verba" : "Solicitar verba"}
                       </button>
                     </div>
                   </td>
@@ -1908,7 +1920,7 @@ function ModalPrazo({ opId, dataAtual, onClose, onSaved }) {
   );
 }
 
-function ModalSolicitarVerba({ tipo, itemId, atual, descricao, onClose, onSaved }) {
+function ModalSolicitarVerba({ tipo, itemId, atual, descricao, podeAlterarVerbaDireto = false, onClose, onSaved }) {
   const [valorProposto, setValorProposto] = useState(atual);
   const [justificativa, setJustificativa] = useState("");
   const [erro, setErro] = useState("");
@@ -1940,7 +1952,7 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, onClose, onSaved 
   };
 
   return (
-    <Modal titulo="Solicitar mudança de verba" onClose={onClose}>
+    <Modal titulo={podeAlterarVerbaDireto ? "Alterar verba" : "Solicitar mudança de verba"} onClose={onClose}>
       <div className="px-6 py-5 space-y-4">
         {erro && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
@@ -1976,7 +1988,9 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, onClose, onSaved 
           />
         </div>
         <p className="text-xs text-torg-gray">
-          A solicitação fica pendente até aprovação do master.
+          {podeAlterarVerbaDireto
+            ? "Aplicado direto na verba. Fica registrado no histórico com seu nome e justificativa."
+            : "A solicitação fica pendente até aprovação do master."}
         </p>
       </div>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
@@ -1988,7 +2002,7 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, onClose, onSaved 
           disabled={salvando}
           className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
         >
-          {salvando && <Loader2 size={14} className="animate-spin" />} Enviar solicitação
+          {salvando && <Loader2 size={14} className="animate-spin" />} {podeAlterarVerbaDireto ? "Aplicar alteração" : "Enviar solicitação"}
         </button>
       </div>
     </Modal>
