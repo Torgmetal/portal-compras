@@ -155,7 +155,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
                     <td className="px-6 py-3 text-center text-torg-gray">{rm._count.cotacoes}</td>
                     <td className="px-6 py-3 text-torg-gray text-xs">{fmtData(rm.createdAt)}</td>
                     <td className="px-6 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap inline-block ${s.className}`}>
                         {s.label}
                       </span>
                     </td>
