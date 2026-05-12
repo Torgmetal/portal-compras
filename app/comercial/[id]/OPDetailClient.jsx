@@ -134,15 +134,58 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
             {op.obra && <p className="text-sm text-torg-gray">{op.obra}</p>}
             {op.descricao && <p className="text-sm text-torg-gray mt-2">{op.descricao}</p>}
           </div>
-          <div className="text-right text-sm">
-            <p className="text-torg-gray">Valor do pedido (cliente)</p>
-            <p className="text-2xl font-extrabold text-torg-blue tabular-nums" title="Soma das receitas do contrato (faturamento bruto pro cliente)">
-              {fmtMoeda(op.kpisFinanceiros?.receitaBruta || 0)}
-            </p>
-            <p className="text-xs text-torg-gray mt-1 tabular-nums" title="Verba contratada — custo estimado das compras">
-              Verba: <span className="text-torg-orange-700 font-semibold">{fmtMoeda(verbaTotal)}</span>
-            </p>
-            <p className="text-xs text-torg-gray mt-0.5">
+          <div className="text-right text-sm space-y-3 min-w-[280px]">
+            {/* Receita: total contratado + ja faturado + saldo */}
+            <div>
+              <p className="text-torg-gray">Valor do pedido (cliente)</p>
+              <p className="text-2xl font-extrabold text-torg-blue tabular-nums" title="Soma das receitas do contrato (faturamento bruto pro cliente)">
+                {fmtMoeda(op.kpisFinanceiros?.receitaBruta || 0)}
+              </p>
+              {(op.resumoMedicoes?.totalMedido || 0) > 0 && (
+                <>
+                  <div className="flex justify-end items-baseline gap-2 mt-1 text-[11px] tabular-nums">
+                    <span className="text-torg-gray">já faturado:</span>
+                    <span className="text-torg-dark font-semibold">{fmtMoeda(op.resumoMedicoes.totalMedido)}</span>
+                    <span className="text-[10px] text-torg-gray">({(op.resumoMedicoes.pctMedido || 0).toFixed(1)}%)</span>
+                  </div>
+                  <div className="flex justify-end items-baseline gap-2 text-[11px] tabular-nums">
+                    <span className="text-torg-gray">saldo a faturar:</span>
+                    <span className={`font-semibold ${
+                      (op.resumoMedicoes?.saldoAMedir || 0) < 0 ? "text-red-600" : "text-emerald-700"
+                    }`}>
+                      {fmtMoeda(op.resumoMedicoes?.saldoAMedir || 0)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Verba: total + ja em pedidos + saldo */}
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-[11px] text-torg-gray">Verba (custo estimado das compras)</p>
+              <p className="text-lg font-bold text-torg-orange-700 tabular-nums">
+                {fmtMoeda(verbaTotal)}
+              </p>
+              {(op.kpisFinanceiros?.totalEmPedidos || 0) > 0 && (
+                <>
+                  <div className="flex justify-end items-baseline gap-2 mt-0.5 text-[11px] tabular-nums">
+                    <span className="text-torg-gray">já em pedidos:</span>
+                    <span className="text-torg-dark font-semibold">{fmtMoeda(op.kpisFinanceiros.totalEmPedidos)}</span>
+                    <span className="text-[10px] text-torg-gray">({(op.kpisFinanceiros.consumoPct || 0).toFixed(1)}%)</span>
+                  </div>
+                  <div className="flex justify-end items-baseline gap-2 text-[11px] tabular-nums">
+                    <span className="text-torg-gray">saldo da verba:</span>
+                    <span className={`font-semibold ${
+                      (op.kpisFinanceiros?.saldo || 0) < 0 ? "text-red-600" : "text-emerald-700"
+                    }`}>
+                      {fmtMoeda(op.kpisFinanceiros?.saldo || 0)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <p className="text-[10px] text-torg-gray pt-1">
               Criada por {op.createdBy?.name} em {fmtData(op.createdAt)}
             </p>
           </div>
