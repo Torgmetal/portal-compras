@@ -153,6 +153,17 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], vencida })
     setErro("");
     setParseInfo(null);
     setParsing(true);
+
+    // Em paralelo: sobe o arquivo pro blob e ja vincula como Anexo
+    // da cotacao. Best-effort — se falhar, segue com parse normal.
+    (async () => {
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        await fetch(`/api/cotacao/anexar/${cotacao.token}`, { method: "POST", body: fd });
+      } catch (_) { /* sem anexo, segue */ }
+    })();
+
     try {
       const base64 = await new Promise((resolve, reject) => {
         const r = new FileReader();

@@ -684,6 +684,27 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                   {c.recebidaEm && ` · respondida em ${fmtData(c.recebidaEm)}`}
                   {c.prazoResposta && ` · prazo ${fmtData(c.prazoResposta)}`}
                 </p>
+                {/* Anexos da cotacao (PDF/imagens da proposta) */}
+                {(c.anexos || []).length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {c.anexos.map((a) => {
+                      const tamMb = a.tamanho ? (a.tamanho / (1024 * 1024)).toFixed(2) : null;
+                      return (
+                        <a
+                          key={a.id}
+                          href={a.blobUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] bg-torg-blue-50 text-torg-blue px-2 py-0.5 rounded border border-torg-blue-100 hover:bg-torg-blue-100"
+                          title={`${a.nomeArquivo}${tamMb ? ` · ${tamMb} MB` : ""}`}
+                        >
+                          <FileText size={11} />
+                          <span className="truncate max-w-[180px]">{a.nomeArquivo}</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {c.total > 0 && (
@@ -905,6 +926,9 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
   const [parseInfo, setParseInfo] = useState(null);
   const [autoFilled, setAutoFilled] = useState(new Set());
   const [revisado, setRevisado] = useState(new Set());
+  // Anexo pendente: arquivo ja uploaded pro blob, aguardando vinculo a
+  // cotacao quando o usuario salvar. { url, nomeArquivo, tamanho, tipo }
+  const [anexoPendente, setAnexoPendente] = useState(null);
   const fileRef = useRef(null);
 
   const setLinha = (id, k, v) => {
@@ -930,6 +954,7 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
     setParseInfo(null);
     setParsing(true);
     setArquivoNome(file.name);
+    setAnexoPendente(null);
     try {
       const base64 = await new Promise((res, rej) => {
         const r = new FileReader();
@@ -942,6 +967,26 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
       if (!isPdf && !isImg) {
         throw new Error("Formato não suportado. Use PDF ou imagem.");
       }
+
+      // Em paralelo: sobe o arquivo pro Vercel Blob (vira anexo da cotacao
+      // quando o usuario salvar). Best-effort — se falhar, segue sem anexo.
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const upRes = await fetch("/api/upload-blob", { method: "POST", body: fd });
+        const upData = await upRes.json();
+        if (upRes.ok) {
+          setAnexoPendente({
+            url: upData.url,
+            nomeArquivo: upData.nomeArquivo,
+            tamanho: upData.tamanho,
+            tipo: upData.tipo,
+          });
+        }
+      } catch {
+        // Sem blob — segue mesmo assim. Usuario ainda vê os dados parseados.
+      }
+
       const body = isPdf
         ? { pdfBase64: base64, rmItens: linhas.map((l) => ({
             descricao: l.descricao, qtd: l.qtdRm, unidade: l.unidade,
@@ -1029,6 +1074,7 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
           condicaoPagamento: condicaoPagamento || null,
           observacao: observacao || null,
           totalProposta: !isNaN(totalPropostaNum) && totalPropostaNum > 0 ? totalPropostaNum : null,
+          anexo: anexoPendente,
         }),
       });
       const data = await res.json();
@@ -1072,8 +1118,13 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
                   <Sparkles size={14} className="text-torg-orange" /> Tem a proposta em PDF ou imagem?
                 </p>
                 <p className="text-xs text-torg-gray mt-0.5">
-                  Anexe o arquivo e a IA preenche os preços automaticamente. Você revisa antes de salvar.
+                  Anexe o arquivo, a IA preenche os preços automaticamente E o arquivo fica salvo na cotação pra consulta.
                 </p>
+                {anexoPendente && (
+                  <p className="text-[11px] text-emerald-700 mt-1 inline-flex items-center gap-1">
+                    <CheckCircle2 size={11} /> Arquivo salvo — será vinculado à cotação ao salvar
+                  </p>
+                )}
               </div>
               <button
                 type="button"

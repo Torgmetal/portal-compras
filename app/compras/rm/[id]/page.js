@@ -46,7 +46,7 @@ export default async function RMComprasDetail({ params }) {
     },
     select: {
       id: true, rmId: true, fornecedorNome: true, fornecedorEmail: true, token: true,
-      status: true, total: true, numeroRevisao: true,
+      status: true, total: true, totalProposta: true, numeroRevisao: true,
       createdAt: true, prazoResposta: true, recebidaEm: true,
       cnpj: true,
       // Itens completos com rmItem details — pra mostrar todos os itens
@@ -63,6 +63,11 @@ export default async function RMComprasDetail({ params }) {
             },
           },
         },
+      },
+      // Anexos enviados pela cotacao (PDFs/imagens da proposta)
+      anexos: {
+        select: { id: true, nomeArquivo: true, blobUrl: true, tamanho: true, tipo: true, uploadedAt: true },
+        orderBy: { uploadedAt: "asc" },
       },
     },
     orderBy: { createdAt: "desc" },

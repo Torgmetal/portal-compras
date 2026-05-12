@@ -19,6 +19,13 @@ const itemSchema = z.object({
   ipiPct: z.number().min(0).optional().nullable(),
 });
 
+const anexoSchema = z.object({
+  url: z.string().url(),
+  nomeArquivo: z.string().min(1),
+  tamanho: z.number().int().min(0),
+  tipo: z.string().default("application/octet-stream"),
+}).nullable().optional();
+
 const schema = z.object({
   cnpj: z.string().min(11),
   razaoSocial: z.string().optional().nullable(),
@@ -29,6 +36,8 @@ const schema = z.object({
   // Total declarado pelo fornecedor (PDF). Quando preenchido, vira fonte da
   // verdade — gerar-pedidos ajusta precos no Omie pra bater com esse valor.
   totalProposta: z.number().min(0).optional().nullable(),
+  // PDF/imagem da proposta uploaded — vincula como Anexo da Cotacao
+  anexo: anexoSchema,
 });
 
 export async function POST(req, { params }) {
@@ -170,13 +179,30 @@ export async function POST(req, { params }) {
       data: { status: "COTADA" },
     });
 
+    // Vincula PDF/imagem da proposta como Anexo da cotacao (se enviado)
+    if (body.anexo && body.anexo.url) {
+      await tx.anexo.create({
+        data: {
+          cotacaoId: cotacao.id,
+          nomeArquivo: body.anexo.nomeArquivo,
+          blobUrl: body.anexo.url,
+          tamanho: body.anexo.tamanho,
+          tipo: body.anexo.tipo,
+        },
+      });
+    }
+
     await tx.auditLog.create({
       data: {
         userId: user.id,
         action: eRevisao ? "lancar_manual_revisao" : "lancar_manual",
         entity: "Cotacao",
         entityId: cotacao.id,
-        diff: { total, fornecedor: body.razaoSocial, cnpj: cnpjLimpo, itens: itensValidos.length },
+        diff: {
+          total, fornecedor: body.razaoSocial, cnpj: cnpjLimpo,
+          itens: itensValidos.length,
+          anexo: body.anexo?.nomeArquivo || null,
+        },
       },
     });
   });
