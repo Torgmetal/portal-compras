@@ -40,8 +40,14 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], vencida })
         id: it.id,
         descricao: it.rmItem.descricao,
         material: it.rmItem.material,
+        comprimento: it.rmItem.comprimento,
+        largura: it.rmItem.largura,
+        tratamento: it.rmItem.tratamento,
         qtdRm: usaKg ? peso : it.rmItem.qtd,
+        qtdPecas: it.rmItem.qtd, // qtd original em peças (chapas, barras, etc)
+        unidadeOriginal: it.rmItem.unidade, // unidade original (UN, PÇ, etc)
         unidade: usaKg ? "KG" : it.rmItem.unidade,
+        pesoTotal: peso,
         // Pre-popula com valores ja enviados se existirem
         precoUnit: it.precoUnit > 0 ? String(it.precoUnit) : "",
         qtdCotada: it.qtdCotada > 0 ? it.qtdCotada : (usaKg ? peso : it.qtdCotada),
@@ -576,7 +582,34 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], vencida })
                         <td className="px-2 py-2 text-gray-400 align-top">{i + 1}</td>
                         <td className="px-2 py-2 align-top">
                           <p className="text-torg-dark font-medium text-xs">{l.descricao}</p>
-                          {l.material && <p className="text-[10px] text-torg-gray">{l.material}</p>}
+                          {/* Detalhes técnicos — material, dimensões, peso, qtd em peças.
+                              Importante pra chapas/perfis: fornecedor precisa entregar
+                              QTD de peças com as dimensões especificadas */}
+                          <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                            {l.material && (
+                              <span className="text-[10px] text-torg-gray">{l.material}</span>
+                            )}
+                            {(l.comprimento || l.largura) && (
+                              <span className="text-[10px] text-torg-blue-700 font-medium" title="Dimensões da peça">
+                                {l.comprimento && l.largura
+                                  ? `${l.comprimento} × ${l.largura}`
+                                  : l.comprimento || l.largura}
+                              </span>
+                            )}
+                            {l.tratamento && (
+                              <span className="text-[10px] text-torg-gray">· {l.tratamento}</span>
+                            )}
+                            {l.qtdPecas > 0 && l.unidadeOriginal && l.unidadeOriginal !== "KG" && (
+                              <span className="text-[10px] bg-amber-50 text-amber-800 px-1 rounded font-semibold" title="Quantidade de peças que o fornecedor deve entregar">
+                                {l.qtdPecas} {l.unidadeOriginal}
+                              </span>
+                            )}
+                            {l.pesoTotal > 0 && (
+                              <span className="text-[10px] text-torg-gray" title="Peso total estimado">
+                                ≈ {l.pesoTotal.toFixed(2)} KG
+                              </span>
+                            )}
+                          </div>
                           {isAuto && (
                             <button
                               type="button"

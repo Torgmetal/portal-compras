@@ -352,9 +352,30 @@ export default function MapaCotacaoClient({ op }) {
                   <td className="px-3 py-2 text-xs text-torg-gray">
                     {it.categoria ? labelCategoria(it.categoria) : "—"}
                   </td>
-                  <td className="px-3 py-2 text-torg-dark font-medium">{it.descricao}</td>
-                  <td className="px-3 py-2 text-right text-torg-gray text-xs tabular-nums">
-                    {it.qtd} {it.unidade}
+                  <td className="px-3 py-2">
+                    <p className="text-torg-dark font-medium">{it.descricao}</p>
+                    {(it.material || it.comprimento || it.largura || it.tratamento) && (
+                      <p className="text-[10px] text-torg-gray mt-0.5">
+                        {it.material && <span>{it.material}</span>}
+                        {(it.comprimento || it.largura) && (
+                          <span className="text-torg-blue-700 font-medium ml-1">
+                            {it.material ? "· " : ""}
+                            {it.comprimento && it.largura
+                              ? `${it.comprimento} × ${it.largura}`
+                              : it.comprimento || it.largura}
+                          </span>
+                        )}
+                        {it.tratamento && <span> · {it.tratamento}</span>}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right text-torg-gray text-xs tabular-nums whitespace-nowrap">
+                    <div>{it.qtd} {it.unidade}</div>
+                    {it.unidade === "KG" && it.qtdPecas > 0 && it.unidadeOriginal && it.unidadeOriginal !== "KG" && (
+                      <div className="text-[10px] text-amber-700 font-semibold" title="Quantidade de peças">
+                        {it.qtdPecas} {it.unidadeOriginal}
+                      </div>
+                    )}
                   </td>
                   {fornecedores.map((f) => {
                     const cell = it.celulas.find((c) => c?.cotacaoId === f.cotacaoId);
@@ -974,6 +995,14 @@ function buildMatriz(op) {
             rmItemId: rmItem.id,
             rmNumero,
             descricao: rmItem.descricao,
+            // Dimensoes e material — pra chapas precisam aparecer
+            material: rmItem.material || null,
+            comprimento: rmItem.comprimento || null,
+            largura: rmItem.largura || null,
+            tratamento: rmItem.tratamento || null,
+            qtdPecas: rmItem.qtd, // qtd em pecas
+            unidadeOriginal: rmItem.unidade,
+            pesoTotal: Number(rmItem.peso) || 0,
             qtd: rmItem.peso > 0 ? Number(rmItem.peso).toFixed(2) : rmItem.qtd,
             unidade: rmItem.peso > 0 ? "KG" : rmItem.unidade,
             categoria,

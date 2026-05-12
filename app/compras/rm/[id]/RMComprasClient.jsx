@@ -361,11 +361,21 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
                 const podeEditarItem = isAdmin || userRole === "COMPRAS";
                 return (
                   <tr key={it.id} className={it.status === "CANCELADO" ? "opacity-60" : "hover:bg-gray-50"}>
-                    <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
-                    <td className="px-3 py-1.5 text-torg-dark font-medium">{it.descricao}</td>
-                    <td className="px-3 py-1.5 text-torg-gray text-xs">{it.material || "—"}</td>
-                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap">{it.qtd} {it.unidade}</td>
-                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap">{it.peso ? Number(it.peso).toFixed(2) : "—"}</td>
+                    <td className="px-3 py-1.5 text-gray-400 align-top">{i + 1}</td>
+                    <td className="px-3 py-1.5 align-top">
+                      <p className="text-torg-dark font-medium">{it.descricao}</p>
+                      {(it.comprimento || it.largura || it.tratamento) && (
+                        <p className="text-[10px] text-torg-gray mt-0.5">
+                          {it.comprimento && it.largura
+                            ? <span className="text-torg-blue-700 font-medium">{it.comprimento} × {it.largura}</span>
+                            : <span className="text-torg-blue-700 font-medium">{it.comprimento || it.largura}</span>}
+                          {it.tratamento && <span> · {it.tratamento}</span>}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-torg-gray text-xs align-top">{it.material || "—"}</td>
+                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap align-top">{it.qtd} {it.unidade}</td>
+                    <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap align-top">{it.peso ? Number(it.peso).toFixed(2) : "—"}</td>
                     <td className="px-3 py-1.5">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap inline-block ${statusItem.className}`}>
                         {statusItem.label}

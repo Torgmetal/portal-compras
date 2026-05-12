@@ -21,7 +21,8 @@ export default async function CotacaoPorToken({ params }) {
           rmItem: {
             select: {
               descricao: true, qtd: true, unidade: true, material: true,
-              comprimento: true, peso: true, codigo: true,
+              comprimento: true, largura: true, tratamento: true,
+              peso: true, codigo: true,
               rmId: true,
               rm: { select: { numero: true } },
             },
