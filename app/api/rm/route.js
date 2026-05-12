@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { notificarEvento } from "@/lib/email";
 
 const itemSchema = z.object({
   opItemId: z.string().nullable().optional(),
@@ -135,6 +136,47 @@ export async function POST(req) {
       },
     },
   });
+
+  // Notifica por email os inscritos no evento RM_CRIADA. Best-effort: nao
+  // bloqueia o response — dispara em background com setTimeout pra nao
+  // segurar o usuario. Se Resend falhar so loga.
+  const opVinculada = body.opId
+    ? await prisma.oP.findUnique({ where: { id: body.opId }, select: { numero: true, cliente: true } })
+    : null;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace-torg.vercel.app";
+  const linkRM = `${baseUrl}/compras/rm/${rm.id}`;
+  notificarEvento({
+    evento: "RM_CRIADA",
+    subject: `[Compras] Nova RM ${rm.numero}${opVinculada ? ` — OP ${opVinculada.numero}` : ""}`,
+    html: `
+      <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #0a3a5c;">Nova RM criada: ${rm.numero}</h2>
+        <p style="color: #4a5568;">
+          ${user.name || user.email} acabou de criar uma nova RM.
+        </p>
+        <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+          <tr><td style="padding: 6px 0; color: #718096;">Número</td><td style="padding: 6px 0;"><strong>${rm.numero}</strong></td></tr>
+          <tr><td style="padding: 6px 0; color: #718096;">Tipo</td><td style="padding: 6px 0;">${body.tipoRM}</td></tr>
+          ${opVinculada ? `<tr><td style="padding: 6px 0; color: #718096;">OP</td><td style="padding: 6px 0;"><strong>${opVinculada.numero}</strong> — ${opVinculada.cliente}</td></tr>` : ""}
+          <tr><td style="padding: 6px 0; color: #718096;">Descrição</td><td style="padding: 6px 0;">${body.descricao}</td></tr>
+          <tr><td style="padding: 6px 0; color: #718096;">Itens</td><td style="padding: 6px 0;">${body.itens.length}</td></tr>
+          <tr><td style="padding: 6px 0; color: #718096;">Criada por</td><td style="padding: 6px 0;">${user.name || user.email}</td></tr>
+        </table>
+        <p style="margin-top: 24px;">
+          <a href="${linkRM}" style="background: #1976d2; color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+            Abrir RM no Workspace Torg
+          </a>
+        </p>
+        <p style="color: #a0aec0; font-size: 12px; margin-top: 24px;">
+          Você recebeu esse email porque está inscrito nas notificações de novas RMs.
+          Pra parar de receber, peça pra um admin remover seu email em /admin/notificacoes.
+        </p>
+      </div>
+    `,
+    text: `Nova RM ${rm.numero} criada por ${user.name || user.email}.\n` +
+          `${opVinculada ? `OP: ${opVinculada.numero} — ${opVinculada.cliente}\n` : ""}` +
+          `Descrição: ${body.descricao}\nItens: ${body.itens.length}\n\nAcesse: ${linkRM}`,
+  }).catch((e) => console.error("[notificar RM_CRIADA] erro:", e?.message));
 
   return NextResponse.json({ id: rm.id, numero: rm.numero });
 }

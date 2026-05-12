@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { BarChart3, PlusCircle, Package, FolderKanban, LogOut } from "lucide-react";
+import { BarChart3, PlusCircle, Package, FolderKanban, Bell, LogOut } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
@@ -10,6 +10,7 @@ const menu = [
   { href: "/compras", label: "Painel de Compras", icon: BarChart3, exact: true },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/catalogo", label: "Catálogo", icon: Package },
+  { href: "/compras/notificacoes", label: "Notificações", icon: Bell, masterOnly: true },
 ];
 
 export default function Sidebar() {
@@ -26,7 +27,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {menu.map((m) => {
+        {menu.filter((m) => !m.masterOnly || session?.user?.role === "ADMIN").map((m) => {
           const Icon = m.icon;
           const active = m.exact
             ? pathname === m.href || pathname.startsWith("/compras/rm/")

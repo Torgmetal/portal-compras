@@ -690,3 +690,22 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
 }
+
+// ─── NOTIFICACOES POR EMAIL ─────────────────────────────────
+
+// Lista de emails inscritos em eventos do sistema (RM criada, etc).
+// Mantida pelo admin via /admin/notificacoes. Toda criacao de RM
+// dispara email pros emails inscritos no evento RM_CRIADA.
+model EmailNotificacao {
+  id        String   @id @default(cuid())
+  email     String
+  nome      String?  // nome de exibicao pro tooltip
+  // Eventos que esse email recebe. Strings livres pra futura extensao.
+  // Hoje suportados: "RM_CRIADA"
+  eventos   String[]
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ativo])
+}
