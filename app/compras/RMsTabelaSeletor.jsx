@@ -121,8 +121,8 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
                         title={podeSelecionar ? "Selecionar pra cotação consolidada" : "RM não está em fluxo ativo"}
                       />
                     </td>
-                    <td className="px-6 py-3">
-                      <Link href={`/compras/rm/${rm.id}`} className="font-mono font-semibold text-torg-blue hover:underline">
+                    <td className="px-6 py-3 whitespace-nowrap">
+                      <Link href={`/compras/rm/${rm.id}`} className="font-mono font-semibold text-torg-blue hover:underline whitespace-nowrap">
                         {rm.numero}
                       </Link>
                     </td>
