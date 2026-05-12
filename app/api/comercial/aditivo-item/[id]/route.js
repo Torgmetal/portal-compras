@@ -22,9 +22,15 @@ const schema = z.object({
 export async function PATCH(req, { params }) {
   let user;
   try {
-    user = await requireRole(["ADMIN"]);
+    user = await requireRole(["ADMIN", "COMERCIAL"]);
   } catch {
-    return NextResponse.json({ error: "Apenas ADMIN pode editar item de aditivo." }, { status: 403 });
+    return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
+  }
+  if (user.role === "COMERCIAL" && !user.podeAlterarVerba) {
+    return NextResponse.json(
+      { error: "Voce nao tem permissao pra editar itens diretamente. Use 'Solicitar verba' pra propor alteracao." },
+      { status: 403 }
+    );
   }
 
   let body;

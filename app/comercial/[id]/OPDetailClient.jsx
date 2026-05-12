@@ -503,11 +503,11 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           <h3 className="text-lg font-semibold text-torg-dark">
             Itens base do contrato ({op.itens.length})
           </h3>
-          {isMaster && !encerradaOuCancelada && (
+          {podeAlterarVerbaDireto && !encerradaOuCancelada && (
             <button
               onClick={() => setModalAddItens(true)}
               className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1"
-              title="Adicionar mais itens à OP base (ADMIN)"
+              title="Adicionar mais itens à OP base"
             >
               <Plus size={14} /> Adicionar itens
             </button>
@@ -1732,11 +1732,11 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, isMaster, podeA
                   </td>
                   <td className="px-4 py-2 text-right">
                     <div className="inline-flex items-center gap-3 justify-end">
-                      {isMaster && onEditar && (
+                      {podeAlterarVerbaDireto && onEditar && (
                         <button
                           onClick={() => onEditar(it)}
                           className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1"
-                          title="Editar item (ADMIN — edição direta)"
+                          title="Editar item — alteração direta dos campos"
                         >
                           <Pencil size={12} /> Editar
                         </button>
