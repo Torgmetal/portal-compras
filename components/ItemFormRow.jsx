@@ -1,7 +1,8 @@
 "use client";
 import { Trash2 } from "lucide-react";
 import {
-  CATEGORIAS_MATERIAL, CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO, LOCAIS_ESTOQUE, getCategoria,
+  CATEGORIAS_MATERIAL, CATEGORIAS_SERVICOS_TERCEIRIZADOS, CATEGORIAS_ALUGUEL,
+  CATEGORIA_OUTRO, LOCAIS_ESTOQUE, getCategoria,
 } from "@/lib/op-categorias";
 
 export function novoItem(categoria = "MATERIA_PRIMA") {
@@ -74,6 +75,11 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
             <optgroup label="Materiais">
               {CATEGORIAS_MATERIAL.map((c) => (
                 <option key={c.codigo} value={c.codigo}>{c.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Serviços Terceirizados">
+              {CATEGORIAS_SERVICOS_TERCEIRIZADOS.map((c) => (
+                <option key={c.codigo} value={c.codigo}>Serviço — {c.label}</option>
               ))}
             </optgroup>
             <optgroup label="Aluguéis">

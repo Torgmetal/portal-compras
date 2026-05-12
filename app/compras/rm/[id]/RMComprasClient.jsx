@@ -6,7 +6,10 @@ import {
   CheckCircle2, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
   Upload, Sparkles,
 } from "lucide-react";
-import { labelCategoria, CATEGORIAS_MATERIAL, CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO } from "@/lib/op-categorias";
+import {
+  labelCategoria, CATEGORIAS_MATERIAL, CATEGORIAS_SERVICOS_TERCEIRIZADOS,
+  CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO,
+} from "@/lib/op-categorias";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1874,6 +1877,7 @@ function ModalEditarCategorias({ rm, onClose, onSaved }) {
 
   const grupos = [
     { titulo: "Material", itens: CATEGORIAS_MATERIAL },
+    { titulo: "Serviços Terceirizados", itens: CATEGORIAS_SERVICOS_TERCEIRIZADOS },
     { titulo: "Aluguel", itens: CATEGORIAS_ALUGUEL },
     { titulo: "Outro", itens: [CATEGORIA_OUTRO] },
   ];

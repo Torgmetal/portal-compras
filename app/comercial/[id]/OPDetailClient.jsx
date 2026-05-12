@@ -1723,11 +1723,14 @@ function ItensTabela({ itens, onSolicitarVerba, onEditar, isMaster, podeAlterarV
   if (!itens || itens.length === 0) {
     return <p className="px-6 py-4 text-sm text-torg-gray">Nenhum item.</p>;
   }
-  const { materiais, alugueis, outros } = agruparPorGrupo(itens);
+  const { materiais, servicos, alugueis, outros } = agruparPorGrupo(itens);
   return (
     <div className="space-y-4">
       {materiais.length > 0 && (
         <BlocoItens titulo="Materiais" itens={materiais} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
+      )}
+      {servicos.length > 0 && (
+        <BlocoItens titulo="Serviços Terceirizados" itens={servicos} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
       )}
       {alugueis.length > 0 && (
         <BlocoItens titulo="Aluguéis e Equipamentos" itens={alugueis} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} aluguel />
