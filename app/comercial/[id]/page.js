@@ -134,14 +134,34 @@ export default async function OPDetailPage({ params }) {
   }, { icms: 0, ipi: 0, pis: 0, cofins: 0, iss: 0, irrf: 0, csll: 0 });
   const totalImpostos = Object.values(impostosDetalhados).reduce((s, v) => s + v, 0);
   const receitaLiquida = receitaBruta - totalImpostos;
-  const margemPrevista = receitaLiquida - verbaTotal;
-  const margemPct = receitaLiquida > 0 ? (margemPrevista / receitaLiquida) * 100 : 0;
 
-  // Detecta se OP tem itens em Faturamento Direto (FD)
-  const temFD = op.itens.some((i) => i.faturamentoDireto)
-    || op.aditivos.some((a) => a.itens.some((i) => i.faturamentoDireto));
-  const totalFD = op.itens.filter((i) => i.faturamentoDireto).reduce((s, i) => s + (i.valorVerba || 0), 0)
-    + op.aditivos.reduce((s, a) => s + a.itens.filter((i) => i.faturamentoDireto).reduce((ss, i) => ss + (i.valorVerba || 0), 0), 0);
+  // Detecta se OP tem itens em Faturamento Direto (FD) e separa verbas/pedidos
+  const itensTodos = [...op.itens, ...op.aditivos.flatMap((a) => a.itens)];
+  const temFD = itensTodos.some((i) => i.faturamentoDireto);
+  const verbaFD = itensTodos.filter((i) => i.faturamentoDireto).reduce((s, i) => s + (i.valorVerba || 0), 0);
+  const verbaTorg = verbaTotal - verbaFD; // verba que a Torg paga (nao FD)
+  // Pedidos: separa pelo flag faturamentoDireto do proprio PedidoOmie
+  const pedidosFD = pedidos
+    .filter((p) => p.status === "CRIADO" && p.faturamentoDireto)
+    .reduce((s, p) => s + (p.total || 0), 0);
+  const pedidosTorg = totalEmPedidos - pedidosFD;
+  // Excedente de FD: quando o pedido FD ultrapassa a verba planejada,
+  // a diferenca sai do bolso da Torg (consome receita).
+  const excedenteFD = Math.max(0, pedidosFD - verbaFD);
+  const totalFD = verbaFD; // alias pra compatibilidade
+
+  // Valor total do contrato: explicitamente preenchido OU fallback = receita + verba FD
+  // (porque a verba FD representa o que sera faturado em nome do cliente — tudo
+  // soma pro valor do contrato).
+  const valorTotalContrato = op.valorTotalContrato != null
+    ? op.valorTotalContrato
+    : receitaBruta + verbaFD;
+
+  // Margem: contrato total - todas as despesas (verba Torg + excedente FD).
+  // Verba FD planejada ja esta "coberta" pelo cliente (faturamento direto),
+  // entao nao entra como despesa Torg — exceto o excedente.
+  const margemPrevista = valorTotalContrato - totalImpostos - verbaTorg - excedenteFD;
+  const margemPct = valorTotalContrato > 0 ? (margemPrevista / valorTotalContrato) * 100 : 0;
 
   // Resumo de medicoes (Pedidos de Venda do Omie)
   const totalMedido = (op.medicoes || []).reduce((s, m) => s + (m.valorBruto || 0), 0);
@@ -171,6 +191,12 @@ export default async function OPDetailPage({ params }) {
     receitaBruta, totalImpostos, receitaLiquida,
     margemPrevista, margemPct,
     impostosDetalhados,
+    // Faturamento Direto + valor total do contrato
+    valorTotalContrato,
+    contratoExplicito: op.valorTotalContrato != null,
+    verbaFD, verbaTorg,
+    pedidosFD, pedidosTorg,
+    excedenteFD,
   };
   opData.faturamento = { temFD, totalFD };
   opData.resumoPedidos = resumoPedidos;

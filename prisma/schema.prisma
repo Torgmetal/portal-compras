@@ -85,6 +85,13 @@ model OP {
   clienteEmail       String?
   clienteTelefone    String?
 
+  // Valor total do contrato com o cliente. Inclui TUDO (receita Torg +
+  // materiais em Faturamento Direto que serao faturados em nome do cliente).
+  // Quando preenchido, vira a fonte de verdade pra calcular margem — sem
+  // ele, o sistema fallback pra soma de receitas (que so reflete o que Torg
+  // fatura, ignora os FDs).
+  valorTotalContrato Float?
+
   createdById String
   createdBy   User     @relation("OPCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())

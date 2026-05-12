@@ -134,16 +134,31 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
             {op.obra && <p className="text-sm text-torg-gray">{op.obra}</p>}
             {op.descricao && <p className="text-sm text-torg-gray mt-2">{op.descricao}</p>}
           </div>
-          <div className="text-right text-sm space-y-3 min-w-[280px]">
-            {/* Receita: total contratado + ja faturado + saldo */}
+          <div className="text-right text-sm space-y-3 min-w-[300px]">
+            {/* Valor TOTAL do contrato (inclui FD em nome do cliente) */}
             <div>
-              <p className="text-torg-gray">Valor do pedido (cliente)</p>
-              <p className="text-2xl font-extrabold text-torg-blue tabular-nums" title="Soma das receitas do contrato (faturamento bruto pro cliente)">
+              <div className="flex items-center justify-end gap-1.5">
+                <p className="text-torg-gray">Valor total do contrato</p>
+                {!op.kpisFinanceiros?.contratoExplicito && (
+                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded uppercase font-semibold tracking-wide" title="Valor implicito (Receita + Verba FD). Edite a OP pra preencher o total exato.">
+                    auto
+                  </span>
+                )}
+              </div>
+              <p className="text-2xl font-extrabold text-torg-blue tabular-nums" title="Valor cheio do contrato com o cliente — Receita Torg + valor em Faturamento Direto">
+                {fmtMoeda(op.kpisFinanceiros?.valorTotalContrato || 0)}
+              </p>
+            </div>
+
+            {/* Receita Torg: o que a Torg fatura em seu nome */}
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-[11px] text-torg-gray">Receita Torg (faturamento em nosso nome)</p>
+              <p className="text-lg font-bold text-torg-dark tabular-nums">
                 {fmtMoeda(op.kpisFinanceiros?.receitaBruta || 0)}
               </p>
               {(op.resumoMedicoes?.totalMedido || 0) > 0 && (
                 <>
-                  <div className="flex justify-end items-baseline gap-2 mt-1 text-[11px] tabular-nums">
+                  <div className="flex justify-end items-baseline gap-2 mt-0.5 text-[11px] tabular-nums">
                     <span className="text-torg-gray">já faturado:</span>
                     <span className="text-torg-dark font-semibold">{fmtMoeda(op.resumoMedicoes.totalMedido)}</span>
                     <span className="text-[10px] text-torg-gray">({(op.resumoMedicoes.pctMedido || 0).toFixed(1)}%)</span>
@@ -160,30 +175,47 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               )}
             </div>
 
-            {/* Verba: total + ja em pedidos + saldo */}
+            {/* Verba Torg (não-FD) — custo Torg paga */}
             <div className="pt-2 border-t border-gray-100">
-              <p className="text-[11px] text-torg-gray">Verba (custo estimado das compras)</p>
-              <p className="text-lg font-bold text-torg-orange-700 tabular-nums">
-                {fmtMoeda(verbaTotal)}
+              <p className="text-[11px] text-torg-gray">
+                Verba Torg
+                <span className="text-torg-gray text-[10px] ml-1">(materiais em nosso nome)</span>
               </p>
-              {(op.kpisFinanceiros?.totalEmPedidos || 0) > 0 && (
-                <>
-                  <div className="flex justify-end items-baseline gap-2 mt-0.5 text-[11px] tabular-nums">
-                    <span className="text-torg-gray">já em pedidos:</span>
-                    <span className="text-torg-dark font-semibold">{fmtMoeda(op.kpisFinanceiros.totalEmPedidos)}</span>
-                    <span className="text-[10px] text-torg-gray">({(op.kpisFinanceiros.consumoPct || 0).toFixed(1)}%)</span>
-                  </div>
-                  <div className="flex justify-end items-baseline gap-2 text-[11px] tabular-nums">
-                    <span className="text-torg-gray">saldo da verba:</span>
-                    <span className={`font-semibold ${
-                      (op.kpisFinanceiros?.saldo || 0) < 0 ? "text-red-600" : "text-emerald-700"
-                    }`}>
-                      {fmtMoeda(op.kpisFinanceiros?.saldo || 0)}
-                    </span>
-                  </div>
-                </>
+              <p className="text-lg font-bold text-torg-orange-700 tabular-nums">
+                {fmtMoeda(op.kpisFinanceiros?.verbaTorg || 0)}
+              </p>
+              {(op.kpisFinanceiros?.pedidosTorg || 0) > 0 && (
+                <div className="flex justify-end items-baseline gap-2 mt-0.5 text-[11px] tabular-nums">
+                  <span className="text-torg-gray">já em pedidos:</span>
+                  <span className="text-torg-dark font-semibold">{fmtMoeda(op.kpisFinanceiros.pedidosTorg)}</span>
+                </div>
               )}
             </div>
+
+            {/* Verba Faturamento Direto — separada (paga pelo cliente, não consome margem Torg) */}
+            {(op.kpisFinanceiros?.verbaFD || 0) > 0 && (
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-[11px] text-torg-gray">
+                  Verba FD
+                  <span className="text-torg-gray text-[10px] ml-1">(faturamento direto em nome do cliente)</span>
+                </p>
+                <p className="text-lg font-bold text-purple-700 tabular-nums">
+                  {fmtMoeda(op.kpisFinanceiros.verbaFD)}
+                </p>
+                {(op.kpisFinanceiros?.pedidosFD || 0) > 0 && (
+                  <div className="flex justify-end items-baseline gap-2 mt-0.5 text-[11px] tabular-nums">
+                    <span className="text-torg-gray">já em pedidos:</span>
+                    <span className="text-torg-dark font-semibold">{fmtMoeda(op.kpisFinanceiros.pedidosFD)}</span>
+                  </div>
+                )}
+                {(op.kpisFinanceiros?.excedenteFD || 0) > 0 && (
+                  <div className="flex justify-end items-baseline gap-2 text-[11px] tabular-nums">
+                    <span className="text-red-600">⚠ excedente FD:</span>
+                    <span className="text-red-700 font-bold">{fmtMoeda(op.kpisFinanceiros.excedenteFD)}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <p className="text-[10px] text-torg-gray pt-1">
               Criada por {op.createdBy?.name} em {fmtData(op.createdAt)}
@@ -936,6 +968,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
     descricao: op.descricao || "",
     dataInicio: fmtDateInput(op.dataInicio),
     dataFimPrevista: fmtDateInput(op.dataFimPrevista),
+    valorTotalContrato: op.valorTotalContrato != null ? String(op.valorTotalContrato) : "",
   });
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -958,6 +991,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
     }
     setSalvando(true);
     try {
+      const valorTotalNum = parseFloat(String(form.valorTotalContrato).replace(",", "."));
       const res = await fetch(`/api/comercial/op/${opId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -968,6 +1002,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
           descricao: form.descricao.trim() || null,
           dataInicio: form.dataInicio || null,
           dataFimPrevista: form.dataFimPrevista || null,
+          valorTotalContrato: !isNaN(valorTotalNum) && valorTotalNum > 0 ? valorTotalNum : null,
         }),
       });
       const data = await res.json();
@@ -1057,6 +1092,23 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">
+            Valor total do contrato (R$)
+          </label>
+          <input
+            type="number" step="0.01" min="0"
+            value={form.valorTotalContrato}
+            onChange={(e) => set("valorTotalContrato", e.target.value)}
+            placeholder="Ex: 250000.00"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
+          />
+          <p className="text-[11px] text-torg-gray mt-1">
+            Valor cheio acordado com o cliente — inclui receita Torg + tudo que será faturado em <strong>Faturamento Direto</strong> (em nome do cliente).
+            Se deixar vazio, o sistema calcula automaticamente como <em>Receita + Verba FD</em>.
+          </p>
         </div>
       </div>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">

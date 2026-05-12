@@ -16,6 +16,7 @@ const patchEditSchema = z.object({
   descricao: z.string().nullable().optional(),
   dataInicio: z.string().nullable().optional(),
   dataFimPrevista: z.string().nullable().optional(),
+  valorTotalContrato: z.number().min(0).nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -95,6 +96,9 @@ export async function PATCH(req, { params }) {
   }
   if (edit.dataFimPrevista !== undefined) {
     dataUpdate.dataFimPrevista = edit.dataFimPrevista ? new Date(edit.dataFimPrevista) : null;
+  }
+  if (edit.valorTotalContrato !== undefined) {
+    dataUpdate.valorTotalContrato = edit.valorTotalContrato;
   }
 
   if (Object.keys(dataUpdate).length === 0) {
