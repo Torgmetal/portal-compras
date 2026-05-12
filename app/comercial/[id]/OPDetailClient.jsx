@@ -135,11 +135,14 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
             {op.descricao && <p className="text-sm text-torg-gray mt-2">{op.descricao}</p>}
           </div>
           <div className="text-right text-sm">
-            <p className="text-torg-gray">Verba total contratada</p>
-            <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
-              {fmtMoeda(verbaTotal)}
+            <p className="text-torg-gray">Valor do pedido (cliente)</p>
+            <p className="text-2xl font-extrabold text-torg-blue tabular-nums" title="Soma das receitas do contrato (faturamento bruto pro cliente)">
+              {fmtMoeda(op.kpisFinanceiros?.receitaBruta || 0)}
             </p>
-            <p className="text-xs text-torg-gray mt-1">
+            <p className="text-xs text-torg-gray mt-1 tabular-nums" title="Verba contratada — custo estimado das compras">
+              Verba: <span className="text-torg-orange-700 font-semibold">{fmtMoeda(verbaTotal)}</span>
+            </p>
+            <p className="text-xs text-torg-gray mt-0.5">
               Criada por {op.createdBy?.name} em {fmtData(op.createdAt)}
             </p>
           </div>
