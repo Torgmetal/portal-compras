@@ -90,14 +90,14 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
                     title="Selecionar todas as RMs ativas"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nº RM</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP / Cliente</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Solicitante</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Itens</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cot.</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Nº RM</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Tipo</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">OP / Cliente</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descrição</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Solicitante</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Itens</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cot.</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Data</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-3 py-3 w-10"></th>
               </tr>
@@ -127,7 +127,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
                       </Link>
                     </td>
                     <td className="px-6 py-3 text-xs text-torg-gray">{TIPO_RM_LABELS[rm.tipoRM]}</td>
-                    <td className="px-6 py-3 text-torg-dark">
+                    <td className="px-6 py-3 text-torg-dark whitespace-nowrap">
                       {rm.op ? (
                         <>
                           <span className="font-mono text-xs">{rm.op.numero}</span>
