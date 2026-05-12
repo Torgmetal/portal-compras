@@ -120,6 +120,32 @@ export default function NovaRMClient({ ops, userSetor }) {
         const parts = [meta.rmRef, meta.obra, meta.cliente].filter(Boolean);
         if (parts.length) setDescricao(`Importação ${parts.join(" — ")}`);
       }
+
+      // Sobe o arquivo Excel original pro Vercel Blob e vincula como anexo
+      // — assim fica disponivel pra consulta E vai pro fornecedor com a cotacao.
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/upload-blob", { method: "POST", body: fd });
+        const data = await res.json();
+        if (res.ok) {
+          setAnexos((p) => {
+            // Evita duplicar se ja existir um anexo com mesma URL
+            if (p.some((a) => a.url === data.url)) return p;
+            return [...p, {
+              url: data.url,
+              nomeArquivo: data.nomeArquivo,
+              tamanho: data.tamanho,
+              tipo: data.tipo,
+            }];
+          });
+        } else {
+          // Nao quebra o fluxo de import se o blob falhar — so avisa
+          setErroAnexo(`Planilha importada, mas falhou salvar como anexo: ${data.error || "erro"}`);
+        }
+      } catch (e) {
+        setErroAnexo(`Planilha importada, mas falhou salvar como anexo: ${e.message}`);
+      }
     } catch (e) {
       setErro("Erro ao ler arquivo: " + e.message);
     } finally {

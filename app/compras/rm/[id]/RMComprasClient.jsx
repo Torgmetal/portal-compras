@@ -40,6 +40,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
   const isAdmin = userRole === "ADMIN";
 
   const [modalCancelarItem, setModalCancelarItem] = useState(null);
+  const [modalEditarItem, setModalEditarItem] = useState(null);
   const [modalEncerrarRM, setModalEncerrarRM] = useState(false);
   const [modalEnviarCot, setModalEnviarCot] = useState(false);
   const [modalEditarCategorias, setModalEditarCategorias] = useState(false);
@@ -354,6 +355,9 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
                 const podeCancelar =
                   (isAdmin || userRole === "COMPRAS") &&
                   ["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status);
+                const podeEditarItem =
+                  (isAdmin || userRole === "COMPRAS") &&
+                  !["PEDIDO_GERADO", "CANCELADO"].includes(it.status);
                 return (
                   <tr key={it.id} className={it.status === "CANCELADO" ? "opacity-60" : "hover:bg-gray-50"}>
                     <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
@@ -370,14 +374,25 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
                       )}
                     </td>
                     <td className="px-3 py-1.5 text-right">
-                      {podeCancelar && (
-                        <button
-                          onClick={() => setModalCancelarItem(it)}
-                          className="text-xs text-red-600 hover:text-red-800 font-medium inline-flex items-center gap-1"
-                        >
-                          <XCircle size={12} /> Cancelar
-                        </button>
-                      )}
+                      <div className="inline-flex items-center gap-3 justify-end">
+                        {podeEditarItem && (
+                          <button
+                            onClick={() => setModalEditarItem(it)}
+                            className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"
+                            title="Editar dados do item"
+                          >
+                            <Edit2 size={12} /> Editar
+                          </button>
+                        )}
+                        {podeCancelar && (
+                          <button
+                            onClick={() => setModalCancelarItem(it)}
+                            className="text-xs text-red-600 hover:text-red-800 font-medium inline-flex items-center gap-1"
+                          >
+                            <XCircle size={12} /> Cancelar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -422,6 +437,14 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
           rmId={rm.id}
           onClose={() => setModalCancelarItem(null)}
           onSaved={() => router.refresh()}
+        />
+      )}
+      {modalEditarItem && (
+        <ModalEditarRMItem
+          item={modalEditarItem}
+          rmId={rm.id}
+          onClose={() => setModalEditarItem(null)}
+          onSaved={() => { setModalEditarItem(null); router.refresh(); }}
         />
       )}
       {modalEncerrarRM && (
@@ -2080,5 +2103,177 @@ function AnexosSection({ rmId, anexos: anexosIniciais, editavel }) {
         <p className="text-xs text-torg-gray italic">Nenhum anexo. Clique em "Anexar" pra adicionar desenhos/PDFs.</p>
       )}
     </div>
+  );
+}
+
+// Modal de edicao dos dados do item da RM. Permite ajustar descricao, qtd,
+// peso, unidade, codigo, material, comprimento, largura, tratamento. Bloqueado
+// pra itens em PEDIDO_GERADO / CANCELADO.
+function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    descricao: item.descricao || "",
+    unidade: item.unidade || "",
+    qtd: item.qtd != null ? String(item.qtd) : "",
+    codigo: item.codigo || "",
+    material: item.material || "",
+    comprimento: item.comprimento || "",
+    largura: item.largura || "",
+    tratamento: item.tratamento || "",
+    peso: item.peso != null ? String(item.peso) : "",
+    pesoLinear: item.pesoLinear != null ? String(item.pesoLinear) : "",
+  });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const parseNum = (s) => {
+    const n = parseFloat(String(s).replace(",", "."));
+    return isNaN(n) ? null : n;
+  };
+
+  const submit = async () => {
+    setErro("");
+    if (!form.descricao.trim()) return setErro("Descrição é obrigatória.");
+    if (!form.unidade.trim()) return setErro("Unidade é obrigatória.");
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/rm/${rmId}/itens/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          descricao: form.descricao.trim(),
+          unidade: form.unidade.trim(),
+          qtd: parseNum(form.qtd) ?? 0,
+          codigo: form.codigo.trim() || null,
+          material: form.material.trim() || null,
+          comprimento: form.comprimento.trim() || null,
+          largura: form.largura.trim() || null,
+          tratamento: form.tratamento.trim() || null,
+          peso: parseNum(form.peso),
+          pesoLinear: parseNum(form.pesoLinear),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal titulo="Editar item da RM" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Descrição *</label>
+          <input
+            type="text" value={form.descricao}
+            onChange={(e) => set("descricao", e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Quantidade *</label>
+            <input
+              type="number" step="0.01" min="0" value={form.qtd}
+              onChange={(e) => set("qtd", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Unidade *</label>
+            <input
+              type="text" value={form.unidade}
+              onChange={(e) => set("unidade", e.target.value.toUpperCase())}
+              placeholder="UN / KG / M / PÇ"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Código</label>
+            <input
+              type="text" value={form.codigo}
+              onChange={(e) => set("codigo", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Material</label>
+            <input
+              type="text" value={form.material}
+              onChange={(e) => set("material", e.target.value)}
+              placeholder="Ex: NBR 5590"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Tratamento</label>
+            <input
+              type="text" value={form.tratamento}
+              onChange={(e) => set("tratamento", e.target.value)}
+              placeholder="Ex: Galvanizado"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Comprimento</label>
+            <input
+              type="text" value={form.comprimento}
+              onChange={(e) => set("comprimento", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Largura</label>
+            <input
+              type="text" value={form.largura}
+              onChange={(e) => set("largura", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Peso (kg)</label>
+            <input
+              type="number" step="0.01" min="0" value={form.peso}
+              onChange={(e) => set("peso", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Peso linear (kg/m)</label>
+            <input
+              type="number" step="0.001" min="0" value={form.pesoLinear}
+              onChange={(e) => set("pesoLinear", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+          Cancelar
+        </button>
+        <button
+          onClick={submit}
+          disabled={salvando}
+          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+        >
+          {salvando && <Loader2 size={14} className="animate-spin" />} Salvar
+        </button>
+      </div>
+    </Modal>
   );
 }
