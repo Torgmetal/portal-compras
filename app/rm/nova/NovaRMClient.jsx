@@ -459,101 +459,104 @@ export default function NovaRMClient({ ops, userSetor }) {
         </div>
 
         {itensImportados.length > 0 && (
-          <div className="mt-4 max-h-[400px] overflow-y-auto border border-gray-100 rounded-lg">
+          <div className="mt-4 max-h-[500px] overflow-y-auto overflow-x-auto border border-gray-100 rounded-lg">
             <table className="w-full text-xs">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase w-8">#</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Descrição</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Cód. Omie</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Material</th>
-                  <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Qtd</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Unid.</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Comp.</th>
-                  <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Peso (kg)</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase w-8">#</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase min-w-[220px]">Descrição *</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Cód.</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Material</th>
+                  <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase">Qtd</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Un.</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Comp.</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Larg.</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Tratamento</th>
+                  <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase">Peso (kg)</th>
                   <th className="w-8"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {itensImportados.slice(0, 200).map((it, i) => (
                   <tr key={i} className={`hover:bg-gray-50 ${it.manual ? "bg-torg-blue-50/30" : ""}`}>
-                    <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
-                    {it.manual ? (
-                      <>
-                        <td className="px-3 py-1.5">
-                          <input
-                            type="text" value={it.descricao}
-                            onChange={(e) => editarItem(i, "descricao", e.target.value)}
-                            placeholder="Descrição do item"
-                            className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
-                          />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <input
-                            type="text" value={it.codigo || ""}
-                            onChange={(e) => editarItem(i, "codigo", e.target.value)}
-                            placeholder="—"
-                            className="w-24 border border-gray-200 rounded px-2 py-1 text-xs font-mono focus:ring-1 focus:ring-torg-blue"
-                          />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <input
-                            type="text" value={it.material || ""}
-                            onChange={(e) => editarItem(i, "material", e.target.value)}
-                            placeholder="—"
-                            className="w-24 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
-                          />
-                        </td>
-                        <td className="px-3 py-1.5 text-right">
-                          <input
-                            type="number" step="0.01" min="0" value={it.qtd || ""}
-                            onChange={(e) => editarItem(i, "qtd", parseFloat(e.target.value) || 0)}
-                            className="w-16 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
-                          />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <input
-                            type="text" value={it.unidade || ""}
-                            onChange={(e) => editarItem(i, "unidade", e.target.value.toUpperCase())}
-                            placeholder="UN"
-                            className="w-12 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
-                          />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <input
-                            type="text" value={it.comprimento || ""}
-                            onChange={(e) => editarItem(i, "comprimento", e.target.value)}
-                            placeholder="—"
-                            className="w-16 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
-                          />
-                        </td>
-                        <td className="px-3 py-1.5 text-right">
-                          <input
-                            type="number" step="0.01" min="0" value={it.peso || ""}
-                            onChange={(e) => editarItem(i, "peso", parseFloat(e.target.value) || 0)}
-                            placeholder="—"
-                            className="w-16 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
-                          />
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="px-3 py-1.5 text-torg-dark font-medium">{it.descricao}</td>
-                        <td className="px-3 py-1.5 text-torg-gray font-mono">{it.codigo || "—"}</td>
-                        <td className="px-3 py-1.5 text-torg-gray">{it.material || "—"}</td>
-                        <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{it.qtd}</td>
-                        <td className="px-3 py-1.5 text-torg-gray">{it.unidade || "UN"}</td>
-                        <td className="px-3 py-1.5 text-torg-gray">{it.comprimento || "—"}</td>
-                        <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums">
-                          {it.peso > 0 ? Number(it.peso).toFixed(2) : "—"}
-                        </td>
-                      </>
-                    )}
-                    <td className="px-3 py-1.5">
+                    <td className="px-2 py-1.5 text-gray-400">{i + 1}</td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text" value={it.descricao || ""}
+                        onChange={(e) => editarItem(i, "descricao", e.target.value)}
+                        placeholder="Descrição do item"
+                        className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text" value={it.codigo || ""}
+                        onChange={(e) => editarItem(i, "codigo", e.target.value)}
+                        placeholder="—"
+                        className="w-20 border border-gray-200 rounded px-2 py-1 text-xs font-mono focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text" value={it.material || ""}
+                        onChange={(e) => editarItem(i, "material", e.target.value)}
+                        placeholder="—"
+                        className="w-24 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      <input
+                        type="number" step="0.01" min="0" value={it.qtd || ""}
+                        onChange={(e) => editarItem(i, "qtd", parseFloat(e.target.value) || 0)}
+                        className="w-14 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text" value={it.unidade || ""}
+                        onChange={(e) => editarItem(i, "unidade", e.target.value.toUpperCase())}
+                        placeholder="UN"
+                        className="w-12 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text" value={it.comprimento || ""}
+                        onChange={(e) => editarItem(i, "comprimento", e.target.value)}
+                        placeholder="—"
+                        className="w-16 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text" value={it.largura || ""}
+                        onChange={(e) => editarItem(i, "largura", e.target.value)}
+                        placeholder="—"
+                        className="w-16 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text" value={it.tratamento || ""}
+                        onChange={(e) => editarItem(i, "tratamento", e.target.value)}
+                        placeholder="—"
+                        className="w-24 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      <input
+                        type="number" step="0.01" min="0" value={it.peso || ""}
+                        onChange={(e) => editarItem(i, "peso", parseFloat(e.target.value) || 0)}
+                        placeholder="—"
+                        className="w-20 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
                       <button
                         type="button"
                         onClick={() => removerImportado(i)}
                         className="text-red-400 hover:text-red-600"
+                        title="Remover item"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -564,9 +567,12 @@ export default function NovaRMClient({ ops, userSetor }) {
             </table>
             {itensImportados.length > 200 && (
               <p className="text-center text-xs text-torg-gray py-2">
-                Exibindo 200 de {itensImportados.length} itens
+                Exibindo 200 de {itensImportados.length} itens — todos serão salvos ao criar a RM
               </p>
             )}
+            <p className="text-[11px] text-torg-gray italic px-3 py-2 border-t border-gray-100 bg-gray-50/50">
+              💡 Todos os campos são editáveis — ajuste comprimento, largura e tratamento principalmente pra chapas e perfis.
+            </p>
           </div>
         )}
       </div>
