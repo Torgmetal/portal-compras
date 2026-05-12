@@ -355,9 +355,10 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
                 const podeCancelar =
                   (isAdmin || userRole === "COMPRAS") &&
                   ["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status);
-                const podeEditarItem =
-                  (isAdmin || userRole === "COMPRAS") &&
-                  !["PEDIDO_GERADO", "CANCELADO"].includes(it.status);
+                // Editar item: ADMIN/COMPRAS sempre podem revisar dados.
+                // Pra itens ja PEDIDO_GERADO/CANCELADO aparece aviso no modal
+                // (ajustes nao alteram pedido ja criado no Omie).
+                const podeEditarItem = isAdmin || userRole === "COMPRAS";
                 return (
                   <tr key={it.id} className={it.status === "CANCELADO" ? "opacity-60" : "hover:bg-gray-50"}>
                     <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
@@ -2168,6 +2169,17 @@ function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
         {erro && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
             <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+        {(item.status === "PEDIDO_GERADO" || item.status === "CANCELADO") && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+            <span>
+              Item em status <strong>{item.status}</strong>. Ajustes aqui são pra
+              correção de dados (material, descrição, etc) e <strong>não alteram
+              o pedido já criado no Omie</strong>. Se precisar mudar quantidade
+              ou preço efetivo, edite direto no Omie.
+            </span>
           </div>
         )}
         <div>

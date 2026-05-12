@@ -39,13 +39,10 @@ export async function PATCH(req, { params }) {
   if (!item || item.rmId !== params.id) {
     return NextResponse.json({ error: "Item nao encontrado nessa RM." }, { status: 404 });
   }
-  if (item.status === "PEDIDO_GERADO" || item.status === "CANCELADO") {
-    return NextResponse.json(
-      { error: `Item em status "${item.status}" nao pode ser editado.` },
-      { status: 409 }
-    );
-  }
 
+  // Edicao permitida em qualquer status — admin/compras pode revisar dados
+  // de qualquer item. Auditoria registra a mudanca. Itens ja PEDIDO_GERADO
+  // continuam vinculados ao pedido Omie criado (mudanca aqui nao reflete la).
   const updated = await prisma.rMItem.update({ where: { id: item.id }, data: body });
 
   await prisma.auditLog.create({
