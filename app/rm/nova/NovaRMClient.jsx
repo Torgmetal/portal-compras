@@ -46,6 +46,50 @@ export default function NovaRMClient({ ops, userSetor }) {
   const [erro, setErro] = useState("");
   const fileRef = useRef(null);
 
+  // Anexos (desenhos, especificacoes, etc) — uploaded ao Vercel Blob.
+  // Quando a RM e criada, vinculamos via metadados no payload do POST /api/rm.
+  // Cada item: { url, nomeArquivo, tamanho, tipo, _uploadingId? }
+  const [anexos, setAnexos] = useState([]);
+  const [anexosUploading, setAnexosUploading] = useState([]); // ids temp
+  const [erroAnexo, setErroAnexo] = useState("");
+  const anexoFileRef = useRef(null);
+
+  const fmtBytes = (n) => {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const uploadAnexos = async (files) => {
+    if (!files || files.length === 0) return;
+    setErroAnexo("");
+    for (const file of files) {
+      const tempId = Math.random().toString(36).slice(2);
+      setAnexosUploading((p) => [...p, tempId]);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/upload-blob", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Falha no upload");
+        setAnexos((p) => [...p, {
+          url: data.url,
+          nomeArquivo: data.nomeArquivo,
+          tamanho: data.tamanho,
+          tipo: data.tipo,
+        }]);
+      } catch (e) {
+        setErroAnexo(`Falha ao enviar "${file.name}": ${e.message}`);
+      } finally {
+        setAnexosUploading((p) => p.filter((id) => id !== tempId));
+      }
+    }
+  };
+
+  const removerAnexoLocal = (url) => {
+    setAnexos((p) => p.filter((a) => a.url !== url));
+  };
+
   const op = useMemo(() => ops.find((o) => o.id === opSelecionada), [ops, opSelecionada]);
   const categoriasOpDisponiveis = useMemo(() => (op ? categoriasUnicasOP(op) : []), [op]);
 
@@ -142,6 +186,7 @@ export default function NovaRMClient({ ops, userSetor }) {
           observacao: observacao.trim() || null,
           setor: setor || null,
           itens,
+          anexos,
         }),
       });
       const data = await res.json();
@@ -500,6 +545,71 @@ export default function NovaRMClient({ ops, userSetor }) {
         )}
       </div>
 
+      {/* Step 4: anexos (desenhos, especificacoes) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+              <FileSpreadsheet size={20} className="text-torg-blue" /> Anexos (opcional)
+            </h3>
+            <p className="text-sm text-torg-gray mt-1">
+              Desenhos, especificações, fotos de referência. Serão enviados junto com a cotação aos fornecedores.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => anexoFileRef.current?.click()}
+            disabled={anexosUploading.length > 0}
+            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {anexosUploading.length > 0 ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+            {anexosUploading.length > 0 ? `Enviando ${anexosUploading.length}...` : "Anexar arquivo(s)"}
+          </button>
+          <input
+            ref={anexoFileRef}
+            type="file"
+            multiple
+            accept="application/pdf,image/*,.dwg,.dxf,.zip,.docx,.xlsx,.txt"
+            className="hidden"
+            onChange={(e) => { uploadAnexos(Array.from(e.target.files || [])); e.target.value = ""; }}
+          />
+        </div>
+        {erroAnexo && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 mb-3 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erroAnexo}</span>
+          </div>
+        )}
+        {anexos.length === 0 ? (
+          <p className="text-sm text-torg-gray italic">Nenhum anexo adicionado.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+            {anexos.map((a) => (
+              <li key={a.url} className="px-3 py-2 flex items-center gap-3 hover:bg-gray-50">
+                <FileSpreadsheet size={16} className="text-torg-blue flex-shrink-0" />
+                <a
+                  href={a.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-0 truncate text-sm text-torg-dark hover:text-torg-blue hover:underline"
+                  title={a.nomeArquivo}
+                >
+                  {a.nomeArquivo}
+                </a>
+                <span className="text-xs text-torg-gray tabular-nums whitespace-nowrap">{fmtBytes(a.tamanho)}</span>
+                <button
+                  type="button"
+                  onClick={() => removerAnexoLocal(a.url)}
+                  className="text-red-500 hover:text-red-700"
+                  title="Remover anexo"
+                >
+                  <X size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="flex justify-end gap-3">
         <Link
           href="/rm"
@@ -509,8 +619,9 @@ export default function NovaRMClient({ ops, userSetor }) {
         </Link>
         <button
           onClick={submit}
-          disabled={salvando}
+          disabled={salvando || anexosUploading.length > 0}
           className="px-6 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50"
+          title={anexosUploading.length > 0 ? "Aguarde os anexos terminarem de subir" : ""}
         >
           {salvando && <Loader2 size={16} className="animate-spin" />}
           {salvando ? "Salvando..." : "Criar RM"}

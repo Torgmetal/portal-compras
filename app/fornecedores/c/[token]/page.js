@@ -15,11 +15,16 @@ export default async function CotacaoPorToken({ params }) {
   const cotacao = await prisma.cotacao.findUnique({
     where: { token: params.token },
     include: {
-      rm: { select: { numero: true, descricao: true, observacao: true } },
+      rm: { select: { id: true, numero: true, descricao: true, observacao: true } },
       itens: {
         include: {
           rmItem: {
-            select: { descricao: true, qtd: true, unidade: true, material: true, comprimento: true, peso: true, codigo: true },
+            select: {
+              descricao: true, qtd: true, unidade: true, material: true,
+              comprimento: true, peso: true, codigo: true,
+              rmId: true,
+              rm: { select: { numero: true } },
+            },
           },
         },
       },
@@ -68,10 +73,23 @@ export default async function CotacaoPorToken({ params }) {
     );
   }
 
+  // Carrega anexos de todas as RMs envolvidas (primaria + qualquer outra
+  // que tenha rmItem referenciado nos CotacaoItens — caso consolidada).
+  const rmIdsEnvolvidos = new Set([cotacao.rmId]);
+  for (const it of cotacao.itens || []) {
+    if (it.rmItem?.rmId) rmIdsEnvolvidos.add(it.rmItem.rmId);
+  }
+  const anexos = await prisma.anexo.findMany({
+    where: { rmId: { in: Array.from(rmIdsEnvolvidos) } },
+    include: { rm: { select: { numero: true } } },
+    orderBy: { uploadedAt: "asc" },
+  });
+
   // Pendente — mostrar formulário
   const data = JSON.parse(JSON.stringify(cotacao));
+  const anexosData = JSON.parse(JSON.stringify(anexos));
 
   return (
-    <CotacaoFornecedorForm cotacao={data} vencida={vencida} />
+    <CotacaoFornecedorForm cotacao={data} anexos={anexosData} vencida={vencida} />
   );
 }

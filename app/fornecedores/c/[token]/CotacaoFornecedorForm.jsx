@@ -27,7 +27,7 @@ function parseObservacao(obs) {
   return { prazoEntrega, condicaoPagamento, observacao: restos.join(" | ") };
 }
 
-export default function CotacaoFornecedorForm({ cotacao, vencida }) {
+export default function CotacaoFornecedorForm({ cotacao, anexos = [], vencida }) {
   const router = useRouter();
   const jaEnviou = cotacao.status === "RECEBIDA";
   const obsParsed = parseObservacao(cotacao.observacao);
@@ -334,6 +334,50 @@ export default function CotacaoFornecedorForm({ cotacao, vencida }) {
             </div>
           </div>
         </div>
+
+        {/* Anexos: desenhos, especificacoes, etc — enviados pelo comprador junto com a RM */}
+        {anexos.length > 0 && (
+          <div className="bg-white rounded-2xl border border-torg-blue-100 p-5 sm:p-6">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <div>
+                <h2 className="text-base font-semibold text-torg-dark inline-flex items-center gap-2">
+                  <FileText size={18} className="text-torg-blue" /> Anexos da solicitação
+                </h2>
+                <p className="text-xs text-torg-gray mt-0.5">
+                  Desenhos, especificações e materiais de referência. Clique pra abrir/baixar.
+                </p>
+              </div>
+              <span className="text-xs text-torg-gray font-medium">{anexos.length} arquivo(s)</span>
+            </div>
+            <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+              {anexos.map((a) => {
+                const tamMb = a.tamanho ? (a.tamanho / (1024 * 1024)).toFixed(2) : null;
+                return (
+                  <li key={a.id} className="px-3 py-2 flex items-center gap-3 hover:bg-torg-blue-50/40">
+                    <FileText size={16} className="text-torg-blue flex-shrink-0" />
+                    <a
+                      href={a.blobUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 min-w-0 truncate text-sm text-torg-dark hover:text-torg-blue hover:underline"
+                      title={a.nomeArquivo}
+                    >
+                      {a.nomeArquivo}
+                    </a>
+                    {a.rm?.numero && (
+                      <span className="text-[10px] font-mono text-torg-gray bg-gray-100 px-1.5 py-0.5 rounded">
+                        RM {a.rm.numero}
+                      </span>
+                    )}
+                    {tamMb && (
+                      <span className="text-xs text-torg-gray tabular-nums whitespace-nowrap">{tamMb} MB</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {vencida && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700 flex items-start gap-2">

@@ -30,6 +30,7 @@ export default async function RMComprasDetail({ params }) {
           aditivoItem: { select: { categoria: true, descricao: true, valorVerba: true, qtdContratada: true, unidade: true } },
         },
       },
+      anexos: { orderBy: { uploadedAt: "asc" } },
     },
   });
   if (!rm) notFound();

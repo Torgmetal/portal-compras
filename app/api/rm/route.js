@@ -19,6 +19,13 @@ const itemSchema = z.object({
   pesoLinear: z.number().optional().nullable(),
 });
 
+const anexoSchema = z.object({
+  url: z.string().url(),
+  nomeArquivo: z.string().min(1),
+  tamanho: z.number().int().min(0),
+  tipo: z.string().default("application/octet-stream"),
+});
+
 const schema = z.object({
   numero: z.string().optional().nullable(),
   tipoRM: z.enum(["ENGENHARIA", "INTERNA"]).default("ENGENHARIA"),
@@ -29,6 +36,9 @@ const schema = z.object({
   observacao: z.string().optional().nullable(),
   setor: z.string().optional().nullable(),
   itens: z.array(itemSchema).min(1),
+  // Anexos ja foram pro Vercel Blob via /api/upload-blob — aqui so vinculamos
+  // os metadados na RM via Anexo records.
+  anexos: z.array(anexoSchema).default([]),
 });
 
 export async function POST(req) {
@@ -95,6 +105,18 @@ export async function POST(req) {
           pesoLinear: it.pesoLinear ?? null,
         })),
       },
+      ...(body.anexos.length > 0
+        ? {
+            anexos: {
+              create: body.anexos.map((a) => ({
+                nomeArquivo: a.nomeArquivo,
+                blobUrl: a.url,
+                tamanho: a.tamanho,
+                tipo: a.tipo,
+              })),
+            },
+          }
+        : {}),
     },
   });
 
