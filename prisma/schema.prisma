@@ -32,6 +32,10 @@ model User {
   role      Role
   setor     String?
   ativo     Boolean  @default(true)
+  // Permite alterar verba direto, sem passar pelo fluxo de solicitacao
+  // pendente de aprovacao do master. Usado pra usuarios COMERCIAL de
+  // confianca que precisam ajustar valores frequentemente.
+  podeAlterarVerba Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

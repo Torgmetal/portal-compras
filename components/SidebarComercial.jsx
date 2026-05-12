@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { FolderKanban, PlusCircle, Inbox, LogOut } from "lucide-react";
+import { FolderKanban, PlusCircle, Inbox, LogOut, History } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
   { href: "/comercial", label: "OPs", icon: FolderKanban, exact: true },
   { href: "/comercial/nova", label: "Nova OP", icon: PlusCircle },
   { href: "/comercial/aprovacoes", label: "Aprovações", icon: Inbox, masterOnly: true },
+  { href: "/comercial/historico-verbas", label: "Histórico de verbas", icon: History },
 ];
 
 export default function SidebarComercial() {

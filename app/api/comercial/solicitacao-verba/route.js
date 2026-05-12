@@ -37,8 +37,10 @@ export async function POST(req) {
     );
   }
 
-  // Se quem solicita É o master, aprova já
-  const isMaster = user.role === "ADMIN";
+  // ADMIN sempre aplica direto. COMERCIAL com flag 'podeAlterarVerba' tambem
+  // aplica direto (sem fluxo de solicitacao). COMERCIAL sem a flag cria
+  // solicitacao PENDENTE que precisa de aprovacao do master.
+  const podeAplicarDireto = user.role === "ADMIN" || user.podeAlterarVerba === true;
 
   const sol = await prisma.solicitacaoVerba.create({
     data: {
@@ -48,19 +50,21 @@ export async function POST(req) {
       valorProposto: body.valorProposto,
       justificativa: body.justificativa,
       createdById: user.id,
-      ...(isMaster
+      ...(podeAplicarDireto
         ? {
             status: "APROVADA",
             decididoEm: new Date(),
             decididoById: user.id,
-            observacaoMaster: "Auto-aprovada pelo master.",
+            observacaoMaster: user.role === "ADMIN"
+              ? "Auto-aprovada pelo master."
+              : `Auto-aprovada (permissao direta de alteracao de verba — ${user.email}).`,
           }
         : {}),
     },
   });
 
-  // Se já aprovada (master criou), aplica direto
-  if (isMaster) {
+  // Se ja aprovada, aplica direto
+  if (podeAplicarDireto) {
     if (body.tipoItem === "op") {
       await prisma.oPItem.update({ where: { id: body.itemId }, data: { valorVerba: body.valorProposto } });
     } else {
@@ -71,10 +75,15 @@ export async function POST(req) {
   await prisma.auditLog.create({
     data: {
       userId: user.id,
-      action: isMaster ? "alterar_verba" : "solicitar_verba",
+      action: podeAplicarDireto ? "alterar_verba" : "solicitar_verba",
       entity: body.tipoItem === "op" ? "OPItem" : "AditivoItem",
       entityId: body.itemId,
-      diff: { de: body.valorAtual, para: body.valorProposto },
+      diff: {
+        de: body.valorAtual,
+        para: body.valorProposto,
+        diff: body.valorProposto - body.valorAtual,
+        justificativa: body.justificativa,
+      },
     },
   });
 
