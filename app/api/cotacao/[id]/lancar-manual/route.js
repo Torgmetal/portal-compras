@@ -104,7 +104,14 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Preencha ao menos um preço unitário." }, { status: 400 });
   }
 
-  const total = round2(itensValidos.reduce((s, it) => s + it.precoUnit * it.qtdCotada, 0));
+  // Total da nota = bruto × qtd × (1 + IPI%) — bate com o "Valor total"
+  // do PDF do fornecedor. ICMS nao entra (e credito da Torg, nao soma na NF).
+  const total = round2(
+    itensValidos.reduce((s, it) => {
+      const ipiPct = Number(it.ipiPct) || 0;
+      return s + it.precoUnit * it.qtdCotada * (1 + ipiPct / 100);
+    }, 0)
+  );
   const eRevisao = cotacao.status === "RECEBIDA";
 
   await prisma.$transaction(async (tx) => {

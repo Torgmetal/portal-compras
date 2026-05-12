@@ -1036,11 +1036,21 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
     }
   }
 
+  // Total da nota: bruto × qtd × (1 + IPI%). Bate com "Valor total" do PDF.
+  // ICMS nao entra (credito Torg, nao soma na NF).
   const total = linhas.reduce((s, l) => {
+    const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
+    const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
+    const ipi = parseFloat(String(l.ipiPct).replace(",", ".")) || 0;
+    return s + p * q * (1 + ipi / 100);
+  }, 0);
+  // Subtotais pra mostrar separados embaixo
+  const totalBrutoSemIPI = linhas.reduce((s, l) => {
     const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
     const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
     return s + p * q;
   }, 0);
+  const totalIPI = total - totalBrutoSemIPI;
 
   const submit = async () => {
     setErro("");
@@ -1283,7 +1293,17 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={5} className="px-2 py-2 text-right text-torg-gray">Total bruto (calculado):</td>
+                    <td colSpan={5} className="px-2 py-1 text-right text-torg-gray text-[11px]">Mercadoria (bruto):</td>
+                    <td className="px-2 py-1 text-right text-torg-gray tabular-nums text-xs">{fmtMoeda(totalBrutoSemIPI)}</td>
+                  </tr>
+                  {totalIPI > 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-2 py-1 text-right text-torg-gray text-[11px]">+ IPI:</td>
+                      <td className="px-2 py-1 text-right text-torg-gray tabular-nums text-xs">{fmtMoeda(totalIPI)}</td>
+                    </tr>
+                  )}
+                  <tr className="border-t border-gray-200">
+                    <td colSpan={5} className="px-2 py-2 text-right text-torg-dark font-semibold">Total da nota (calculado):</td>
                     <td className="px-2 py-2 text-right font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(total)}</td>
                   </tr>
                 </tfoot>
