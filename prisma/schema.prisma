@@ -691,6 +691,38 @@ model AuditLog {
   @@index([createdAt])
 }
 
+// ─── FORNECEDORES (Vendor List) ─────────────────────────────
+
+// Cadastro de fornecedores classificados por categoria de material/servico.
+// Usado pra selecionar destinatarios no envio de cotacao (em vez de digitar
+// nome/email manualmente toda vez).
+model Fornecedor {
+  id              String   @id @default(cuid())
+  razaoSocial     String
+  nomeFantasia    String?
+  cnpj            String?
+  email           String   // email principal
+  emailsAdicionais String[] // emails secundarios (copias)
+  telefone        String?
+  contato         String?  // nome do vendedor/contato
+  cidade          String?
+  uf              String?
+
+  // Categorias que esse fornecedor atende. Codigos do catalogo
+  // lib/fornecedor-categorias.js (MATERIA_PRIMA, TINTA, etc).
+  categorias      String[]
+  observacao      String?
+
+  // Integracao Omie — pra resolver pedido sem precisar buscar de novo
+  nCodOmie        String?
+
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([ativo])
+}
+
 // ─── NOTIFICACOES POR EMAIL ─────────────────────────────────
 
 // Lista de emails inscritos em eventos do sistema (RM criada, etc).
