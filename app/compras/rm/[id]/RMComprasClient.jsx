@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
   CheckCircle2, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
@@ -10,6 +11,9 @@ import {
   labelCategoria, CATEGORIAS_MATERIAL, CATEGORIAS_SERVICOS_TERCEIRIZADOS,
   CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO,
 } from "@/lib/op-categorias";
+import {
+  CATEGORIAS_FORNECEDOR, chipCategoriaFornecedor, labelCategoriaFornecedor,
+} from "@/lib/fornecedor-categorias";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1544,14 +1548,52 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
     });
   };
 
-  // Lista de fornecedores em campos separados (nome + email).
-  // Sempre tem pelo menos 1 linha. Botoes pra adicionar/remover.
+  // Vendor List (fornecedores cadastrados) — busca quando modal abre
+  const [fornecedoresCadastrados, setFornecedoresCadastrados] = useState([]);
+  const [carregandoForn, setCarregandoForn] = useState(true);
+  const [fornSelecionadosIds, setFornSelecionadosIds] = useState(new Set());
+  const [filtroCatForn, setFiltroCatForn] = useState(null);
+  const [buscaForn, setBuscaForn] = useState("");
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/fornecedores");
+        const data = await res.json();
+        setFornecedoresCadastrados(data.fornecedores || []);
+      } catch (_) { /* silently */ }
+      finally { setCarregandoForn(false); }
+    })();
+  }, []);
+
+  // Linhas avulsas (nome + email) pra fornecedor nao cadastrado. Default vazio.
   const [fornecedoresLinhas, setFornecedoresLinhas] = useState([{ nome: "", email: "" }]);
   const addFornecedor = () => setFornecedoresLinhas((p) => [...p, { nome: "", email: "" }]);
   const setFornecedor = (idx, campo, valor) =>
     setFornecedoresLinhas((p) => p.map((f, i) => (i === idx ? { ...f, [campo]: valor } : f)));
   const removerFornecedor = (idx) =>
     setFornecedoresLinhas((p) => (p.length === 1 ? [{ nome: "", email: "" }] : p.filter((_, i) => i !== idx)));
+
+  // Lista filtrada de fornecedores cadastrados pra exibir
+  const fornFiltrados = useMemo(() => {
+    return fornecedoresCadastrados.filter((f) => {
+      if (!f.ativo) return false;
+      if (filtroCatForn && !(f.categorias || []).includes(filtroCatForn)) return false;
+      if (buscaForn) {
+        const b = buscaForn.toLowerCase();
+        const hay = [f.razaoSocial, f.nomeFantasia, f.email, f.contato].filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(b)) return false;
+      }
+      return true;
+    });
+  }, [fornecedoresCadastrados, filtroCatForn, buscaForn]);
+
+  const toggleFornCadastrado = (id) => {
+    setFornSelecionadosIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const [prazo, setPrazo] = useState(() => {
     const d = new Date();
@@ -1585,19 +1627,33 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
     (it) => it.status === "COTADO" && it.temPropostaComPreco === false
   ).length;
 
-  // Valida e monta a lista de fornecedores a partir das linhas do form
+  // Monta a lista final de fornecedores combinando: (1) selecionados da
+  // Vendor List + (2) avulsos digitados nos campos. Dedupe por email.
   const parsearFornecedores = () => {
     const out = [];
+    const emailsVistos = new Set();
+    // 1) Da Vendor List
+    for (const id of fornSelecionadosIds) {
+      const f = fornecedoresCadastrados.find((x) => x.id === id);
+      if (!f) continue;
+      const email = f.email.toLowerCase();
+      if (emailsVistos.has(email)) continue;
+      emailsVistos.add(email);
+      out.push({ nome: f.razaoSocial, email, nCodOmie: f.nCodOmie || null, cnpj: f.cnpj || null });
+    }
+    // 2) Avulsos
     for (const f of fornecedoresLinhas) {
-      const email = String(f.email || "").trim();
+      const email = String(f.email || "").trim().toLowerCase();
       const nome = String(f.nome || "").trim();
-      if (!email && !nome) continue; // linha vazia, ignora
+      if (!email && !nome) continue;
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return { error: `Email inválido: "${email || "(em branco)"}"${nome ? ` — fornecedor "${nome}"` : ""}` };
       }
       if (!nome) {
         return { error: `Preencha o nome do fornecedor pro email "${email}"` };
       }
+      if (emailsVistos.has(email)) continue;
+      emailsVistos.add(email);
       out.push({ nome, email });
     }
     return { fornecedores: out };
@@ -1759,53 +1815,22 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
           </div>
         </div>
 
-        {/* Fornecedores — campos separados, 1 linha por fornecedor */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-torg-dark">
-              Fornecedores ({fornecedoresLinhas.filter((f) => f.email && f.nome).length})
-            </label>
-            <button
-              type="button"
-              onClick={addFornecedor}
-              className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"
-            >
-              <Plus size={12} /> Adicionar fornecedor
-            </button>
-          </div>
-          <div className="space-y-2">
-            {fornecedoresLinhas.map((f, idx) => (
-              <div key={idx} className="flex gap-2 items-start">
-                <input
-                  type="text"
-                  value={f.nome}
-                  onChange={(e) => setFornecedor(idx, "nome", e.target.value)}
-                  placeholder="Nome do fornecedor"
-                  className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
-                />
-                <input
-                  type="email"
-                  value={f.email}
-                  onChange={(e) => setFornecedor(idx, "email", e.target.value)}
-                  placeholder="email@fornecedor.com.br"
-                  className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
-                />
-                <button
-                  type="button"
-                  onClick={() => removerFornecedor(idx)}
-                  disabled={fornecedoresLinhas.length === 1 && !f.nome && !f.email}
-                  className="px-2 py-2 text-red-500 hover:text-red-700 disabled:opacity-30"
-                  title="Remover esse fornecedor"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-torg-gray mt-2">
-            Cada fornecedor recebe um <strong>link único e privado</strong> com a cotação.
-          </p>
-        </div>
+        {/* Fornecedores — Vendor List (cadastrados) + avulsos */}
+        <FornecedoresPicker
+          fornecedoresCadastrados={fornecedoresCadastrados}
+          fornFiltrados={fornFiltrados}
+          carregandoForn={carregandoForn}
+          fornSelecionadosIds={fornSelecionadosIds}
+          toggleFornCadastrado={toggleFornCadastrado}
+          filtroCatForn={filtroCatForn}
+          setFiltroCatForn={setFiltroCatForn}
+          buscaForn={buscaForn}
+          setBuscaForn={setBuscaForn}
+          fornecedoresLinhas={fornecedoresLinhas}
+          setFornecedor={setFornecedor}
+          addFornecedor={addFornecedor}
+          removerFornecedor={removerFornecedor}
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -2483,5 +2508,179 @@ function CotacaoAnexoChip({ anexo, cotacaoId }) {
         {removendo ? <Loader2 size={10} className="animate-spin" /> : <X size={10} />}
       </button>
     </span>
+  );
+}
+
+// FornecedoresPicker — bloco que combina:
+// 1) Lista de fornecedores cadastrados (Vendor List) com checkbox + filtro
+//    por categoria + busca
+// 2) Linhas avulsas (nome + email) pra fornecedor nao cadastrado
+// Usado nos modais de envio de cotacao.
+function FornecedoresPicker({
+  fornecedoresCadastrados, fornFiltrados, carregandoForn,
+  fornSelecionadosIds, toggleFornCadastrado,
+  filtroCatForn, setFiltroCatForn, buscaForn, setBuscaForn,
+  fornecedoresLinhas, setFornecedor, addFornecedor, removerFornecedor,
+}) {
+  const qtdSelCadastrados = fornSelecionadosIds.size;
+  const qtdAvulsosValidos = fornecedoresLinhas.filter((f) => f.email && f.nome).length;
+  const totalSel = qtdSelCadastrados + qtdAvulsosValidos;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <label className="block text-sm font-medium text-torg-dark">
+          Fornecedores selecionados ({totalSel})
+        </label>
+        <Link
+          href="/compras/vendorlist"
+          target="_blank"
+          className="text-[11px] text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"
+          title="Abrir Vendor List em nova aba"
+        >
+          + Cadastrar novo fornecedor
+        </Link>
+      </div>
+
+      {/* Filtros + busca pros cadastrados */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <span className="text-[11px] text-torg-gray font-medium">Categoria:</span>
+          <button
+            type="button"
+            onClick={() => setFiltroCatForn(null)}
+            className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${
+              filtroCatForn === null
+                ? "bg-torg-dark text-white border-torg-dark"
+                : "bg-white text-torg-gray border-gray-300 hover:bg-gray-100"
+            }`}
+          >
+            Todas
+          </button>
+          {CATEGORIAS_FORNECEDOR.map((cat) => (
+            <button
+              key={cat.codigo}
+              type="button"
+              onClick={() => setFiltroCatForn(filtroCatForn === cat.codigo ? null : cat.codigo)}
+              className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${
+                filtroCatForn === cat.codigo
+                  ? "bg-torg-blue text-white border-torg-blue"
+                  : `${chipCategoriaFornecedor(cat.codigo)} hover:opacity-80`
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          value={buscaForn}
+          onChange={(e) => setBuscaForn(e.target.value)}
+          placeholder="Buscar fornecedor por nome, email, contato..."
+          className="w-full text-xs border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-torg-blue"
+        />
+      </div>
+
+      {/* Lista de cadastrados — checkbox + chips de categoria */}
+      <div className="border border-gray-200 rounded-lg max-h-[260px] overflow-y-auto divide-y divide-gray-100 mb-3">
+        {carregandoForn ? (
+          <p className="text-center text-xs text-torg-gray italic py-6">
+            <Loader2 size={12} className="inline animate-spin mr-1" /> Carregando fornecedores...
+          </p>
+        ) : fornFiltrados.length === 0 ? (
+          <p className="text-center text-xs text-torg-gray italic py-6">
+            {fornecedoresCadastrados.length === 0
+              ? "Nenhum fornecedor cadastrado. Use o link acima pra cadastrar."
+              : "Nenhum fornecedor encontrado com esses filtros."}
+          </p>
+        ) : (
+          fornFiltrados.map((f) => {
+            const checked = fornSelecionadosIds.has(f.id);
+            return (
+              <label
+                key={f.id}
+                className={`flex items-start gap-2 px-3 py-2 cursor-pointer text-xs hover:bg-gray-50 ${
+                  checked ? "bg-torg-blue-50/40" : ""
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleFornCadastrado(f.id)}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-torg-dark font-medium truncate">{f.razaoSocial}</p>
+                    <span className="text-[10px] text-torg-gray">{f.email}</span>
+                  </div>
+                  {(f.categorias || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {f.categorias.map((c) => (
+                        <span
+                          key={c}
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${chipCategoriaFornecedor(c)}`}
+                        >
+                          {labelCategoriaFornecedor(c)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {f.contato && (
+                    <p className="text-[10px] text-torg-gray mt-0.5 italic">contato: {f.contato}</p>
+                  )}
+                </div>
+              </label>
+            );
+          })
+        )}
+      </div>
+
+      {/* Avulsos (nao cadastrados) */}
+      <details className="bg-amber-50/40 border border-amber-200 rounded-lg" {...(qtdAvulsosValidos > 0 ? { open: true } : {})}>
+        <summary className="px-3 py-2 cursor-pointer text-xs font-medium text-amber-800 hover:bg-amber-50/60">
+          + Adicionar fornecedor avulso (não cadastrado) {qtdAvulsosValidos > 0 && `(${qtdAvulsosValidos})`}
+        </summary>
+        <div className="p-3 border-t border-amber-200 space-y-2">
+          {fornecedoresLinhas.map((f, idx) => (
+            <div key={idx} className="flex gap-2 items-start">
+              <input
+                type="text"
+                value={f.nome}
+                onChange={(e) => setFornecedor(idx, "nome", e.target.value)}
+                placeholder="Nome do fornecedor"
+                className="flex-1 min-w-0 border border-amber-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-torg-blue bg-white"
+              />
+              <input
+                type="email"
+                value={f.email}
+                onChange={(e) => setFornecedor(idx, "email", e.target.value)}
+                placeholder="email@fornecedor.com.br"
+                className="flex-1 min-w-0 border border-amber-200 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-torg-blue bg-white"
+              />
+              <button
+                type="button"
+                onClick={() => removerFornecedor(idx)}
+                disabled={fornecedoresLinhas.length === 1 && !f.nome && !f.email}
+                className="px-2 py-1.5 text-red-500 hover:text-red-700 disabled:opacity-30"
+                title="Remover"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addFornecedor}
+            className="text-[11px] text-amber-800 hover:text-amber-900 font-medium inline-flex items-center gap-1"
+          >
+            <Plus size={11} /> Mais um avulso
+          </button>
+        </div>
+      </details>
+
+      <p className="text-xs text-torg-gray mt-2">
+        Cada fornecedor recebe um <strong>link único e privado</strong> com a cotação.
+      </p>
+    </div>
   );
 }
