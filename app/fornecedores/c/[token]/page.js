@@ -80,17 +80,29 @@ export default async function CotacaoPorToken({ params }) {
   for (const it of cotacao.itens || []) {
     if (it.rmItem?.rmId) rmIdsEnvolvidos.add(it.rmItem.rmId);
   }
-  const anexos = await prisma.anexo.findMany({
-    where: { rmId: { in: Array.from(rmIdsEnvolvidos) } },
-    include: { rm: { select: { numero: true } } },
-    orderBy: { uploadedAt: "asc" },
-  });
+  const [anexosRM, anexosCotacao] = await Promise.all([
+    prisma.anexo.findMany({
+      where: { rmId: { in: Array.from(rmIdsEnvolvidos) } },
+      include: { rm: { select: { numero: true } } },
+      orderBy: { uploadedAt: "asc" },
+    }),
+    prisma.anexo.findMany({
+      where: { cotacaoId: cotacao.id },
+      orderBy: { uploadedAt: "asc" },
+    }),
+  ]);
 
   // Pendente — mostrar formulário
   const data = JSON.parse(JSON.stringify(cotacao));
-  const anexosData = JSON.parse(JSON.stringify(anexos));
+  const anexosRMData = JSON.parse(JSON.stringify(anexosRM));
+  const anexosCotacaoData = JSON.parse(JSON.stringify(anexosCotacao));
 
   return (
-    <CotacaoFornecedorForm cotacao={data} anexos={anexosData} vencida={vencida} />
+    <CotacaoFornecedorForm
+      cotacao={data}
+      anexos={anexosRMData}
+      anexosCotacao={anexosCotacaoData}
+      vencida={vencida}
+    />
   );
 }

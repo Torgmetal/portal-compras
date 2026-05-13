@@ -27,7 +27,7 @@ function parseObservacao(obs) {
   return { prazoEntrega, condicaoPagamento, observacao: restos.join(" | ") };
 }
 
-export default function CotacaoFornecedorForm({ cotacao, anexos = [], vencida }) {
+export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao = [], vencida }) {
   const router = useRouter();
   const jaEnviou = cotacao.status === "RECEBIDA";
   const obsParsed = parseObservacao(cotacao.observacao);
@@ -392,6 +392,28 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], vencida })
                   </li>
                 );
               })}
+            </ul>
+          </div>
+        )}
+
+        {/* Anexos da PROPRIA cotacao (PDFs subidos pelo fornecedor) — pode remover */}
+        {anexosCotacao.length > 0 && (
+          <div className="bg-amber-50/40 rounded-2xl border border-amber-200 p-5 sm:p-6">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <div>
+                <h2 className="text-base font-semibold text-amber-800 inline-flex items-center gap-2">
+                  <FileText size={18} className="text-amber-700" /> Sua proposta anexada
+                </h2>
+                <p className="text-xs text-amber-700/80 mt-0.5">
+                  PDFs/imagens que você enviou pra essa cotação. Pode remover se quiser substituir.
+                </p>
+              </div>
+              <span className="text-xs text-amber-700 font-medium">{anexosCotacao.length} arquivo(s)</span>
+            </div>
+            <ul className="divide-y divide-amber-100 border border-amber-200 rounded-lg bg-white">
+              {anexosCotacao.map((a) => (
+                <AnexoCotacaoLinha key={a.id} anexo={a} token={cotacao.token} />
+              ))}
             </ul>
           </div>
         )}
@@ -774,5 +796,53 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], vencida })
         </footer>
       </div>
     </div>
+  );
+}
+
+// Linha de anexo da cotacao com botao remover (so o fornecedor ve e remove).
+function AnexoCotacaoLinha({ anexo, token }) {
+  const router = useRouter();
+  const [removendo, setRemovendo] = useState(false);
+  const tamMb = anexo.tamanho ? (anexo.tamanho / (1024 * 1024)).toFixed(2) : null;
+  const remover = async () => {
+    if (!window.confirm(`Remover "${anexo.nomeArquivo}"?`)) return;
+    setRemovendo(true);
+    try {
+      const res = await fetch(`/api/cotacao/anexar/${token}/${anexo.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || "Erro");
+      }
+      router.refresh();
+    } catch (e) {
+      alert("Falha ao remover: " + e.message);
+      setRemovendo(false);
+    }
+  };
+  return (
+    <li className="px-3 py-2 flex items-center gap-3 hover:bg-amber-50/40">
+      <FileText size={16} className="text-amber-700 flex-shrink-0" />
+      <a
+        href={anexo.blobUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex-1 min-w-0 truncate text-sm text-torg-dark hover:text-torg-blue hover:underline"
+        title={anexo.nomeArquivo}
+      >
+        {anexo.nomeArquivo}
+      </a>
+      {tamMb && (
+        <span className="text-xs text-torg-gray tabular-nums whitespace-nowrap">{tamMb} MB</span>
+      )}
+      <button
+        type="button"
+        onClick={remover}
+        disabled={removendo}
+        className="text-xs text-red-600 hover:text-white hover:bg-red-600 font-medium px-2 py-1 rounded border border-red-200 hover:border-red-600 inline-flex items-center gap-1 disabled:opacity-50"
+        title="Remover esse anexo"
+      >
+        {removendo ? <Loader2 size={12} className="animate-spin" /> : "Remover"}
+      </button>
+    </li>
   );
 }
