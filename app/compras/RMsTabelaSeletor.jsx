@@ -453,7 +453,14 @@ function ModalEnviarConsolidada({ rms, onClose, onSent }) {
   const [itensSelecionados, setItensSelecionados] = useState(
     new Set(itensCotaveis.map((i) => i.id))
   );
-  const [emailsTexto, setEmailsTexto] = useState("");
+  // Linhas de fornecedor (nome + email) — sempre ao menos 1
+  const [fornecedoresLinhas, setFornecedoresLinhas] = useState([{ nome: "", email: "" }]);
+  const addFornecedor = () => setFornecedoresLinhas((p) => [...p, { nome: "", email: "" }]);
+  const setFornecedor = (idx, campo, valor) =>
+    setFornecedoresLinhas((p) => p.map((f, i) => (i === idx ? { ...f, [campo]: valor } : f)));
+  const removerFornecedor = (idx) =>
+    setFornecedoresLinhas((p) => (p.length === 1 ? [{ nome: "", email: "" }] : p.filter((_, i) => i !== idx)));
+
   const [prazo, setPrazo] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 5);
@@ -473,20 +480,26 @@ function ModalEnviarConsolidada({ rms, onClose, onSent }) {
   };
 
   const parsearFornecedores = () => {
-    const linhas = emailsTexto.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
-    const fornecedores = [];
-    for (const linha of linhas) {
-      const m = linha.match(/^(.+?)\s*<(.+?@.+?\..+?)>\s*$/);
-      if (m) fornecedores.push({ nome: m[1].trim(), email: m[2].trim() });
-      else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linha)) fornecedores.push({ nome: linha.split("@")[0], email: linha });
+    const out = [];
+    for (const f of fornecedoresLinhas) {
+      const email = String(f.email || "").trim();
+      const nome = String(f.nome || "").trim();
+      if (!email && !nome) continue;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { error: `Email inválido: "${email || "(em branco)"}"${nome ? ` — fornecedor "${nome}"` : ""}` };
+      }
+      if (!nome) return { error: `Preencha o nome pro email "${email}"` };
+      out.push({ nome, email });
     }
-    return fornecedores;
+    return { fornecedores: out };
   };
 
   const submit = async () => {
     setErro("");
-    const fornecedores = parsearFornecedores();
-    if (fornecedores.length === 0) return setErro("Adicione ao menos 1 fornecedor com email válido.");
+    const parsed = parsearFornecedores();
+    if (parsed.error) return setErro(parsed.error);
+    const fornecedores = parsed.fornecedores;
+    if (fornecedores.length === 0) return setErro("Adicione ao menos 1 fornecedor com nome e email válido.");
     if (itensSelecionados.size === 0) return setErro("Selecione ao menos 1 item.");
 
     setSalvando(true);
@@ -585,18 +598,51 @@ function ModalEnviarConsolidada({ rms, onClose, onSent }) {
             </div>
           </div>
 
-          {/* Fornecedores */}
+          {/* Fornecedores — campos separados nome + email */}
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Fornecedores</label>
-            <textarea
-              value={emailsTexto}
-              onChange={(e) => setEmailsTexto(e.target.value)}
-              rows={4}
-              placeholder={`Soufer <vendas@soufer.com.br>\nGerdau <comercial@gerdau.com.br>\n...ou só email@fornecedor.com`}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
-            />
-            <p className="text-xs text-torg-gray mt-1">
-              Um por linha. Cada fornecedor recebe um link único com TODOS os itens das RMs selecionadas.
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-torg-dark">
+                Fornecedores ({fornecedoresLinhas.filter((f) => f.email && f.nome).length})
+              </label>
+              <button
+                type="button"
+                onClick={addFornecedor}
+                className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"
+              >
+                <FileText size={12} /> Adicionar fornecedor
+              </button>
+            </div>
+            <div className="space-y-2">
+              {fornecedoresLinhas.map((f, idx) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <input
+                    type="text"
+                    value={f.nome}
+                    onChange={(e) => setFornecedor(idx, "nome", e.target.value)}
+                    placeholder="Nome do fornecedor"
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+                  />
+                  <input
+                    type="email"
+                    value={f.email}
+                    onChange={(e) => setFornecedor(idx, "email", e.target.value)}
+                    placeholder="email@fornecedor.com.br"
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removerFornecedor(idx)}
+                    disabled={fornecedoresLinhas.length === 1 && !f.nome && !f.email}
+                    className="px-2 py-2 text-red-500 hover:text-red-700 disabled:opacity-30"
+                    title="Remover esse fornecedor"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-torg-gray mt-2">
+              Cada fornecedor recebe um <strong>link único</strong> com TODOS os itens das RMs selecionadas.
             </p>
           </div>
 
