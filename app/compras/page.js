@@ -80,6 +80,66 @@ export default async function PainelCompras({ searchParams }) {
     console.error("[/compras] Falha contando cotacoes multi-RM:", e?.message);
   }
 
+  // Pra cada RM: quantas cotacoes RECEBIDA / quantas PENDENTE / atraso
+  // (cotacao pendente com prazoResposta < hoje). Usado nos KPI cards e
+  // na coluna "Ação" da tabela.
+  try {
+    const rmIdsListados = rms.map((r) => r.id);
+    if (rmIdsListados.length > 0) {
+      // Busca todas cotacoes que tocam essas RMs (primaria ou consolidada)
+      const cotsRelacionadas = await prisma.cotacao.findMany({
+        where: {
+          OR: [
+            { rmId: { in: rmIdsListados } },
+            { itens: { some: { rmItem: { rmId: { in: rmIdsListados } } } } },
+          ],
+        },
+        select: {
+          id: true, rmId: true, status: true, prazoResposta: true,
+          itens: { select: { rmItem: { select: { rmId: true } } } },
+        },
+      });
+      const agora = Date.now();
+      // Mapa rmId -> { recebidas: Set<cotId>, pendentes: Set<cotId>, atrasadas: Set<cotId> }
+      const infoPorRm = new Map();
+      const upsert = (rmId) => {
+        if (!infoPorRm.has(rmId)) {
+          infoPorRm.set(rmId, { recebidas: new Set(), pendentes: new Set(), atrasadas: new Set() });
+        }
+        return infoPorRm.get(rmId);
+      };
+      for (const cot of cotsRelacionadas) {
+        const rmIdsDestaCot = new Set();
+        if (cot.rmId) rmIdsDestaCot.add(cot.rmId);
+        for (const it of cot.itens || []) {
+          if (it.rmItem?.rmId) rmIdsDestaCot.add(it.rmItem.rmId);
+        }
+        for (const rid of rmIdsDestaCot) {
+          if (!rmIdsListados.includes(rid)) continue;
+          const info = upsert(rid);
+          if (cot.status === "RECEBIDA") info.recebidas.add(cot.id);
+          else if (cot.status === "PENDENTE") {
+            info.pendentes.add(cot.id);
+            if (cot.prazoResposta && new Date(cot.prazoResposta).getTime() < agora) {
+              info.atrasadas.add(cot.id);
+            }
+          }
+        }
+      }
+      for (const rm of rms) {
+        const info = infoPorRm.get(rm.id);
+        rm.recebidas = info ? info.recebidas.size : 0;
+        rm.pendentes = info ? info.pendentes.size : 0;
+        rm.atrasadas = info ? info.atrasadas.size : 0;
+      }
+    }
+  } catch (e) {
+    console.error("[/compras] Falha agregando status de cotacoes:", e?.message);
+    for (const rm of rms) {
+      rm.recebidas = 0; rm.pendentes = 0; rm.atrasadas = 0;
+    }
+  }
+
   const statusCount = totais.reduce((acc, t) => {
     acc[t.status] = t._count._all;
     return acc;

@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, AlertCircle, Loader2, Mail, X, FileText, Send, Copy, Check, ExternalLink, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, AlertCircle, Loader2, Mail, X, FileText, Send, Copy, Check, ExternalLink, CheckCircle2, Truck, Clock, LayoutGrid, List } from "lucide-react";
 import RMRowActions from "@/components/RMRowActions";
 
 const STATUS_LABELS = {
@@ -16,17 +16,62 @@ const STATUS_LABELS = {
 const TIPO_RM_LABELS = { ENGENHARIA: "Engenharia", INTERNA: "Interna" };
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
+// Classifica uma RM em uma "categoria de ação" pra os KPI cards e a tabela.
+// As categorias sao:
+//   - ABERTA          → ainda nao enviou cotacao pra fornecedor
+//   - EM_COTACAO      → enviou mas nenhuma proposta recebida ainda
+//   - PARCIAL         → recebeu algumas propostas, outras ainda pendentes
+//   - PRONTA          → todas propostas recebidas / status COTADA (pronta pra pedido)
+function categoriaRM(rm) {
+  if (rm.status === "ABERTA") return "ABERTA";
+  if (rm.status === "COTADA") return "PRONTA";
+  if (rm.status === "EM_COTACAO") {
+    return (rm.recebidas || 0) > 0 ? "PARCIAL" : "EM_COTACAO";
+  }
+  return rm.status;
+}
+
+const PRIORIDADE_CAT = { PRONTA: 1, PARCIAL: 2, EM_COTACAO: 3, ABERTA: 4 };
+
 export default function RMsTabelaSeletor({ rms, isAdmin }) {
   const router = useRouter();
   const [selecionadas, setSelecionadas] = useState(new Set());
   const [modalEnviar, setModalEnviar] = useState(false);
   const [linksGerados, setLinksGerados] = useState(null); // { cotacoes, rmsNumeros }
+  // Filtro click-to-filter dos KPI cards. null = todas, ou string com categoria
+  const [filtroCat, setFiltroCat] = useState(null);
+  // Toggle entre tabela e kanban
+  const [viewMode, setViewMode] = useState("tabela"); // "tabela" | "kanban"
 
   // Só permite cotar RMs que ainda estão em fluxo ativo
   const cotaveis = useMemo(
     () => rms.filter((r) => ["ABERTA", "EM_COTACAO", "COTADA"].includes(r.status)),
     [rms]
   );
+
+  // KPIs agregados por categoria de ação
+  const stats = useMemo(() => {
+    const acc = { ABERTA: 0, EM_COTACAO: 0, PARCIAL: 0, PRONTA: 0 };
+    let atrasadas = 0;
+    for (const r of rms) {
+      const cat = categoriaRM(r);
+      if (acc[cat] != null) acc[cat]++;
+      if ((r.atrasadas || 0) > 0) atrasadas++;
+    }
+    return { ...acc, atrasadas };
+  }, [rms]);
+
+  // RMs filtradas pelos KPI cards, ordenadas por prioridade (PRONTA primeiro)
+  const rmsExibidas = useMemo(() => {
+    const filtrada = filtroCat ? rms.filter((r) => categoriaRM(r) === filtroCat) : rms;
+    return [...filtrada].sort((a, b) => {
+      const pa = PRIORIDADE_CAT[categoriaRM(a)] || 99;
+      const pb = PRIORIDADE_CAT[categoriaRM(b)] || 99;
+      if (pa !== pb) return pa - pb;
+      // Empate: mais recente primeiro
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [rms, filtroCat]);
 
   const toggle = (id) => {
     setSelecionadas((prev) => {
@@ -45,6 +90,82 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
 
   return (
     <>
+      {/* KPI cards click-to-filter */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <KpiCard
+          label="Abertas"
+          subtitle="Aguardando envio"
+          value={stats.ABERTA}
+          color="blue"
+          icon={FileText}
+          active={filtroCat === "ABERTA"}
+          onClick={() => setFiltroCat(filtroCat === "ABERTA" ? null : "ABERTA")}
+        />
+        <KpiCard
+          label="Em cotação"
+          subtitle="Aguardando proposta"
+          value={stats.EM_COTACAO}
+          alerta={stats.atrasadas > 0 ? `${stats.atrasadas} atrasada(s)` : null}
+          color="orange"
+          icon={Clock}
+          active={filtroCat === "EM_COTACAO"}
+          onClick={() => setFiltroCat(filtroCat === "EM_COTACAO" ? null : "EM_COTACAO")}
+        />
+        <KpiCard
+          label="Recebida parcial"
+          subtitle="Algumas propostas vieram"
+          value={stats.PARCIAL}
+          color="emerald"
+          icon={Mail}
+          active={filtroCat === "PARCIAL"}
+          onClick={() => setFiltroCat(filtroCat === "PARCIAL" ? null : "PARCIAL")}
+        />
+        <KpiCard
+          label="Pronta pra pedido"
+          subtitle="Fechar no Omie"
+          value={stats.PRONTA}
+          color="torg-blue"
+          icon={Truck}
+          highlight
+          active={filtroCat === "PRONTA"}
+          onClick={() => setFiltroCat(filtroCat === "PRONTA" ? null : "PRONTA")}
+        />
+      </div>
+
+      {/* Toggle de visualizacao + filtro ativo */}
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-2 text-xs">
+          {filtroCat && (
+            <button
+              onClick={() => setFiltroCat(null)}
+              className="text-torg-blue font-medium hover:underline inline-flex items-center gap-1"
+            >
+              <X size={12} /> Limpar filtro
+            </button>
+          )}
+          <span className="text-torg-gray">
+            Mostrando {rmsExibidas.length} de {rms.length} RM{rms.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+          <button
+            onClick={() => setViewMode("tabela")}
+            className={`px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1 ${
+              viewMode === "tabela" ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"
+            }`}
+          >
+            <List size={14} /> Tabela
+          </button>
+          <button
+            onClick={() => setViewMode("kanban")}
+            className={`px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1 border-l border-gray-200 ${
+              viewMode === "kanban" ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"
+            }`}
+          >
+            <LayoutGrid size={14} /> Kanban
+          </button>
+        </div>
+      </div>
       {/* Action bar — aparece quando 1+ RM selecionada */}
       {selecionadas.size > 0 && (
         <div className="bg-torg-blue text-white rounded-xl shadow-md px-4 py-3 flex items-center justify-between flex-wrap gap-3 sticky top-2 z-10">
@@ -73,6 +194,9 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
         </div>
       )}
 
+      {viewMode === "kanban" ? (
+        <KanbanView rms={rmsExibidas} isAdmin={isAdmin} />
+      ) : (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -103,14 +227,21 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {rms.map((rm) => {
+              {rmsExibidas.map((rm) => {
                 const s = STATUS_LABELS[rm.status] || STATUS_LABELS.ABERTA;
+                const cat = categoriaRM(rm);
                 const pedidoCount = (rm.itens || []).filter((i) => i.status === "PEDIDO_GERADO").length;
                 const pendentes = (rm.itens || []).filter((i) => i.status === "PENDENTE").length;
                 const podeSelecionar = ["ABERTA", "EM_COTACAO", "COTADA"].includes(rm.status);
                 const checked = selecionadas.has(rm.id);
+                // Fundo sutil por categoria — destaca PRONTA (azul) e PARCIAL (verde)
+                const bgRow =
+                  cat === "PRONTA" ? "bg-torg-blue-50/40 hover:bg-torg-blue-50/60" :
+                  cat === "PARCIAL" ? "bg-emerald-50/40 hover:bg-emerald-50/60" :
+                  cat === "EM_COTACAO" ? "bg-amber-50/20 hover:bg-amber-50/40" :
+                  "hover:bg-gray-50";
                 return (
-                  <tr key={rm.id} className={`hover:bg-gray-50 ${checked ? "bg-torg-blue-50/30" : ""}`}>
+                  <tr key={rm.id} className={`${bgRow} ${checked ? "ring-2 ring-torg-blue ring-inset" : ""}`}>
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
@@ -155,9 +286,21 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
                     <td className="px-6 py-3 text-center text-torg-gray">{rm._count.cotacoes}</td>
                     <td className="px-6 py-3 text-torg-gray text-xs">{fmtData(rm.createdAt)}</td>
                     <td className="px-6 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap inline-block ${s.className}`}>
-                        {s.label}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap inline-block w-fit ${s.className}`}>
+                          {s.label}
+                        </span>
+                        {(rm.recebidas > 0 || rm.pendentes > 0) && (
+                          <span className="text-[10px] text-torg-gray whitespace-nowrap">
+                            {rm.recebidas}/{rm.recebidas + rm.pendentes} recebida{(rm.recebidas + rm.pendentes) !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                        {rm.atrasadas > 0 && (
+                          <span className="text-[10px] text-red-600 font-semibold whitespace-nowrap inline-flex items-center gap-0.5">
+                            🔴 {rm.atrasadas} atrasada{rm.atrasadas !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-right">
                       <RMRowActions rmId={rm.id} numero={rm.numero} status={rm.status} isAdmin={isAdmin} />
@@ -169,6 +312,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
           </table>
         </div>
       </div>
+      )}
 
       {modalEnviar && (
         <ModalEnviarConsolidada
@@ -491,6 +635,144 @@ function ModalEnviarConsolidada({ rms, onClose, onSent }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// KPI card click-to-filter no topo do painel.
+// color: "blue" | "orange" | "emerald" | "torg-blue"
+// highlight: borda mais grossa quando e a categoria prioritaria
+function KpiCard({ label, subtitle, value, color, icon: Icon, active, onClick, highlight, alerta }) {
+  const colorMap = {
+    blue:       { bg: "bg-torg-blue-50",   text: "text-torg-blue",         border: "border-torg-blue-200",   activeBg: "bg-torg-blue text-white",       activeBorder: "border-torg-blue" },
+    orange:     { bg: "bg-torg-orange-50", text: "text-torg-orange-700",   border: "border-torg-orange-200", activeBg: "bg-torg-orange text-white",     activeBorder: "border-torg-orange" },
+    emerald:    { bg: "bg-emerald-50",     text: "text-emerald-700",       border: "border-emerald-200",     activeBg: "bg-emerald-600 text-white",     activeBorder: "border-emerald-600" },
+    "torg-blue":{ bg: "bg-torg-blue-50",   text: "text-torg-blue",         border: "border-torg-blue-300",   activeBg: "bg-torg-blue text-white",       activeBorder: "border-torg-blue" },
+  };
+  const c = colorMap[color] || colorMap.blue;
+  return (
+    <button
+      onClick={onClick}
+      className={`text-left p-4 rounded-xl border-2 transition-all ${
+        active ? `${c.activeBg} ${c.activeBorder} shadow-md` : `bg-white ${c.border} hover:shadow-sm`
+      } ${highlight && !active ? "ring-1 ring-torg-blue/20" : ""}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className={`text-xs font-semibold uppercase tracking-wide ${active ? "text-white/90" : c.text}`}>
+            {label}
+          </p>
+          <p className={`text-3xl font-extrabold tabular-nums mt-1 ${active ? "text-white" : "text-torg-dark"}`}>
+            {value}
+          </p>
+          {subtitle && (
+            <p className={`text-[10px] mt-0.5 ${active ? "text-white/80" : "text-torg-gray"}`}>
+              {subtitle}
+            </p>
+          )}
+          {alerta && (
+            <p className={`text-[10px] mt-1 font-semibold ${active ? "text-white/90" : "text-red-600"}`}>
+              🔴 {alerta}
+            </p>
+          )}
+        </div>
+        <div className={`p-2 rounded-lg ${active ? "bg-white/20" : c.bg}`}>
+          <Icon size={18} className={active ? "text-white" : c.text} />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// Visualizacao Kanban — 4 colunas por categoria de acao.
+function KanbanView({ rms, isAdmin }) {
+  const colunas = [
+    { cat: "ABERTA",     titulo: "Abertas",            subtitle: "Aguardando envio",       color: "blue" },
+    { cat: "EM_COTACAO", titulo: "Em cotação",         subtitle: "Aguardando proposta",    color: "orange" },
+    { cat: "PARCIAL",    titulo: "Recebida parcial",   subtitle: "Algumas propostas",      color: "emerald" },
+    { cat: "PRONTA",     titulo: "Pronta pra pedido",  subtitle: "Fechar no Omie",         color: "torg-blue" },
+  ];
+  const headerColor = {
+    blue: "bg-torg-blue-50 text-torg-blue border-torg-blue-200",
+    orange: "bg-torg-orange-50 text-torg-orange-700 border-torg-orange-200",
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    "torg-blue": "bg-torg-blue text-white border-torg-blue",
+  };
+  const cardColor = {
+    blue: "bg-white border-torg-blue-100 hover:border-torg-blue-300",
+    orange: "bg-white border-torg-orange-100 hover:border-torg-orange-300",
+    emerald: "bg-white border-emerald-100 hover:border-emerald-300",
+    "torg-blue": "bg-torg-blue-50/40 border-torg-blue-200 hover:border-torg-blue-400 shadow-sm",
+  };
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {colunas.map((col) => {
+        const itens = rms.filter((r) => categoriaRM(r) === col.cat);
+        return (
+          <div key={col.cat} className="flex flex-col bg-gray-50 rounded-xl border border-gray-200 overflow-hidden min-h-[300px]">
+            <div className={`px-3 py-3 border-b ${headerColor[col.color]}`}>
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-sm">{col.titulo}</p>
+                <span className="text-xs font-bold bg-white/30 px-2 py-0.5 rounded-full">
+                  {itens.length}
+                </span>
+              </div>
+              <p className="text-[10px] mt-0.5 opacity-90">{col.subtitle}</p>
+            </div>
+            <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[600px]">
+              {itens.length === 0 ? (
+                <p className="text-center text-xs text-torg-gray italic py-8">
+                  Nenhuma RM
+                </p>
+              ) : (
+                itens.map((rm) => {
+                  const diasAtras = rm.createdAt
+                    ? Math.floor((Date.now() - new Date(rm.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+                    : null;
+                  return (
+                    <Link
+                      key={rm.id}
+                      href={`/compras/rm/${rm.id}`}
+                      className={`block p-3 rounded-lg border-2 transition-all ${cardColor[col.color]}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-mono font-bold text-torg-blue text-sm">{rm.numero}</p>
+                        <span className="text-[10px] text-torg-gray whitespace-nowrap">
+                          {diasAtras != null && diasAtras > 0 ? `há ${diasAtras}d` : "hoje"}
+                        </span>
+                      </div>
+                      {rm.op && (
+                        <p className="text-xs text-torg-gray mt-1 font-mono">
+                          {rm.op.numero} <span className="text-torg-gray/70">·</span> {rm.op.cliente}
+                        </p>
+                      )}
+                      <p className="text-xs text-torg-dark mt-1 line-clamp-2 leading-tight">{rm.descricao}</p>
+                      <div className="flex items-center justify-between gap-2 mt-2 text-[10px] text-torg-gray">
+                        <span>{rm._count?.itens || 0} itens</span>
+                        {(rm.recebidas > 0 || rm.pendentes > 0) && (
+                          <span className="font-semibold">
+                            {rm.recebidas}/{rm.recebidas + rm.pendentes} props
+                          </span>
+                        )}
+                      </div>
+                      {rm.atrasadas > 0 && (
+                        <p className="text-[10px] mt-1 text-red-600 font-bold">
+                          🔴 {rm.atrasadas} atrasada{rm.atrasadas !== 1 ? "s" : ""}
+                        </p>
+                      )}
+                      {col.cat === "PRONTA" && (
+                        <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-torg-blue font-semibold">
+                          <Truck size={11} /> Pronta pra fechar pedido →
+                        </div>
+                      )}
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
