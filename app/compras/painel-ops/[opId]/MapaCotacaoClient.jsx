@@ -919,6 +919,20 @@ function ModalResultados({ resultados, onClose }) {
                       {r.numeroPedido && ` · pedido #${r.numeroPedido}`}
                       {r.codigoPedido && !r.numeroPedido && ` · cód ${r.codigoPedido}`}
                     </p>
+                    {r.anexos && (r.anexos.anexados > 0 || r.anexos.erros > 0) && (
+                      <p className="text-[11px] mt-1">
+                        {r.anexos.anexados > 0 && (
+                          <span className="text-emerald-700 font-medium">
+                            📎 {r.anexos.anexados} anexo(s) enviado(s)
+                          </span>
+                        )}
+                        {r.anexos.erros > 0 && (
+                          <span className="text-red-600 ml-2">
+                            · {r.anexos.erros} falha(s)
+                          </span>
+                        )}
+                      </p>
+                    )}
                     {r.erro && (
                       <p className="text-xs text-red-700 mt-1 font-mono break-words">{r.erro}</p>
                     )}

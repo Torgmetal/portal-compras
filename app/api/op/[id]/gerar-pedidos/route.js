@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { criarPedidoOmie } from "@/lib/omie-pedido-compra";
+import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -246,12 +246,52 @@ export async function POST(req, { params }) {
       },
     });
 
+    let resAnexos = null;
     if (!erroPedido) {
       // Marca os RMItens como PEDIDO_GERADO e vincula ao PedidoOmie
       await prisma.rMItem.updateMany({
         where: { id: { in: linhas.map((l) => l.rmItem.id) } },
         data: { status: "PEDIDO_GERADO", pedidoOmieId: pedidoOmie.id },
       });
+
+      // Envia anexos pro Omie via API de anexos com URL externa.
+      // Inclui: PDFs da cotacao (proposta do fornecedor) + anexos das RMs
+      // envolvidas no grupo (drawings, especificacoes, planilha Tekla).
+      // Best-effort: erro em anexo nao quebra o fluxo.
+      try {
+        const nCodPed = Number(pedidoCriado?.codigo_pedido) || null;
+        if (nCodPed) {
+          const rmIdsDoGrupo = [...rmIdsEnvolvidas];
+          const [anexosCot, anexosRMs] = await Promise.all([
+            prisma.anexo.findMany({
+              where: { cotacaoId: cotacao.id },
+              select: { nomeArquivo: true, blobUrl: true, tipo: true },
+            }),
+            prisma.anexo.findMany({
+              where: { rmId: { in: rmIdsDoGrupo } },
+              select: { nomeArquivo: true, blobUrl: true, tipo: true },
+            }),
+          ]);
+          const todosAnexos = [...anexosCot, ...anexosRMs];
+          if (todosAnexos.length > 0) {
+            resAnexos = await anexarAoPedidoOmie({ nCodPed, anexos: todosAnexos });
+            // Guarda resultado no PedidoOmie.resposta pra rastreabilidade
+            await prisma.pedidoOmie.update({
+              where: { id: pedidoOmie.id },
+              data: {
+                resposta: {
+                  ...(pedidoOmie.resposta || {}),
+                  pedido_criado: pedidoCriado,
+                  anexos: resAnexos,
+                },
+              },
+            }).catch((e) => console.error("[anexos] falha atualizando resposta:", e?.message));
+          }
+        }
+      } catch (e) {
+        console.error("[gerar-pedidos anexar] erro:", e?.message);
+        resAnexos = { anexados: 0, erros: [{ error: e?.message }] };
+      }
     }
 
     resultados.push({
@@ -263,6 +303,7 @@ export async function POST(req, { params }) {
       sucesso: !erroPedido,
       codigoPedido: pedidoCriado?.codigo_pedido || null,
       numeroPedido: pedidoCriado?.numero_pedido || null,
+      anexos: resAnexos ? { anexados: resAnexos.anexados, erros: resAnexos.erros?.length || 0 } : null,
       erro: erroPedido,
     });
 
