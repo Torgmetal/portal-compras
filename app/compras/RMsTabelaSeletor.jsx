@@ -344,9 +344,6 @@ function ModalLinksGerados({ payload, onClose }) {
   const cotacoes = payload?.cotacoes || [];
   const rmsNumeros = payload?.rmsNumeros || [];
   const [copiado, setCopiado] = useState(null);
-  const [enviandoEmail, setEnviandoEmail] = useState(null);
-  const [emailEnviado, setEmailEnviado] = useState(new Set());
-  const [erroEmail, setErroEmail] = useState(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const linkOf = (cot) => `${baseUrl}/fornecedores/c/${cot.token}`;
@@ -364,22 +361,6 @@ function ModalLinksGerados({ payload, onClose }) {
       ta.select();
       try { document.execCommand("copy"); setCopiado(cot.id); setTimeout(() => setCopiado(null), 2000); } catch {}
       document.body.removeChild(ta);
-    }
-  };
-
-  // Envia o email via Resend (servidor) — link vai como hiperlink HTML clicavel.
-  const enviarEmail = async (cot) => {
-    setEnviandoEmail(cot.id);
-    setErroEmail(null);
-    try {
-      const res = await fetch(`/api/cotacao/${cot.id}/enviar-email`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Falha no envio");
-      setEmailEnviado((prev) => new Set(prev).add(cot.id));
-    } catch (e) {
-      setErroEmail({ id: cot.id, msg: e.message });
-    } finally {
-      setEnviandoEmail(null);
     }
   };
 
@@ -432,35 +413,13 @@ function ModalLinksGerados({ payload, onClose }) {
                     href={`/api/cotacao/${cot.id}/preview-email`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1.5 text-xs bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50 rounded font-medium inline-flex items-center gap-1"
-                    title="Abrir email pronto pra copiar e colar no Outlook"
+                    className="px-3 py-1.5 text-xs bg-torg-blue text-white hover:bg-torg-blue-700 rounded font-medium inline-flex items-center gap-1"
+                    title="Abrir email pronto: copia o conteudo HTML e cola no Outlook"
                   >
-                    <FileText size={12} /> Email pronto
+                    <Mail size={12} /> Enviar email
                   </a>
-                  <button
-                    onClick={() => enviarEmail(cot)}
-                    disabled={enviandoEmail === cot.id || emailEnviado.has(cot.id)}
-                    className={`px-3 py-1.5 text-xs rounded font-medium inline-flex items-center gap-1 disabled:opacity-60 ${
-                      emailEnviado.has(cot.id)
-                        ? "bg-emerald-600 text-white"
-                        : "bg-torg-blue text-white hover:bg-torg-blue-700"
-                    }`}
-                  >
-                    {enviandoEmail === cot.id ? (
-                      <><Loader2 size={12} className="animate-spin" /> Enviando...</>
-                    ) : emailEnviado.has(cot.id) ? (
-                      <><Check size={12} /> Enviado</>
-                    ) : (
-                      <><Mail size={12} /> Enviar email</>
-                    )}
-                  </button>
                 </div>
               </div>
-              {erroEmail?.id === cot.id && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-[11px] rounded px-2 py-1">
-                  ✗ {erroEmail.msg}
-                </div>
-              )}
               <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 font-mono text-[11px] text-torg-gray break-all">
                 {linkOf(cot)}
               </div>
