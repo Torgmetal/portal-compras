@@ -626,51 +626,61 @@ function ConfigPedidoOmie({ rm }) {
 
 // ─── LISTA DE COTAÇÕES ──────────────────────────────
 
-// Copia HTML pro clipboard SINCRONAMENTE usando execCommand.
-// Necessario porque async clipboard.write perde o "user gesture" apos await.
-// Cria div temporario invisivel, seleciona, executa copy.
-function copyHtmlSync(html, text) {
-  // Listener que injeta HTML estruturado no clipboard event
-  const handler = (e) => {
-    e.clipboardData.setData("text/html", html);
-    e.clipboardData.setData("text/plain", text);
-    e.preventDefault();
-  };
-  document.addEventListener("copy", handler);
+// Copia HTML pro clipboard SINCRONAMENTE — selecionando o HTML em um elemento
+// real e executando copy. O navegador copia o conteudo da selecao com formatacao
+// (incluindo a tag <a> que vira hiperlink no Outlook).
+function copyHtmlSync(html /*, text */) {
+  let ok = false;
+  let container = null;
   try {
-    // Cria selecao temporaria pra disparar o copy
+    // Cria container REAL (no flow do DOM) com o HTML que queremos copiar.
+    // Precisa estar visivel pro Range selecionar com formatacao preservada.
+    container = document.createElement("div");
+    container.setAttribute("contenteditable", "true");
+    container.innerHTML = html;
+    container.style.position = "fixed";
+    container.style.left = "0";
+    container.style.top = "0";
+    container.style.width = "1px";
+    container.style.height = "1px";
+    container.style.opacity = "0";
+    container.style.pointerEvents = "none";
+    container.style.overflow = "hidden";
+    document.body.appendChild(container);
+
+    // Seleciona TODO o conteudo do container
     const range = document.createRange();
-    const tempEl = document.createElement("div");
-    tempEl.contentEditable = "true";
-    tempEl.style.position = "fixed";
-    tempEl.style.top = "-9999px";
-    tempEl.style.opacity = "0";
-    tempEl.innerHTML = "x"; // precisa ter conteudo
-    document.body.appendChild(tempEl);
-    range.selectNodeContents(tempEl);
+    range.selectNodeContents(container);
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
-    const ok = document.execCommand("copy");
+
+    // Copia
+    ok = document.execCommand("copy");
     sel.removeAllRanges();
-    document.body.removeChild(tempEl);
-    return ok;
   } catch (e) {
     console.warn("copyHtmlSync falhou:", e?.message);
-    return false;
+    ok = false;
   } finally {
-    document.removeEventListener("copy", handler);
+    if (container && container.parentNode) container.parentNode.removeChild(container);
   }
+  return ok;
 }
 
 // Helper: usa dados ja em cache (pre-buscados) pra fazer copy sincrono + mailto.
 // O clipboard precisa ser chamado SINCRONAMENTE no momento do clique pra nao
-// perder o user gesture.
+// perder o user gesture. Pequeno delay antes do mailto evita que o navegador
+// invalide o clipboard ao trocar de contexto (protocolo handler).
 function enviarEmailComCache(cachedData) {
   if (!cachedData) throw new Error("Email ainda nao foi carregado");
   const copiouHtml = copyHtmlSync(cachedData.html, cachedData.text);
   const mailto = `mailto:${encodeURIComponent(cachedData.to)}?subject=${encodeURIComponent(cachedData.subject)}`;
-  window.location.href = mailto;
+  // Atraso de 150ms pra dar tempo do clipboard estabilizar antes do mailto.
+  // Sem isso, alguns navegadores invalidam o clipboard quando o protocolo
+  // mailto: dispara (perde contexto).
+  setTimeout(() => {
+    window.location.href = mailto;
+  }, 150);
   return { copiouHtml };
 }
 

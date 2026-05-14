@@ -339,43 +339,46 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
   );
 }
 
-// Copia HTML pro clipboard SINCRONAMENTE (precisa pra nao perder user gesture).
-function copyHtmlSync(html, text) {
-  const handler = (e) => {
-    e.clipboardData.setData("text/html", html);
-    e.clipboardData.setData("text/plain", text);
-    e.preventDefault();
-  };
-  document.addEventListener("copy", handler);
+// Copia HTML pro clipboard SINCRONAMENTE via selecao + execCommand.
+function copyHtmlSync(html /*, text */) {
+  let ok = false;
+  let container = null;
   try {
+    container = document.createElement("div");
+    container.setAttribute("contenteditable", "true");
+    container.innerHTML = html;
+    container.style.position = "fixed";
+    container.style.left = "0";
+    container.style.top = "0";
+    container.style.width = "1px";
+    container.style.height = "1px";
+    container.style.opacity = "0";
+    container.style.pointerEvents = "none";
+    container.style.overflow = "hidden";
+    document.body.appendChild(container);
     const range = document.createRange();
-    const tempEl = document.createElement("div");
-    tempEl.contentEditable = "true";
-    tempEl.style.position = "fixed";
-    tempEl.style.top = "-9999px";
-    tempEl.style.opacity = "0";
-    tempEl.innerHTML = "x";
-    document.body.appendChild(tempEl);
-    range.selectNodeContents(tempEl);
+    range.selectNodeContents(container);
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
-    const ok = document.execCommand("copy");
+    ok = document.execCommand("copy");
     sel.removeAllRanges();
-    document.body.removeChild(tempEl);
-    return ok;
   } catch (e) {
-    return false;
+    ok = false;
   } finally {
-    document.removeEventListener("copy", handler);
+    if (container && container.parentNode) container.parentNode.removeChild(container);
   }
+  return ok;
 }
 
 function enviarEmailComCache(cachedData) {
   if (!cachedData) throw new Error("Email ainda nao foi carregado");
   const copiouHtml = copyHtmlSync(cachedData.html, cachedData.text);
   const mailto = `mailto:${encodeURIComponent(cachedData.to)}?subject=${encodeURIComponent(cachedData.subject)}`;
-  window.location.href = mailto;
+  // Delay pequeno antes do mailto pra clipboard estabilizar
+  setTimeout(() => {
+    window.location.href = mailto;
+  }, 150);
   return { copiouHtml };
 }
 
