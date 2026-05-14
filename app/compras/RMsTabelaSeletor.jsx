@@ -428,6 +428,15 @@ function ModalLinksGerados({ payload, onClose }) {
                   >
                     <ExternalLink size={12} /> Abrir
                   </a>
+                  <a
+                    href={`/api/cotacao/${cot.id}/preview-email`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 text-xs bg-white border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50 rounded font-medium inline-flex items-center gap-1"
+                    title="Abrir email pronto pra copiar e colar no Outlook"
+                  >
+                    <FileText size={12} /> Email pronto
+                  </a>
                   <button
                     onClick={() => enviarEmail(cot)}
                     disabled={enviandoEmail === cot.id || emailEnviado.has(cot.id)}

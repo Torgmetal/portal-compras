@@ -630,26 +630,33 @@ function CotacoesList({ rm, outrasRMs = [] }) {
   const [modalVincular, setModalVincular] = useState(null); // cotação selecionada
   const [copiado, setCopiado] = useState(null);
   const [modalManual, setModalManual] = useState(null);
+  const [enviandoEmail, setEnviandoEmail] = useState(null);
+  const [emailEnviado, setEmailEnviado] = useState(new Set());
+  const [erroEmail, setErroEmail] = useState(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  const corpoEmail = (link, fornecedorNome) => [
-    `Olá, ${fornecedorNome},`,
-    "",
-    `Solicitamos cotação para a Requisição ${rm.numero} (${rm.descricao}).`,
-    "",
-    "Acesse o link abaixo para visualizar os itens e enviar (ou atualizar) sua proposta:",
-    "",
-    link,
-    "",
-    "Atenciosamente,",
-    "Torg Metal",
-  ].join("\n");
-
-  const abrirEmail = (cot) => {
-    const link = `${baseUrl}/fornecedores/c/${cot.token}`;
-    const subject = encodeURIComponent(`Solicitação de Cotação — RM ${rm.numero}`);
-    const body = encodeURIComponent(corpoEmail(link, cot.fornecedorNome));
-    window.location.href = `mailto:${cot.fornecedorEmail}?subject=${subject}&body=${body}`;
+  // Envia o email via Resend (link clicavel como hiperlink HTML).
+  // Antes usava mailto: do cliente local que deixava o link como texto puro.
+  const enviarEmail = async (cot) => {
+    setEnviandoEmail(cot.id);
+    setErroEmail(null);
+    try {
+      const res = await fetch(`/api/cotacao/${cot.id}/enviar-email`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha no envio");
+      setEmailEnviado((prev) => new Set(prev).add(cot.id));
+      setTimeout(() => {
+        setEmailEnviado((prev) => {
+          const next = new Set(prev);
+          next.delete(cot.id);
+          return next;
+        });
+      }, 4000);
+    } catch (e) {
+      setErroEmail({ id: cot.id, msg: e.message });
+    } finally {
+      setEnviandoEmail(null);
+    }
   };
 
   const copiarLink = async (cot) => {
@@ -752,14 +759,45 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                     <Plus size={12} /> Vincular RM
                   </button>
                 )}
-                <button
-                  onClick={() => abrirEmail(c)}
-                  className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
-                  title="Abrir o email no Outlook com mensagem pré-formatada"
+                <a
+                  href={`/api/cotacao/${c.id}/preview-email`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 text-xs bg-white border border-torg-blue-200 text-torg-blue rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-1"
+                  title="Abrir email pronto pra copiar e colar no Outlook (link clicavel garantido)"
                 >
-                  <Mail size={12} /> {c.recebidaEm ? "Reenviar" : "Enviar email"}
+                  <FileText size={12} /> Email pronto
+                </a>
+                <button
+                  onClick={() => enviarEmail(c)}
+                  disabled={enviandoEmail === c.id}
+                  className={`px-3 py-1.5 text-xs rounded-lg font-medium inline-flex items-center gap-1 disabled:opacity-60 ${
+                    emailEnviado.has(c.id)
+                      ? "bg-emerald-600 text-white"
+                      : "bg-torg-blue text-white hover:bg-torg-blue-700"
+                  }`}
+                  title="Envia direto via Resend (requer config)"
+                >
+                  {enviandoEmail === c.id ? (
+                    <><Loader2 size={12} className="animate-spin" /> Enviando...</>
+                  ) : emailEnviado.has(c.id) ? (
+                    <><Check size={12} /> Enviado!</>
+                  ) : (
+                    <><Mail size={12} /> {c.recebidaEm ? "Reenviar" : "Enviar email"}</>
+                  )}
                 </button>
               </div>
+              {erroEmail?.id === c.id && (
+                <div className="w-full mt-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded px-3 py-2">
+                  <strong>✗ Falha:</strong> {erroEmail.msg}
+                  <button
+                    onClick={() => setErroEmail(null)}
+                    className="ml-2 text-red-500 hover:text-red-800 font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </li>
           );
         })}
@@ -1929,6 +1967,15 @@ function ModalLinksEnvio({ rm, links, onClose }) {
                   >
                     {copiado === cot.id ? "✓ copiado" : "Copiar link"}
                   </button>
+                  <a
+                    href={`/api/cotacao/${cot.id}/preview-email`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 text-xs bg-white border border-torg-blue-200 text-torg-blue rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-1"
+                    title="Abrir email pronto pra copiar e colar no Outlook (link clicavel)"
+                  >
+                    <FileText size={12} /> Email pronto
+                  </a>
                   <button
                     onClick={() => enviarEmail(cot)}
                     disabled={enviandoEmail === cot.id || emailEnviado.has(cot.id)}
