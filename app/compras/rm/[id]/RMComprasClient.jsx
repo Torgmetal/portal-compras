@@ -626,42 +626,51 @@ function ConfigPedidoOmie({ rm }) {
 
 // ─── LISTA DE COTAÇÕES ──────────────────────────────
 
-// Helper: copia o HTML do email pro clipboard e abre mailto com Para+Assunto.
-// O usuario so precisa dar Ctrl+V no corpo da mensagem do Outlook que abriu.
-// O link vai como hiperlink HTML clicavel.
-async function enviarEmailViaClipboardMailto(cotId) {
-  const res = await fetch(`/api/cotacao/${cotId}/preview-email?format=json`);
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error || "Falha ao montar email");
-  }
-  const data = await res.json();
-
-  // Copia HTML formatado pro clipboard (com link clicavel)
-  let copiouHtml = false;
+// Copia HTML pro clipboard SINCRONAMENTE usando execCommand.
+// Necessario porque async clipboard.write perde o "user gesture" apos await.
+// Cria div temporario invisivel, seleciona, executa copy.
+function copyHtmlSync(html, text) {
+  // Listener que injeta HTML estruturado no clipboard event
+  const handler = (e) => {
+    e.clipboardData.setData("text/html", html);
+    e.clipboardData.setData("text/plain", text);
+    e.preventDefault();
+  };
+  document.addEventListener("copy", handler);
   try {
-    if (navigator.clipboard && window.ClipboardItem) {
-      const blob = new ClipboardItem({
-        "text/html": new Blob([data.html], { type: "text/html" }),
-        "text/plain": new Blob([data.text], { type: "text/plain" }),
-      });
-      await navigator.clipboard.write([blob]);
-      copiouHtml = true;
-    }
+    // Cria selecao temporaria pra disparar o copy
+    const range = document.createRange();
+    const tempEl = document.createElement("div");
+    tempEl.contentEditable = "true";
+    tempEl.style.position = "fixed";
+    tempEl.style.top = "-9999px";
+    tempEl.style.opacity = "0";
+    tempEl.innerHTML = "x"; // precisa ter conteudo
+    document.body.appendChild(tempEl);
+    range.selectNodeContents(tempEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const ok = document.execCommand("copy");
+    sel.removeAllRanges();
+    document.body.removeChild(tempEl);
+    return ok;
   } catch (e) {
-    console.warn("Clipboard HTML falhou, tentando so texto:", e?.message);
+    console.warn("copyHtmlSync falhou:", e?.message);
+    return false;
+  } finally {
+    document.removeEventListener("copy", handler);
   }
-  if (!copiouHtml) {
-    // Fallback: copia so texto
-    try {
-      await navigator.clipboard.writeText(data.text);
-    } catch { /* sem clipboard */ }
-  }
+}
 
-  // Abre o Outlook (mailto) com Para + Assunto preenchidos, corpo vazio
-  const mailto = `mailto:${encodeURIComponent(data.to)}?subject=${encodeURIComponent(data.subject)}`;
+// Helper: usa dados ja em cache (pre-buscados) pra fazer copy sincrono + mailto.
+// O clipboard precisa ser chamado SINCRONAMENTE no momento do clique pra nao
+// perder o user gesture.
+function enviarEmailComCache(cachedData) {
+  if (!cachedData) throw new Error("Email ainda nao foi carregado");
+  const copiouHtml = copyHtmlSync(cachedData.html, cachedData.text);
+  const mailto = `mailto:${encodeURIComponent(cachedData.to)}?subject=${encodeURIComponent(cachedData.subject)}`;
   window.location.href = mailto;
-
   return { copiouHtml };
 }
 
@@ -670,20 +679,45 @@ function CotacoesList({ rm, outrasRMs = [] }) {
   const [copiado, setCopiado] = useState(null);
   const [modalManual, setModalManual] = useState(null);
   const [emailToast, setEmailToast] = useState(null);
+  const [emailsCache, setEmailsCache] = useState({}); // cotId -> { html, text, to, subject }
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  const handleEnviarEmail = async (cot) => {
+  // Pre-fetch dos emails das cotacoes ativas. Cacheia no state pra que o
+  // clipboard.write seja sincrono no clique (sem perder user gesture).
+  useEffect(() => {
+    const ativas = (rm.cotacoes || []).filter((c) => c.status !== "CANCELADA");
+    ativas.forEach((c) => {
+      if (emailsCache[c.id]) return;
+      fetch(`/api/cotacao/${c.id}/preview-email?format=json`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data) setEmailsCache((prev) => ({ ...prev, [c.id]: data }));
+        })
+        .catch(() => { /* silencioso */ });
+    });
+  }, [rm.cotacoes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleEnviarEmail = (cot) => {
     setEmailToast(null);
+    const cached = emailsCache[cot.id];
+    if (!cached) {
+      setEmailToast({ id: cot.id, ok: false, msg: "Email ainda carregando, aguarde 1s e tente de novo." });
+      // tenta buscar e cachear pra proxima tentativa
+      fetch(`/api/cotacao/${cot.id}/preview-email?format=json`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => d && setEmailsCache((prev) => ({ ...prev, [cot.id]: d })));
+      return;
+    }
     try {
-      const r = await enviarEmailViaClipboardMailto(cot.id);
+      const r = enviarEmailComCache(cached);
       setEmailToast({
         id: cot.id,
         ok: true,
         msg: r.copiouHtml
           ? "Email copiado. Outlook aberto — cole no corpo (Ctrl+V) e envie."
-          : "Outlook aberto. Cole o conteúdo manualmente.",
+          : "Outlook aberto. Cole o conteúdo manualmente (Ctrl+V).",
       });
-      setTimeout(() => setEmailToast(null), 6000);
+      setTimeout(() => setEmailToast(null), 8000);
     } catch (e) {
       setEmailToast({ id: cot.id, ok: false, msg: e.message });
     }
@@ -1920,18 +1954,35 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
 function ModalLinksEnvio({ rm, links, onClose }) {
   const [copiado, setCopiado] = useState(null);
   const [emailToast, setEmailToast] = useState(null);
+  const [emailsCache, setEmailsCache] = useState({});
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  const handleEnviarEmail = async (cot) => {
+  // Pre-fetch dos emails de cada cotacao
+  useEffect(() => {
+    links.forEach((cot) => {
+      if (emailsCache[cot.id]) return;
+      fetch(`/api/cotacao/${cot.id}/preview-email?format=json`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => d && setEmailsCache((prev) => ({ ...prev, [cot.id]: d })))
+        .catch(() => {});
+    });
+  }, [links]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleEnviarEmail = (cot) => {
     setEmailToast(null);
+    const cached = emailsCache[cot.id];
+    if (!cached) {
+      setEmailToast({ id: cot.id, ok: false, msg: "Aguarde o email carregar e tente de novo." });
+      return;
+    }
     try {
-      const r = await enviarEmailViaClipboardMailto(cot.id);
+      const r = enviarEmailComCache(cached);
       setEmailToast({
         id: cot.id,
         ok: true,
-        msg: r.copiouHtml ? "Email copiado. Outlook aberto — Ctrl+V e enviar." : "Outlook aberto. Cole manualmente.",
+        msg: r.copiouHtml ? "Email copiado. Cole no Outlook (Ctrl+V) e envie." : "Outlook aberto. Cole manualmente.",
       });
-      setTimeout(() => setEmailToast(null), 6000);
+      setTimeout(() => setEmailToast(null), 8000);
     } catch (e) {
       setEmailToast({ id: cot.id, ok: false, msg: e.message });
     }

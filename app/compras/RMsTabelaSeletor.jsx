@@ -339,30 +339,42 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
   );
 }
 
-// Helper: copia HTML do email pro clipboard e abre Outlook (mailto).
-// Usuario so faz Ctrl+V no corpo e envia.
-async function enviarEmailViaClipboardMailto(cotId) {
-  const res = await fetch(`/api/cotacao/${cotId}/preview-email?format=json`);
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}));
-    throw new Error(d.error || "Falha ao montar email");
-  }
-  const data = await res.json();
-  let copiouHtml = false;
+// Copia HTML pro clipboard SINCRONAMENTE (precisa pra nao perder user gesture).
+function copyHtmlSync(html, text) {
+  const handler = (e) => {
+    e.clipboardData.setData("text/html", html);
+    e.clipboardData.setData("text/plain", text);
+    e.preventDefault();
+  };
+  document.addEventListener("copy", handler);
   try {
-    if (navigator.clipboard && window.ClipboardItem) {
-      const blob = new ClipboardItem({
-        "text/html": new Blob([data.html], { type: "text/html" }),
-        "text/plain": new Blob([data.text], { type: "text/plain" }),
-      });
-      await navigator.clipboard.write([blob]);
-      copiouHtml = true;
-    }
-  } catch (e) { console.warn("Clipboard HTML falhou:", e?.message); }
-  if (!copiouHtml) {
-    try { await navigator.clipboard.writeText(data.text); } catch {}
+    const range = document.createRange();
+    const tempEl = document.createElement("div");
+    tempEl.contentEditable = "true";
+    tempEl.style.position = "fixed";
+    tempEl.style.top = "-9999px";
+    tempEl.style.opacity = "0";
+    tempEl.innerHTML = "x";
+    document.body.appendChild(tempEl);
+    range.selectNodeContents(tempEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const ok = document.execCommand("copy");
+    sel.removeAllRanges();
+    document.body.removeChild(tempEl);
+    return ok;
+  } catch (e) {
+    return false;
+  } finally {
+    document.removeEventListener("copy", handler);
   }
-  const mailto = `mailto:${encodeURIComponent(data.to)}?subject=${encodeURIComponent(data.subject)}`;
+}
+
+function enviarEmailComCache(cachedData) {
+  if (!cachedData) throw new Error("Email ainda nao foi carregado");
+  const copiouHtml = copyHtmlSync(cachedData.html, cachedData.text);
+  const mailto = `mailto:${encodeURIComponent(cachedData.to)}?subject=${encodeURIComponent(cachedData.subject)}`;
   window.location.href = mailto;
   return { copiouHtml };
 }
@@ -373,20 +385,37 @@ function ModalLinksGerados({ payload, onClose }) {
   const rmsNumeros = payload?.rmsNumeros || [];
   const [copiado, setCopiado] = useState(null);
   const [emailToast, setEmailToast] = useState(null);
+  const [emailsCache, setEmailsCache] = useState({});
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const linkOf = (cot) => `${baseUrl}/fornecedores/c/${cot.token}`;
 
-  const handleEnviarEmail = async (cot) => {
+  // Pre-fetch dos emails de cada cotacao do payload
+  useEffect(() => {
+    cotacoes.forEach((cot) => {
+      if (emailsCache[cot.id]) return;
+      fetch(`/api/cotacao/${cot.id}/preview-email?format=json`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => d && setEmailsCache((prev) => ({ ...prev, [cot.id]: d })))
+        .catch(() => {});
+    });
+  }, [cotacoes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleEnviarEmail = (cot) => {
     setEmailToast(null);
+    const cached = emailsCache[cot.id];
+    if (!cached) {
+      setEmailToast({ id: cot.id, ok: false, msg: "Aguarde o email carregar e tente de novo." });
+      return;
+    }
     try {
-      const r = await enviarEmailViaClipboardMailto(cot.id);
+      const r = enviarEmailComCache(cached);
       setEmailToast({
         id: cot.id,
         ok: true,
         msg: r.copiouHtml ? "Email copiado. Cole no Outlook (Ctrl+V) e envie." : "Outlook aberto. Cole manualmente.",
       });
-      setTimeout(() => setEmailToast(null), 6000);
+      setTimeout(() => setEmailToast(null), 8000);
     } catch (e) {
       setEmailToast({ id: cot.id, ok: false, msg: e.message });
     }
