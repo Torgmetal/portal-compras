@@ -47,6 +47,7 @@ model User {
   solicitacoesCriadas     SolicitacaoVerba[]  @relation("SolicitacaoCreatedBy")
   solicitacoesDecididas   SolicitacaoVerba[]  @relation("SolicitacaoDecididoBy")
   auditLogs               AuditLog[]
+  notificacoes            Notificacao[]
 }
 
 // ─── OP (ORDEM DE PRODUÇÃO) ─────────────────────────────────
@@ -748,13 +749,44 @@ model EmailNotificacao {
   email     String
   nome      String?  // nome de exibicao pro tooltip
   // Eventos que esse email recebe. Strings livres pra futura extensao.
-  // Hoje suportados: "RM_CRIADA"
+  // Hoje suportados: "RM_CRIADA", "COTACAO_RESPONDIDA"
   eventos   String[]
   ativo     Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([ativo])
+}
+
+// ─── FEED DE ATIVIDADES (NOTIFICACOES IN-APP) ──────────────
+// Registra eventos do sistema (RM criada, cotacao respondida) pra exibir
+// em /compras/notificacoes como feed cronologico. Independente do envio
+// por email (que e best-effort via Resend).
+enum NotificacaoTipo {
+  RM_CRIADA
+  COTACAO_RESPONDIDA
+}
+
+model Notificacao {
+  id        String          @id @default(cuid())
+  tipo      NotificacaoTipo
+  titulo    String          // ex: "Nova RM 0042 criada por João"
+  mensagem  String          // texto descritivo
+  link      String?         // url interna pra abrir o item (RM, cotacao)
+  // Dados estruturados pra exibicao rica (numeros, fornecedor, total, etc)
+  dados     Json?
+  // Quem disparou o evento (opcional). Null pra eventos de fornecedor externo.
+  origemUserId String?
+  origemUser   User? @relation(fields: [origemUserId], references: [id])
+  // Marcacao de lida — global, todos veem o mesmo estado pra simplicidade
+  // (depois pode evoluir pra UserNotificacao se quiser por-usuario)
+  lida      Boolean         @default(false)
+  lidaEm    DateTime?
+  createdAt DateTime        @default(now())
+
+  @@index([lida])
+  @@index([createdAt])
+  @@index([tipo])
 }
 
 // ─── ESTOQUE TORG ──────────────────────────────────────────

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
 import { notificarEvento } from "@/lib/email";
+import { criarNotificacao } from "@/lib/notificacoes";
 
 const itemSchema = z.object({
   cotacaoItemId: z.string().min(1),
@@ -186,10 +187,28 @@ export async function POST(req, { params }) {
         ? `RM ${rmsNumeros[0]}`
         : `RMs ${rmsNumeros.join(", ")}`;
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace-torg.vercel.app";
-      const linkRM = rmsMap.size === 1
-        ? `${baseUrl}/compras/rm/${[...rmsMap.keys()][0]}`
-        : `${baseUrl}/compras`;
+      const linkInterno = rmsMap.size === 1
+        ? `/compras/rm/${[...rmsMap.keys()][0]}`
+        : "/compras";
+      const linkRM = `${baseUrl}${linkInterno}`;
       const totalFmt = total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+      // Notificacao IN-APP — sempre registrada
+      await criarNotificacao({
+        tipo: "COTACAO_RESPONDIDA",
+        titulo: `${eRevisao ? "Revisão de" : "Nova"} proposta — ${cotacao.fornecedorNome}`,
+        mensagem: `${cotacao.fornecedorNome} ${eRevisao ? "atualizou" : "enviou"} a proposta da ${rotuloRMs}. Total ${totalFmt}, ${itensValidos.length} item(s).`,
+        link: linkInterno,
+        dados: {
+          cotacaoId: cotacao.id,
+          fornecedor: cotacao.fornecedorNome,
+          rmsNumeros,
+          total,
+          itens: itensValidos.length,
+          revisao: eRevisao,
+          numeroRevisao: eRevisao ? cotacao.numeroRevisao + 1 : 0,
+        },
+      });
 
       await notificarEvento({
         evento: "COTACAO_RESPONDIDA",

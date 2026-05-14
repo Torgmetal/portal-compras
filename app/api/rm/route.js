@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { notificarEvento } from "@/lib/email";
+import { criarNotificacao } from "@/lib/notificacoes";
 
 const itemSchema = z.object({
   opItemId: z.string().nullable().optional(),
@@ -192,6 +193,25 @@ export async function POST(req) {
     : null;
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace-torg.vercel.app";
   const linkRM = `${baseUrl}/compras/rm/${rm.id}`;
+
+  // Notificacao IN-APP — sempre criada, independente do Resend
+  criarNotificacao({
+    tipo: "RM_CRIADA",
+    titulo: `Nova RM ${rm.numero}`,
+    mensagem: `${user.name || user.email} criou a RM ${rm.numero}${opVinculada ? ` para OP ${opVinculada.numero} (${opVinculada.cliente})` : ""} com ${body.itens.length} item(s).`,
+    link: `/compras/rm/${rm.id}`,
+    dados: {
+      rmId: rm.id,
+      rmNumero: rm.numero,
+      tipoRM: body.tipoRM,
+      opNumero: opVinculada?.numero || null,
+      opCliente: opVinculada?.cliente || null,
+      itensCount: body.itens.length,
+      criadoPor: user.name || user.email,
+    },
+    origemUserId: user.id,
+  }).catch((e) => console.error("[notif RM_CRIADA] erro:", e?.message));
+
   notificarEvento({
     evento: "RM_CRIADA",
     subject: `[Compras] Nova RM ${rm.numero}${opVinculada ? ` — OP ${opVinculada.numero}` : ""}`,

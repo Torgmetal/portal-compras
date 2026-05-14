@@ -5,13 +5,27 @@ import NotificacoesClient from "./NotificacoesClient";
 export const dynamic = "force-dynamic";
 
 export default async function NotificacoesPage() {
-  await requireRole(["ADMIN"]);
+  const user = await requireRole(["ADMIN", "COMPRAS"]);
 
-  const inscritos = await prisma.emailNotificacao.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  const [feed, inscritos] = await Promise.all([
+    prisma.notificacao.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      include: {
+        origemUser: { select: { name: true, email: true } },
+      },
+    }),
+    user.role === "ADMIN"
+      ? prisma.emailNotificacao.findMany({ orderBy: { createdAt: "desc" } })
+      : Promise.resolve([]),
+  ]);
 
-  const data = JSON.parse(JSON.stringify(inscritos));
-  const resendConfigurado = !!process.env.RESEND_API_KEY;
-  return <NotificacoesClient inscritosIniciais={data} resendConfigurado={resendConfigurado} />;
+  return (
+    <NotificacoesClient
+      feedInicial={JSON.parse(JSON.stringify(feed))}
+      inscritosIniciais={JSON.parse(JSON.stringify(inscritos))}
+      isAdmin={user.role === "ADMIN"}
+      resendConfigurado={!!process.env.RESEND_API_KEY}
+    />
+  );
 }
