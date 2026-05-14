@@ -12,5 +12,6 @@ export default async function NotificacoesPage() {
   });
 
   const data = JSON.parse(JSON.stringify(inscritos));
-  return <NotificacoesClient inscritosIniciais={data} />;
+  const resendConfigurado = !!process.env.RESEND_API_KEY;
+  return <NotificacoesClient inscritosIniciais={data} resendConfigurado={resendConfigurado} />;
 }

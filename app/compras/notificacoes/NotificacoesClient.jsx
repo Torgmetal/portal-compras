@@ -8,11 +8,27 @@ const EVENTOS = [
   { codigo: "COTACAO_RESPONDIDA", label: "Fornecedor respondeu cotação", descricao: "Quando um fornecedor envia ou atualiza a proposta dele" },
 ];
 
-export default function NotificacoesClient({ inscritosIniciais }) {
+export default function NotificacoesClient({ inscritosIniciais, resendConfigurado = true }) {
   const router = useRouter();
   const [inscritos, setInscritos] = useState(inscritosIniciais || []);
   const [modalNovo, setModalNovo] = useState(false);
   const [erro, setErro] = useState("");
+  const [testando, setTestando] = useState(false);
+  const [resultadoTeste, setResultadoTeste] = useState(null);
+
+  const testarEnvio = async () => {
+    setTestando(true);
+    setResultadoTeste(null);
+    try {
+      const res = await fetch("/api/email-teste");
+      const data = await res.json();
+      setResultadoTeste(data);
+    } catch (e) {
+      setResultadoTeste({ ok: false, msg: e.message });
+    } finally {
+      setTestando(false);
+    }
+  };
 
   const toggleAtivo = async (inscrito) => {
     setErro("");
@@ -59,16 +75,69 @@ export default function NotificacoesClient({ inscritosIniciais }) {
             <Bell size={26} className="text-torg-blue" /> Notificações por email
           </h2>
           <p className="text-sm text-torg-gray mt-1">
-            Gerencia os emails que recebem notificações automáticas do sistema (ex: nova RM cadastrada).
+            Gerencia os emails que recebem notificações automáticas do sistema (ex: nova RM cadastrada, cotação respondida).
           </p>
         </div>
-        <button
-          onClick={() => setModalNovo(true)}
-          className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2"
-        >
-          <Plus size={16} /> Adicionar email
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={testarEnvio}
+            disabled={testando}
+            className="px-4 py-2 border border-gray-300 text-torg-gray hover:bg-gray-50 text-sm font-medium rounded-lg inline-flex items-center gap-2 disabled:opacity-50"
+          >
+            {testando ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+            Testar envio pra mim
+          </button>
+          <button
+            onClick={() => setModalNovo(true)}
+            className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2"
+          >
+            <Plus size={16} /> Adicionar email
+          </button>
+        </div>
       </div>
+
+      {!resendConfigurado && (
+        <div className="bg-red-50 border-2 border-red-300 text-red-800 text-sm rounded-lg p-4">
+          <p className="font-semibold inline-flex items-center gap-2">
+            <AlertCircle size={16} /> Resend não está configurado — emails NÃO estão sendo enviados
+          </p>
+          <p className="text-xs mt-2 leading-relaxed">
+            Pra ativar o envio: acesse{" "}
+            <a href="https://resend.com" target="_blank" rel="noopener" className="underline font-medium">resend.com</a>,
+            crie uma conta gratuita, copie a API Key e adicione no Vercel em
+            <code className="bg-red-100 px-1 rounded mx-1">Settings → Environment Variables</code>
+            com o nome <code className="bg-red-100 px-1 rounded">RESEND_API_KEY</code>. Depois faça redeploy.
+          </p>
+        </div>
+      )}
+
+      {resultadoTeste && (
+        <div className={`rounded-lg p-4 text-sm ${
+          resultadoTeste.ok
+            ? "bg-emerald-50 border border-emerald-300 text-emerald-800"
+            : "bg-red-50 border border-red-300 text-red-800"
+        }`}>
+          {resultadoTeste.ok ? (
+            <>
+              <p className="font-semibold">✓ Email enviado pra {resultadoTeste.enviadoPara}</p>
+              <p className="text-xs mt-1">
+                Confira sua caixa de entrada (e o spam, na primeira vez). Se chegou, está tudo certo.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold">✗ Falha no envio</p>
+              <p className="text-xs mt-1">{resultadoTeste.msg || resultadoTeste.resendResult?.error || "Erro desconhecido"}</p>
+              {resultadoTeste.status && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs underline">Detalhes do diagnóstico</summary>
+                  <pre className="text-[10px] bg-white p-2 rounded mt-1 overflow-x-auto">{JSON.stringify(resultadoTeste.status, null, 2)}</pre>
+                </details>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {erro && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">

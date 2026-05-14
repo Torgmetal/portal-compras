@@ -44,6 +44,16 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Cotacao sem email do fornecedor." }, { status: 400 });
   }
 
+  // Bloqueia cedo se Resend nao configurado — mensagem explicita pro usuario.
+  if (!process.env.RESEND_API_KEY) {
+    return NextResponse.json(
+      {
+        error: "Servico de email nao configurado. Peca pro admin setar RESEND_API_KEY no Vercel (Settings -> Environment Variables). Por enquanto, use o botao 'Copiar link' e envie manualmente.",
+      },
+      { status: 503 }
+    );
+  }
+
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace-torg.vercel.app";
   const link = `${baseUrl}/fornecedores/c/${cot.token}`;
 
