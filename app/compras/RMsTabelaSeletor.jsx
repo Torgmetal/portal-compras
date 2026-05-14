@@ -375,11 +375,21 @@ function enviarEmailComCache(cachedData) {
   if (!cachedData) throw new Error("Email ainda nao foi carregado");
   const copiouHtml = copyHtmlSync(cachedData.html, cachedData.text);
   const mailto = `mailto:${encodeURIComponent(cachedData.to)}?subject=${encodeURIComponent(cachedData.subject)}`;
-  // Delay pequeno antes do mailto pra clipboard estabilizar
   setTimeout(() => {
-    window.location.href = mailto;
-  }, 150);
+    const a = document.createElement("a");
+    a.href = mailto;
+    a.rel = "noopener noreferrer";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, 250);
   return { copiouHtml };
+}
+
+function reCopiarEmail(cachedData) {
+  if (!cachedData) return false;
+  return copyHtmlSync(cachedData.html, cachedData.text);
 }
 
 // Modal mostrando os links únicos gerados pra cada fornecedor (após envio)
@@ -495,12 +505,30 @@ function ModalLinksGerados({ payload, onClose }) {
                 </div>
               </div>
               {emailToast?.id === cot.id && (
-                <div className={`text-xs rounded px-2 py-1 ${
+                <div className={`text-xs rounded px-2 py-1 flex items-center justify-between gap-2 ${
                   emailToast.ok
                     ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
                     : "bg-red-50 border border-red-200 text-red-700"
                 }`}>
-                  {emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}
+                  <span className="flex-1">
+                    {emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}
+                  </span>
+                  {emailToast.ok && (
+                    <button
+                      onClick={() => {
+                        const cached = emailsCache[cot.id];
+                        const ok = reCopiarEmail(cached);
+                        setEmailToast({
+                          id: cot.id,
+                          ok,
+                          msg: ok ? "Email recopiado. Cole no Outlook (Ctrl+V)." : "Falha ao recopiar.",
+                        });
+                      }}
+                      className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
+                    >
+                      Copiar de novo
+                    </button>
+                  )}
                 </div>
               )}
               <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 font-mono text-[11px] text-torg-gray break-all">
