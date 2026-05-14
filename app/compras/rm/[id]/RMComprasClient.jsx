@@ -626,45 +626,71 @@ function ConfigPedidoOmie({ rm }) {
 
 // ─── LISTA DE COTAÇÕES ──────────────────────────────
 
-// Copia HTML pro clipboard SINCRONAMENTE — selecionando o HTML em um elemento
-// real e executando copy. O navegador copia o conteudo da selecao com formatacao
-// (incluindo a tag <a> que vira hiperlink no Outlook).
-function copyHtmlSync(html /*, text */) {
+// Copia HTML pro clipboard usando 2 estrategias em sequencia:
+// 1) Listener no evento "copy" que injeta HTML estruturado
+// 2) Selecao de elemento contenteditable visivel
+// Logs verbose pra debug.
+function copyHtmlSync(html, text) {
   let ok = false;
   let container = null;
+  let listener = null;
   try {
-    // Cria container REAL (no flow do DOM) com o HTML que queremos copiar.
-    // Precisa estar visivel pro Range selecionar com formatacao preservada.
+    // Strategy 1: registrar handler que injeta HTML no clipboardData
+    listener = (e) => {
+      try {
+        e.clipboardData.setData("text/html", html);
+        e.clipboardData.setData("text/plain", text || html.replace(/<[^>]+>/g, ""));
+        e.preventDefault();
+        console.log("[copyHtmlSync] clipboardData setData OK");
+      } catch (err) {
+        console.warn("[copyHtmlSync] setData falhou:", err?.message);
+      }
+    };
+    document.addEventListener("copy", listener);
+
+    // Cria container visivel mas no canto da tela
     container = document.createElement("div");
     container.setAttribute("contenteditable", "true");
     container.innerHTML = html;
     container.style.position = "fixed";
     container.style.left = "0";
     container.style.top = "0";
-    container.style.width = "1px";
-    container.style.height = "1px";
-    container.style.opacity = "0";
-    container.style.pointerEvents = "none";
+    container.style.width = "2px";
+    container.style.height = "2px";
+    container.style.opacity = "0.01"; // pequeno mas visivel
+    container.style.zIndex = "-1";
     container.style.overflow = "hidden";
     document.body.appendChild(container);
 
-    // Seleciona TODO o conteudo do container
     const range = document.createRange();
     range.selectNodeContents(container);
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
 
-    // Copia
     ok = document.execCommand("copy");
+    console.log("[copyHtmlSync] execCommand return:", ok, "| html len:", html.length);
     sel.removeAllRanges();
   } catch (e) {
-    console.warn("copyHtmlSync falhou:", e?.message);
+    console.warn("[copyHtmlSync] erro:", e?.message);
     ok = false;
   } finally {
+    if (listener) document.removeEventListener("copy", listener);
     if (container && container.parentNode) container.parentNode.removeChild(container);
   }
   return ok;
+}
+
+// Dispara mailto: via <a>.click() — mais robusto que window.location.href
+function abrirOutlookMailto(to, subject) {
+  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}`;
+  const a = document.createElement("a");
+  a.href = mailto;
+  a.rel = "noopener noreferrer";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // Helper: usa dados ja em cache (pre-buscados) pra fazer copy sincrono + mailto.
@@ -673,25 +699,18 @@ function copyHtmlSync(html /*, text */) {
 // invalide o clipboard ao trocar de contexto (protocolo handler).
 function enviarEmailComCache(cachedData) {
   if (!cachedData) throw new Error("Email ainda nao foi carregado");
+  console.log("[enviarEmail] iniciando copy + mailto");
   const copiouHtml = copyHtmlSync(cachedData.html, cachedData.text);
-  const mailto = `mailto:${encodeURIComponent(cachedData.to)}?subject=${encodeURIComponent(cachedData.subject)}`;
-  // Atraso pra clipboard estabilizar antes do navegador trocar contexto.
-  // Usa <a>.click() em vez de window.location.href — mais robusto pra
-  // disparar handlers de protocolo (mailto:) sem invalidar clipboard.
+  console.log("[enviarEmail] copy returned:", copiouHtml);
+  // Atraso de 300ms — clipboard estabiliza, depois dispara mailto.
   setTimeout(() => {
-    const a = document.createElement("a");
-    a.href = mailto;
-    a.rel = "noopener noreferrer";
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }, 250);
+    console.log("[enviarEmail] disparando mailto agora");
+    abrirOutlookMailto(cachedData.to, cachedData.subject);
+  }, 300);
   return { copiouHtml };
 }
 
-// Re-copia o HTML pro clipboard. Usado quando o usuario perdeu o conteudo
-// (Ctrl+V no Outlook trouxe vazio). NAO abre mailto.
+// Re-copia o HTML pro clipboard. Usado quando o usuario perdeu o conteudo.
 function reCopiarEmail(cachedData) {
   if (!cachedData) return false;
   return copyHtmlSync(cachedData.html, cachedData.text);
@@ -737,10 +756,10 @@ function CotacoesList({ rm, outrasRMs = [] }) {
         id: cot.id,
         ok: true,
         msg: r.copiouHtml
-          ? "Email copiado. Outlook aberto — cole no corpo (Ctrl+V) e envie."
-          : "Outlook aberto. Cole o conteúdo manualmente (Ctrl+V).",
+          ? "Outlook abrindo + email copiado. Cole no corpo (Ctrl+V). Se vier vazio, clique 'Copiar de novo' e cole de novo."
+          : "Outlook aberto. Clique 'Copiar de novo' e depois cole (Ctrl+V).",
       });
-      setTimeout(() => setEmailToast(null), 8000);
+      setTimeout(() => setEmailToast(null), 15000);
     } catch (e) {
       setEmailToast({ id: cot.id, ok: false, msg: e.message });
     }
@@ -855,31 +874,44 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                 </button>
               </div>
               {emailToast?.id === c.id && (
-                <div className={`w-full mt-2 text-xs rounded px-3 py-2 flex items-center justify-between gap-2 ${
+                <div className={`w-full mt-2 text-xs rounded px-3 py-2 ${
                   emailToast.ok
                     ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
                     : "bg-red-50 border border-red-200 text-red-700"
                 }`}>
-                  <span className="flex-1">
-                    {emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex-1">
+                      {emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}
+                    </span>
+                    <button onClick={() => setEmailToast(null)} className="opacity-60 hover:opacity-100">×</button>
+                  </div>
                   {emailToast.ok && (
-                    <button
-                      onClick={() => {
-                        const cached = emailsCache[c.id];
-                        const ok = reCopiarEmail(cached);
-                        setEmailToast({
-                          id: c.id,
-                          ok,
-                          msg: ok ? "Email recopiado. Volte ao Outlook e cole (Ctrl+V)." : "Falha ao recopiar.",
-                        });
-                      }}
-                      className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
-                    >
-                      Copiar de novo
-                    </button>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          const cached = emailsCache[c.id];
+                          const ok = reCopiarEmail(cached);
+                          setEmailToast({
+                            id: c.id,
+                            ok,
+                            msg: ok ? "Email recopiado. Cole no Outlook (Ctrl+V)." : "Falha ao recopiar.",
+                          });
+                        }}
+                        className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
+                      >
+                        Copiar de novo
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cached = emailsCache[c.id];
+                          if (cached) abrirOutlookMailto(cached.to, cached.subject);
+                        }}
+                        className="px-2 py-1 rounded font-medium bg-torg-blue text-white hover:bg-torg-blue-700 whitespace-nowrap"
+                      >
+                        Abrir Outlook
+                      </button>
+                    </div>
                   )}
-                  <button onClick={() => setEmailToast(null)} className="opacity-60 hover:opacity-100">×</button>
                 </div>
               )}
             </li>
@@ -2075,29 +2107,38 @@ function ModalLinksEnvio({ rm, links, onClose }) {
                 </div>
               </div>
               {emailToast?.id === cot.id && (
-                <div className={`text-xs rounded px-2 py-1 flex items-center justify-between gap-2 ${
+                <div className={`text-xs rounded px-2 py-2 ${
                   emailToast.ok
                     ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
                     : "bg-red-50 border border-red-200 text-red-700"
                 }`}>
-                  <span className="flex-1">
-                    {emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}
-                  </span>
+                  <div>{emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}</div>
                   {emailToast.ok && (
-                    <button
-                      onClick={() => {
-                        const cached = emailsCache[cot.id];
-                        const ok = reCopiarEmail(cached);
-                        setEmailToast({
-                          id: cot.id,
-                          ok,
-                          msg: ok ? "Email recopiado. Cole no Outlook (Ctrl+V)." : "Falha ao recopiar.",
-                        });
-                      }}
-                      className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
-                    >
-                      Copiar de novo
-                    </button>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          const cached = emailsCache[cot.id];
+                          const ok = reCopiarEmail(cached);
+                          setEmailToast({
+                            id: cot.id,
+                            ok,
+                            msg: ok ? "Email recopiado. Cole no Outlook (Ctrl+V)." : "Falha ao recopiar.",
+                          });
+                        }}
+                        className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
+                      >
+                        Copiar de novo
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cached = emailsCache[cot.id];
+                          if (cached) abrirOutlookMailto(cached.to, cached.subject);
+                        }}
+                        className="px-2 py-1 rounded font-medium bg-torg-blue text-white hover:bg-torg-blue-700 whitespace-nowrap"
+                      >
+                        Abrir Outlook
+                      </button>
+                    </div>
                   )}
                 </div>
               )}

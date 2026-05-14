@@ -339,21 +339,31 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
   );
 }
 
-// Copia HTML pro clipboard SINCRONAMENTE via selecao + execCommand.
-function copyHtmlSync(html /*, text */) {
+// Copia HTML via clipboard event handler + execCommand.
+function copyHtmlSync(html, text) {
   let ok = false;
   let container = null;
+  let listener = null;
   try {
+    listener = (e) => {
+      try {
+        e.clipboardData.setData("text/html", html);
+        e.clipboardData.setData("text/plain", text || html.replace(/<[^>]+>/g, ""));
+        e.preventDefault();
+      } catch {}
+    };
+    document.addEventListener("copy", listener);
+
     container = document.createElement("div");
     container.setAttribute("contenteditable", "true");
     container.innerHTML = html;
     container.style.position = "fixed";
     container.style.left = "0";
     container.style.top = "0";
-    container.style.width = "1px";
-    container.style.height = "1px";
-    container.style.opacity = "0";
-    container.style.pointerEvents = "none";
+    container.style.width = "2px";
+    container.style.height = "2px";
+    container.style.opacity = "0.01";
+    container.style.zIndex = "-1";
     container.style.overflow = "hidden";
     document.body.appendChild(container);
     const range = document.createRange();
@@ -363,27 +373,30 @@ function copyHtmlSync(html /*, text */) {
     sel.addRange(range);
     ok = document.execCommand("copy");
     sel.removeAllRanges();
-  } catch (e) {
+  } catch {
     ok = false;
   } finally {
+    if (listener) document.removeEventListener("copy", listener);
     if (container && container.parentNode) container.parentNode.removeChild(container);
   }
   return ok;
 }
 
+function abrirOutlookMailto(to, subject) {
+  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}`;
+  const a = document.createElement("a");
+  a.href = mailto;
+  a.rel = "noopener noreferrer";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 function enviarEmailComCache(cachedData) {
   if (!cachedData) throw new Error("Email ainda nao foi carregado");
   const copiouHtml = copyHtmlSync(cachedData.html, cachedData.text);
-  const mailto = `mailto:${encodeURIComponent(cachedData.to)}?subject=${encodeURIComponent(cachedData.subject)}`;
-  setTimeout(() => {
-    const a = document.createElement("a");
-    a.href = mailto;
-    a.rel = "noopener noreferrer";
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }, 250);
+  setTimeout(() => abrirOutlookMailto(cachedData.to, cachedData.subject), 300);
   return { copiouHtml };
 }
 
@@ -505,29 +518,38 @@ function ModalLinksGerados({ payload, onClose }) {
                 </div>
               </div>
               {emailToast?.id === cot.id && (
-                <div className={`text-xs rounded px-2 py-1 flex items-center justify-between gap-2 ${
+                <div className={`text-xs rounded px-2 py-2 ${
                   emailToast.ok
                     ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
                     : "bg-red-50 border border-red-200 text-red-700"
                 }`}>
-                  <span className="flex-1">
-                    {emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}
-                  </span>
+                  <div>{emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}</div>
                   {emailToast.ok && (
-                    <button
-                      onClick={() => {
-                        const cached = emailsCache[cot.id];
-                        const ok = reCopiarEmail(cached);
-                        setEmailToast({
-                          id: cot.id,
-                          ok,
-                          msg: ok ? "Email recopiado. Cole no Outlook (Ctrl+V)." : "Falha ao recopiar.",
-                        });
-                      }}
-                      className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
-                    >
-                      Copiar de novo
-                    </button>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      <button
+                        onClick={() => {
+                          const cached = emailsCache[cot.id];
+                          const ok = reCopiarEmail(cached);
+                          setEmailToast({
+                            id: cot.id,
+                            ok,
+                            msg: ok ? "Email recopiado. Cole no Outlook (Ctrl+V)." : "Falha ao recopiar.",
+                          });
+                        }}
+                        className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
+                      >
+                        Copiar de novo
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cached = emailsCache[cot.id];
+                          if (cached) abrirOutlookMailto(cached.to, cached.subject);
+                        }}
+                        className="px-2 py-1 rounded font-medium bg-torg-blue text-white hover:bg-torg-blue-700 whitespace-nowrap"
+                      >
+                        Abrir Outlook
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
