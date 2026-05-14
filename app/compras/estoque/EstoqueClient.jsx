@@ -163,73 +163,116 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
             </button>
           </div>
 
-          {/* Famílias */}
-          {diagnostico.familias && diagnostico.familias.length > 0 ? (
-            <div>
-              <p className="text-xs font-semibold text-amber-900 mb-1">
-                ✓ Famílias cadastradas no Omie ({diagnostico.totalFamilias || diagnostico.familias.length})
-              </p>
-              <div className="bg-white border border-amber-200 rounded p-2 max-h-[280px] overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-white">
-                    <tr className="text-amber-800">
-                      <th className="text-left pb-1">Código</th>
-                      <th className="text-left pb-1">Descrição</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {diagnostico.familias.filter((f) => !f.inativa).map((f, i) => (
-                      <tr key={i} className="border-t border-amber-100">
-                        <td className="py-1 font-mono text-torg-blue font-semibold pr-3">{f.codigo || "—"}</td>
-                        <td className="py-1 text-torg-dark">{f.descricao || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* 1) Famílias — sempre mostra status, mesmo vazio */}
+          <div>
+            {diagnostico.familiasErro ? (
+              <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700">
+                ✗ <strong>ListarFamilias:</strong> {diagnostico.familiasErro}
               </div>
-              <p className="text-[10px] text-amber-700 mt-1 italic">
-                💡 Encontre "Matéria Prima" na lista, copie o <strong>código exato</strong> e cole em Configurar.
+            ) : diagnostico.familias && diagnostico.familias.length > 0 ? (
+              <>
+                <p className="text-xs font-semibold text-emerald-700 mb-1">
+                  ✓ ListarFamilias — {diagnostico.totalFamilias || diagnostico.familias.length} famílias no Omie
+                </p>
+                <div className="bg-white border border-amber-200 rounded p-2 max-h-[280px] overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-white">
+                      <tr className="text-amber-800">
+                        <th className="text-left pb-1">Código</th>
+                        <th className="text-left pb-1">Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {diagnostico.familias.filter((f) => !f.inativa).map((f, i) => (
+                        <tr key={i} className="border-t border-amber-100">
+                          <td className="py-1 font-mono text-torg-blue font-semibold pr-3">{f.codigo || "—"}</td>
+                          <td className="py-1 text-torg-dark">{f.descricao || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[10px] text-amber-700 mt-1 italic">
+                  💡 Encontre a categoria "Matéria Prima" (ou equivalente), copie o <strong>código exato</strong> e cole em Configurar.
+                </p>
+              </>
+            ) : diagnostico.familias ? (
+              <div className="bg-amber-100 border border-amber-300 rounded p-2 text-xs text-amber-800">
+                ⚠️ ListarFamilias retornou vazio (0 famílias cadastradas no Omie).
+              </div>
+            ) : (
+              <div className="text-xs text-torg-gray italic">ListarFamilias não testado.</div>
+            )}
+          </div>
+
+          {/* 2) ListarProdutos COM filtro por família — o teste decisivo */}
+          {diagnostico.testesComFiltro && diagnostico.testesComFiltro.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-amber-900">
+                Teste com filtro por categoria configurada ({(diagnostico.categoriasConfig || []).join(", ")}):
               </p>
+              {diagnostico.testesComFiltro.map((t, i) => (
+                <div key={i} className={`rounded p-2 text-xs ${
+                  t.ok
+                    ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                    : "bg-red-50 border border-red-200 text-red-700"
+                }`}>
+                  {t.ok ? (
+                    <>
+                      ✓ <strong>ListarProdutos (familia {t.categoria}):</strong>{" "}
+                      {t.totalRegistros ?? "?"} produtos em {t.totalPaginas ?? "?"} páginas
+                      {t.exemplo && (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-emerald-700">Exemplo do 1º produto</summary>
+                          <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto">
+                            {JSON.stringify(t.exemplo, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      ✗ <strong>ListarProdutos (familia {t.categoria}):</strong> {t.erro}
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
-          ) : diagnostico.familiasErro ? (
-            <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700">
-              ✗ ListarFamilias: {diagnostico.familiasErro}
-            </div>
-          ) : null}
+          )}
 
-          {/* ListarProdutosResumido (fallback) */}
-          {diagnostico.produtosResumido ? (
-            <div className="text-xs text-amber-900">
-              ✓ ListarProdutosResumido funciona — total {diagnostico.produtosResumido.totalRegistros || "?"} produtos
-              ({diagnostico.produtosResumido.totalPaginas} páginas)
+          {/* 3) ListarProdutosResumido (sem filtro) */}
+          {diagnostico.produtosResumido && (
+            <div className={`text-xs rounded p-2 ${
+              diagnostico.produtosResumido.ok
+                ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}>
+              {diagnostico.produtosResumido.ok ? (
+                <>✓ <strong>ListarProdutosResumido (sem filtro):</strong> {diagnostico.produtosResumido.totalRegistros ?? "?"} produtos em {diagnostico.produtosResumido.totalPaginas ?? "?"} páginas</>
+              ) : (
+                <>✗ <strong>ListarProdutosResumido (sem filtro):</strong> {diagnostico.produtosResumido.erro}</>
+              )}
             </div>
-          ) : diagnostico.produtosResumidoErro ? (
-            <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700">
-              ✗ ListarProdutosResumido: {diagnostico.produtosResumidoErro}
-            </div>
-          ) : null}
+          )}
 
-          {/* ListarProdutos completo */}
-          {diagnostico.produtosCompleto ? (
-            <div className="text-xs text-emerald-700">
-              ✓ ListarProdutos completo funciona — total {diagnostico.produtosCompleto.totalPaginas} páginas
+          {/* 4) ListarProdutos completo SEM filtro */}
+          {diagnostico.produtosCompleto && (
+            <div className={`text-xs rounded p-2 ${
+              diagnostico.produtosCompleto.ok
+                ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}>
+              {diagnostico.produtosCompleto.ok ? (
+                <>✓ <strong>ListarProdutos (sem filtro):</strong> {diagnostico.produtosCompleto.totalPaginas ?? "?"} páginas</>
+              ) : (
+                <>
+                  ✗ <strong>ListarProdutos (sem filtro):</strong> {diagnostico.produtosCompleto.erro}
+                  <p className="mt-1 text-[10px]">
+                    Erro indica produto com cadastro corrompido no Omie. A sync ignora esse caminho e usa o filtrado por família.
+                  </p>
+                </>
+              )}
             </div>
-          ) : diagnostico.produtosCompletoErro ? (
-            <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700">
-              ✗ ListarProdutos: <strong>{diagnostico.produtosCompletoErro}</strong>
-              <p className="mt-1 text-[10px]">
-                Erro do Omie indica problema num produto específico. A sync vai usar o caminho alternativo (ListarProdutosResumido + lookup individual de família).
-              </p>
-            </div>
-          ) : null}
-
-          {diagnostico.produtosCompleto?.exemplo && (
-            <details>
-              <summary className="cursor-pointer text-xs font-medium text-amber-900">Ver estrutura do 1º produto (JSON)</summary>
-              <pre className="text-[10px] bg-white border border-amber-200 rounded p-2 mt-1 overflow-x-auto max-h-[300px]">
-                {JSON.stringify(diagnostico.produtosCompleto.exemplo, null, 2)}
-              </pre>
-            </details>
           )}
         </div>
       )}
