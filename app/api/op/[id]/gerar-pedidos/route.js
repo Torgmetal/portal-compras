@@ -226,25 +226,46 @@ export async function POST(req, { params }) {
       erroPedido = e.message;
     }
 
-    // Persiste o pedido no banco (sucesso ou erro — pra historico)
-    const pedidoOmie = await prisma.pedidoOmie.create({
-      data: {
-        cotacaoId: cotacao.id,
-        fornecedorNome: cotacao.fornecedorNome,
-        nCodFor: pedidoCriado?.nCodFor_resolvido?.toString() || cotacao.nCodOmie || null,
-        cnpj: cnpjFinal || null,
-        codigoPedido: pedidoCriado?.codigo_pedido?.toString() || null,
-        numeroPedido: pedidoCriado?.numero_pedido?.toString() || null,
-        total,
-        faturamentoDireto: isFD,
-        status: erroPedido ? "ERRO" : "CRIADO",
-        observacao: observacaoBase,
-        erroOmie: erroPedido,
-        payload: itensPayload,
-        resposta: pedidoCriado || null,
-        createdById: user.id,
-      },
-    });
+    // Persiste o pedido no banco SO se foi criado com sucesso no Omie.
+    // Erros nao poluem o historico — ficam apenas no AuditLog pra debug.
+    let pedidoOmie = null;
+    if (!erroPedido) {
+      pedidoOmie = await prisma.pedidoOmie.create({
+        data: {
+          cotacaoId: cotacao.id,
+          fornecedorNome: cotacao.fornecedorNome,
+          nCodFor: pedidoCriado?.nCodFor_resolvido?.toString() || cotacao.nCodOmie || null,
+          cnpj: cnpjFinal || null,
+          codigoPedido: pedidoCriado?.codigo_pedido?.toString() || null,
+          numeroPedido: pedidoCriado?.numero_pedido?.toString() || null,
+          total,
+          faturamentoDireto: isFD,
+          status: "CRIADO",
+          observacao: observacaoBase,
+          payload: itensPayload,
+          resposta: pedidoCriado || null,
+          createdById: user.id,
+        },
+      });
+    } else {
+      // Erro: registra no audit pra rastreabilidade, sem criar PedidoOmie
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: "gerar_pedido_erro",
+          entity: "Cotacao",
+          entityId: cotacao.id,
+          diff: {
+            fornecedor: cotacao.fornecedorNome,
+            isFD,
+            total,
+            itens: linhas.length,
+            erro: erroPedido,
+            cNumPedido,
+          },
+        },
+      }).catch(() => {});
+    }
 
     let resAnexos = null;
     if (!erroPedido) {
@@ -295,7 +316,7 @@ export async function POST(req, { params }) {
     }
 
     resultados.push({
-      pedidoOmieId: pedidoOmie.id,
+      pedidoOmieId: pedidoOmie?.id || null,
       fornecedor: cotacao.fornecedorNome,
       isFD,
       total,
