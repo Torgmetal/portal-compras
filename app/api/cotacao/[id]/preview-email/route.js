@@ -37,6 +37,8 @@ export async function GET(req, { params }) {
   });
   if (!cot) return new Response("Cotacao nao encontrada.", { status: 404 });
 
+  const isJson = new URL(req.url).searchParams.get("format") === "json";
+
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace-torg.vercel.app";
   const link = `${baseUrl}/fornecedores/c/${cot.token}`;
 
@@ -56,6 +58,60 @@ export async function GET(req, { params }) {
     ? new Date(cot.prazoResposta).toLocaleDateString("pt-BR")
     : null;
   const subject = `Solicitacao de Cotacao - ${rotuloRMs} (Torg Metal)`;
+
+  // Conteudo do email (HTML pro clipboard + Outlook colar)
+  const emailHtml = `<div>
+    <p>Olá <strong>${escapeHtml(cot.fornecedorNome)}</strong>,</p>
+    <p>Estamos solicitando sua cotação para o material listado na <strong>${escapeHtml(rotuloRMs)}</strong>.</p>
+    <p>Acesse o link abaixo pra ver os itens e enviar sua proposta. O link é <strong>único e privado</strong>, não precisa de login:</p>
+    <p style="text-align: center; margin: 28px 0;">
+      <a href="${link}" style="background: #1976d2; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
+        Abrir cotação
+      </a>
+    </p>
+    <p style="color: #718096; font-size: 13px;">
+      Ou copie e cole esse endereço no navegador:<br>
+      <a href="${link}" style="color: #1976d2; word-break: break-all;">${link}</a>
+    </p>
+    <table style="width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 14px;">
+      <tr><td style="padding: 6px 0; color: #718096;">Total de itens</td><td style="padding: 6px 0;"><strong>${totalItens}</strong></td></tr>
+      ${prazoTxt ? `<tr><td style="padding: 6px 0; color: #718096;">Prazo de resposta</td><td style="padding: 6px 0;"><strong>${prazoTxt}</strong></td></tr>` : ""}
+      ${cot.observacao ? `<tr><td style="padding: 6px 0; color: #718096; vertical-align: top;">Observação</td><td style="padding: 6px 0;">${escapeHtml(cot.observacao)}</td></tr>` : ""}
+    </table>
+    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+    <p style="color: #4a5568; font-size: 13px;">
+      Atenciosamente,<br>
+      <strong>Equipe de Compras - Torg Metal</strong>
+    </p>
+  </div>`;
+
+  const emailText = [
+    `Olá ${cot.fornecedorNome},`,
+    "",
+    `Estamos solicitando sua cotação para o material listado na ${rotuloRMs}.`,
+    "Acesse o link abaixo pra ver os itens e enviar sua proposta. O link é único e privado:",
+    "",
+    link,
+    "",
+    `Total de itens: ${totalItens}`,
+    prazoTxt ? `Prazo de resposta: ${prazoTxt}` : null,
+    cot.observacao ? `Observação: ${cot.observacao}` : null,
+    "",
+    "Atenciosamente,",
+    "Equipe de Compras - Torg Metal",
+  ].filter(Boolean).join("\n");
+
+  // Modo JSON — retorna pro frontend usar em "copiar + abrir mailto"
+  if (isJson) {
+    return Response.json({
+      to: cot.fornecedorEmail || "",
+      subject,
+      html: emailHtml,
+      text: emailText,
+      link,
+      fornecedorNome: cot.fornecedorNome,
+    });
+  }
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">

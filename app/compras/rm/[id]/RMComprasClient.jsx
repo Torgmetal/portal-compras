@@ -626,11 +626,68 @@ function ConfigPedidoOmie({ rm }) {
 
 // ─── LISTA DE COTAÇÕES ──────────────────────────────
 
+// Helper: copia o HTML do email pro clipboard e abre mailto com Para+Assunto.
+// O usuario so precisa dar Ctrl+V no corpo da mensagem do Outlook que abriu.
+// O link vai como hiperlink HTML clicavel.
+async function enviarEmailViaClipboardMailto(cotId) {
+  const res = await fetch(`/api/cotacao/${cotId}/preview-email?format=json`);
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error || "Falha ao montar email");
+  }
+  const data = await res.json();
+
+  // Copia HTML formatado pro clipboard (com link clicavel)
+  let copiouHtml = false;
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      const blob = new ClipboardItem({
+        "text/html": new Blob([data.html], { type: "text/html" }),
+        "text/plain": new Blob([data.text], { type: "text/plain" }),
+      });
+      await navigator.clipboard.write([blob]);
+      copiouHtml = true;
+    }
+  } catch (e) {
+    console.warn("Clipboard HTML falhou, tentando so texto:", e?.message);
+  }
+  if (!copiouHtml) {
+    // Fallback: copia so texto
+    try {
+      await navigator.clipboard.writeText(data.text);
+    } catch { /* sem clipboard */ }
+  }
+
+  // Abre o Outlook (mailto) com Para + Assunto preenchidos, corpo vazio
+  const mailto = `mailto:${encodeURIComponent(data.to)}?subject=${encodeURIComponent(data.subject)}`;
+  window.location.href = mailto;
+
+  return { copiouHtml };
+}
+
 function CotacoesList({ rm, outrasRMs = [] }) {
   const [modalVincular, setModalVincular] = useState(null); // cotação selecionada
   const [copiado, setCopiado] = useState(null);
   const [modalManual, setModalManual] = useState(null);
+  const [emailToast, setEmailToast] = useState(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  const handleEnviarEmail = async (cot) => {
+    setEmailToast(null);
+    try {
+      const r = await enviarEmailViaClipboardMailto(cot.id);
+      setEmailToast({
+        id: cot.id,
+        ok: true,
+        msg: r.copiouHtml
+          ? "Email copiado. Outlook aberto — cole no corpo (Ctrl+V) e envie."
+          : "Outlook aberto. Cole o conteúdo manualmente.",
+      });
+      setTimeout(() => setEmailToast(null), 6000);
+    } catch (e) {
+      setEmailToast({ id: cot.id, ok: false, msg: e.message });
+    }
+  };
 
   const copiarLink = async (cot) => {
     const link = `${baseUrl}/fornecedores/c/${cot.token}`;
@@ -732,16 +789,24 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                     <Plus size={12} /> Vincular RM
                   </button>
                 )}
-                <a
-                  href={`/api/cotacao/${c.id}/preview-email`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => handleEnviarEmail(c)}
                   className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
-                  title="Abrir email pronto: copia o conteudo HTML e cola no Outlook (link clicavel)"
+                  title="Copia o email com link clicavel e abre o Outlook — basta colar e enviar"
                 >
                   <Mail size={12} /> {c.recebidaEm ? "Reenviar email" : "Enviar email"}
-                </a>
+                </button>
               </div>
+              {emailToast?.id === c.id && (
+                <div className={`w-full mt-2 text-xs rounded px-3 py-2 ${
+                  emailToast.ok
+                    ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                    : "bg-red-50 border border-red-200 text-red-700"
+                }`}>
+                  {emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}
+                  <button onClick={() => setEmailToast(null)} className="ml-2 opacity-60 hover:opacity-100">×</button>
+                </div>
+              )}
             </li>
           );
         })}
@@ -1854,7 +1919,23 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
 
 function ModalLinksEnvio({ rm, links, onClose }) {
   const [copiado, setCopiado] = useState(null);
+  const [emailToast, setEmailToast] = useState(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  const handleEnviarEmail = async (cot) => {
+    setEmailToast(null);
+    try {
+      const r = await enviarEmailViaClipboardMailto(cot.id);
+      setEmailToast({
+        id: cot.id,
+        ok: true,
+        msg: r.copiouHtml ? "Email copiado. Outlook aberto — Ctrl+V e enviar." : "Outlook aberto. Cole manualmente.",
+      });
+      setTimeout(() => setEmailToast(null), 6000);
+    } catch (e) {
+      setEmailToast({ id: cot.id, ok: false, msg: e.message });
+    }
+  };
 
   const copiarLink = async (cot) => {
     const link = `${baseUrl}/fornecedores/c/${cot.token}`;
@@ -1876,31 +1957,40 @@ function ModalLinksEnvio({ rm, links, onClose }) {
 
         <ul className="space-y-2">
           {links.map((cot) => (
-            <li key={cot.id} className="border border-gray-200 rounded-lg p-3 flex items-center gap-3 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-torg-dark">{cot.fornecedorNome}</p>
-                <p className="text-xs text-torg-gray truncate">{cot.fornecedorEmail}</p>
-                <p className="text-[10px] text-torg-gray font-mono mt-0.5 truncate">
-                  /fornecedores/c/{cot.token.slice(0, 8)}...
-                </p>
+            <li key={cot.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-torg-dark">{cot.fornecedorNome}</p>
+                  <p className="text-xs text-torg-gray truncate">{cot.fornecedorEmail}</p>
+                  <p className="text-[10px] text-torg-gray font-mono mt-0.5 truncate">
+                    /fornecedores/c/{cot.token.slice(0, 8)}...
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => copiarLink(cot)}
+                    className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 font-medium"
+                  >
+                    {copiado === cot.id ? "✓ copiado" : "Copiar link"}
+                  </button>
+                  <button
+                    onClick={() => handleEnviarEmail(cot)}
+                    className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
+                    title="Copia o email e abre o Outlook — Ctrl+V e enviar"
+                  >
+                    <Mail size={12} /> Enviar email
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => copiarLink(cot)}
-                  className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 font-medium"
-                >
-                  {copiado === cot.id ? "✓ copiado" : "Copiar link"}
-                </button>
-                <a
-                  href={`/api/cotacao/${cot.id}/preview-email`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
-                  title="Abrir email pronto: copia o conteudo HTML e cola no Outlook"
-                >
-                  <Mail size={12} /> Enviar email
-                </a>
-              </div>
+              {emailToast?.id === cot.id && (
+                <div className={`text-xs rounded px-2 py-1 ${
+                  emailToast.ok
+                    ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                    : "bg-red-50 border border-red-200 text-red-700"
+                }`}>
+                  {emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}
+                </div>
+              )}
             </li>
           ))}
         </ul>

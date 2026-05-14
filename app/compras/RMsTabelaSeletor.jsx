@@ -339,14 +339,58 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
   );
 }
 
+// Helper: copia HTML do email pro clipboard e abre Outlook (mailto).
+// Usuario so faz Ctrl+V no corpo e envia.
+async function enviarEmailViaClipboardMailto(cotId) {
+  const res = await fetch(`/api/cotacao/${cotId}/preview-email?format=json`);
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error || "Falha ao montar email");
+  }
+  const data = await res.json();
+  let copiouHtml = false;
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      const blob = new ClipboardItem({
+        "text/html": new Blob([data.html], { type: "text/html" }),
+        "text/plain": new Blob([data.text], { type: "text/plain" }),
+      });
+      await navigator.clipboard.write([blob]);
+      copiouHtml = true;
+    }
+  } catch (e) { console.warn("Clipboard HTML falhou:", e?.message); }
+  if (!copiouHtml) {
+    try { await navigator.clipboard.writeText(data.text); } catch {}
+  }
+  const mailto = `mailto:${encodeURIComponent(data.to)}?subject=${encodeURIComponent(data.subject)}`;
+  window.location.href = mailto;
+  return { copiouHtml };
+}
+
 // Modal mostrando os links únicos gerados pra cada fornecedor (após envio)
 function ModalLinksGerados({ payload, onClose }) {
   const cotacoes = payload?.cotacoes || [];
   const rmsNumeros = payload?.rmsNumeros || [];
   const [copiado, setCopiado] = useState(null);
+  const [emailToast, setEmailToast] = useState(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const linkOf = (cot) => `${baseUrl}/fornecedores/c/${cot.token}`;
+
+  const handleEnviarEmail = async (cot) => {
+    setEmailToast(null);
+    try {
+      const r = await enviarEmailViaClipboardMailto(cot.id);
+      setEmailToast({
+        id: cot.id,
+        ok: true,
+        msg: r.copiouHtml ? "Email copiado. Cole no Outlook (Ctrl+V) e envie." : "Outlook aberto. Cole manualmente.",
+      });
+      setTimeout(() => setEmailToast(null), 6000);
+    } catch (e) {
+      setEmailToast({ id: cot.id, ok: false, msg: e.message });
+    }
+  };
 
   const copiarLink = async (cot) => {
     try {
@@ -409,17 +453,24 @@ function ModalLinksGerados({ payload, onClose }) {
                   >
                     <ExternalLink size={12} /> Abrir
                   </a>
-                  <a
-                    href={`/api/cotacao/${cot.id}/preview-email`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => handleEnviarEmail(cot)}
                     className="px-3 py-1.5 text-xs bg-torg-blue text-white hover:bg-torg-blue-700 rounded font-medium inline-flex items-center gap-1"
-                    title="Abrir email pronto: copia o conteudo HTML e cola no Outlook"
+                    title="Copia o email e abre o Outlook — Ctrl+V e enviar"
                   >
                     <Mail size={12} /> Enviar email
-                  </a>
+                  </button>
                 </div>
               </div>
+              {emailToast?.id === cot.id && (
+                <div className={`text-xs rounded px-2 py-1 ${
+                  emailToast.ok
+                    ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                    : "bg-red-50 border border-red-200 text-red-700"
+                }`}>
+                  {emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}
+                </div>
+              )}
               <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 font-mono text-[11px] text-torg-gray break-all">
                 {linkOf(cot)}
               </div>
