@@ -107,6 +107,8 @@ model OP {
   producaoSemanal ProducaoSemanal[]
   fluxoCaixa     FluxoCaixa[]
   romaneios      Romaneio[]
+  estoqueReservas EstoqueReserva[]
+  estoqueAlocacoes EstoqueAlocacao[]
 
   @@index([numero])
   @@index([status])
@@ -740,4 +742,96 @@ model EmailNotificacao {
   updatedAt DateTime @updatedAt
 
   @@index([ativo])
+}
+
+// ─── ESTOQUE TORG ──────────────────────────────────────────
+
+// Configuracao de quais categorias do Omie entram no controle de estoque.
+// Singleton (so 1 registro). Default: categoria "3.1".
+model ConfigEstoque {
+  id              String   @id @default(cuid())
+  categoriasOmie  String[] @default(["3.1"])
+  ultimaSincProd  DateTime?
+  ultimaSincMov   DateTime?
+  updatedAt       DateTime @updatedAt
+}
+
+// Item do estoque — espelha produto do Omie das categorias configuradas.
+// Sincronizado periodicamente. CMC e quantidade vem do Omie.
+model EstoqueItem {
+  id              String   @id @default(cuid())
+  codigoOmie      String   @unique
+  codigoIntegracao String? @unique
+  descricao       String
+  categoriaOmie   String
+  categoriaLabel  String?
+  unidade         String
+  cmc             Float    @default(0)
+  qtdAtual        Float    @default(0)
+  ativo           Boolean  @default(true)
+  ultimaSincOmie  DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  reservas        EstoqueReserva[]
+  movimentacoes   EstoqueMovimentacao[]
+
+  @@index([categoriaOmie])
+  @@index([ativo])
+}
+
+// Reserva — quanto de cada item foi planejado pra cada OP via linha de RM.
+model EstoqueReserva {
+  id              String   @id @default(cuid())
+  itemEstoqueId   String
+  itemEstoque     EstoqueItem @relation(fields: [itemEstoqueId], references: [id], onDelete: Cascade)
+  opId            String
+  op              OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+  rmItemId        String?
+  qtdReservada    Float
+  qtdConsumida    Float    @default(0)
+  status          String   @default("ATIVA")
+  cancelMotivo    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([opId])
+  @@index([itemEstoqueId, status])
+}
+
+// Movimentacao de estoque — entradas, saidas, ajustes.
+model EstoqueMovimentacao {
+  id              String   @id @default(cuid())
+  itemEstoqueId   String
+  itemEstoque     EstoqueItem @relation(fields: [itemEstoqueId], references: [id], onDelete: Cascade)
+  tipo            String   // ENTRADA | SAIDA | AJUSTE
+  origem          String   // OMIE_NF | OMIE_BAIXA | MANUAL | SYNECO
+  quantidade      Float
+  cmcMomento      Float?
+  observacao      String?
+  syncCodigoOmie  String?  @unique
+  alocacoes       EstoqueAlocacao[]
+  createdAt       DateTime @default(now())
+  createdById     String?
+
+  @@index([itemEstoqueId])
+  @@index([tipo, createdAt])
+}
+
+// Alocacao — quanto de uma SAIDA foi pra cada OP.
+model EstoqueAlocacao {
+  id              String   @id @default(cuid())
+  movimentacaoId  String
+  movimentacao    EstoqueMovimentacao @relation(fields: [movimentacaoId], references: [id], onDelete: Cascade)
+  opId            String
+  op              OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+  reservaId       String?
+  quantidade      Float
+  valorCMC        Float
+  ajustadoManual  Boolean  @default(false)
+  ajustadoById    String?
+  createdAt       DateTime @default(now())
+
+  @@index([opId])
+  @@index([movimentacaoId])
 }
