@@ -764,12 +764,16 @@ model EmailNotificacao {
 model ConfigEstoque {
   id              String   @id @default(cuid())
   categoriasOmie  String[] @default(["3.1"])
+  // Palavras-chave que identificam um produto como "Estoque Torg" (matéria-prima
+  // central). Match case-insensitive na descricao. Ex: ["AÇO", "CHAPA", "TUBO"]
+  // Usado quando o Omie nao tem familias estruturadas pra classificar via codigo.
+  palavrasChave   String[] @default([])
   ultimaSincProd  DateTime?
   ultimaSincMov   DateTime?
   updatedAt       DateTime @updatedAt
 }
 
-// Item do estoque — espelha produto do Omie das categorias configuradas.
+// Item do estoque — espelha produto do Omie via ListarPosEstoque.
 // Sincronizado periodicamente. CMC e quantidade vem do Omie.
 model EstoqueItem {
   id              String   @id @default(cuid())
@@ -778,6 +782,10 @@ model EstoqueItem {
   descricao       String
   categoriaOmie   String
   categoriaLabel  String?
+  // Flag que indica se esse item entra no fluxo "Estoque Torg" (centralizado).
+  // Setado durante a sync via match das palavras-chave do ConfigEstoque,
+  // ou manualmente pelo usuario via UI.
+  estoqueTorg     Boolean  @default(false)
   unidade         String
   cmc             Float    @default(0)
   qtdAtual        Float    @default(0)
@@ -790,6 +798,7 @@ model EstoqueItem {
   movimentacoes   EstoqueMovimentacao[]
 
   @@index([categoriaOmie])
+  @@index([estoqueTorg])
   @@index([ativo])
 }
 

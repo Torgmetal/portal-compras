@@ -17,6 +17,8 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
   const [config, setConfig] = useState(configInicial);
   const [busca, setBusca] = useState("");
   const [filtroCat, setFiltroCat] = useState(null);
+  // 3 estados: null = todos | "torg" = apenas Estoque Torg | "outros" = apenas nao-Estoque-Torg
+  const [filtroTorg, setFiltroTorg] = useState("torg");
   const [sincronizando, setSincronizando] = useState(false);
   const [erro, setErro] = useState("");
   const [info, setInfo] = useState("");
@@ -33,8 +35,12 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
     return Array.from(set.entries()).map(([cod, lbl]) => ({ codigo: cod, label: lbl }));
   }, [itens]);
 
+  const totalTorg = useMemo(() => itens.filter((i) => i.estoqueTorg).length, [itens]);
+
   const filtrados = useMemo(() => {
     return itens.filter((i) => {
+      if (filtroTorg === "torg" && !i.estoqueTorg) return false;
+      if (filtroTorg === "outros" && i.estoqueTorg) return false;
       if (filtroCat && i.categoriaOmie !== filtroCat) return false;
       if (busca) {
         const b = busca.toLowerCase();
@@ -43,7 +49,7 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
       }
       return true;
     });
-  }, [itens, busca, filtroCat]);
+  }, [itens, busca, filtroCat, filtroTorg]);
 
   // KPIs
   const valorTotalEstoque = useMemo(() => {
@@ -82,7 +88,13 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
       const partes = [];
       if (data.produtos) {
         if (data.produtos.error) partes.push(`Produtos: ${data.produtos.error}`);
-        else partes.push(`${data.produtos.criados} criados, ${data.produtos.atualizados} atualizados`);
+        else {
+          let txt = `${data.produtos.criados} criados, ${data.produtos.atualizados} atualizados`;
+          if (data.produtos.estoqueTorgMarcados !== undefined) {
+            txt += ` (${data.produtos.estoqueTorgMarcados} marcados como Estoque Torg)`;
+          }
+          partes.push(txt);
+        }
       }
       if (data.movimentacoes) {
         if (data.movimentacoes.error) partes.push(`Movs: ${data.movimentacoes.error}`);
@@ -105,8 +117,12 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
             <Package size={26} className="text-torg-blue" /> Estoque Torg
           </h2>
           <p className="text-sm text-torg-gray mt-1">
-            Materiais sincronizados do Omie (categorias: {(config?.categoriasOmie || []).join(", ") || "nenhuma"}).
-            CMC e quantidade atualizados pela API.
+            Materiais sincronizados do Omie via ListarPosEstoque.
+            {(config?.palavrasChave || []).length > 0 ? (
+              <> Palavras-chave: <strong>{(config.palavrasChave || []).join(", ")}</strong>.</>
+            ) : (
+              <> <span className="text-amber-700">Configure palavras-chave pra marcar produtos como Estoque Torg.</span></>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -352,6 +368,26 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-torg-blue"
           />
         </div>
+        <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+          <button
+            onClick={() => setFiltroTorg("torg")}
+            className={`px-3 py-2 ${filtroTorg === "torg" ? "bg-emerald-600 text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}
+          >
+            Estoque Torg ({totalTorg})
+          </button>
+          <button
+            onClick={() => setFiltroTorg("outros")}
+            className={`px-3 py-2 border-l border-gray-300 ${filtroTorg === "outros" ? "bg-gray-700 text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}
+          >
+            Outros ({itens.length - totalTorg})
+          </button>
+          <button
+            onClick={() => setFiltroTorg(null)}
+            className={`px-3 py-2 border-l border-gray-300 ${filtroTorg === null ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}
+          >
+            Todos ({itens.length})
+          </button>
+        </div>
         {categorias.length > 1 && (
           <select
             value={filtroCat || ""}
@@ -385,9 +421,9 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Torg</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Código</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Categoria</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Qtd</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">CMC</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Valor total</th>
@@ -400,6 +436,23 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
                   const semEstoque = i.qtdAtual <= 0;
                   return (
                     <tr key={i.id} className={`hover:bg-gray-50 ${semEstoque ? "bg-amber-50/20" : ""}`}>
+                      <td className="px-3 py-3 text-center">
+                        {isAdmin ? (
+                          <ToggleEstoqueTorg
+                            itemId={i.id}
+                            initial={i.estoqueTorg}
+                            onChanged={(novoValor) => {
+                              setItens((prev) => prev.map((x) => x.id === i.id ? { ...x, estoqueTorg: novoValor } : x));
+                            }}
+                          />
+                        ) : (
+                          i.estoqueTorg ? (
+                            <span title="Estoque Torg" className="inline-block w-3 h-3 rounded-full bg-emerald-500" />
+                          ) : (
+                            <span title="Não" className="inline-block w-3 h-3 rounded-full bg-gray-200" />
+                          )
+                        )}
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs text-torg-gray whitespace-nowrap">{i.codigoOmie}</td>
                       <td className="px-4 py-3">
                         <Link
@@ -408,13 +461,6 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
                         >
                           {i.descricao}
                         </Link>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-torg-gray">
-                        {i.categoriaLabel ? (
-                          <span title={`Código: ${i.categoriaOmie}`}>{i.categoriaLabel}</span>
-                        ) : (
-                          <span className="font-mono">{i.categoriaOmie}</span>
-                        )}
                       </td>
                       <td className={`px-4 py-3 text-right tabular-nums whitespace-nowrap font-medium ${
                         semEstoque ? "text-amber-700" : "text-torg-dark"
@@ -457,13 +503,60 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
   );
 }
 
+// Botao toggle pra marcar/desmarcar item como Estoque Torg (apenas admin).
+function ToggleEstoqueTorg({ itemId, initial, onChanged }) {
+  const [valor, setValor] = useState(!!initial);
+  const [salvando, setSalvando] = useState(false);
+
+  const toggle = async () => {
+    if (salvando) return;
+    const novo = !valor;
+    setSalvando(true);
+    setValor(novo); // optimistic
+    try {
+      const res = await fetch(`/api/estoque/item/${itemId}/torg`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estoqueTorg: novo }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Erro");
+      }
+      onChanged?.(novo);
+    } catch (e) {
+      setValor(!novo); // reverte
+      alert("Falhou: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={salvando}
+      className={`relative inline-flex items-center h-5 w-9 rounded-full transition-colors ${
+        valor ? "bg-emerald-500" : "bg-gray-300"
+      } ${salvando ? "opacity-50" : "hover:opacity-80"}`}
+      title={valor ? "É Estoque Torg — clique para desmarcar" : "Não é Estoque Torg — clique para marcar"}
+    >
+      <span className={`inline-block w-4 h-4 transform bg-white rounded-full shadow transition-transform ${
+        valor ? "translate-x-4" : "translate-x-0.5"
+      }`} />
+    </button>
+  );
+}
+
 function ModalConfig({ config, onClose, onSaved }) {
   const [categorias, setCategorias] = useState(config?.categoriasOmie || ["3.1"]);
   const [novaCategoria, setNovaCategoria] = useState("");
+  const [palavras, setPalavras] = useState(config?.palavrasChave || []);
+  const [novaPalavra, setNovaPalavra] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
-  const adicionar = () => {
+  const adicionarCat = () => {
     const c = novaCategoria.trim();
     if (!c) return;
     if (categorias.includes(c)) {
@@ -474,7 +567,20 @@ function ModalConfig({ config, onClose, onSaved }) {
     setNovaCategoria("");
     setErro("");
   };
-  const remover = (c) => setCategorias(categorias.filter((x) => x !== c));
+  const removerCat = (c) => setCategorias(categorias.filter((x) => x !== c));
+
+  const adicionarPalavra = () => {
+    const p = novaPalavra.trim().toUpperCase();
+    if (!p) return;
+    if (palavras.includes(p)) {
+      setErro(`Palavra "${p}" já está na lista`);
+      return;
+    }
+    setPalavras([...palavras, p]);
+    setNovaPalavra("");
+    setErro("");
+  };
+  const removerPalavra = (p) => setPalavras(palavras.filter((x) => x !== p));
 
   const salvar = async () => {
     setErro("");
@@ -483,7 +589,7 @@ function ModalConfig({ config, onClose, onSaved }) {
       const res = await fetch("/api/estoque/config", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoriasOmie: categorias }),
+        body: JSON.stringify({ categoriasOmie: categorias, palavrasChave: palavras }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
@@ -496,32 +602,84 @@ function ModalConfig({ config, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
           <h3 className="text-lg font-semibold text-torg-dark inline-flex items-center gap-2">
             <Settings size={18} /> Configurações do Estoque
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-6">
           {erro && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
               <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
             </div>
           )}
+
+          {/* PALAVRAS-CHAVE — destaque, é a principal */}
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-2">
-              Categorias do Omie que entram no estoque
+            <label className="block text-sm font-semibold text-torg-dark mb-1">
+              Palavras-chave para "Estoque Torg" ⭐
             </label>
             <p className="text-xs text-torg-gray mb-3">
-              Use o código da família/categoria do Omie. Apenas produtos dessas categorias serão sincronizados.
+              Produtos cuja descrição <strong>contém</strong> alguma dessas palavras serão marcados como Estoque Torg (matéria-prima central).
+              Match não diferencia maiúsculas/minúsculas. Ex: <code>AÇO</code>, <code>CHAPA</code>, <code>TUBO</code>, <code>PERFIL</code>.
+            </p>
+            <div className="space-y-2">
+              {palavras.length === 0 ? (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                  ⚠️ Nenhuma palavra-chave. Sem isso, nenhum produto entra no Estoque Torg.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {palavras.map((p) => (
+                    <div key={p} className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-300 rounded-full text-sm">
+                      <span className="font-mono text-emerald-800 font-semibold">{p}</span>
+                      <button
+                        onClick={() => removerPalavra(p)}
+                        className="text-emerald-600 hover:text-red-600 leading-none text-lg"
+                        title="Remover"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <input
+                type="text"
+                value={novaPalavra}
+                onChange={(e) => setNovaPalavra(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), adicionarPalavra())}
+                placeholder="Ex: AÇO"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+              />
+              <button
+                onClick={adicionarPalavra}
+                className="px-3 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700"
+              >
+                + Adicionar
+              </button>
+            </div>
+          </div>
+
+          {/* CATEGORIAS — secundário */}
+          <div className="border-t border-gray-100 pt-5">
+            <label className="block text-sm font-medium text-torg-dark mb-1">
+              Categorias do Omie (opcional)
+            </label>
+            <p className="text-xs text-torg-gray mb-3">
+              Códigos de família do Omie. Atualmente seu Omie não tem famílias estruturadas, então esse filtro é opcional.
+              Se vazio, o sistema usa só as palavras-chave acima.
             </p>
             <div className="space-y-2">
               {categorias.map((c) => (
                 <div key={c} className="flex items-center justify-between gap-2 px-3 py-2 bg-torg-blue-50 border border-torg-blue-200 rounded-lg">
                   <span className="font-mono text-sm text-torg-blue font-semibold">{c}</span>
                   <button
-                    onClick={() => remover(c)}
+                    onClick={() => removerCat(c)}
                     className="text-xs text-red-600 hover:text-red-800 font-medium"
                   >
                     Remover
@@ -534,12 +692,12 @@ function ModalConfig({ config, onClose, onSaved }) {
                 type="text"
                 value={novaCategoria}
                 onChange={(e) => setNovaCategoria(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), adicionar())}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), adicionarCat())}
                 placeholder="Ex: 3.1"
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
               />
               <button
-                onClick={adicionar}
+                onClick={adicionarCat}
                 className="px-3 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700"
               >
                 + Adicionar
@@ -547,7 +705,7 @@ function ModalConfig({ config, onClose, onSaved }) {
             </div>
           </div>
         </div>
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0">
           <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
             Cancelar
           </button>
