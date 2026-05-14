@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Package, Search, RefreshCw, Loader2, AlertCircle, Settings, ExternalLink, TrendingUp, TrendingDown } from "lucide-react";
+import { Package, Search, RefreshCw, Loader2, AlertCircle, Settings, ExternalLink, TrendingUp, TrendingDown, Microscope } from "lucide-react";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -21,6 +21,8 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
   const [erro, setErro] = useState("");
   const [info, setInfo] = useState("");
   const [modalConfig, setModalConfig] = useState(false);
+  const [diagnostico, setDiagnostico] = useState(null);
+  const [carregandoDiag, setCarregandoDiag] = useState(false);
 
   // Categorias unicas presentes nos items
   const categorias = useMemo(() => {
@@ -49,6 +51,21 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
   }, [filtrados]);
   const qtdItensComEstoque = useMemo(() => filtrados.filter((i) => i.qtdAtual > 0).length, [filtrados]);
   const qtdItensSemEstoque = useMemo(() => filtrados.filter((i) => i.qtdAtual <= 0).length, [filtrados]);
+
+  const rodarDiagnostico = async () => {
+    setCarregandoDiag(true);
+    setErro("");
+    try {
+      const res = await fetch("/api/estoque/diagnostico");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setDiagnostico(data);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregandoDiag(false);
+    }
+  };
 
   const sincronizar = async () => {
     setSincronizando(true);
@@ -93,6 +110,15 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={rodarDiagnostico}
+            disabled={carregandoDiag}
+            className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50"
+            title="Inspeciona a 1a pagina de produtos do Omie pra descobrir nomes/codigos das categorias"
+          >
+            {carregandoDiag ? <Loader2 size={14} className="animate-spin" /> : <Microscope size={14} />}
+            Diagnóstico
+          </button>
           {isAdmin && (
             <button
               onClick={() => setModalConfig(true)}
@@ -120,6 +146,64 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
       {info && !erro && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg px-3 py-2">
           ✓ {info}
+        </div>
+      )}
+
+      {diagnostico && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-amber-900 inline-flex items-center gap-2">
+              <Microscope size={14} /> Diagnóstico do Omie
+            </p>
+            <button
+              onClick={() => setDiagnostico(null)}
+              className="text-xs text-amber-700 hover:text-amber-900 font-medium"
+            >
+              Fechar
+            </button>
+          </div>
+          <div className="text-xs text-amber-900 space-y-1">
+            <p>Total de produtos no Omie: <strong>{diagnostico.totalRegistros || "—"}</strong></p>
+            <p>Páginas: <strong>{diagnostico.totalPaginas || "—"}</strong> · Nessa amostra: <strong>{diagnostico.totalNaPagina}</strong></p>
+          </div>
+          {diagnostico.familiasEncontradas && diagnostico.familiasEncontradas.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-amber-900 mb-1">
+                Famílias/categorias encontradas nessa amostra (use o código no Configurar):
+              </p>
+              <div className="bg-white border border-amber-200 rounded p-2 max-h-[200px] overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-amber-800">
+                      <th className="text-left pb-1">Código</th>
+                      <th className="text-left pb-1">Descrição</th>
+                      <th className="text-right pb-1">Produtos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diagnostico.familiasEncontradas.map((f, i) => (
+                      <tr key={i} className="border-t border-amber-100">
+                        <td className="py-1 font-mono text-torg-blue font-semibold">{f.codigo || "—"}</td>
+                        <td className="py-1 text-torg-dark">{f.descricao || "—"}</td>
+                        <td className="py-1 text-right text-amber-800">{f.contagem}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-amber-700 mt-1 italic">
+                Copie o código da família correta e cole em "Configurar" → "Adicionar".
+              </p>
+            </div>
+          )}
+          {diagnostico.exemploProduto && (
+            <details>
+              <summary className="cursor-pointer text-xs font-medium text-amber-900">Ver estrutura do 1º produto (JSON)</summary>
+              <pre className="text-[10px] bg-white border border-amber-200 rounded p-2 mt-1 overflow-x-auto max-h-[300px]">
+                {JSON.stringify(diagnostico.exemploProduto, null, 2)}
+              </pre>
+            </details>
+          )}
         </div>
       )}
 
