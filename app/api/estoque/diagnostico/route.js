@@ -14,6 +14,8 @@ export const maxDuration = 30;
 
 const OMIE_FAMILIAS_URL = "https://app.omie.com.br/api/v1/geral/familias/";
 const OMIE_PROD_URL = "https://app.omie.com.br/api/v1/geral/produtos/";
+const OMIE_ESTOQUE_URL = "https://app.omie.com.br/api/v1/estoque/consulta/";
+const OMIE_MOV_URL = "https://app.omie.com.br/api/v1/estoque/movestoque/";
 
 async function callOmie(url, payload) {
   const resp = await fetch(url, {
@@ -138,6 +140,71 @@ export async function GET() {
     };
   } catch (e) {
     resultado.produtosCompleto = { ok: false, erro: e.message };
+  }
+
+  // 5) ListarPosEstoque — endpoint ALTERNATIVO. Le da tabela de posicao de estoque,
+  // nao do cadastro de produtos. Se o registro corrompido nao tiver tocado essa
+  // tabela, podemos usar isso pra puxar codigo+descricao+saldo+CMC.
+  try {
+    const hoje = new Date();
+    const dDataPosicao = `${String(hoje.getDate()).padStart(2, "0")}/${String(hoje.getMonth() + 1).padStart(2, "0")}/${hoje.getFullYear()}`;
+    const data = await callOmie(OMIE_ESTOQUE_URL, {
+      call: "ListarPosEstoque",
+      app_key: APP_KEY,
+      app_secret: APP_SECRET,
+      param: [{
+        nPagina: 1,
+        nRegPorPagina: 10,
+        dDataPosicao,
+      }],
+    });
+    const lista = data.produtos || [];
+    resultado.posEstoque = {
+      ok: true,
+      totalNaPagina: lista.length,
+      totalPaginas: Number(data.nTotPaginas) || null,
+      totalRegistros: Number(data.nRegistros) || null,
+      exemplo: lista[0] ? {
+        cCodigo: lista[0].cCodigo,
+        cDescricao: lista[0].cDescricao,
+        cUnidade: lista[0].cUnidade,
+        nSaldo: lista[0].nSaldo,
+        nFisico: lista[0].nFisico,
+        nCMC: lista[0].nCMC,
+        // Tudo o que aparecer alem desses campos
+        ...Object.keys(lista[0]).filter((k) => !["cCodigo","cDescricao","cUnidade","nSaldo","nFisico","nCMC"].includes(k)).reduce((a, k) => ({ ...a, [k]: lista[0][k] }), {}),
+      } : null,
+    };
+  } catch (e) {
+    resultado.posEstoque = { ok: false, erro: e.message };
+  }
+
+  // 6) ListarMovEstoque — outro endpoint que nao depende do cadastro de produtos
+  try {
+    const ate = new Date();
+    const de = new Date();
+    de.setDate(de.getDate() - 7);
+    const fmt = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    const data = await callOmie(OMIE_MOV_URL, {
+      call: "ListarMovEstoque",
+      app_key: APP_KEY,
+      app_secret: APP_SECRET,
+      param: [{
+        nPagina: 1,
+        nRegPorPagina: 10,
+        dDtInicial: fmt(de),
+        dDtFinal: fmt(ate),
+      }],
+    });
+    const lista = data.movimentos || [];
+    resultado.movEstoque = {
+      ok: true,
+      totalNaPagina: lista.length,
+      totalPaginas: Number(data.nTotPaginas) || null,
+      exemplo: lista[0] || null,
+    };
+  } catch (e) {
+    resultado.movEstoque = { ok: false, erro: e.message };
   }
 
   return NextResponse.json(resultado);

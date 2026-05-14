@@ -265,12 +265,56 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
               {diagnostico.produtosCompleto.ok ? (
                 <>✓ <strong>ListarProdutos (sem filtro):</strong> {diagnostico.produtosCompleto.totalPaginas ?? "?"} páginas</>
               ) : (
+                <>✗ <strong>ListarProdutos (sem filtro):</strong> {diagnostico.produtosCompleto.erro}</>
+              )}
+            </div>
+          )}
+
+          {/* 5) ListarPosEstoque — endpoint alternativo (sem passar pelo cadastro de produtos) */}
+          {diagnostico.posEstoque && (
+            <div className={`rounded p-2 text-xs ${
+              diagnostico.posEstoque.ok
+                ? "bg-emerald-50 border border-emerald-300 text-emerald-900"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}>
+              {diagnostico.posEstoque.ok ? (
                 <>
-                  ✗ <strong>ListarProdutos (sem filtro):</strong> {diagnostico.produtosCompleto.erro}
-                  <p className="mt-1 text-[10px]">
-                    Erro indica produto com cadastro corrompido no Omie. A sync ignora esse caminho e usa o filtrado por família.
+                  <p className="font-semibold">
+                    ✓ <strong>ListarPosEstoque (endpoint alternativo):</strong>{" "}
+                    {diagnostico.posEstoque.totalRegistros ?? "?"} produtos com estoque ({diagnostico.posEstoque.totalPaginas ?? "?"} páginas)
                   </p>
+                  <p className="mt-1 text-[11px]">
+                    🎯 <strong>Salvação:</strong> esse endpoint funciona! A sync pode usar ele pra puxar produtos.
+                  </p>
+                  {diagnostico.posEstoque.exemplo && (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-emerald-700 text-[11px]">Ver exemplo de produto retornado</summary>
+                      <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto">
+                        {JSON.stringify(diagnostico.posEstoque.exemplo, null, 2)}
+                      </pre>
+                    </details>
+                  )}
                 </>
+              ) : (
+                <>✗ <strong>ListarPosEstoque:</strong> {diagnostico.posEstoque.erro}</>
+              )}
+            </div>
+          )}
+
+          {/* 6) ListarMovEstoque */}
+          {diagnostico.movEstoque && (
+            <div className={`rounded p-2 text-xs ${
+              diagnostico.movEstoque.ok
+                ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}>
+              {diagnostico.movEstoque.ok ? (
+                <>
+                  ✓ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.totalNaPagina} movimentações na 1ª página
+                  ({diagnostico.movEstoque.totalPaginas ?? "?"} páginas)
+                </>
+              ) : (
+                <>✗ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.erro}</>
               )}
             </div>
           )}
