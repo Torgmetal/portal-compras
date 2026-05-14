@@ -7,6 +7,13 @@ import { notificarEvento } from "@/lib/email";
 const itemSchema = z.object({
   opItemId: z.string().nullable().optional(),
   aditivoItemId: z.string().nullable().optional(),
+  // NOVO: OP destinataria multi-OP (linha pode apontar pra OP diferente
+  // da OP "principal" da RM, ou ser null = estoque livre)
+  opDestinoId: z.string().nullable().optional(),
+  // NOVO: marca se este item vai pro estoque (true) ou sob encomenda OP (false)
+  destinoEstoque: z.boolean().default(false),
+  // NOVO: codigo do produto Omie (pra vincular ao EstoqueItem e criar reserva)
+  codigoOmieEstoque: z.string().nullable().optional(),
   descricao: z.string().min(1),
   unidade: z.string().min(1),
   qtd: z.number().min(0),
@@ -94,6 +101,9 @@ export async function POST(req) {
           ordem: idx,
           opItemId: it.opItemId || null,
           aditivoItemId: it.aditivoItemId || null,
+          opDestinoId: it.opDestinoId || body.opId || null,
+          destinoEstoque: !!it.destinoEstoque,
+          codigoOmieEstoque: it.codigoOmieEstoque || it.codigo || null,
           descricao: it.descricao,
           unidade: it.unidade,
           qtd: it.qtd,
@@ -120,6 +130,43 @@ export async function POST(req) {
         : {}),
     },
   });
+
+  // Cria EstoqueReserva automatica pra cada item com destinoEstoque=true,
+  // opDestinoId definido e codigoOmieEstoque vinculado a um EstoqueItem.
+  // Itens sem opDestino entram como "estoque livre" (sem reserva).
+  try {
+    const rmItensSalvos = await prisma.rMItem.findMany({
+      where: { rmId: rm.id },
+      select: {
+        id: true, opDestinoId: true, destinoEstoque: true,
+        codigoOmieEstoque: true, qtd: true, peso: true, unidade: true,
+      },
+    });
+    for (const ri of rmItensSalvos) {
+      if (!ri.destinoEstoque || !ri.opDestinoId || !ri.codigoOmieEstoque) continue;
+      const itemEstoque = await prisma.estoqueItem.findUnique({
+        where: { codigoOmie: ri.codigoOmieEstoque },
+      });
+      if (!itemEstoque) continue;
+      // Usa peso quando o item de estoque eh em KG, senao a qtd
+      const qtdReserva = (itemEstoque.unidade === "KG" && ri.peso)
+        ? Number(ri.peso)
+        : Number(ri.qtd);
+      if (qtdReserva <= 0) continue;
+      await prisma.estoqueReserva.create({
+        data: {
+          itemEstoqueId: itemEstoque.id,
+          opId: ri.opDestinoId,
+          rmItemId: ri.id,
+          qtdReservada: qtdReserva,
+          status: "ATIVA",
+        },
+      });
+    }
+  } catch (e) {
+    console.error("[rm create reservas] erro:", e?.message);
+    // Nao bloqueia criacao da RM — reservas podem ser sincronizadas depois
+  }
 
   await prisma.auditLog.create({
     data: {

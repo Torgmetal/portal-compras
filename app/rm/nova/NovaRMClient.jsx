@@ -185,6 +185,11 @@ export default function NovaRMClient({ ops, userSetor }) {
     const itens = itensValidos.map((it) => ({
       opItemId: null,
       aditivoItemId: null,
+      // Por linha: OP destino (multi-OP). Se vazio, usa a OP principal da RM.
+      opDestinoId: it.opDestinoId || opSelecionada || null,
+      // Se marcado como estoque, vincula ao EstoqueItem via codigoOmieEstoque
+      destinoEstoque: !!it.destinoEstoque,
+      codigoOmieEstoque: it.codigoOmieEstoque || it.codigo || null,
       descricao: it.descricao,
       unidade: it.unidade || "UN",
       qtd: Number(it.qtd) || 0,
@@ -473,6 +478,8 @@ export default function NovaRMClient({ ops, userSetor }) {
                   <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Larg.</th>
                   <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Tratamento</th>
                   <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase">Peso (kg)</th>
+                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase" title="OP destino (multi-OP)">OP dest.</th>
+                  <th className="px-2 py-2 text-center font-medium text-gray-500 uppercase" title="Vai pro estoque (categoria 3.1)?">Estq.</th>
                   <th className="w-8"></th>
                 </tr>
               </thead>
@@ -549,6 +556,28 @@ export default function NovaRMClient({ ops, userSetor }) {
                         onChange={(e) => editarItem(i, "peso", parseFloat(e.target.value) || 0)}
                         placeholder="—"
                         className="w-20 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <select
+                        value={it.opDestinoId || opSelecionada || ""}
+                        onChange={(e) => editarItem(i, "opDestinoId", e.target.value || null)}
+                        className="w-28 border border-gray-200 rounded px-1 py-1 text-xs focus:ring-1 focus:ring-torg-blue bg-white"
+                        title="OP destinatária desta linha (multi-OP)"
+                      >
+                        <option value="">— sem OP —</option>
+                        {(ops || []).map((op) => (
+                          <option key={op.id} value={op.id}>{op.numero}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!it.destinoEstoque}
+                        onChange={(e) => editarItem(i, "destinoEstoque", e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                        title="Marcar quando o item vai pro estoque (matéria prima padrão — categoria 3.1)"
                       />
                     </td>
                     <td className="px-2 py-1.5">

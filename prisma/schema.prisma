@@ -109,6 +109,7 @@ model OP {
   romaneios      Romaneio[]
   estoqueReservas EstoqueReserva[]
   estoqueAlocacoes EstoqueAlocacao[]
+  rmItensDestino  RMItem[]   @relation("RMItemOpDestino")
 
   @@index([numero])
   @@index([status])
@@ -534,6 +535,18 @@ model RMItem {
   id          String  @id @default(cuid())
   rmId        String
   rm          RM      @relation(fields: [rmId], references: [id], onDelete: Cascade)
+
+  // OP destinataria deste item (multi-OP via RM). Pode ser null quando
+  // a linha eh compra pra estoque livre (sem destino especifico).
+  opDestinoId   String?
+  opDestino     OP?     @relation("RMItemOpDestino", fields: [opDestinoId], references: [id])
+  // Quando true, este item vai pro estoque e e consumido depois via CMC.
+  // Quando false, comportamento atual (sob encomenda / FD direto pra OP).
+  destinoEstoque Boolean @default(false)
+  // Codigo do item no Omie (cCodProduto) — quando o usuario souber,
+  // permite vincular direto ao EstoqueItem. Sem isso, vira "compra avulsa"
+  // sem reserva automatica.
+  codigoOmieEstoque String?
 
   // Vinculo com item da OP base OU com item de Aditivo (exatamente um dos dois)
   opItemId      String?
