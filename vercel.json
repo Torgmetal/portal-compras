@@ -3,11 +3,11 @@
   "crons": [
     {
       "path": "/api/cron/estoque-produtos",
-      "schedule": "5 * * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/estoque-movimentacoes",
-      "schedule": "35 * * * *"
+      "schedule": "30 6 * * *"
     }
   ]
 }
