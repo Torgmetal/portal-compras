@@ -27,10 +27,12 @@ function parseObservacao(obs) {
   return { prazoEntrega, condicaoPagamento, observacao: restos.join(" | ") };
 }
 
-export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao = [], vencida }) {
+export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao: anexosCotacaoInicial = [], vencida }) {
   const router = useRouter();
   const jaEnviou = cotacao.status === "RECEBIDA";
   const obsParsed = parseObservacao(cotacao.observacao);
+  // State local pra refletir uploads em tempo real (sem precisar de reload da pagina)
+  const [anexosCotacao, setAnexosCotacao] = useState(anexosCotacaoInicial);
 
   const [linhas, setLinhas] = useState(() =>
     cotacao.itens.map((it) => {
@@ -65,7 +67,8 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [enviadoAgora, setEnviadoAgora] = useState(false);
-  const [arquivoNome, setArquivoNome] = useState("");
+  // Nomes dos PDFs subidos nessa sessao (alem dos anexosCotacao que ja vem do servidor)
+  const [arquivosSessao, setArquivosSessao] = useState([]);
   const [parsing, setParsing] = useState(false);
   const [parseInfo, setParseInfo] = useState(null); // { match: N, total: M, fornecedor, prazo }
   // IDs de linhas preenchidas automaticamente que o fornecedor ainda NÃO revisou
@@ -150,87 +153,131 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     return casados;
   }
 
-  async function uploadPDF(file) {
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setErro("Arquivo muito grande (limite 10MB).");
+  // Upload de um arquivo: salva no blob, retorna o anexo criado.
+  async function uploadArquivo(file) {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/cotacao/anexar/${cotacao.token}`, { method: "POST", body: fd });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || "Falha no upload");
+    }
+    return res.json(); // { id, url, nomeArquivo, tamanho, tipo }
+  }
+
+  // Faz parse via IA (ou fallback regex) de um PDF. Retorna { itens, fornecedor, prazoPagamento, usouIA }.
+  async function parsePDF(file) {
+    const base64 = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+
+    // Contexto da RM pra IA fazer o matching
+    const rmItensCtx = linhas.map((l) => ({
+      descricao: l.descricao,
+      material: l.material,
+      qtd: l.qtdRm,
+      unidade: l.unidade,
+      pesoKg: l.unidade === "KG" ? l.qtdRm : null,
+    }));
+
+    // 1. Tenta IA
+    try {
+      const resIA = await fetch("/api/parse-cotacao-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdfBase64: base64, rmItens: rmItensCtx }),
+      });
+      if (resIA.ok) {
+        const data = await resIA.json();
+        return { ...data, usouIA: true };
+      }
+    } catch (_) { /* cai no fallback */ }
+
+    // 2. Fallback regex
+    const resFb = await fetch("/api/parse-pdf-cotacao", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base64 }),
+    });
+    if (!resFb.ok) {
+      const e = await resFb.json().catch(() => ({}));
+      throw new Error(e.error || "Falha ao ler PDF");
+    }
+    const data = await resFb.json();
+    return { ...data, usouIA: false };
+  }
+
+  // Aceita 1 ou mais PDFs. Sobe todos pro blob, mas o parse via IA roda
+  // apenas no primeiro (assume que e o principal — pra nao sobrescrever
+  // valores ja preenchidos com o proximo).
+  async function uploadPDFs(files) {
+    const lista = Array.from(files || []).filter((f) => f && f.size > 0);
+    if (lista.length === 0) return;
+    const grandes = lista.filter((f) => f.size > 10 * 1024 * 1024);
+    if (grandes.length > 0) {
+      setErro(`Arquivo(s) muito grande(s) (limite 10MB): ${grandes.map((f) => f.name).join(", ")}`);
       return;
     }
+
     setErro("");
     setParseInfo(null);
     setParsing(true);
 
-    // Em paralelo: sobe o arquivo pro blob e ja vincula como Anexo
-    // da cotacao. Best-effort — se falhar, segue com parse normal.
-    (async () => {
-      try {
-        const fd = new FormData();
-        fd.append("file", file);
-        await fetch(`/api/cotacao/anexar/${cotacao.token}`, { method: "POST", body: fd });
-      } catch (_) { /* sem anexo, segue */ }
-    })();
-
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result);
-        r.onerror = reject;
-        r.readAsDataURL(file);
+      // Sobe TODOS em paralelo
+      const resultados = await Promise.allSettled(lista.map((f) => uploadArquivo(f)));
+      const ok = [];
+      const falhas = [];
+      resultados.forEach((r, i) => {
+        if (r.status === "fulfilled") ok.push(r.value);
+        else falhas.push(`${lista[i].name}: ${r.reason?.message || "erro"}`);
       });
 
-      // Contexto da RM pra IA fazer o matching
-      const rmItensCtx = linhas.map((l) => ({
-        descricao: l.descricao,
-        material: l.material,
-        qtd: l.qtdRm,
-        unidade: l.unidade,
-        pesoKg: l.unidade === "KG" ? l.qtdRm : null,
-      }));
-
-      // 1. Tenta IA (Claude — entende variacoes brasileiras + faz matching automatico)
-      let usouIA = false;
-      let data = null;
-      try {
-        const resIA = await fetch("/api/parse-cotacao-ai", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pdfBase64: base64, rmItens: rmItensCtx }),
-        });
-        if (resIA.ok) {
-          data = await resIA.json();
-          usouIA = true;
-        }
-      } catch (_) { /* cai no fallback */ }
-
-      // 2. Fallback regex se IA falhou
-      if (!usouIA) {
-        const resFb = await fetch("/api/parse-pdf-cotacao", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64 }),
-        });
-        if (!resFb.ok) {
-          const e = await resFb.json().catch(() => ({}));
-          throw new Error(e.error || "Falha ao ler PDF");
-        }
-        data = await resFb.json();
+      // Adiciona os anexos novos no state (vao aparecer na secao "Sua proposta anexada")
+      if (ok.length > 0) {
+        setAnexosCotacao((prev) => [
+          ...prev,
+          ...ok.map((a) => ({
+            id: a.id,
+            nomeArquivo: a.nomeArquivo,
+            blobUrl: a.url,
+            tamanho: a.tamanho,
+            tipo: a.tipo,
+          })),
+        ]);
+        setArquivosSessao((prev) => [...prev, ...ok.map((a) => a.nomeArquivo)]);
       }
 
-      const itensExtra = data.itens || [];
-      const casados = usouIA ? aplicarItensIA(itensExtra) : aplicarItensFallback(itensExtra);
-      setArquivoNome(file.name);
-      setParseInfo({
-        match: casados,
-        total: itensExtra.length,
-        fornecedor: data.fornecedor,
-        prazo: data.prazoPagamento,
-        usouIA,
-      });
-      // Pre-preenche identificacao se vier no PDF
-      if (data.fornecedor && !razaoSocial) setRazaoSocial(data.fornecedor);
-      if (data.prazoPagamento && !condicaoPagamento) setCondicaoPagamento(data.prazoPagamento);
-    } catch (e) {
-      setErro("Falha ao processar PDF: " + e.message);
+      if (falhas.length > 0) {
+        setErro("Falha em alguns arquivos: " + falhas.join(" · "));
+      }
+
+      // Parse via IA so no PRIMEIRO arquivo (pra autopreencher).
+      // Os outros sao apenas anexados.
+      if (lista.length > 0) {
+        try {
+          const data = await parsePDF(lista[0]);
+          const itensExtra = data.itens || [];
+          const casados = data.usouIA ? aplicarItensIA(itensExtra) : aplicarItensFallback(itensExtra);
+          setParseInfo({
+            match: casados,
+            total: itensExtra.length,
+            fornecedor: data.fornecedor,
+            prazo: data.prazoPagamento,
+            usouIA: data.usouIA,
+            nomeArquivo: lista[0].name,
+            multiPdf: lista.length > 1,
+          });
+          if (data.fornecedor && !razaoSocial) setRazaoSocial(data.fornecedor);
+          if (data.prazoPagamento && !condicaoPagamento) setCondicaoPagamento(data.prazoPagamento);
+        } catch (e) {
+          // Parse falhou mas anexos podem ter sido salvos — nao bloqueia
+          setErro("PDFs anexados, mas falha na leitura automatica: " + e.message);
+        }
+      }
     } finally {
       setParsing(false);
     }
@@ -412,7 +459,15 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             </div>
             <ul className="divide-y divide-amber-100 border border-amber-200 rounded-lg bg-white">
               {anexosCotacao.map((a) => (
-                <AnexoCotacaoLinha key={a.id} anexo={a} token={cotacao.token} />
+                <AnexoCotacaoLinha
+                  key={a.id}
+                  anexo={a}
+                  token={cotacao.token}
+                  onRemoved={(id) => {
+                    setAnexosCotacao((prev) => prev.filter((x) => x.id !== id));
+                    setArquivosSessao((prev) => prev.filter((nome) => nome !== a.nomeArquivo));
+                  }}
+                />
               ))}
             </ul>
           </div>
@@ -473,7 +528,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                   Tem a proposta em PDF?
                 </h2>
                 <p className="text-xs text-torg-gray mt-1">
-                  Anexe o PDF e a gente tenta preencher os preços automaticamente. Você revisa antes de enviar.
+                  Anexe o(s) PDF(s) e a gente tenta preencher os preços automaticamente. Você pode anexar <strong>mais de um arquivo</strong> (ex: faturamento por CNPJs diferentes).
                 </p>
               </div>
               <div className="flex gap-2 items-center flex-wrap">
@@ -484,30 +539,32 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                   className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50"
                 >
                   {parsing ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                  {parsing ? "Lendo PDF..." : arquivoNome ? "Trocar PDF" : "Anexar proposta (PDF)"}
+                  {parsing
+                    ? "Lendo PDF(s)..."
+                    : anexosCotacao.length > 0
+                      ? "Adicionar mais PDFs"
+                      : "Anexar proposta(s) (PDF)"}
                 </button>
                 <input
                   ref={fileRef}
                   type="file"
                   accept="application/pdf,.pdf"
+                  multiple
                   className="hidden"
-                  onChange={(e) => { uploadPDF(e.target.files?.[0]); e.target.value = ""; }}
+                  onChange={(e) => { uploadPDFs(e.target.files); e.target.value = ""; }}
                 />
               </div>
             </div>
 
-            {arquivoNome && (
-              <div className="mt-4 flex items-center gap-2 bg-torg-blue-50/50 border border-torg-blue-100 rounded-lg px-3 py-2">
-                <FileText size={16} className="text-torg-blue flex-shrink-0" />
-                <p className="text-sm text-torg-dark flex-1 truncate">{arquivoNome}</p>
-                <button
-                  type="button"
-                  onClick={() => { setArquivoNome(""); setParseInfo(null); }}
-                  className="text-gray-400 hover:text-red-600 flex-shrink-0"
-                  title="Remover"
-                >
-                  <X size={14} />
-                </button>
+            {arquivosSessao.length > 0 && (
+              <div className="mt-4 space-y-1.5">
+                {arquivosSessao.map((nome, i) => (
+                  <div key={`${nome}-${i}`} className="flex items-center gap-2 bg-emerald-50/60 border border-emerald-200 rounded-lg px-3 py-2">
+                    <FileText size={16} className="text-emerald-700 flex-shrink-0" />
+                    <p className="text-sm text-torg-dark flex-1 truncate">{nome}</p>
+                    <span className="text-[10px] text-emerald-700 font-medium uppercase">enviado</span>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -517,6 +574,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <p className="text-torg-dark">
                       ✓ <strong>{parseInfo.match}</strong> {parseInfo.match === 1 ? "item preenchido" : "itens preenchidos"} automaticamente
+                      {parseInfo.nomeArquivo && parseInfo.multiPdf && (
+                        <span className="text-torg-gray"> (lido de <strong>{parseInfo.nomeArquivo}</strong>; os outros PDFs ficaram apenas como anexo)</span>
+                      )}
                       {parseInfo.total > parseInfo.match && (
                         <span className="text-torg-gray"> ({parseInfo.total - parseInfo.match} item(s) do PDF não casaram com a RM — preencha manualmente)</span>
                       )}.
@@ -800,8 +860,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
 }
 
 // Linha de anexo da cotacao com botao remover (so o fornecedor ve e remove).
-function AnexoCotacaoLinha({ anexo, token }) {
-  const router = useRouter();
+function AnexoCotacaoLinha({ anexo, token, onRemoved }) {
   const [removendo, setRemovendo] = useState(false);
   const tamMb = anexo.tamanho ? (anexo.tamanho / (1024 * 1024)).toFixed(2) : null;
   const remover = async () => {
@@ -813,7 +872,7 @@ function AnexoCotacaoLinha({ anexo, token }) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || "Erro");
       }
-      router.refresh();
+      onRemoved?.(anexo.id);
     } catch (e) {
       alert("Falha ao remover: " + e.message);
       setRemovendo(false);
