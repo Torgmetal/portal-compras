@@ -5,6 +5,7 @@ import { Bell, Plus, Trash2, AlertCircle, Loader2, Mail } from "lucide-react";
 
 const EVENTOS = [
   { codigo: "RM_CRIADA", label: "Nova RM criada", descricao: "Quando alguém sobe uma RM nova pra cotação" },
+  { codigo: "COTACAO_RESPONDIDA", label: "Fornecedor respondeu cotação", descricao: "Quando um fornecedor envia ou atualiza a proposta dele" },
 ];
 
 export default function NotificacoesClient({ inscritosIniciais }) {

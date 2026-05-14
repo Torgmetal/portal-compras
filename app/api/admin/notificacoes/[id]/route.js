@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
-const EVENTOS_VALIDOS = ["RM_CRIADA"];
+const EVENTOS_VALIDOS = ["RM_CRIADA", "COTACAO_RESPONDIDA"];
 
 const patchSchema = z.object({
   nome: z.string().optional().nullable(),

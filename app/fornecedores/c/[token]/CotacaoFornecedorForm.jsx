@@ -27,7 +27,7 @@ function parseObservacao(obs) {
   return { prazoEntrega, condicaoPagamento, observacao: restos.join(" | ") };
 }
 
-export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao: anexosCotacaoInicial = [], vencida }) {
+export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao: anexosCotacaoInicial = [], vencida, faturamento = null }) {
   const router = useRouter();
   const jaEnviou = cotacao.status === "RECEBIDA";
   const obsParsed = parseObservacao(cotacao.observacao);
@@ -473,6 +473,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
           </div>
         )}
 
+        {/* Dados de FATURAMENTO — quem o fornecedor deve emitir a NF para */}
+        {faturamento && (
+          <PainelFaturamento faturamento={faturamento} />
+        )}
+
         {vencida && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700 flex items-start gap-2">
             <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
@@ -860,6 +865,104 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
 }
 
 // Linha de anexo da cotacao com botao remover (so o fornecedor ve e remove).
+// Painel de dados de faturamento — mostra pra quem o fornecedor deve emitir
+// a NF (Torg quando faturamento padrao, ou cliente da OP quando faturamento direto).
+function PainelFaturamento({ faturamento }) {
+  const [copiado, setCopiado] = useState(null);
+  const isCliente = faturamento.tipo === "Cliente";
+
+  const copiar = async (label, valor) => {
+    if (!valor) return;
+    try {
+      await navigator.clipboard.writeText(valor);
+      setCopiado(label);
+      setTimeout(() => setCopiado(null), 1500);
+    } catch { /* sem feedback */ }
+  };
+
+  const Linha = ({ label, valor }) => {
+    if (!valor) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => copiar(label, valor)}
+        className="w-full flex items-start gap-2 py-1.5 px-2 -mx-2 rounded hover:bg-white/60 text-left transition-colors group"
+        title={`Clique pra copiar: ${valor}`}
+      >
+        <span className={`text-xs flex-shrink-0 w-32 ${isCliente ? "text-amber-700" : "text-torg-blue"} font-medium`}>
+          {label}
+        </span>
+        <span className="text-sm text-torg-dark flex-1 break-words font-medium">{valor}</span>
+        <span className="text-[10px] text-torg-gray opacity-0 group-hover:opacity-100 flex-shrink-0 mt-0.5">
+          {copiado === label ? "✓ copiado" : "copiar"}
+        </span>
+      </button>
+    );
+  };
+
+  return (
+    <div className={`rounded-2xl border p-5 sm:p-6 ${
+      isCliente
+        ? "bg-amber-50/60 border-amber-300"
+        : "bg-torg-blue-50/40 border-torg-blue-200"
+    }`}>
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+        <div>
+          <h2 className={`text-base font-semibold inline-flex items-center gap-2 ${
+            isCliente ? "text-amber-800" : "text-torg-blue"
+          }`}>
+            <FileText size={18} /> Dados de Faturamento
+          </h2>
+          <p className={`text-xs mt-0.5 ${isCliente ? "text-amber-700/90" : "text-torg-blue/80"}`}>
+            {isCliente
+              ? `Faturamento DIRETO pelo cliente final da obra. A nota fiscal deve ser emitida em nome do cliente abaixo, NÃO em nome da Torg.`
+              : `A nota fiscal deve ser emitida em nome da Torg Metal (dados abaixo).`}
+          </p>
+        </div>
+        <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
+          isCliente
+            ? "bg-amber-200 text-amber-900"
+            : "bg-torg-blue-100 text-torg-blue"
+        }`}>
+          {isCliente ? "Faturamento Direto" : "Faturamento Torg"}
+        </span>
+      </div>
+
+      {isCliente && faturamento.opNumero && (
+        <p className="text-xs text-amber-700 bg-amber-100/70 border border-amber-200 rounded px-3 py-2 mb-3">
+          Referente à <strong>OP {faturamento.opNumero}</strong>
+          {faturamento.opObra ? ` — obra "${faturamento.opObra}"` : ""}
+        </p>
+      )}
+
+      <div className="bg-white border border-gray-200 rounded-lg p-3 divide-y divide-gray-100">
+        <Linha label="Razão Social" valor={faturamento.razaoSocial} />
+        <Linha label="CNPJ" valor={faturamento.cnpj} />
+        <Linha label="Inscrição Estadual" valor={faturamento.inscricaoEstadual} />
+        <Linha label="Endereço" valor={[
+          faturamento.endereco,
+          faturamento.bairro,
+        ].filter(Boolean).join(", ")} />
+        <Linha label="Cidade/UF" valor={[
+          faturamento.cidade,
+          faturamento.uf,
+        ].filter(Boolean).join(" / ")} />
+        <Linha label="CEP" valor={faturamento.cep} />
+        {isCliente && <Linha label="Contato" valor={faturamento.contato} />}
+        <Linha label="E-mail" valor={faturamento.email} />
+        <Linha label="Telefone" valor={faturamento.telefone} />
+      </div>
+
+      {isCliente && !faturamento.razaoSocial && (
+        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2 mt-3">
+          ⚠️ Faturamento direto, mas o cliente desta OP ainda não tem dados fiscais cadastrados.
+          Contate o comprador da Torg pra confirmar antes de emitir a nota.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function AnexoCotacaoLinha({ anexo, token, onRemoved }) {
   const [removendo, setRemovendo] = useState(false);
   const tamMb = anexo.tamanho ? (anexo.tamanho / (1024 * 1024)).toFixed(2) : null;

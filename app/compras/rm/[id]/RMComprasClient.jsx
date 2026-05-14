@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
-  CheckCircle2, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
+  CheckCircle2, Check, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
   Upload, Sparkles,
 } from "lucide-react";
 import {
@@ -1872,28 +1872,25 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
 
 function ModalLinksEnvio({ rm, links, onClose }) {
   const [copiado, setCopiado] = useState(null);
+  const [enviandoEmail, setEnviandoEmail] = useState(null);
+  const [emailEnviado, setEmailEnviado] = useState(new Set());
+  const [erroEmail, setErroEmail] = useState(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  const corpoEmail = (link) => {
-    return [
-      "Olá,",
-      "",
-      `Solicitamos cotação para a Requisição ${rm.numero} (${rm.descricao}).`,
-      "",
-      `Acesse o link abaixo para visualizar os itens e enviar sua proposta diretamente:`,
-      "",
-      link,
-      "",
-      "Atenciosamente,",
-      "Torg Metal",
-    ].join("\n");
-  };
-
-  const abrirEmail = (cot) => {
-    const link = `${baseUrl}/fornecedores/c/${cot.token}`;
-    const subject = encodeURIComponent(`Solicitação de Cotação — RM ${rm.numero}`);
-    const body = encodeURIComponent(corpoEmail(link));
-    window.location.href = `mailto:${cot.fornecedorEmail}?subject=${subject}&body=${body}`;
+  // Envia direto via Resend (servidor) — link clicavel como hiperlink HTML.
+  const enviarEmail = async (cot) => {
+    setEnviandoEmail(cot.id);
+    setErroEmail(null);
+    try {
+      const res = await fetch(`/api/cotacao/${cot.id}/enviar-email`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha no envio");
+      setEmailEnviado((prev) => new Set(prev).add(cot.id));
+    } catch (e) {
+      setErroEmail({ id: cot.id, msg: e.message });
+    } finally {
+      setEnviandoEmail(null);
+    }
   };
 
   const copiarLink = async (cot) => {
@@ -1909,35 +1906,53 @@ function ModalLinksEnvio({ rm, links, onClose }) {
         <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg p-3 text-sm text-torg-dark">
           <p className="font-medium">✓ Cotações criadas com sucesso</p>
           <p className="text-xs text-torg-gray mt-1">
-            Clique em "Abrir email" pra cada fornecedor — vai abrir o Outlook com mensagem pré-formatada
-            e o link único de cada um. Você também pode só copiar o link e enviar por WhatsApp/outro canal.
+            Clique em "Enviar email" pra disparar a notificação automaticamente pro fornecedor.
+            O link vai como hiperlink clicável. Também pode copiar o link e enviar por WhatsApp.
           </p>
         </div>
 
         <ul className="space-y-2">
           {links.map((cot) => (
-            <li key={cot.id} className="border border-gray-200 rounded-lg p-3 flex items-center gap-3 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-torg-dark">{cot.fornecedorNome}</p>
-                <p className="text-xs text-torg-gray truncate">{cot.fornecedorEmail}</p>
-                <p className="text-[10px] text-torg-gray font-mono mt-0.5 truncate">
-                  /fornecedores/c/{cot.token.slice(0, 8)}...
-                </p>
+            <li key={cot.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-torg-dark">{cot.fornecedorNome}</p>
+                  <p className="text-xs text-torg-gray truncate">{cot.fornecedorEmail}</p>
+                  <p className="text-[10px] text-torg-gray font-mono mt-0.5 truncate">
+                    /fornecedores/c/{cot.token.slice(0, 8)}...
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => copiarLink(cot)}
+                    className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 font-medium"
+                  >
+                    {copiado === cot.id ? "✓ copiado" : "Copiar link"}
+                  </button>
+                  <button
+                    onClick={() => enviarEmail(cot)}
+                    disabled={enviandoEmail === cot.id || emailEnviado.has(cot.id)}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium inline-flex items-center gap-1 disabled:opacity-60 ${
+                      emailEnviado.has(cot.id)
+                        ? "bg-emerald-600 text-white"
+                        : "bg-torg-blue text-white hover:bg-torg-blue-700"
+                    }`}
+                  >
+                    {enviandoEmail === cot.id ? (
+                      <><Loader2 size={12} className="animate-spin" /> Enviando...</>
+                    ) : emailEnviado.has(cot.id) ? (
+                      <><Check size={12} /> Enviado</>
+                    ) : (
+                      <><Mail size={12} /> Enviar email</>
+                    )}
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => copiarLink(cot)}
-                  className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 font-medium"
-                >
-                  {copiado === cot.id ? "✓ copiado" : "Copiar link"}
-                </button>
-                <button
-                  onClick={() => abrirEmail(cot)}
-                  className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
-                >
-                  <Mail size={12} /> Abrir email
-                </button>
-              </div>
+              {erroEmail?.id === cot.id && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-[11px] rounded px-2 py-1">
+                  ✗ {erroEmail.msg}
+                </div>
+              )}
             </li>
           ))}
         </ul>

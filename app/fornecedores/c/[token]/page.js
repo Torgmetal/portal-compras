@@ -1,6 +1,7 @@
 import MarketingShell from "@/components/MarketingShell";
 import { Lock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { DADOS_TORG } from "@/lib/empresa";
 import CotacaoFornecedorForm from "./CotacaoFornecedorForm";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,20 @@ export default async function CotacaoPorToken({ params }) {
   const cotacao = await prisma.cotacao.findUnique({
     where: { token: params.token },
     include: {
-      rm: { select: { id: true, numero: true, descricao: true, observacao: true } },
+      rm: {
+        select: {
+          id: true, numero: true, descricao: true, observacao: true,
+          op: {
+            select: {
+              numero: true, cliente: true, obra: true,
+              clienteRazaoSocial: true, clienteCnpj: true, clienteIE: true,
+              clienteEndereco: true, clienteCidade: true, clienteUF: true,
+              clienteCep: true, clienteContato: true, clienteEmail: true,
+              clienteTelefone: true,
+            },
+          },
+        },
+      },
       itens: {
         include: {
           rmItem: {
@@ -97,12 +111,51 @@ export default async function CotacaoPorToken({ params }) {
   const anexosRMData = JSON.parse(JSON.stringify(anexosRM));
   const anexosCotacaoData = JSON.parse(JSON.stringify(anexosCotacao));
 
+  // Monta dados de faturamento. Se cotacao.faturamento === "Cliente" e a OP
+  // vinculada tem dados fiscais preenchidos, mostra o cliente. Senao, Torg.
+  let faturamento;
+  if (cotacao.faturamento === "Cliente" && cotacao.rm?.op?.clienteRazaoSocial) {
+    const op = cotacao.rm.op;
+    faturamento = {
+      tipo: "Cliente",
+      razaoSocial: op.clienteRazaoSocial,
+      cnpj: op.clienteCnpj,
+      inscricaoEstadual: op.clienteIE,
+      endereco: op.clienteEndereco,
+      cidade: op.clienteCidade,
+      uf: op.clienteUF,
+      cep: op.clienteCep,
+      contato: op.clienteContato,
+      email: op.clienteEmail,
+      telefone: op.clienteTelefone,
+      opNumero: op.numero,
+      opCliente: op.cliente,
+      opObra: op.obra,
+    };
+  } else {
+    faturamento = {
+      tipo: "Torg",
+      razaoSocial: DADOS_TORG.razaoSocial,
+      nomeFantasia: DADOS_TORG.nomeFantasia,
+      cnpj: DADOS_TORG.cnpj,
+      inscricaoEstadual: DADOS_TORG.inscricaoEstadual,
+      endereco: DADOS_TORG.endereco,
+      bairro: DADOS_TORG.bairro,
+      cidade: DADOS_TORG.cidade,
+      uf: DADOS_TORG.uf,
+      cep: DADOS_TORG.cep,
+      email: DADOS_TORG.email,
+      telefone: DADOS_TORG.telefone,
+    };
+  }
+
   return (
     <CotacaoFornecedorForm
       cotacao={data}
       anexos={anexosRMData}
       anexosCotacao={anexosCotacaoData}
       vencida={vencida}
+      faturamento={faturamento}
     />
   );
 }

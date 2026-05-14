@@ -344,6 +344,9 @@ function ModalLinksGerados({ payload, onClose }) {
   const cotacoes = payload?.cotacoes || [];
   const rmsNumeros = payload?.rmsNumeros || [];
   const [copiado, setCopiado] = useState(null);
+  const [enviandoEmail, setEnviandoEmail] = useState(null);
+  const [emailEnviado, setEmailEnviado] = useState(new Set());
+  const [erroEmail, setErroEmail] = useState(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const linkOf = (cot) => `${baseUrl}/fornecedores/c/${cot.token}`;
@@ -364,10 +367,20 @@ function ModalLinksGerados({ payload, onClose }) {
     }
   };
 
-  const abrirEmail = (cot) => {
-    const subject = `Solicitação de Cotação — RMs ${rmsNumeros.join(" + ")}`;
-    const body = `Olá ${cot.fornecedorNome},\n\nSegue link único pra envio da proposta:\n\n${linkOf(cot)}\n\nNo link você verá os itens consolidados das RMs ${rmsNumeros.join(", ")}.\n\nObrigado!\nTorg Metal`;
-    window.location.href = `mailto:${cot.fornecedorEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // Envia o email via Resend (servidor) — link vai como hiperlink HTML clicavel.
+  const enviarEmail = async (cot) => {
+    setEnviandoEmail(cot.id);
+    setErroEmail(null);
+    try {
+      const res = await fetch(`/api/cotacao/${cot.id}/enviar-email`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha no envio");
+      setEmailEnviado((prev) => new Set(prev).add(cot.id));
+    } catch (e) {
+      setErroEmail({ id: cot.id, msg: e.message });
+    } finally {
+      setEnviandoEmail(null);
+    }
   };
 
   return (
@@ -416,13 +429,29 @@ function ModalLinksGerados({ payload, onClose }) {
                     <ExternalLink size={12} /> Abrir
                   </a>
                   <button
-                    onClick={() => abrirEmail(cot)}
-                    className="px-3 py-1.5 text-xs bg-torg-blue text-white hover:bg-torg-blue-700 rounded font-medium inline-flex items-center gap-1"
+                    onClick={() => enviarEmail(cot)}
+                    disabled={enviandoEmail === cot.id || emailEnviado.has(cot.id)}
+                    className={`px-3 py-1.5 text-xs rounded font-medium inline-flex items-center gap-1 disabled:opacity-60 ${
+                      emailEnviado.has(cot.id)
+                        ? "bg-emerald-600 text-white"
+                        : "bg-torg-blue text-white hover:bg-torg-blue-700"
+                    }`}
                   >
-                    <Mail size={12} /> Email
+                    {enviandoEmail === cot.id ? (
+                      <><Loader2 size={12} className="animate-spin" /> Enviando...</>
+                    ) : emailEnviado.has(cot.id) ? (
+                      <><Check size={12} /> Enviado</>
+                    ) : (
+                      <><Mail size={12} /> Enviar email</>
+                    )}
                   </button>
                 </div>
               </div>
+              {erroEmail?.id === cot.id && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-[11px] rounded px-2 py-1">
+                  ✗ {erroEmail.msg}
+                </div>
+              )}
               <div className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 font-mono text-[11px] text-torg-gray break-all">
                 {linkOf(cot)}
               </div>

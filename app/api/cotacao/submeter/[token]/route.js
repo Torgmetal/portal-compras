@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
+import { notificarEvento } from "@/lib/email";
 
 const itemSchema = z.object({
   cotacaoItemId: z.string().min(1),
@@ -166,6 +167,66 @@ export async function POST(req, { params }) {
       },
     });
   });
+
+  // Notifica os inscritos no evento COTACAO_RESPONDIDA. Best-effort, nao bloqueia.
+  // Busca RMs envolvidas via CotacaoItem -> RMItem -> RM pra montar contexto.
+  (async () => {
+    try {
+      const cotItens = await prisma.cotacaoItem.findMany({
+        where: { cotacaoId: cotacao.id },
+        select: { rmItem: { select: { rm: { select: { id: true, numero: true } } } } },
+      });
+      const rmsMap = new Map();
+      for (const ci of cotItens) {
+        const rm = ci.rmItem?.rm;
+        if (rm) rmsMap.set(rm.id, rm.numero);
+      }
+      const rmsNumeros = Array.from(rmsMap.values()).sort();
+      const rotuloRMs = rmsNumeros.length === 1
+        ? `RM ${rmsNumeros[0]}`
+        : `RMs ${rmsNumeros.join(", ")}`;
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace-torg.vercel.app";
+      const linkRM = rmsMap.size === 1
+        ? `${baseUrl}/compras/rm/${[...rmsMap.keys()][0]}`
+        : `${baseUrl}/compras`;
+      const totalFmt = total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+      await notificarEvento({
+        evento: "COTACAO_RESPONDIDA",
+        subject: `[Compras] ${eRevisao ? "Revisão de" : "Nova"} proposta — ${cotacao.fornecedorNome} (${rotuloRMs})`,
+        html: `
+          <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0a3a5c;">
+              ${eRevisao ? "Revisão de proposta recebida" : "Nova proposta recebida"}
+            </h2>
+            <p style="color: #4a5568;">
+              <strong>${cotacao.fornecedorNome}</strong> ${eRevisao ? "atualizou" : "enviou"} a proposta de cotação.
+            </p>
+            <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+              <tr><td style="padding: 6px 0; color: #718096;">Fornecedor</td><td style="padding: 6px 0;"><strong>${cotacao.fornecedorNome}</strong></td></tr>
+              <tr><td style="padding: 6px 0; color: #718096;">RM(s)</td><td style="padding: 6px 0;"><strong>${rotuloRMs}</strong></td></tr>
+              <tr><td style="padding: 6px 0; color: #718096;">Total da proposta</td><td style="padding: 6px 0;"><strong>${totalFmt}</strong></td></tr>
+              <tr><td style="padding: 6px 0; color: #718096;">Itens preenchidos</td><td style="padding: 6px 0;">${itensValidos.length}</td></tr>
+              ${eRevisao ? `<tr><td style="padding: 6px 0; color: #718096;">Revisão</td><td style="padding: 6px 0;"><strong>#${cotacao.numeroRevisao + 1}</strong></td></tr>` : ""}
+            </table>
+            <p style="margin-top: 24px;">
+              <a href="${linkRM}" style="background: #1976d2; color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+                Abrir RM no Workspace Torg
+              </a>
+            </p>
+            <p style="color: #a0aec0; font-size: 12px; margin-top: 24px;">
+              Você está inscrito nas notificações de cotações respondidas.
+              Pra parar, peça pra um admin remover seu email em /admin/notificacoes.
+            </p>
+          </div>
+        `,
+        text: `${cotacao.fornecedorNome} ${eRevisao ? "atualizou" : "enviou"} proposta da ${rotuloRMs}.\n` +
+              `Total: ${totalFmt}\nItens: ${itensValidos.length}\n${eRevisao ? `Revisao: #${cotacao.numeroRevisao + 1}\n` : ""}\nAcesse: ${linkRM}`,
+      });
+    } catch (e) {
+      console.error("[notificar COTACAO_RESPONDIDA] erro:", e?.message);
+    }
+  })();
 
   return NextResponse.json({
     ok: true,

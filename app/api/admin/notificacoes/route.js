@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
-const EVENTOS_VALIDOS = ["RM_CRIADA"];
+const EVENTOS_VALIDOS = ["RM_CRIADA", "COTACAO_RESPONDIDA"];
 
 const schema = z.object({
   email: z.string().email(),
