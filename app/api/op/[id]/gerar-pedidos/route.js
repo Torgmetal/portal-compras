@@ -165,16 +165,29 @@ export async function POST(req, { params }) {
 
     // Indica se houve algum item com IPI > 0 — pra adicionar nota na observacao
     const temIPI = linhas.some((l) => Number(l.cotItem.ipiPct) > 0);
-    // cNumPedido tem limite de tamanho no Omie — quando multi-RM, usa "RM1+N"
-    const cNumPedido =
-      rmNumeros.length === 1
+    // Detecta se TODOS os itens deste grupo sao destinoEstoque (compra pra
+    // estoque torg). Nesse caso, o pedido no Omie nao cita OP especifica —
+    // entra como compra consolidada.
+    const todosEstoque = linhas.every((l) => l.rmItem.destinoEstoque === true);
+    // cNumPedido tem limite de tamanho no Omie
+    let cNumPedido;
+    if (todosEstoque && !isFD) {
+      // Compra pra estoque: nao cita OP, usa RM como referencia
+      cNumPedido = rmNumeros.length === 1
+        ? `EST-${rmNumeros[0]}`
+        : `EST-${rmNumeros[0]}+${rmNumeros.length - 1}`;
+    } else {
+      cNumPedido = rmNumeros.length === 1
         ? `${rmNumeros[0]}${isFD ? "-FD" : ""}`
         : `${rmNumeros[0]}+${rmNumeros.length - 1}${isFD ? "-FD" : ""}`;
+    }
     const observacaoBase = [
-      rmNumeros.length === 1
+      todosEstoque && !isFD
+        ? `Compra consolidada pro estoque — RMs ${rmNumeros.join(", ")}`
+        : rmNumeros.length === 1
         ? `Pedido via Workspace Torg — RM ${rmNumeros[0]}`
         : `Pedido via Workspace Torg — RMs ${rmNumeros.join(", ")}`,
-      `Cliente: ${op.cliente}`,
+      todosEstoque && !isFD ? null : `Cliente: ${op.cliente}`,
       isFD ? "FATURAMENTO DIRETO — encerrar sem contas a pagar" : null,
       temIPI ? "Preço unitário inclui IPI (para bater total com NF do fornecedor)" : null,
       totalAjustado ? `Preços ajustados pro total bater com proposta do fornecedor (R$ ${totalProposta.toFixed(2)})` : null,

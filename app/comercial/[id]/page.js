@@ -186,6 +186,45 @@ export default async function OPDetailPage({ params }) {
   // Transformar pra plain object (Date → string)
   const opData = JSON.parse(JSON.stringify(op));
   opData.cobertura = cobertura;
+
+  // Materiais de estoque (cat 3.1) reservados/consumidos por essa OP
+  try {
+    const reservas = await prisma.estoqueReserva.findMany({
+      where: { opId: op.id, status: { in: ["ATIVA", "CONCLUIDA"] } },
+      include: { itemEstoque: true },
+    });
+    const alocacoes = await prisma.estoqueAlocacao.findMany({
+      where: { opId: op.id },
+    });
+    const valorConsumido = alocacoes.reduce((s, a) => s + (a.valorCMC || 0), 0);
+    const porItem = new Map();
+    for (const r of reservas) {
+      const k = r.itemEstoqueId;
+      if (!porItem.has(k)) {
+        porItem.set(k, {
+          itemId: r.itemEstoqueId,
+          descricao: r.itemEstoque.descricao,
+          codigoOmie: r.itemEstoque.codigoOmie,
+          unidade: r.itemEstoque.unidade,
+          cmc: r.itemEstoque.cmc,
+          reservado: 0,
+          consumido: 0,
+        });
+      }
+      const acc = porItem.get(k);
+      acc.reservado += r.qtdReservada;
+      acc.consumido += r.qtdConsumida;
+    }
+    opData.materiaisEstoque = {
+      itens: Array.from(porItem.values()),
+      valorConsumido,
+      totalReservado: Array.from(porItem.values()).reduce((s, i) => s + i.reservado, 0),
+      totalConsumido: Array.from(porItem.values()).reduce((s, i) => s + i.consumido, 0),
+    };
+  } catch (e) {
+    console.error("[comercial/[id]] materiais estoque:", e?.message);
+    opData.materiaisEstoque = { itens: [], valorConsumido: 0, totalReservado: 0, totalConsumido: 0 };
+  }
   opData.kpisFinanceiros = {
     verbaTotal, totalEmPedidos, saldo, consumoPct,
     receitaBruta, totalImpostos, receitaLiquida,

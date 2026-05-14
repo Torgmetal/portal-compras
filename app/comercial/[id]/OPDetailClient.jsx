@@ -549,6 +549,60 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         </div>
       )}
 
+      {/* Materiais de Estoque (cat 3.1) — consumo e reservas */}
+      {op.materiaisEstoque && op.materiaisEstoque.itens.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="text-lg font-semibold text-torg-dark">
+                Materiais de Estoque ({op.materiaisEstoque.itens.length})
+              </h3>
+              <p className="text-xs text-torg-gray mt-0.5">
+                Matéria prima (cat. 3.1) reservada via RM e consumida pelo Syneco. CMC vigente do Omie.
+              </p>
+            </div>
+            <div className="text-right text-xs">
+              <p className="text-torg-gray">Consumido (CMC)</p>
+              <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums">
+                {fmtMoeda(op.materiaisEstoque.valorConsumido)}
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">CMC</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Reservado</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Consumido</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Saldo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {op.materiaisEstoque.itens.map((it) => {
+                  const saldo = it.reservado - it.consumido;
+                  return (
+                    <tr key={it.itemId} className="hover:bg-gray-50">
+                      <td className="px-4 py-2">
+                        <span className="font-mono text-[10px] text-torg-gray mr-1">{it.codigoOmie}</span>
+                        <span className="text-torg-dark text-xs">{it.descricao}</span>
+                      </td>
+                      <td className="px-4 py-2 text-right text-torg-gray text-xs tabular-nums">{fmtMoeda(it.cmc)}</td>
+                      <td className="px-4 py-2 text-right text-torg-dark tabular-nums whitespace-nowrap">{Number(it.reservado).toFixed(2)} {it.unidade}</td>
+                      <td className="px-4 py-2 text-right text-amber-700 tabular-nums whitespace-nowrap">{Number(it.consumido).toFixed(2)} {it.unidade}</td>
+                      <td className={`px-4 py-2 text-right tabular-nums whitespace-nowrap font-semibold ${saldo > 0 ? "text-emerald-700" : "text-torg-gray"}`}>
+                        {Number(saldo).toFixed(2)} {it.unidade}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Receitas do contrato */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">

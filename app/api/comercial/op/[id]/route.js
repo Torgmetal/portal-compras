@@ -52,6 +52,18 @@ export async function PATCH(req, { params }) {
 
     const updated = await prisma.oP.update({ where: { id: params.id }, data: dataUpdate });
 
+    // Quando OP eh ENCERRADA ou CANCELADA: cancela reservas de estoque
+    // ativas dessa OP — qty volta pro estoque livre.
+    if (parsed.acao === "finalizar" || parsed.acao === "cancelar") {
+      const motivo = parsed.acao === "finalizar"
+        ? `OP encerrada em ${new Date().toLocaleDateString("pt-BR")}`
+        : `OP cancelada em ${new Date().toLocaleDateString("pt-BR")}`;
+      await prisma.estoqueReserva.updateMany({
+        where: { opId: op.id, status: "ATIVA" },
+        data: { status: "CANCELADA", cancelMotivo: motivo },
+      }).catch((e) => console.error("[op finalizar - cancelar reservas]", e?.message));
+    }
+
     await prisma.auditLog.create({
       data: {
         userId: user.id,

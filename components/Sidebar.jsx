@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { BarChart3, PlusCircle, Package, FolderKanban, Bell, Building2, Boxes, LogOut } from "lucide-react";
+import { BarChart3, PlusCircle, Package, FolderKanban, Bell, Building2, Boxes, Layers, LogOut } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
@@ -10,6 +10,7 @@ const menu = [
   { href: "/compras", label: "Painel de Compras", icon: BarChart3, exact: true },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/estoque", label: "Estoque", icon: Boxes },
+  { href: "/compras/materiais", label: "Materiais por OP", icon: Layers },
   { href: "/compras/vendorlist", label: "Vendor List", icon: Building2 },
   { href: "/compras/catalogo", label: "Catálogo", icon: Package },
   { href: "/compras/notificacoes", label: "Notificações", icon: Bell, masterOnly: true },
