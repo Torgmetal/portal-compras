@@ -35,31 +35,41 @@ export async function POST(req, { params }) {
     },
   });
 
-  // Mapa rmItemId -> lista de CotacaoItens (de qualquer cotacao que tem esse item)
+  // Mapa rmItemId -> lista de { ci, faturamento } (faturamento e crucial pra
+  // saber se usa liquido ou bruto+IPI no criterio de menor preco)
   const cotItensPorRmItem = new Map();
   for (const cot of cotacoes) {
+    const faturamentoCliente = cot.faturamento === "Cliente";
     for (const ci of cot.itens) {
       if (!ci.precoUnit || ci.precoUnit <= 0) continue;
       if (!cotItensPorRmItem.has(ci.rmItemId)) cotItensPorRmItem.set(ci.rmItemId, []);
-      cotItensPorRmItem.get(ci.rmItemId).push(ci);
+      cotItensPorRmItem.get(ci.rmItemId).push({ ci, faturamentoCliente });
     }
   }
 
-  // Pra cada RMItem, encontra o CotacaoItem com menor preço líquido
+  // Pra cada RMItem, escolhe o vencedor pelo CRITERIO CORRETO baseado no
+  // faturamento de CADA cotacao candidata:
+  // - Faturamento "Cliente" (Direto): compara pelo BRUTO + IPI (sem credito
+  //   de ICMS — a nota nao vai pra Torg)
+  // - Faturamento "Torg": compara pelo LIQUIDO (com credito de ICMS)
+  // O preco usado pra comparar e o "custo efetivo Torg" em cada cenario.
   const escolhas = []; // { rmItemId, cotacaoItemIdVencedor }
   for (const rm of op.rms) {
     for (const rmItem of rm.itens) {
       const candidatos = cotItensPorRmItem.get(rmItem.id) || [];
       if (candidatos.length === 0) continue;
       let melhor = null;
-      let melhorLiquido = null;
-      for (const ci of candidatos) {
+      let melhorComparacao = null;
+      for (const { ci, faturamentoCliente } of candidatos) {
         const icms = Number(ci.icmsPct) || 0;
         const ipi = Number(ci.ipiPct) || 0;
-        // Compara pelo líquido (custo Torg) — ICMS por dentro + IPI por fora
-        const liquido = ci.precoUnit * (1 - icms / 100) * (1 + ipi / 100);
-        if (melhorLiquido === null || liquido < melhorLiquido) {
-          melhorLiquido = liquido;
+        // Se Faturamento Direto: ignora ICMS (nao vira credito), so soma IPI.
+        // Se Faturamento Torg: subtrai ICMS (vira credito), soma IPI.
+        const valorComparacao = faturamentoCliente
+          ? ci.precoUnit * (1 + ipi / 100)
+          : ci.precoUnit * (1 - icms / 100) * (1 + ipi / 100);
+        if (melhorComparacao === null || valorComparacao < melhorComparacao) {
+          melhorComparacao = valorComparacao;
           melhor = ci;
         }
       }

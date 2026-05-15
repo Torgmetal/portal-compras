@@ -291,15 +291,15 @@ export default function MapaCotacaoClient({ op }) {
         const precoUnit = Number(cell.precoUnit) || 0;
         // Valor da nota = bruto × (1 + IPI%) — bate com "Preço total" do PDF
         const valorNota = precoUnit * qtd * (1 + ipiPct / 100);
-        // Valor liquido = custo real Torg apos creditar ICMS
-        const valorLiquido = (cell.precoLiquido || precoUnit) * qtd;
+        // Custo efetivo Torg — depende do faturamento:
+        // - Fat Direto: igual ao valor da nota (sem credito ICMS)
+        // - Fat Torg: liquido (com credito ICMS)
+        const custoEfetivo = (cell.precoComparacao || cell.precoLiquido || precoUnit) * qtd;
         totaisPorFornecedor[cell.cotacaoId] += valorNota;
-        totaisLiquidoPorFornecedor[cell.cotacaoId] += valorLiquido;
+        totaisLiquidoPorFornecedor[cell.cotacaoId] += custoEfetivo;
         if (it.jaPedido) totalEmPedidos += valorNota;
         else if (!it.cancelado) totalAGerar += valorNota;
-        totalLiquidoGeral += valorLiquido;
-        // So inclui em itensPorFornecedor (lista pra gerar pedido) o que ainda
-        // nao virou pedido nem foi cancelado — gerar de novo daria duplicidade.
+        totalLiquidoGeral += custoEfetivo;
         if (!it.jaPedido && !it.cancelado) {
           itensPorFornecedor[cell.cotacaoId].push({
             descricao: it.descricao,
@@ -307,10 +307,12 @@ export default function MapaCotacaoClient({ op }) {
             unidade: it.unidade,
             precoUnit: cell.precoUnit,
             precoLiquido: cell.precoLiquido,
+            precoComparacao: cell.precoComparacao,
+            faturamentoDireto: cell.faturamentoDireto,
             icmsPct: cell.icmsPct,
             ipiPct: cell.ipiPct,
             total: valorNota,
-            totalLiquido: valorLiquido,
+            totalLiquido: custoEfetivo,
           });
         }
       }
@@ -351,7 +353,7 @@ export default function MapaCotacaoClient({ op }) {
           </h3>
           <p className="text-xs text-torg-gray mt-1">
             Click na célula pra escolher vencedor por item, ou no nome do fornecedor pra marcar todos dele.
-            Use "Sugerir menor preço" pra preencher rapidamente.
+            Fornecedores marcados <span className="font-bold text-amber-700">FD</span> (Faturamento Direto) são comparados pelo bruto+IPI — ICMS não vira crédito pra Torg.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -435,8 +437,16 @@ export default function MapaCotacaoClient({ op }) {
                         : "Click pra marcar todos os itens deste fornecedor como vencedores"
                     }
                   >
-                    <div className="flex items-center justify-center gap-1">
-                      {f.fornecedorNome}
+                    <div className="flex items-center justify-center gap-1 flex-wrap">
+                      <span>{f.fornecedorNome}</span>
+                      {f.faturamentoDireto && (
+                        <span
+                          className="text-[8px] px-1 py-0.5 rounded bg-amber-200 text-amber-900 font-bold leading-none"
+                          title="Faturamento Direto — comparação pelo BRUTO+IPI (sem crédito ICMS pra Torg)"
+                        >
+                          FD
+                        </span>
+                      )}
                       {isLoading && <Loader2 size={10} className="animate-spin" />}
                     </div>
                     {totalCells > 0 && (
@@ -451,13 +461,14 @@ export default function MapaCotacaoClient({ op }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {itens.map((it) => {
-              // Compara pelo líquido pra ser justo entre regimes diferentes.
-              // Cai pro bruto quando líquido não calculado (sem ICMS/IPI).
-              const liquidos = it.celulas
+              // Marca o "menor" usando precoComparacao — que ja respeita
+              // o faturamento de cada celula (Fat Direto = bruto+IPI;
+              // Fat Torg = liquido com credito ICMS).
+              const comparacoes = it.celulas
                 .filter(Boolean)
-                .map((c) => c.precoLiquido || c.precoUnit)
+                .map((c) => c.precoComparacao || c.precoLiquido || c.precoUnit)
                 .filter((p) => p > 0);
-              const menorLiquido = liquidos.length ? Math.min(...liquidos) : null;
+              const menorLiquido = comparacoes.length ? Math.min(...comparacoes) : null;
               return (
                 <tr key={it.rmItemId} className="hover:bg-gray-50">
                   <td className="px-3 py-2 text-xs font-mono text-torg-blue sticky left-0 bg-white">{it.rmNumero}</td>
@@ -498,11 +509,15 @@ export default function MapaCotacaoClient({ op }) {
                         </td>
                       );
                     }
-                    const liquido = cell.precoLiquido || cell.precoUnit;
-                    const isMenor = liquido === menorLiquido;
+                    // Valor de comparacao depende do faturamento do fornecedor:
+                    // - Faturamento Direto: bruto+IPI (sem credito ICMS)
+                    // - Faturamento Torg: liquido (com credito ICMS)
+                    const comparacao = cell.precoComparacao || cell.precoLiquido || cell.precoUnit;
+                    const isMenor = comparacao === menorLiquido;
                     const isVencedor = cell.vencedor;
-                    const totalLiquido = liquido * cell.qtdCotada;
+                    const totalLinha = comparacao * cell.qtdCotada;
                     const temImposto = cell.icmsPct > 0 || cell.ipiPct > 0;
+                    const fatDireto = cell.faturamentoDireto;
                     return (
                       <td
                         key={f.cotacaoId}
@@ -515,19 +530,22 @@ export default function MapaCotacaoClient({ op }) {
                         }`}
                         onClick={() => !loading && marcarVencedor(cell.id, isVencedor)}
                         title={
-                          temImposto
-                            ? `Bruto ${fmtMoeda(cell.precoUnit)} | ICMS ${cell.icmsPct}% | IPI ${cell.ipiPct}% | Líquido ${fmtMoeda(liquido)}`
+                          fatDireto
+                            ? `Faturamento Direto — comparação pelo BRUTO+IPI ${fmtMoeda(comparacao)} (ICMS ${cell.icmsPct}% NÃO vira crédito) | bruto ${fmtMoeda(cell.precoUnit)} | IPI ${cell.ipiPct}%`
+                            : temImposto
+                            ? `Faturamento Torg — comparação pelo LÍQUIDO ${fmtMoeda(comparacao)} | bruto ${fmtMoeda(cell.precoUnit)} | ICMS ${cell.icmsPct}% (crédito) | IPI ${cell.ipiPct}%`
                             : `Preço bruto ${fmtMoeda(cell.precoUnit)}`
                         }
                       >
                         <div className={`text-sm font-medium tabular-nums ${isVencedor ? "text-torg-orange-700" : isMenor ? "text-torg-orange-700" : "text-torg-dark"}`}>
-                          {fmtMoeda(liquido)}
+                          {fmtMoeda(comparacao)}
+                          {fatDireto && <span className="text-[8px] ml-1 text-amber-700 font-bold">FD</span>}
                         </div>
                         <div className="text-[10px] text-torg-gray tabular-nums leading-tight">
                           {temImposto ? (
                             <>bruto {fmtMoeda(cell.precoUnit)}</>
                           ) : (
-                            <>total {fmtMoeda(totalLiquido)}</>
+                            <>total {fmtMoeda(totalLinha)}</>
                           )}
                         </div>
                         {temImposto && (
@@ -596,9 +614,19 @@ export default function MapaCotacaoClient({ op }) {
               <details key={f.cotacaoId} className="bg-white rounded-lg border border-torg-orange-100 p-4 group">
                 <summary className="cursor-pointer list-none flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-torg-dark truncate">{f.fornecedorNome}</p>
+                    <p className="font-semibold text-torg-dark truncate flex items-center gap-2">
+                      {f.fornecedorNome}
+                      {f.faturamentoDireto && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-bold whitespace-nowrap" title="Faturamento Direto — comparação pelo bruto+IPI (sem crédito ICMS pra Torg)">
+                          FATURAMENTO DIRETO
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-torg-gray">
                       {itensPorFornecedor[f.cotacaoId].length} ite{itensPorFornecedor[f.cotacaoId].length === 1 ? "m" : "ns"}
+                      {f.faturamentoDireto && (
+                        <span className="ml-2 text-amber-700"> · ICMS NÃO vira crédito</span>
+                      )}
                     </p>
                   </div>
                   <div className="text-right ml-3">
@@ -630,7 +658,9 @@ export default function MapaCotacaoClient({ op }) {
                         <th className="px-1 py-1 text-right font-medium">Bruto</th>
                         <th className="px-1 py-1 text-right font-medium">ICMS</th>
                         <th className="px-1 py-1 text-right font-medium">IPI</th>
-                        <th className="px-1 py-1 text-right font-medium">Líquido</th>
+                        <th className="px-1 py-1 text-right font-medium" title={f.faturamentoDireto ? "Custo efetivo Torg = Bruto + IPI (Faturamento Direto não dá crédito ICMS)" : "Custo efetivo Torg = Bruto × (1 − ICMS%) × (1 + IPI%)"}>
+                          {f.faturamentoDireto ? "Bruto+IPI" : "Líquido"}
+                        </th>
                         <th className="px-1 py-1 text-right font-medium">Total</th>
                       </tr>
                     </thead>
@@ -644,14 +674,14 @@ export default function MapaCotacaoClient({ op }) {
                           <td className="px-1 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap">
                             {fmtMoeda(it.precoUnit)}
                           </td>
-                          <td className="px-1 py-1.5 text-right text-torg-gray tabular-nums">
+                          <td className={`px-1 py-1.5 text-right tabular-nums ${f.faturamentoDireto ? "text-gray-300 line-through" : "text-torg-gray"}`} title={f.faturamentoDireto ? "ICMS ignorado em Faturamento Direto (sem crédito)" : ""}>
                             {it.icmsPct > 0 ? `−${it.icmsPct}%` : "—"}
                           </td>
                           <td className="px-1 py-1.5 text-right text-torg-gray tabular-nums">
                             {it.ipiPct > 0 ? `+${it.ipiPct}%` : "—"}
                           </td>
                           <td className="px-1 py-1.5 text-right text-torg-orange-700 font-medium tabular-nums whitespace-nowrap">
-                            {fmtMoeda(it.precoLiquido || it.precoUnit)}
+                            {fmtMoeda(it.precoComparacao || it.precoLiquido || it.precoUnit)}
                           </td>
                           <td className="px-1 py-1.5 text-right text-torg-dark font-bold tabular-nums whitespace-nowrap">
                             {fmtMoeda(it.total)}
@@ -661,7 +691,9 @@ export default function MapaCotacaoClient({ op }) {
                     </tbody>
                   </table>
                   <p className="text-[10px] text-torg-gray italic mt-2 px-1">
-                    Líquido = Bruto × (1 − ICMS%) × (1 + IPI%) — ICMS recuperado como crédito, IPI somado por fora.
+                    {f.faturamentoDireto
+                      ? "Faturamento Direto: custo efetivo = Bruto + IPI (ICMS não vira crédito porque a NF vai pro cliente, não pra Torg)."
+                      : "Faturamento Torg: custo efetivo = Bruto × (1 − ICMS%) × (1 + IPI%) — ICMS recuperado como crédito."}
                   </p>
 
                   {/* Botao: pedir revisao final ao fornecedor */}
@@ -1165,6 +1197,12 @@ function buildMatriz(op) {
             cnpj: cot.cnpj || "",
             nCodOmie: cot.nCodOmie || "",
             totalProposta: cot.totalProposta || null,
+            // CRITICO pra decisao de vencedor: faturamento direto significa
+            // que a NF vai pro cliente, Torg nao recebe credito de ICMS.
+            // Logo, o "custo efetivo" pra Torg comparar e bruto+IPI (sem
+            // desconto de ICMS). Quando faturamento "Torg", e o liquido.
+            faturamento: cot.faturamento || "Torg",
+            faturamentoDireto: cot.faturamento === "Cliente",
           });
         }
         // Garante que o RMItem está na matriz (lookup global — multi-RM)
@@ -1194,13 +1232,23 @@ function buildMatriz(op) {
         }
         const icms = Number(ci.icmsPct) || 0;
         const ipi = Number(ci.ipiPct) || 0;
-        // Preço líquido (custo Torg): ICMS por dentro (subtrai) + IPI por fora (soma)
+        // Preço líquido (custo Torg c/ credito ICMS): bruto * (1-ICMS) * (1+IPI)
         const precoLiquido = ci.precoUnit * (1 - icms / 100) * (1 + ipi / 100);
+        // Valor da nota (bruto + IPI): o que sai do bolso da empresa pagante
+        const valorNota = ci.precoUnit * (1 + ipi / 100);
+        // PRECO PRA COMPARACAO/DECISAO — depende do faturamento:
+        // - Faturamento Direto (cliente): bruto+IPI, ICMS nao vira credito
+        // - Faturamento Torg: liquido (com credito ICMS)
+        const isFatDireto = cot.faturamento === "Cliente";
+        const precoComparacao = isFatDireto ? valorNota : precoLiquido;
         itensMap.get(ci.rmItemId).celulas.push({
           id: ci.id,
           cotacaoId: cot.id,
           precoUnit: ci.precoUnit,
           precoLiquido,
+          valorNota,
+          precoComparacao,
+          faturamentoDireto: isFatDireto,
           icmsPct: icms,
           ipiPct: ipi,
           qtdCotada: ci.qtdCotada,
