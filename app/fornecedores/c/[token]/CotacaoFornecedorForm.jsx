@@ -27,7 +27,7 @@ function parseObservacao(obs) {
   return { prazoEntrega, condicaoPagamento, observacao: restos.join(" | ") };
 }
 
-export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao: anexosCotacaoInicial = [], vencida, faturamento = null }) {
+export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao: anexosCotacaoInicial = [], vencida, faturamento = null, emRevisaoFinal = false }) {
   const router = useRouter();
   const jaEnviou = cotacao.status === "RECEBIDA";
   const obsParsed = parseObservacao(cotacao.observacao);
@@ -476,6 +476,18 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         {/* Dados de FATURAMENTO — quem o fornecedor deve emitir a NF para */}
         {faturamento && (
           <PainelFaturamento faturamento={faturamento} />
+        )}
+
+        {emRevisaoFinal && (
+          <div className="bg-emerald-50 border-2 border-emerald-300 rounded-lg p-4 text-sm text-emerald-900 flex items-start gap-3">
+            <CheckCircle2 size={22} className="mt-0.5 flex-shrink-0 text-emerald-700" />
+            <div>
+              <p className="font-semibold text-base">📋 Revisão final dos itens vencedores</p>
+              <p className="text-xs mt-1 leading-relaxed">
+                A Torg analisou sua proposta e a partir das melhores condições, <strong>essa é a lista de itens em que você foi escolhido como fornecedor</strong>. Confira os valores abaixo e <strong>confirme</strong> (ou ajuste se necessário) antes de enviar — essa será a proposta final usada na geração do pedido de compra.
+              </p>
+            </div>
+          </div>
         )}
 
         {vencida && (

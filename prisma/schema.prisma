@@ -616,6 +616,11 @@ model Cotacao {
 
   prazoResposta   DateTime?     // limite pra fornecedor responder
   recebidaEm      DateTime?
+  // Marca quando Compras pediu "revisao final" — o fornecedor entra no portal
+  // e ve so os itens em que ele venceu (vencedor=true) pra confirmar os
+  // valores finais antes da geracao do pedido. Quando setado, o portal
+  // entra em modo "revisao final" com aviso destacado.
+  solicitadaRevisaoFinal DateTime?
   status          CotacaoStatus @default(PENDENTE)
 
   // Token único para acesso do fornecedor (uploads via /fornecedores/c/[token])

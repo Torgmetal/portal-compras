@@ -88,6 +88,14 @@ export default async function CotacaoPorToken({ params }) {
     );
   }
 
+  // Modo "Revisao Final" — quando Compras solicitou ao fornecedor que ele
+  // revise APENAS os itens em que ele venceu, pra confirmar valores finais.
+  // Nesse modo, filtramos cotacao.itens pra mostrar so vencedor=true.
+  const emRevisaoFinal = !!cotacao.solicitadaRevisaoFinal;
+  if (emRevisaoFinal) {
+    cotacao.itens = (cotacao.itens || []).filter((it) => it.vencedor === true);
+  }
+
   // Carrega anexos de todas as RMs envolvidas (primaria + qualquer outra
   // que tenha rmItem referenciado nos CotacaoItens — caso consolidada).
   const rmIdsEnvolvidos = new Set([cotacao.rmId]);
@@ -156,6 +164,7 @@ export default async function CotacaoPorToken({ params }) {
       anexosCotacao={anexosCotacaoData}
       vencida={vencida}
       faturamento={faturamento}
+      emRevisaoFinal={emRevisaoFinal}
     />
   );
 }

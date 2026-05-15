@@ -1,17 +1,129 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2, X, XCircle } from "lucide-react";
+import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2, X, XCircle, Mail, Send } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
 const fmtMoeda = (v) =>
   v != null && v > 0 ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
+
+// Copia HTML pro clipboard sincronamente (preserva user gesture pro mailto).
+function copyHtmlSync(html, text) {
+  let ok = false;
+  let container = null;
+  let listener = null;
+  try {
+    listener = (e) => {
+      try {
+        e.clipboardData.setData("text/html", html);
+        e.clipboardData.setData("text/plain", text || html.replace(/<[^>]+>/g, ""));
+        e.preventDefault();
+      } catch {}
+    };
+    document.addEventListener("copy", listener);
+    container = document.createElement("div");
+    container.setAttribute("contenteditable", "true");
+    container.innerHTML = html;
+    container.style.position = "fixed";
+    container.style.left = "0";
+    container.style.top = "0";
+    container.style.width = "2px";
+    container.style.height = "2px";
+    container.style.opacity = "0.01";
+    container.style.zIndex = "-1";
+    container.style.overflow = "hidden";
+    document.body.appendChild(container);
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ok = document.execCommand("copy");
+    sel.removeAllRanges();
+  } catch {
+    ok = false;
+  } finally {
+    if (listener) document.removeEventListener("copy", listener);
+    if (container && container.parentNode) container.parentNode.removeChild(container);
+  }
+  return ok;
+}
+
+function abrirOutlookMailto(to, subject) {
+  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}`;
+  const a = document.createElement("a");
+  a.href = mailto;
+  a.rel = "noopener noreferrer";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 
 export default function MapaCotacaoClient({ op }) {
   const router = useRouter();
   const [loading, setLoading] = useState(null);
   const [erro, setErro] = useState("");
   const [mostrarPedidos, setMostrarPedidos] = useState(false);
+  const [revisaoToast, setRevisaoToast] = useState(null); // { cotacaoId, ok, msg }
+  const [emailRevisaoCache, setEmailRevisaoCache] = useState({}); // cotacaoId -> emailData
+
+  // Solicita revisao final ao fornecedor + copia email + abre Outlook
+  const solicitarRevisaoFinal = async (cotacaoId, fornecedorNome) => {
+    setLoading(`rev-${cotacaoId}`);
+    setRevisaoToast(null);
+    try {
+      // 1. Marca a cotacao como em modo revisao final
+      const res1 = await fetch(`/api/cotacao/${cotacaoId}/solicitar-revisao-final`, {
+        method: "POST",
+      });
+      const data1 = await res1.json();
+      if (!res1.ok) throw new Error(data1.error || "Falha ao solicitar revisao");
+
+      // 2. Busca preview-email (vai vir com texto de "revisao final" pq o
+      // backend ja sabe que a cotacao foi marcada)
+      const res2 = await fetch(`/api/cotacao/${cotacaoId}/preview-email?format=json`);
+      if (!res2.ok) {
+        const d = await res2.json().catch(() => ({}));
+        throw new Error(d.error || "Falha ao montar email");
+      }
+      const emailData = await res2.json();
+      setEmailRevisaoCache((prev) => ({ ...prev, [cotacaoId]: emailData }));
+
+      // 3. Copia HTML pro clipboard (sincrono)
+      const copiouHtml = copyHtmlSync(emailData.html, emailData.text);
+
+      // 4. Abre Outlook depois de 300ms
+      setTimeout(() => abrirOutlookMailto(emailData.to, emailData.subject), 300);
+
+      setRevisaoToast({
+        cotacaoId,
+        ok: true,
+        msg: copiouHtml
+          ? `Revisão solicitada a ${fornecedorNome}. Outlook abrindo + email copiado. Cole no corpo (Ctrl+V) e envie.`
+          : `Revisão solicitada. Outlook aberto. Cole o conteúdo manualmente.`,
+      });
+      router.refresh();
+    } catch (e) {
+      setRevisaoToast({ cotacaoId, ok: false, msg: e.message });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const reCopiarEmailRevisao = (cotacaoId) => {
+    const data = emailRevisaoCache[cotacaoId];
+    if (!data) {
+      setRevisaoToast({ cotacaoId, ok: false, msg: "Cache vazio, peca revisao novamente." });
+      return;
+    }
+    const ok = copyHtmlSync(data.html, data.text);
+    setRevisaoToast({
+      cotacaoId,
+      ok,
+      msg: ok ? "Email recopiado. Cole no Outlook (Ctrl+V)." : "Falha ao recopiar.",
+    });
+  };
 
   // Constrói matriz: cada linha é um RMItem, cada coluna é uma Cotação RECEBIDA
   const { itens: itensTodos, fornecedores: fornecedoresTodos } = useMemo(() => buildMatriz(op), [op]);
@@ -551,6 +663,59 @@ export default function MapaCotacaoClient({ op }) {
                   <p className="text-[10px] text-torg-gray italic mt-2 px-1">
                     Líquido = Bruto × (1 − ICMS%) × (1 + IPI%) — ICMS recuperado como crédito, IPI somado por fora.
                   </p>
+
+                  {/* Botao: pedir revisao final ao fornecedor */}
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-[11px] text-torg-gray italic flex-1">
+                      Antes de gerar o pedido, envie ao fornecedor pra que ele revise apenas estes itens vencedores e confirme os valores finais.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); solicitarRevisaoFinal(f.cotacaoId, f.fornecedorNome); }}
+                      disabled={loading === `rev-${f.cotacaoId}`}
+                      className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium inline-flex items-center gap-1 disabled:opacity-50"
+                      title="Marca a cotacao em modo revisao final e abre email pro fornecedor confirmar os itens vencedores"
+                    >
+                      {loading === `rev-${f.cotacaoId}` ? (
+                        <><Loader2 size={12} className="animate-spin" /> Preparando...</>
+                      ) : (
+                        <><Send size={12} /> Pedir revisão final</>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Toast do resultado da solicitacao */}
+                  {revisaoToast?.cotacaoId === f.cotacaoId && (
+                    <div className={`mt-2 text-xs rounded px-3 py-2 ${
+                      revisaoToast.ok
+                        ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                        : "bg-red-50 border border-red-200 text-red-700"
+                    }`}>
+                      <div>{revisaoToast.ok ? "✓ " : "✗ "}{revisaoToast.msg}</div>
+                      {revisaoToast.ok && emailRevisaoCache[f.cotacaoId] && (
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); reCopiarEmailRevisao(f.cotacaoId); }}
+                            className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
+                          >
+                            Copiar de novo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const d = emailRevisaoCache[f.cotacaoId];
+                              if (d) abrirOutlookMailto(d.to, d.subject);
+                            }}
+                            className="px-2 py-1 rounded font-medium bg-torg-blue text-white hover:bg-torg-blue-700 whitespace-nowrap"
+                          >
+                            Abrir Outlook
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </details>
               );

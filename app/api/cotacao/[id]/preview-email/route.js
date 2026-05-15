@@ -53,28 +53,40 @@ export async function GET(req, { params }) {
     numerosRMs = rms.map((r) => r.numero);
   }
   const rotuloRMs = numerosRMs.length === 1 ? `RM ${numerosRMs[0]}` : `RMs ${numerosRMs.join(", ")}`;
-  const totalItens = cot.itens.length;
+  const emRevisaoFinal = !!cot.solicitadaRevisaoFinal;
+  // Em modo revisao final, conta so os itens vencedores
+  const totalItens = emRevisaoFinal
+    ? cot.itens.filter((i) => i.vencedor === true).length
+    : cot.itens.length;
   const prazoTxt = cot.prazoResposta
     ? new Date(cot.prazoResposta).toLocaleDateString("pt-BR")
     : null;
-  const subject = `Solicitacao de Cotacao - ${rotuloRMs} (Torg Metal)`;
+  const subject = emRevisaoFinal
+    ? `Revisao Final dos Itens Vencedores - ${rotuloRMs} (Torg Metal)`
+    : `Solicitacao de Cotacao - ${rotuloRMs} (Torg Metal)`;
 
   // Conteudo do email (HTML pro clipboard + Outlook colar)
-  const emailHtml = `<div>
+  const emailHtml = emRevisaoFinal
+    ? `<div>
+    <p>Olá <strong>${escapeHtml(cot.fornecedorNome)}</strong>,</p>
+    <p>Após análise das propostas recebidas, sua empresa foi escolhida para fornecer alguns itens da <strong>${escapeHtml(rotuloRMs)}</strong>.</p>
+    <p>Pedimos a gentileza de acessar o link abaixo, conferir os <strong>${totalItens} item(s) vencedor(es)</strong> e confirmar (ou ajustar se necessário) os valores finais. Essa será a base para a geração do pedido de compra:</p>`
+    : `<div>
     <p>Olá <strong>${escapeHtml(cot.fornecedorNome)}</strong>,</p>
     <p>Estamos solicitando sua cotação para o material listado na <strong>${escapeHtml(rotuloRMs)}</strong>.</p>
-    <p>Acesse o link abaixo pra ver os itens e enviar sua proposta. O link é <strong>único e privado</strong>, não precisa de login:</p>
+    <p>Acesse o link abaixo pra ver os itens e enviar sua proposta. O link é <strong>único e privado</strong>, não precisa de login:</p>`;
+  const emailHtmlContinuacao = `
     <p style="text-align: center; margin: 28px 0;">
-      <a href="${link}" style="background: #1976d2; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
-        Abrir cotação
+      <a href="${link}" style="background: ${emRevisaoFinal ? "#2e7d32" : "#1976d2"}; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">
+        ${emRevisaoFinal ? "Confirmar itens vencedores" : "Abrir cotação"}
       </a>
     </p>
     <p style="color: #718096; font-size: 13px;">
       Ou copie e cole esse endereço no navegador:<br>
-      <a href="${link}" style="color: #1976d2; word-break: break-all;">${link}</a>
+      <a href="${link}" style="color: ${emRevisaoFinal ? "#2e7d32" : "#1976d2"}; word-break: break-all;">${link}</a>
     </p>
     <table style="width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 14px;">
-      <tr><td style="padding: 6px 0; color: #718096;">Total de itens</td><td style="padding: 6px 0;"><strong>${totalItens}</strong></td></tr>
+      <tr><td style="padding: 6px 0; color: #718096;">${emRevisaoFinal ? "Itens vencedores" : "Total de itens"}</td><td style="padding: 6px 0;"><strong>${totalItens}</strong></td></tr>
       ${prazoTxt ? `<tr><td style="padding: 6px 0; color: #718096;">Prazo de resposta</td><td style="padding: 6px 0;"><strong>${prazoTxt}</strong></td></tr>` : ""}
       ${cot.observacao ? `<tr><td style="padding: 6px 0; color: #718096; vertical-align: top;">Observação</td><td style="padding: 6px 0;">${escapeHtml(cot.observacao)}</td></tr>` : ""}
     </table>
@@ -85,31 +97,50 @@ export async function GET(req, { params }) {
     </p>
   </div>`;
 
-  const emailText = [
-    `Olá ${cot.fornecedorNome},`,
-    "",
-    `Estamos solicitando sua cotação para o material listado na ${rotuloRMs}.`,
-    "Acesse o link abaixo pra ver os itens e enviar sua proposta. O link é único e privado:",
-    "",
-    link,
-    "",
-    `Total de itens: ${totalItens}`,
-    prazoTxt ? `Prazo de resposta: ${prazoTxt}` : null,
-    cot.observacao ? `Observação: ${cot.observacao}` : null,
-    "",
-    "Atenciosamente,",
-    "Equipe de Compras - Torg Metal",
-  ].filter(Boolean).join("\n");
+  // Junta cabecalho + continuacao no email final
+  const emailHtmlCompleto = emailHtml + emailHtmlContinuacao;
+
+  const emailText = emRevisaoFinal
+    ? [
+        `Olá ${cot.fornecedorNome},`,
+        "",
+        `Após análise das propostas, sua empresa foi escolhida para fornecer alguns itens da ${rotuloRMs}.`,
+        "Acesse o link abaixo e confirme os valores finais dos itens vencedores:",
+        "",
+        link,
+        "",
+        `Itens vencedores: ${totalItens}`,
+        prazoTxt ? `Prazo de resposta: ${prazoTxt}` : null,
+        "",
+        "Atenciosamente,",
+        "Equipe de Compras - Torg Metal",
+      ].filter(Boolean).join("\n")
+    : [
+        `Olá ${cot.fornecedorNome},`,
+        "",
+        `Estamos solicitando sua cotação para o material listado na ${rotuloRMs}.`,
+        "Acesse o link abaixo pra ver os itens e enviar sua proposta. O link é único e privado:",
+        "",
+        link,
+        "",
+        `Total de itens: ${totalItens}`,
+        prazoTxt ? `Prazo de resposta: ${prazoTxt}` : null,
+        cot.observacao ? `Observação: ${cot.observacao}` : null,
+        "",
+        "Atenciosamente,",
+        "Equipe de Compras - Torg Metal",
+      ].filter(Boolean).join("\n");
 
   // Modo JSON — retorna pro frontend usar em "copiar + abrir mailto"
   if (isJson) {
     return Response.json({
       to: cot.fornecedorEmail || "",
       subject,
-      html: emailHtml,
+      html: emailHtmlCompleto,
       text: emailText,
       link,
       fornecedorNome: cot.fornecedorNome,
+      emRevisaoFinal,
     });
   }
 
