@@ -84,6 +84,52 @@ export default async function PainelOPDetalhe({ params }) {
     cotacoesPorRm.get(rid).add(ci.cotacaoId);
   }
 
+  // EXTRA: cotacoes consolidadas cuja RM PRINCIPAL e de OUTRA OP, mas que
+  // tem itens (CotacaoItem.rmItem.rmId) DENTRO dessa OP. Sem esse fetch
+  // extra, elas nao aparecem no mapa porque op.rms[].cotacoes so pega
+  // cotacoes cujo Cotacao.rmId == rm.id.
+  const cotIdsJaIncluidas = new Set();
+  for (const rm of op.rms) {
+    for (const c of rm.cotacoes) cotIdsJaIncluidas.add(c.id);
+  }
+  const cotIdsTocandoOP = new Set();
+  for (const ci of cotItensDaOP) cotIdsTocandoOP.add(ci.cotacaoId);
+  const cotIdsExternas = [...cotIdsTocandoOP].filter((id) => !cotIdsJaIncluidas.has(id));
+
+  if (cotIdsExternas.length > 0) {
+    const cotacoesExternas = await prisma.cotacao.findMany({
+      where: { id: { in: cotIdsExternas } },
+      include: {
+        itens: {
+          select: {
+            id: true, rmItemId: true, precoUnit: true, qtdCotada: true,
+            icmsPct: true, ipiPct: true, vencedor: true, observacao: true,
+          },
+        },
+        pedidosOmie: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            codigoPedido: true,
+            numeroPedido: true,
+            total: true,
+            faturamentoDireto: true,
+            status: true,
+            erroOmie: true,
+            fornecedorNome: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    // Anexa as cotacoes externas a primeira RM da OP. O buildMatriz no
+    // mapa processa cada CotacaoItem pelo rmItemId individual, entao a
+    // RM "host" nao importa pra exibicao.
+    if (op.rms.length > 0) {
+      op.rms[0].cotacoes = [...op.rms[0].cotacoes, ...cotacoesExternas];
+    }
+  }
+
   // Verba estimada total (base + aditivos)
   const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);
   const verbaAditivos = op.aditivos.reduce(

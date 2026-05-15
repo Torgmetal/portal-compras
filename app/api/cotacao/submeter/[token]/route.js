@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
@@ -168,6 +169,29 @@ export async function POST(req, { params }) {
       },
     });
   });
+
+  // Invalida cache do Next.js pras paginas que mostram a cotacao — sem isso,
+  // o mapa de cotacao pode continuar mostrando dados antigos mesmo apos
+  // o usuario navegar (force-dynamic so vale na primeira request, depois
+  // entra cache do Router Cache do Next.js).
+  try {
+    // Busca rms+ops envolvidas pra invalidar todas as paginas relacionadas
+    const cotItens = await prisma.cotacaoItem.findMany({
+      where: { cotacaoId: cotacao.id },
+      select: { rmItem: { select: { rmId: true, rm: { select: { opId: true } } } } },
+    });
+    const rmIds = new Set();
+    const opIds = new Set();
+    for (const ci of cotItens) {
+      if (ci.rmItem?.rmId) rmIds.add(ci.rmItem.rmId);
+      if (ci.rmItem?.rm?.opId) opIds.add(ci.rmItem.rm.opId);
+    }
+    for (const rmId of rmIds) revalidatePath(`/compras/rm/${rmId}`);
+    for (const opId of opIds) revalidatePath(`/compras/painel-ops/${opId}`);
+    revalidatePath("/compras");
+  } catch (e) {
+    console.warn("[submeter] revalidatePath falhou:", e?.message);
+  }
 
   // Notifica os inscritos no evento COTACAO_RESPONDIDA. Best-effort, nao bloqueia.
   // Busca RMs envolvidas via CotacaoItem -> RMItem -> RM pra montar contexto.
