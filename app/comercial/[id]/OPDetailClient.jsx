@@ -499,9 +499,14 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           setSyncMedicaoId(id);
           try {
             const res = await fetch(`/api/comercial/medicao/${id}`, { method: "POST" });
-            const d = await res.json();
-            if (!res.ok) alert(d.error || "Erro ao sincronizar");
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              const detalhe = d?.error || `HTTP ${res.status}`;
+              alert(`Falha ao sincronizar medição:\n\n${detalhe}\n\nO erro foi salvo no registro — passe o mouse no aviso "⚠ erro no sync" pra ver detalhes.`);
+            }
             router.refresh();
+          } catch (e) {
+            alert(`Erro de rede ao sincronizar: ${e.message}`);
           } finally {
             setSyncMedicaoId(null);
           }
