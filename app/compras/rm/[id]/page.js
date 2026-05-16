@@ -26,8 +26,8 @@ export default async function RMComprasDetail({ params }) {
       itens: {
         orderBy: { ordem: "asc" },
         include: {
-          opItem: { select: { categoria: true, descricao: true, valorVerba: true, qtdContratada: true, unidade: true } },
-          aditivoItem: { select: { categoria: true, descricao: true, valorVerba: true, qtdContratada: true, unidade: true } },
+          opItem: { select: { categoria: true, descricao: true, valorVerba: true, qtdContratada: true, unidade: true, faturamentoDireto: true } },
+          aditivoItem: { select: { categoria: true, descricao: true, valorVerba: true, qtdContratada: true, unidade: true, faturamentoDireto: true } },
         },
       },
       anexos: { orderBy: { uploadedAt: "asc" } },
@@ -48,13 +48,13 @@ export default async function RMComprasDetail({ params }) {
       id: true, rmId: true, fornecedorNome: true, fornecedorEmail: true, token: true,
       status: true, total: true, totalProposta: true, numeroRevisao: true,
       createdAt: true, prazoResposta: true, recebidaEm: true,
-      cnpj: true,
+      cnpj: true, nCodOmie: true,
       // Itens completos com rmItem details — pra mostrar todos os itens
       // (incluindo de outras RMs) no modal de lancamento manual
       itens: {
         select: {
           id: true, rmItemId: true, precoUnit: true, qtdCotada: true,
-          icmsPct: true, ipiPct: true, observacao: true,
+          icmsPct: true, ipiPct: true, observacao: true, vencedor: true,
           rmItem: {
             select: {
               id: true, descricao: true, unidade: true, qtd: true,
@@ -150,15 +150,70 @@ export default async function RMComprasDetail({ params }) {
     return (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true });
   });
 
+  // Monta estrutura "OP virtualizada" pro componente MapaCotacaoClient
+  // (que espera { id, rms: [...] }). Inclui:
+  // - id da OP real (pra chamar /api/op/[id]/sugerir-vencedores etc)
+  // - Apenas essa RM no array rms[]
+  // - Cotacoes com formato esperado pelo mapa (itens com vencedor, etc)
+  //
+  // Calcula tambem _fdDerivado por categoria (mesma logica do painel da OP)
+  // pra que itens sem opItemId herdem FD via categoriasOP.
+  const fdPorCategoria = new Map();
+  const todosOpItens = [
+    ...(rm.op?.itens || []).map((i) => ({ categoria: i.categoria, fd: i.faturamentoDireto })),
+    ...(rm.op?.aditivos || []).flatMap((a) => a.itens.map((i) => ({ categoria: i.categoria, fd: i.faturamentoDireto }))),
+  ];
+  for (const { categoria, fd } of todosOpItens) {
+    if (!categoria) continue;
+    if (!fdPorCategoria.has(categoria)) fdPorCategoria.set(categoria, fd);
+    else if (fdPorCategoria.get(categoria) !== fd) fdPorCategoria.set(categoria, true);
+  }
+  const rmFd = (rm.categoriasOP || []).length > 0 &&
+    rm.categoriasOP.every((c) => fdPorCategoria.get(c) === true);
+  // Propaga pros RMItens sem vinculo direto
+  for (const it of rm.itens) {
+    if (!it.opItem && !it.aditivoItem && rmFd) {
+      it._fdDerivado = true;
+    }
+  }
+
+  // Cotacoes no formato esperado pelo MapaCotacaoClient
+  const cotacoesPorMapa = cotacoesRelacionadas.map((c) => ({
+    id: c.id,
+    rmId: c.rmId,
+    fornecedorNome: c.fornecedorNome,
+    status: c.status,
+    cnpj: c.cnpj,
+    nCodOmie: c.nCodOmie,
+    totalProposta: c.totalProposta,
+    itens: c.itens, // ja com vencedor, precoUnit, icms/ipiPct
+    pedidosOmie: [], // mapa nao precisa (botao "Gerar pedidos" cria novos)
+  }));
+
+  const dadosMapa = {
+    id: rm.opId,
+    numero: rm.op?.numero || "",
+    rms: [{
+      id: rm.id,
+      numero: rm.numero,
+      categoriasOP: rm.categoriasOP || [],
+      itens: rm.itens,
+      cotacoes: cotacoesPorMapa,
+    }],
+  };
+
   const data = JSON.parse(JSON.stringify(rm));
   const outrasRMs = JSON.parse(JSON.stringify(outrasRMsAtivas));
+  const dadosMapaSerial = rm.opId
+    ? JSON.parse(JSON.stringify(dadosMapa))
+    : null;
 
   return (
     <div className="space-y-6 max-w-7xl">
       <Link href="/compras" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
         <ArrowLeft size={14} /> Voltar pro Painel
       </Link>
-      <RMComprasClient rm={data} outrasRMs={outrasRMs} userRole={user.role} />
+      <RMComprasClient rm={data} outrasRMs={outrasRMs} userRole={user.role} dadosMapa={dadosMapaSerial} />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
 import {
   CATEGORIAS_FORNECEDOR, chipCategoriaFornecedor, labelCategoriaFornecedor,
 } from "@/lib/fornecedor-categorias";
+import MapaCotacaoClient from "@/app/compras/painel-ops/[opId]/MapaCotacaoClient";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -39,7 +40,7 @@ const STATUS_ITEM_LABELS = {
 // mostra como "Sem proposta" pro usuario perceber que precisa re-cotar.
 const STATUS_SEM_PROPOSTA = { label: "Sem proposta", className: "bg-amber-50 text-amber-700" };
 
-export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
+export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null }) {
   const router = useRouter();
   const isAdmin = userRole === "ADMIN";
 
@@ -432,6 +433,19 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole }) {
           </table>
         </div>
       </div>
+
+      {/* Mapa de Cotação — escopo dessa RM (mesma UI do painel de OPs) */}
+      {dadosMapa && rm.cotacoes.some((c) => c.status === "RECEBIDA") && (
+        <div>
+          <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg px-4 py-2 mb-2 text-xs text-torg-dark flex items-start gap-2">
+            <span>💡</span>
+            <span>
+              Mapa filtrado pra esta RM. Clique nas células pra escolher vencedores e gerar os pedidos. O botão "Gerar Pedidos Omie" abaixo cria pedidos pra <strong>todos os itens vencedores dessa OP</strong> (não só desta RM).
+            </span>
+          </div>
+          <MapaCotacaoClient op={dadosMapa} />
+        </div>
+      )}
 
       {/* Cotações */}
       {rm.cotacoes.length > 0 ? (
