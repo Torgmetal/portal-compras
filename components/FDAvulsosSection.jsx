@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FileText, Plus, Upload, Loader2, AlertCircle, Trash2, ExternalLink, Send, CheckCircle2,
+  FileText, Plus, Upload, Loader2, AlertCircle, Trash2, ExternalLink, Send, CheckCircle2, Search,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
@@ -239,7 +239,7 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
   const [erro, setErro] = useState("");
 
   const addItem = () => {
-    setItens([...itens, { descricao: "", qtd: "", unidade: "UN", valorUnit: "", ipiPct: "", icmsPct: "" }]);
+    setItens([...itens, { codigo: "", descricao: "", qtd: "", unidade: "UN", valorUnit: "", ipiPct: "", icmsPct: "" }]);
   };
   const removerItem = (idx) => {
     setItens(itens.filter((_, i) => i !== idx));
@@ -264,6 +264,7 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
     // Itens detalhados (opcional)
     const itensValidos = itens
       .map((it) => ({
+        codigo: it.codigo ? String(it.codigo).trim() : null,
         descricao: it.descricao.trim(),
         qtd: parseFloat(String(it.qtd).replace(",", ".")) || 0,
         unidade: it.unidade || "UN",
@@ -434,17 +435,30 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
                   return (
                     <div key={idx} className="bg-white border border-gray-200 rounded p-2 space-y-1">
                       <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={it.descricao}
-                          onChange={(e) => setItem(idx, "descricao", e.target.value)}
-                          placeholder="Descrição do item (ex: Chapa de aço A36 1/4)"
-                          className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
-                        />
+                        <div className="flex-1">
+                          <AutocompleteProdutoOmie
+                            valor={it.descricao}
+                            codigoAtual={it.codigo}
+                            onSelecionarItem={(p) => {
+                              setItens((prev) => prev.map((x, i) => i === idx ? {
+                                ...x,
+                                codigo: p.codigo,
+                                descricao: p.descricao,
+                                unidade: p.unidade || x.unidade || "UN",
+                              } : x));
+                            }}
+                            onChangeTexto={(txt) => setItem(idx, "descricao", txt)}
+                          />
+                          {it.codigo && (
+                            <p className="text-[9px] text-emerald-700 mt-0.5">
+                              ✓ Produto Omie vinculado: <span className="font-mono">{it.codigo}</span>
+                            </p>
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => removerItem(idx)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-red-600 hover:text-red-800 mt-2"
                           title="Remover"
                         >
                           <Trash2 size={14} />
@@ -600,6 +614,124 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Autocomplete que busca produtos no Omie (ou no Estoque Torg local).
+// Quando o usuario seleciona uma sugestao, dispara onSelecionarItem(produto)
+// com { codigo, descricao, unidade }. Pra texto livre (sem seleção), dispara
+// onChangeTexto(txt) — assim o sistema cria com codigo=null (produto generico).
+function AutocompleteProdutoOmie({ valor, codigoAtual, onSelecionarItem, onChangeTexto }) {
+  const [busca, setBusca] = useState(valor || "");
+  const [sugestoes, setSugestoes] = useState([]);
+  const [aberto, setAberto] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  const [origem, setOrigem] = useState(null);
+  const timeoutRef = useRef(null);
+  const containerRef = useRef(null);
+
+  // Sincroniza state local quando valor externo muda
+  useEffect(() => {
+    if (valor !== busca) setBusca(valor || "");
+  }, [valor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounce de busca
+  useEffect(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (!busca || busca.length < 2) {
+      setSugestoes([]);
+      return;
+    }
+    timeoutRef.current = setTimeout(async () => {
+      setCarregando(true);
+      try {
+        const res = await fetch(`/api/omie/buscar-produto?q=${encodeURIComponent(busca)}&limit=15`);
+        const data = await res.json();
+        setSugestoes(data.itens || []);
+        setOrigem(data.origem);
+      } catch (e) {
+        setSugestoes([]);
+      } finally {
+        setCarregando(false);
+      }
+    }, 400);
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+  }, [busca]);
+
+  // Fecha dropdown ao clicar fora
+  useEffect(() => {
+    const onClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const selecionar = (produto) => {
+    setBusca(produto.descricao);
+    setAberto(false);
+    onSelecionarItem(produto);
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-torg-gray" />
+        <input
+          type="text"
+          value={busca}
+          onChange={(e) => {
+            setBusca(e.target.value);
+            onChangeTexto(e.target.value);
+            setAberto(true);
+          }}
+          onFocus={() => setAberto(true)}
+          placeholder="Buscar produto Omie ou digitar descrição"
+          className="w-full border border-gray-300 rounded pl-7 pr-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+        />
+        {carregando && (
+          <Loader2 size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-torg-gray animate-spin" />
+        )}
+      </div>
+
+      {aberto && busca.length >= 2 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+          {sugestoes.length === 0 && !carregando ? (
+            <div className="px-3 py-2 text-[11px] text-torg-gray italic">
+              {busca.length < 2 ? "Digite ao menos 2 caracteres..." : "Nenhum produto encontrado. Você pode usar a descrição digitada (cria como item genérico no Omie)."}
+            </div>
+          ) : (
+            <>
+              {sugestoes.map((p, i) => (
+                <button
+                  key={`${p.codigo}-${i}`}
+                  type="button"
+                  onClick={() => selecionar(p)}
+                  className="w-full text-left px-3 py-2 hover:bg-torg-blue-50 border-b border-gray-100 last:border-b-0"
+                >
+                  <p className="text-xs text-torg-dark font-medium truncate">{p.descricao}</p>
+                  <p className="text-[10px] text-torg-gray font-mono">
+                    {p.codigo} {p.unidade && `· ${p.unidade}`}
+                  </p>
+                </button>
+              ))}
+              {origem === "estoque-local" && (
+                <p className="px-3 py-1.5 text-[9px] text-torg-gray italic bg-gray-50 border-t border-gray-100">
+                  Resultados do Estoque Torg (sincronizado do Omie)
+                </p>
+              )}
+              {origem === "omie" && (
+                <p className="px-3 py-1.5 text-[9px] text-torg-gray italic bg-gray-50 border-t border-gray-100">
+                  Resultados direto do Omie
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
