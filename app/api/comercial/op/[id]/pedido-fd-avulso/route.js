@@ -105,6 +105,7 @@ export async function POST(req, { params }) {
       criadoManualmente: true,
       anexoUrl,
       anexoNome,
+      categoriaItem: dados.categoriaItem ? String(dados.categoriaItem) : null,
       createdById: user.id,
     },
   });

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   FileText, Plus, Upload, Loader2, AlertCircle, Trash2, ExternalLink,
 } from "lucide-react";
+import { labelCategoria } from "@/lib/op-categorias";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -15,7 +16,7 @@ const fmtCnpj = (s) => {
   return c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 };
 
-export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true }) {
+export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true, categoriasOP = [] }) {
   const router = useRouter();
   const [modal, setModal] = useState(false);
   const [erro, setErro] = useState("");
@@ -82,6 +83,7 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Pedido Omie</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
@@ -96,6 +98,15 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
                     <td className="px-4 py-2">
                       <p className="text-torg-dark font-medium">{p.fornecedorNome}</p>
                       {p.cnpj && <p className="text-[10px] text-torg-gray font-mono">{fmtCnpj(p.cnpj)}</p>}
+                    </td>
+                    <td className="px-4 py-2">
+                      {p.categoriaItem ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-medium whitespace-nowrap">
+                          {labelCategoria(p.categoriaItem)}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-torg-gray italic">não classificado</span>
+                      )}
                     </td>
                     <td className="px-4 py-2 font-mono text-xs">
                       {p.numeroPedido || p.codigoPedido ? (
@@ -150,6 +161,7 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
       {modal && (
         <ModalNovoFDAvulso
           opId={opId}
+          categoriasOP={categoriasOP}
           onClose={() => setModal(false)}
           onSaved={() => { setModal(false); router.refresh(); }}
         />
@@ -158,13 +170,14 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
   );
 }
 
-function ModalNovoFDAvulso({ opId, onClose, onSaved }) {
+function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
   const [form, setForm] = useState({
     fornecedorNome: "",
     cnpj: "",
     numeroPedido: "",
     total: "",
     observacao: "",
+    categoriaItem: "",
   });
   const [file, setFile] = useState(null);
   const [salvando, setSalvando] = useState(false);
@@ -185,6 +198,7 @@ function ModalNovoFDAvulso({ opId, onClose, onSaved }) {
         numeroPedido: form.numeroPedido?.trim() || null,
         total,
         observacao: form.observacao?.trim() || null,
+        categoriaItem: form.categoriaItem || null,
         faturamentoDireto: true,
       }));
       if (file) fd.append("file", file);
@@ -272,6 +286,26 @@ function ModalNovoFDAvulso({ opId, onClose, onSaved }) {
               placeholder="Ex: 15000,00"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">
+              Categoria do material {categoriasOP.length === 0 && <span className="text-torg-gray font-normal">(OP sem categorias no escopo)</span>}
+            </label>
+            <select
+              value={form.categoriaItem}
+              onChange={(e) => setForm({ ...form, categoriaItem: e.target.value })}
+              disabled={categoriasOP.length === 0}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white disabled:bg-gray-50 disabled:text-torg-gray"
+            >
+              <option value="">— Selecione a categoria —</option>
+              {categoriasOP.map((cat) => (
+                <option key={cat} value={cat}>{labelCategoria(cat)}</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-torg-gray mt-0.5">
+              Categorias do escopo da OP. Usado pra agrupar/conferir o saldo por tipo de material.
+            </p>
           </div>
 
           <div>

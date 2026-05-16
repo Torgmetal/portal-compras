@@ -536,6 +536,9 @@ model PedidoOmie {
   // PDF anexo da NF/pedido (URL Vercel Blob) — pra cadastros manuais
   anexoUrl          String?
   anexoNome         String?
+  // Categoria do material/escopo (ex: STEEL_DECK, TINTA, PARAFUSOS) — pra
+  // cadastros manuais; quando via cotacao a categoria sai pelos rmItens.
+  categoriaItem     String?
 
   createdById       String?
   createdAt         DateTime @default(now())

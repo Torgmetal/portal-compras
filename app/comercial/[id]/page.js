@@ -100,6 +100,7 @@ export default async function OPDetailPage({ params }) {
       criadoManualmente: true,
       anexoUrl: true,
       anexoNome: true,
+      categoriaItem: true,
       cotacao: { select: { rm: { select: { numero: true } } } },
     },
   });
@@ -119,6 +120,7 @@ export default async function OPDetailPage({ params }) {
     criadoManualmente: p.criadoManualmente,
     anexoUrl: p.anexoUrl,
     anexoNome: p.anexoNome,
+    categoriaItem: p.categoriaItem,
   }));
   // Separa entre normais (via cotacao) e FD avulsos (manuais)
   const pedidosFdAvulsos = pedidos.filter((p) => p.criadoManualmente);
@@ -274,6 +276,7 @@ export default async function OPDetailPage({ params }) {
         opId={params.id}
         pedidos={pedidosFdAvulsos}
         podeEditar={["ADMIN", "COMERCIAL", "COMPRAS"].includes(user.role)}
+        categoriasOP={Array.from(categoriasNoEscopo)}
       />
 
       <PedidosOmieSection pedidos={pedidos} />
