@@ -43,14 +43,26 @@ export async function GET(req) {
   const tentativas = [];
 
   if (tipo === "VENDA") {
-    // Tenta varios filtros pra Pedido de Venda
-    const filtros = [
+    // Tenta varios filtros pra Pedido de Venda — DEDUPLICA e adiciona delay
+    // entre chamadas pra nao acionar "Consumo redundante" do Omie.
+    const filtrosBrutos = [
       { numero_pedido: numero },
-      { numero_pedido: numero.split("/")[0] },
-      { codigo_pedido: Number(numero.replace(/\D/g, "")) || 0 },
+      ...(numero.includes("/") ? [{ numero_pedido: numero.split("/")[0] }] : []),
+      ...(Number(numero.replace(/\D/g, "")) > 0
+        ? [{ codigo_pedido: Number(numero.replace(/\D/g, "")) }]
+        : []),
     ];
+    // Dedupe por JSON
+    const filtros = [];
+    const vistos = new Set();
+    for (const f of filtrosBrutos) {
+      const key = JSON.stringify(f);
+      if (!vistos.has(key)) {
+        vistos.add(key);
+        filtros.push(f);
+      }
+    }
     for (const f of filtros) {
-      if (f.codigo_pedido === 0) continue;
       const r = await callOmie(OMIE_VENDA_URL, {
         call: "ConsultarPedido",
         app_key: APP_KEY,
@@ -62,7 +74,6 @@ export async function GET(req) {
         httpStatus: r.status,
         sucesso: !!r.data?.pedido_venda_produto?.cabecalho,
         faultstring: r.data?.faultstring || null,
-        // Resumo da resposta (top-level keys + cabecalho se houver)
         topKeys: Object.keys(r.data || {}).slice(0, 10),
         cabecalhoExtract: r.data?.pedido_venda_produto?.cabecalho ? {
           numero_pedido: r.data.pedido_venda_produto.cabecalho.numero_pedido,
@@ -70,6 +81,10 @@ export async function GET(req) {
           etapa: r.data.pedido_venda_produto.cabecalho.etapa,
         } : null,
       });
+      // Se ja achou, para
+      if (r.data?.pedido_venda_produto?.cabecalho) break;
+      // Delay 4s entre tentativas pra evitar REDUNDANT
+      await new Promise((r) => setTimeout(r, 4000));
     }
 
     // Tenta tambem ListarPedidos pra ver se acha o pedido por outros campos
