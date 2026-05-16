@@ -7,6 +7,7 @@ import { labelCategoria } from "@/lib/op-categorias";
 import MapaCotacaoClient from "./MapaCotacaoClient";
 import OPAcoesClient from "./OPAcoesClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
+import FDAvulsosSection from "@/components/FDAvulsosSection";
 
 export const dynamic = "force-dynamic";
 
@@ -159,6 +160,38 @@ export default async function PainelOPDetalhe({ params }) {
         });
       }
     }
+  }
+
+  // FDs avulsos cadastrados direto na OP (sem cotacao)
+  const fdAvulsosRaw = await prisma.pedidoOmie.findMany({
+    where: { opId: op.id, criadoManualmente: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const pedidosFdAvulsos = fdAvulsosRaw.map((p) => ({
+    id: p.id,
+    codigoPedido: p.codigoPedido,
+    numeroPedido: p.numeroPedido,
+    total: p.total,
+    faturamentoDireto: p.faturamentoDireto,
+    status: p.status,
+    fornecedorNome: p.fornecedorNome,
+    observacao: p.observacao,
+    cnpj: p.cnpj,
+    createdAt: p.createdAt.toISOString(),
+    criadoManualmente: p.criadoManualmente,
+    anexoUrl: p.anexoUrl,
+    anexoNome: p.anexoNome,
+    categoriaItem: p.categoriaItem,
+  }));
+  // Soma os FDs avulsos no totalEmPedidos pra saldo refletir
+  for (const p of pedidosFdAvulsos) {
+    if (p.status === "CRIADO") totalEmPedidos += p.total || 0;
+    pedidosFlat.push({
+      ...p,
+      erroOmie: null,
+      rmNumero: null,
+      cotacaoId: null,
+    });
   }
   pedidosFlat.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const saldo = verbaTotal - totalEmPedidos;
@@ -325,6 +358,17 @@ export default async function PainelOPDetalhe({ params }) {
 
       {/* Mapa de Cotação */}
       <MapaCotacaoClient op={data} />
+
+      {/* FDs avulsos / Regularizacao — acima do PedidosOmieSection */}
+      <FDAvulsosSection
+        opId={op.id}
+        pedidos={pedidosFdAvulsos}
+        podeEditar={["ADMIN", "COMERCIAL", "COMPRAS"].includes(user.role)}
+        categoriasOP={Array.from(new Set([
+          ...op.itens.map((i) => i.categoria).filter(Boolean),
+          ...op.aditivos.flatMap((a) => a.itens.map((i) => i.categoria)).filter(Boolean),
+        ]))}
+      />
 
       {/* Pedidos no Omie vinculados a essa OP */}
       <PedidosOmieSection pedidos={pedidosFlat} />
