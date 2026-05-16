@@ -5,7 +5,6 @@ import { requireRole } from "@/lib/session";
 import { ArrowLeft } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
-import FDAvulsosSection from "@/components/FDAvulsosSection";
 
 // Sempre busca dados frescos do banco
 export const dynamic = "force-dynamic";
@@ -271,13 +270,6 @@ export default async function OPDetailPage({ params }) {
       </Link>
 
       <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} />
-
-      <FDAvulsosSection
-        opId={params.id}
-        pedidos={pedidosFdAvulsos}
-        podeEditar={["ADMIN", "COMERCIAL", "COMPRAS"].includes(user.role)}
-        categoriasOP={Array.from(categoriasNoEscopo)}
-      />
 
       <PedidosOmieSection pedidos={pedidos} />
     </div>
