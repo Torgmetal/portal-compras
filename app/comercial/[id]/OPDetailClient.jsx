@@ -791,6 +791,23 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdicionar, onSync, onRemover }) {
   const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
+  // Enriquece cada medicao com pct e acumulado pra ajudar a conferir 100%.
+  // Medicoes ja vem ordenadas por createdAt asc do servidor.
+  const medicoesComAcumulado = (() => {
+    let acumValor = 0;
+    return medicoes.map((m) => {
+      const valor = Number(m.valorBruto) || 0;
+      acumValor += valor;
+      const pctMedicao = receitaBruta > 0 ? (valor / receitaBruta) * 100 : 0;
+      const pctAcumulado = receitaBruta > 0 ? (acumValor / receitaBruta) * 100 : 0;
+      // Detecta se eh medicao parcial (numero com "/")
+      const ehParcial = /\//.test(m.numeroPedidoOmie || "");
+      return { ...m, valorAcumulado: acumValor, pctMedicao, pctAcumulado, ehParcial };
+    });
+  })();
+  const completou100 = medicoesComAcumulado.length > 0
+    && medicoesComAcumulado[medicoesComAcumulado.length - 1].pctAcumulado >= 99.5;
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
@@ -853,22 +870,36 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdi
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                 <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Itens</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Percentual da medição em relação à receita do contrato">% Contrato</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Soma acumulada das medições ao longo do tempo">% Acumulado</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {medicoes.map((m) => (
+              {medicoesComAcumulado.map((m) => {
+                // Cor do acumulado: verde quando >= 100%, amber quando >= 70%
+                const corAcum = m.pctAcumulado >= 99.5
+                  ? "text-emerald-700 bg-emerald-50"
+                  : m.pctAcumulado >= 70
+                  ? "text-amber-700 bg-amber-50"
+                  : "text-torg-dark bg-torg-blue-50";
+                return (
                 <tr key={m.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2">
                     <a
                       href={`/api/omie/pedido-compra-pdf/${m.codigoPedidoOmie || m.numeroPedidoOmie}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-mono font-semibold text-torg-blue hover:underline"
+                      className="font-mono font-semibold text-torg-blue hover:underline inline-flex items-center gap-1.5"
                       title="Abrir no Omie"
                     >
                       {m.numeroPedidoOmie}
+                      {m.ehParcial && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-torg-orange-100 text-torg-orange-700 font-bold normal-case whitespace-nowrap" title="Medição parcial">
+                          PARCIAL
+                        </span>
+                      )}
                     </a>
                   </td>
                   <td className="px-4 py-2 text-torg-dark text-xs max-w-xs truncate" title={m.descricao || ""}>
@@ -878,6 +909,16 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdi
                   <td className="px-4 py-2 text-center text-torg-gray text-xs">{m.qtdItens || 0}</td>
                   <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">
                     {fmtMoeda(m.valorBruto)}
+                  </td>
+                  <td className="px-4 py-2 text-right text-torg-gray tabular-nums whitespace-nowrap">
+                    {receitaBruta > 0 ? `${m.pctMedicao.toFixed(1)}%` : "—"}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+                    {receitaBruta > 0 ? (
+                      <span className={`px-2 py-0.5 rounded font-semibold ${corAcum}`} title={`Acumulado: ${fmtMoeda(m.valorAcumulado)}`}>
+                        {m.pctAcumulado.toFixed(1)}%
+                      </span>
+                    ) : "—"}
                   </td>
                   <td className="px-4 py-2 text-xs">
                     {m.status ? (
@@ -912,8 +953,39 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdi
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
+            {medicoesComAcumulado.length > 0 && receitaBruta > 0 && (
+              <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+                <tr>
+                  <td colSpan={4} className="px-4 py-2 text-right text-xs font-semibold text-torg-gray uppercase">
+                    Total medido
+                  </td>
+                  <td className="px-4 py-2 text-right text-torg-dark font-bold tabular-nums">
+                    {fmtMoeda(medicoesComAcumulado[medicoesComAcumulado.length - 1].valorAcumulado)}
+                  </td>
+                  <td className="px-4 py-2 text-right text-torg-gray text-xs tabular-nums">
+                    —
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    <span className={`px-2 py-0.5 rounded font-bold ${
+                      completou100
+                        ? "bg-emerald-600 text-white"
+                        : "bg-amber-100 text-amber-800"
+                    }`}>
+                      {medicoesComAcumulado[medicoesComAcumulado.length - 1].pctAcumulado.toFixed(1)}%
+                      {completou100 && " ✓"}
+                    </span>
+                  </td>
+                  <td colSpan={2} className="px-4 py-2 text-[10px] text-torg-gray italic">
+                    {completou100
+                      ? "Contrato 100% medido"
+                      : `Falta ${(100 - medicoesComAcumulado[medicoesComAcumulado.length - 1].pctAcumulado).toFixed(1)}% pra fechar 100%`}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       )}
