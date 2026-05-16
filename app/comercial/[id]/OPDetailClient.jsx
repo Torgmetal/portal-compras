@@ -950,8 +950,8 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, 
                   </td>
                   <td className="px-4 py-2 text-torg-gray text-xs">{fmtData(m.data)}</td>
                   <td className="px-4 py-2 text-center text-torg-gray text-xs">{m.qtdItens || 0}</td>
-                  <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">
-                    {fmtMoeda(m.valorBruto)}
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    <ValorMedicaoEditavel medicao={m} onSync={onSync} />
                   </td>
                   <td className="px-4 py-2 text-right text-torg-gray tabular-nums whitespace-nowrap">
                     {baseContrato > 0 ? `${m.pctMedicao.toFixed(1)}%` : "—"}
@@ -1031,6 +1031,85 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, 
             )}
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+// Valor da medicao com opcao de editar manualmente. Util quando o Omie nao
+// retornou o valor faturado correto (ex: pedido aberto com saldo a medir
+// que aparece como total contratado).
+function ValorMedicaoEditavel({ medicao, onSync }) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(String(medicao.valorBruto || 0));
+  const [salvando, setSalvando] = useState(false);
+  const valorContratado = Number(medicao.valorContratado) || 0;
+  const valorAtual = Number(medicao.valorBruto) || 0;
+
+  const salvar = async () => {
+    const v = parseFloat(String(valor).replace(",", "."));
+    if (isNaN(v) || v < 0) {
+      alert("Valor inválido");
+      return;
+    }
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/comercial/medicao/${medicao.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ valorBruto: v }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Erro");
+      setEditando(false);
+      onSync?.(medicao.id, true); // pode passar uma flag pro refresh externo
+      // refresh local: como o pai usa router.refresh, vai re-renderizar
+      window.location.reload();
+    } catch (e) {
+      alert("Falha: " + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  if (editando) {
+    return (
+      <div className="flex items-center gap-1 justify-end">
+        <input
+          type="text"
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          autoFocus
+          className="w-24 border border-gray-300 rounded px-1.5 py-0.5 text-xs text-right tabular-nums"
+        />
+        <button
+          onClick={salvar}
+          disabled={salvando}
+          className="text-emerald-600 hover:text-emerald-800 text-xs"
+          title="Salvar"
+        >
+          {salvando ? <Loader2 size={12} className="animate-spin" /> : "✓"}
+        </button>
+        <button onClick={() => setEditando(false)} className="text-red-600 hover:text-red-800 text-xs" title="Cancelar">
+          ×
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-right">
+      <button
+        onClick={() => setEditando(true)}
+        className="text-torg-dark font-medium tabular-nums hover:text-torg-blue cursor-pointer"
+        title="Clique pra editar manualmente"
+      >
+        {fmtMoeda(valorAtual)}
+      </button>
+      {valorContratado > 0 && valorContratado !== valorAtual && (
+        <p className="text-[9px] text-torg-gray" title="Valor total contratado no pedido Omie">
+          de {fmtMoeda(valorContratado)}
+        </p>
       )}
     </div>
   );

@@ -54,6 +54,44 @@ export async function POST(_req, { params }) {
   return NextResponse.json({ ok: true });
 }
 
+// PATCH — edita campos manuais (valorBruto, descricao) sem sincronizar Omie.
+// Util quando a deteccao automatica de "valor faturado" nao bate com o
+// que o usuario realmente quer medir.
+export async function PATCH(req, { params }) {
+  let user;
+  try {
+    user = await requireRole(["ADMIN", "COMERCIAL"]);
+  } catch {
+    return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
+  }
+  const body = await req.json().catch(() => ({}));
+  const m = await prisma.oPMedicao.findUnique({ where: { id: params.id } });
+  if (!m) return NextResponse.json({ error: "Medicao nao encontrada" }, { status: 404 });
+
+  const data = {};
+  if (body.valorBruto !== undefined) {
+    const v = Number(body.valorBruto);
+    if (isNaN(v) || v < 0) return NextResponse.json({ error: "Valor invalido" }, { status: 400 });
+    data.valorBruto = v;
+  }
+  if (body.descricao !== undefined) data.descricao = String(body.descricao || "").trim() || null;
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "Nada pra atualizar" }, { status: 400 });
+  }
+
+  const updated = await prisma.oPMedicao.update({ where: { id: m.id }, data });
+  await prisma.auditLog.create({
+    data: {
+      userId: user.id,
+      action: "editar_medicao_manual",
+      entity: "OPMedicao",
+      entityId: m.id,
+      diff: { antes: { valorBruto: m.valorBruto, descricao: m.descricao }, depois: data },
+    },
+  });
+  return NextResponse.json({ medicao: updated });
+}
+
 // DELETE — desvincula a medicao da OP (nao apaga no Omie)
 export async function DELETE(_req, { params }) {
   let user;

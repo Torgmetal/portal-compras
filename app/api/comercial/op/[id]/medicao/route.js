@@ -65,6 +65,8 @@ export async function POST(req, { params }) {
       data: resultado.data,
       valorBruto: resultado.valorBruto || 0,
       valorLiquido: resultado.valorLiquido || null,
+      valorContratado: resultado.valorContratado || null,
+      valorFaturadoAuto: resultado.valorFaturado || 0,
       status: resultado.status,
       etapa: resultado.etapa,
       qtdItens: resultado.qtdItens || 0,

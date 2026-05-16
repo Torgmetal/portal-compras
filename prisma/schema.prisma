@@ -231,8 +231,17 @@ model OPMedicao {
   // Snapshot dos dados (sincronizado via API Omie)
   descricao        String?
   data             DateTime?
+  // valorBruto = quanto JA FOI MEDIDO/FATURADO desse pedido (default: parcelas
+  // com nFatura ou etapa=60 = total). Pode ser editado manualmente quando a
+  // detecccao automatica nao bate.
   valorBruto       Float    @default(0)
   valorLiquido     Float?
+  // valorContratado = valor_total_pedido do Omie (info auxiliar pra
+  // comparar quanto foi medido vs contratado)
+  valorContratado  Float?
+  // valorFaturado bruto detectado das parcelas (mesma logica do valorBruto,
+  // guardado pra auditoria — pode divergir se usuario editou manualmente)
+  valorFaturadoAuto Float?
   status           String?  // ABERTO | FATURADO | CANCELADO | etc
   etapa            String?  // codigo da etapa do pedido no Omie
   qtdItens         Int      @default(0)
