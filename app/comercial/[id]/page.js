@@ -132,8 +132,19 @@ export default async function OPDetailPage({ params }) {
     0
   );
   const verbaTotal = verbaBase + verbaAditivos;
+  // Pedidos que consomem verba:
+  // - Status CRIADO (ja existe no Omie)
+  // - FDs avulsos manuais com status PENDENTE_OMIE ou ERRO (NF ja foi feita,
+  //   so falta criar no Omie — mas a verba ja esta comprometida)
+  // - CANCELADO nunca conta
+  const consomeVerba = (p) => {
+    if (p.status === "CANCELADO") return false;
+    if (p.status === "CRIADO") return true;
+    if (p.criadoManualmente && (p.status === "PENDENTE_OMIE" || p.status === "ERRO")) return true;
+    return false;
+  };
   const totalEmPedidos = pedidos
-    .filter((p) => p.status === "CRIADO")
+    .filter(consomeVerba)
     .reduce((s, p) => s + (p.total || 0), 0);
   const saldo = verbaTotal - totalEmPedidos;
   const consumoPct = verbaTotal > 0 ? (totalEmPedidos / verbaTotal) * 100 : 0;
@@ -161,9 +172,10 @@ export default async function OPDetailPage({ params }) {
   const temFD = itensTodos.some((i) => i.faturamentoDireto);
   const verbaFD = itensTodos.filter((i) => i.faturamentoDireto).reduce((s, i) => s + (i.valorVerba || 0), 0);
   const verbaTorg = verbaTotal - verbaFD; // verba que a Torg paga (nao FD)
-  // Pedidos: separa pelo flag faturamentoDireto do proprio PedidoOmie
+  // Pedidos: separa pelo flag faturamentoDireto do proprio PedidoOmie.
+  // Mesma regra de consomeVerba (inclui FDs avulsos PENDENTE_OMIE).
   const pedidosFD = pedidos
-    .filter((p) => p.status === "CRIADO" && p.faturamentoDireto)
+    .filter((p) => consomeVerba(p) && p.faturamentoDireto)
     .reduce((s, p) => s + (p.total || 0), 0);
   const pedidosTorg = totalEmPedidos - pedidosFD;
   // Excedente de FD: quando o pedido FD ultrapassa a verba planejada,

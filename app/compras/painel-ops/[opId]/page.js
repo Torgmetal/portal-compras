@@ -183,9 +183,12 @@ export default async function PainelOPDetalhe({ params }) {
     anexoNome: p.anexoNome,
     categoriaItem: p.categoriaItem,
   }));
-  // Soma os FDs avulsos no totalEmPedidos pra saldo refletir
+  // Soma os FDs avulsos no totalEmPedidos pra saldo refletir.
+  // IMPORTANTE: pra FDs avulsos, conta tambem status PENDENTE_OMIE e ERRO —
+  // o valor da NF/proposta ja foi comprometido, mesmo se o pedido ainda
+  // nao foi criado no Omie. So nao conta CANCELADO.
   for (const p of pedidosFdAvulsos) {
-    if (p.status === "CRIADO") totalEmPedidos += p.total || 0;
+    if (p.status !== "CANCELADO") totalEmPedidos += p.total || 0;
     pedidosFlat.push({
       ...p,
       erroOmie: null,

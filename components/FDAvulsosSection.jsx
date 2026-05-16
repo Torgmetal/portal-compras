@@ -435,7 +435,7 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
                   return (
                     <div key={idx} className="bg-white border border-gray-200 rounded p-2 space-y-1">
                       <div className="flex items-center gap-2">
-                        <div className="flex-1">
+                        <div className="flex-1 space-y-1">
                           <AutocompleteProdutoOmie
                             valor={it.descricao}
                             codigoAtual={it.codigo}
@@ -449,11 +449,19 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
                             }}
                             onChangeTexto={(txt) => setItem(idx, "descricao", txt)}
                           />
-                          {it.codigo && (
-                            <p className="text-[9px] text-emerald-700 mt-0.5">
-                              ✓ Produto Omie vinculado: <span className="font-mono">{it.codigo}</span>
-                            </p>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <label className="text-[9px] text-torg-gray uppercase whitespace-nowrap">Cód. Omie</label>
+                            <input
+                              type="text"
+                              value={it.codigo || ""}
+                              onChange={(e) => setItem(idx, "codigo", e.target.value)}
+                              placeholder="Cole aqui se já tem (opcional)"
+                              className="flex-1 border border-gray-300 rounded px-2 py-1 text-[11px] font-mono focus:ring-1 focus:ring-torg-blue"
+                            />
+                            {it.codigo && (
+                              <span className="text-[9px] text-emerald-700 font-medium whitespace-nowrap">✓ vinculado</span>
+                            )}
+                          </div>
                         </div>
                         <button
                           type="button"
