@@ -221,9 +221,12 @@ model OPMedicao {
   opId        String
   op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
 
+  // Tipo de documento Omie: "VENDA" (Pedido de Venda — default histórico)
+  // ou "SERVICO" (Ordem de Servico). Define qual API consultar.
+  tipoDocumento    String   @default("VENDA")
   // Identificadores no Omie
-  numeroPedidoOmie String  // Numero visivel (ex: "1500")
-  codigoPedidoOmie String? // codigo_pedido interno do Omie
+  numeroPedidoOmie String  // Numero visivel (ex: "1500" ou "233/1" pra OS)
+  codigoPedidoOmie String? // codigo_pedido / codigo_os interno do Omie
 
   // Snapshot dos dados (sincronizado via API Omie)
   descricao        String?

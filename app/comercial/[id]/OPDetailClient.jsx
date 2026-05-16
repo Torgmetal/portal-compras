@@ -918,20 +918,32 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, 
                 return (
                 <tr key={m.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2">
-                    <a
-                      href={`/api/omie/pedido-compra-pdf/${m.codigoPedidoOmie || m.numeroPedidoOmie}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono font-semibold text-torg-blue hover:underline inline-flex items-center gap-1.5"
-                      title="Abrir no Omie"
-                    >
-                      {m.numeroPedidoOmie}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <a
+                        href={`/api/omie/pedido-compra-pdf/${m.codigoPedidoOmie || m.numeroPedidoOmie}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono font-semibold text-torg-blue hover:underline"
+                        title="Abrir no Omie"
+                      >
+                        {m.numeroPedidoOmie}
+                      </a>
+                      {/* Badge do tipo de documento */}
+                      {m.tipoDocumento === "SERVICO" ? (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-torg-orange-50 text-torg-orange-700 border border-torg-orange-200 font-bold normal-case whitespace-nowrap" title="Ordem de Serviço">
+                          🔧 OS
+                        </span>
+                      ) : (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue border border-torg-blue-200 font-bold normal-case whitespace-nowrap" title="Pedido de Venda">
+                          📋 Venda
+                        </span>
+                      )}
                       {m.ehParcial && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-torg-orange-100 text-torg-orange-700 font-bold normal-case whitespace-nowrap" title="Medição parcial">
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 font-bold normal-case whitespace-nowrap" title="Medição parcial">
                           PARCIAL
                         </span>
                       )}
-                    </a>
+                    </div>
                   </td>
                   <td className="px-4 py-2 text-torg-dark text-xs max-w-xs truncate" title={m.descricao || ""}>
                     {m.descricao || "—"}
@@ -1035,20 +1047,27 @@ function statusMedicaoClasses(etapa) {
 
 // Modal pra vincular medicao
 function ModalMedicao({ opId, onClose, onSaved }) {
+  const [tipo, setTipo] = useState("VENDA"); // VENDA | SERVICO
   const [numero, setNumero] = useState("");
   const [descricao, setDescricao] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
+  const tipoLabel = tipo === "SERVICO" ? "Ordem de Serviço" : "Pedido de Venda";
+
   const submit = async () => {
     setErro("");
-    if (!numero.trim()) return setErro("Informe o número do Pedido de Venda no Omie.");
+    if (!numero.trim()) return setErro(`Informe o número da ${tipoLabel} no Omie.`);
     setSalvando(true);
     try {
       const res = await fetch(`/api/comercial/op/${opId}/medicao`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ numeroPedido: numero.trim(), descricao: descricao.trim() || null }),
+        body: JSON.stringify({
+          numeroPedido: numero.trim(),
+          descricao: descricao.trim() || null,
+          tipoDocumento: tipo,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
@@ -1060,7 +1079,7 @@ function ModalMedicao({ opId, onClose, onSaved }) {
   };
 
   return (
-    <Modal titulo="Vincular medição (Pedido de Venda do Omie)" onClose={onClose}>
+    <Modal titulo={`Vincular medição (${tipoLabel} do Omie)`} onClose={onClose}>
       <div className="px-6 py-5 space-y-4">
         {erro && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
@@ -1068,13 +1087,43 @@ function ModalMedicao({ opId, onClose, onSaved }) {
           </div>
         )}
 
+        <div>
+          <label className="block text-sm font-medium text-torg-dark mb-2">Tipo de medição *</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setTipo("VENDA")}
+              className={`px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                tipo === "VENDA"
+                  ? "border-torg-blue bg-torg-blue-50 text-torg-blue"
+                  : "border-gray-200 bg-white text-torg-gray hover:bg-gray-50"
+              }`}
+            >
+              📋 Pedido de Venda
+              <p className="text-[10px] font-normal mt-0.5 opacity-80">NF de mercadoria</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTipo("SERVICO")}
+              className={`px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                tipo === "SERVICO"
+                  ? "border-torg-orange bg-torg-orange-50 text-torg-orange-700"
+                  : "border-gray-200 bg-white text-torg-gray hover:bg-gray-50"
+              }`}
+            >
+              🔧 Ordem de Serviço
+              <p className="text-[10px] font-normal mt-0.5 opacity-80">NF de serviço</p>
+            </button>
+          </div>
+        </div>
+
         <p className="text-xs text-torg-gray">
-          Digite o número do Pedido de Venda que você criou no Omie (ex: <code>1500</code> ou <code>233/1</code>).
-          O portal busca os dados via API: data, valor total, status e quantidade de itens.
+          Digite o número da <strong>{tipoLabel}</strong> que você criou no Omie (ex: <code>1500</code> ou <code>233/1</code>).
+          O portal busca os dados via API: data, valor total, status.
         </p>
 
         <div>
-          <label className="block text-sm font-medium text-torg-dark mb-1">Nº do Pedido de Venda no Omie *</label>
+          <label className="block text-sm font-medium text-torg-dark mb-1">Nº da {tipoLabel} no Omie *</label>
           <input
             type="text"
             value={numero}

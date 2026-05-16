@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { consultarPedidoVenda } from "@/lib/omie-pedido-venda";
+import { consultarOrdemServico } from "@/lib/omie-ordem-servico";
 
 // POST — sincroniza dados da medicao com o Omie (re-busca via API).
 export async function POST(_req, { params }) {
@@ -15,10 +16,16 @@ export async function POST(_req, { params }) {
   const m = await prisma.oPMedicao.findUnique({ where: { id: params.id } });
   if (!m) return NextResponse.json({ error: "Medicao nao encontrada" }, { status: 404 });
 
-  const r = await consultarPedidoVenda({
-    codigoPedido: m.codigoPedidoOmie,
-    numeroPedido: m.numeroPedidoOmie,
-  });
+  // Re-busca usando o mesmo tipo (VENDA / SERVICO) salvo na medicao
+  const r = m.tipoDocumento === "SERVICO"
+    ? await consultarOrdemServico({
+        codigo: m.codigoPedidoOmie,
+        numero: m.numeroPedidoOmie,
+      })
+    : await consultarPedidoVenda({
+        codigoPedido: m.codigoPedidoOmie,
+        numeroPedido: m.numeroPedidoOmie,
+      });
 
   if (r.error) {
     await prisma.oPMedicao.update({

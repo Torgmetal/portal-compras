@@ -3,13 +3,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { consultarPedidoVenda } from "@/lib/omie-pedido-venda";
+import { consultarOrdemServico } from "@/lib/omie-ordem-servico";
 
-// POST — vincula um Pedido de Venda do Omie como medicao da OP.
-// Busca os dados via API do Omie e salva como snapshot.
+// POST — vincula um Pedido de Venda OU uma Ordem de Servico do Omie
+// como medicao da OP. Busca dados via API e salva snapshot.
 
 const schema = z.object({
   numeroPedido: z.string().min(1),
   descricao: z.string().optional().nullable(),
+  tipoDocumento: z.enum(["VENDA", "SERVICO"]).default("VENDA"),
 });
 
 export async function POST(req, { params }) {
@@ -30,11 +32,14 @@ export async function POST(req, { params }) {
   const op = await prisma.oP.findUnique({ where: { id: params.id } });
   if (!op) return NextResponse.json({ error: "OP nao encontrada" }, { status: 404 });
 
-  // Consulta no Omie
-  const resultado = await consultarPedidoVenda({ numeroPedido: body.numeroPedido.trim() });
+  // Consulta no Omie — Pedido de Venda ou Ordem de Servico
+  const resultado = body.tipoDocumento === "SERVICO"
+    ? await consultarOrdemServico({ numero: body.numeroPedido.trim() })
+    : await consultarPedidoVenda({ numeroPedido: body.numeroPedido.trim() });
   if (resultado.error) {
+    const tipoLabel = body.tipoDocumento === "SERVICO" ? "Ordem de Serviço" : "Pedido de Venda";
     return NextResponse.json(
-      { error: `Omie nao retornou o pedido: ${resultado.error}` },
+      { error: `Omie nao retornou a ${tipoLabel}: ${resultado.error}` },
       { status: 502 }
     );
   }
@@ -45,7 +50,7 @@ export async function POST(req, { params }) {
   });
   if (ja) {
     return NextResponse.json(
-      { error: `Pedido ${resultado.numeroPedido} ja esta vinculado a essa OP.` },
+      { error: `${body.tipoDocumento === "SERVICO" ? "OS" : "Pedido"} ${resultado.numeroPedido} ja esta vinculado a essa OP.` },
       { status: 409 }
     );
   }
@@ -53,6 +58,7 @@ export async function POST(req, { params }) {
   const created = await prisma.oPMedicao.create({
     data: {
       opId: op.id,
+      tipoDocumento: body.tipoDocumento,
       numeroPedidoOmie: resultado.numeroPedido,
       codigoPedidoOmie: resultado.codigoPedido,
       descricao: body.descricao || resultado.observacao || null,
