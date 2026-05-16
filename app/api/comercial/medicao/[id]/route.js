@@ -42,6 +42,8 @@ export async function POST(_req, { params }) {
       data: r.data || m.data,
       valorBruto: r.valorBruto || 0,
       valorLiquido: r.valorLiquido,
+      valorContratado: r.valorContratado != null ? r.valorContratado : m.valorContratado,
+      valorFaturadoAuto: r.valorFaturado != null ? r.valorFaturado : m.valorFaturadoAuto,
       status: r.status,
       etapa: r.etapa,
       qtdItens: r.qtdItens || 0,
