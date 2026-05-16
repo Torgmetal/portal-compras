@@ -4,8 +4,28 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { CATEGORIAS_FORNECEDOR_BUILTIN } from "@/lib/fornecedor-categorias";
 
-const CATEGORIAS_VALIDAS = ["MATERIA_PRIMA", "TINTA", "PARAFUSOS", "MATERIAL_AUXILIAR", "EPI", "FERRAMENTAS", "SERVICOS"];
+const CODIGOS_BUILTIN = new Set(CATEGORIAS_FORNECEDOR_BUILTIN.map((c) => c.codigo));
+
+// Valida que cada codigo de categoria existe (built-in OU custom no banco).
+// Retorna { ok: true } ou { ok: false, erro: "..." }
+async function validarCategorias(codigos) {
+  if (!Array.isArray(codigos) || codigos.length === 0) return { ok: true };
+  const desconhecidas = codigos.filter((c) => !CODIGOS_BUILTIN.has(c));
+  if (desconhecidas.length === 0) return { ok: true };
+  // Procura no banco as customizadas
+  const encontradas = await prisma.categoriaFornecedor.findMany({
+    where: { codigo: { in: desconhecidas } },
+    select: { codigo: true },
+  });
+  const codigosEncontrados = new Set(encontradas.map((c) => c.codigo));
+  const naoExistem = desconhecidas.filter((c) => !codigosEncontrados.has(c));
+  if (naoExistem.length > 0) {
+    return { ok: false, erro: `Categorias desconhecidas: ${naoExistem.join(", ")}` };
+  }
+  return { ok: true };
+}
 
 const schema = z.object({
   razaoSocial: z.string().min(1),
@@ -17,7 +37,9 @@ const schema = z.object({
   contato: z.string().optional().nullable(),
   cidade: z.string().optional().nullable(),
   uf: z.string().optional().nullable(),
-  categorias: z.array(z.enum(CATEGORIAS_VALIDAS)).default([]),
+  // Aceita qualquer string; validacao real consulta banco pra confirmar
+  // se cada codigo existe (built-in ou custom)
+  categorias: z.array(z.string().min(1)).default([]),
   observacao: z.string().optional().nullable(),
   nCodOmie: z.string().optional().nullable(),
   ativo: z.boolean().default(true),
@@ -68,6 +90,12 @@ export async function POST(req) {
     body = schema.parse(await req.json());
   } catch (e) {
     return NextResponse.json({ error: "Dados invalidos: " + e.message }, { status: 400 });
+  }
+
+  // Valida que cada codigo de categoria existe (built-in ou custom)
+  const validacao = await validarCategorias(body.categorias);
+  if (!validacao.ok) {
+    return NextResponse.json({ error: validacao.erro }, { status: 400 });
   }
 
   const fornecedor = await prisma.fornecedor.create({
