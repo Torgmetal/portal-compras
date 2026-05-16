@@ -1977,26 +1977,47 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, isMaster, podeA
               const consumido = Number(it.consumido) || 0;
               const verba = Number(it.valorVerba) || 0;
               const saldo = verba - consumido;
+              const pctUsado = verba > 0 ? Math.min(100, (consumido / verba) * 100) : 0;
+              // Semáforo: vermelho > 100% (estourou), amber > 80%, azul/verde restante
+              const corBarra = saldo < 0 ? "bg-red-500" : pctUsado > 80 ? "bg-amber-500" : "bg-emerald-500";
+              const corSaldo = saldo < 0 ? "text-red-700" : pctUsado > 80 ? "text-amber-700" : "text-emerald-700";
               return (
                 <tr key={it.id}>
                   <td className="px-4 py-2 text-torg-gray text-xs">{labelCategoria(it.categoria)}</td>
                   <td className="px-4 py-2 text-torg-dark font-medium">{it.descricao}</td>
                   <td className="px-4 py-2 text-torg-gray text-xs">{detalhesItem(it)}</td>
                   <td className="px-4 py-2 text-torg-gray text-xs">{localLabel(it.localEstoque) || "—"}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">
-                    <p className="text-torg-dark font-medium">{fmtMoeda(verba)}</p>
+                  <td className="px-4 py-2 text-right tabular-nums min-w-[200px]">
+                    <div className="flex items-baseline justify-end gap-1.5">
+                      <span className="text-torg-dark font-semibold">{fmtMoeda(verba)}</span>
+                      {consumido > 0 && (
+                        <span className={`text-[10px] font-medium ${corSaldo}`}>
+                          {pctUsado.toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
                     {consumido > 0 && (
                       <>
-                        <p className="text-[10px] text-amber-700">−{fmtMoeda(consumido)} consumido</p>
-                        <p className={`text-[10px] font-semibold ${
-                          saldo < 0 ? "text-red-700" : saldo < verba * 0.2 ? "text-amber-700" : "text-emerald-700"
-                        }`}>
-                          = {fmtMoeda(saldo)} saldo
-                        </p>
+                        <div className="mt-1 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${corBarra} transition-all`}
+                            style={{ width: `${Math.min(100, pctUsado)}%` }}
+                            title={`${pctUsado.toFixed(1)}% consumido`}
+                          />
+                        </div>
+                        <div className="flex items-center justify-end gap-2 mt-1 text-[10px]">
+                          <span className="text-amber-700">
+                            <span className="text-torg-gray">−</span> {fmtMoeda(consumido)}
+                          </span>
+                          <span className="text-gray-300">·</span>
+                          <span className={`font-semibold ${corSaldo}`}>
+                            {fmtMoeda(saldo)} saldo
+                          </span>
+                        </div>
                       </>
                     )}
                     {temPendente && (
-                      <p className="text-[10px] text-torg-orange-700 font-medium">⏳ alteração pendente</p>
+                      <p className="text-[10px] text-torg-orange-700 font-medium mt-1">⏳ alteração pendente</p>
                     )}
                   </td>
                   <td className="px-4 py-2 text-center">
