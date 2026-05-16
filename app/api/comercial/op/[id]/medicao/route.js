@@ -12,6 +12,10 @@ const schema = z.object({
   numeroPedido: z.string().min(1),
   descricao: z.string().optional().nullable(),
   tipoDocumento: z.enum(["VENDA", "SERVICO"]).default("VENDA"),
+  // Modo manual: pula consulta ao Omie e usa os valores informados
+  manual: z.boolean().optional().default(false),
+  valorBruto: z.number().optional(),
+  data: z.string().optional().nullable(), // ISO date
 });
 
 export async function POST(req, { params }) {
@@ -32,16 +36,42 @@ export async function POST(req, { params }) {
   const op = await prisma.oP.findUnique({ where: { id: params.id } });
   if (!op) return NextResponse.json({ error: "OP nao encontrada" }, { status: 404 });
 
-  // Consulta no Omie — Pedido de Venda ou Ordem de Servico
-  const resultado = body.tipoDocumento === "SERVICO"
-    ? await consultarOrdemServico({ numero: body.numeroPedido.trim() })
-    : await consultarPedidoVenda({ numeroPedido: body.numeroPedido.trim() });
-  if (resultado.error) {
-    const tipoLabel = body.tipoDocumento === "SERVICO" ? "Ordem de Serviço" : "Pedido de Venda";
-    return NextResponse.json(
-      { error: `Omie nao retornou a ${tipoLabel}: ${resultado.error}` },
-      { status: 502 }
-    );
+  // Modo manual: usa os dados informados sem consultar Omie
+  let resultado;
+  if (body.manual) {
+    if (!body.valorBruto || body.valorBruto <= 0) {
+      return NextResponse.json(
+        { error: "Modo manual exige valor bruto maior que zero." },
+        { status: 400 }
+      );
+    }
+    resultado = {
+      success: true,
+      codigoPedido: null,
+      numeroPedido: body.numeroPedido.trim(),
+      data: body.data ? new Date(body.data) : null,
+      valorBruto: body.valorBruto,
+      valorLiquido: body.valorBruto,
+      valorContratado: body.valorBruto,
+      valorFaturado: body.valorBruto,
+      etapa: null,
+      status: "Manual (não sincronizado)",
+      qtdItens: 0,
+      observacao: "",
+      raw: { _manual: true },
+    };
+  } else {
+    // Consulta no Omie — Pedido de Venda ou Ordem de Servico
+    resultado = body.tipoDocumento === "SERVICO"
+      ? await consultarOrdemServico({ numero: body.numeroPedido.trim() })
+      : await consultarPedidoVenda({ numeroPedido: body.numeroPedido.trim() });
+    if (resultado.error) {
+      const tipoLabel = body.tipoDocumento === "SERVICO" ? "Ordem de Serviço" : "Pedido de Venda";
+      return NextResponse.json(
+        { error: `Omie nao retornou a ${tipoLabel}: ${resultado.error}` },
+        { status: 502 }
+      );
+    }
   }
 
   // Verifica se ja foi vinculado a essa OP

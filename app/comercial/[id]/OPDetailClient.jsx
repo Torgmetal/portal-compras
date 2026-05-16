@@ -1140,14 +1140,26 @@ function ModalMedicao({ opId, onClose, onSaved }) {
   const [tipo, setTipo] = useState("VENDA"); // VENDA | SERVICO
   const [numero, setNumero] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [modoManual, setModoManual] = useState(false);
+  const [valorManual, setValorManual] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   const tipoLabel = tipo === "SERVICO" ? "Ordem de Serviço" : "Pedido de Venda";
 
-  const submit = async () => {
+  const submit = async (forceManual = false) => {
     setErro("");
-    if (!numero.trim()) return setErro(`Informe o número da ${tipoLabel} no Omie.`);
+    const manual = forceManual || modoManual;
+    if (!numero.trim()) return setErro(`Informe o número da ${tipoLabel}.`);
+
+    let valorBrutoNum = null;
+    if (manual) {
+      valorBrutoNum = parseFloat(String(valorManual).replace(",", "."));
+      if (!valorBrutoNum || valorBrutoNum <= 0) {
+        return setErro("No modo manual é obrigatório informar o valor (maior que 0).");
+      }
+    }
+
     setSalvando(true);
     try {
       const res = await fetch(`/api/comercial/op/${opId}/medicao`, {
@@ -1157,13 +1169,25 @@ function ModalMedicao({ opId, onClose, onSaved }) {
           numeroPedido: numero.trim(),
           descricao: descricao.trim() || null,
           tipoDocumento: tipo,
+          manual,
+          ...(manual ? { valorBruto: valorBrutoNum } : {}),
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) {
+        // Se erro mencionar REDUNDANT, sugerir modo manual
+        const ehRedundant = /redundante|REDUNDANT|aguarde/i.test(data.error || "");
+        if (ehRedundant && !manual) {
+          setErro(`${data.error}\n\n⚠️ Omie bloqueou a consulta. Marque "Cadastrar manualmente" abaixo e digite o valor pra prosseguir sem consultar o Omie.`);
+        } else {
+          throw new Error(data.error || "Erro");
+        }
+        return;
+      }
       onSaved();
     } catch (e) {
       setErro(e.message);
+    } finally {
       setSalvando(false);
     }
   };
@@ -1240,17 +1264,54 @@ function ModalMedicao({ opId, onClose, onSaved }) {
             Se vazio, usamos a observação do pedido no Omie.
           </p>
         </div>
+
+        {/* Modo manual — pula consulta ao Omie. Util quando o Omie bloqueia
+            consultas repetidas ou quando o pedido nao existe na API mas existe
+            no Omie ERP. */}
+        <div className="border-t border-gray-100 pt-3">
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={modoManual}
+              onChange={(e) => setModoManual(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+            />
+            <div>
+              <p className="text-sm font-medium text-torg-dark">Cadastrar manualmente (sem consultar o Omie)</p>
+              <p className="text-[10px] text-torg-gray">
+                Use quando o Omie estiver bloqueando consultas ("Consumo redundante") ou se o pedido só existe no ERP mas não na API.
+              </p>
+            </div>
+          </label>
+
+          {modoManual && (
+            <div className="mt-3 ml-6">
+              <label className="block text-sm font-medium text-torg-dark mb-1">Valor da medição (R$) *</label>
+              <input
+                type="text"
+                value={valorManual}
+                onChange={(e) => setValorManual(e.target.value)}
+                placeholder="Ex: 350000,00"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
+              />
+              <p className="text-[10px] text-torg-gray mt-0.5">
+                Valor que essa medição representa do contrato. Pode editar depois clicando no valor da linha.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
         <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
           Cancelar
         </button>
         <button
-          onClick={submit}
+          onClick={() => submit(false)}
           disabled={salvando}
           className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
         >
-          {salvando && <Loader2 size={14} className="animate-spin" />} Buscar e vincular
+          {salvando && <Loader2 size={14} className="animate-spin" />}
+          {modoManual ? "Cadastrar manual" : "Buscar e vincular"}
         </button>
       </div>
     </Modal>
