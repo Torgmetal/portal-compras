@@ -12,7 +12,10 @@ import {
   CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO,
 } from "@/lib/op-categorias";
 import {
-  CATEGORIAS_FORNECEDOR, chipCategoriaFornecedor, labelCategoriaFornecedor,
+  CATEGORIAS_FORNECEDOR_BUILTIN,
+  mergeCategorias,
+  chipCategoriaFornecedor,
+  labelCategoriaFornecedor,
 } from "@/lib/fornecedor-categorias";
 import MapaCotacaoClient from "@/app/compras/painel-ops/[opId]/MapaCotacaoClient";
 
@@ -40,9 +43,14 @@ const STATUS_ITEM_LABELS = {
 // mostra como "Sem proposta" pro usuario perceber que precisa re-cotar.
 const STATUS_SEM_PROPOSTA = { label: "Sem proposta", className: "bg-amber-50 text-amber-700" };
 
-export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null }) {
+export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null, categoriasCustom = [] }) {
   const router = useRouter();
   const isAdmin = userRole === "ADMIN";
+  // Lista mesclada (built-in + custom do banco)
+  const todasCategoriasFornecedor = useMemo(
+    () => mergeCategorias(categoriasCustom),
+    [categoriasCustom]
+  );
 
   const [modalCancelarItem, setModalCancelarItem] = useState(null);
   const [modalEditarItem, setModalEditarItem] = useState(null);
@@ -465,6 +473,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
           preSelecionarMode={preSelecionarMode}
           rm={rm}
           outrasRMs={outrasRMs}
+          categoriasFornecedor={todasCategoriasFornecedor}
           onClose={() => setModalEnviarCot(false)}
           onSent={(links) => { setModalEnviarCot(false); setLinksParaEnvio(links); router.refresh(); }}
         />
@@ -1647,7 +1656,7 @@ function ModalCancelarItem({ item, rmId, onClose, onSaved }) {
   );
 }
 
-function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionarMode = null }) {
+function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionarMode = null, categoriasFornecedor = CATEGORIAS_FORNECEDOR_BUILTIN }) {
   // RMs incluidas no envio: a atual sempre, mais as escolhidas via checkbox
   const [rmsExtrasIds, setRmsExtrasIds] = useState(new Set());
   // Itens cotaveis (RM atual + extras selecionadas), recalculado quando muda extras
@@ -1998,6 +2007,7 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
           setFornecedor={setFornecedor}
           addFornecedor={addFornecedor}
           removerFornecedor={removerFornecedor}
+          categoriasFornecedor={categoriasFornecedor}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2739,6 +2749,7 @@ function FornecedoresPicker({
   fornSelecionadosIds, toggleFornCadastrado,
   filtroCatForn, setFiltroCatForn, buscaForn, setBuscaForn,
   fornecedoresLinhas, setFornecedor, addFornecedor, removerFornecedor,
+  categoriasFornecedor = CATEGORIAS_FORNECEDOR_BUILTIN,
 }) {
   const qtdSelCadastrados = fornSelecionadosIds.size;
   const qtdAvulsosValidos = fornecedoresLinhas.filter((f) => f.email && f.nome).length;
@@ -2774,7 +2785,7 @@ function FornecedoresPicker({
           >
             Todas
           </button>
-          {CATEGORIAS_FORNECEDOR.map((cat) => (
+          {categoriasFornecedor.map((cat) => (
             <button
               key={cat.codigo}
               type="button"
@@ -2782,7 +2793,7 @@ function FornecedoresPicker({
               className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${
                 filtroCatForn === cat.codigo
                   ? "bg-torg-blue text-white border-torg-blue"
-                  : `${chipCategoriaFornecedor(cat.codigo)} hover:opacity-80`
+                  : `${chipCategoriaFornecedor(cat.codigo, categoriasFornecedor)} hover:opacity-80`
               }`}
             >
               {cat.label}
@@ -2836,9 +2847,9 @@ function FornecedoresPicker({
                       {f.categorias.map((c) => (
                         <span
                           key={c}
-                          className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${chipCategoriaFornecedor(c)}`}
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${chipCategoriaFornecedor(c, categoriasFornecedor)}`}
                         >
-                          {labelCategoriaFornecedor(c)}
+                          {labelCategoriaFornecedor(c, categoriasFornecedor)}
                         </span>
                       ))}
                     </div>

@@ -30,7 +30,7 @@ export default async function PainelCompras({ searchParams }) {
     ? { status: { in: ["PEDIDO_GERADO", "CANCELADA"] } }
     : { status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] } };
 
-  const [rms, totais] = await Promise.all([
+  const [rms, totais, categoriasCustom] = await Promise.all([
     prisma.rM.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -48,6 +48,12 @@ export default async function PainelCompras({ searchParams }) {
     prisma.rM.groupBy({
       by: ["status"],
       _count: { _all: true },
+    }),
+    // Carrega categorias customizadas de fornecedor pra disponibilizar
+    // nos filtros do modal de envio de cotacao (alem das built-in)
+    prisma.categoriaFornecedor.findMany({
+      where: { ativa: true },
+      orderBy: [{ ordem: "asc" }, { label: "asc" }],
     }),
   ]);
 
@@ -211,6 +217,7 @@ export default async function PainelCompras({ searchParams }) {
         <RMsTabelaSeletor
           rms={JSON.parse(JSON.stringify(rms))}
           isAdmin={user.role === "ADMIN"}
+          categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
         />
       )}
     </div>

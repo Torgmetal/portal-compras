@@ -202,6 +202,12 @@ export default async function RMComprasDetail({ params }) {
     }],
   };
 
+  // Categorias custom de fornecedor pra filtro/chips no modal de envio
+  const categoriasCustom = await prisma.categoriaFornecedor.findMany({
+    where: { ativa: true },
+    orderBy: [{ ordem: "asc" }, { label: "asc" }],
+  });
+
   const data = JSON.parse(JSON.stringify(rm));
   const outrasRMs = JSON.parse(JSON.stringify(outrasRMsAtivas));
   const dadosMapaSerial = rm.opId
@@ -213,7 +219,13 @@ export default async function RMComprasDetail({ params }) {
       <Link href="/compras" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
         <ArrowLeft size={14} /> Voltar pro Painel
       </Link>
-      <RMComprasClient rm={data} outrasRMs={outrasRMs} userRole={user.role} dadosMapa={dadosMapaSerial} />
+      <RMComprasClient
+        rm={data}
+        outrasRMs={outrasRMs}
+        userRole={user.role}
+        dadosMapa={dadosMapaSerial}
+        categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
+      />
     </div>
   );
 }

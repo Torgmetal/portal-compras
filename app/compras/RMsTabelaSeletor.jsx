@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, AlertCircle, Loader2, Mail, X, FileText, Send, Copy, Check, ExternalLink, CheckCircle2, Truck, Clock, LayoutGrid, List, Plus } from "lucide-react";
 import RMRowActions from "@/components/RMRowActions";
 import {
-  CATEGORIAS_FORNECEDOR, chipCategoriaFornecedor, labelCategoriaFornecedor,
+  CATEGORIAS_FORNECEDOR_BUILTIN,
+  mergeCategorias,
+  chipCategoriaFornecedor,
+  labelCategoriaFornecedor,
 } from "@/lib/fornecedor-categorias";
 
 const STATUS_LABELS = {
@@ -36,7 +39,12 @@ function categoriaRM(rm) {
 
 const PRIORIDADE_CAT = { PRONTA: 1, PARCIAL: 2, EM_COTACAO: 3, ABERTA: 4 };
 
-export default function RMsTabelaSeletor({ rms, isAdmin }) {
+export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }) {
+  // Lista mesclada (built-in + custom do banco) — passada por toda a arvore
+  const todasCategoriasFornecedor = useMemo(
+    () => mergeCategorias(categoriasCustom),
+    [categoriasCustom]
+  );
   const router = useRouter();
   const [selecionadas, setSelecionadas] = useState(new Set());
   const [modalEnviar, setModalEnviar] = useState(false);
@@ -320,6 +328,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin }) {
       {modalEnviar && (
         <ModalEnviarConsolidada
           rms={rmsSelecionadas}
+          categoriasFornecedor={todasCategoriasFornecedor}
           onClose={() => setModalEnviar(false)}
           onSent={(payload) => {
             setModalEnviar(false);
@@ -573,7 +582,7 @@ function ModalLinksGerados({ payload, onClose }) {
   );
 }
 
-function ModalEnviarConsolidada({ rms, onClose, onSent }) {
+function ModalEnviarConsolidada({ rms, onClose, onSent, categoriasFornecedor = CATEGORIAS_FORNECEDOR_BUILTIN }) {
   // Coleta todos os itens cotaveis das RMs selecionadas
   const itensCotaveis = useMemo(() => {
     return rms.flatMap((r) =>
@@ -793,6 +802,7 @@ function ModalEnviarConsolidada({ rms, onClose, onSent }) {
             setFornecedor={setFornecedor}
             addFornecedor={addFornecedor}
             removerFornecedor={removerFornecedor}
+            categoriasFornecedor={categoriasFornecedor}
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -980,6 +990,7 @@ function FornecedoresPickerConsolidada({
   fornSelecionadosIds, toggleFornCadastrado,
   filtroCatForn, setFiltroCatForn, buscaForn, setBuscaForn,
   fornecedoresLinhas, setFornecedor, addFornecedor, removerFornecedor,
+  categoriasFornecedor = CATEGORIAS_FORNECEDOR_BUILTIN,
 }) {
   const qtdSelCadastrados = fornSelecionadosIds.size;
   const qtdAvulsosValidos = fornecedoresLinhas.filter((f) => f.email && f.nome).length;
@@ -1010,13 +1021,13 @@ function FornecedoresPickerConsolidada({
           >
             Todas
           </button>
-          {CATEGORIAS_FORNECEDOR.map((cat) => (
+          {categoriasFornecedor.map((cat) => (
             <button
               key={cat.codigo}
               type="button"
               onClick={() => setFiltroCatForn(filtroCatForn === cat.codigo ? null : cat.codigo)}
               className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${
-                filtroCatForn === cat.codigo ? "bg-torg-blue text-white border-torg-blue" : `${chipCategoriaFornecedor(cat.codigo)} hover:opacity-80`
+                filtroCatForn === cat.codigo ? "bg-torg-blue text-white border-torg-blue" : `${chipCategoriaFornecedor(cat.codigo, categoriasFornecedor)} hover:opacity-80`
               }`}
             >
               {cat.label}
@@ -1066,9 +1077,9 @@ function FornecedoresPickerConsolidada({
                       {f.categorias.map((c) => (
                         <span
                           key={c}
-                          className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${chipCategoriaFornecedor(c)}`}
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${chipCategoriaFornecedor(c, categoriasFornecedor)}`}
                         >
-                          {labelCategoriaFornecedor(c)}
+                          {labelCategoriaFornecedor(c, categoriasFornecedor)}
                         </span>
                       ))}
                     </div>
