@@ -1,8 +1,11 @@
 "use client";
 import { useState, useMemo } from "react";
-import { Building2, Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle, Loader2, X, Filter } from "lucide-react";
+import { Building2, Plus, Search, Edit2, Trash2, Mail, Phone, MapPin, AlertCircle, Loader2, X, Filter, Tag, Settings } from "lucide-react";
 import {
-  CATEGORIAS_FORNECEDOR,
+  CATEGORIAS_FORNECEDOR_BUILTIN,
+  CORES_DISPONIVEIS,
+  CHIP_CLASSES,
+  mergeCategorias,
   chipCategoriaFornecedor,
   labelCategoriaFornecedor,
 } from "@/lib/fornecedor-categorias";
@@ -14,13 +17,17 @@ const fmtCnpj = (s) => {
   return c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 };
 
-export default function VendorListClient({ fornecedoresIniciais }) {
+export default function VendorListClient({ fornecedoresIniciais, categoriasCustomIniciais = [], isAdmin = false }) {
   const [fornecedores, setFornecedores] = useState(fornecedoresIniciais || []);
+  const [categoriasCustom, setCategoriasCustom] = useState(categoriasCustomIniciais || []);
   const [busca, setBusca] = useState("");
   const [filtroCat, setFiltroCat] = useState(null);
   const [verInativos, setVerInativos] = useState(false);
-  const [modal, setModal] = useState(null); // null | "novo" | fornecedor
+  const [modal, setModal] = useState(null); // null | "novo" | "categorias" | fornecedor
   const [erro, setErro] = useState("");
+
+  // Lista combinada de categorias (built-in + custom do banco)
+  const todasCategorias = useMemo(() => mergeCategorias(categoriasCustom), [categoriasCustom]);
 
   const filtrados = useMemo(() => {
     return fornecedores.filter((f) => {
@@ -79,12 +86,21 @@ export default function VendorListClient({ fornecedoresIniciais }) {
             Cadastro de fornecedores classificados por categoria. Usados pra envio rápido de cotação.
           </p>
         </div>
-        <button
-          onClick={() => setModal("novo")}
-          className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2"
-        >
-          <Plus size={16} /> Novo fornecedor
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setModal("categorias")}
+            className="px-4 py-2 border border-gray-300 text-torg-gray bg-white hover:bg-gray-50 text-sm font-medium rounded-lg inline-flex items-center gap-2"
+            title="Cadastrar/editar categorias customizadas"
+          >
+            <Tag size={16} /> Gerenciar categorias
+          </button>
+          <button
+            onClick={() => setModal("novo")}
+            className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2"
+          >
+            <Plus size={16} /> Novo fornecedor
+          </button>
+        </div>
       </div>
 
       {erro && (
@@ -109,7 +125,7 @@ export default function VendorListClient({ fornecedoresIniciais }) {
           >
             Todas ({fornecedores.filter((f) => f.ativo).length})
           </button>
-          {CATEGORIAS_FORNECEDOR.map((cat) => {
+          {todasCategorias.map((cat) => {
             const active = filtroCat === cat.codigo;
             const count = contPorCat[cat.codigo] || 0;
             return (
@@ -119,7 +135,7 @@ export default function VendorListClient({ fornecedoresIniciais }) {
                 className={`text-xs px-3 py-1 rounded-full border font-medium ${
                   active
                     ? "bg-torg-blue text-white border-torg-blue"
-                    : `${chipCategoriaFornecedor(cat.codigo)} hover:opacity-80`
+                    : `${chipCategoriaFornecedor(cat.codigo, todasCategorias)} hover:opacity-80`
                 }`}
               >
                 {cat.label} {count > 0 && <span className="opacity-75">({count})</span>}
@@ -197,9 +213,9 @@ export default function VendorListClient({ fornecedoresIniciais }) {
                         {(f.categorias || []).map((c) => (
                           <span
                             key={c}
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium whitespace-nowrap ${chipCategoriaFornecedor(c)}`}
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium whitespace-nowrap ${chipCategoriaFornecedor(c, todasCategorias)}`}
                           >
-                            {labelCategoriaFornecedor(c)}
+                            {labelCategoriaFornecedor(c, todasCategorias)}
                           </span>
                         ))}
                         {(f.categorias || []).length === 0 && (
@@ -257,18 +273,28 @@ export default function VendorListClient({ fornecedoresIniciais }) {
         </div>
       )}
 
-      {modal && (
+      {modal && modal !== "categorias" && (
         <ModalFornecedor
           fornecedor={modal === "novo" ? null : modal}
+          categoriasDisponiveis={todasCategorias}
           onClose={() => setModal(null)}
           onSaved={onSalvo}
+        />
+      )}
+
+      {modal === "categorias" && (
+        <ModalGerenciarCategorias
+          categoriasCustom={categoriasCustom}
+          isAdmin={isAdmin}
+          onClose={() => setModal(null)}
+          onChanged={setCategoriasCustom}
         />
       )}
     </div>
   );
 }
 
-function ModalFornecedor({ fornecedor, onClose, onSaved }) {
+function ModalFornecedor({ fornecedor, onClose, onSaved, categoriasDisponiveis = CATEGORIAS_FORNECEDOR_BUILTIN }) {
   const editando = !!fornecedor;
   const [form, setForm] = useState({
     razaoSocial: fornecedor?.razaoSocial || "",
@@ -475,7 +501,7 @@ function ModalFornecedor({ fornecedor, onClose, onSaved }) {
               Categorias atendidas ({form.categorias.size})
             </label>
             <div className="flex flex-wrap gap-2">
-              {CATEGORIAS_FORNECEDOR.map((cat) => {
+              {categoriasDisponiveis.map((cat) => {
                 const ativo = form.categorias.has(cat.codigo);
                 return (
                   <button
@@ -485,7 +511,7 @@ function ModalFornecedor({ fornecedor, onClose, onSaved }) {
                     className={`text-xs px-3 py-1.5 rounded-full border-2 font-medium transition-all ${
                       ativo
                         ? "bg-torg-blue text-white border-torg-blue"
-                        : `${chipCategoriaFornecedor(cat.codigo)} hover:opacity-80`
+                        : `${chipCategoriaFornecedor(cat.codigo, categoriasDisponiveis)} hover:opacity-80`
                     }`}
                   >
                     {ativo && "✓ "}{cat.label}
@@ -531,6 +557,200 @@ function ModalFornecedor({ fornecedor, onClose, onSaved }) {
           >
             {salvando && <Loader2 size={14} className="animate-spin" />}
             {editando ? "Salvar alterações" : "Cadastrar fornecedor"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Modal pra cadastrar e remover categorias customizadas de fornecedor.
+// Built-in (MATERIA_PRIMA, TINTA, etc) ficam visiveis mas nao editaveis.
+function ModalGerenciarCategorias({ categoriasCustom, isAdmin, onClose, onChanged }) {
+  const [novaLabel, setNovaLabel] = useState("");
+  const [novaCor, setNovaCor] = useState("slate");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [removendoId, setRemovendoId] = useState(null);
+
+  const adicionar = async () => {
+    setErro("");
+    if (!novaLabel.trim()) return setErro("Informe o nome da categoria.");
+    setSalvando(true);
+    try {
+      const res = await fetch("/api/categorias-fornecedor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: novaLabel.trim(), color: novaCor }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onChanged([...categoriasCustom, data.item]);
+      setNovaLabel("");
+      setNovaCor("slate");
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const remover = async (cat) => {
+    if (!window.confirm(`Remover a categoria "${cat.label}"?`)) return;
+    setErro("");
+    setRemovendoId(cat.id);
+    try {
+      const res = await fetch(`/api/categorias-fornecedor/${cat.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      onChanged(categoriasCustom.filter((c) => c.id !== cat.id));
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setRemovendoId(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h3 className="text-lg font-semibold text-torg-dark inline-flex items-center gap-2">
+            <Tag size={18} /> Gerenciar categorias de fornecedor
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+            </div>
+          )}
+
+          {/* Built-in (não editáveis) */}
+          <div>
+            <p className="text-xs font-semibold text-torg-gray uppercase mb-2">Categorias padrão (7)</p>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIAS_FORNECEDOR_BUILTIN.map((c) => (
+                <span
+                  key={c.codigo}
+                  className={`text-xs px-3 py-1.5 rounded-full border font-medium ${chipCategoriaFornecedor(c.codigo, CATEGORIAS_FORNECEDOR_BUILTIN)}`}
+                  title="Categoria built-in — não pode ser removida"
+                >
+                  🔒 {c.label}
+                </span>
+              ))}
+            </div>
+            <p className="text-[10px] text-torg-gray mt-1.5 italic">
+              Categorias padrão são fixas — não podem ser removidas nem editadas.
+            </p>
+          </div>
+
+          {/* Custom (editáveis) */}
+          <div>
+            <p className="text-xs font-semibold text-torg-gray uppercase mb-2">
+              Categorias customizadas ({categoriasCustom.length})
+            </p>
+            {categoriasCustom.length === 0 ? (
+              <p className="text-xs text-torg-gray italic bg-gray-50 border border-gray-200 rounded p-3">
+                Nenhuma categoria customizada ainda. Crie a primeira no formulário abaixo.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {categoriasCustom.map((c) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span
+                        className={`text-xs px-3 py-1 rounded-full border font-medium ${
+                          CHIP_CLASSES[c.color] || CHIP_CLASSES.slate
+                        }`}
+                      >
+                        {c.label}
+                      </span>
+                      <span className="text-[10px] text-torg-gray font-mono">{c.codigo}</span>
+                    </div>
+                    {isAdmin ? (
+                      <button
+                        onClick={() => remover(c)}
+                        disabled={removendoId === c.id}
+                        className="text-xs text-red-600 hover:text-red-800 font-medium inline-flex items-center gap-1 disabled:opacity-50"
+                      >
+                        {removendoId === c.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                        Remover
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-torg-gray italic">apenas admin remove</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Formulário de nova */}
+          <div className="border-t border-gray-100 pt-5">
+            <p className="text-xs font-semibold text-torg-gray uppercase mb-2">Adicionar nova categoria</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-torg-dark mb-1">Nome *</label>
+                <input
+                  type="text"
+                  value={novaLabel}
+                  onChange={(e) => setNovaLabel(e.target.value)}
+                  placeholder="Ex: Pintura Automotiva, Borracharia, Soldas"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+                />
+                <p className="text-[10px] text-torg-gray mt-0.5">
+                  O sistema gera o código automático (ex: "Pintura Automotiva" → <code>PINTURA_AUTOMOTIVA</code>).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-torg-dark mb-1">Cor</label>
+                <div className="flex flex-wrap gap-2">
+                  {CORES_DISPONIVEIS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNovaCor(c)}
+                      className={`text-xs px-3 py-1 rounded-full border font-medium ${
+                        CHIP_CLASSES[c] || CHIP_CLASSES.slate
+                      } ${novaCor === c ? "ring-2 ring-torg-blue ring-offset-1" : ""}`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {novaLabel && (
+                <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded p-2 text-xs">
+                  <span className="text-torg-gray">Preview: </span>
+                  <span className={`px-3 py-1 rounded-full border font-medium ${CHIP_CLASSES[novaCor]}`}>
+                    {novaLabel.trim()}
+                  </span>
+                </div>
+              )}
+
+              <button
+                onClick={adicionar}
+                disabled={salvando || !novaLabel.trim()}
+                className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-2 disabled:opacity-50"
+              >
+                {salvando ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                Adicionar categoria
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end sticky bottom-0">
+          <button onClick={onClose} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium">
+            Fechar
           </button>
         </div>
       </div>

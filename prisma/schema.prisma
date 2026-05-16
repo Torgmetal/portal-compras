@@ -763,6 +763,21 @@ model EmailNotificacao {
   @@index([ativo])
 }
 
+// ─── CATEGORIAS CUSTOMIZADAS DE FORNECEDORES ────────────────
+// Alem das 7 categorias built-in (MATERIA_PRIMA, TINTA, etc — em
+// lib/fornecedor-categorias.js), admin/compras pode cadastrar mais
+// categorias aqui pelo botao "Gerenciar categorias" do Vendor List.
+model CategoriaFornecedor {
+  id        String   @id @default(cuid())
+  codigo    String   @unique // ex: "PINTURA_AUTOMOTIVA" (auto-gerado do label)
+  label     String   // ex: "Pintura Automotiva"
+  color     String   @default("slate") // blue|purple|slate|amber|red|emerald|orange
+  ordem     Int      @default(100)
+  ativa     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // ─── FEED DE ATIVIDADES (NOTIFICACOES IN-APP) ──────────────
 // Registra eventos do sistema (RM criada, cotacao respondida) pra exibir
 // em /compras/notificacoes como feed cronologico. Independente do envio
