@@ -1974,14 +1974,27 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, isMaster, podeA
           <tbody className="divide-y divide-gray-100">
             {itens.map((it) => {
               const temPendente = (it.solicitacoesVerba || []).length > 0;
+              const consumido = Number(it.consumido) || 0;
+              const verba = Number(it.valorVerba) || 0;
+              const saldo = verba - consumido;
               return (
                 <tr key={it.id}>
                   <td className="px-4 py-2 text-torg-gray text-xs">{labelCategoria(it.categoria)}</td>
                   <td className="px-4 py-2 text-torg-dark font-medium">{it.descricao}</td>
                   <td className="px-4 py-2 text-torg-gray text-xs">{detalhesItem(it)}</td>
                   <td className="px-4 py-2 text-torg-gray text-xs">{localLabel(it.localEstoque) || "—"}</td>
-                  <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">
-                    {fmtMoeda(it.valorVerba)}
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    <p className="text-torg-dark font-medium">{fmtMoeda(verba)}</p>
+                    {consumido > 0 && (
+                      <>
+                        <p className="text-[10px] text-amber-700">−{fmtMoeda(consumido)} consumido</p>
+                        <p className={`text-[10px] font-semibold ${
+                          saldo < 0 ? "text-red-700" : saldo < verba * 0.2 ? "text-amber-700" : "text-emerald-700"
+                        }`}>
+                          = {fmtMoeda(saldo)} saldo
+                        </p>
+                      </>
+                    )}
                     {temPendente && (
                       <p className="text-[10px] text-torg-orange-700 font-medium">⏳ alteração pendente</p>
                     )}

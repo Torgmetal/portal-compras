@@ -149,6 +149,38 @@ export default async function OPDetailPage({ params }) {
   const saldo = verbaTotal - totalEmPedidos;
   const consumoPct = verbaTotal > 0 ? (totalEmPedidos / verbaTotal) * 100 : 0;
 
+  // Calcula consumo POR ITEM da OP. Soma FDs avulsos por categoria e
+  // distribui proporcionalmente entre OPItens da mesma categoria (proporcional
+  // ao valorVerba de cada item). Pedidos via cotacao tambem entram quando o
+  // rmItem.opItemId aponta pro item.
+  const consumoPorCategoria = {}; // categoria -> total gasto em FDs avulsos
+  for (const p of pedidos.filter(consomeVerba)) {
+    if (p.criadoManualmente && p.categoriaItem) {
+      consumoPorCategoria[p.categoriaItem] = (consumoPorCategoria[p.categoriaItem] || 0) + (p.total || 0);
+    }
+  }
+  // Agrupa OPItens (base + aditivos) por categoria
+  const opItensPorCategoria = {};
+  const todosOpItensComVerba = [
+    ...op.itens.map((i) => ({ id: i.id, categoria: i.categoria, valorVerba: i.valorVerba || 0 })),
+    ...op.aditivos.flatMap((a) => a.itens.map((i) => ({ id: i.id, categoria: i.categoria, valorVerba: i.valorVerba || 0 }))),
+  ];
+  for (const it of todosOpItensComVerba) {
+    if (!opItensPorCategoria[it.categoria]) opItensPorCategoria[it.categoria] = [];
+    opItensPorCategoria[it.categoria].push(it);
+  }
+  // Distribui consumo da categoria proporcional ao valorVerba de cada item
+  const consumoPorOpItem = {}; // opItemId -> total consumido
+  for (const [cat, totalConsumo] of Object.entries(consumoPorCategoria)) {
+    const itens = opItensPorCategoria[cat] || [];
+    if (itens.length === 0) continue;
+    const verbaCat = itens.reduce((s, i) => s + i.valorVerba, 0);
+    for (const it of itens) {
+      const fracao = verbaCat > 0 ? it.valorVerba / verbaCat : 1 / itens.length;
+      consumoPorOpItem[it.id] = (consumoPorOpItem[it.id] || 0) + totalConsumo * fracao;
+    }
+  }
+
   // KPIs de receita: bruto + impostos detalhados por tipo -> liquida
   const receitaBruta = op.receitas.reduce((s, r) => s + (r.valor || 0), 0);
 
@@ -225,6 +257,16 @@ export default async function OPDetailPage({ params }) {
   // Transformar pra plain object (Date → string)
   const opData = JSON.parse(JSON.stringify(op));
   opData.cobertura = cobertura;
+
+  // Anota consumo por item (FDs avulsos distribuidos proporcional)
+  for (const it of opData.itens) {
+    it.consumido = consumoPorOpItem[it.id] || 0;
+  }
+  for (const ad of opData.aditivos || []) {
+    for (const it of ad.itens) {
+      it.consumido = consumoPorOpItem[it.id] || 0;
+    }
+  }
 
   // Materiais de estoque (cat 3.1) reservados/consumidos por essa OP
   try {
