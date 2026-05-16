@@ -33,8 +33,8 @@ export default async function PainelOPDetalhe({ params }) {
         include: {
           itens: {
             include: {
-              opItem: { select: { categoria: true } },
-              aditivoItem: { select: { categoria: true } },
+              opItem: { select: { categoria: true, faturamentoDireto: true } },
+              aditivoItem: { select: { categoria: true, faturamentoDireto: true } },
             },
             orderBy: { ordem: "asc" },
           },

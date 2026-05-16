@@ -14,7 +14,17 @@ export async function POST(req, { params }) {
   const op = await prisma.oP.findUnique({
     where: { id: params.id },
     include: {
-      rms: { include: { itens: { select: { id: true } } } },
+      rms: {
+        include: {
+          itens: {
+            select: {
+              id: true,
+              opItem: { select: { faturamentoDireto: true } },
+              aditivoItem: { select: { faturamentoDireto: true } },
+            },
+          },
+        },
+      },
     },
   });
   if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
@@ -35,37 +45,35 @@ export async function POST(req, { params }) {
     },
   });
 
-  // Mapa rmItemId -> lista de { ci, faturamento } (faturamento e crucial pra
-  // saber se usa liquido ou bruto+IPI no criterio de menor preco)
+  // Mapa rmItemId -> lista de CotacaoItens
   const cotItensPorRmItem = new Map();
   for (const cot of cotacoes) {
-    const faturamentoCliente = cot.faturamento === "Cliente";
     for (const ci of cot.itens) {
       if (!ci.precoUnit || ci.precoUnit <= 0) continue;
       if (!cotItensPorRmItem.has(ci.rmItemId)) cotItensPorRmItem.set(ci.rmItemId, []);
-      cotItensPorRmItem.get(ci.rmItemId).push({ ci, faturamentoCliente });
+      cotItensPorRmItem.get(ci.rmItemId).push(ci);
     }
   }
 
   // Pra cada RMItem, escolhe o vencedor pelo CRITERIO CORRETO baseado no
-  // faturamento de CADA cotacao candidata:
-  // - Faturamento "Cliente" (Direto): compara pelo BRUTO + IPI (sem credito
-  //   de ICMS — a nota nao vai pra Torg)
-  // - Faturamento "Torg": compara pelo LIQUIDO (com credito de ICMS)
-  // O preco usado pra comparar e o "custo efetivo Torg" em cada cenario.
+  // faturamento do ITEM (OPItem.faturamentoDireto ou AditivoItem.faturamentoDireto):
+  // - Item de Faturamento Direto: compara pelo BRUTO + IPI (ICMS nao
+  //   vira credito pra Torg — a NF vai pro cliente)
+  // - Item de Faturamento Torg: compara pelo LIQUIDO (com credito ICMS)
   const escolhas = []; // { rmItemId, cotacaoItemIdVencedor }
   for (const rm of op.rms) {
     for (const rmItem of rm.itens) {
       const candidatos = cotItensPorRmItem.get(rmItem.id) || [];
       if (candidatos.length === 0) continue;
+      const itemEhFatDireto = !!(
+        rmItem.opItem?.faturamentoDireto || rmItem.aditivoItem?.faturamentoDireto
+      );
       let melhor = null;
       let melhorComparacao = null;
-      for (const { ci, faturamentoCliente } of candidatos) {
+      for (const ci of candidatos) {
         const icms = Number(ci.icmsPct) || 0;
         const ipi = Number(ci.ipiPct) || 0;
-        // Se Faturamento Direto: ignora ICMS (nao vira credito), so soma IPI.
-        // Se Faturamento Torg: subtrai ICMS (vira credito), soma IPI.
-        const valorComparacao = faturamentoCliente
+        const valorComparacao = itemEhFatDireto
           ? ci.precoUnit * (1 + ipi / 100)
           : ci.precoUnit * (1 - icms / 100) * (1 + ipi / 100);
         if (melhorComparacao === null || valorComparacao < melhorComparacao) {
