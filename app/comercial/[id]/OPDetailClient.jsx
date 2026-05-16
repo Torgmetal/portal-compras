@@ -966,8 +966,8 @@ function ModalMedicao({ opId, onClose, onSaved }) {
         )}
 
         <p className="text-xs text-torg-gray">
-          Digite o número do Pedido de Venda que você criou no Omie (ex: 1500). O portal busca os
-          dados via API: data, valor total, status e quantidade de itens.
+          Digite o número do Pedido de Venda que você criou no Omie (ex: <code>1500</code> ou <code>233/1</code>).
+          O portal busca os dados via API: data, valor total, status e quantidade de itens.
         </p>
 
         <div>
@@ -975,11 +975,14 @@ function ModalMedicao({ opId, onClose, onSaved }) {
           <input
             type="text"
             value={numero}
-            onChange={(e) => setNumero(e.target.value.replace(/\D/g, ""))}
-            placeholder="Ex: 1500"
+            onChange={(e) => setNumero(e.target.value.replace(/[^\d/]/g, ""))}
+            placeholder="Ex: 1500 ou 233/1"
             autoFocus
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
           />
+          <p className="text-[10px] text-torg-gray mt-0.5">
+            Aceita números e barra (ex: <code>233/1</code>, <code>233/2</code> pra medições parciais).
+          </p>
         </div>
 
         <div>
