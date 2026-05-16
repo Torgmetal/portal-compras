@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/session";
 import { ArrowLeft } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
+import FDAvulsosSection from "@/components/FDAvulsosSection";
 
 // Sempre busca dados frescos do banco
 export const dynamic = "force-dynamic";
@@ -75,8 +76,14 @@ export default async function OPDetailPage({ params }) {
   }
 
   // Pedidos no Omie vinculados a essa OP (via cotacao -> rm -> opId)
+  // OU FDs avulsos (PedidoOmie.opId direto, sem cotacao)
   const pedidosRaw = await prisma.pedidoOmie.findMany({
-    where: { cotacao: { rm: { opId: params.id } } },
+    where: {
+      OR: [
+        { cotacao: { rm: { opId: params.id } } },
+        { opId: params.id },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -87,7 +94,12 @@ export default async function OPDetailPage({ params }) {
       status: true,
       erroOmie: true,
       fornecedorNome: true,
+      observacao: true,
+      cnpj: true,
       createdAt: true,
+      criadoManualmente: true,
+      anexoUrl: true,
+      anexoNome: true,
       cotacao: { select: { rm: { select: { numero: true } } } },
     },
   });
@@ -100,9 +112,17 @@ export default async function OPDetailPage({ params }) {
     status: p.status,
     erroOmie: p.erroOmie,
     fornecedorNome: p.fornecedorNome,
+    observacao: p.observacao,
+    cnpj: p.cnpj,
     createdAt: p.createdAt.toISOString(),
     rmNumero: p.cotacao?.rm?.numero || null,
+    criadoManualmente: p.criadoManualmente,
+    anexoUrl: p.anexoUrl,
+    anexoNome: p.anexoNome,
   }));
+  // Separa entre normais (via cotacao) e FD avulsos (manuais)
+  const pedidosFdAvulsos = pedidos.filter((p) => p.criadoManualmente);
+  const pedidosViaCotacao = pedidos.filter((p) => !p.criadoManualmente);
 
   // KPIs de verba: estimada (base + aditivos) vs ja em pedidos (Omie status=CRIADO)
   const verbaBase = op.itens.reduce((s, i) => s + (i.valorVerba || 0), 0);
@@ -240,6 +260,7 @@ export default async function OPDetailPage({ params }) {
   opData.faturamento = { temFD, totalFD };
   opData.resumoPedidos = resumoPedidos;
   opData.resumoMedicoes = resumoMedicoes;
+  opData.pedidosFdAvulsos = pedidosFdAvulsos;
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -248,6 +269,12 @@ export default async function OPDetailPage({ params }) {
       </Link>
 
       <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} />
+
+      <FDAvulsosSection
+        opId={params.id}
+        pedidos={pedidosFdAvulsos}
+        podeEditar={["ADMIN", "COMERCIAL", "COMPRAS"].includes(user.role)}
+      />
 
       <PedidosOmieSection pedidos={pedidos} />
     </div>

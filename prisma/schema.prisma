@@ -111,6 +111,7 @@ model OP {
   estoqueReservas EstoqueReserva[]
   estoqueAlocacoes EstoqueAlocacao[]
   rmItensDestino  RMItem[]   @relation("RMItemOpDestino")
+  pedidosOmieAvulsos PedidoOmie[]   // pedidos cadastrados direto na OP (FD avulsos)
 
   @@index([numero])
   @@index([status])
@@ -523,12 +524,26 @@ model PedidoOmie {
   payload           Json?    // payload enviado (auditoria)
   resposta          Json?    // resposta do Omie
 
+  // Vinculo direto pra OP — usado em FD avulsos (cadastros manuais
+  // sem RM/Cotacao prévia, pra regularizar compras que ocorreram fora
+  // do fluxo do portal).
+  opId              String?
+  op                OP?      @relation(fields: [opId], references: [id])
+
+  // Pedido cadastrado manualmente (fora do fluxo RM → Cotacao → Pedido).
+  // Quando true, geralmente significa regularizacao de FD existente.
+  criadoManualmente Boolean  @default(false)
+  // PDF anexo da NF/pedido (URL Vercel Blob) — pra cadastros manuais
+  anexoUrl          String?
+  anexoNome         String?
+
   createdById       String?
   createdAt         DateTime @default(now())
 
   rmItens           RMItem[]
 
   @@index([cotacaoId])
+  @@index([opId])
   @@index([status])
 }
 
