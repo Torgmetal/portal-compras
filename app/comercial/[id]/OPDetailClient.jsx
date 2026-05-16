@@ -485,6 +485,8 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         medicoes={op.medicoes || []}
         resumo={op.resumoMedicoes}
         receitaBruta={op.kpisFinanceiros?.receitaBruta || 0}
+        valorTotalContrato={op.kpisFinanceiros?.valorTotalContrato || 0}
+        contratoExplicito={op.kpisFinanceiros?.contratoExplicito || false}
         encerrada={encerradaOuCancelada}
         syncId={syncMedicaoId}
         onAdicionar={() => setModalMedicao(true)}
@@ -788,8 +790,14 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 }
 
 // Card 'Medicoes' — lista pedidos de venda do Omie vinculados a OP
-function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdicionar, onSync, onRemover }) {
+function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, contratoExplicito = false, encerrada, syncId, onAdicionar, onSync, onRemover }) {
   const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+
+  // Base do calculo de %:
+  // 1) valorTotalContrato (campo explicito da OP) — fonte de verdade
+  // 2) Fallback pra receitaBruta (soma das OPReceita)
+  const baseContrato = valorTotalContrato > 0 ? valorTotalContrato : receitaBruta;
+  const baseLabel = valorTotalContrato > 0 ? "Valor do contrato" : "Receita do contrato";
 
   // Enriquece cada medicao com pct e acumulado pra ajudar a conferir 100%.
   // Medicoes ja vem ordenadas por createdAt asc do servidor.
@@ -798,8 +806,8 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdi
     return medicoes.map((m) => {
       const valor = Number(m.valorBruto) || 0;
       acumValor += valor;
-      const pctMedicao = receitaBruta > 0 ? (valor / receitaBruta) * 100 : 0;
-      const pctAcumulado = receitaBruta > 0 ? (acumValor / receitaBruta) * 100 : 0;
+      const pctMedicao = baseContrato > 0 ? (valor / baseContrato) * 100 : 0;
+      const pctAcumulado = baseContrato > 0 ? (acumValor / baseContrato) * 100 : 0;
       // Detecta se eh medicao parcial (numero com "/")
       const ehParcial = /\//.test(m.numeroPedidoOmie || "");
       return { ...m, valorAcumulado: acumValor, pctMedicao, pctAcumulado, ehParcial };
@@ -829,13 +837,31 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdi
         )}
       </div>
 
+      {/* Aviso quando nao tem base de comparacao */}
+      {medicoes.length > 0 && baseContrato === 0 && (
+        <div className="mx-6 my-3 bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm text-amber-900 flex items-start gap-2">
+          <AlertCircle size={16} className="mt-0.5 flex-shrink-0 text-amber-700" />
+          <div>
+            <p className="font-semibold">Valor total do contrato não cadastrado</p>
+            <p className="text-xs mt-1">
+              Não conseguimos calcular o % de cada medição porque o contrato dessa OP está zerado.
+              Clique em <strong>"Editar OP"</strong> no topo e preencha o campo <strong>"Valor total do contrato"</strong> (ex: 1.523.000,00 pra NF de industrialização) — depois os percentuais aparecem automaticamente.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Resumo */}
       {medicoes.length > 0 && (
         <div className="px-6 py-3 bg-torg-blue-50/30 border-b border-torg-blue-100 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
           <div>
             <p className="text-[10px] text-torg-gray uppercase tracking-wide">Total medido (bruto)</p>
             <p className="text-lg font-extrabold text-torg-blue tabular-nums">{fmtMoeda(resumo?.totalMedido || 0)}</p>
-            <p className="text-[10px] text-torg-gray">{(resumo?.pctMedido || 0).toFixed(1)}% da receita do contrato</p>
+            <p className="text-[10px] text-torg-gray">
+              {baseContrato > 0
+                ? `${((resumo?.totalMedido || 0) / baseContrato * 100).toFixed(1)}% do ${baseLabel.toLowerCase()}`
+                : "(base de comparação não cadastrada)"}
+            </p>
           </div>
           <div>
             <p className="text-[10px] text-torg-gray uppercase tracking-wide">Receita do contrato</p>
@@ -870,7 +896,7 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdi
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                 <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Itens</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Percentual da medição em relação à receita do contrato">% Contrato</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" title={`Percentual da medição em relação ao ${baseLabel.toLowerCase()} (${fmtMoeda(baseContrato)})`}>% Contrato</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Soma acumulada das medições ao longo do tempo">% Acumulado</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -911,10 +937,10 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdi
                     {fmtMoeda(m.valorBruto)}
                   </td>
                   <td className="px-4 py-2 text-right text-torg-gray tabular-nums whitespace-nowrap">
-                    {receitaBruta > 0 ? `${m.pctMedicao.toFixed(1)}%` : "—"}
+                    {baseContrato > 0 ? `${m.pctMedicao.toFixed(1)}%` : "—"}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
-                    {receitaBruta > 0 ? (
+                    {baseContrato > 0 ? (
                       <span className={`px-2 py-0.5 rounded font-semibold ${corAcum}`} title={`Acumulado: ${fmtMoeda(m.valorAcumulado)}`}>
                         {m.pctAcumulado.toFixed(1)}%
                       </span>
@@ -956,7 +982,7 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, encerrada, syncId, onAdi
                 );
               })}
             </tbody>
-            {medicoesComAcumulado.length > 0 && receitaBruta > 0 && (
+            {medicoesComAcumulado.length > 0 && baseContrato > 0 && (
               <tfoot className="bg-gray-50 border-t-2 border-gray-200">
                 <tr>
                   <td colSpan={4} className="px-4 py-2 text-right text-xs font-semibold text-torg-gray uppercase">
