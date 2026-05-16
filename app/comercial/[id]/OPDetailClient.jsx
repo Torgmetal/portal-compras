@@ -1097,6 +1097,12 @@ function ValorMedicaoEditavel({ medicao, onSync }) {
     );
   }
 
+  // So mostra "de R$ X" quando ha divergencia significativa (>1%) entre o
+  // valor editado e o valor contratado original do pedido
+  const divergenciaAbsoluta = Math.abs(valorContratado - valorAtual);
+  const temDivergencia = valorContratado > 0
+    && divergenciaAbsoluta > Math.max(0.01, valorContratado * 0.01);
+
   return (
     <div className="text-right">
       <button
@@ -1106,9 +1112,9 @@ function ValorMedicaoEditavel({ medicao, onSync }) {
       >
         {fmtMoeda(valorAtual)}
       </button>
-      {valorContratado > 0 && valorContratado !== valorAtual && (
+      {temDivergencia && (
         <p className="text-[9px] text-torg-gray" title="Valor total contratado no pedido Omie">
-          de {fmtMoeda(valorContratado)}
+          ajustado · pedido R$ {fmtMoeda(valorContratado).replace("R$ ", "")}
         </p>
       )}
     </div>
