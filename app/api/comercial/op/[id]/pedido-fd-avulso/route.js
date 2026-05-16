@@ -89,6 +89,12 @@ export async function POST(req, { params }) {
     }
   }
 
+  // jaExisteNoOmie=true → cadastro de regularizacao (status=CRIADO)
+  // jaExisteNoOmie=false → ainda nao criou no Omie (status=PENDENTE_OMIE).
+  //   Usuario pode disparar a criacao depois pelo botao "Criar no Omie".
+  const jaExisteNoOmie = dados.jaExisteNoOmie !== false; // default true
+  const status = jaExisteNoOmie ? "CRIADO" : "PENDENTE_OMIE";
+
   const pedido = await prisma.pedidoOmie.create({
     data: {
       opId: op.id,
@@ -97,10 +103,10 @@ export async function POST(req, { params }) {
       cnpj: dados.cnpj ? String(dados.cnpj).replace(/\D/g, "") : null,
       nCodFor: dados.nCodFor ? String(dados.nCodFor) : null,
       codigoPedido: dados.codigoPedido ? String(dados.codigoPedido) : null,
-      numeroPedido: dados.numeroPedido ? String(dados.numeroPedido) : null,
+      numeroPedido: jaExisteNoOmie && dados.numeroPedido ? String(dados.numeroPedido) : null,
       total: Math.round(total * 100) / 100,
       faturamentoDireto: dados.faturamentoDireto !== false, // default true
-      status: "CRIADO", // ja existe no Omie (cadastro manual de regularizacao)
+      status,
       observacao: dados.observacao ? String(dados.observacao).trim() : null,
       criadoManualmente: true,
       anexoUrl,

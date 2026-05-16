@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FileText, Plus, Upload, Loader2, AlertCircle, Trash2, ExternalLink,
+  FileText, Plus, Upload, Loader2, AlertCircle, Trash2, ExternalLink, Send, CheckCircle2,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
@@ -20,8 +20,25 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
   const router = useRouter();
   const [modal, setModal] = useState(false);
   const [erro, setErro] = useState("");
+  const [criandoOmieId, setCriandoOmieId] = useState(null);
 
   const total = pedidos.reduce((s, p) => s + (p.total || 0), 0);
+
+  const criarNoOmie = async (p) => {
+    if (!window.confirm(`Criar o pedido no Omie pra ${p.fornecedorNome} (${fmtMoeda(p.total)})?\n\nO sistema vai gerar 1 item genérico com o valor total. O PDF anexado também será enviado ao Omie.`)) return;
+    setErro("");
+    setCriandoOmieId(p.id);
+    try {
+      const res = await fetch(`/api/comercial/pedido-fd-avulso/${p.id}/criar-omie`, { method: "POST" });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCriandoOmieId(null);
+    }
+  };
 
   const remover = async (p) => {
     if (!window.confirm(`Remover o FD avulso de ${p.fornecedorNome} (${fmtMoeda(p.total)})?\n\nApenas o registro no portal é removido — o pedido no Omie continua intacto.`)) return;
@@ -88,6 +105,7 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">PDF</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
@@ -125,6 +143,23 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
                       {fmtMoeda(p.total)}
                     </td>
                     <td className="px-4 py-2 text-center">
+                      {p.status === "CRIADO" ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium inline-flex items-center gap-1">
+                          <CheckCircle2 size={10} /> No Omie
+                        </span>
+                      ) : p.status === "PENDENTE_OMIE" ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                          Pendente
+                        </span>
+                      ) : p.status === "ERRO" ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 font-medium" title={p.erroOmie || ""}>
+                          Erro
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-torg-gray">{p.status || "—"}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-center">
                       {p.anexoUrl ? (
                         <a
                           href={p.anexoUrl}
@@ -140,15 +175,31 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
                       )}
                     </td>
                     <td className="px-4 py-2 text-right">
-                      {podeEditar && (
-                        <button
-                          onClick={() => remover(p)}
-                          className="text-xs text-red-600 hover:text-red-800 inline-flex items-center gap-1"
-                          title="Remover (apenas o registro local)"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      )}
+                      <div className="inline-flex items-center gap-2">
+                        {podeEditar && (p.status === "PENDENTE_OMIE" || p.status === "ERRO") && (
+                          <button
+                            onClick={() => criarNoOmie(p)}
+                            disabled={criandoOmieId === p.id}
+                            className="text-xs px-2 py-1 bg-emerald-600 text-white rounded font-medium hover:bg-emerald-700 inline-flex items-center gap-1 disabled:opacity-50"
+                            title="Cria o pedido no Omie via API"
+                          >
+                            {criandoOmieId === p.id ? (
+                              <><Loader2 size={12} className="animate-spin" /> Criando...</>
+                            ) : (
+                              <><Send size={12} /> Criar no Omie</>
+                            )}
+                          </button>
+                        )}
+                        {podeEditar && (
+                          <button
+                            onClick={() => remover(p)}
+                            className="text-xs text-red-600 hover:text-red-800 inline-flex items-center gap-1"
+                            title="Remover (apenas o registro local)"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -178,6 +229,7 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
     total: "",
     observacao: "",
     categoriaItem: "",
+    jaExisteNoOmie: true, // true = regularizacao, false = criar depois
   });
   const [file, setFile] = useState(null);
   const [salvando, setSalvando] = useState(false);
@@ -200,6 +252,7 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
         observacao: form.observacao?.trim() || null,
         categoriaItem: form.categoriaItem || null,
         faturamentoDireto: true,
+        jaExisteNoOmie: form.jaExisteNoOmie,
       }));
       if (file) fd.append("file", file);
 
@@ -229,12 +282,37 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
 
         <div className="px-6 py-5 space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900">
-            <p className="font-semibold">Quando usar este cadastro</p>
-            <p className="mt-1">
-              Pra <strong>regularizar</strong> compras de Faturamento Direto que já existem no Omie
-              mas não passaram pelo fluxo RM → Cotação do portal. O sistema vai considerar o valor
-              no saldo FD da OP pra evitar que o teto seja ultrapassado.
-            </p>
+            <p className="font-semibold">Cenários de uso</p>
+            <div className="mt-2 space-y-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  checked={form.jaExisteNoOmie === true}
+                  onChange={() => setForm({ ...form, jaExisteNoOmie: true })}
+                  className="mt-0.5 w-4 h-4 text-amber-600 focus:ring-amber-600"
+                />
+                <div>
+                  <p className="font-medium">📋 Regularização (pedido já existe no Omie)</p>
+                  <p className="text-[11px] opacity-90">
+                    A compra já foi feita e o pedido criado direto no Omie. Você só está cadastrando aqui pra contabilizar no saldo FD da OP.
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  checked={form.jaExisteNoOmie === false}
+                  onChange={() => setForm({ ...form, jaExisteNoOmie: false })}
+                  className="mt-0.5 w-4 h-4 text-amber-600 focus:ring-amber-600"
+                />
+                <div>
+                  <p className="font-medium">📤 Criar pedido novo no Omie</p>
+                  <p className="text-[11px] opacity-90">
+                    Você tem o PDF/proposta do fornecedor e quer registrar pra depois <strong>disparar a criação do pedido no Omie via API</strong>. O cadastro fica como "Pendente" e tem botão "Criar no Omie" na tabela.
+                  </p>
+                </div>
+              </label>
+            </div>
           </div>
 
           {erro && (
@@ -266,13 +344,17 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-torg-dark mb-1">Nº Pedido no Omie</label>
+              <label className="block text-xs font-medium text-torg-dark mb-1">
+                Nº Pedido no Omie
+                {!form.jaExisteNoOmie && <span className="text-torg-gray font-normal"> (será gerado)</span>}
+              </label>
               <input
                 type="text"
-                value={form.numeroPedido}
+                value={form.jaExisteNoOmie ? form.numeroPedido : ""}
                 onChange={(e) => setForm({ ...form, numeroPedido: e.target.value })}
-                placeholder="Ex: 1500"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+                placeholder={form.jaExisteNoOmie ? "Ex: 1500" : "Gerado pelo Omie ao criar"}
+                disabled={!form.jaExisteNoOmie}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue disabled:bg-gray-50 disabled:text-torg-gray"
               />
             </div>
           </div>
