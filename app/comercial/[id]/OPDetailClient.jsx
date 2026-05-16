@@ -251,8 +251,13 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               <p className="text-torg-gray text-xs">Pedidos vinculados</p>
               <p className="text-torg-dark font-medium">
                 {op.resumoPedidos?.criados || 0}
+                {op.resumoPedidos?.fdPendentes > 0 && (
+                  <span className="text-[10px] text-amber-700 font-medium ml-1" title="FDs avulsos registrados, pendentes de criação no Omie">
+                    +{op.resumoPedidos.fdPendentes} FD
+                  </span>
+                )}
                 {op.resumoPedidos?.erros > 0 && (
-                  <span className="text-[10px] text-red-600 font-medium ml-1">
+                  <span className="text-[10px] text-red-600 font-medium ml-1" title="Pedidos via cotação que falharam na criação">
                     +{op.resumoPedidos.erros} c/erro
                   </span>
                 )}

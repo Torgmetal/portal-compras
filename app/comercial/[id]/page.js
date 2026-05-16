@@ -207,13 +207,19 @@ export default async function OPDetailPage({ params }) {
     pctMedido,
   };
 
-  // Resumo de pedidos vinculados (count + total de criados)
+  // Resumo de pedidos vinculados (count + total de criados).
+  // Separa "erros reais" (cotacao que falhou) de "FDs pendentes" (avulsos
+  // ainda nao enviados ao Omie — sao registros validos, nao erro).
   const pedidosCriados = pedidos.filter((p) => p.status === "CRIADO");
+  const pedidosFDPendentes = pedidos.filter((p) => p.status !== "CRIADO" && p.criadoManualmente);
+  const pedidosErrosReais = pedidos.filter((p) => p.status !== "CRIADO" && !p.criadoManualmente);
   const resumoPedidos = {
     total: pedidos.length,
     criados: pedidosCriados.length,
-    erros: pedidos.length - pedidosCriados.length,
-    valorTotal: pedidosCriados.reduce((s, p) => s + (p.total || 0), 0),
+    fdPendentes: pedidosFDPendentes.length,
+    erros: pedidosErrosReais.length,
+    // Valor total inclui criados + FDs pendentes (que ja consomem verba)
+    valorTotal: pedidos.filter(consomeVerba).reduce((s, p) => s + (p.total || 0), 0),
   };
 
   // Transformar pra plain object (Date → string)
