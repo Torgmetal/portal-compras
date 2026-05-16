@@ -1185,9 +1185,14 @@ function buildMatriz(op) {
   for (const rm of op.rms) {
     for (const it of rm.itens) {
       const cat = it.opItem?.categoria || it.aditivoItem?.categoria || null;
-      // Flag de Faturamento Direto: vem do OPItem ou AditivoItem associado.
-      // Define o criterio de comparacao da celula (bruto+IPI vs liquido).
-      const fatDireto = !!(it.opItem?.faturamentoDireto || it.aditivoItem?.faturamentoDireto);
+      // Flag de Faturamento Direto: vem do OPItem/AditivoItem vinculado, OU
+      // do _fdDerivado calculado no servidor (fallback pra RMs sem vinculo
+      // direto — usa categoriasOP da RM pra deduzir).
+      const fatDireto = !!(
+        it.opItem?.faturamentoDireto ||
+        it.aditivoItem?.faturamentoDireto ||
+        it._fdDerivado
+      );
       itemPorId.set(it.id, { rmItem: it, rmNumero: rm.numero, categoria: cat, faturamentoDireto: fatDireto });
     }
   }

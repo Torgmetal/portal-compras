@@ -27,8 +27,8 @@ export default async function PainelOPDetalhe({ params }) {
   const op = await prisma.oP.findUnique({
     where: { id: params.opId },
     include: {
-      itens: { select: { id: true, valorVerba: true } },
-      aditivos: { include: { itens: { select: { id: true, valorVerba: true } } } },
+      itens: { select: { id: true, valorVerba: true, categoria: true, faturamentoDireto: true } },
+      aditivos: { include: { itens: { select: { id: true, valorVerba: true, categoria: true, faturamentoDireto: true } } } },
       rms: {
         include: {
           itens: {
@@ -163,6 +163,46 @@ export default async function PainelOPDetalhe({ params }) {
   pedidosFlat.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const saldo = verbaTotal - totalEmPedidos;
   const consumoPct = verbaTotal > 0 ? (totalEmPedidos / verbaTotal) * 100 : 0;
+
+  // Deduz "Faturamento Direto" por CATEGORIA da OP — usado como fallback
+  // quando RMItem.opItemId e null (RM nao vinculada diretamente ao OPItem).
+  // Para cada categoria, se TODOS os OPItens dessa categoria sao FD, a
+  // categoria inteira e FD. Caso contrario nao-FD (ou misto, tratado como nao-FD).
+  const fdPorCategoria = new Map();
+  const todosOpItens = [
+    ...op.itens.map((i) => ({ categoria: i.categoria, fd: i.faturamentoDireto })),
+    ...op.aditivos.flatMap((a) => a.itens.map((i) => ({ categoria: i.categoria, fd: i.faturamentoDireto }))),
+  ];
+  for (const { categoria, fd } of todosOpItens) {
+    if (!categoria) continue;
+    if (!fdPorCategoria.has(categoria)) {
+      fdPorCategoria.set(categoria, fd);
+    } else if (fdPorCategoria.get(categoria) !== fd) {
+      // Misto pra essa categoria — vamos prevalecer FD (mais conservador
+      // pra evitar erro de calculo). Ou sempre Torg? Optei FD: melhor avisar
+      // que algo e FD do que esconder.
+      fdPorCategoria.set(categoria, true);
+    }
+  }
+
+  // Enriquece cada RM com `_fdDerivado` baseado em rm.categoriasOP
+  for (const rm of op.rms) {
+    let rmFd = null; // null = indefinido (sem categoriasOP)
+    if (rm.categoriasOP && rm.categoriasOP.length > 0) {
+      // RM e FD se TODAS suas categorias sao FD
+      rmFd = rm.categoriasOP.every((c) => fdPorCategoria.get(c) === true);
+    }
+    rm._fdDerivado = rmFd;
+    // Propaga pros RMItens que nao tem opItemId — eles herdam o flag da RM
+    for (const it of rm.itens) {
+      const temVinculo = it.opItem || it.aditivoItem;
+      if (!temVinculo && rmFd === true) {
+        // Injeta sintaticamente: cria um opItem fake so com a flag pra que o
+        // buildMatriz no client consiga ler igual aos itens vinculados
+        it._fdDerivado = true;
+      }
+    }
+  }
 
   // Plain object pra Client Component
   const data = JSON.parse(JSON.stringify({

@@ -14,8 +14,12 @@ export async function POST(req, { params }) {
   const op = await prisma.oP.findUnique({
     where: { id: params.id },
     include: {
+      itens: { select: { categoria: true, faturamentoDireto: true } },
+      aditivos: { include: { itens: { select: { categoria: true, faturamentoDireto: true } } } },
       rms: {
-        include: {
+        select: {
+          id: true,
+          categoriasOP: true,
           itens: {
             select: {
               id: true,
@@ -28,6 +32,25 @@ export async function POST(req, { params }) {
     },
   });
   if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
+
+  // Fallback de FD por categoria (mesma logica do page.js)
+  const fdPorCategoria = new Map();
+  const todosOpItens = [
+    ...op.itens.map((i) => ({ categoria: i.categoria, fd: i.faturamentoDireto })),
+    ...op.aditivos.flatMap((a) => a.itens.map((i) => ({ categoria: i.categoria, fd: i.faturamentoDireto }))),
+  ];
+  for (const { categoria, fd } of todosOpItens) {
+    if (!categoria) continue;
+    if (!fdPorCategoria.has(categoria)) fdPorCategoria.set(categoria, fd);
+    else if (fdPorCategoria.get(categoria) !== fd) fdPorCategoria.set(categoria, true);
+  }
+  // Marca cada RM como FD se TODAS suas categorias forem FD
+  const rmFdMap = new Map();
+  for (const rm of op.rms) {
+    if (rm.categoriasOP && rm.categoriasOP.length > 0) {
+      rmFdMap.set(rm.id, rm.categoriasOP.every((c) => fdPorCategoria.get(c) === true));
+    }
+  }
 
   // Busca cotacoes RECEBIDAS que tocam essa OP — primaria por rmId OU
   // por qualquer item ligado a uma RM dessa OP (consolidadas).
@@ -56,17 +79,18 @@ export async function POST(req, { params }) {
   }
 
   // Pra cada RMItem, escolhe o vencedor pelo CRITERIO CORRETO baseado no
-  // faturamento do ITEM (OPItem.faturamentoDireto ou AditivoItem.faturamentoDireto):
-  // - Item de Faturamento Direto: compara pelo BRUTO + IPI (ICMS nao
-  //   vira credito pra Torg — a NF vai pro cliente)
-  // - Item de Faturamento Torg: compara pelo LIQUIDO (com credito ICMS)
+  // faturamento do ITEM (OPItem.faturamentoDireto ou AditivoItem.faturamentoDireto),
+  // com fallback pra rm.categoriasOP quando RMItem nao tem vinculo direto.
   const escolhas = []; // { rmItemId, cotacaoItemIdVencedor }
   for (const rm of op.rms) {
+    const rmFd = rmFdMap.get(rm.id) === true;
     for (const rmItem of rm.itens) {
       const candidatos = cotItensPorRmItem.get(rmItem.id) || [];
       if (candidatos.length === 0) continue;
       const itemEhFatDireto = !!(
-        rmItem.opItem?.faturamentoDireto || rmItem.aditivoItem?.faturamentoDireto
+        rmItem.opItem?.faturamentoDireto ||
+        rmItem.aditivoItem?.faturamentoDireto ||
+        rmFd
       );
       let melhor = null;
       let melhorComparacao = null;
