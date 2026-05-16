@@ -53,7 +53,9 @@ export default function PedidosOmieSection({ pedidos }) {
 
   const totalCriados = pedidos.filter((p) => p.status === "CRIADO").reduce((s, p) => s + (p.total || 0), 0);
   const qtdCriados = pedidos.filter((p) => p.status === "CRIADO").length;
-  const qtdErros = pedidos.filter((p) => p.status !== "CRIADO").length;
+  // Conta erros REAIS — FDs avulsos pendentes nao sao "erro", sao FD valido
+  const qtdErros = pedidos.filter((p) => p.status !== "CRIADO" && !p.criadoManualmente).length;
+  const qtdFD = pedidos.filter((p) => p.status !== "CRIADO" && p.criadoManualmente).length;
 
   return (
     <div id="pedidos-omie" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden scroll-mt-4">
@@ -64,6 +66,11 @@ export default function PedidosOmieSection({ pedidos }) {
           <span className="text-xs bg-torg-blue-50 text-torg-blue px-2 py-0.5 rounded-full font-medium">
             {qtdCriados} criado{qtdCriados !== 1 ? "s" : ""}
           </span>
+          {qtdFD > 0 && (
+            <span className="text-xs bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full font-medium border border-amber-200">
+              {qtdFD} FD pendente{qtdFD !== 1 ? "s" : ""}
+            </span>
+          )}
           {qtdErros > 0 && (
             <span className="text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded-full font-medium">
               {qtdErros} com erro
@@ -133,6 +140,15 @@ export default function PedidosOmieSection({ pedidos }) {
                   {p.status === "CRIADO" ? (
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-torg-blue text-white">
                       Criado
+                    </span>
+                  ) : p.criadoManualmente ? (
+                    // FD avulso pendente/erro: mostra como "FD" amber (registro
+                    // valido, ja consome verba) em vez de "Erro" vermelho.
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-800 border border-amber-200"
+                      title={p.erroOmie ? `Tentativa de envio ao Omie falhou: ${p.erroOmie}` : "FD registrado, pendente de criação no Omie"}
+                    >
+                      FD
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-xs text-red-700" title={p.erroOmie || "Erro ao criar"}>
