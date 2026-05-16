@@ -49,7 +49,35 @@ export async function POST(req, { params }) {
   if (!dados.fornecedorNome || !String(dados.fornecedorNome).trim()) {
     return NextResponse.json({ error: "Informe o fornecedor." }, { status: 400 });
   }
-  const total = Number(dados.total);
+
+  // Itens detalhados (opcional). Se vier, o total e calculado a partir deles.
+  let itensDetalhes = null;
+  let total = Number(dados.total);
+  if (Array.isArray(dados.itensDetalhes) && dados.itensDetalhes.length > 0) {
+    itensDetalhes = dados.itensDetalhes
+      .map((it) => ({
+        descricao: String(it.descricao || "").trim().substring(0, 200),
+        qtd: Number(it.qtd) || 0,
+        unidade: String(it.unidade || "UN").trim().substring(0, 5),
+        valorUnit: Number(it.valorUnit) || 0,
+        ipiPct: Number(it.ipiPct) || 0,
+        icmsPct: Number(it.icmsPct) || 0,
+        codigo: it.codigo ? String(it.codigo).trim() : null,
+      }))
+      .filter((it) => it.descricao && it.qtd > 0 && it.valorUnit > 0);
+    if (itensDetalhes.length === 0) {
+      return NextResponse.json(
+        { error: "Itens detalhados invalidos. Preencha descricao, quantidade e valor unitario." },
+        { status: 400 }
+      );
+    }
+    // Recalcula total = soma de (qtd × valorUnit × (1 + IPI%))
+    total = itensDetalhes.reduce(
+      (s, it) => s + it.qtd * it.valorUnit * (1 + (it.ipiPct || 0) / 100),
+      0
+    );
+  }
+
   if (!total || total <= 0) {
     return NextResponse.json({ error: "Informe o valor total (> 0)." }, { status: 400 });
   }
@@ -112,6 +140,7 @@ export async function POST(req, { params }) {
       anexoUrl,
       anexoNome,
       categoriaItem: dados.categoriaItem ? String(dados.categoriaItem) : null,
+      itensDetalhes,
       createdById: user.id,
     },
   });

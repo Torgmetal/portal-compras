@@ -38,21 +38,37 @@ export async function POST(req, { params }) {
     );
   }
 
-  // Monta payload pra criarPedidoOmie
-  const descricaoItem = ped.observacao
-    || `FD ${ped.fornecedorNome}${ped.categoriaItem ? ` — ${ped.categoriaItem}` : ""}`;
-
-  const resultado = await criarPedidoOmie({
-    itens: [
+  // Monta itens pra criarPedidoOmie.
+  // Se o FD avulso tem itens detalhados, usa eles. Senao, fallback pra 1
+  // item generico com total embutido (comportamento antigo).
+  let itensOmie;
+  if (Array.isArray(ped.itensDetalhes) && ped.itensDetalhes.length > 0) {
+    itensOmie = ped.itensDetalhes.map((it) => ({
+      codigo: it.codigo || null,
+      descricao: String(it.descricao || "").substring(0, 200),
+      qtd: Number(it.qtd) || 1,
+      unidade: it.unidade || "UN",
+      valorUnit: Number(it.valorUnit) || 0,
+      ipiPct: Number(it.ipiPct) || 0,
+      icmsPct: Number(it.icmsPct) || 0,
+    }));
+  } else {
+    const descricaoItem = ped.observacao
+      || `FD ${ped.fornecedorNome}${ped.categoriaItem ? ` — ${ped.categoriaItem}` : ""}`;
+    itensOmie = [
       {
-        codigo: null, // usa produto generico
-        descricao: descricaoItem.substring(0, 120),
+        codigo: null,
+        descricao: descricaoItem.substring(0, 200),
         qtd: 1,
         valorUnit: ped.total,
         ipiPct: 0,
         icmsPct: 0,
       },
-    ],
+    ];
+  }
+
+  const resultado = await criarPedidoOmie({
+    itens: itensOmie,
     observacao: `[FD avulso] OP ${ped.op?.numero || ""} — ${ped.fornecedorNome}`
       + (ped.categoriaItem ? ` (${ped.categoriaItem})` : ""),
     nCodFor: ped.nCodFor || null,

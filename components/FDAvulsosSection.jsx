@@ -231,15 +231,58 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
     categoriaItem: "",
     jaExisteNoOmie: true, // true = regularizacao, false = criar depois
   });
+  // Itens detalhados (opcional) — quando preenchido, total e calculado.
+  // Quando vazio, usuario digita total direto no campo "Valor total".
+  const [itens, setItens] = useState([]);
   const [file, setFile] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
+  const addItem = () => {
+    setItens([...itens, { descricao: "", qtd: "", unidade: "UN", valorUnit: "", ipiPct: "", icmsPct: "" }]);
+  };
+  const removerItem = (idx) => {
+    setItens(itens.filter((_, i) => i !== idx));
+  };
+  const setItem = (idx, campo, valor) => {
+    setItens(itens.map((it, i) => i === idx ? { ...it, [campo]: valor } : it));
+  };
+
+  // Total calculado dos itens (se houver)
+  const totalItens = itens.reduce((s, it) => {
+    const qtd = parseFloat(String(it.qtd).replace(",", ".")) || 0;
+    const valorUnit = parseFloat(String(it.valorUnit).replace(",", ".")) || 0;
+    const ipi = parseFloat(String(it.ipiPct).replace(",", ".")) || 0;
+    return s + qtd * valorUnit * (1 + ipi / 100);
+  }, 0);
+  const temItens = itens.length > 0 && itens.some((it) => it.descricao && it.qtd && it.valorUnit);
+
   const submit = async () => {
     setErro("");
     if (!form.fornecedorNome.trim()) return setErro("Informe o fornecedor.");
-    const total = parseFloat(form.total.replace(",", "."));
-    if (!total || total <= 0) return setErro("Informe o valor total (maior que 0).");
+
+    // Itens detalhados (opcional)
+    const itensValidos = itens
+      .map((it) => ({
+        descricao: it.descricao.trim(),
+        qtd: parseFloat(String(it.qtd).replace(",", ".")) || 0,
+        unidade: it.unidade || "UN",
+        valorUnit: parseFloat(String(it.valorUnit).replace(",", ".")) || 0,
+        ipiPct: parseFloat(String(it.ipiPct).replace(",", ".")) || 0,
+        icmsPct: parseFloat(String(it.icmsPct).replace(",", ".")) || 0,
+      }))
+      .filter((it) => it.descricao && it.qtd > 0 && it.valorUnit > 0);
+
+    let total;
+    if (itensValidos.length > 0) {
+      total = itensValidos.reduce(
+        (s, it) => s + it.qtd * it.valorUnit * (1 + it.ipiPct / 100),
+        0
+      );
+    } else {
+      total = parseFloat(String(form.total).replace(",", "."));
+      if (!total || total <= 0) return setErro("Informe o valor total (maior que 0) ou pelo menos 1 item detalhado.");
+    }
 
     setSalvando(true);
     try {
@@ -253,6 +296,7 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
         categoriaItem: form.categoriaItem || null,
         faturamentoDireto: true,
         jaExisteNoOmie: form.jaExisteNoOmie,
+        itensDetalhes: itensValidos.length > 0 ? itensValidos : null,
       }));
       if (file) fd.append("file", file);
 
@@ -359,14 +403,122 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
             </div>
           </div>
 
+          {/* Itens detalhados (opcional) — quando preenchido, total e calculado.
+              Quando vazio, usuario informa total no campo "Valor total". */}
+          <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/50">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <label className="block text-xs font-semibold text-torg-dark">
+                  Itens do pedido (opcional)
+                </label>
+                <p className="text-[10px] text-torg-gray">
+                  Recomendado quando vai <strong>criar o pedido no Omie</strong> — descrição vira o item no Omie.
+                  Se deixar vazio, o sistema cria 1 item genérico com o valor total embutido.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={addItem}
+                className="text-xs px-2 py-1 bg-torg-blue text-white rounded font-medium hover:bg-torg-blue-700 inline-flex items-center gap-1"
+              >
+                <Plus size={12} /> Adicionar item
+              </button>
+            </div>
+
+            {itens.length > 0 && (
+              <div className="space-y-2 mb-2">
+                {itens.map((it, idx) => {
+                  const subtotal = (parseFloat(String(it.qtd).replace(",", ".")) || 0)
+                    * (parseFloat(String(it.valorUnit).replace(",", ".")) || 0)
+                    * (1 + (parseFloat(String(it.ipiPct).replace(",", ".")) || 0) / 100);
+                  return (
+                    <div key={idx} className="bg-white border border-gray-200 rounded p-2 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={it.descricao}
+                          onChange={(e) => setItem(idx, "descricao", e.target.value)}
+                          placeholder="Descrição do item (ex: Chapa de aço A36 1/4)"
+                          className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removerItem(idx)}
+                          className="text-red-600 hover:text-red-800"
+                          title="Remover"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-12 gap-1.5">
+                        <div className="col-span-2">
+                          <label className="block text-[9px] text-torg-gray uppercase">Qtd</label>
+                          <input
+                            type="text"
+                            value={it.qtd}
+                            onChange={(e) => setItem(idx, "qtd", e.target.value)}
+                            placeholder="1"
+                            className="w-full border border-gray-300 rounded px-1.5 py-1 text-xs tabular-nums text-right focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-[9px] text-torg-gray uppercase">Un</label>
+                          <input
+                            type="text"
+                            value={it.unidade}
+                            onChange={(e) => setItem(idx, "unidade", e.target.value)}
+                            placeholder="UN"
+                            className="w-full border border-gray-300 rounded px-1.5 py-1 text-xs uppercase focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <label className="block text-[9px] text-torg-gray uppercase">Valor unit (R$)</label>
+                          <input
+                            type="text"
+                            value={it.valorUnit}
+                            onChange={(e) => setItem(idx, "valorUnit", e.target.value)}
+                            placeholder="0,00"
+                            className="w-full border border-gray-300 rounded px-1.5 py-1 text-xs tabular-nums text-right focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-[9px] text-torg-gray uppercase">IPI %</label>
+                          <input
+                            type="text"
+                            value={it.ipiPct}
+                            onChange={(e) => setItem(idx, "ipiPct", e.target.value)}
+                            placeholder="0"
+                            className="w-full border border-gray-300 rounded px-1.5 py-1 text-xs tabular-nums text-right focus:ring-1 focus:ring-torg-blue"
+                          />
+                        </div>
+                        <div className="col-span-3 text-right pt-3">
+                          <p className="text-[9px] text-torg-gray uppercase">Subtotal</p>
+                          <p className="text-xs text-torg-dark font-bold tabular-nums">{fmtMoeda(subtotal)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="flex justify-end pt-1 text-xs">
+                  <span className="text-torg-gray mr-2">Total dos itens:</span>
+                  <span className="text-torg-dark font-bold tabular-nums">{fmtMoeda(totalItens)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">Valor total da NF (R$) *</label>
+            <label className="block text-xs font-medium text-torg-dark mb-1">
+              Valor total da NF (R$) {!temItens && <span className="text-red-600">*</span>}
+              {temItens && <span className="text-emerald-700 font-normal"> — calculado dos itens</span>}
+            </label>
             <input
               type="text"
-              value={form.total}
+              value={temItens ? totalItens.toFixed(2).replace(".", ",") : form.total}
               onChange={(e) => setForm({ ...form, total: e.target.value })}
               placeholder="Ex: 15000,00"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
+              disabled={temItens}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue disabled:bg-emerald-50/50 disabled:text-torg-dark"
             />
           </div>
 

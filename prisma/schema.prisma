@@ -539,6 +539,10 @@ model PedidoOmie {
   // Categoria do material/escopo (ex: STEEL_DECK, TINTA, PARAFUSOS) — pra
   // cadastros manuais; quando via cotacao a categoria sai pelos rmItens.
   categoriaItem     String?
+  // Itens detalhados do FD avulso (cadastros manuais). Array de objetos
+  // { descricao, qtd, unidade, valorUnit, ipiPct, icmsPct, codigo? }.
+  // Quando vazio, o "Criar no Omie" usa 1 item generico com o total embutido.
+  itensDetalhes     Json?
 
   createdById       String?
   createdAt         DateTime @default(now())
