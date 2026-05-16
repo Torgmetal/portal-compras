@@ -147,13 +147,12 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium inline-flex items-center gap-1">
                           <CheckCircle2 size={10} /> No Omie
                         </span>
-                      ) : p.status === "PENDENTE_OMIE" ? (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium">
-                          Pendente
-                        </span>
-                      ) : p.status === "ERRO" ? (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 font-medium" title={p.erroOmie || ""}>
-                          Erro
+                      ) : p.status === "PENDENTE_OMIE" || p.status === "ERRO" ? (
+                        <span
+                          className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium"
+                          title={p.erroOmie ? `Última tentativa de envio falhou: ${p.erroOmie}` : "FD registrado, pendente de criação no Omie"}
+                        >
+                          FD
                         </span>
                       ) : (
                         <span className="text-[10px] text-torg-gray">{p.status || "—"}</span>
