@@ -1192,9 +1192,15 @@ function ModalMedicao({ opId, onClose, onSaved }) {
         throw new Error("Resposta invalida do servidor (vazia). Marque 'Cadastrar manualmente' pra prosseguir sem consultar o Omie.");
       }
       if (!res.ok) {
-        const ehRedundant = /redundante|REDUNDANT|aguarde/i.test(data.error || "");
-        if (ehRedundant && !manual) {
-          setErro(`${data.error}\n\n⚠️ Omie bloqueou a consulta. Marque "Cadastrar manualmente" abaixo e digite o valor pra prosseguir sem consultar o Omie.`);
+        // Qualquer erro do Omie — ativa automaticamente modo manual e
+        // sugere ao user preencher o valor. Mais simples e direto.
+        if (!manual) {
+          setModoManual(true);
+          setErro(
+            `❌ Omie não retornou o pedido ${numero}.\n\n` +
+            `Detalhe: ${data.error || "erro desconhecido"}\n\n` +
+            `✅ Modo manual ativado. Preencha o valor da medição abaixo e clique em "Cadastrar manual".`
+          );
         } else {
           throw new Error(data.error || "Erro");
         }
