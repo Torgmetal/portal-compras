@@ -4,6 +4,9 @@ import { requireRole } from "@/lib/session";
 import { consultarPedidoVenda } from "@/lib/omie-pedido-venda";
 import { consultarOrdemServico } from "@/lib/omie-ordem-servico";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 // POST — sincroniza dados da medicao com o Omie (re-busca via API).
 export async function POST(_req, { params }) {
   let user;

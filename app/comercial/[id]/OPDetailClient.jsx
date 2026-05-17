@@ -1173,9 +1173,25 @@ function ModalMedicao({ opId, onClose, onSaved }) {
           ...(manual ? { valorBruto: valorBrutoNum } : {}),
         }),
       });
-      const data = await res.json();
+      // Trata resposta robustamente — pode vir vazia em timeout ou erro do Vercel
+      let data;
+      const texto = await res.text();
+      try {
+        data = texto ? JSON.parse(texto) : {};
+      } catch {
+        // Resposta nao eh JSON (provavelmente HTML de erro)
+        if (!res.ok) {
+          throw new Error(
+            `Servidor retornou ${res.status}. ${
+              res.status === 504 || res.status === 408
+                ? "Tempo esgotado consultando o Omie — marque 'Cadastrar manualmente' abaixo pra cadastrar sem consultar."
+                : "Tente de novo em alguns segundos."
+            }`
+          );
+        }
+        throw new Error("Resposta invalida do servidor (vazia). Marque 'Cadastrar manualmente' pra prosseguir sem consultar o Omie.");
+      }
       if (!res.ok) {
-        // Se erro mencionar REDUNDANT, sugerir modo manual
         const ehRedundant = /redundante|REDUNDANT|aguarde/i.test(data.error || "");
         if (ehRedundant && !manual) {
           setErro(`${data.error}\n\n⚠️ Omie bloqueou a consulta. Marque "Cadastrar manualmente" abaixo e digite o valor pra prosseguir sem consultar o Omie.`);

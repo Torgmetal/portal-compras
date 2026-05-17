@@ -5,6 +5,10 @@ import { requireRole } from "@/lib/session";
 import { consultarPedidoVenda } from "@/lib/omie-pedido-venda";
 import { consultarOrdemServico } from "@/lib/omie-ordem-servico";
 
+// Timeout maior — a chamada Omie + retry pode levar ate ~30s no pior caso
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 // POST — vincula um Pedido de Venda OU uma Ordem de Servico do Omie
 // como medicao da OP. Busca dados via API e salva snapshot.
 
