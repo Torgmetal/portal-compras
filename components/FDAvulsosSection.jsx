@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FileText, Plus, Upload, Loader2, AlertCircle, Trash2, ExternalLink, Send, CheckCircle2, Search,
+  FileText, Plus, Upload, Loader2, AlertCircle, Trash2, ExternalLink, Send, CheckCircle2, Search, Link2,
 } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 
@@ -21,6 +21,7 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
   const [modal, setModal] = useState(false);
   const [erro, setErro] = useState("");
   const [criandoOmieId, setCriandoOmieId] = useState(null);
+  const [vincularModal, setVincularModal] = useState(null); // pedido selecionado
 
   const total = pedidos.reduce((s, p) => s + (p.total || 0), 0);
 
@@ -175,6 +176,15 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
                     </td>
                     <td className="px-4 py-2 text-right">
                       <div className="inline-flex items-center gap-2">
+                        {podeEditar && rmsAtivas.length > 0 && (
+                          <button
+                            onClick={() => setVincularModal(p)}
+                            className="text-xs px-2 py-1 bg-white border border-torg-blue-200 text-torg-blue rounded font-medium hover:bg-torg-blue-50 inline-flex items-center gap-1"
+                            title="Vincular este FD a uma RM — marca a RM como PEDIDO_GERADO"
+                          >
+                            <Link2 size={12} /> RM
+                          </button>
+                        )}
                         {podeEditar && (p.status === "PENDENTE_OMIE" || p.status === "ERRO") && (
                           <button
                             onClick={() => criarNoOmie(p)}
@@ -215,6 +225,15 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
           rmsAtivas={rmsAtivas}
           onClose={() => setModal(false)}
           onSaved={() => { setModal(false); router.refresh(); }}
+        />
+      )}
+
+      {vincularModal && (
+        <ModalVincularRM
+          pedido={vincularModal}
+          rmsAtivas={rmsAtivas}
+          onClose={() => setVincularModal(null)}
+          onSaved={() => { setVincularModal(null); router.refresh(); }}
         />
       )}
     </div>
@@ -648,6 +667,109 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], rmsAtivas = [], onClose, o
           >
             {salvando && <Loader2 size={14} className="animate-spin" />}
             Cadastrar FD avulso
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Modal pra vincular FD avulso EXISTENTE a uma RM (depois do fato).
+// Pra cadastros antigos ou casos onde user esqueceu de marcar a RM
+// no momento do cadastro.
+function ModalVincularRM({ pedido, rmsAtivas = [], onClose, onSaved }) {
+  const [rmId, setRmId] = useState(pedido.rmAtendidaId || "");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const submit = async () => {
+    setErro("");
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/comercial/pedido-fd-avulso/${pedido.id}/vincular-rm`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rmAtendidaId: rmId || null }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Erro");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  const rmSelecionada = rmsAtivas.find((r) => r.id === rmId);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-torg-dark inline-flex items-center gap-2">
+            <Link2 size={18} /> Vincular FD a uma RM
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+            </div>
+          )}
+
+          <div className="bg-gray-50 border border-gray-200 rounded p-3 text-xs">
+            <p><strong>FD selecionado:</strong></p>
+            <p className="text-torg-gray mt-1">
+              {pedido.fornecedorNome} · {fmtMoeda(pedido.total)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-2">
+              Qual RM este FD atende?
+            </label>
+            <select
+              value={rmId}
+              onChange={(e) => setRmId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-torg-blue"
+            >
+              <option value="">— Nenhuma (FD avulso solto) —</option>
+              {rmsAtivas.map((rm) => (
+                <option key={rm.id} value={rm.id}>
+                  RM {rm.numero} ({rm.status})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {rmSelecionada && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded p-3 text-xs">
+              <p className="font-semibold">✓ Ao salvar:</p>
+              <ul className="list-disc list-inside mt-1 space-y-0.5">
+                <li>RM <strong>{rmSelecionada.numero}</strong> vai mudar pra <strong>PEDIDO_GERADO</strong></li>
+                <li>Todos os itens da RM viram <strong>PEDIDO_GERADO</strong></li>
+                <li>RM sai da lista de RMs ativas do painel de Compras</li>
+              </ul>
+            </div>
+          )}
+
+          {!rmId && pedido.rmAtendidaId && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded p-3 text-xs">
+              <p>⚠️ Desvincular este FD vai reverter a RM atualmente vinculada para <strong>COTADA</strong>.</p>
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
+            Cancelar
+          </button>
+          <button
+            onClick={submit}
+            disabled={salvando}
+            className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            {salvando && <Loader2 size={14} className="animate-spin" />} Salvar vínculo
           </button>
         </div>
       </div>
