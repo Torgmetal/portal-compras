@@ -6,7 +6,14 @@ import {
   ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
   Trash2, Upload, FileSpreadsheet, X, Wrench, Building2, Plus,
 } from "lucide-react";
-import { labelCategoria, categoriasUnicasOP } from "@/lib/op-categorias";
+import {
+  labelCategoria,
+  categoriasUnicasOP,
+  CATEGORIAS_MATERIAL,
+  CATEGORIAS_SERVICOS_TERCEIRIZADOS,
+  CATEGORIAS_ALUGUEL,
+  CATEGORIA_OUTRO,
+} from "@/lib/op-categorias";
 import { parseTekla } from "@/lib/parse-tekla";
 
 const fmtMoeda = (v) =>
@@ -315,32 +322,82 @@ export default function NovaRMClient({ ops, userSetor }) {
         {precisaCategorias && op && (
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-2">
-              Categorias do escopo cobertas por essa RM *
+              Categorias da solicitação *
             </label>
-            <p className="text-xs text-torg-gray mb-2">
-              Marque o que essa RM compra. Ajuda a Compras a saber se o escopo todo está coberto.
+            <p className="text-xs text-torg-gray mb-3">
+              Marque do que se trata essa RM. Categorias marcadas com <span className="text-emerald-700 font-semibold">✓ no escopo</span> já estão previstas no contrato da OP.
             </p>
-            <div className="flex flex-wrap gap-2">
-              {categoriasOpDisponiveis.map((cat) => {
-                const selecionada = categoriasCobertas.includes(cat);
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => toggleCategoria(cat)}
-                    className={`px-3 py-1.5 rounded-full text-sm border-2 transition-colors ${
-                      selecionada
-                        ? "border-torg-blue bg-torg-blue text-white"
-                        : "border-gray-200 text-torg-dark hover:border-torg-blue-200"
-                    }`}
-                  >
-                    {labelCategoria(cat)}
-                  </button>
-                );
-              })}
+
+            {/* Materiais */}
+            <div className="mb-3">
+              <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1 font-semibold">Materiais</p>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIAS_MATERIAL.map((c) => (
+                  <CategoriaChip
+                    key={c.codigo}
+                    codigo={c.codigo}
+                    label={c.label}
+                    selecionada={categoriasCobertas.includes(c.codigo)}
+                    noEscopo={categoriasOpDisponiveis.includes(c.codigo)}
+                    onClick={() => toggleCategoria(c.codigo)}
+                  />
+                ))}
+              </div>
             </div>
-            {categoriasOpDisponiveis.length === 0 && (
-              <p className="text-xs text-torg-gray italic">A OP escolhida não tem itens cadastrados.</p>
+
+            {/* Serviços terceirizados */}
+            <div className="mb-3">
+              <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1 font-semibold">Serviços Terceirizados</p>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIAS_SERVICOS_TERCEIRIZADOS.map((c) => (
+                  <CategoriaChip
+                    key={c.codigo}
+                    codigo={c.codigo}
+                    label={c.label}
+                    selecionada={categoriasCobertas.includes(c.codigo)}
+                    noEscopo={categoriasOpDisponiveis.includes(c.codigo)}
+                    onClick={() => toggleCategoria(c.codigo)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Aluguéis */}
+            <div className="mb-3">
+              <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1 font-semibold">Aluguéis e Equipamentos</p>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIAS_ALUGUEL.map((c) => (
+                  <CategoriaChip
+                    key={c.codigo}
+                    codigo={c.codigo}
+                    label={c.label}
+                    selecionada={categoriasCobertas.includes(c.codigo)}
+                    noEscopo={categoriasOpDisponiveis.includes(c.codigo)}
+                    onClick={() => toggleCategoria(c.codigo)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Outro */}
+            <div>
+              <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1 font-semibold">Outro</p>
+              <div className="flex flex-wrap gap-2">
+                <CategoriaChip
+                  codigo={CATEGORIA_OUTRO.codigo}
+                  label={CATEGORIA_OUTRO.label}
+                  selecionada={categoriasCobertas.includes(CATEGORIA_OUTRO.codigo)}
+                  noEscopo={categoriasOpDisponiveis.includes(CATEGORIA_OUTRO.codigo)}
+                  onClick={() => toggleCategoria(CATEGORIA_OUTRO.codigo)}
+                />
+              </div>
+            </div>
+
+            {/* Aviso quando seleciona categoria fora do escopo */}
+            {categoriasCobertas.some((c) => !categoriasOpDisponiveis.includes(c)) && (
+              <p className="text-[11px] text-amber-700 italic mt-3 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                ⚠️ Você selecionou categoria(s) que não estão no escopo desta OP. Compras pode pedir aditivo se necessário.
+              </p>
             )}
           </div>
         )}
@@ -689,5 +746,35 @@ export default function NovaRMClient({ ops, userSetor }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// Chip de categoria — mostra label + badge "no escopo" quando aplicavel.
+// Selecao destaca em azul; nao-selecionadas mostram label normal.
+function CategoriaChip({ codigo, label, selecionada, noEscopo, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-sm border-2 transition-colors inline-flex items-center gap-1.5 ${
+        selecionada
+          ? "border-torg-blue bg-torg-blue text-white"
+          : noEscopo
+          ? "border-emerald-200 text-torg-dark bg-emerald-50/40 hover:border-emerald-400"
+          : "border-gray-200 text-torg-dark hover:border-torg-blue-200"
+      }`}
+    >
+      {label}
+      {noEscopo && !selecionada && (
+        <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold whitespace-nowrap" title="Categoria já prevista no escopo da OP">
+          ✓ no escopo
+        </span>
+      )}
+      {noEscopo && selecionada && (
+        <span className="text-[9px] px-1 py-0.5 rounded bg-white/20 text-white font-bold whitespace-nowrap">
+          ✓ escopo
+        </span>
+      )}
+    </button>
   );
 }
