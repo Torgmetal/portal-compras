@@ -43,7 +43,11 @@ function parseXlsx(buffer) {
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+  return parseRows(rows);
+}
 
+// Parser que opera sobre rows ja extraidas (vindas do cliente OU do parseXlsx)
+function parseRows(rows) {
   const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
   const findCol = (row, candidates) => {
     for (const c of Object.keys(row)) {
@@ -53,7 +57,7 @@ function parseXlsx(buffer) {
     return null;
   };
 
-  if (rows.length === 0) return { itens: [] };
+  if (!Array.isArray(rows) || rows.length === 0) return { itens: [] };
 
   // Detecta colunas pela primeira linha
   const sample = rows[0];
@@ -207,28 +211,41 @@ export async function POST(req) {
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
   }
 
-  const { fileBase64, mimeType, fileName } = body;
-  if (!fileBase64) return NextResponse.json({ error: "fileBase64 obrigatório" }, { status: 400 });
+  const { fileBase64, mimeType, fileName, rows } = body;
 
+  // Modo CLIENT-SIDE PARSE: o frontend ja parseou a planilha com XLSX
+  // e mandou as rows direto (evita o limite de 4.5MB do Vercel pra body).
+  // Aceita arrays de objetos como sheet_to_json produz.
   let resultado;
-  try {
-    if (
-      mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-      mimeType === "application/vnd.ms-excel" ||
-      /\.(xlsx|xls|csv)$/i.test(fileName || "")
-    ) {
-      const c = fileBase64.includes(",") ? fileBase64.split(",")[1] : fileBase64;
-      const buffer = Buffer.from(c, "base64");
-      resultado = parseXlsx(buffer);
-    } else if (mimeType === "application/pdf" || /\.pdf$/i.test(fileName || "")) {
-      resultado = await parseWithAI({ pdfBase64: fileBase64 });
-    } else if ((mimeType || "").startsWith("image/")) {
-      resultado = await parseWithAI({ imageBase64: fileBase64, imageType: mimeType });
-    } else {
-      return NextResponse.json({ error: "Formato não suportado. Use xlsx, pdf ou imagem." }, { status: 400 });
+  if (Array.isArray(rows)) {
+    try {
+      resultado = parseRows(rows);
+    } catch (e) {
+      return NextResponse.json({ error: "Falha ao processar rows: " + e.message }, { status: 500 });
     }
-  } catch (e) {
-    return NextResponse.json({ error: "Falha ao processar: " + e.message }, { status: 500 });
+  } else if (!fileBase64) {
+    return NextResponse.json({ error: "Envie fileBase64 (legado) OU rows (novo)" }, { status: 400 });
+  } else {
+    // Caminho legado: recebe base64, parseia no servidor
+    try {
+      if (
+        mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        mimeType === "application/vnd.ms-excel" ||
+        /\.(xlsx|xls|csv)$/i.test(fileName || "")
+      ) {
+        const c = fileBase64.includes(",") ? fileBase64.split(",")[1] : fileBase64;
+        const buffer = Buffer.from(c, "base64");
+        resultado = parseXlsx(buffer);
+      } else if (mimeType === "application/pdf" || /\.pdf$/i.test(fileName || "")) {
+        resultado = await parseWithAI({ pdfBase64: fileBase64 });
+      } else if ((mimeType || "").startsWith("image/")) {
+        resultado = await parseWithAI({ imageBase64: fileBase64, imageType: mimeType });
+      } else {
+        return NextResponse.json({ error: "Formato não suportado. Use xlsx, pdf ou imagem." }, { status: 400 });
+      }
+    } catch (e) {
+      return NextResponse.json({ error: "Falha ao processar: " + e.message }, { status: 500 });
+    }
   }
 
   if (resultado.error) {

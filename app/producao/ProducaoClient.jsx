@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
 import {
   Activity, Plus, Loader2, AlertCircle, X, Upload,
   Package, Pencil, Trash2, FileSpreadsheet, CheckCircle2, FileText,
@@ -251,18 +252,54 @@ function ModalImportarPCP({ ops, onClose, onSaved }) {
     setParsing(true);
     setArquivoNome(file.name);
     try {
-      const base64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result);
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
-      const resp = await fetch("/api/producao/importar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileBase64: base64, mimeType: file.type, fileName: file.name }),
-      });
-      const data = await resp.json();
+      const isPlanilha =
+        /\.(xlsx|xls|csv)$/i.test(file.name) ||
+        file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        file.type === "application/vnd.ms-excel" ||
+        file.type === "text/csv";
+
+      let resp;
+      if (isPlanilha) {
+        // Parse client-side: evita o limite de 4.5MB do Vercel pra body
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+        if (rows.length === 0) {
+          setErro("Planilha vazia ou primeira aba sem dados.");
+          return;
+        }
+        resp = await fetch("/api/producao/importar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rows }),
+        });
+      } else {
+        // PDF/imagem: continua com base64 pra IA processar
+        const base64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        resp = await fetch("/api/producao/importar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileBase64: base64, mimeType: file.type, fileName: file.name }),
+        });
+      }
+
+      const txt = await resp.text();
+      let data;
+      try {
+        data = JSON.parse(txt);
+      } catch {
+        throw new Error(
+          resp.status === 413
+            ? "Arquivo muito grande pro servidor. Tente um menor."
+            : `Servidor retornou resposta inválida (HTTP ${resp.status}). ${txt.slice(0, 120)}`
+        );
+      }
       if (!resp.ok) throw new Error(data.error || "Erro ao processar arquivo");
       if (!data.itens || data.itens.length === 0) {
         setErro("Nenhum item extraído. Verifique o formato do arquivo.");
