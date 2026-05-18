@@ -16,7 +16,7 @@ const fmtCnpj = (s) => {
   return c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 };
 
-export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true, categoriasOP = [] }) {
+export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true, categoriasOP = [], rmsAtivas = [] }) {
   const router = useRouter();
   const [modal, setModal] = useState(false);
   const [erro, setErro] = useState("");
@@ -212,6 +212,7 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
         <ModalNovoFDAvulso
           opId={opId}
           categoriasOP={categoriasOP}
+          rmsAtivas={rmsAtivas}
           onClose={() => setModal(false)}
           onSaved={() => { setModal(false); router.refresh(); }}
         />
@@ -220,7 +221,7 @@ export default function FDAvulsosSection({ opId, pedidos = [], podeEditar = true
   );
 }
 
-function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
+function ModalNovoFDAvulso({ opId, categoriasOP = [], rmsAtivas = [], onClose, onSaved }) {
   const [form, setForm] = useState({
     fornecedorNome: "",
     cnpj: "",
@@ -229,6 +230,7 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
     observacao: "",
     categoriaItem: "",
     jaExisteNoOmie: true, // true = regularizacao, false = criar depois
+    rmAtendidaId: "", // RM que esse FD cobre (opcional)
   });
   // Itens detalhados (opcional) — quando preenchido, total e calculado.
   // Quando vazio, usuario digita total direto no campo "Valor total".
@@ -297,6 +299,7 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
         faturamentoDireto: true,
         jaExisteNoOmie: form.jaExisteNoOmie,
         itensDetalhes: itensValidos.length > 0 ? itensValidos : null,
+        rmAtendidaId: form.rmAtendidaId || null,
       }));
       if (file) fd.append("file", file);
 
@@ -542,6 +545,33 @@ function ModalNovoFDAvulso({ opId, categoriasOP = [], onClose, onSaved }) {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue disabled:bg-emerald-50/50 disabled:text-torg-dark"
             />
           </div>
+
+          {/* Vinculo com RM (opcional) — ao selecionar, marca a RM como
+              PEDIDO_GERADO e tira ela da lista do Compras */}
+          {rmsAtivas.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-torg-dark mb-1">
+                Esse FD atende qual RM? <span className="text-torg-gray font-normal">(opcional)</span>
+              </label>
+              <select
+                value={form.rmAtendidaId}
+                onChange={(e) => setForm({ ...form, rmAtendidaId: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+              >
+                <option value="">— Nenhuma (FD avulso solto) —</option>
+                {rmsAtivas.map((rm) => (
+                  <option key={rm.id} value={rm.id}>
+                    RM {rm.numero} ({rm.status})
+                  </option>
+                ))}
+              </select>
+              {form.rmAtendidaId && (
+                <p className="text-[10px] text-emerald-700 mt-0.5 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">
+                  ✓ Ao salvar, a RM <strong>{rmsAtivas.find((r) => r.id === form.rmAtendidaId)?.numero}</strong> vai mudar para <strong>PEDIDO_GERADO</strong> e sair da lista de RMs ativas do Compras.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">

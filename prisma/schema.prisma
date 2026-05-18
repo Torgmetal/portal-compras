@@ -500,6 +500,7 @@ model RM {
   cotacoes    Cotacao[]
   envios      Envio[]
   anexos      Anexo[]
+  pedidosFDAtendidos PedidoOmie[] @relation("PedidoOmieRMAtendida")
 
   @@index([opId])
   @@index([status])
@@ -555,6 +556,11 @@ model PedidoOmie {
   // { descricao, qtd, unidade, valorUnit, ipiPct, icmsPct, codigo? }.
   // Quando vazio, o "Criar no Omie" usa 1 item generico com o total embutido.
   itensDetalhes     Json?
+  // RM que esse FD avulso atende. Quando preenchido, ao salvar marca
+  // todos os RMItens dela como PEDIDO_GERADO e a RM tambem — saindo
+  // da lista de RMs ativas do Compras.
+  rmAtendidaId      String?
+  rmAtendida        RM?      @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
 
   createdById       String?
   createdAt         DateTime @default(now())

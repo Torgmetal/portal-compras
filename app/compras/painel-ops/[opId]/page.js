@@ -371,6 +371,9 @@ export default async function PainelOPDetalhe({ params }) {
           ...op.itens.map((i) => i.categoria).filter(Boolean),
           ...op.aditivos.flatMap((a) => a.itens.map((i) => i.categoria)).filter(Boolean),
         ]))}
+        rmsAtivas={(op.rms || [])
+          .filter((rm) => !["PEDIDO_GERADO", "CANCELADA"].includes(rm.status))
+          .map((rm) => ({ id: rm.id, numero: rm.numero, status: rm.status }))}
       />
 
       {/* Pedidos no Omie vinculados a essa OP */}

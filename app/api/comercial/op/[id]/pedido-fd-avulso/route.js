@@ -123,6 +123,22 @@ export async function POST(req, { params }) {
   const jaExisteNoOmie = dados.jaExisteNoOmie !== false; // default true
   const status = jaExisteNoOmie ? "CRIADO" : "PENDENTE_OMIE";
 
+  // Valida rmAtendidaId (opcional) — RM que esse FD cobre
+  let rmAtendidaId = null;
+  if (dados.rmAtendidaId) {
+    const rm = await prisma.rM.findFirst({
+      where: { id: String(dados.rmAtendidaId), opId: op.id },
+      select: { id: true, numero: true, status: true },
+    });
+    if (!rm) {
+      return NextResponse.json(
+        { error: "RM informada não pertence a essa OP." },
+        { status: 400 }
+      );
+    }
+    rmAtendidaId = rm.id;
+  }
+
   const pedido = await prisma.pedidoOmie.create({
     data: {
       opId: op.id,
@@ -141,9 +157,31 @@ export async function POST(req, { params }) {
       anexoNome,
       categoriaItem: dados.categoriaItem ? String(dados.categoriaItem) : null,
       itensDetalhes,
+      rmAtendidaId,
       createdById: user.id,
     },
   });
+
+  // Se o FD atende uma RM, marca os RMItens dela como PEDIDO_GERADO e
+  // muda o status da RM — assim ela sai da lista de RMs ativas do Compras.
+  let rmAtualizada = null;
+  if (rmAtendidaId) {
+    await prisma.rMItem.updateMany({
+      where: {
+        rmId: rmAtendidaId,
+        status: { notIn: ["CANCELADO", "PEDIDO_GERADO"] },
+      },
+      data: {
+        status: "PEDIDO_GERADO",
+        pedidoOmieId: pedido.id,
+      },
+    });
+    rmAtualizada = await prisma.rM.update({
+      where: { id: rmAtendidaId },
+      data: { status: "PEDIDO_GERADO" },
+      select: { id: true, numero: true, status: true },
+    });
+  }
 
   await prisma.auditLog.create({
     data: {
@@ -156,9 +194,10 @@ export async function POST(req, { params }) {
         fornecedor: pedido.fornecedorNome,
         total: pedido.total,
         numeroPedido: pedido.numeroPedido,
+        rmAtendida: rmAtualizada?.numero || null,
       },
     },
   });
 
-  return NextResponse.json({ pedido });
+  return NextResponse.json({ pedido, rmAtualizada });
 }
