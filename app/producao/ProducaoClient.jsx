@@ -242,8 +242,8 @@ function ModalImportarPCP({ ops, onClose, onSaved }) {
 
   async function uploadFile(file) {
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setErro("Arquivo muito grande (limite 10MB).");
+    if (file.size > 50 * 1024 * 1024) {
+      setErro("Arquivo muito grande (limite 50MB).");
       return;
     }
     setErro("");
