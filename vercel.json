@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/estoque-movimentacoes",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/producao/sync-sharepoint",
+      "schedule": "0 8 * * *"
     }
   ]
 }

@@ -48,6 +48,7 @@ model User {
   solicitacoesDecididas   SolicitacaoVerba[]  @relation("SolicitacaoDecididoBy")
   auditLogs               AuditLog[]
   notificacoes            Notificacao[]
+  sharepointSyncs         SharepointSync[]
 }
 
 // ─── OP (ORDEM DE PRODUÇÃO) ─────────────────────────────────
@@ -144,6 +145,9 @@ model ProducaoSemanal {
   op              OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
 
   observacao      String?
+
+  // Fonte da informacao: MANUAL (usuario lancou), IMPORT (planilha local), SHAREPOINT (sync auto).
+  fonte           String?
 
   createdById     String?
   createdAt       DateTime @default(now())
@@ -948,4 +952,24 @@ model EstoqueAlocacao {
 
   @@index([opId])
   @@index([movimentacaoId])
+}
+
+// ─── SHAREPOINT SYNC ────────────────────────────────────────
+// Log de cada execucao do sync com SharePoint. Cada tipo (PCP_PRODUCAO, etc.)
+// tem o seu fluxo. Permite ver historico, debugar falhas e mostrar "ultima sync".
+model SharepointSync {
+  id               String   @id @default(cuid())
+  tipo             String   // "PCP_PRODUCAO", "COTACOES", etc.
+  sucesso          Boolean
+  itensProcessados Int      @default(0)
+  criados          Int      @default(0)
+  atualizados      Int      @default(0)
+  mensagem         String?  // texto livre com info do que foi sincronizado
+  erro             String?  // mensagem de erro quando sucesso=false
+  duracaoMs        Int      @default(0)
+  executadoPorId   String?
+  executadoPor     User?    @relation(fields: [executadoPorId], references: [id], onDelete: SetNull)
+  criadoEm         DateTime @default(now())
+
+  @@index([tipo, criadoEm])
 }

@@ -1,10 +1,11 @@
 "use client";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   Activity, Plus, Loader2, AlertCircle, X, Upload,
   Package, Pencil, Trash2, FileSpreadsheet, CheckCircle2, FileText,
+  Cloud, RefreshCw, XCircle,
 } from "lucide-react";
 import { fmtSemana, isoWeekString } from "@/lib/semana";
 
@@ -90,6 +91,9 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
           </button>
         </div>
       </div>
+
+      {/* Card de Sync com SharePoint */}
+      <SharepointSyncCard />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -902,6 +906,111 @@ function ModalProducao({ ops, semanas, item, onClose, onSaved }) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+// Card que mostra o status do sync com SharePoint e permite forcar sync manual.
+function SharepointSyncCard() {
+  const router = useRouter();
+  const [syncs, setSyncs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  async function fetchHistorico() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/producao/sync-sharepoint/historico");
+      const data = await res.json();
+      if (res.ok) setSyncs(data.syncs || []);
+    } catch {}
+    setLoading(false);
+  }
+
+  useEffect(() => { fetchHistorico(); }, []);
+
+  async function sincronizarAgora() {
+    setSincronizando(true);
+    setErro("");
+    try {
+      const res = await fetch("/api/producao/sync-sharepoint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.sucesso) {
+        setErro(data.erro || data.error || "Falha no sync");
+      } else {
+        router.refresh();
+      }
+      await fetchHistorico();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSincronizando(false);
+    }
+  }
+
+  const ultimo = syncs[0];
+  const diffMin = ultimo ? Math.round((Date.now() - new Date(ultimo.criadoEm).getTime()) / 60000) : null;
+  const tempo = diffMin == null ? "—" :
+    diffMin < 1 ? "agora" :
+    diffMin < 60 ? `${diffMin} min atrás` :
+    diffMin < 60 * 24 ? `${Math.round(diffMin / 60)} h atrás` :
+    `${Math.round(diffMin / 60 / 24)} dias atrás`;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 overflow-hidden">
+      <div className="px-5 py-3 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`p-2 rounded-lg ${ultimo?.sucesso ? "bg-torg-blue-50" : ultimo && !ultimo.sucesso ? "bg-red-50" : "bg-gray-100"}`}>
+            <Cloud size={18} className={ultimo?.sucesso ? "text-torg-blue" : ultimo && !ultimo.sucesso ? "text-red-600" : "text-torg-gray"} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-torg-dark flex items-center gap-2">
+              SharePoint — PCP
+              {loading ? null : ultimo?.sucesso ? (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-torg-blue-50 text-torg-blue px-1.5 py-0.5 rounded uppercase font-bold"><CheckCircle2 size={10} /> OK</span>
+              ) : ultimo && !ultimo.sucesso ? (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded uppercase font-bold"><XCircle size={10} /> Erro</span>
+              ) : (
+                <span className="text-[10px] text-torg-gray uppercase">nunca sincronizou</span>
+              )}
+            </p>
+            <p className="text-xs text-torg-gray truncate">
+              {loading ? "Carregando histórico..." :
+                ultimo ? (
+                  <>
+                    Última: <span className="font-medium text-torg-dark">{tempo}</span>
+                    {ultimo.executadoPor ? ` · ${ultimo.executadoPor.name}` : " · cron automático"}
+                    {ultimo.sucesso && ` · ${ultimo.criados} criados, ${ultimo.atualizados} atualizados`}
+                  </>
+                ) : "Cron diário roda às 08:00 (Vercel). Você também pode disparar manualmente."}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={sincronizarAgora}
+          disabled={sincronizando}
+          className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+        >
+          {sincronizando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {sincronizando ? "Sincronizando..." : "Sincronizar agora"}
+        </button>
+      </div>
+      {(erro || (ultimo && !ultimo.sucesso && ultimo.erro)) && (
+        <div className="px-5 py-2 bg-red-50 border-t border-red-100 text-xs text-red-700 flex items-start gap-2">
+          <AlertCircle size={12} className="mt-0.5 shrink-0" />
+          <span>{erro || ultimo.erro}</span>
+        </div>
+      )}
+      {ultimo && ultimo.sucesso && ultimo.mensagem && (
+        <div className="px-5 py-2 bg-torg-blue-50/40 border-t border-torg-blue-100 text-[11px] text-torg-gray font-mono truncate" title={ultimo.mensagem}>
+          {ultimo.mensagem}
+        </div>
+      )}
+    </div>
   );
 }
 
