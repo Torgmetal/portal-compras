@@ -149,14 +149,19 @@ model ProducaoSemanal {
   // Fonte da informacao: MANUAL (usuario lancou), IMPORT (planilha local), SHAREPOINT (sync auto).
   fonte           String?
 
+  // Setor da fabrica (Corte, Montagem, Solda, Acabamento, Jato, Pintura, Expedicao).
+  // null = lancamento geral/agregado (lancamentos manuais antigos).
+  setor           String?
+
   createdById     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([data, opId])
+  @@unique([data, opId, setor])
   @@index([data])
   @@index([semana])
   @@index([opId])
+  @@index([setor])
 }
 
 // Romaneio = nota de expedicao com peso REAL produzido/expedido.

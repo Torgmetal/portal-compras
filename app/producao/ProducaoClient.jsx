@@ -19,16 +19,49 @@ const diaSemana = (d) => {
   return dias[new Date(d).getDay()];
 };
 
+const SETORES_ORDEM = ["Corte", "Montagem", "Solda", "Acabamento", "Jato", "Pintura", "Expedicao"];
+const SETOR_LABEL = {
+  Corte: "Corte",
+  Montagem: "Montagem",
+  Solda: "Solda",
+  Acabamento: "Acabamento",
+  Jato: "Jato",
+  Pintura: "Pintura",
+  Expedicao: "Expedição",
+  __manual__: "Lançamentos manuais",
+};
+
 export default function ProducaoClient({ ops, semanas, semanaAtual, producoes }) {
   const router = useRouter();
   const [modalProd, setModalProd] = useState(null);
   const [modalImport, setModalImport] = useState(false);
+  // Setor selecionado pra filtrar exibicao. Default: Expedicao.
+  const [setorFiltro, setSetorFiltro] = useState("Expedicao");
 
-  // Agrega producao por semana
+  // Identifica setores que tem dados no banco
+  const setoresDisponiveis = useMemo(() => {
+    const set = new Set();
+    let temManual = false;
+    for (const p of producoes) {
+      if (p.setor) set.add(p.setor);
+      else temManual = true;
+    }
+    const ordenados = SETORES_ORDEM.filter((s) => set.has(s));
+    if (temManual) ordenados.push("__manual__");
+    return ordenados;
+  }, [producoes]);
+
+  // Producoes filtradas pelo setor selecionado
+  const producoesFiltradas = useMemo(() => {
+    if (setorFiltro === "__manual__") return producoes.filter((p) => !p.setor);
+    return producoes.filter((p) => p.setor === setorFiltro);
+  }, [producoes, setorFiltro]);
+
+  // Agrega producao por semana (filtrada por setor)
   const producaoPorSemana = useMemo(() => {
     const map = {};
     for (const s of semanas) map[s.semana] = { ...s, prevKg: 0, realKg: 0, items: [] };
-    for (const p of producoes) {
+    for (const p of producoesFiltradas) {
       const k = p.semana;
       if (!map[k]) continue;
       map[k].prevKg += p.pesoPrevistoKg || 0;
@@ -36,7 +69,24 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
       map[k].items.push(p);
     }
     return Object.values(map);
-  }, [producoes, semanas]);
+  }, [producoesFiltradas, semanas]);
+
+  // Comparacao por setor (totais do mes corrente)
+  const comparacaoSetores = useMemo(() => {
+    const hoje = new Date();
+    const ano = hoje.getFullYear(), mes = hoje.getMonth();
+    const map = {};
+    for (const s of SETORES_ORDEM) map[s] = { setor: s, prev: 0, real: 0, dias: 0 };
+    for (const p of producoes) {
+      if (!p.setor || !map[p.setor]) continue;
+      const d = new Date(p.data);
+      if (d.getFullYear() !== ano || d.getMonth() !== mes) continue;
+      map[p.setor].prev += p.pesoPrevistoKg || 0;
+      map[p.setor].real += p.pesoRealizadoKg || 0;
+      if (p.pesoRealizadoKg > 0) map[p.setor].dias++;
+    }
+    return Object.values(map);
+  }, [producoes]);
 
   // KPIs da semana atual
   const kpiSemana = producaoPorSemana.find((s) => s.semana === semanaAtual) || { prevKg: 0, realKg: 0 };
@@ -51,14 +101,14 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
   };
   const kpiMes = useMemo(() => {
     let prevKg = 0, realKg = 0;
-    for (const p of producoes) {
+    for (const p of producoesFiltradas) {
       if (noMesAtual(p.dataInicio)) {
         prevKg += p.pesoPrevistoKg || 0;
         realKg += p.pesoRealizadoKg || 0;
       }
     }
     return { prevKg, realKg };
-  }, [producoes]);
+  }, [producoesFiltradas]);
 
   const maxKg = Math.max(
     ...producaoPorSemana.map((s) => Math.max(s.prevKg, s.realKg)),
@@ -125,8 +175,16 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
         />
       </div>
 
+      {/* Comparacao por setor — visual horizontal */}
+      <ComparacaoSetoresCard
+        comparacao={comparacaoSetores}
+        setoresDisponiveis={setoresDisponiveis}
+        setorFiltro={setorFiltro}
+        onSelect={setSetorFiltro}
+      />
+
       {/* Análise diária — últimos 30 dias */}
-      <AnaliseDiaria producoes={producoes} />
+      <AnaliseDiaria producoes={producoesFiltradas} />
 
       {/* Gráfico: peso previsto × realizado por semana */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -162,15 +220,20 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
 
       {/* Tabela: Lançamentos diários do PCP */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-torg-dark">Lançamentos diários do PCP</h3>
-          <p className="text-xs text-torg-gray mt-0.5">
-            Pesos previstos vs realizados por dia e por OP. Cada linha pode ser editada.
-          </p>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark">Lançamentos diários do PCP</h3>
+            <p className="text-xs text-torg-gray mt-0.5">
+              Setor selecionado: <strong>{SETOR_LABEL[setorFiltro] || setorFiltro}</strong> · {producoesFiltradas.length} lançamentos
+            </p>
+          </div>
+          <span className="text-[10px] text-torg-gray bg-gray-100 px-2 py-1 rounded uppercase font-bold">
+            Use o card acima pra trocar de setor
+          </span>
         </div>
-        {producoes.length === 0 ? (
+        {producoesFiltradas.length === 0 ? (
           <p className="px-6 py-6 text-sm text-torg-gray text-center">
-            Nenhum lançamento ainda. Clique em "+ Produção semanal" pra começar.
+            Nenhum lançamento desse setor ainda.
           </p>
         ) : (
           <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
@@ -188,7 +251,7 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {[...producoes].sort((a, b) => (new Date(a.data) < new Date(b.data) ? 1 : -1)).map((p) => {
+                {[...producoesFiltradas].sort((a, b) => (new Date(a.data) < new Date(b.data) ? 1 : -1)).map((p) => {
                   const ader = p.pesoPrevistoKg > 0 ? (p.pesoRealizadoKg / p.pesoPrevistoKg) * 100 : 0;
                   return (
                     <tr key={p.id} className="hover:bg-gray-50">
@@ -906,6 +969,99 @@ function ModalProducao({ ops, semanas, item, onClose, onSaved }) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+// Comparacao visual dos 7 setores no mes corrente (Corte -> ... -> Expedicao).
+// Clicar no setor filtra todos os outros cards/tabelas dessa tela.
+function ComparacaoSetoresCard({ comparacao, setoresDisponiveis, setorFiltro, onSelect }) {
+  const maxPrev = Math.max(...comparacao.map((c) => c.prev), 1);
+  const totalDisp = setoresDisponiveis.filter((s) => s !== "__manual__");
+  const semDado = totalDisp.length === 0;
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h3 className="text-lg font-semibold text-torg-dark">Funil da produção (mês atual)</h3>
+          <p className="text-xs text-torg-gray mt-0.5">
+            Cada etapa mostra peso previsto e realizado no mês. Clique pra filtrar os gráficos abaixo.
+          </p>
+        </div>
+        {setoresDisponiveis.includes("__manual__") && (
+          <button
+            onClick={() => onSelect("__manual__")}
+            className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
+              setorFiltro === "__manual__"
+                ? "bg-torg-blue text-white"
+                : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+            }`}
+          >
+            Ver lançamentos manuais
+          </button>
+        )}
+      </div>
+      {semDado ? (
+        <p className="px-6 py-6 text-sm text-torg-gray text-center">
+          Nenhum dado de setor sincronizado do SharePoint ainda. Click "Sincronizar agora" no card acima.
+        </p>
+      ) : (
+        <div className="px-6 py-5 space-y-2.5">
+          {comparacao.map((c, i) => {
+            const ader = c.prev > 0 ? (c.real / c.prev) * 100 : 0;
+            const isAtual = setorFiltro === c.setor;
+            const widthPrev = (c.prev / maxPrev) * 100;
+            const widthReal = c.prev > 0 ? (c.real / c.prev) * 100 : 0;
+            return (
+              <button
+                key={c.setor}
+                onClick={() => onSelect(c.setor)}
+                className={`w-full grid grid-cols-12 gap-3 items-center text-left p-3 rounded-lg transition-all ${
+                  isAtual
+                    ? "bg-torg-blue-50 border-2 border-torg-blue ring-2 ring-torg-blue-100"
+                    : "hover:bg-gray-50 border-2 border-transparent"
+                }`}
+              >
+                <div className="col-span-3 sm:col-span-2">
+                  <p className="text-[10px] text-torg-gray font-bold uppercase tracking-wide">
+                    {i + 1}. {i < comparacao.length - 1 ? "↓" : "📦"}
+                  </p>
+                  <p className={`text-sm font-semibold ${isAtual ? "text-torg-blue" : "text-torg-dark"}`}>
+                    {SETOR_LABEL[c.setor] || c.setor}
+                  </p>
+                </div>
+                <div className="col-span-9 sm:col-span-7 relative">
+                  {/* Barra previsto (bg) */}
+                  <div className="bg-gray-100 rounded h-6 relative overflow-hidden" style={{ width: `${widthPrev}%`, minWidth: "12%" }}>
+                    {/* Barra realizado (fill) */}
+                    <div
+                      className={`h-full ${
+                        ader >= 90 ? "bg-torg-blue" : ader >= 70 ? "bg-torg-orange" : "bg-red-400"
+                      } transition-all`}
+                      style={{ width: `${Math.min(widthReal, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-torg-gray mt-0.5 flex items-center gap-3 tabular-nums">
+                    <span>Prev: <strong className="text-torg-dark">{fmtKg(c.prev)}</strong></span>
+                    <span>Real: <strong className="text-torg-dark">{fmtKg(c.real)}</strong></span>
+                    <span className="text-torg-gray">· {c.dias} dia{c.dias === 1 ? "" : "s"} com produção</span>
+                  </p>
+                </div>
+                <div className="col-span-12 sm:col-span-3 text-right">
+                  <p className={`text-2xl font-extrabold tabular-nums ${
+                    c.prev === 0 ? "text-gray-300" :
+                    ader >= 90 ? "text-torg-blue" : ader >= 70 ? "text-torg-orange-700" : "text-red-600"
+                  }`}>
+                    {c.prev > 0 ? `${ader.toFixed(0)}%` : "—"}
+                  </p>
+                  <p className="text-[10px] text-torg-gray">aderência</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

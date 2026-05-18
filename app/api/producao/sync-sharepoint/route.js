@@ -24,18 +24,18 @@ function rangeDaSemana(date) {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-async function executarSync({ userId = null, setor = "Exped." } = {}) {
+async function executarSync({ userId = null } = {}) {
   const inicio = Date.now();
   const agora = new Date();
   try {
     const { buffer, path } = await downloadPlanilhaProducao(agora);
-    const parsed = parseEapProducao(buffer, { setor, mesIdx: agora.getMonth() });
+    const parsed = parseEapProducao(buffer, { mesIdx: agora.getMonth() });
 
     let criados = 0, atualizados = 0;
     for (const it of parsed.itens) {
       const data = new Date(it.data + "T12:00:00");
       const existente = await prisma.producaoSemanal.findFirst({
-        where: { data, opId: null, fonte: "SHAREPOINT" },
+        where: { data, opId: null, setor: it.setor, fonte: "SHAREPOINT" },
       });
       if (existente) {
         if (
@@ -63,6 +63,7 @@ async function executarSync({ userId = null, setor = "Exped." } = {}) {
             pesoPrevistoKg: it.pesoPrevistoKg,
             pesoRealizadoKg: it.pesoRealizadoKg,
             opId: null,
+            setor: it.setor,
             observacao: it.observacao,
             fonte: "SHAREPOINT",
           },
@@ -78,12 +79,22 @@ async function executarSync({ userId = null, setor = "Exped." } = {}) {
         itensProcessados: parsed.itens.length,
         criados,
         atualizados,
-        mensagem: `${parsed.sheet} | Setor: ${parsed.setor} | Mês: ${parsed.mes} | Prev. total: ${parsed.totalPrevisto.toFixed(0)} kg | Real. total: ${parsed.totalRealizado.toFixed(0)} kg | Path: ${path}`,
+        mensagem: `${parsed.sheet} | Setores: ${parsed.setoresExtraidos.length}/7 | ${parsed.diasComDado} dias | Prev. total: ${parsed.totalPrevisto.toFixed(0)} kg | Real. total: ${parsed.totalRealizado.toFixed(0)} kg`,
         duracaoMs: Date.now() - inicio,
         executadoPorId: userId,
       },
     });
-    return { ok: true, ...log, parsed: { sheet: parsed.sheet, mes: parsed.mes, setor: parsed.setor, total: parsed.itens.length } };
+    return {
+      ok: true,
+      ...log,
+      parsed: {
+        sheet: parsed.sheet,
+        mes: parsed.mes,
+        setoresExtraidos: parsed.setoresExtraidos,
+        setoresFaltando: parsed.setoresFaltando,
+        total: parsed.itens.length,
+      },
+    };
   } catch (e) {
     const log = await prisma.sharepointSync.create({
       data: {
@@ -106,8 +117,7 @@ export async function POST(req) {
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
-  const body = await req.json().catch(() => ({}));
-  const result = await executarSync({ userId: user.id, setor: body.setor });
+  const result = await executarSync({ userId: user.id });
   return NextResponse.json(result, { status: result.ok ? 200 : 500 });
 }
 
