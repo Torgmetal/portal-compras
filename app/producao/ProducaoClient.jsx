@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import {
   Activity, Plus, Loader2, AlertCircle, X, Upload,
   Package, Pencil, Trash2, FileSpreadsheet, CheckCircle2, FileText,
-  Cloud, RefreshCw, XCircle, Calendar,
+  Cloud, RefreshCw, XCircle, Calendar, ChevronDown, ChevronUp, TrendingUp,
 } from "lucide-react";
 import { fmtSemana, isoWeekString } from "@/lib/semana";
 
@@ -185,175 +185,67 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
   );
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="space-y-4 max-w-7xl">
+      {/* Cabecalho compacto */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">
             Painel de Produção
           </h2>
-          <p className="text-sm text-torg-gray mt-1">
-            PCP — pesos previstos × realizados de estruturas, planejados pela equipe de produção.
+          <p className="text-xs text-torg-gray mt-0.5">
+            PCP — peso previsto × realizado por setor da fábrica.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setModalImport(true)}
-            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+            className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5"
           >
-            <Upload size={16} /> Importar planilha
+            <Upload size={14} /> Importar planilha
           </button>
           <button
             onClick={() => setModalProd("novo")}
-            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+            className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
           >
-            <Plus size={16} /> Produção semanal
+            <Plus size={14} /> Lançar produção
           </button>
         </div>
       </div>
 
-      {/* Card de Sync com SharePoint */}
+      {/* Card de Sync com SharePoint (compact) */}
       <SharepointSyncCard />
 
-      {/* Seletor de periodo + KPIs */}
-      <SeletorPeriodo periodo={periodo} onChange={setPeriodo} range={rangePeriodo} />
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KpiCard
-          label="Peso previsto (período)"
-          value={fmtKg(kpiPeriodo.prevTotal)}
-          subtitle={`Setor: ${SETOR_LABEL[setorFiltro] || setorFiltro}`}
-          color="bg-torg-blue-700"
-          Icon={Package}
-        />
-        <KpiCard
-          label="Peso realizado (período)"
-          value={fmtKg(kpiPeriodo.realTotal)}
-          subtitle={kpiPeriodo.prevTotal > 0 ? `${kpiPeriodo.aderencia.toFixed(1)}% aderência` : ""}
-          color={kpiPeriodo.aderencia >= 90 ? "bg-torg-blue" : kpiPeriodo.aderencia >= 70 ? "bg-torg-orange" : "bg-red-500"}
-          Icon={Activity}
-        />
-        <KpiCard
-          label="Média diária"
-          value={fmtKg(kpiPeriodo.mediaDiariaReal)}
-          subtitle={`${kpiPeriodo.dias} dia${kpiPeriodo.dias === 1 ? "" : "s"} com produção`}
-          color="bg-torg-blue"
-          Icon={Activity}
-        />
-        <KpiCard
-          label="Peso previsto (semana atual)"
-          value={fmtKg(kpiSemana.prevKg)}
-          subtitle={kpiSemana.prevKg > 0 ? `Real: ${fmtKg(kpiSemana.realKg)} (${aderencia.toFixed(1)}%)` : ""}
-          color="bg-torg-orange"
-          Icon={Package}
-        />
-      </div>
-
-      {/* Comparacao por setor — visual horizontal */}
-      <ComparacaoSetoresCard
-        comparacao={comparacaoSetores}
+      {/* Toolbar unificada: periodo + setor */}
+      <Toolbar
+        periodo={periodo} onChangePeriodo={setPeriodo} range={rangePeriodo}
+        setorFiltro={setorFiltro} onChangeSetor={setSetorFiltro}
         setoresDisponiveis={setoresDisponiveis}
-        setorFiltro={setorFiltro}
-        onSelect={setSetorFiltro}
       />
 
-      {/* Análise diária — últimos 30 dias */}
-      <AnaliseDiaria producoes={producoesFiltradas} />
+      {/* Hero KPI: 1 card grande com tudo o que importa */}
+      <HeroKpi kpi={kpiPeriodo} setor={setorFiltro} kpiSemana={kpiSemana} />
 
-      {/* Gráfico: peso previsto × realizado por semana */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-torg-dark">Pesos por semana</h3>
-          <p className="text-xs text-torg-gray mt-0.5">
-            <span className="inline-block w-3 h-2 bg-torg-blue-700 align-middle mr-1" /> Previsto
-            <span className="inline-block w-3 h-2 bg-torg-orange align-middle ml-3 mr-1" /> Realizado
-          </p>
-        </div>
-        <div className="px-6 py-5">
-          <div className="space-y-4">
-            {producaoPorSemana.map((s) => {
-              const prevPct = (s.prevKg / maxKg) * 100;
-              const realPct = (s.realKg / maxKg) * 100;
-              const isAtual = s.semana === semanaAtual;
-              return (
-                <div key={s.semana} className={`grid grid-cols-12 gap-3 items-center ${isAtual ? "bg-torg-blue-50/30 -mx-6 px-6 py-2" : ""}`}>
-                  <div className="col-span-3 sm:col-span-2 text-xs">
-                    <p className={`font-semibold ${isAtual ? "text-torg-blue" : "text-torg-dark"} font-mono`}>{s.semana}</p>
-                    {isAtual && <p className="text-[10px] text-torg-blue">atual</p>}
-                  </div>
-                  <div className="col-span-9 sm:col-span-10 space-y-1">
-                    <Bar pct={prevPct} color="bg-torg-blue-700" label={`Prev: ${fmtKg(s.prevKg)}`} />
-                    <Bar pct={realPct} color="bg-torg-orange" label={`Real: ${fmtKg(s.realKg)}`} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Funil dos setores (compacto) */}
+      <FunilSetores
+        comparacao={comparacaoSetores}
+        setorFiltro={setorFiltro}
+        onSelect={setSetorFiltro}
+        setoresDisponiveis={setoresDisponiveis}
+      />
 
-      {/* Tabela: Lançamentos diários do PCP */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h3 className="text-lg font-semibold text-torg-dark">Lançamentos diários do PCP</h3>
-            <p className="text-xs text-torg-gray mt-0.5">
-              Setor selecionado: <strong>{SETOR_LABEL[setorFiltro] || setorFiltro}</strong> · {producoesFiltradas.length} lançamentos
-            </p>
-          </div>
-          <span className="text-[10px] text-torg-gray bg-gray-100 px-2 py-1 rounded uppercase font-bold">
-            Use o card acima pra trocar de setor
-          </span>
-        </div>
-        {producoesFiltradas.length === 0 ? (
-          <p className="px-6 py-6 text-sm text-torg-gray text-center">
-            Nenhum lançamento desse setor ainda.
-          </p>
-        ) : (
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dia</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Semana</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Prev (kg)</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Real (kg)</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">% ader.</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {[...producoesFiltradas].sort((a, b) => (new Date(a.data) < new Date(b.data) ? 1 : -1)).map((p) => {
-                  const ader = p.pesoPrevistoKg > 0 ? (p.pesoRealizadoKg / p.pesoPrevistoKg) * 100 : 0;
-                  return (
-                    <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-xs text-torg-dark font-medium">{fmtData(p.data)}</td>
-                      <td className="px-4 py-2 text-xs text-torg-gray">{diaSemana(p.data)}</td>
-                      <td className="px-4 py-2 text-xs font-mono text-torg-gray">{p.semana}</td>
-                      <td className="px-4 py-2 text-xs font-mono text-torg-blue">{p.op?.numero || "—"}</td>
-                      <td className="px-4 py-2 text-right text-torg-gray tabular-nums">{fmtKg(p.pesoPrevistoKg)}</td>
-                      <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{fmtKg(p.pesoRealizadoKg)}</td>
-                      <td className={`px-4 py-2 text-right tabular-nums font-medium ${
-                        p.pesoPrevistoKg === 0 ? "text-torg-gray" :
-                        ader >= 90 ? "text-torg-blue" : ader >= 70 ? "text-torg-orange-700" : "text-red-600"
-                      }`}>
-                        {p.pesoPrevistoKg === 0 ? "—" : `${ader.toFixed(1)}%`}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <button onClick={() => setModalProd(p)}
-                          className="text-xs text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
-                          <Pencil size={12} /> Editar
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Evolucao semanal (so' semanas no periodo, max 26 semanas) */}
+      <EvolucaoSemanal
+        producaoPorSemana={producaoPorSemana}
+        semanaAtual={semanaAtual}
+        setorLabel={SETOR_LABEL[setorFiltro] || setorFiltro}
+      />
+
+      {/* Tabela: Lançamentos diários (colapsavel) */}
+      <TabelaLancamentosColapsavel
+        producoes={producoesFiltradas}
+        setorLabel={SETOR_LABEL[setorFiltro] || setorFiltro}
+        onEdit={setModalProd}
+      />
 
       {modalProd && (
         <ModalProducao ops={ops} semanas={semanas}
@@ -1045,126 +937,297 @@ function ModalProducao({ ops, semanas, item, onClose, onSaved }) {
   );
 }
 
-// Seletor de periodo (pre-definidos + range exibido).
-function SeletorPeriodo({ periodo, onChange, range }) {
-  const fmtRange = (d) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+// Toolbar unificada: chips de periodo + chips de setor + range exibido
+function Toolbar({ periodo, onChangePeriodo, range, setorFiltro, onChangeSetor, setoresDisponiveis }) {
+  const fmtRange = (d) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  const setoresPraExibir = setoresDisponiveis.length > 0 ? setoresDisponiveis : SETORES_ORDEM;
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-5 py-3 flex items-center gap-3 flex-wrap">
-      <div className="flex items-center gap-2 text-torg-dark">
-        <Calendar size={16} className="text-torg-blue" />
-        <span className="text-sm font-semibold">Período:</span>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 text-torg-dark min-w-fit pr-1">
+          <Calendar size={14} className="text-torg-blue" />
+          <span className="text-xs font-semibold uppercase tracking-wide">Período</span>
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {PERIODOS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onChangePeriodo(p.id)}
+              title={p.desc}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
+                periodo === p.id
+                  ? "bg-torg-blue text-white"
+                  : "bg-gray-50 text-torg-gray hover:bg-gray-100"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] text-torg-gray ml-auto tabular-nums">
+          {fmtRange(range.inicio)} → {fmtRange(range.fim)}
+        </span>
       </div>
-      <div className="flex gap-1.5 flex-wrap">
-        {PERIODOS.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => onChange(p.id)}
-            title={p.desc}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-              periodo === p.id
-                ? "bg-torg-blue text-white"
-                : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 flex-wrap border-t border-gray-100 pt-2">
+        <div className="flex items-center gap-1.5 text-torg-dark min-w-fit pr-1">
+          <Activity size={14} className="text-torg-blue" />
+          <span className="text-xs font-semibold uppercase tracking-wide">Setor</span>
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {setoresPraExibir.map((s) => (
+            <button
+              key={s}
+              onClick={() => onChangeSetor(s)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition ${
+                setorFiltro === s
+                  ? "bg-torg-orange text-white"
+                  : "bg-gray-50 text-torg-gray hover:bg-gray-100"
+              }`}
+            >
+              {SETOR_LABEL[s] || s}
+            </button>
+          ))}
+        </div>
       </div>
-      <span className="text-xs text-torg-gray ml-auto">
-        {fmtRange(range.inicio)} → {fmtRange(range.fim)}
-      </span>
     </div>
   );
 }
 
-// Comparacao visual dos 7 setores no mes corrente (Corte -> ... -> Expedicao).
-// Clicar no setor filtra todos os outros cards/tabelas dessa tela.
-function ComparacaoSetoresCard({ comparacao, setoresDisponiveis, setorFiltro, onSelect }) {
+// Card grande com os numeros chave do periodo + setor.
+function HeroKpi({ kpi, setor, kpiSemana }) {
+  const cor = kpi.aderencia >= 90 ? "text-torg-blue" : kpi.aderencia >= 70 ? "text-torg-orange-700" : "text-red-600";
+  const corBar = kpi.aderencia >= 90 ? "bg-torg-blue" : kpi.aderencia >= 70 ? "bg-torg-orange" : "bg-red-400";
+  const semDado = kpi.prevTotal === 0 && kpi.realTotal === 0;
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
+      {semDado ? (
+        <p className="text-sm text-torg-gray text-center py-4">
+          Sem produção no período selecionado pra {SETOR_LABEL[setor] || setor}.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          {/* Coluna 1: barra de aderencia */}
+          <div className="sm:col-span-2">
+            <p className="text-xs text-torg-gray uppercase tracking-wide">Aderência {SETOR_LABEL[setor] || setor}</p>
+            <p className={`text-5xl font-extrabold tabular-nums ${cor}`}>
+              {kpi.prevTotal > 0 ? `${kpi.aderencia.toFixed(1)}%` : "—"}
+            </p>
+            <div className="mt-3 bg-gray-100 rounded-full h-3 overflow-hidden">
+              <div
+                className={`h-full ${corBar} transition-all`}
+                style={{ width: `${Math.min(kpi.aderencia, 100)}%` }}
+              />
+            </div>
+            <div className="mt-2 flex justify-between text-xs text-torg-gray tabular-nums">
+              <span>Realizado: <strong className="text-torg-dark">{fmtKg(kpi.realTotal)}</strong></span>
+              <span>Previsto: <strong className="text-torg-dark">{fmtKg(kpi.prevTotal)}</strong></span>
+            </div>
+          </div>
+          {/* Coluna 2: dias + media */}
+          <div>
+            <p className="text-xs text-torg-gray uppercase tracking-wide">Média diária</p>
+            <p className="text-3xl font-bold text-torg-dark tabular-nums">{fmtKg(kpi.mediaDiariaReal)}</p>
+            <p className="text-[11px] text-torg-gray mt-1">{kpi.dias} dia{kpi.dias === 1 ? "" : "s"} com produção</p>
+          </div>
+          {/* Coluna 3: semana atual */}
+          <div>
+            <p className="text-xs text-torg-gray uppercase tracking-wide">Semana atual</p>
+            <p className="text-3xl font-bold text-torg-dark tabular-nums">{fmtKg(kpiSemana.realKg)}</p>
+            <p className="text-[11px] text-torg-gray mt-1">
+              de {fmtKg(kpiSemana.prevKg)} previsto
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Funil compacto: 7 etapas em sequencia com barra prev/real e %.
+function FunilSetores({ comparacao, setorFiltro, onSelect, setoresDisponiveis }) {
   const maxPrev = Math.max(...comparacao.map((c) => c.prev), 1);
-  const totalDisp = setoresDisponiveis.filter((s) => s !== "__manual__");
-  const semDado = totalDisp.length === 0;
+  const temDado = comparacao.some((c) => c.prev > 0 || c.real > 0);
+
+  if (!temDado) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
+        <p className="text-sm text-torg-gray text-center">
+          Sem dados de setor no período. Clique <strong>"Sincronizar agora"</strong> no card SharePoint pra puxar a planilha.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h3 className="text-lg font-semibold text-torg-dark">Funil da produção</h3>
-          <p className="text-xs text-torg-gray mt-0.5">
-            Cada etapa mostra peso previsto e realizado no período. Clique pra filtrar a tela.
-          </p>
-        </div>
-        {setoresDisponiveis.includes("__manual__") && (
-          <button
-            onClick={() => onSelect("__manual__")}
-            className={`text-xs px-3 py-1.5 rounded-lg font-medium ${
-              setorFiltro === "__manual__"
-                ? "bg-torg-blue text-white"
-                : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
-            }`}
-          >
-            Ver lançamentos manuais
-          </button>
-        )}
+      <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">Funil da produção</h3>
+        <p className="text-[11px] text-torg-gray">Clique no setor pra filtrar</p>
       </div>
-      {semDado ? (
-        <p className="px-6 py-6 text-sm text-torg-gray text-center">
-          Nenhum dado de setor sincronizado do SharePoint ainda. Click "Sincronizar agora" no card acima.
+      <div className="px-4 py-3 space-y-1">
+        {comparacao.map((c) => {
+          const ader = c.prev > 0 ? (c.real / c.prev) * 100 : 0;
+          const isAtual = setorFiltro === c.setor;
+          const widthPrev = (c.prev / maxPrev) * 100;
+          const widthReal = c.prev > 0 ? (c.real / c.prev) * 100 : 0;
+          const corBar = ader >= 90 ? "bg-torg-blue" : ader >= 70 ? "bg-torg-orange" : "bg-red-400";
+          return (
+            <button
+              key={c.setor}
+              onClick={() => onSelect(c.setor)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition ${
+                isAtual ? "bg-torg-blue-50 ring-1 ring-torg-blue" : "hover:bg-gray-50"
+              }`}
+            >
+              <span className={`text-xs font-semibold w-24 shrink-0 ${isAtual ? "text-torg-blue" : "text-torg-dark"}`}>
+                {SETOR_LABEL[c.setor] || c.setor}
+              </span>
+              <div className="flex-1 relative h-5 bg-gray-100 rounded overflow-hidden" style={{ maxWidth: `${Math.max(widthPrev, 8)}%` }}>
+                <div className={`h-full ${corBar}`} style={{ width: `${Math.min(widthReal, 100)}%` }} />
+              </div>
+              <span className="text-[11px] text-torg-gray tabular-nums w-44 text-right shrink-0">
+                {fmtKg(c.real)} / {fmtKg(c.prev)}
+              </span>
+              <span className={`text-sm font-bold w-12 text-right shrink-0 tabular-nums ${
+                c.prev === 0 ? "text-gray-300" : ader >= 90 ? "text-torg-blue" : ader >= 70 ? "text-torg-orange-700" : "text-red-600"
+              }`}>
+                {c.prev > 0 ? `${ader.toFixed(0)}%` : "—"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Grafico de evolucao semanal: bar chart simples com previsto (cinza) + realizado (cor).
+function EvolucaoSemanal({ producaoPorSemana, semanaAtual, setorLabel }) {
+  // Limita a 26 semanas (~6 meses) pra nao virar parede de barras
+  const semanas = producaoPorSemana.slice(-26);
+  const maxKg = Math.max(...semanas.map((s) => Math.max(s.prevKg, s.realKg)), 1);
+
+  if (semanas.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap">
+        <div className="flex items-center gap-2">
+          <TrendingUp size={14} className="text-torg-blue" />
+          <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">Evolução semanal — {setorLabel}</h3>
+        </div>
+        <p className="text-[11px] text-torg-gray flex items-center gap-3">
+          <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-2 bg-gray-200" /> Previsto</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-2 bg-torg-blue" /> Realizado</span>
         </p>
-      ) : (
-        <div className="px-6 py-5 space-y-2.5">
-          {comparacao.map((c, i) => {
-            const ader = c.prev > 0 ? (c.real / c.prev) * 100 : 0;
-            const isAtual = setorFiltro === c.setor;
-            const widthPrev = (c.prev / maxPrev) * 100;
-            const widthReal = c.prev > 0 ? (c.real / c.prev) * 100 : 0;
+      </div>
+      <div className="px-4 py-4">
+        <div className="flex items-end gap-1 h-48">
+          {semanas.map((s) => {
+            const isAtual = s.semana === semanaAtual;
+            const hPrev = (s.prevKg / maxKg) * 100;
+            const hReal = (s.realKg / maxKg) * 100;
+            const ader = s.prevKg > 0 ? (s.realKg / s.prevKg) * 100 : 0;
+            const corReal = ader >= 90 ? "bg-torg-blue" : ader >= 70 ? "bg-torg-orange" : "bg-red-400";
             return (
-              <button
-                key={c.setor}
-                onClick={() => onSelect(c.setor)}
-                className={`w-full grid grid-cols-12 gap-3 items-center text-left p-3 rounded-lg transition-all ${
-                  isAtual
-                    ? "bg-torg-blue-50 border-2 border-torg-blue ring-2 ring-torg-blue-100"
-                    : "hover:bg-gray-50 border-2 border-transparent"
-                }`}
-              >
-                <div className="col-span-3 sm:col-span-2">
-                  <p className="text-[10px] text-torg-gray font-bold uppercase tracking-wide">
-                    {i + 1}. {i < comparacao.length - 1 ? "↓" : "📦"}
-                  </p>
-                  <p className={`text-sm font-semibold ${isAtual ? "text-torg-blue" : "text-torg-dark"}`}>
-                    {SETOR_LABEL[c.setor] || c.setor}
-                  </p>
+              <div key={s.semana} className="flex-1 flex flex-col items-center gap-1 group min-w-0" title={`${s.semana}: prev ${fmtKg(s.prevKg)} | real ${fmtKg(s.realKg)} (${ader.toFixed(0)}%)`}>
+                <div className="w-full h-full flex flex-col justify-end relative">
+                  {/* Barra previsto (fundo claro) */}
+                  <div
+                    className={`w-full ${isAtual ? "bg-torg-blue-100" : "bg-gray-200"} rounded-t absolute bottom-0 left-0`}
+                    style={{ height: `${hPrev}%` }}
+                  />
+                  {/* Barra realizado (cor sobre o previsto) */}
+                  <div
+                    className={`w-full ${corReal} rounded-t absolute bottom-0 left-0 transition-all`}
+                    style={{ height: `${hReal}%` }}
+                  />
                 </div>
-                <div className="col-span-9 sm:col-span-7 relative">
-                  {/* Barra previsto (bg) */}
-                  <div className="bg-gray-100 rounded h-6 relative overflow-hidden" style={{ width: `${widthPrev}%`, minWidth: "12%" }}>
-                    {/* Barra realizado (fill) */}
-                    <div
-                      className={`h-full ${
-                        ader >= 90 ? "bg-torg-blue" : ader >= 70 ? "bg-torg-orange" : "bg-red-400"
-                      } transition-all`}
-                      style={{ width: `${Math.min(widthReal, 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-torg-gray mt-0.5 flex items-center gap-3 tabular-nums">
-                    <span>Prev: <strong className="text-torg-dark">{fmtKg(c.prev)}</strong></span>
-                    <span>Real: <strong className="text-torg-dark">{fmtKg(c.real)}</strong></span>
-                    <span className="text-torg-gray">· {c.dias} dia{c.dias === 1 ? "" : "s"} com produção</span>
-                  </p>
-                </div>
-                <div className="col-span-12 sm:col-span-3 text-right">
-                  <p className={`text-2xl font-extrabold tabular-nums ${
-                    c.prev === 0 ? "text-gray-300" :
-                    ader >= 90 ? "text-torg-blue" : ader >= 70 ? "text-torg-orange-700" : "text-red-600"
-                  }`}>
-                    {c.prev > 0 ? `${ader.toFixed(0)}%` : "—"}
-                  </p>
-                  <p className="text-[10px] text-torg-gray">aderência</p>
-                </div>
-              </button>
+                <span className={`text-[9px] font-mono ${isAtual ? "text-torg-blue font-bold" : "text-torg-gray"} truncate w-full text-center`}>
+                  {s.semana.split("-W")[1]}
+                </span>
+              </div>
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Tabela colapsavel (escondida por default).
+function TabelaLancamentosColapsavel({ producoes, setorLabel, onEdit }) {
+  const [aberta, setAberta] = useState(false);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <button
+        onClick={() => setAberta((v) => !v)}
+        className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50"
+      >
+        <div className="flex items-center gap-2">
+          {aberta ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          <span className="text-sm font-semibold text-torg-dark">
+            Lançamentos diários — {setorLabel}
+          </span>
+          <span className="text-[11px] text-torg-gray">({producoes.length} {producoes.length === 1 ? "linha" : "linhas"})</span>
+        </div>
+        <span className="text-[10px] text-torg-gray uppercase tracking-wide">
+          {aberta ? "Ocultar" : "Ver detalhes"}
+        </span>
+      </button>
+      {aberta && (
+        producoes.length === 0 ? (
+          <p className="px-6 py-4 text-sm text-torg-gray text-center border-t border-gray-100">
+            Nenhum lançamento nesse setor no período.
+          </p>
+        ) : (
+          <div className="overflow-x-auto max-h-[480px] overflow-y-auto border-t border-gray-100">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Data</th>
+                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Dia</th>
+                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Sem.</th>
+                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">OP</th>
+                  <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Prev</th>
+                  <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Real</th>
+                  <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Ader.</th>
+                  <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {[...producoes].sort((a, b) => (new Date(a.data) < new Date(b.data) ? 1 : -1)).map((p) => {
+                  const ader = p.pesoPrevistoKg > 0 ? (p.pesoRealizadoKg / p.pesoPrevistoKg) * 100 : 0;
+                  return (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-1.5 text-xs text-torg-dark font-medium">{fmtData(p.data)}</td>
+                      <td className="px-4 py-1.5 text-xs text-torg-gray">{diaSemana(p.data)}</td>
+                      <td className="px-4 py-1.5 text-xs font-mono text-torg-gray">{p.semana}</td>
+                      <td className="px-4 py-1.5 text-xs font-mono text-torg-blue">{p.op?.numero || "—"}</td>
+                      <td className="px-4 py-1.5 text-right text-torg-gray tabular-nums text-xs">{fmtKg(p.pesoPrevistoKg)}</td>
+                      <td className="px-4 py-1.5 text-right text-torg-dark font-medium tabular-nums text-xs">{fmtKg(p.pesoRealizadoKg)}</td>
+                      <td className={`px-4 py-1.5 text-right tabular-nums font-medium text-xs ${
+                        p.pesoPrevistoKg === 0 ? "text-torg-gray" :
+                        ader >= 90 ? "text-torg-blue" : ader >= 70 ? "text-torg-orange-700" : "text-red-600"
+                      }`}>
+                        {p.pesoPrevistoKg === 0 ? "—" : `${ader.toFixed(0)}%`}
+                      </td>
+                      <td className="px-4 py-1.5 text-right">
+                        <button onClick={() => onEdit(p)}
+                          className="text-[10px] text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
+                          <Pencil size={11} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   );
