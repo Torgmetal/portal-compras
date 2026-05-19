@@ -37,7 +37,12 @@ Three env vars that differ between Vercel and local:
 
 ### Branches
 
-Two devs: Vitor (director) and Matheus. All work goes on `vitor/<feature>` or `matheus/<feature>` branches and merges to `main` via PR. Never commit directly to `main`.
+Time atual: Vitor (diretor) e Matheus.
+
+- **Mudanças simples** (docs, config, fix pequeno): podem ir direto na `main`.
+- **Features grandes ou mudanças de schema**: preferir branch `vitor/<feature>` ou `matheus/<feature>` com PR.
+- Sempre `git pull origin main` antes de começar qualquer trabalho e antes de fazer push.
+- Quando o time crescer (3+ pessoas), migrar para branches obrigatórias para todo tipo de mudança.
 
 ## Architecture
 
