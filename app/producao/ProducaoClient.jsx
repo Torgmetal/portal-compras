@@ -1101,13 +1101,10 @@ function FunilSetores({ comparacao, setorFiltro, onSelect, setoresDisponiveis })
   );
 }
 
-// Grafico de evolucao semanal: bar chart simples com previsto (cinza) + realizado (cor).
+// Grafico de evolucao semanal: linha SVG com previsto (pontilhado) + realizado (continuo).
 function EvolucaoSemanal({ producaoPorSemana, semanaAtual, setorLabel }) {
-  // So' semanas que TEM dado (prev ou real > 0) — evita semanas vazias no eixo X
   const semanasComDado = producaoPorSemana.filter((s) => s.prevKg > 0 || s.realKg > 0);
-  // Limita a 26 semanas (~6 meses) pra nao virar parede de barras
   const semanas = semanasComDado.slice(-26);
-  const maxKg = Math.max(...semanas.map((s) => Math.max(s.prevKg, s.realKg)), 1);
 
   if (semanas.length === 0) {
     return (
@@ -1123,8 +1120,25 @@ function EvolucaoSemanal({ producaoPorSemana, semanaAtual, setorLabel }) {
     );
   }
 
-  // Eixo Y: 5 marcacoes (0, 25%, 50%, 75%, 100% de maxKg)
-  const yTicks = [maxKg, maxKg * 0.75, maxKg * 0.5, maxKg * 0.25, 0];
+  const maxKg = Math.max(...semanas.map((s) => Math.max(s.prevKg, s.realKg)), 1);
+
+  // SVG dimensions (viewBox responsivo — viewBox redimensiona com o container)
+  const W = 800;
+  const H = 280;
+  const padL = 50, padR = 20, padT = 20, padB = 40;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  // Escala
+  const x = (i) => padL + (semanas.length === 1 ? plotW / 2 : (i / (semanas.length - 1)) * plotW);
+  const y = (val) => padT + plotH - (val / maxKg) * plotH;
+
+  // Paths das duas linhas
+  const prevPath = semanas.map((s, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(s.prevKg).toFixed(1)}`).join(" ");
+  const realPath = semanas.map((s, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(s.realKg).toFixed(1)}`).join(" ");
+
+  // Y ticks (4 + zero)
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((p) => maxKg * p);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -1133,74 +1147,82 @@ function EvolucaoSemanal({ producaoPorSemana, semanaAtual, setorLabel }) {
           <TrendingUp size={14} className="text-torg-blue" />
           <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">Evolução semanal — {setorLabel}</h3>
         </div>
-        <p className="text-[11px] text-torg-gray flex items-center gap-3">
-          <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-2 bg-gray-200" /> Previsto</span>
-          <span className="inline-flex items-center gap-1"><span className="inline-block w-3 h-2 bg-torg-blue" /> Realizado</span>
+        <p className="text-[11px] text-torg-gray flex items-center gap-4">
+          <span className="inline-flex items-center gap-1.5">
+            <svg width="22" height="6" className="inline-block">
+              <line x1="0" y1="3" x2="22" y2="3" stroke="#9ca3af" strokeWidth="2" strokeDasharray="5,3" />
+            </svg>
+            Previsto
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <svg width="22" height="6" className="inline-block">
+              <line x1="0" y1="3" x2="22" y2="3" stroke="#1e40af" strokeWidth="2.5" />
+            </svg>
+            Realizado
+          </span>
         </p>
       </div>
-      <div className="px-4 py-4">
-        <div className="flex gap-2">
-          {/* Eixo Y */}
-          <div className="flex flex-col justify-between h-48 text-[9px] text-torg-gray text-right shrink-0 w-10 tabular-nums">
-            {yTicks.map((t, i) => (
-              <span key={i}>{Math.round(t / 1000)}t</span>
-            ))}
-          </div>
-          {/* Area das barras */}
-          <div className="flex-1">
-            <div className="h-48 flex items-end gap-1 border-l border-b border-gray-200 pl-1 pb-0 relative">
-              {/* Linhas de grade horizontais */}
-              {yTicks.slice(1, -1).map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute left-0 right-0 border-t border-gray-100"
-                  style={{ bottom: `${((i + 1) * 100) / (yTicks.length - 1)}%` }}
-                />
-              ))}
-              {semanas.map((s) => {
-                const isAtual = s.semana === semanaAtual;
-                const hPrev = (s.prevKg / maxKg) * 100;
-                const hReal = (s.realKg / maxKg) * 100;
-                const ader = s.prevKg > 0 ? (s.realKg / s.prevKg) * 100 : 0;
-                const corReal = ader >= 90 ? "bg-torg-blue" : ader >= 70 ? "bg-torg-orange" : "bg-red-400";
-                return (
-                  <div
-                    key={s.semana}
-                    className="flex-1 relative h-full min-w-0 cursor-help"
-                    title={`${s.semana}: prev ${fmtKg(s.prevKg)} | real ${fmtKg(s.realKg)} (${ader.toFixed(0)}%)`}
-                  >
-                    {/* Barra previsto */}
-                    <div
-                      className={`absolute bottom-0 left-0 w-full rounded-t ${isAtual ? "bg-torg-blue-100" : "bg-gray-200"}`}
-                      style={{ height: `${hPrev}%` }}
-                    />
-                    {/* Barra realizado */}
-                    <div
-                      className={`absolute bottom-0 left-0 w-full rounded-t ${corReal} transition-all`}
-                      style={{ height: `${hReal}%` }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            {/* Labels das semanas */}
-            <div className="flex gap-1 mt-1 pl-1">
-              {semanas.map((s) => {
-                const isAtual = s.semana === semanaAtual;
-                return (
-                  <span
-                    key={s.semana}
-                    className={`flex-1 text-[9px] font-mono text-center min-w-0 truncate ${
-                      isAtual ? "text-torg-blue font-bold" : "text-torg-gray"
-                    }`}
-                  >
-                    W{s.semana.split("-W")[1]}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+      <div className="px-4 py-3">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet" style={{ maxHeight: "320px" }}>
+          {/* Grid + labels Y */}
+          {yTicks.map((t, i) => (
+            <g key={i}>
+              <line x1={padL} y1={y(t)} x2={W - padR} y2={y(t)} stroke="#f3f4f6" strokeWidth="1" />
+              <text x={padL - 8} y={y(t) + 4} fontSize="11" fill="#6b7280" textAnchor="end" fontFamily="ui-monospace,monospace">
+                {Math.round(t / 1000)}t
+              </text>
+            </g>
+          ))}
+          {/* Eixo Y vertical */}
+          <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="#d1d5db" strokeWidth="1" />
+          {/* Eixo X horizontal */}
+          <line x1={padL} y1={padT + plotH} x2={W - padR} y2={padT + plotH} stroke="#d1d5db" strokeWidth="1" />
+
+          {/* Linha previsto (pontilhada cinza) */}
+          <path d={prevPath} fill="none" stroke="#9ca3af" strokeWidth="2" strokeDasharray="5,3" />
+          {/* Linha realizado (continua azul) */}
+          <path d={realPath} fill="none" stroke="#1e40af" strokeWidth="2.5" />
+
+          {/* Pontos */}
+          {semanas.map((s, i) => {
+            const ader = s.prevKg > 0 ? (s.realKg / s.prevKg) * 100 : 0;
+            const isAtual = s.semana === semanaAtual;
+            const corPonto = ader >= 90 ? "#1e40af" : ader >= 70 ? "#ea580c" : "#dc2626";
+            return (
+              <g key={s.semana}>
+                <circle cx={x(i)} cy={y(s.prevKg)} r="3" fill="#9ca3af" />
+                <circle cx={x(i)} cy={y(s.realKg)} r="4" fill={corPonto}>
+                  <title>{`${s.semana}: previsto ${fmtKg(s.prevKg)} | realizado ${fmtKg(s.realKg)} (${ader.toFixed(0)}%)`}</title>
+                </circle>
+                {isAtual && (
+                  <circle cx={x(i)} cy={y(s.realKg)} r="8" fill="none" stroke={corPonto} strokeWidth="1.5" opacity="0.4" />
+                )}
+              </g>
+            );
+          })}
+
+          {/* Labels X (semanas) */}
+          {semanas.map((s, i) => {
+            const isAtual = s.semana === semanaAtual;
+            // Pula labels intermediarios quando tem muitas semanas pra nao sobrepor
+            const step = Math.ceil(semanas.length / 14);
+            if (i % step !== 0 && i !== semanas.length - 1 && !isAtual) return null;
+            return (
+              <text
+                key={s.semana}
+                x={x(i)}
+                y={H - padB + 16}
+                fontSize="10"
+                fill={isAtual ? "#1e40af" : "#6b7280"}
+                textAnchor="middle"
+                fontWeight={isAtual ? "bold" : "normal"}
+                fontFamily="ui-monospace,monospace"
+              >
+                W{s.semana.split("-W")[1]}
+              </text>
+            );
+          })}
+        </svg>
       </div>
     </div>
   );
