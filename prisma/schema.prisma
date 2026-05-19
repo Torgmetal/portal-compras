@@ -113,6 +113,7 @@ model OP {
   estoqueAlocacoes EstoqueAlocacao[]
   rmItensDestino  RMItem[]   @relation("RMItemOpDestino")
   pedidosOmieAvulsos PedidoOmie[]   // pedidos cadastrados direto na OP (FD avulsos)
+  pecasConjunto   PecaConjunto[]
 
   @@index([numero])
   @@index([status])
@@ -957,6 +958,39 @@ model EstoqueAlocacao {
 
   @@index([opId])
   @@index([movimentacaoId])
+}
+
+// ─── CONTROLE DE PECAS (CONJUNTOS) ─────────────────────────
+// Lista de Estrutura (LE / FORM 21) importada por OP. Cada conjunto tem
+// marca unica dentro da OP, qte/peso/descricao e status que avanca pelo
+// pipeline de producao (pendente -> corte -> ... -> expedido).
+model PecaConjunto {
+  id            String   @id @default(cuid())
+  opId          String?
+  op            OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
+  opNumero      String   // backup do numero da OP (caso a OP nao esteja cadastrada)
+  item          Int?     // numero do item na LE (1, 2, 3, ...)
+  marca         String   // T64K1, T64K2, etc
+  descricao     String?  // VIGA, COLUNA, LIGACAO, etc
+  qte           Int      @default(1)
+  pesoUnitKg    Float    @default(0)
+  pesoTotalKg   Float    @default(0)
+  // Status atual: PENDENTE | CORTE | MONTAGEM | SOLDA | ACABAMENTO | JATO | PINTURA | EXPEDIDO
+  status        String   @default("PENDENTE")
+  // Peca sem letra "P" no inicio da marca pula montagem/solda/acab e vai direto pra jato
+  fluxoEspecial Boolean  @default(false)
+  ultimoSetor   String?  // setor onde foi feito o ultimo apontamento
+  dataConcluida DateTime? // quando foi expedida
+  dataPrevista  DateTime? // data planejada de conclusao (opcional)
+  fonte         String?  // LE_IMPORT | MANUAL
+  observacao    String?
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  @@unique([opNumero, marca])
+  @@index([opId])
+  @@index([status])
+  @@index([marca])
 }
 
 // ─── SHAREPOINT SYNC ────────────────────────────────────────

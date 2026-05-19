@@ -2,11 +2,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { Activity, FileText, LogOut } from "lucide-react";
+import { Activity, FileText, LogOut, Package } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const menu = [
   { href: "/producao", label: "Painel de Produção", icon: Activity, exact: true },
+  { href: "/producao/pecas", label: "Controle de Peças", icon: Package },
   { href: "/producao/romaneios", label: "Romaneios", icon: FileText },
 ];
 
