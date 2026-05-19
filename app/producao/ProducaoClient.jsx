@@ -5,9 +5,50 @@ import * as XLSX from "xlsx";
 import {
   Activity, Plus, Loader2, AlertCircle, X, Upload,
   Package, Pencil, Trash2, FileSpreadsheet, CheckCircle2, FileText,
-  Cloud, RefreshCw, XCircle,
+  Cloud, RefreshCw, XCircle, Calendar,
 } from "lucide-react";
 import { fmtSemana, isoWeekString } from "@/lib/semana";
+
+// Periodos pre-definidos para o seletor (em dias relativos a hoje)
+const PERIODOS = [
+  { id: "ytd",   label: "Ano (YTD)",      desc: "1 jan ate hoje" },
+  { id: "30",    label: "Últimos 30 dias", desc: "" },
+  { id: "90",    label: "Últimos 90 dias", desc: "" },
+  { id: "mes",   label: "Mês atual",       desc: "" },
+  { id: "anterior", label: "Mês anterior", desc: "" },
+  { id: "tudo",  label: "Tudo",            desc: "Sem filtro de data" },
+];
+
+function calcularRangePeriodo(periodoId) {
+  const hoje = new Date();
+  hoje.setHours(23, 59, 59, 999);
+  let inicio;
+  switch (periodoId) {
+    case "ytd":
+      inicio = new Date(hoje.getFullYear(), 0, 1);
+      break;
+    case "30":
+      inicio = new Date(hoje);
+      inicio.setDate(inicio.getDate() - 30);
+      break;
+    case "90":
+      inicio = new Date(hoje);
+      inicio.setDate(inicio.getDate() - 90);
+      break;
+    case "mes":
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      break;
+    case "anterior": {
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+      const fim = new Date(hoje.getFullYear(), hoje.getMonth(), 0, 23, 59, 59, 999);
+      return { inicio, fim };
+    }
+    case "tudo":
+    default:
+      return { inicio: new Date(2020, 0, 1), fim: hoje };
+  }
+  return { inicio, fim: hoje };
+}
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -37,6 +78,9 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
   const [modalImport, setModalImport] = useState(false);
   // Setor selecionado pra filtrar exibicao. Default: Expedicao.
   const [setorFiltro, setSetorFiltro] = useState("Expedicao");
+  // Periodo selecionado. Default: YTD (ano corrente).
+  const [periodo, setPeriodo] = useState("ytd");
+  const rangePeriodo = useMemo(() => calcularRangePeriodo(periodo), [periodo]);
 
   // Identifica setores que tem dados no banco
   const setoresDisponiveis = useMemo(() => {
@@ -51,16 +95,31 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
     return ordenados;
   }, [producoes]);
 
-  // Producoes filtradas pelo setor selecionado
+  // Producoes filtradas pelo setor + periodo
   const producoesFiltradas = useMemo(() => {
-    if (setorFiltro === "__manual__") return producoes.filter((p) => !p.setor);
-    return producoes.filter((p) => p.setor === setorFiltro);
-  }, [producoes, setorFiltro]);
+    const ini = rangePeriodo.inicio.getTime();
+    const fim = rangePeriodo.fim.getTime();
+    let lista;
+    if (setorFiltro === "__manual__") lista = producoes.filter((p) => !p.setor);
+    else lista = producoes.filter((p) => p.setor === setorFiltro);
+    return lista.filter((p) => {
+      const t = new Date(p.data).getTime();
+      return t >= ini && t <= fim;
+    });
+  }, [producoes, setorFiltro, rangePeriodo]);
 
-  // Agrega producao por semana (filtrada por setor)
+  // Agrega producao por semana (filtrada por setor + periodo).
+  // So' inclui semanas que tem overlap com o periodo selecionado.
   const producaoPorSemana = useMemo(() => {
+    const ini = rangePeriodo.inicio.getTime();
+    const fim = rangePeriodo.fim.getTime();
     const map = {};
-    for (const s of semanas) map[s.semana] = { ...s, prevKg: 0, realKg: 0, items: [] };
+    for (const s of semanas) {
+      const sIni = new Date(s.dataInicio).getTime();
+      const sFim = new Date(s.dataFim).getTime();
+      if (sFim < ini || sIni > fim) continue; // semana fora do periodo
+      map[s.semana] = { ...s, prevKg: 0, realKg: 0, items: [] };
+    }
     for (const p of producoesFiltradas) {
       const k = p.semana;
       if (!map[k]) continue;
@@ -69,24 +128,34 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
       map[k].items.push(p);
     }
     return Object.values(map);
-  }, [producoesFiltradas, semanas]);
+  }, [producoesFiltradas, semanas, rangePeriodo]);
 
-  // Comparacao por setor (totais do mes corrente)
+  // Comparacao por setor (totais do periodo selecionado, com TODOS os setores)
   const comparacaoSetores = useMemo(() => {
-    const hoje = new Date();
-    const ano = hoje.getFullYear(), mes = hoje.getMonth();
+    const ini = rangePeriodo.inicio.getTime();
+    const fim = rangePeriodo.fim.getTime();
     const map = {};
     for (const s of SETORES_ORDEM) map[s] = { setor: s, prev: 0, real: 0, dias: 0 };
     for (const p of producoes) {
       if (!p.setor || !map[p.setor]) continue;
-      const d = new Date(p.data);
-      if (d.getFullYear() !== ano || d.getMonth() !== mes) continue;
+      const t = new Date(p.data).getTime();
+      if (t < ini || t > fim) continue;
       map[p.setor].prev += p.pesoPrevistoKg || 0;
       map[p.setor].real += p.pesoRealizadoKg || 0;
       if (p.pesoRealizadoKg > 0) map[p.setor].dias++;
     }
     return Object.values(map);
-  }, [producoes]);
+  }, [producoes, rangePeriodo]);
+
+  // KPIs do periodo selecionado
+  const kpiPeriodo = useMemo(() => {
+    const prevTotal = producoesFiltradas.reduce((s, p) => s + (p.pesoPrevistoKg || 0), 0);
+    const realTotal = producoesFiltradas.reduce((s, p) => s + (p.pesoRealizadoKg || 0), 0);
+    const dias = new Set(producoesFiltradas.filter(p => p.pesoRealizadoKg > 0).map(p => new Date(p.data).toISOString().slice(0, 10))).size;
+    const aderencia = prevTotal > 0 ? (realTotal / prevTotal) * 100 : 0;
+    const mediaDiariaReal = dias > 0 ? realTotal / dias : 0;
+    return { prevTotal, realTotal, dias, aderencia, mediaDiariaReal };
+  }, [producoesFiltradas]);
 
   // KPIs da semana atual
   const kpiSemana = producaoPorSemana.find((s) => s.semana === semanaAtual) || { prevKg: 0, realKg: 0 };
@@ -145,33 +214,37 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
       {/* Card de Sync com SharePoint */}
       <SharepointSyncCard />
 
-      {/* KPIs */}
+      {/* Seletor de periodo + KPIs */}
+      <SeletorPeriodo periodo={periodo} onChange={setPeriodo} range={rangePeriodo} />
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <KpiCard
-          label="Peso previsto (semana)"
-          value={fmtKg(kpiSemana.prevKg)}
+          label="Peso previsto (período)"
+          value={fmtKg(kpiPeriodo.prevTotal)}
+          subtitle={`Setor: ${SETOR_LABEL[setorFiltro] || setorFiltro}`}
           color="bg-torg-blue-700"
           Icon={Package}
         />
         <KpiCard
-          label="Peso realizado (semana)"
-          value={fmtKg(kpiSemana.realKg)}
-          subtitle={`${aderencia.toFixed(1)}% aderência`}
-          color={aderencia >= 90 ? "bg-torg-blue" : aderencia >= 70 ? "bg-torg-orange" : "bg-red-500"}
+          label="Peso realizado (período)"
+          value={fmtKg(kpiPeriodo.realTotal)}
+          subtitle={kpiPeriodo.prevTotal > 0 ? `${kpiPeriodo.aderencia.toFixed(1)}% aderência` : ""}
+          color={kpiPeriodo.aderencia >= 90 ? "bg-torg-blue" : kpiPeriodo.aderencia >= 70 ? "bg-torg-orange" : "bg-red-500"}
           Icon={Activity}
         />
         <KpiCard
-          label="Peso previsto (mês)"
-          value={fmtKg(kpiMes.prevKg)}
+          label="Média diária"
+          value={fmtKg(kpiPeriodo.mediaDiariaReal)}
+          subtitle={`${kpiPeriodo.dias} dia${kpiPeriodo.dias === 1 ? "" : "s"} com produção`}
           color="bg-torg-blue"
-          Icon={Package}
+          Icon={Activity}
         />
         <KpiCard
-          label="Peso realizado (mês)"
-          value={fmtKg(kpiMes.realKg)}
-          subtitle={kpiMes.prevKg > 0 ? `${((kpiMes.realKg / kpiMes.prevKg) * 100).toFixed(1)}% aderência` : ""}
+          label="Peso previsto (semana atual)"
+          value={fmtKg(kpiSemana.prevKg)}
+          subtitle={kpiSemana.prevKg > 0 ? `Real: ${fmtKg(kpiSemana.realKg)} (${aderencia.toFixed(1)}%)` : ""}
           color="bg-torg-orange"
-          Icon={Activity}
+          Icon={Package}
         />
       </div>
 
@@ -972,6 +1045,38 @@ function ModalProducao({ ops, semanas, item, onClose, onSaved }) {
   );
 }
 
+// Seletor de periodo (pre-definidos + range exibido).
+function SeletorPeriodo({ periodo, onChange, range }) {
+  const fmtRange = (d) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-5 py-3 flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-2 text-torg-dark">
+        <Calendar size={16} className="text-torg-blue" />
+        <span className="text-sm font-semibold">Período:</span>
+      </div>
+      <div className="flex gap-1.5 flex-wrap">
+        {PERIODOS.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => onChange(p.id)}
+            title={p.desc}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              periodo === p.id
+                ? "bg-torg-blue text-white"
+                : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <span className="text-xs text-torg-gray ml-auto">
+        {fmtRange(range.inicio)} → {fmtRange(range.fim)}
+      </span>
+    </div>
+  );
+}
+
 // Comparacao visual dos 7 setores no mes corrente (Corte -> ... -> Expedicao).
 // Clicar no setor filtra todos os outros cards/tabelas dessa tela.
 function ComparacaoSetoresCard({ comparacao, setoresDisponiveis, setorFiltro, onSelect }) {
@@ -983,9 +1088,9 @@ function ComparacaoSetoresCard({ comparacao, setoresDisponiveis, setorFiltro, on
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h3 className="text-lg font-semibold text-torg-dark">Funil da produção (mês atual)</h3>
+          <h3 className="text-lg font-semibold text-torg-dark">Funil da produção</h3>
           <p className="text-xs text-torg-gray mt-0.5">
-            Cada etapa mostra peso previsto e realizado no mês. Clique pra filtrar os gráficos abaixo.
+            Cada etapa mostra peso previsto e realizado no período. Clique pra filtrar a tela.
           </p>
         </div>
         {setoresDisponiveis.includes("__manual__") && (

@@ -12,12 +12,10 @@ export const metadata = {
 export default async function PainelProducao() {
   const user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
 
-  // Janela: 8 semanas pra tras + atual + 4 semanas pra frente
+  // Janela: do inicio do ano corrente ate' fim do ano corrente (YTD + projecao)
   const hoje = new Date();
-  const inicioJanela = new Date(hoje);
-  inicioJanela.setDate(inicioJanela.getDate() - 8 * 7);
-  const fimJanela = new Date(hoje);
-  fimJanela.setDate(fimJanela.getDate() + 12 * 7);
+  const inicioJanela = new Date(hoje.getFullYear(), 0, 1); // 1 jan do ano
+  const fimJanela = new Date(hoje.getFullYear(), 11, 31, 23, 59, 59); // 31 dez do ano
 
   // OPs ativas pra dropdown — ordenadas numericamente
   const opsRaw = await prisma.oP.findMany({
@@ -35,20 +33,21 @@ export default async function PainelProducao() {
     include: { op: { select: { numero: true } } },
   });
 
-  // Lista de semanas (ultimas 8 + atual + 4 prox = 13 semanas)
+  // Lista de TODAS as semanas do ano corrente (W01 ate' W52/W53)
+  const ano = hoje.getFullYear();
   const semanas = [];
-  for (let i = 8; i >= -4; i--) {
-    const d = new Date(hoje);
-    d.setDate(d.getDate() - i * 7);
-    const semana = isoWeekString(d);
-    const p = parseSemana(semana);
-    if (p) {
-      semanas.push({
-        semana,
-        dataInicio: semanaInicio(p.ano, p.semana).toISOString(),
-        dataFim: semanaFim(p.ano, p.semana).toISOString(),
-      });
-    }
+  // Numero de semanas no ano: 52 ou 53 (depende do calendario ISO)
+  // Calcula olhando 31 de dezembro
+  const ultimoDia = new Date(ano, 11, 31);
+  const ultimaSemana = parseSemana(isoWeekString(ultimoDia));
+  const numSemanas = (ultimaSemana && ultimaSemana.ano === ano) ? ultimaSemana.semana : 52;
+  for (let w = 1; w <= numSemanas; w++) {
+    const semana = `${ano}-W${String(w).padStart(2, "0")}`;
+    semanas.push({
+      semana,
+      dataInicio: semanaInicio(ano, w).toISOString(),
+      dataFim: semanaFim(ano, w).toISOString(),
+    });
   }
   // Dedupe (caso de virada de ano)
   const seen = new Set();
