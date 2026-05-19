@@ -54,6 +54,14 @@ const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtKg = (v) =>
   v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kg` : "—";
+// Formato compacto: >= 1t mostra "X,Xt", senao "X kg". Reduz ruido visual.
+const fmtPesoCompacto = (v) => {
+  if (v == null) return "—";
+  const kg = Number(v);
+  if (kg === 0) return "0";
+  if (Math.abs(kg) >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
+  return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
+};
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const diaSemana = (d) => {
   const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -993,52 +1001,132 @@ function Toolbar({ periodo, onChangePeriodo, range, setorFiltro, onChangeSetor, 
   );
 }
 
+// Donut SVG pra aderencia (sem dependencia externa).
+function DonutAderencia({ pct, color, label }) {
+  const r = 52;
+  const stroke = 11;
+  const c = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, pct));
+  const offset = c - (clamped / 100) * c;
+  return (
+    <div className="relative shrink-0">
+      <svg width="140" height="140" viewBox="0 0 140 140">
+        <circle cx="70" cy="70" r={r} fill="none" stroke="#f3f4f6" strokeWidth={stroke} />
+        <circle
+          cx="70" cy="70" r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform="rotate(-90 70 70)"
+          style={{ transition: "stroke-dashoffset 0.4s" }}
+        />
+        <text x="70" y="74" textAnchor="middle" fontSize="28" fontWeight="800" fill={color} fontFamily="ui-sans-serif,system-ui">
+          {pct.toFixed(0)}%
+        </text>
+        <text x="70" y="92" textAnchor="middle" fontSize="9" fill="#6b7280" fontWeight="600" letterSpacing="1">
+          ADERÊNCIA
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 // Card grande com os numeros chave do periodo + setor.
 function HeroKpi({ kpi, setor, kpiSemana }) {
-  const cor = kpi.aderencia >= 90 ? "text-torg-blue" : kpi.aderencia >= 70 ? "text-torg-orange-700" : "text-red-600";
-  const corBar = kpi.aderencia >= 90 ? "bg-torg-blue" : kpi.aderencia >= 70 ? "bg-torg-orange" : "bg-red-400";
+  const cor = kpi.aderencia >= 90 ? "#1d4ed8" : kpi.aderencia >= 70 ? "#ea580c" : "#dc2626";
   const semDado = kpi.prevTotal === 0 && kpi.realTotal === 0;
+  const falta = Math.max(0, kpi.prevTotal - kpi.realTotal);
+  const setorLabel = SETOR_LABEL[setor] || setor;
+  const aderSemana = kpiSemana.prevKg > 0 ? (kpiSemana.realKg / kpiSemana.prevKg) * 100 : 0;
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
       {semDado ? (
         <p className="text-sm text-torg-gray text-center py-4">
-          Sem produção no período selecionado pra {SETOR_LABEL[setor] || setor}.
+          Sem produção no período selecionado pra {setorLabel}.
         </p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          {/* Coluna 1: barra de aderencia */}
-          <div className="sm:col-span-2">
-            <p className="text-xs text-torg-gray uppercase tracking-wide">Aderência {SETOR_LABEL[setor] || setor}</p>
-            <p className={`text-5xl font-extrabold tabular-nums ${cor}`}>
-              {kpi.prevTotal > 0 ? `${kpi.aderencia.toFixed(1)}%` : "—"}
-            </p>
-            <div className="mt-3 bg-gray-100 rounded-full h-3 overflow-hidden">
-              <div
-                className={`h-full ${corBar} transition-all`}
-                style={{ width: `${Math.min(kpi.aderencia, 100)}%` }}
-              />
-            </div>
-            <div className="mt-2 flex justify-between text-xs text-torg-gray tabular-nums">
-              <span>Realizado: <strong className="text-torg-dark">{fmtKg(kpi.realTotal)}</strong></span>
-              <span>Previsto: <strong className="text-torg-dark">{fmtKg(kpi.prevTotal)}</strong></span>
-            </div>
+        <div className="flex items-center gap-6 flex-wrap">
+          {/* Esquerda: Donut + setor label */}
+          <div className="flex flex-col items-center shrink-0">
+            <DonutAderencia pct={kpi.aderencia} color={cor} />
+            <p className="text-[11px] text-torg-gray mt-1 font-medium uppercase tracking-wide">{setorLabel}</p>
           </div>
-          {/* Coluna 2: dias + media */}
-          <div>
-            <p className="text-xs text-torg-gray uppercase tracking-wide">Média diária</p>
-            <p className="text-3xl font-bold text-torg-dark tabular-nums">{fmtKg(kpi.mediaDiariaReal)}</p>
-            <p className="text-[11px] text-torg-gray mt-1">{kpi.dias} dia{kpi.dias === 1 ? "" : "s"} com produção</p>
+
+          {/* Direita: stats em grid */}
+          <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4 min-w-[280px]">
+            <Stat
+              label="Realizado"
+              value={fmtPesoCompacto(kpi.realTotal)}
+              valueColor="text-torg-dark"
+              accent={cor}
+            />
+            <Stat
+              label="Previsto"
+              value={fmtPesoCompacto(kpi.prevTotal)}
+              valueColor="text-torg-gray"
+            />
+            <Stat
+              label="Falta produzir"
+              value={fmtPesoCompacto(falta)}
+              valueColor={falta > 0 ? "text-torg-orange-700" : "text-torg-blue"}
+              sub={kpi.prevTotal > 0 ? `${((falta / kpi.prevTotal) * 100).toFixed(0)}% do previsto` : ""}
+            />
+            <Stat
+              label="Média diária"
+              value={fmtPesoCompacto(kpi.mediaDiariaReal)}
+              valueColor="text-torg-dark"
+              sub={`${kpi.dias} ${kpi.dias === 1 ? "dia" : "dias"} com produção`}
+            />
           </div>
-          {/* Coluna 3: semana atual */}
-          <div>
-            <p className="text-xs text-torg-gray uppercase tracking-wide">Semana atual</p>
-            <p className="text-3xl font-bold text-torg-dark tabular-nums">{fmtKg(kpiSemana.realKg)}</p>
-            <p className="text-[11px] text-torg-gray mt-1">
-              de {fmtKg(kpiSemana.prevKg)} previsto
-            </p>
+
+          {/* Faixa inferior: semana atual */}
+          <div className="w-full border-t border-gray-100 pt-3 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-torg-gray uppercase tracking-wider font-semibold">Semana atual</span>
+              <span className="text-lg font-bold tabular-nums text-torg-dark">{fmtPesoCompacto(kpiSemana.realKg)}</span>
+              <span className="text-xs text-torg-gray tabular-nums">de {fmtPesoCompacto(kpiSemana.prevKg)} previsto</span>
+              {kpiSemana.prevKg > 0 && (
+                <span className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded ${
+                  aderSemana >= 90 ? "bg-torg-blue-50 text-torg-blue" :
+                  aderSemana >= 70 ? "bg-orange-50 text-torg-orange-700" :
+                  "bg-red-50 text-red-600"
+                }`}>
+                  {aderSemana.toFixed(0)}%
+                </span>
+              )}
+            </div>
+            {/* Mini progress bar da semana */}
+            {kpiSemana.prevKg > 0 && (
+              <div className="flex-1 max-w-xs bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="h-full transition-all"
+                  style={{
+                    width: `${Math.min(aderSemana, 100)}%`,
+                    backgroundColor: aderSemana >= 90 ? "#1d4ed8" : aderSemana >= 70 ? "#ea580c" : "#dc2626",
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Stat({ label, value, valueColor = "text-torg-dark", sub, accent }) {
+  return (
+    <div>
+      <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold flex items-center gap-1.5">
+        {accent && <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />}
+        {label}
+      </p>
+      <p className={`text-2xl font-extrabold tabular-nums leading-tight ${valueColor}`}>{value}</p>
+      {sub && <p className="text-[10px] text-torg-gray mt-0.5">{sub}</p>}
     </div>
   );
 }
