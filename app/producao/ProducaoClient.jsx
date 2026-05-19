@@ -1085,14 +1085,14 @@ function SharepointSyncCard() {
 
   useEffect(() => { fetchHistorico(); }, []);
 
-  async function sincronizarAgora() {
+  async function sincronizarAgora(mesesAtras = 0) {
     setSincronizando(true);
     setErro("");
     try {
       const res = await fetch("/api/producao/sync-sharepoint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ mesesAtras }),
       });
       const data = await res.json();
       if (!res.ok || !data.sucesso) {
@@ -1146,14 +1146,28 @@ function SharepointSyncCard() {
             </p>
           </div>
         </div>
-        <button
-          onClick={sincronizarAgora}
-          disabled={sincronizando}
-          className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50 shrink-0"
-        >
-          {sincronizando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-          {sincronizando ? "Sincronizando..." : "Sincronizar agora"}
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={() => sincronizarAgora(0)}
+            disabled={sincronizando}
+            className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {sincronizando ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            {sincronizando ? "Sincronizando..." : "Sincronizar mês atual"}
+          </button>
+          <button
+            onClick={() => {
+              if (window.confirm("Vai baixar e parsear as planilhas dos últimos 3 meses (atual + 2 anteriores). Pode levar 30+ segundos. Continuar?")) {
+                sincronizarAgora(2);
+              }
+            }}
+            disabled={sincronizando}
+            className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5 disabled:opacity-50"
+            title="Sincroniza tambem meses anteriores (Marco, Abril)"
+          >
+            <RefreshCw size={12} /> Buscar histórico
+          </button>
+        </div>
       </div>
       {(erro || (ultimo && !ultimo.sucesso && ultimo.erro)) && (
         <div className="px-5 py-2 bg-red-50 border-t border-red-100 text-xs text-red-700 flex items-start gap-2">
