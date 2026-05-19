@@ -1103,17 +1103,32 @@ function FunilSetores({ comparacao, setorFiltro, onSelect, setoresDisponiveis })
 
 // Grafico de evolucao semanal: bar chart simples com previsto (cinza) + realizado (cor).
 function EvolucaoSemanal({ producaoPorSemana, semanaAtual, setorLabel }) {
+  // So' semanas que TEM dado (prev ou real > 0) — evita semanas vazias no eixo X
+  const semanasComDado = producaoPorSemana.filter((s) => s.prevKg > 0 || s.realKg > 0);
   // Limita a 26 semanas (~6 meses) pra nao virar parede de barras
-  const semanas = producaoPorSemana.slice(-26);
+  const semanas = semanasComDado.slice(-26);
   const maxKg = Math.max(...semanas.map((s) => Math.max(s.prevKg, s.realKg)), 1);
 
   if (semanas.length === 0) {
-    return null;
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
+        <div className="flex items-center gap-2 mb-2">
+          <TrendingUp size={14} className="text-torg-blue" />
+          <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">Evolução semanal — {setorLabel}</h3>
+        </div>
+        <p className="text-xs text-torg-gray text-center py-4">
+          Sem produção registrada nesse setor no período. Click <strong>"Buscar histórico"</strong> pra puxar meses anteriores.
+        </p>
+      </div>
+    );
   }
+
+  // Eixo Y: 5 marcacoes (0, 25%, 50%, 75%, 100% de maxKg)
+  const yTicks = [maxKg, maxKg * 0.75, maxKg * 0.5, maxKg * 0.25, 0];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap">
+      <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <TrendingUp size={14} className="text-torg-blue" />
           <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">Evolução semanal — {setorLabel}</h3>
@@ -1124,33 +1139,67 @@ function EvolucaoSemanal({ producaoPorSemana, semanaAtual, setorLabel }) {
         </p>
       </div>
       <div className="px-4 py-4">
-        <div className="flex items-end gap-1 h-48">
-          {semanas.map((s) => {
-            const isAtual = s.semana === semanaAtual;
-            const hPrev = (s.prevKg / maxKg) * 100;
-            const hReal = (s.realKg / maxKg) * 100;
-            const ader = s.prevKg > 0 ? (s.realKg / s.prevKg) * 100 : 0;
-            const corReal = ader >= 90 ? "bg-torg-blue" : ader >= 70 ? "bg-torg-orange" : "bg-red-400";
-            return (
-              <div key={s.semana} className="flex-1 flex flex-col items-center gap-1 group min-w-0" title={`${s.semana}: prev ${fmtKg(s.prevKg)} | real ${fmtKg(s.realKg)} (${ader.toFixed(0)}%)`}>
-                <div className="w-full h-full flex flex-col justify-end relative">
-                  {/* Barra previsto (fundo claro) */}
+        <div className="flex gap-2">
+          {/* Eixo Y */}
+          <div className="flex flex-col justify-between h-48 text-[9px] text-torg-gray text-right shrink-0 w-10 tabular-nums">
+            {yTicks.map((t, i) => (
+              <span key={i}>{Math.round(t / 1000)}t</span>
+            ))}
+          </div>
+          {/* Area das barras */}
+          <div className="flex-1">
+            <div className="h-48 flex items-end gap-1 border-l border-b border-gray-200 pl-1 pb-0 relative">
+              {/* Linhas de grade horizontais */}
+              {yTicks.slice(1, -1).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute left-0 right-0 border-t border-gray-100"
+                  style={{ bottom: `${((i + 1) * 100) / (yTicks.length - 1)}%` }}
+                />
+              ))}
+              {semanas.map((s) => {
+                const isAtual = s.semana === semanaAtual;
+                const hPrev = (s.prevKg / maxKg) * 100;
+                const hReal = (s.realKg / maxKg) * 100;
+                const ader = s.prevKg > 0 ? (s.realKg / s.prevKg) * 100 : 0;
+                const corReal = ader >= 90 ? "bg-torg-blue" : ader >= 70 ? "bg-torg-orange" : "bg-red-400";
+                return (
                   <div
-                    className={`w-full ${isAtual ? "bg-torg-blue-100" : "bg-gray-200"} rounded-t absolute bottom-0 left-0`}
-                    style={{ height: `${hPrev}%` }}
-                  />
-                  {/* Barra realizado (cor sobre o previsto) */}
-                  <div
-                    className={`w-full ${corReal} rounded-t absolute bottom-0 left-0 transition-all`}
-                    style={{ height: `${hReal}%` }}
-                  />
-                </div>
-                <span className={`text-[9px] font-mono ${isAtual ? "text-torg-blue font-bold" : "text-torg-gray"} truncate w-full text-center`}>
-                  {s.semana.split("-W")[1]}
-                </span>
-              </div>
-            );
-          })}
+                    key={s.semana}
+                    className="flex-1 relative h-full min-w-0 cursor-help"
+                    title={`${s.semana}: prev ${fmtKg(s.prevKg)} | real ${fmtKg(s.realKg)} (${ader.toFixed(0)}%)`}
+                  >
+                    {/* Barra previsto */}
+                    <div
+                      className={`absolute bottom-0 left-0 w-full rounded-t ${isAtual ? "bg-torg-blue-100" : "bg-gray-200"}`}
+                      style={{ height: `${hPrev}%` }}
+                    />
+                    {/* Barra realizado */}
+                    <div
+                      className={`absolute bottom-0 left-0 w-full rounded-t ${corReal} transition-all`}
+                      style={{ height: `${hReal}%` }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            {/* Labels das semanas */}
+            <div className="flex gap-1 mt-1 pl-1">
+              {semanas.map((s) => {
+                const isAtual = s.semana === semanaAtual;
+                return (
+                  <span
+                    key={s.semana}
+                    className={`flex-1 text-[9px] font-mono text-center min-w-0 truncate ${
+                      isAtual ? "text-torg-blue font-bold" : "text-torg-gray"
+                    }`}
+                  >
+                    W{s.semana.split("-W")[1]}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </div>
