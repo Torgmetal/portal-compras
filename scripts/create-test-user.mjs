@@ -1,3 +1,8 @@
+// ATENÇÃO: usuário e senha hardcoded — uso interno de desenvolvimento.
+// Este usuário será usado como cobaia em testes de TODOS os módulos do portal
+// durante a fase de desenvolvimento, e deve ser DESATIVADO ao final do projeto.
+// Em scripts futuros que envolvam credenciais reais, ler de env vars (ex: process.env.TEST_USER_PASSWORD).
+
 /**
  * Cria o usuário de teste "teste@torg.com.br" no banco de dados.
  * Uso: node scripts/create-test-user.mjs
