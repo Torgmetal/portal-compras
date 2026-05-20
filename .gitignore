@@ -15,6 +15,9 @@ node_modules/
 .env.production
 .vercel
 
+# Configuração local do Claude Code Desktop (não versionada — cada dev tem a sua)
+.claude/settings.local.json
+
 # Duplicatas que o iCloud Drive cria por conflito de sincronização
 * 2.*
 * 2
