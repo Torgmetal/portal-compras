@@ -1,4 +1,5 @@
 "use client";
+import { useEffect } from "react";
 import { AlertTriangle, Info, Loader2, X } from "lucide-react";
 
 /**
@@ -24,6 +25,15 @@ export default function ConfirmModal({
   loading = false,
   variant = "padrao",
 }) {
+  useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(e) {
+      if (e.key === "Escape" && !loading) onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, loading, onClose]);
+
   if (!open) return null;
 
   const btnConfirmar =
