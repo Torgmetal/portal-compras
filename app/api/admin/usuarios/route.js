@@ -1,4 +1,4 @@
-// GET  /api/admin/usuarios  — lista todos os usuários (com filtros opcionais)
+// GET  /api/admin/usuarios  — lista usuários (default: só ativos; ?ativo=false → inativos; ?ativo=todos → todos)
 // POST /api/admin/usuarios  — cria novo usuário e retorna senha temporária
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -12,7 +12,7 @@ const ROLES_VALIDAS = ["ADMIN", "COMERCIAL", "ENGENHARIA", "ALMOXARIFADO", "COMP
 const schemaPost = z.object({
   name:             z.string().min(2, "Nome deve ter pelo menos 2 caracteres").max(100),
   email:            z.string().email("E-mail inválido").toLowerCase(),
-  role:             z.enum(ROLES_VALIDAS, { errorMap: () => ({ message: "Role inválida" }) }),
+  role:             z.enum(ROLES_VALIDAS),
   setor:            z.string().max(100).optional().nullable(),
   podeAlterarVerba: z.boolean().default(false),
 });
@@ -22,18 +22,22 @@ const schemaPost = z.object({
 export async function GET(req) {
   try {
     await requireRole(["ADMIN"]);
-  } catch {
-    return NextResponse.json({ success: false, error: "Apenas ADMIN." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   const { searchParams } = new URL(req.url);
   const roleFilter  = searchParams.get("role");
-  const ativoParam  = searchParams.get("ativo"); // "true" | "false" | null (todos)
+  const ativoParam  = searchParams.get("ativo");
+  // ?ativo não enviado ou "true" → só ativos (default)
+  // ?ativo=false                 → só inativos
+  // ?ativo=todos                 → sem filtro
 
   const where = {};
   if (roleFilter && ROLES_VALIDAS.includes(roleFilter)) where.role = roleFilter;
-  if (ativoParam === "true")  where.ativo = true;
-  if (ativoParam === "false") where.ativo = false;
+  if (ativoParam === "false")       where.ativo = false;
+  else if (ativoParam !== "todos")  where.ativo = true;   // default: apenas ativos
 
   const usuarios = await prisma.user.findMany({
     where,
@@ -60,15 +64,16 @@ export async function POST(req) {
   let adminUser;
   try {
     adminUser = await requireRole(["ADMIN"]);
-  } catch {
-    return NextResponse.json({ success: false, error: "Apenas ADMIN." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   let body;
   try {
     body = schemaPost.parse(await req.json());
   } catch (e) {
-    return NextResponse.json({ success: false, error: e.errors?.[0]?.message ?? "Dados inválidos." }, { status: 400 });
+    return NextResponse.json({ success: false, error: e.issues?.[0]?.message ?? "Dados inválidos." }, { status: 400 });
   }
 
   // Verifica duplicidade de e-mail

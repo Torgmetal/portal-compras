@@ -8,8 +8,9 @@ export async function POST(_req, { params }) {
   let adminUser;
   try {
     adminUser = await requireRole(["ADMIN"]);
-  } catch {
-    return NextResponse.json({ success: false, error: "Apenas ADMIN." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   const alvoId = params.id;

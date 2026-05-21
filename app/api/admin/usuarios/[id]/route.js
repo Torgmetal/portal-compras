@@ -10,7 +10,7 @@ const ROLES_VALIDAS = ["ADMIN", "COMERCIAL", "ENGENHARIA", "ALMOXARIFADO", "COMP
 const schemaPut = z.object({
   name:             z.string().min(2).max(100).optional(),
   email:            z.string().email("E-mail inválido").toLowerCase().optional(),
-  role:             z.enum(ROLES_VALIDAS, { errorMap: () => ({ message: "Role inválida" }) }).optional(),
+  role:             z.enum(ROLES_VALIDAS).optional(),
   setor:            z.string().max(100).nullable().optional(),
   podeAlterarVerba: z.boolean().optional(),
 });
@@ -20,8 +20,9 @@ const schemaPut = z.object({
 export async function GET(_req, { params }) {
   try {
     await requireRole(["ADMIN"]);
-  } catch {
-    return NextResponse.json({ success: false, error: "Apenas ADMIN." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   const usuario = await prisma.user.findUnique({
@@ -52,8 +53,9 @@ export async function PUT(req, { params }) {
   let adminUser;
   try {
     adminUser = await requireRole(["ADMIN"]);
-  } catch {
-    return NextResponse.json({ success: false, error: "Apenas ADMIN." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   const alvoId = params.id;
@@ -63,7 +65,7 @@ export async function PUT(req, { params }) {
   try {
     body = schemaPut.parse(await req.json());
   } catch (e) {
-    return NextResponse.json({ success: false, error: e.errors?.[0]?.message ?? "Dados inválidos." }, { status: 400 });
+    return NextResponse.json({ success: false, error: e.issues?.[0]?.message ?? "Dados inválidos." }, { status: 400 });
   }
 
   // ── Proteções anti-suicídio ───────────────────────────────────────────────
