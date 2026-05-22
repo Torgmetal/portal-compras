@@ -150,6 +150,7 @@ export default function MapaCotacaoClient({ op }) {
 
   const qtdPedido = itensTodos.filter((it) => it.jaPedido).length;
   const qtdCancelado = itensTodos.filter((it) => it.cancelado).length;
+  const qtdSemCotacao = itensTodos.filter((it) => it.semCotacao && !it.jaPedido && !it.cancelado).length;
   const qtdAtivo = itensTodos.length - qtdPedido - qtdCancelado;
 
   const marcarVencedor = async (cotacaoItemId, jaVencedor) => {
@@ -254,7 +255,7 @@ export default function MapaCotacaoClient({ op }) {
     }
   };
 
-  if (fornecedores.length === 0) {
+  if (fornecedores.length === 0 && itens.length === 0) {
     return (
       <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-6 text-center">
         <BarChart3 size={36} className="mx-auto text-torg-blue/40 mb-2" />
@@ -336,7 +337,7 @@ export default function MapaCotacaoClient({ op }) {
   }
   const totalAGerarLiquido = Object.values(totaisAGerarLiquidoPorFornecedor).reduce((s, n) => s + n, 0);
   const fornecedoresVencedores = fornecedores.filter((f) => itensPorFornecedor[f.cotacaoId].length > 0);
-  const itensSemVencedor = itens.filter((it) => !it.celulas.some((c) => c?.vencedor));
+  const itensSemVencedor = itens.filter((it) => !it.semCotacao && !it.celulas.some((c) => c?.vencedor));
 
   return (
     <>
@@ -352,8 +353,10 @@ export default function MapaCotacaoClient({ op }) {
             </span>
           </h3>
           <p className="text-xs text-torg-gray mt-1">
-            Click na célula pra escolher vencedor por item, ou no nome do fornecedor pra marcar todos dele.
-            Itens marcados <span className="font-bold text-amber-700">FD</span> (Faturamento Direto) são comparados pelo bruto+IPI — ICMS não vira crédito pra Torg.
+            {fornecedores.length > 0
+              ? <>Click na célula pra escolher vencedor por item, ou no nome do fornecedor pra marcar todos dele. Itens marcados <span className="font-bold text-amber-700">FD</span> (Faturamento Direto) são comparados pelo bruto+IPI — ICMS não vira crédito pra Torg.</>
+              : <>Todos os itens das RMs desta OP. Itens sem cotação recebida aparecem como "Aguardando cotação".</>
+            }
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -370,29 +373,40 @@ export default function MapaCotacaoClient({ op }) {
               {mostrarPedidos ? "Ocultar pedidos" : `Mostrar pedidos (${qtdPedido})`}
             </button>
           )}
-          <button
-            onClick={sugerirVencedoresMenorPreco}
-            disabled={loading === "sugerir"}
-            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-2 disabled:opacity-50"
-            title="Marca o menor preço de cada item como vencedor automaticamente"
-          >
-            {loading === "sugerir" ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-            Sugerir menor preço
-          </button>
-          <div className="text-right">
-            <p className="text-xs text-torg-gray">Total dos vencedores</p>
-            <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums" title="Valor da nota fiscal — bruto + IPI">
-              {fmtMoeda(totalGeral)}
-            </p>
-            <p className="text-[10px] text-torg-gray mt-0.5 tabular-nums" title="Custo real Torg apos creditar ICMS">
-              Custo líquido: {fmtMoeda(totalLiquidoGeral)}
-            </p>
-            {totalEmPedidos > 0 && totalAGerar > 0 && (
-              <p className="text-[10px] text-torg-gray mt-0.5 tabular-nums">
-                {fmtMoeda(totalEmPedidos)} em pedidos · {fmtMoeda(totalAGerar)} a gerar
+          {fornecedores.length > 0 && (
+            <>
+            <button
+              onClick={sugerirVencedoresMenorPreco}
+              disabled={loading === "sugerir"}
+              className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-2 disabled:opacity-50"
+              title="Marca o menor preço de cada item como vencedor automaticamente"
+            >
+              {loading === "sugerir" ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+              Sugerir menor preço
+            </button>
+            <div className="text-right">
+              <p className="text-xs text-torg-gray">Total dos vencedores</p>
+              <p className="text-xl font-extrabold text-torg-orange-700 tabular-nums" title="Valor da nota fiscal — bruto + IPI">
+                {fmtMoeda(totalGeral)}
               </p>
-            )}
-          </div>
+              <p className="text-[10px] text-torg-gray mt-0.5 tabular-nums" title="Custo real Torg apos creditar ICMS">
+                Custo líquido: {fmtMoeda(totalLiquidoGeral)}
+              </p>
+              {totalEmPedidos > 0 && totalAGerar > 0 && (
+                <p className="text-[10px] text-torg-gray mt-0.5 tabular-nums">
+                  {fmtMoeda(totalEmPedidos)} em pedidos · {fmtMoeda(totalAGerar)} a gerar
+                </p>
+              )}
+            </div>
+            </>
+          )}
+          {fornecedores.length === 0 && qtdSemCotacao > 0 && (
+            <div className="text-right">
+              <p className="text-xs text-amber-600 font-medium">
+                {qtdSemCotacao} ite{qtdSemCotacao === 1 ? "m" : "ns"} aguardando cotação
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -410,6 +424,9 @@ export default function MapaCotacaoClient({ op }) {
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
               <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
+              {fornecedores.length === 0 && itens.length > 0 && (
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase min-w-[140px]">Status</th>
+              )}
               {fornecedores.map((f) => {
                 // Conta itens dessa cotação com preço (potenciais vencedores)
                 const cellsDoForn = itens
@@ -462,8 +479,8 @@ export default function MapaCotacaoClient({ op }) {
                 .filter((p) => p > 0);
               const menorLiquido = comparacoes.length ? Math.min(...comparacoes) : null;
               return (
-                <tr key={it.rmItemId} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-xs font-mono text-torg-blue sticky left-0 bg-white">{it.rmNumero}</td>
+                <tr key={it.rmItemId} className={`hover:bg-gray-50 ${it.semCotacao ? "bg-amber-50/30" : ""}`}>
+                  <td className={`px-3 py-2 text-xs font-mono text-torg-blue sticky left-0 ${it.semCotacao ? "bg-amber-50/30" : "bg-white"}`}>{it.rmNumero}</td>
                   <td className="px-3 py-2 text-xs text-torg-gray">
                     {it.categoria ? labelCategoria(it.categoria) : "—"}
                   </td>
@@ -502,7 +519,22 @@ export default function MapaCotacaoClient({ op }) {
                       </div>
                     )}
                   </td>
-                  {fornecedores.map((f) => {
+                  {it.semCotacao && fornecedores.length > 0 ? (
+                    <td colSpan={fornecedores.length} className="px-3 py-2 text-center">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+                        <Mail size={12} />
+                        Aguardando cotação
+                      </span>
+                    </td>
+                  ) : it.semCotacao && fornecedores.length === 0 ? (
+                    <td className="px-3 py-2 text-center">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+                        <Mail size={12} />
+                        Aguardando cotação
+                      </span>
+                    </td>
+                  ) : (
+                    fornecedores.map((f) => {
                     const cell = it.celulas.find((c) => c?.cotacaoId === f.cotacaoId);
                     if (!cell || cell.precoUnit <= 0) {
                       return (
@@ -563,11 +595,13 @@ export default function MapaCotacaoClient({ op }) {
                         )}
                       </td>
                     );
-                  })}
+                  })
+                  )}
                 </tr>
               );
             })}
           </tbody>
+          {fornecedores.length > 0 && (
           <tfoot className="bg-gray-50 border-t-2 border-gray-200">
             <tr>
               <td colSpan={4} className="px-3 py-2 text-right text-xs font-semibold text-torg-dark">
@@ -580,6 +614,7 @@ export default function MapaCotacaoClient({ op }) {
               ))}
             </tr>
           </tfoot>
+          )}
         </table>
       </div>
 
@@ -784,7 +819,9 @@ export default function MapaCotacaoClient({ op }) {
 
       <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-wrap gap-2">
         <p className="text-xs text-torg-gray">
-          {itens.length} ite{itens.length === 1 ? "m" : "ns"} cotados · {fornecedores.length} fornecedor{fornecedores.length !== 1 ? "es" : ""}
+          {itens.length} ite{itens.length === 1 ? "m" : "ns"}
+          {fornecedores.length > 0 && ` · ${fornecedores.length} fornecedor${fornecedores.length !== 1 ? "es" : ""}`}
+          {qtdSemCotacao > 0 && <span className="text-amber-600"> · {qtdSemCotacao} aguardando cotação</span>}
           {fornecedoresVencedores.length > 0 && ` · ${fornecedoresVencedores.length} pedido${fornecedoresVencedores.length !== 1 ? "s" : ""} a gerar`}
         </p>
         <button
@@ -1274,6 +1311,35 @@ function buildMatriz(op) {
           vencedor: ci.vencedor,
         });
       }
+    }
+  }
+
+  // Inclui TODOS os itens de TODAS as RMs — mesmo os que nao tem cotacao RECEBIDA.
+  // Assim o mapa mostra o panorama completo (itens aguardando cotacao aparecem).
+  for (const [rmItemId, entry] of itemPorId) {
+    if (!itensMap.has(rmItemId)) {
+      const { rmItem, rmNumero, categoria, faturamentoDireto: fatDiretoItem } = entry;
+      itensMap.set(rmItemId, {
+        rmItemId: rmItem.id,
+        rmNumero,
+        descricao: rmItem.descricao,
+        material: rmItem.material || null,
+        comprimento: rmItem.comprimento || null,
+        largura: rmItem.largura || null,
+        tratamento: rmItem.tratamento || null,
+        qtdPecas: rmItem.qtd,
+        unidadeOriginal: rmItem.unidade,
+        pesoTotal: Number(rmItem.peso) || 0,
+        qtd: rmItem.peso > 0 ? Number(rmItem.peso).toFixed(2) : rmItem.qtd,
+        unidade: rmItem.peso > 0 ? "KG" : rmItem.unidade,
+        categoria,
+        faturamentoDireto: fatDiretoItem,
+        itemStatus: rmItem.status,
+        jaPedido: rmItem.status === "PEDIDO_GERADO",
+        cancelado: rmItem.status === "CANCELADO",
+        semCotacao: true,
+        celulas: [],
+      });
     }
   }
 

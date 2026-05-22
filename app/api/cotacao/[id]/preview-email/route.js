@@ -39,7 +39,7 @@ export async function GET(req, { params }) {
 
   const isJson = new URL(req.url).searchParams.get("format") === "json";
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace-torg.vercel.app";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace.torg.com.br";
   const link = `${baseUrl}/fornecedores/c/${cot.token}`;
 
   const rmIds = Array.from(new Set(cot.itens.map((i) => i.rmItem?.rmId).filter(Boolean)));

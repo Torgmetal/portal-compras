@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
-import { ClipboardList, PlusCircle, LogOut } from "lucide-react";
-import TorgLogo from "@/components/TorgLogo";
+import { ClipboardList, PlusCircle } from "lucide-react";
+import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
+import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/rm", label: "Minhas RMs", icon: ClipboardList, exact: true },
@@ -12,16 +12,10 @@ const menu = [
 
 export default function SidebarRM() {
   const pathname = usePathname();
-  const { data: session } = useSession();
 
   return (
     <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col min-h-screen fixed left-0 top-0">
-      <div className="px-5 py-5 border-b border-torg-blue-100">
-        <TorgLogo size="sm" />
-        <p className="text-[10px] text-torg-gray mt-1 tracking-wider uppercase">
-          Portal de RMs
-        </p>
-      </div>
+      <SidebarModuleSwitcher moduloAtual="Portal de RMs" />
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {menu.map((m) => {
@@ -43,21 +37,7 @@ export default function SidebarRM() {
         })}
       </nav>
 
-      <div className="px-5 py-4 border-t border-torg-blue-100 text-xs">
-        {session?.user && (
-          <div className="mb-3">
-            <p className="text-torg-dark font-medium truncate">{session.user.name}</p>
-            <p className="text-torg-gray truncate">{session.user.email}</p>
-            <p className="text-[10px] text-torg-gray uppercase tracking-wide mt-0.5">{session.user.role}</p>
-          </div>
-        )}
-        <button
-          onClick={() => signOut({ callbackUrl: "/entrar" })}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-torg-gray hover:bg-gray-50 hover:text-torg-dark transition-colors"
-        >
-          <LogOut size={14} /> Sair
-        </button>
-      </div>
+      <SidebarUserFooter />
     </aside>
   );
 }

@@ -191,7 +191,7 @@ export async function POST(req) {
   const opVinculada = body.opId
     ? await prisma.oP.findUnique({ where: { id: body.opId }, select: { numero: true, cliente: true } })
     : null;
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace-torg.vercel.app";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace.torg.com.br";
   const linkRM = `${baseUrl}/compras/rm/${rm.id}`;
 
   // Notificacao IN-APP — sempre criada, independente do Resend

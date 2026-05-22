@@ -18,7 +18,7 @@ export async function GET() {
   const status = {
     RESEND_API_KEY: !!process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM || "(nao definido — usando default onboarding@resend.dev)",
-    NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || "(nao definido — usando default workspace-torg.vercel.app)",
+    NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || "(nao definido — usando default workspace.torg.com.br)",
     userEmail: user.email,
   };
 
@@ -41,7 +41,7 @@ export async function GET() {
           a config do Resend ta correta e os emails de notificacao vao chegar normalmente.
         </p>
         <p style="margin-top: 24px;">
-          <a href="https://workspace-torg.vercel.app/compras"
+          <a href="https://workspace.torg.com.br/compras"
              style="background: #1976d2; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">
             Abrir Workspace Torg
           </a>

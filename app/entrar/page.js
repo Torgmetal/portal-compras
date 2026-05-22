@@ -40,31 +40,37 @@ function LoginForm() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (carregando) return; // bloqueia duplo-clique
     setErro("");
     setCarregando(true);
-    const res = await signIn("credentials", {
-      email,
-      password: senha,
-      redirect: false,
-    });
-    if (res?.error) {
-      setCarregando(false);
-      setErro("Email ou senha inválidos.");
-      return;
-    }
-    // Lê a sessão pra descobrir o role e redirecionar pro portal certo
-    let destino = callbackUrl;
-    if (!destino) {
-      try {
-        const s = await fetch("/api/auth/session").then((r) => r.json());
-        destino = homePorRole(s?.user?.role);
-      } catch {
-        destino = "/";
+    try {
+      const res = await signIn("credentials", {
+        email,
+        password: senha,
+        redirect: false,
+      });
+      if (res?.error) {
+        setErro("Email ou senha inválidos.");
+        setCarregando(false);
+        return;
       }
+      // Lê a sessão pra descobrir o role e redirecionar pro portal certo
+      let destino = callbackUrl;
+      if (!destino) {
+        try {
+          const s = await fetch("/api/auth/session").then((r) => r.json());
+          destino = homePorRole(s?.user?.role);
+        } catch {
+          destino = "/";
+        }
+      }
+      // Hard redirect — garante que o cookie de sessão esteja disponível
+      // e evita problemas de soft navigation do App Router
+      window.location.href = destino;
+    } catch {
+      setErro("Erro de conexão. Tente novamente.");
+      setCarregando(false);
     }
-    setCarregando(false);
-    router.push(destino);
-    router.refresh();
   };
 
   return (
@@ -149,10 +155,10 @@ function LoginForm() {
 
           <div className="pt-3 border-t border-gray-100 space-y-2 text-center">
             <Link
-              href="/trocar-senha"
+              href="/esqueci-senha"
               className="block text-sm text-torg-blue hover:text-torg-blue-700 font-medium"
             >
-              Trocar senha
+              Esqueci minha senha
             </Link>
             <p className="text-xs text-torg-gray">
               Não tem acesso? Fale com o administrador do portal.

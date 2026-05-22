@@ -49,6 +49,21 @@ model User {
   auditLogs               AuditLog[]
   notificacoes            Notificacao[]
   sharepointSyncs         SharepointSync[]
+  producaoDiarias         ProducaoDiaria[]     @relation("ProducaoDiariaCreatedBy")
+  passwordResetTokens     PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique        // código de 6 dígitos
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime                // expira em 15 minutos
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ─── OP (ORDEM DE PRODUÇÃO) ─────────────────────────────────
@@ -975,6 +990,8 @@ model PecaConjunto {
   qte           Int      @default(1)
   pesoUnitKg    Float    @default(0)
   pesoTotalKg   Float    @default(0)
+  precoUnitario Float    @default(0)  // R$ por peça
+  precoTotal    Float    @default(0)  // R$ total (precoUnitario * qte)
   // Status atual: PENDENTE | CORTE | MONTAGEM | SOLDA | ACABAMENTO | JATO | PINTURA | EXPEDIDO
   status        String   @default("PENDENTE")
   // Peca sem letra "P" no inicio da marca pula montagem/solda/acab e vai direto pra jato
@@ -987,10 +1004,54 @@ model PecaConjunto {
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
 
+  planejamentos PecaPlanejamento[]
+
   @@unique([opNumero, marca])
   @@index([opId])
   @@index([status])
   @@index([marca])
+}
+
+// ─── CONTROLE DIÁRIO DE PRODUÇÃO ────────────────────────────
+// Preenchido pelo admin: metas e parametros de produção por setor/dia.
+model ProducaoDiaria {
+  id                      String   @id @default(cuid())
+  data                    DateTime @db.Date
+  setor                   String   // CORTE, MONTAGEM, SOLDA, ACABAMENTO, JATO, PINTURA, EXPEDICAO
+  pesoMetaKg              Float    @default(0)   // meta de peso do dia (kg)
+  pesoRealizadoKg         Float    @default(0)   // peso efetivamente produzido (kg)
+  produtividadeEstimada   Float?                  // kg/pessoa/hora estimado
+  qtdPessoas              Int      @default(0)    // pessoas no setor naquele dia
+  horasNormais            Float    @default(8.8)  // horas normais de trabalho/dia
+  horasExtrasProjetadas   Float    @default(0)    // horas extras projetadas
+  horasExtrasRealizadas   Float?                  // horas extras realizadas
+  observacao              String?
+  createdById             String?
+  createdBy               User?    @relation("ProducaoDiariaCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  pecasPlanejadas         PecaPlanejamento[]
+
+  @@unique([data, setor])
+  @@index([data])
+  @@index([setor])
+}
+
+// Vínculo peça ↔ dia planejado: quais peças serão fabricadas em qual dia/setor.
+model PecaPlanejamento {
+  id                String          @id @default(cuid())
+  producaoDiariaId  String
+  producaoDiaria    ProducaoDiaria  @relation(fields: [producaoDiariaId], references: [id], onDelete: Cascade)
+  pecaConjuntoId    String
+  pecaConjunto      PecaConjunto    @relation(fields: [pecaConjuntoId], references: [id], onDelete: Cascade)
+  qtdPlanejada      Int             @default(1)   // quantas unidades daquela peça
+  concluida         Boolean         @default(false)
+  observacao        String?
+  createdAt         DateTime        @default(now())
+
+  @@unique([producaoDiariaId, pecaConjuntoId])
+  @@index([pecaConjuntoId])
 }
 
 // ─── SHAREPOINT SYNC ────────────────────────────────────────

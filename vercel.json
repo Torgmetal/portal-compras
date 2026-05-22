@@ -1,5 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?!workspace\\.torg\\.com\\.br$).*\\.vercel\\.app$"
+        }
+      ],
+      "destination": "https://workspace.torg.com.br/:path*",
+      "permanent": true
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/estoque-produtos",

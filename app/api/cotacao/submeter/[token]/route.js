@@ -210,7 +210,7 @@ export async function POST(req, { params }) {
       const rotuloRMs = rmsNumeros.length === 1
         ? `RM ${rmsNumeros[0]}`
         : `RMs ${rmsNumeros.join(", ")}`;
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace-torg.vercel.app";
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace.torg.com.br";
       const linkInterno = rmsMap.size === 1
         ? `/compras/rm/${[...rmsMap.keys()][0]}`
         : "/compras";

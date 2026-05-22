@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 // Protege /compras, /comercial, /rm (exceto /rm/[id]/cotar via token futuro)
 // /fornecedores fica aberto (acesso por token único depois)
+// Redirect de domínios .vercel.app → workspace.torg.com.br via vercel.json (edge, mais rápido)
 export default withAuth(
   function middleware(req) {
     // Retorno explícito necessário para que o Vercel sirva corretamente
@@ -22,6 +23,8 @@ export default withAuth(
           path === "/entrar" ||
           path === "/trocar-senha" ||
           path === "/api/trocar-senha" ||
+          path === "/esqueci-senha" ||
+          path === "/api/esqueci-senha" ||
           // Endpoints que o portal do fornecedor consome (sem login)
           path === "/api/parse-pdf-cotacao" ||
           path === "/api/parse-cotacao-ai" ||
