@@ -111,3 +111,52 @@ Routes that exceed the default 10-second limit declare `export const maxDuration
 - All naming (variables, comments, UI text) is in **Portuguese**
 - Client components use `"use client"`; keep server-only logic in API routes or lib modules
 - Zod validation on all API route inputs
+
+## Padrões de qualidade
+
+Consolidados nas Fases 1 e 2 (gestão de usuários). Aplicar em todos os módulos novos.
+
+### Backend (endpoints)
+
+- **401 vs 403**: `requireRole` lança `Error("Unauthorized")` quando não há sessão e `Error("Forbidden")` quando a role não bate. Sempre distinguir:
+  ```js
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
+  }
+  ```
+- **Zod 4**: usar `e.issues[0]?.message` (não `e.errors` — foi removido). Não usar `errorMap` (silenciosamente ignorado na v4).
+- **Validação Zod** em todo endpoint que recebe body.
+- **AuditLog em toda mutação** — incluir diff `{ antes, depois }` quando aplicável. Nunca usar `console.log` para rastrear mutações (some no Vercel; AuditLog persiste).
+- **Nunca retornar `password`** no response — nem o hash.
+- **Senha temporária em plaintext** só no response imediato de criar/reset-senha, em mais nenhum outro lugar.
+- **Default de listagens**: filtrar `ativo: true`; suportar `?ativo=todos` e `?ativo=false` como parâmetro explícito.
+- **Anti-suicídio** para rotas de admin: ADMIN nunca pode desativar a si mesmo, mudar a própria role, ou alterar próprio `podeAlterarVerba`. Pode resetar a própria senha (com confirmação reforçada no front).
+- **Geração de senhas**: usar `crypto.randomBytes` (não `Math.random`). Charset sem caracteres ambíguos (`0/O`, `1/l/I`). Ver `lib/gerar-senha.js`.
+
+### Frontend (telas)
+
+- **Toast**: sempre via `useStore().showToast(mensagem, tipo)` — nunca criar sistema paralelo.
+- **Modais de confirmação**: reusar `components/admin/ConfirmModal.jsx` (suporta `variant="destrutivo"` e `variant="padrao"`, ESC fecha, click-outside fecha, spinner durante `loading`). Referência de estilo: `ExportOmieModal.jsx`.
+- **Tabelas**: `bg-white rounded-xl border border-gray-100 shadow-sm`, `thead bg-gray-50/60`, `tbody divide-y divide-gray-50`, `overflow-x-auto` no wrapper para mobile.
+- **Paleta torg-\***: `torg-blue` (#006EAB, primário), `torg-dark` (#002945), `torg-gray` (#576D7E), `torg-orange` (#F4801F). Badges de role têm cores próprias por role — ver `ROLES_LABELS` em `app/admin/usuarios/page.js`.
+- **Estados obrigatórios em toda tela com dados remotos**:
+  1. Loading inicial (spinner + texto)
+  2. Erro com botão "Tentar novamente"
+  3. Estado vazio com ícone e mensagem
+  4. Loading em ações inline (por item, não bloquear a tela inteira)
+- **Update otimista**: após ação bem-sucedida, atualizar `useState` local via `setX(prev => ...)` em vez de refetch, para evitar flickering.
+- **`"use client"`** só onde necessário. Layout com `export const metadata` não pode ser Client Component.
+
+### Padrões de coding
+
+- **JS puro** (sem TypeScript); JSDoc onde o tipo for útil para quem vai ler.
+- **`setModal(null)` e limpeza de estado** no `finally`, não no início do `try` — garante limpeza mesmo se a ação lançar exceção.
+- **Campos `id`**: usar `cuid()` via Prisma (padrão do schema); nunca gerar IDs manualmente no front.
+- **Imports de Prisma**: sempre de `@/lib/prisma`, nunca instanciar `PrismaClient` diretamente em outro arquivo.
+
+### Comportamento esperado do Claude Code
+
+- Quando o usuário pedir "mostre o código" ou "mostre o arquivo", **colar o conteúdo COMPLETO** em blocos markdown — nunca dizer "aqui estão" sem colar.
+- Quando o usuário pedir "pause", "aguarde" ou "pare antes de X", **pausar de fato** — não seguir por iniciativa própria.
+- Se discordar de algo combinado, **argumentar antes** de executar uma versão alternativa.
