@@ -1,10 +1,13 @@
 import { withAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
 
 // Protege /compras, /comercial, /rm (exceto /rm/[id]/cotar via token futuro)
 // /fornecedores fica aberto (acesso por token único depois)
 export default withAuth(
   function middleware(req) {
-    // espaço pra checagens de role específicas se necessário
+    // Retorno explícito necessário para que o Vercel sirva corretamente
+    // tanto páginas dinâmicas (ƒ) quanto estáticas (○) após autorização.
+    return NextResponse.next();
   },
   {
     callbacks: {
