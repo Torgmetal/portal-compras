@@ -387,7 +387,7 @@ function TabelaOrcamentos({ orcamentos, onVer, onEditar, onExcluir }) {
               const s = STATUS_LABELS[orc.status] || STATUS_LABELS.ORCAMENTO;
               return (
                 <tr key={orc.id} className="hover:bg-gray-50/50">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <button
                       onClick={() => onVer(orc)}
                       className="font-mono font-semibold text-torg-blue hover:underline"
@@ -400,12 +400,12 @@ function TabelaOrcamentos({ orcamentos, onVer, onEditar, onExcluir }) {
                   <td className="px-4 py-3 text-torg-gray text-xs">
                     {orc.tipoVenda ? TIPO_VENDA_LABELS[orc.tipoVenda] : "—"}
                   </td>
-                  <td className="px-4 py-3 text-right text-torg-dark font-medium tabular-nums">
+                  <td className="px-4 py-3 text-right text-torg-dark font-medium tabular-nums whitespace-nowrap">
                     {fmtMoeda(orc.valor)}
                   </td>
-                  <td className="px-4 py-3 text-torg-gray">{orc.vendedor || "—"}</td>
-                  <td className="px-4 py-3 text-torg-gray text-xs">{fmtData(orc.dataSolicitada)}</td>
-                  <td className="px-4 py-3 text-torg-gray text-xs">{fmtData(orc.dataEnvio)}</td>
+                  <td className="px-4 py-3 text-torg-gray whitespace-nowrap">{orc.vendedor || "—"}</td>
+                  <td className="px-4 py-3 text-torg-gray text-xs whitespace-nowrap">{fmtData(orc.dataSolicitada)}</td>
+                  <td className="px-4 py-3 text-torg-gray text-xs whitespace-nowrap">{fmtData(orc.dataEnvio)}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${s.cor}`}>
                       {s.label}
