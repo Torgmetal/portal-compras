@@ -22,15 +22,18 @@ const TIPO_VENDA_LABELS = {
   MONTAGEM:               "Montagem",
   FABRICACAO_E_MONTAGEM:  "Fabricação e Montagem",
   PINTURA:                "Pintura",
+  MAO_DE_OBRA:            "Mão de Obra",
+  REVENDA:                "Revenda",
 };
 
 const PORTE_LABELS = {
   ATE_1_2M:      "Até R$ 1,2M",
   DE_1_2M_A_10M: "R$ 1,2M – R$ 10M",
-  ACIMA_10M:     "Acima R$ 10M",
+  DE_10M_A_50M:  "R$ 10M – R$ 50M",
+  ACIMA_50M:     "Acima R$ 50M",
 };
 
-const VENDEDORES = ["Vitor", "Patrícia", "Matheus", "Airton"];
+const VENDEDORES = ["Vitor", "Patrícia", "Matheus", "André Metzker", "Jorge"];
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";

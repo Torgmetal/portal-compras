@@ -1229,12 +1229,15 @@ enum TipoVenda {
   MONTAGEM
   FABRICACAO_E_MONTAGEM
   PINTURA
+  MAO_DE_OBRA
+  REVENDA
 }
 
 enum PorteOrcamento {
   ATE_1_2M        // Até R$ 1,2M
   DE_1_2M_A_10M   // De R$ 1,2M até R$ 10,0M
-  ACIMA_10M       // Acima de R$ 10,0M
+  DE_10M_A_50M    // De R$ 10M até R$ 50M
+  ACIMA_50M       // Acima de R$ 50M
 }
 
 model Orcamento {
