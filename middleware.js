@@ -43,6 +43,21 @@ export default withAuth(
         if (path.startsWith("/compras") && !["ADMIN", "COMPRAS"].includes(token.role)) {
           return false;
         }
+        if (path.startsWith("/admin") && token.role !== "ADMIN") {
+          return false;
+        }
+        if (
+          path.startsWith("/expedicao") &&
+          !["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA"].includes(token.role)
+        ) {
+          return false;
+        }
+        if (
+          path.startsWith("/producao") &&
+          !["ADMIN", "PRODUCAO", "EXPEDICAO", "COMERCIAL", "ENGENHARIA"].includes(token.role)
+        ) {
+          return false;
+        }
         // /rm liberado pra todos os logados (engenharia, almox, compras, admin)
         return true;
       },

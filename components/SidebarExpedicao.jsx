@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText } from "lucide-react";
+import { FileText, ClipboardCheck } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/expedicao", label: "Romaneios", icon: FileText, exact: true },
+  { href: "/expedicao/checklist", label: "Checklist", icon: ClipboardCheck },
   // Futuro: Notas Fiscais de saida, Logistica, etc
 ];
 

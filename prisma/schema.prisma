@@ -51,6 +51,7 @@ model User {
   sharepointSyncs         SharepointSync[]
   producaoDiarias         ProducaoDiaria[]     @relation("ProducaoDiariaCreatedBy")
   passwordResetTokens     PasswordResetToken[]
+  orcamentosCriados       Orcamento[]          @relation("OrcamentoCriadoPor")
 }
 
 model PasswordResetToken {
@@ -64,6 +65,36 @@ model PasswordResetToken {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+// ─── METAS / OBJETIVOS ─────────────────────────────────────
+// Metas mensais por módulo/setor com distribuição semanal.
+// Admin define o valor mensal; distribuição semanal é automática (÷ 4 semanas)
+// ou manual quando os campos semana1-5 são preenchidos.
+
+model Meta {
+  id          String   @id @default(cuid())
+  modulo      String   // PRODUCAO, COMERCIAL, FINANCEIRO, EXPEDICAO, COMPRAS
+  tipo        String   // PESO_KG, FATURAMENTO_BRL, QTD_PEDIDOS, etc.
+  setor       String   @default("GERAL") // CORTE, MONTAGEM, etc. ou GERAL
+  ano         Int
+  mes         Int      // 1-12
+  valorMensal Float    @default(0) // valor total do mês (kg pra peso, R$ pra financeiro)
+  // Distribuição semanal (null = auto ÷ 4 semanas).
+  // Quando preenchido, sobrescreve a distribuição automática.
+  semana1     Float?
+  semana2     Float?
+  semana3     Float?
+  semana4     Float?
+  semana5     Float?   // apenas meses com 5 semanas úteis
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([modulo, tipo, setor, ano, mes])
+  @@index([modulo, ano])
+  @@index([modulo, tipo, ano])
 }
 
 // ─── OP (ORDEM DE PRODUÇÃO) ─────────────────────────────────
@@ -124,11 +155,13 @@ model OP {
   producaoSemanal ProducaoSemanal[]
   fluxoCaixa     FluxoCaixa[]
   romaneios      Romaneio[]
+  planejamentosCarga PlanejamentoCarga[]
   estoqueReservas EstoqueReserva[]
   estoqueAlocacoes EstoqueAlocacao[]
   rmItensDestino  RMItem[]   @relation("RMItemOpDestino")
   pedidosOmieAvulsos PedidoOmie[]   // pedidos cadastrados direto na OP (FD avulsos)
   pecasConjunto   PecaConjunto[]
+  orcamentos      Orcamento[]    @relation("OrcamentoOP")
 
   @@index([numero])
   @@index([status])
@@ -203,8 +236,112 @@ model Romaneio {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  itens       RomaneioItem[]
+  planejamentoCarga PlanejamentoCarga?
+
   @@index([opId])
   @@index([data])
+}
+
+// Itens detalhados de um romaneio — vincula peças (PecaConjunto) e
+// acessórios (RMItem) ao romaneio de saída. Permite rastrear QUAIS
+// itens foram expedidos em cada carga.
+model RomaneioItem {
+  id              String        @id @default(cuid())
+  romaneioId      String
+  romaneio        Romaneio      @relation(fields: [romaneioId], references: [id], onDelete: Cascade)
+
+  // Tipo do item: PECA (estrutura/marca) ou ACESSORIO (item de RM expedível)
+  tipo            String        // PECA | ACESSORIO
+  descricao       String        // descrição (ex: "T64K1 - VIGA" ou "Parafusos M16")
+
+  // Vínculo com peça de estrutura (marca da LE/form21)
+  pecaConjuntoId  String?
+  pecaConjunto    PecaConjunto? @relation(fields: [pecaConjuntoId], references: [id])
+
+  // Vínculo com item de RM (acessórios expedíveis)
+  rmItemId        String?
+  rmItem          RMItem?       @relation(fields: [rmItemId], references: [id])
+
+  qtd             Float         @default(1)   // quantidade expedida neste romaneio
+  pesoKg          Float?        // peso deste item (kg)
+  observacao      String?
+
+  createdAt       DateTime      @default(now())
+
+  @@index([romaneioId])
+  @@index([pecaConjuntoId])
+  @@index([rmItemId])
+}
+
+// ─── PLANEJAMENTO DE CARGA ─────────────────────────────────
+// Lista o que DEVERIA ser carregado numa carga (antes do romaneio).
+// Quando a carga acontece, gera um Romaneio. Itens que não foram
+// carregados recebem motivo e podem ser reprogramados pra próxima carga.
+
+model PlanejamentoCarga {
+  id           String   @id @default(cuid())
+  opId         String
+  op           OP       @relation(fields: [opId], references: [id])
+
+  dataPrevista DateTime               // data prevista de carregamento
+  descricao    String?                // ex: "Carga 1 - Mezanino etapa 1"
+  // PLANEJADO: carga planejada, aguardando dia de carregar
+  // EM_CARGA: caminhão chegou, carregamento em andamento
+  // CONCLUIDO: romaneio gerado, carga saiu
+  // CANCELADO: carga cancelada
+  status       String   @default("PLANEJADO")
+
+  // Quando concluído, vincula ao romaneio oficial
+  romaneioId   String?  @unique
+  romaneio     Romaneio? @relation(fields: [romaneioId], references: [id])
+
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  itens        PlanejamentoCargaItem[]
+
+  @@index([opId])
+  @@index([status])
+  @@index([dataPrevista])
+}
+
+// Item do planejamento de carga. Pode ser peça (PecaConjunto) ou
+// acessório (RMItem expedível). Acompanha se foi carregado ou não.
+model PlanejamentoCargaItem {
+  id                  String              @id @default(cuid())
+  planejamentoId      String
+  planejamento        PlanejamentoCarga   @relation(fields: [planejamentoId], references: [id], onDelete: Cascade)
+
+  tipo                String              // PECA | ACESSORIO
+  descricao           String
+
+  pecaConjuntoId      String?
+  pecaConjunto        PecaConjunto?       @relation(fields: [pecaConjuntoId], references: [id])
+  rmItemId            String?
+  rmItem              RMItem?             @relation(fields: [rmItemId], references: [id])
+
+  qtdPlanejada        Float               @default(1)
+  qtdCarregada        Float               @default(0)   // preenchido ao gerar romaneio
+  pesoEstimadoKg      Float?              // peso estimado do item
+
+  // PLANEJADO: item aguardando carregamento
+  // CARREGADO: item foi no romaneio (qtdCarregada = qtdPlanejada)
+  // PARCIAL: carregou menos que o planejado
+  // NAO_ENVIADO: não foi carregado (precisa de motivo)
+  // REPROGRAMADO: reagendado pra próxima carga
+  status              String              @default("PLANEJADO")
+  motivoNaoEnvio      String?             // obrigatório quando NAO_ENVIADO
+  // Referência ao planejamento futuro onde esse item foi reprogramado
+  reprogramadoParaId  String?
+
+  createdAt           DateTime            @default(now())
+
+  @@index([planejamentoId])
+  @@index([pecaConjuntoId])
+  @@index([rmItemId])
+  @@index([status])
 }
 
 // Fluxo de caixa previsto (entradas e saidas)
@@ -641,7 +778,9 @@ model RMItem {
   codigo      String?
   tratamento  String?
 
-  cotacaoItens CotacaoItem[]
+  cotacaoItens    CotacaoItem[]
+  romaneioItens   RomaneioItem[]
+  planejamentoCargaItens PlanejamentoCargaItem[]
 
   @@index([rmId])
   @@index([opItemId])
@@ -1004,7 +1143,9 @@ model PecaConjunto {
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
 
-  planejamentos PecaPlanejamento[]
+  planejamentos          PecaPlanejamento[]
+  romaneioItens          RomaneioItem[]
+  planejamentoCargaItens PlanejamentoCargaItem[]
 
   @@unique([opNumero, marca])
   @@index([opId])
@@ -1072,4 +1213,73 @@ model SharepointSync {
   criadoEm         DateTime @default(now())
 
   @@index([tipo, criadoEm])
+}
+
+// ─── CENTRAL DE ORÇAMENTOS (COMERCIAL) ─────────────────────
+
+enum StatusOrcamento {
+  ORCAMENTO       // Proposta em elaboração/enviada
+  EM_NEGOCIACAO   // Cliente está negociando
+  FECHADA         // Proposta aceita / virou OP
+  PERDIDA         // Proposta perdida
+}
+
+enum TipoVenda {
+  FABRICACAO
+  MONTAGEM
+  FABRICACAO_E_MONTAGEM
+  PINTURA
+}
+
+enum PorteOrcamento {
+  ATE_1_2M        // Até R$ 1,2M
+  DE_1_2M_A_10M   // De R$ 1,2M até R$ 10,0M
+  ACIMA_10M       // Acima de R$ 10,0M
+}
+
+model Orcamento {
+  id              String            @id @default(cuid())
+  numero          String            @unique   // e.g. "001-26"
+  cliente         String
+  obra            String?
+  responsavel     String?           // nome do contato no cliente
+  contato         String?           // e-mail do contato
+  orcamentista    String?           // quem elaborou o orçamento
+  tipoVenda       TipoVenda?
+  valor           Float?            // valor total do orçamento
+  porte           PorteOrcamento?
+  dataSolicitada  DateTime?         // data em que o cliente pediu
+  dataEnvio       DateTime?         // data em que enviamos a proposta
+  dataFechamento  DateTime?         // data do aceite / perda
+  status          StatusOrcamento   @default(ORCAMENTO)
+  vendedor        String?           // Vitor, Patrícia, Matheus, Airton, etc.
+  motivoPerda     String?           // motivo quando status = PERDIDA
+  observacoes     String?
+
+  opId            String?           // OP gerada (quando status = FECHADA)
+  op              OP?               @relation("OrcamentoOP", fields: [opId], references: [id], onDelete: SetNull)
+
+  criadoPorId     String?
+  criadoPor       User?             @relation("OrcamentoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  revisoes        OrcamentoRevisao[]
+
+  @@index([status])
+  @@index([vendedor])
+  @@index([createdAt])
+}
+
+model OrcamentoRevisao {
+  id            String    @id @default(cuid())
+  orcamentoId   String
+  orcamento     Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  numero        Int       // revisão 1, 2, 3...
+  dataEnvio     DateTime?
+  observacao    String?
+  createdAt     DateTime  @default(now())
+
+  @@index([orcamentoId])
 }

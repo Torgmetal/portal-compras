@@ -2,13 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { FolderKanban, PlusCircle, Inbox, History } from "lucide-react";
+import { FolderKanban, Inbox, History, FileSpreadsheet } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/comercial", label: "OPs", icon: FolderKanban, exact: true },
-  { href: "/comercial/nova", label: "Nova OP", icon: PlusCircle },
+  { href: "/comercial/orcamentos", label: "Central de Orçamentos", icon: FileSpreadsheet },
   { href: "/comercial/aprovacoes", label: "Aprovações", icon: Inbox, masterOnly: true },
   { href: "/comercial/historico-verbas", label: "Histórico de verbas", icon: History },
 ];
