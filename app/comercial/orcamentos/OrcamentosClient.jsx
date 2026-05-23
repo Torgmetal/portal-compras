@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import {
   FileSpreadsheet, PlusCircle, Search, X, ChevronDown,
   Pencil, Trash2, Eye, Loader2, AlertCircle, Filter,
-  TrendingUp, Clock, XCircle, FileCheck2,
+  TrendingUp, Clock, XCircle, FileCheck2, DollarSign,
+  Calendar, BarChart3,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -37,7 +38,64 @@ const VENDEDORES = ["Vitor", "Patrícia", "Matheus", "André Metzker", "Jorge"];
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
+const fmtMoedaCurto = (v) => {
+  if (v == null || v === 0) return "R$ 0";
+  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
+  if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}k`;
+  return `R$ ${v.toFixed(0)}`;
+};
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+
+// ─── HELPERS DE PERÍODO ─────────────────────────────────────────
+
+function getISOWeekBounds(date) {
+  const d = new Date(date);
+  const day = d.getDay() || 7; // Mon=1 ... Sun=7
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - day + 1);
+  mon.setHours(0, 0, 0, 0);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  sun.setHours(23, 59, 59, 999);
+  return [mon, sun];
+}
+
+function getMonthBounds(year, month) {
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  return [start, end];
+}
+
+function getYearBounds(year) {
+  return [new Date(year, 0, 1), new Date(year, 11, 31, 23, 59, 59, 999)];
+}
+
+const MESES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+/** Filtra orçamentos pelo período, usando dataSolicitada como referência */
+function filtrarPorPeriodo(orcamentos, periodo, mesSel, anoSel) {
+  if (periodo === "tudo") return orcamentos;
+
+  let start, end;
+  const now = new Date();
+
+  if (periodo === "semana") {
+    [start, end] = getISOWeekBounds(now);
+  } else if (periodo === "mes") {
+    [start, end] = getMonthBounds(anoSel, mesSel);
+  } else if (periodo === "ano") {
+    [start, end] = getYearBounds(anoSel);
+  }
+
+  return orcamentos.filter((o) => {
+    if (!o.dataSolicitada) return false;
+    const d = new Date(o.dataSolicitada);
+    return d >= start && d <= end;
+  });
+}
 
 // ─── COMPONENTE PRINCIPAL ───────────────────────────────────────
 
@@ -52,6 +110,12 @@ export default function OrcamentosClient() {
   const [filtroVendedor, setFiltroVendedor] = useState("");
   const [busca, setBusca] = useState("");
   const [buscaDebounced, setBuscaDebounced] = useState("");
+
+  // Filtro de período
+  const now = new Date();
+  const [periodo, setPeriodo] = useState("tudo"); // "semana" | "mes" | "ano" | "tudo"
+  const [mesSel, setMesSel] = useState(now.getMonth()); // 0-11
+  const [anoSel, setAnoSel] = useState(now.getFullYear());
 
   // Modal
   const [modal, setModal] = useState(null); // "novo" | "editar" | "ver" | "excluir"
@@ -88,22 +152,32 @@ export default function OrcamentosClient() {
     fetchOrcamentos();
   }, [fetchOrcamentos]);
 
-  // ─── KPIs ───────────────────────────────────────────────────
+  // ─── DADOS FILTRADOS POR PERÍODO ─────────────────────────────
 
-  const kpis = orcamentos.reduce(
+  const orcPeriodo = filtrarPorPeriodo(orcamentos, periodo, mesSel, anoSel);
+
+  // ─── KPIs (sobre dados filtrados por período) ──────────────
+
+  const kpis = orcPeriodo.reduce(
     (acc, o) => {
       acc.total += 1;
+      acc.valorTotal += o.valor || 0;
       if (o.status === "ORCAMENTO") acc.abertos += 1;
-      if (o.status === "EM_NEGOCIACAO") acc.negociando += 1;
+      if (o.status === "EM_NEGOCIACAO") {
+        acc.negociando += 1;
+        acc.valorNegociando += o.valor || 0;
+      }
       if (o.status === "FECHADA") {
         acc.fechados += 1;
         acc.valorFechado += o.valor || 0;
       }
-      if (o.status === "PERDIDA") acc.perdidos += 1;
-      acc.valorTotal += o.valor || 0;
+      if (o.status === "PERDIDA") {
+        acc.perdidos += 1;
+        acc.valorPerdido += o.valor || 0;
+      }
       return acc;
     },
-    { total: 0, abertos: 0, negociando: 0, fechados: 0, perdidos: 0, valorTotal: 0, valorFechado: 0 }
+    { total: 0, abertos: 0, negociando: 0, fechados: 0, perdidos: 0, valorTotal: 0, valorFechado: 0, valorPerdido: 0, valorNegociando: 0 }
   );
 
   const taxaConversao = kpis.total > 0
@@ -176,13 +250,27 @@ export default function OrcamentosClient() {
     setOrcSelecionado(null);
   };
 
+  // ─── LABEL DO PERÍODO ATIVO ──────────────────────────────────
+
+  const labelPeriodo = periodo === "semana"
+    ? "Esta semana"
+    : periodo === "mes"
+      ? `${MESES[mesSel]} ${anoSel}`
+      : periodo === "ano"
+        ? `${anoSel}`
+        : "Todo o período";
+
+  // Anos disponíveis (de 2024 até ano atual + 1)
+  const anosDisponiveis = [];
+  for (let a = 2024; a <= now.getFullYear() + 1; a++) anosDisponiveis.push(a);
+
   // ─── CARDS KPI ──────────────────────────────────────────────
 
   const cards = [
-    { label: "Total",       value: kpis.total,                     color: "bg-torg-blue",   Icon: FileSpreadsheet },
-    { label: "Em negociação", value: kpis.negociando,              color: "bg-amber-500",   Icon: TrendingUp },
-    { label: "Fechados",    value: kpis.fechados,                  color: "bg-green-600",   Icon: FileCheck2 },
-    { label: "Conversão",   value: `${taxaConversao}%`,           color: "bg-torg-dark",   Icon: TrendingUp },
+    { label: "Total orçado",     value: fmtMoedaCurto(kpis.valorTotal),  sub: `${kpis.total} propostas`,   color: "bg-torg-blue",   Icon: DollarSign },
+    { label: "Obras fechadas",   value: fmtMoedaCurto(kpis.valorFechado), sub: `${kpis.fechados} fechadas`, color: "bg-green-600",   Icon: FileCheck2 },
+    { label: "Obras perdidas",   value: fmtMoedaCurto(kpis.valorPerdido), sub: `${kpis.perdidos} perdidas`, color: "bg-red-500",     Icon: XCircle },
+    { label: "Conversão",        value: `${taxaConversao}%`,              sub: `${kpis.negociando} em negociação`, color: "bg-torg-dark", Icon: BarChart3 },
   ];
 
   // ─── RENDER ─────────────────────────────────────────────────
@@ -207,6 +295,89 @@ export default function OrcamentosClient() {
         </button>
       </div>
 
+      {/* Filtro de Período */}
+      {!loading && orcamentos.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-torg-gray">
+              <Calendar size={16} />
+              <span className="font-medium">Período:</span>
+            </div>
+
+            <div className="flex gap-1">
+              {[
+                { key: "semana", label: "Semana" },
+                { key: "mes", label: "Mês" },
+                { key: "ano", label: "Ano" },
+                { key: "tudo", label: "Tudo" },
+              ].map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setPeriodo(p.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    periodo === p.key
+                      ? "bg-torg-blue text-white"
+                      : "bg-gray-100 text-torg-gray hover:bg-gray-200"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Seletor de mês (quando período = mês) */}
+            {periodo === "mes" && (
+              <div className="flex gap-2">
+                <div className="relative">
+                  <select
+                    value={mesSel}
+                    onChange={(e) => setMesSel(Number(e.target.value))}
+                    className="appearance-none pl-3 pr-7 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-torg-blue/30"
+                  >
+                    {MESES.map((m, i) => (
+                      <option key={i} value={i}>{m}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+                <div className="relative">
+                  <select
+                    value={anoSel}
+                    onChange={(e) => setAnoSel(Number(e.target.value))}
+                    className="appearance-none pl-3 pr-7 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-torg-blue/30"
+                  >
+                    {anosDisponiveis.map((a) => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+            )}
+
+            {/* Seletor de ano (quando período = ano) */}
+            {periodo === "ano" && (
+              <div className="relative">
+                <select
+                  value={anoSel}
+                  onChange={(e) => setAnoSel(Number(e.target.value))}
+                  className="appearance-none pl-3 pr-7 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-torg-blue/30"
+                >
+                  {anosDisponiveis.map((a) => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            )}
+
+            <span className="text-xs text-torg-gray/70 ml-auto">
+              {labelPeriodo} — {orcPeriodo.length} orçamento{orcPeriodo.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards */}
       {!loading && orcamentos.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -223,13 +394,14 @@ export default function OrcamentosClient() {
                 <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate">
                   {c.value}
                 </p>
+                <p className="text-[10px] text-torg-gray/70 truncate">{c.sub}</p>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Filtros */}
+      {/* Filtros da tabela */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -302,20 +474,20 @@ export default function OrcamentosClient() {
             Tentar novamente
           </button>
         </div>
-      ) : orcamentos.length === 0 ? (
+      ) : orcPeriodo.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <FileSpreadsheet size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-torg-gray text-lg">
-            {filtroStatus || filtroVendedor || buscaDebounced
-              ? "Nenhum orçamento encontrado com esses filtros"
+            {filtroStatus || filtroVendedor || buscaDebounced || periodo !== "tudo"
+              ? "Nenhum orçamento encontrado nesse período/filtro"
               : "Nenhum orçamento cadastrado"}
           </p>
           <p className="text-sm text-torg-gray mt-1 mb-4">
-            {filtroStatus || filtroVendedor || buscaDebounced
-              ? "Tente ajustar os filtros."
+            {filtroStatus || filtroVendedor || buscaDebounced || periodo !== "tudo"
+              ? "Tente ajustar o período ou os filtros."
               : "Cadastre o primeiro orçamento pra começar."}
           </p>
-          {!filtroStatus && !filtroVendedor && !buscaDebounced && (
+          {!filtroStatus && !filtroVendedor && !buscaDebounced && periodo === "tudo" && (
             <button
               onClick={handleNovo}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium"
@@ -326,7 +498,7 @@ export default function OrcamentosClient() {
         </div>
       ) : (
         <TabelaOrcamentos
-          orcamentos={orcamentos}
+          orcamentos={orcPeriodo}
           onVer={handleVer}
           onEditar={handleEditar}
           onExcluir={handleExcluir}
