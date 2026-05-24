@@ -5,7 +5,8 @@ import {
   ArrowLeft, FileSpreadsheet, ExternalLink, Upload, Scale,
   DollarSign, Calculator, BarChart3, Loader2, AlertCircle,
   Save, CheckCircle2, Clock, Edit3, Link2, Paperclip, Trash2,
-  Plus, X, Search, FileText, Download, ChevronDown,
+  Plus, X, Search, FileText, Download, ChevronDown, Sparkles,
+  Check, Info,
 } from "lucide-react";
 
 const STATUS_LABELS = {
@@ -260,7 +261,11 @@ function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate }) {
         const regJson = await regRes.json();
         if (!regJson.success) throw new Error(regJson.error);
 
-        setDocs((prev) => [regJson.data, ...prev]);
+        setDocs((prev) => {
+          const novos = [regJson.data, ...prev];
+          onUpdate?.(novos);
+          return novos;
+        });
       } catch (err) {
         setErroUpload(err.message);
       }
@@ -268,7 +273,6 @@ function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate }) {
 
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
-    onUpdate?.();
   };
 
   const handleExcluir = async (docId) => {
@@ -278,8 +282,11 @@ function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate }) {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
-      setDocs((prev) => prev.filter((d) => d.id !== docId));
-      onUpdate?.();
+      setDocs((prev) => {
+        const novos = prev.filter((d) => d.id !== docId);
+        onUpdate?.(novos);
+        return novos;
+      });
     } catch (err) {
       setErroUpload(err.message);
     }
@@ -561,6 +568,177 @@ function NovoItemModal({ onClose, onSalvar }) {
 
 // ── Aba Peso de Projeto ────────────────────────────────────
 
+// ── Modal de Revisao IA ────────────────────────────────────
+
+function ModalRevisaoIA({ resultado, onClose, onConfirmar, salvando }) {
+  const [selecionados, setSelecionados] = useState(
+    () => new Set(resultado.itens.map((_, i) => i))
+  );
+
+  const toggleItem = (idx) => {
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const toggleTodos = () => {
+    if (selecionados.size === resultado.itens.length) {
+      setSelecionados(new Set());
+    } else {
+      setSelecionados(new Set(resultado.itens.map((_, i) => i)));
+    }
+  };
+
+  const itensSelecionados = resultado.itens.filter((_, i) => selecionados.has(i));
+  const pesoSelecionado = itensSelecionados.reduce((s, i) => s + (i.pesoTotal || 0), 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+              <Sparkles size={20} className="text-purple-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-torg-dark">Resultado da Analise</h2>
+              <p className="text-sm text-torg-gray">
+                {resultado.itens.length} itens encontrados
+                {resultado.docsAnalisados?.length > 0 && ` em ${resultado.docsAnalisados.length} documento(s)`}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+            <X size={20} className="text-gray-400" />
+          </button>
+        </div>
+
+        {/* Info do projeto */}
+        {(resultado.composicao || resultado.observacoes || resultado.pesoTotalProjeto) && (
+          <div className="px-6 py-3 bg-purple-50/50 border-b border-purple-100/50 shrink-0">
+            <div className="flex items-start gap-2 text-sm">
+              <Info size={16} className="text-purple-500 mt-0.5 shrink-0" />
+              <div className="space-y-1 text-torg-gray">
+                {resultado.pesoTotalProjeto && (
+                  <p>Peso total do projeto estimado: <strong className="text-torg-dark">{fmtNum(resultado.pesoTotalProjeto, 0)} kg</strong></p>
+                )}
+                {resultado.composicao && <p>Composicao: {resultado.composicao}</p>}
+                {resultado.observacoes && <p>{resultado.observacoes}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tabela de itens */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50/60 sticky top-0">
+                <tr className="text-left text-xs font-semibold text-torg-gray uppercase tracking-wider">
+                  <th className="px-3 py-2 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selecionados.size === resultado.itens.length}
+                      onChange={toggleTodos}
+                      className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue/30"
+                    />
+                  </th>
+                  <th className="px-3 py-2">Descricao</th>
+                  <th className="px-3 py-2">Setor</th>
+                  <th className="px-3 py-2">Tipo</th>
+                  <th className="px-3 py-2">Norma</th>
+                  <th className="px-3 py-2 text-right">Comp.</th>
+                  <th className="px-3 py-2 text-right">Peso un.</th>
+                  <th className="px-3 py-2 text-right">Qtd</th>
+                  <th className="px-3 py-2 text-right">Peso total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {resultado.itens.map((item, idx) => (
+                  <tr
+                    key={idx}
+                    className={`transition-colors cursor-pointer ${
+                      selecionados.has(idx) ? "bg-torg-blue/5" : "hover:bg-gray-50/50 opacity-50"
+                    }`}
+                    onClick={() => toggleItem(idx)}
+                  >
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selecionados.has(idx)}
+                        onChange={() => toggleItem(idx)}
+                        className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue/30"
+                      />
+                    </td>
+                    <td className="px-3 py-2 font-medium text-torg-dark whitespace-nowrap">
+                      {item.descricao}
+                    </td>
+                    <td className="px-3 py-2 text-torg-gray text-xs whitespace-nowrap">
+                      {item.setor || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap">
+                      {TIPO_MATERIAL_LABELS[item.tipoMaterial] || item.tipoMaterial || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap">
+                      {item.norma || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-torg-dark whitespace-nowrap">
+                      {item.comprimento ? fmtNum(item.comprimento) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-torg-dark whitespace-nowrap">
+                      {fmtNum(item.pesoUnitario)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-torg-dark whitespace-nowrap">
+                      {item.quantidade}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-torg-dark whitespace-nowrap">
+                      {fmtNum(item.pesoTotal, 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl shrink-0">
+          <div className="text-sm text-torg-gray">
+            <strong className="text-torg-dark">{selecionados.size}</strong> de {resultado.itens.length} selecionados
+            {" · "}
+            <strong className="text-torg-blue">{fmtNum(pesoSelecionado, 0)} kg</strong>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => onConfirmar(itensSelecionados)}
+              disabled={selecionados.size === 0 || salvando}
+              className="flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {salvando ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+              Adicionar {selecionados.size} {selecionados.size === 1 ? "item" : "itens"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Aba Peso de Projeto ────────────────────────────────────
+
 function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const [itens, setItens] = useState(estudo.itensPerso || []);
   const [showModal, setShowModal] = useState(false);
@@ -569,6 +747,10 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const [editValores, setEditValores] = useState({});
   const [filtroSetor, setFiltroSetor] = useState("");
   const [toast, setToast] = useState(null);
+  const [analisandoIA, setAnalisandoIA] = useState(false);
+  const [resultadoIA, setResultadoIA] = useState(null);
+  const [salvandoIA, setSalvandoIA] = useState(false);
+  const [textoExtra, setTextoExtra] = useState("");
 
   // Setores unicos para filtro
   const setores = [...new Set(itens.map((i) => i.setor).filter(Boolean))].sort();
@@ -593,6 +775,50 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
+  };
+
+  // ── IA: analisar documentos ──
+  const handleAnalisarIA = async () => {
+    setAnalisandoIA(true);
+    try {
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/analisar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ textoExtra: textoExtra.trim() || undefined }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      if (!json.data.itens?.length) {
+        showToast("Nenhum item encontrado nos documentos");
+        return;
+      }
+      setResultadoIA(json.data);
+    } catch (e) {
+      showToast(`Erro: ${e.message}`);
+    } finally {
+      setAnalisandoIA(false);
+    }
+  };
+
+  const handleConfirmarIA = async (itensSelecionados) => {
+    setSalvandoIA(true);
+    try {
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/itens`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(itensSelecionados),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setItens(json.data);
+      onEstudoUpdate?.({ pesoTotal: json.data.reduce((s, i) => s + (i.pesoTotal || 0), 0) });
+      setResultadoIA(null);
+      showToast(`${itensSelecionados.length} itens adicionados via IA`);
+    } catch (e) {
+      showToast(`Erro: ${e.message}`);
+    } finally {
+      setSalvandoIA(false);
+    }
   };
 
   const handleAdicionarItem = async (dados) => {
@@ -721,6 +947,15 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
             </select>
           )}
           <button
+            onClick={handleAnalisarIA}
+            disabled={analisandoIA || (estudo.documentos?.length || 0) === 0}
+            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!estudo.documentos?.length ? "Envie documentos primeiro" : "Analisar documentos com IA"}
+          >
+            {analisandoIA ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            {analisandoIA ? "Analisando..." : "Analisar com IA"}
+          </button>
+          <button
             onClick={() => setShowModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors shadow-sm"
           >
@@ -758,15 +993,25 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
           <Scale size={40} className="text-gray-300 mb-3" />
           <p className="text-torg-gray font-medium mb-1">Nenhum item de peso cadastrado</p>
           <p className="text-sm text-gray-400 mb-4 text-center max-w-sm">
-            Adicione os perfis e materiais do projeto para calcular o peso total da estrutura
+            Envie documentos do projeto e use a IA para extrair automaticamente, ou adicione manualmente
           </p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors"
-          >
-            <Plus size={16} />
-            Adicionar primeiro item
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleAnalisarIA}
+              disabled={analisandoIA || (estudo.documentos?.length || 0) === 0}
+              className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {analisandoIA ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              {analisandoIA ? "Analisando..." : "Analisar com IA"}
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors"
+            >
+              <Plus size={16} />
+              Adicionar manualmente
+            </button>
+          </div>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -970,14 +1215,26 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
       <SecaoDocumentos
         estudoId={estudoId}
         documentos={estudo.documentos}
-        onUpdate={() => {}}
+        onUpdate={(docs) => {
+          if (docs) onEstudoUpdate?.({ documentos: docs });
+        }}
       />
 
-      {/* Modal */}
+      {/* Modal novo item */}
       {showModal && (
         <NovoItemModal
           onClose={() => setShowModal(false)}
           onSalvar={handleAdicionarItem}
+        />
+      )}
+
+      {/* Modal revisao IA */}
+      {resultadoIA && (
+        <ModalRevisaoIA
+          resultado={resultadoIA}
+          onClose={() => setResultadoIA(null)}
+          onConfirmar={handleConfirmarIA}
+          salvando={salvandoIA}
         />
       )}
 
