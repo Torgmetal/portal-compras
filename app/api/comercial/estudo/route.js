@@ -46,11 +46,26 @@ export async function GET(req) {
 // ── POST /api/comercial/estudo ── Criar estudo ──
 
 const criarSchema = z.object({
-  orcamentoId: z.string().min(1, "Orçamento é obrigatório"),
+  cliente: z.string().min(1, "Cliente é obrigatório"),
+  obra: z.string().optional(),
   referencia: z.string().optional(),
   sharepointUrl: z.string().optional(),
   observacoes: z.string().optional(),
 });
+
+// Gera o próximo número sequencial: "159-26"
+async function gerarProximoNumero() {
+  const anoSufixo = String(new Date().getFullYear()).slice(-2); // "26"
+  const todos = await prisma.orcamento.findMany({
+    where: { numero: { endsWith: `-${anoSufixo}` } },
+    select: { numero: true },
+  });
+  const nums = todos
+    .map((o) => parseInt(o.numero.split("-")[0]))
+    .filter((n) => !isNaN(n));
+  const proximo = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+  return `${String(proximo).padStart(3, "0")}-${anoSufixo}`;
+}
 
 export async function POST(req) {
   try {
@@ -58,22 +73,23 @@ export async function POST(req) {
     const body = await req.json();
     const data = criarSchema.parse(body);
 
-    // Verificar se orçamento existe
-    const orcamento = await prisma.orcamento.findUnique({
-      where: { id: data.orcamentoId },
-      select: { id: true, numero: true, cliente: true },
+    // Gerar número sequencial e criar o orçamento
+    const numero = await gerarProximoNumero();
+    const orcamento = await prisma.orcamento.create({
+      data: {
+        numero,
+        cliente: data.cliente,
+        obra: data.obra || null,
+        status: "ORCAMENTO",
+        criadoPorId: user.id,
+      },
     });
-    if (!orcamento) {
-      return NextResponse.json({ success: false, error: "Orçamento não encontrado" }, { status: 404 });
-    }
 
-    // Contar estudos existentes para definir revisão
-    const count = await prisma.propostaEstudo.count({ where: { orcamentoId: data.orcamentoId } });
-
+    // Criar o estudo vinculado
     const estudo = await prisma.propostaEstudo.create({
       data: {
-        orcamentoId: data.orcamentoId,
-        revisao: count,
+        orcamentoId: orcamento.id,
+        revisao: 0,
         referencia: data.referencia || null,
         sharepointUrl: data.sharepointUrl || null,
         observacoes: data.observacoes || null,
@@ -90,7 +106,7 @@ export async function POST(req) {
         action: "CRIAR_ESTUDO",
         entity: "PropostaEstudo",
         entityId: estudo.id,
-        diff: { orcamento: orcamento.numero, cliente: orcamento.cliente, revisao: count },
+        diff: { orcamento: orcamento.numero, cliente: orcamento.cliente, revisao: 0 },
       },
     });
 

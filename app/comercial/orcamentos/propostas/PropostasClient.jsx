@@ -2,8 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FilePlus2, Search, FileSpreadsheet, ExternalLink, Clock,
-  CheckCircle2, AlertCircle, Loader2, ChevronRight, Plus,
+  FilePlus2, Search, AlertCircle, Loader2, ChevronRight, Plus,
   FolderOpen, X, Link2,
 } from "lucide-react";
 
@@ -32,55 +31,15 @@ function fmtData(d) {
 // ── Modal Nova Proposta ────────────────────────────────────
 
 function NovaPropostaModal({ onClose, onCriado }) {
-  const [busca, setBusca] = useState("");
-  const [orcamentos, setOrcamentos] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selecionado, setSelecionado] = useState(null);
+  const [cliente, setCliente] = useState("");
+  const [obra, setObra] = useState("");
   const [referencia, setReferencia] = useState("");
   const [sharepointUrl, setSharepointUrl] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
-  // Buscar orçamentos
-  const buscarOrcamentos = useCallback(async () => {
-    if (!busca.trim() && !selecionado) return;
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (busca.trim()) params.set("busca", busca.trim());
-      const res = await fetch(`/api/comercial/orcamento?${params}`);
-      const json = await res.json();
-      if (json.success) setOrcamentos(json.orcamentos || json.data || []);
-    } catch {
-      /* silenciar */
-    } finally {
-      setLoading(false);
-    }
-  }, [busca]);
-
-  useEffect(() => {
-    const timer = setTimeout(buscarOrcamentos, 300);
-    return () => clearTimeout(timer);
-  }, [busca, buscarOrcamentos]);
-
-  // Carregar últimos orçamentos ao abrir
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await fetch("/api/comercial/orcamento?status=ORCAMENTO");
-        const json = await res.json();
-        if (json.success) setOrcamentos(json.orcamentos || json.data || []);
-      } catch {
-        /* silenciar */
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
   const handleCriar = async () => {
-    if (!selecionado) return setErro("Selecione um orçamento");
+    if (!cliente.trim()) return setErro("Cliente é obrigatório");
     setSalvando(true);
     setErro("");
     try {
@@ -88,7 +47,8 @@ function NovaPropostaModal({ onClose, onCriado }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orcamentoId: selecionado.id,
+          cliente: cliente.trim(),
+          obra: obra.trim() || undefined,
           referencia: referencia.trim() || undefined,
           sharepointUrl: sharepointUrl.trim() || undefined,
         }),
@@ -118,87 +78,52 @@ function NovaPropostaModal({ onClose, onCriado }) {
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Step 1: Selecionar orçamento */}
-          <div>
-            <label className="block text-sm font-semibold text-torg-dark mb-2">
-              1. Vincular a um orçamento
-            </label>
-            {selecionado ? (
-              <div className="flex items-center gap-3 p-3 bg-torg-blue/5 border border-torg-blue/20 rounded-xl">
-                <FileSpreadsheet size={20} className="text-torg-blue" />
-                <div className="flex-1">
-                  <p className="font-semibold text-torg-dark">{selecionado.numero} — {selecionado.cliente}</p>
-                  {selecionado.obra && <p className="text-sm text-torg-gray">{selecionado.obra}</p>}
-                </div>
-                <button
-                  onClick={() => setSelecionado(null)}
-                  className="text-sm text-torg-blue hover:underline"
-                >
-                  Trocar
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    placeholder="Buscar por número, cliente ou obra..."
-                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
-                  />
-                </div>
-                <div className="max-h-48 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-50">
-                  {loading && (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 size={18} className="animate-spin text-torg-blue" />
-                    </div>
-                  )}
-                  {!loading && orcamentos.length === 0 && (
-                    <p className="text-sm text-gray-400 text-center py-4">Nenhum orçamento encontrado</p>
-                  )}
-                  {!loading &&
-                    orcamentos.map((o) => (
-                      <button
-                        key={o.id}
-                        onClick={() => setSelecionado(o)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors"
-                      >
-                        <FileSpreadsheet size={16} className="text-torg-gray shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-torg-dark truncate">
-                            {o.numero} — {o.cliente}
-                          </p>
-                          {o.obra && <p className="text-xs text-torg-gray truncate">{o.obra}</p>}
-                        </div>
-                        <span className="text-xs text-torg-gray whitespace-nowrap">{o.vendedor || "—"}</span>
-                        <ChevronRight size={14} className="text-gray-300" />
-                      </button>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Step 2: Referência */}
+          {/* Cliente e Obra */}
           <div>
             <label className="block text-sm font-semibold text-torg-dark mb-1.5">
-              2. Referência do cliente <span className="font-normal text-torg-gray">(opcional)</span>
+              Cliente <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
-              value={referencia}
-              onChange={(e) => setReferencia(e.target.value)}
-              placeholder="Ex: ENC-0333, Pedido 123..."
+              value={cliente}
+              onChange={(e) => setCliente(e.target.value)}
+              placeholder="Nome do cliente"
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
+              autoFocus
             />
           </div>
 
-          {/* Step 3: Link SharePoint */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-torg-dark mb-1.5">
+                Obra <span className="font-normal text-torg-gray">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={obra}
+                onChange={(e) => setObra(e.target.value)}
+                placeholder="Nome da obra ou projeto"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-torg-dark mb-1.5">
+                Referência do cliente <span className="font-normal text-torg-gray">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={referencia}
+                onChange={(e) => setReferencia(e.target.value)}
+                placeholder="Ex: ENC-0333, Pedido 123..."
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Link SharePoint */}
           <div>
             <label className="block text-sm font-semibold text-torg-dark mb-1.5">
-              3. Pasta SharePoint <span className="font-normal text-torg-gray">(opcional)</span>
+              Pasta SharePoint <span className="font-normal text-torg-gray">(opcional)</span>
             </label>
             <div className="relative">
               <Link2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -210,9 +135,6 @@ function NovaPropostaModal({ onClose, onCriado }) {
                 className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
               />
             </div>
-            <p className="text-xs text-torg-gray mt-1">
-              Desenhos pesados (DWG, DXF) ficam no SharePoint. PDFs e docs leves podem ser enviados diretamente.
-            </p>
           </div>
 
           {/* Erro */}
@@ -234,7 +156,7 @@ function NovaPropostaModal({ onClose, onCriado }) {
           </button>
           <button
             onClick={handleCriar}
-            disabled={!selecionado || salvando}
+            disabled={!cliente.trim() || salvando}
             className="flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {salvando ? <Loader2 size={16} className="animate-spin" /> : <FilePlus2 size={16} />}
@@ -288,12 +210,12 @@ export default function PropostasClient() {
   };
 
   return (
-    <div className="ml-64 p-8 min-h-screen bg-gray-50/30">
+    <div className="space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-torg-dark">Propostas (EPC)</h1>
-          <p className="text-sm text-torg-gray mt-0.5">Estudos de precificação comercial</p>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Propostas (EPC)</h2>
+          <p className="text-sm text-torg-gray mt-1">Estudos de precificação comercial</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -305,7 +227,7 @@ export default function PropostasClient() {
       </div>
 
       {/* Filtros */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -348,17 +270,12 @@ export default function PropostasClient() {
       )}
 
       {!loading && !erro && estudos.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-20">
           <FolderOpen size={48} className="text-gray-300 mb-4" />
           <p className="text-torg-gray font-medium mb-1">Nenhuma proposta encontrada</p>
-          <p className="text-sm text-gray-400 mb-4">Crie o primeiro estudo de precificação</p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors"
-          >
-            <Plus size={16} />
-            Nova Proposta
-          </button>
+          <p className="text-sm text-gray-400">
+            Clique em <strong>+ Nova Proposta</strong> para criar o primeiro estudo
+          </p>
         </div>
       )}
 
