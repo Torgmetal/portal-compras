@@ -52,6 +52,7 @@ model User {
   producaoDiarias         ProducaoDiaria[]     @relation("ProducaoDiariaCreatedBy")
   passwordResetTokens     PasswordResetToken[]
   orcamentosCriados       Orcamento[]          @relation("OrcamentoCriadoPor")
+  estudosCriados          PropostaEstudo[]     @relation("EstudoCriadoPor")
 }
 
 model PasswordResetToken {
@@ -1269,6 +1270,7 @@ model Orcamento {
   updatedAt       DateTime          @updatedAt
 
   revisoes        OrcamentoRevisao[]
+  estudos         PropostaEstudo[]
 
   @@index([status])
   @@index([vendedor])
@@ -1285,4 +1287,184 @@ model OrcamentoRevisao {
   createdAt     DateTime  @default(now())
 
   @@index([orcamentoId])
+}
+
+// ─── ESTUDO DE PRECIFICAÇÃO (EPC) ──────────────────────────
+
+enum StatusEstudo {
+  RASCUNHO        // Em elaboração
+  EM_ANALISE      // Sendo revisado
+  APROVADO        // Aprovado internamente
+  CONCLUIDO       // Proposta gerada
+}
+
+enum CategoriaCusto {
+  MATERIA_PRIMA
+  PARAFUSO
+  TINTA
+  ENGENHARIA
+  QUALIDADE
+  TRANSPORTE
+  FABRICACAO
+  MONTAGEM
+  EQUIPAMENTO
+  GRADE_DEGRAU
+  DESPESA
+  PRE_MONTAGEM
+  OUTRO
+}
+
+enum TipoMaterial {
+  PERFIL_W        // W, HP
+  PERFIL_U        // U, UE
+  PERFIL_L        // Cantoneiras
+  TUBO_REDONDO
+  TUBO_QUADRADO
+  TUBO_RETANGULAR
+  CHAPA
+  BARRA_REDONDA
+  BARRA_CHATA
+  BARRA_QUADRADA
+  BARRA_ROSCADA
+  TELA
+  GRADE_PISO
+  DEGRAU
+  OUTRO
+}
+
+model PropostaEstudo {
+  id                String          @id @default(cuid())
+  orcamentoId       String
+  orcamento         Orcamento       @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  revisao           Int             @default(0)   // R0, R1, R2...
+  status            StatusEstudo    @default(RASCUNHO)
+  referencia        String?         // ENC-0333, referência do cliente
+  sharepointUrl     String?         // link para pasta no SharePoint
+
+  // Totais calculados (denormalizados para performance)
+  pesoTotal         Float?          // kg
+  areaTotal         Float?          // m² de pintura
+  custoMaterial     Float?          // R$ total materiais
+  custoFabricacao   Float?          // R$ total fabricação
+  custoMontagem     Float?          // R$ total montagem
+  custoTerceiros    Float?          // R$ total terceiros
+  bdiValor          Float?          // R$ valor do BDI
+  valorTotal        Float?          // R$ valor total com BDI
+
+  // Percentuais de perda e configurações
+  percPerda         Float           @default(12)  // % de perda sobre matéria prima
+  percParafusos     Float           @default(0.50) // R$/kg de parafusos
+
+  // BDI
+  cfopPrincipal     String?         // 5101, 6101, etc.
+  bdiAdmin          Float           @default(0)   // %
+  bdiSeguro         Float           @default(0)   // %
+  bdiRisco          Float           @default(0)   // %
+  bdiFactoring      Float           @default(1.6) // % despesas financeiras
+  bdiLucro          Float           @default(6.0) // % margem de lucro
+  bdiComissao       Float           @default(0)   // %
+  // Impostos
+  aliqPIS           Float           @default(1.65)
+  aliqCOFINS        Float           @default(7.60)
+  aliqCSLL          Float           @default(1.08)
+  aliqIRPJ          Float           @default(3.00)
+  aliqICMS          Float           @default(18.00)
+  aliqISS           Float           @default(0)
+
+  observacoes       String?
+
+  criadoPorId       String?
+  criadoPor         User?           @relation("EstudoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  itensPerso        PesoProjetoItem[]
+  itensCusto        CustoItem[]
+  documentos        PropostaDocumento[]
+
+  @@index([orcamentoId])
+  @@index([status])
+}
+
+model PesoProjetoItem {
+  id              String          @id @default(cuid())
+  estudoId        String
+  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  setor           String?         // TRASEIRA, FRONTAL, DESAERADOR, etc.
+  projeto         String?         // nome do projeto/desenho
+  tipoMaterial    TipoMaterial    @default(OUTRO)
+  descricao       String          // W200X15, CHAPA#9,50, etc.
+  norma           String?         // ASTM A572 Gr. 50, A36, etc.
+  comprimento     Float?          // metros ou m²
+  pesoUnitario    Float           // kg/m ou kg/m²
+  quantidade      Int             @default(1)
+  pesoTotal       Float           // kg (calculado)
+  areaPintura     Float?          // m²
+  ordem           Int             @default(0) // para manter a ordem do levantamento
+
+  createdAt       DateTime        @default(now())
+
+  @@index([estudoId])
+}
+
+model CustoItem {
+  id              String          @id @default(cuid())
+  estudoId        String
+  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  categoria       CategoriaCusto
+  descricao       String
+  unidade         String?         // kg, m², un, vb, L
+  quantidade      Float           @default(0)
+  precoUnitario   Float           @default(0)
+  subtotal        Float           @default(0)  // quantidade × precoUnitario
+  percImpostos    Float?          // % de imposto sobre este item
+  percInsumos     Float?          // % de insumos
+  observacao      String?
+  ordem           Int             @default(0)
+
+  createdAt       DateTime        @default(now())
+
+  @@index([estudoId])
+  @@index([categoria])
+}
+
+model PropostaDocumento {
+  id              String          @id @default(cuid())
+  estudoId        String
+  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  nome            String          // nome do arquivo
+  tipo            String          // pdf, xlsx, dxf, eml, docx, etc.
+  tamanho         Int?            // bytes
+  blobUrl         String          // URL no Vercel Blob
+  categoria       String?         // email, projeto, documento, cotacao
+  observacao      String?
+
+  criadoEm        DateTime        @default(now())
+
+  @@index([estudoId])
+}
+
+// Banco de Dados de Materiais — tabela de referência de perfis metálicos
+model BDMPerfil {
+  id              String          @id @default(cuid())
+  tipo            TipoMaterial
+  codigo          String          @unique // W200X15, U150X50X3, CHAPA#9,50
+  descricao       String?         // descrição longa
+  pesoUnitario    Float           // kg/m ou kg/m²
+  secao           Float?          // mm (perímetro para cálculo de pintura)
+  precoRef        Float?          // preço de referência R$/kg (atualizado via CMC)
+  fontePreco      String?         // "CMC", "Cotação Fornecedor", "Manual"
+  dataPreco       DateTime?       // quando o preço foi atualizado
+  ativo           Boolean         @default(true)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([tipo])
+  @@index([codigo])
 }
