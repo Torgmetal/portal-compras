@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
@@ -54,7 +54,7 @@ const criarSchema = z.object({
 
 export async function POST(req) {
   try {
-    const session = await requireRole(["ADMIN", "COMERCIAL"]);
+    const user = await requireRole(["ADMIN", "COMERCIAL"]);
     const body = await req.json();
     const data = criarSchema.parse(body);
 
@@ -77,7 +77,7 @@ export async function POST(req) {
         referencia: data.referencia || null,
         sharepointUrl: data.sharepointUrl || null,
         observacoes: data.observacoes || null,
-        criadoPorId: session.user.id,
+        criadoPorId: user.id,
       },
       include: {
         orcamento: { select: { numero: true, cliente: true, obra: true } },
@@ -86,11 +86,11 @@ export async function POST(req) {
 
     await prisma.auditLog.create({
       data: {
-        userId: session.user.id,
+        user: { connect: { id: user.id } },
         action: "CRIAR_ESTUDO",
         entity: "PropostaEstudo",
         entityId: estudo.id,
-        details: { orcamento: orcamento.numero, cliente: orcamento.cliente, revisao: count },
+        diff: { orcamento: orcamento.numero, cliente: orcamento.cliente, revisao: count },
       },
     });
 

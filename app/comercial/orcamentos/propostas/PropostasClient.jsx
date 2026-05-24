@@ -50,7 +50,7 @@ function NovaPropostaModal({ onClose, onCriado }) {
       if (busca.trim()) params.set("busca", busca.trim());
       const res = await fetch(`/api/comercial/orcamento?${params}`);
       const json = await res.json();
-      if (json.success) setOrcamentos(json.data || []);
+      if (json.success) setOrcamentos(json.orcamentos || json.data || []);
     } catch {
       /* silenciar */
     } finally {
@@ -70,7 +70,7 @@ function NovaPropostaModal({ onClose, onCriado }) {
       try {
         const res = await fetch("/api/comercial/orcamento?status=ORCAMENTO");
         const json = await res.json();
-        if (json.success) setOrcamentos(json.data || []);
+        if (json.success) setOrcamentos(json.orcamentos || json.data || []);
       } catch {
         /* silenciar */
       } finally {

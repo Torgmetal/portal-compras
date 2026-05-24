@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
@@ -73,7 +73,7 @@ const updateSchema = z.object({
 
 export async function PATCH(req, { params }) {
   try {
-    const session = await requireRole(["ADMIN", "COMERCIAL"]);
+    const user = await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const body = await req.json();
     const data = updateSchema.parse(body);
@@ -101,11 +101,11 @@ export async function PATCH(req, { params }) {
 
     await prisma.auditLog.create({
       data: {
-        userId: session.user.id,
+        user: { connect: { id: user.id } },
         action: "ATUALIZAR_ESTUDO",
         entity: "PropostaEstudo",
         entityId: id,
-        details: { antes: { status: antes.status }, depois: data },
+        diff: { antes: { status: antes.status }, depois: data },
       },
     });
 
@@ -123,7 +123,7 @@ export async function PATCH(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    const session = await requireRole(["ADMIN"]);
+    const user = await requireRole(["ADMIN"]);
     const { id } = await params;
 
     const estudo = await prisma.propostaEstudo.findUnique({
@@ -138,11 +138,11 @@ export async function DELETE(req, { params }) {
 
     await prisma.auditLog.create({
       data: {
-        userId: session.user.id,
+        user: { connect: { id: user.id } },
         action: "EXCLUIR_ESTUDO",
         entity: "PropostaEstudo",
         entityId: id,
-        details: { orcamento: estudo.orcamento.numero, revisao: estudo.revisao },
+        diff: { orcamento: estudo.orcamento.numero, revisao: estudo.revisao },
       },
     });
 
