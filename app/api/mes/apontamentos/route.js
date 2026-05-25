@@ -58,13 +58,24 @@ export async function GET(req) {
     orderBy: [{ obra: "asc" }],
   });
 
-  // Carrega info das OPs (numero, cliente, obra/descricao)
+  // Carrega info das OPs — converte T64 → 064 para encontrar no portal
   const obrasUnicas = [...new Set(grupos.map(g => g.obra))];
+  function obraParaNumeroOP(obra) {
+    if (!obra) return obra;
+    const m = obra.match(/^T(\d+)(.*)/i);
+    if (!m) return obra;
+    return String(parseInt(m[1])).padStart(3, "0") + m[2];
+  }
+  const numerosPortal = [...new Set(obrasUnicas.map(obraParaNumeroOP))];
   const ops = await prisma.oP.findMany({
-    where: { numero: { in: obrasUnicas } },
+    where: { numero: { in: numerosPortal } },
     select: { id: true, numero: true, cliente: true, obra: true },
   });
-  const opMap = Object.fromEntries(ops.map(o => [o.numero, o]));
+  const opMapPorNumero = Object.fromEntries(ops.map(o => [o.numero, o]));
+  // Chave = obra SKA (T64) → info da OP
+  const opMap = Object.fromEntries(
+    obrasUnicas.map(obra => [obra, opMapPorNumero[obraParaNumeroOP(obra)] || null])
+  );
 
   // Contagem total de apontamentos (sem groupBy) para cada obra
   const totaisPorObra = await prisma.mesApontamento.groupBy({

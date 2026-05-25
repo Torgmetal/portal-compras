@@ -35,6 +35,15 @@ const bodySchema = z.object({
   duracaoMs:    z.number().int().optional(),
 });
 
+// Converte código Obra do SKA para número de OP do portal
+// T64 → 064 | T64E → 064E | T70 → 070 | T100 → 100
+function obraParaNumeroOP(obra) {
+  if (!obra) return obra;
+  const m = obra.match(/^T(\d+)(.*)/i);
+  if (!m) return obra;
+  return String(parseInt(m[1])).padStart(3, "0") + m[2];
+}
+
 // Converte string "DD/MM/YYYY HH:mm:ss" ou ISO para Date
 function parseData(s) {
   if (!s) return null;
@@ -68,13 +77,20 @@ export async function POST(req) {
   const inicio = Date.now();
   let criados = 0, atualizados = 0;
 
-  // Pré-carrega mapa obra → opId (Obra no SKA = numero da OP no portal)
+  // Pré-carrega mapa obra → opId
+  // Obra no SKA usa prefixo T (T64, T70...) — portal usa número com zero (064, 070...)
   const obrasUnicas = [...new Set(body.apontamentos.map((a) => a.obra).filter(Boolean))];
+  const numerosPortal = [...new Set(obrasUnicas.map(obraParaNumeroOP))];
   const ops = await prisma.oP.findMany({
-    where: { numero: { in: obrasUnicas } },
+    where: { numero: { in: numerosPortal } },
     select: { id: true, numero: true },
   });
-  const opMap = Object.fromEntries(ops.map((o) => [o.numero, o.id]));
+  // opMap: chave = numero do portal (064) → id
+  const opMapPorNumero = Object.fromEntries(ops.map((o) => [o.numero, o.id]));
+  // opMap: chave = obra SKA (T64) → id  (para lookup direto no loop)
+  const opMap = Object.fromEntries(
+    obrasUnicas.map((obra) => [obra, opMapPorNumero[obraParaNumeroOP(obra)] || null])
+  );
 
   const syncLog = await prisma.mesSyncLog.create({
     data: {

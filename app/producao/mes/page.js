@@ -39,7 +39,21 @@ export default async function MesPage() {
     prisma.mesApontamento.count(),
   ]);
 
-  const opMap = Object.fromEntries(opsDb.map(o => [o.numero, o]));
+  // Converte T64 → 064 para encontrar a OP no portal
+  function obraParaNumeroOP(obra) {
+    if (!obra) return obra;
+    const m = obra.match(/^T(\d+)(.*)/i);
+    if (!m) return obra;
+    return String(parseInt(m[1])).padStart(3, "0") + m[2];
+  }
+  // opMapPorNumero: "064" → { id, numero, cliente, obra }
+  const opMapPorNumero = Object.fromEntries(opsDb.map(o => [o.numero, o]));
+  // obrasUnicas do período: ["T64", "T70", ...]
+  const obrasUnicas = [...new Set(grupos.map(g => g.obra).filter(Boolean))];
+  // opMap final com chave = obra SKA (T64) para o client usar direto
+  const opMap = Object.fromEntries(
+    obrasUnicas.map(obra => [obra, opMapPorNumero[obraParaNumeroOP(obra)] || null])
+  );
   const totaisMap = Object.fromEntries(totaisPorObra.map(t => [t.obra, t]));
 
   // Setores únicos para os filtros (vindos dos dados reais)
