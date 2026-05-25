@@ -36,12 +36,13 @@ const bodySchema = z.object({
 });
 
 // Converte código Obra do SKA para número de OP do portal
-// T64 → 064 | T64E → 064E | T70 → 070 | T100 → 100
+// T64 → 064 | T64E → 064 | T64A → 064 | T70 → 070 | T100 → 100
+// Sufixos de letra (A, B, C, E...) indicam partes do projeto — mesma OP
 function obraParaNumeroOP(obra) {
   if (!obra) return obra;
-  const m = obra.match(/^T(\d+)(.*)/i);
+  const m = obra.match(/^T(\d+)/i);
   if (!m) return obra;
-  return String(parseInt(m[1])).padStart(3, "0") + m[2];
+  return String(parseInt(m[1])).padStart(3, "0");
 }
 
 // Converte string "DD/MM/YYYY HH:mm:ss" ou ISO para Date

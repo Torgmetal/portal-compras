@@ -62,9 +62,9 @@ export async function GET(req) {
   const obrasUnicas = [...new Set(grupos.map(g => g.obra))];
   function obraParaNumeroOP(obra) {
     if (!obra) return obra;
-    const m = obra.match(/^T(\d+)(.*)/i);
+    const m = obra.match(/^T(\d+)/i);
     if (!m) return obra;
-    return String(parseInt(m[1])).padStart(3, "0") + m[2];
+    return String(parseInt(m[1])).padStart(3, "0");
   }
   const numerosPortal = [...new Set(obrasUnicas.map(obraParaNumeroOP))];
   const ops = await prisma.oP.findMany({

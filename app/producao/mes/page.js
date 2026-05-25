@@ -42,9 +42,9 @@ export default async function MesPage() {
   // Converte T64 → 064 para encontrar a OP no portal
   function obraParaNumeroOP(obra) {
     if (!obra) return obra;
-    const m = obra.match(/^T(\d+)(.*)/i);
+    const m = obra.match(/^T(\d+)/i);
     if (!m) return obra;
-    return String(parseInt(m[1])).padStart(3, "0") + m[2];
+    return String(parseInt(m[1])).padStart(3, "0");
   }
   // opMapPorNumero: "064" → { id, numero, cliente, obra }
   const opMapPorNumero = Object.fromEntries(opsDb.map(o => [o.numero, o]));
