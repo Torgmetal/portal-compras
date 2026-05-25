@@ -23,3 +23,5 @@ node_modules/
 * 2
 *\ 2.*
 .env*.local
+.env.vercel
+.env.production
