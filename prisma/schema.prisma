@@ -182,6 +182,8 @@ model OP {
 
   @@index([numero])
   @@index([status])
+  @@index([status, createdAt])   // listagem de OPs por status ordenada por data
+  @@index([createdById, status]) // OPs criadas por usuário + filtro de status
 }
 
 // ─── PRODUÇÃO (PCP / FÁBRICA) ─────────────────────────────────
@@ -684,6 +686,8 @@ model RM {
   @@index([opId])
   @@index([status])
   @@index([createdById])
+  @@index([status, createdAt])   // listagem de RMs por status ordenada por data
+  @@index([opId, status])        // RMs de uma OP filtradas por status
 }
 
 enum RMItemStatus {
@@ -804,6 +808,8 @@ model RMItem {
   @@index([aditivoItemId])
   @@index([status])
   @@index([pedidoOmieId])
+  @@index([status, opDestinoId]) // itens pendentes por OP de destino
+  @@index([rmId, status])        // itens de uma RM filtrados por status
 }
 
 // ─── COTAÇÕES ───────────────────────────────────────────────
@@ -858,6 +864,8 @@ model Cotacao {
   @@index([rmId])
   @@index([status])
   @@index([token])
+  @@index([status, createdAt])   // cotações por status ordenadas por data
+  @@index([rmId, status])        // cotações de uma RM filtradas por status
 }
 
 model CotacaoItem {
@@ -877,6 +885,8 @@ model CotacaoItem {
 
   @@index([cotacaoId])
   @@index([rmItemId])
+  @@index([cotacaoId, vencedor]) // itens vencedores de uma cotação
+  @@index([rmItemId, vencedor])  // item de RM que foi vencedor
 }
 
 // Histórico de e-mails enviados aos fornecedores
@@ -1073,6 +1083,8 @@ model EstoqueItem {
   @@index([categoriaOmie])
   @@index([estoqueTorg])
   @@index([ativo])
+  @@index([estoqueTorg, ativo])  // listagem principal do estoque Torg ativo
+  @@index([descricao])           // busca textual por descrição
 }
 
 // Reserva — quanto de cada item foi planejado pra cada OP via linha de RM.
