@@ -3,7 +3,7 @@ import { useState, useMemo, useCallback } from "react";
 import {
   Activity, RefreshCw, ChevronDown, ChevronRight, Weight,
   Package, Clock, CheckCircle2, AlertCircle, Loader2, X,
-  Search, Calendar, Filter, Factory, TrendingUp, Info, Zap,
+  Search, Calendar, Filter, Factory, TrendingUp, Info,
 } from "lucide-react";
 
 // ─── helpers ──────────────────────────────────────────────────────
@@ -309,10 +309,8 @@ export default function MesClient({
   const [ultimoSync, setUltimoSync] = useState(ultimoSyncInicial);
   const [setoresDisp, setSetoresDisp] = useState(setoresIniciais);
 
-  const [loading,       setLoading]       = useState(false);
-  const [erro,          setErro]          = useState(null);
-  const [solicitando,   setSolicitando]   = useState(false);
-  const [syncSolicitado, setSyncSolicitado] = useState(false); // feedback pós-clique
+  const [loading, setLoading] = useState(false);
+  const [erro,    setErro]    = useState(null);
 
   // Filtros
   const [de,         setDe]         = useState(deInicial);
@@ -391,26 +389,6 @@ export default function MesClient({
     buscar(de, ate, setorFiltro);
   }
 
-  async function handleSolicitarSync() {
-    setSolicitando(true);
-    setSyncSolicitado(false);
-    setErro(null);
-    try {
-      const r = await fetch("/api/mes/solicitar-sync", { method: "POST" });
-      if (!r.ok) {
-        const d = await r.json().catch(() => ({}));
-        throw new Error(d.error || `Erro ${r.status}`);
-      }
-      setSyncSolicitado(true);
-      // Limpa o aviso após 8 segundos
-      setTimeout(() => setSyncSolicitado(false), 8000);
-    } catch (e) {
-      setErro("Falha ao solicitar sync: " + e.message);
-    } finally {
-      setSolicitando(false);
-    }
-  }
-
   // ─── Render ────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -425,29 +403,6 @@ export default function MesClient({
             Dados do SKA Syneco — dataset 242 (Rastreabilidade de OP e Item)
           </p>
         </div>
-
-        {/* Botão sync manual + badge */}
-        <div className="flex flex-col items-end gap-2">
-          <button
-            onClick={handleSolicitarSync}
-            disabled={solicitando || syncSolicitado}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              syncSolicitado
-                ? "bg-green-50 text-green-700 border border-green-200 cursor-default"
-                : "bg-torg-blue text-white hover:bg-torg-blue/90 disabled:opacity-60"
-            }`}
-          >
-            {solicitando ? (
-              <><Loader2 size={15} className="animate-spin" /> Solicitando...</>
-            ) : syncSolicitado ? (
-              <><CheckCircle2 size={15} /> Sync solicitado!</>
-            ) : (
-              <><Zap size={15} /> Sincronizar agora</>
-            )}
-          </button>
-          {syncSolicitado && (
-            <p className="text-xs text-torg-gray">O agente executará em até 30 segundos.</p>
-          )}
 
         {/* Badge último sync */}
         {ultimoSync && (
@@ -476,7 +431,6 @@ export default function MesClient({
             <span>Nenhum sync realizado ainda</span>
           </div>
         )}
-        </div> {/* fim flex-col botão + badge */}
       </div>
 
       {/* Cards de KPIs */}

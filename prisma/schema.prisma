@@ -1562,13 +1562,3 @@ model MesSyncLog {
   @@index([sucesso])
 }
 
-// Solicitações de sync manual feitas pelo botão no portal.
-// O agente (daemon) consulta este endpoint a cada 30s e executa se houver pendente.
-model MesSyncRequest {
-  id            String    @id @default(cuid())
-  criadoEm      DateTime  @default(now())
-  executadoEm   DateTime?             // preenchido pelo agente ao executar
-  solicitadoPor String?               // userId de quem clicou
-
-  @@index([executadoEm])
-}
