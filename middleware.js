@@ -1,8 +1,15 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
-// Protege /compras, /comercial, /rm (exceto /rm/[id]/cotar via token futuro)
-// /fornecedores fica aberto (acesso por token único depois)
+// Gates por módulo — cada rota só é acessível pelo módulo correspondente (ou ADMIN):
+//   /comercial  → COMERCIAL
+//   /compras    → COMPRAS
+//   /financeiro → FINANCEIRO
+//   /expedicao  → EXPEDICAO
+//   /producao   → PRODUCAO
+//   /rm         → ENGENHARIA
+//   /admin      → apenas ADMIN
+// /fornecedores fica aberto (acesso por token único)
 // Redirect de domínios .vercel.app → workspace.torg.com.br via vercel.json (edge, mais rápido)
 export default withAuth(
   function middleware(req) {
@@ -47,21 +54,11 @@ export default withAuth(
         if (path.startsWith("/comercial")  && !temModulo("COMERCIAL"))  return false;
         if (path.startsWith("/compras")    && !temModulo("COMPRAS"))     return false;
         if (path.startsWith("/financeiro") && !temModulo("FINANCEIRO"))  return false;
+        if (path.startsWith("/expedicao")  && !temModulo("EXPEDICAO"))   return false;
+        if (path.startsWith("/producao")   && !temModulo("PRODUCAO"))    return false;
+        if (path.startsWith("/rm")         && !temModulo("ENGENHARIA"))  return false;
         if (path.startsWith("/admin")      && !isAdmin)                  return false;
 
-        // Expedição: módulo EXPEDICAO ou leitura por PRODUCAO/COMERCIAL/ENGENHARIA
-        if (
-          path.startsWith("/expedicao") &&
-          !temModulo("EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA")
-        ) return false;
-
-        // Produção: módulo PRODUCAO ou leitura por EXPEDICAO/COMERCIAL/ENGENHARIA
-        if (
-          path.startsWith("/producao") &&
-          !temModulo("PRODUCAO", "EXPEDICAO", "COMERCIAL", "ENGENHARIA")
-        ) return false;
-
-        // /rm liberado pra todos os logados (engenharia, almox, compras, admin, etc.)
         return true;
       },
     },
