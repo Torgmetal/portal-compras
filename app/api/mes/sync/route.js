@@ -118,29 +118,25 @@ export async function POST(req) {
             syncRunId: syncLog.id,
           };
 
-          const existing = await prisma.mesApontamento.findUnique({
-            where: { productionId: ap.productionId },
-            select: { id: true },
+          const result = await prisma.mesApontamento.upsert({
+            where:  { productionId: ap.productionId },
+            create: data,
+            update: {
+              dataFim:      data.dataFim,
+              status:       data.status,
+              produzidoUn:  data.produzidoUn,
+              rejeitado:    data.rejeitado,
+              retrabalhado: data.retrabalhado,
+              produzidoKg:  data.produzidoKg,
+              opId:         data.opId,
+              syncRunId:    data.syncRunId,
+            },
           });
-
-          if (existing) {
-            await prisma.mesApontamento.update({
-              where: { productionId: ap.productionId },
-              data: {
-                dataFim: data.dataFim,
-                status:  data.status,
-                produzidoUn: data.produzidoUn,
-                rejeitado:   data.rejeitado,
-                retrabalhado: data.retrabalhado,
-                produzidoKg: data.produzidoKg,
-                opId:      data.opId,
-                syncRunId: data.syncRunId,
-              },
-            });
-            atualizados++;
-          } else {
-            await prisma.mesApontamento.create({ data });
+          // Prisma upsert não informa se foi create ou update — comparamos datas
+          if (result.createdAt.getTime() === result.updatedAt.getTime()) {
             criados++;
+          } else {
+            atualizados++;
           }
         })
       );
