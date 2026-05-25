@@ -26,7 +26,7 @@ export async function PATCH(req, { params }) {
   } catch {
     return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
   }
-  if (user.role === "COMERCIAL" && !user.podeAlterarVerba) {
+  if (user.modulos?.includes("COMERCIAL") && !user.podeAlterarVerba) {
     return NextResponse.json(
       { error: "Voce nao tem permissao pra editar itens diretamente. Use 'Solicitar verba' pra propor alteracao." },
       { status: 403 }

@@ -3,12 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Loader2 } from "lucide-react";
+import { ArrowLeft, UserPlus, Loader2, Shield } from "lucide-react";
 import { useStore } from "@/lib/store";
 import SenhaGeradaModal from "@/components/admin/SenhaGeradaModal";
 
-const ROLES_OPCOES = [
-  { value: "ADMIN",        label: "Admin" },
+const MODULOS_OPCOES = [
   { value: "COMERCIAL",    label: "Comercial" },
   { value: "ENGENHARIA",   label: "Engenharia" },
   { value: "COMPRAS",      label: "Compras" },
@@ -21,7 +20,8 @@ const ROLES_OPCOES = [
 const campoVazio = {
   name:             "",
   email:            "",
-  role:             "",
+  tipo:             "",
+  modulos:          [],
   setor:            "",
   podeAlterarVerba: false,
 };
@@ -45,6 +45,17 @@ export default function FormNovoUsuario() {
     if (erros[campo]) setErros((prev) => ({ ...prev, [campo]: null }));
   }
 
+  function toggleModulo(modulo) {
+    setForm((prev) => {
+      const atual = prev.modulos;
+      const novo = atual.includes(modulo)
+        ? atual.filter((m) => m !== modulo)
+        : [...atual, modulo];
+      return { ...prev, modulos: novo };
+    });
+    if (erros.modulos) setErros((prev) => ({ ...prev, modulos: null }));
+  }
+
   function validarFront() {
     const novosErros = {};
     if (!form.name.trim() || form.name.trim().length < 2)
@@ -53,8 +64,10 @@ export default function FormNovoUsuario() {
       novosErros.email = "E-mail é obrigatório.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       novosErros.email = "E-mail inválido.";
-    if (!form.role)
-      novosErros.role = "Selecione uma role.";
+    if (!form.tipo)
+      novosErros.tipo = "Selecione o tipo de usuário.";
+    if (form.tipo === "USUARIO" && form.modulos.length === 0)
+      novosErros.modulos = "Selecione pelo menos um módulo.";
     return novosErros;
   }
 
@@ -77,7 +90,8 @@ export default function FormNovoUsuario() {
         body: JSON.stringify({
           name:             form.name.trim(),
           email:            form.email.trim(),
-          role:             form.role,
+          tipo:             form.tipo,
+          modulos:          form.tipo === "ADMIN" ? [] : form.modulos,
           setor:            form.setor.trim() || null,
           podeAlterarVerba: form.podeAlterarVerba,
         }),
@@ -85,7 +99,6 @@ export default function FormNovoUsuario() {
       const json = await res.json();
 
       if (!json.success) {
-        // Erros específicos de campo
         if (json.error?.toLowerCase().includes("e-mail") || json.error?.toLowerCase().includes("email")) {
           setErros({ email: json.error });
         } else {
@@ -96,9 +109,9 @@ export default function FormNovoUsuario() {
 
       const { usuario, senhaTemporaria } = json.data;
       setModal({
-        senha:         senhaTemporaria,
-        nomeUsuario:   usuario.name,
-        emailUsuario:  usuario.email,
+        senha:        senhaTemporaria,
+        nomeUsuario:  usuario.name,
+        emailUsuario: usuario.email,
       });
     } catch {
       showToast("Erro de conexão. Tente novamente.", "error");
@@ -177,26 +190,77 @@ export default function FormNovoUsuario() {
               {erros.email && <p className="mt-1 text-xs text-red-500">{erros.email}</p>}
             </div>
 
-            {/* Role */}
+            {/* Tipo */}
             <div>
               <label className="block text-sm font-medium text-torg-dark mb-1.5">
-                Role <span className="text-red-500">*</span>
+                Tipo <span className="text-red-500">*</span>
               </label>
-              <select
-                value={form.role}
-                onChange={(e) => setcampo("role", e.target.value)}
-                disabled={loading}
-                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-torg-blue/30 disabled:bg-gray-50 disabled:text-gray-400 bg-white ${
-                  erros.role ? "border-red-400 bg-red-50" : "border-gray-200"
-                }`}
-              >
-                <option value="">Selecionar role...</option>
-                {ROLES_OPCOES.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
+              <div className="flex gap-3">
+                {[
+                  { value: "USUARIO", label: "Usuário", desc: "Acesso restrito aos módulos selecionados" },
+                  { value: "ADMIN",   label: "Admin",   desc: "Acesso total ao sistema" },
+                ].map(({ value, label, desc }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => { setcampo("tipo", value); if (value === "ADMIN") setcampo("modulos", []); }}
+                    disabled={loading}
+                    className={`flex-1 flex flex-col items-start px-4 py-3 rounded-lg border text-left transition-colors disabled:opacity-50 ${
+                      form.tipo === value
+                        ? "border-torg-blue bg-torg-blue/5 ring-1 ring-torg-blue/30"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <span className={`flex items-center gap-1.5 text-sm font-medium ${form.tipo === value ? "text-torg-blue" : "text-torg-dark"}`}>
+                      {value === "ADMIN" && <Shield size={13} />}
+                      {label}
+                    </span>
+                    <span className="text-xs text-torg-gray mt-0.5">{desc}</span>
+                  </button>
                 ))}
-              </select>
-              {erros.role && <p className="mt-1 text-xs text-red-500">{erros.role}</p>}
+              </div>
+              {erros.tipo && <p className="mt-1 text-xs text-red-500">{erros.tipo}</p>}
             </div>
+
+            {/* Módulos — só aparece para tipo USUARIO */}
+            {form.tipo === "USUARIO" && (
+              <div>
+                <label className="block text-sm font-medium text-torg-dark mb-2">
+                  Módulos <span className="text-red-500">*</span>
+                  <span className="font-normal text-torg-gray ml-1">(selecione ao menos um)</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODULOS_OPCOES.map(({ value, label }) => {
+                    const ativo = form.modulos.includes(value);
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleModulo(value)}
+                        disabled={loading}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors disabled:opacity-50 ${
+                          ativo
+                            ? "border-torg-blue bg-torg-blue/5 text-torg-blue font-medium"
+                            : "border-gray-200 text-torg-dark hover:border-gray-300"
+                        }`}
+                      >
+                        <span className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 border ${
+                          ativo ? "bg-torg-blue border-torg-blue" : "border-gray-300"
+                        }`}>
+                          {ativo && (
+                            <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                              <path d="M1 3l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </span>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {erros.modulos && <p className="mt-1 text-xs text-red-500">{erros.modulos}</p>}
+              </div>
+            )}
 
             {/* Setor */}
             <div>

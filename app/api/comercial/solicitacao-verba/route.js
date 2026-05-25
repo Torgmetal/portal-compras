@@ -40,7 +40,7 @@ export async function POST(req) {
   // ADMIN sempre aplica direto. COMERCIAL com flag 'podeAlterarVerba' tambem
   // aplica direto (sem fluxo de solicitacao). COMERCIAL sem a flag cria
   // solicitacao PENDENTE que precisa de aprovacao do master.
-  const podeAplicarDireto = user.role === "ADMIN" || user.podeAlterarVerba === true;
+  const podeAplicarDireto = user.tipo === "ADMIN" || user.podeAlterarVerba === true;
 
   const sol = await prisma.solicitacaoVerba.create({
     data: {
@@ -55,7 +55,7 @@ export async function POST(req) {
             status: "APROVADA",
             decididoEm: new Date(),
             decididoById: user.id,
-            observacaoMaster: user.role === "ADMIN"
+            observacaoMaster: user.tipo === "ADMIN"
               ? "Auto-aprovada pelo master."
               : `Auto-aprovada (permissao direta de alteracao de verba — ${user.email}).`,
           }

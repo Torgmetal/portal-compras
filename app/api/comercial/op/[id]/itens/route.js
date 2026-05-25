@@ -35,7 +35,7 @@ export async function POST(req, { params }) {
   } catch {
     return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
   }
-  if (user.role === "COMERCIAL" && !user.podeAlterarVerba) {
+  if (user.modulos?.includes("COMERCIAL") && !user.podeAlterarVerba) {
     return NextResponse.json(
       { error: "Voce nao tem permissao pra adicionar itens diretamente. Solicite via aditivo." },
       { status: 403 }

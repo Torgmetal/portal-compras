@@ -20,8 +20,7 @@ import { useStore } from "@/lib/store";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import SenhaGeradaModal from "@/components/admin/SenhaGeradaModal";
 
-const ROLES_OPCOES = [
-  { value: "ADMIN",        label: "Admin" },
+const MODULOS_OPCOES = [
   { value: "COMERCIAL",    label: "Comercial" },
   { value: "ENGENHARIA",   label: "Engenharia" },
   { value: "COMPRAS",      label: "Compras" },
@@ -44,7 +43,7 @@ export default function PageEditarUsuario() {
 
   // Estado do formulário
   const [form, setForm] = useState({
-    name: "", email: "", role: "", setor: "", podeAlterarVerba: false,
+    name: "", email: "", tipo: "", modulos: [], setor: "", podeAlterarVerba: false,
   });
   const [ativo, setAtivo] = useState(true);
 
@@ -71,7 +70,14 @@ export default function PageEditarUsuario() {
       if (!json.success) throw new Error(json.error || "Erro ao carregar usuário.");
       const u = json.data;
       setOriginal(u);
-      setForm({ name: u.name, email: u.email, role: u.role, setor: u.setor ?? "", podeAlterarVerba: u.podeAlterarVerba });
+      setForm({
+        name:             u.name,
+        email:            u.email,
+        tipo:             u.tipo,
+        modulos:          (u.modulos ?? []).map((m) => m.modulo ?? m),
+        setor:            u.setor ?? "",
+        podeAlterarVerba: u.podeAlterarVerba,
+      });
       setAtivo(u.ativo);
     } catch (e) {
       setErroPagina(e.message);
@@ -97,8 +103,10 @@ export default function PageEditarUsuario() {
       e.email = "E-mail é obrigatório.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       e.email = "E-mail inválido.";
-    if (!form.role)
-      e.role = "Selecione uma role.";
+    if (!form.tipo)
+      e.tipo = "Selecione o tipo de usuário.";
+    if (form.tipo === "USUARIO" && form.modulos.length === 0)
+      e.modulos = "Selecione pelo menos um módulo.";
     return e;
   }
 
@@ -113,9 +121,10 @@ export default function PageEditarUsuario() {
     setErros({});
     try {
       const body = { name: form.name.trim(), email: form.email.trim(), setor: form.setor.trim() || null };
-      // Anti-suicídio: não enviar role/podeAlterarVerba se for o próprio admin
+      // Anti-suicídio: não enviar tipo/modulos/podeAlterarVerba se for o próprio admin
       if (!proprio) {
-        body.role = form.role;
+        body.tipo = form.tipo;
+        body.modulos = form.tipo === "ADMIN" ? [] : form.modulos;
         body.podeAlterarVerba = form.podeAlterarVerba;
       }
 
@@ -305,41 +314,98 @@ export default function PageEditarUsuario() {
               {erros.email && <p className="mt-1 text-xs text-red-500">{erros.email}</p>}
             </div>
 
-            {/* Role */}
+            {/* Tipo */}
             <div>
               <label className="block text-sm font-medium text-torg-dark mb-1.5">
-                Role <span className="text-red-500">*</span>
+                Tipo <span className="text-red-500">*</span>
               </label>
               {proprio ? (
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    value={ROLES_OPCOES.find((r) => r.value === form.role)?.label ?? form.role}
+                    value={form.tipo === "ADMIN" ? "Admin" : "Usuário"}
                     disabled
                     className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-400"
                   />
-                  <span title="Você não pode alterar sua própria role">
+                  <span title="Você não pode alterar seu próprio tipo">
                     <ShieldAlert size={16} className="text-amber-400 shrink-0" />
                   </span>
                 </div>
               ) : (
-                <select
-                  value={form.role}
-                  onChange={(e) => setcampo("role", e.target.value)}
-                  disabled={loadingSalvar}
-                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-torg-blue/30 disabled:bg-gray-50 disabled:text-gray-400 bg-white ${erros.role ? "border-red-400 bg-red-50" : "border-gray-200"}`}
-                >
-                  <option value="">Selecionar role...</option>
-                  {ROLES_OPCOES.map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
+                <div className="flex gap-3">
+                  {[
+                    { value: "USUARIO", label: "Usuário", desc: "Acesso restrito aos módulos" },
+                    { value: "ADMIN",   label: "Admin",   desc: "Acesso total ao sistema" },
+                  ].map(({ value, label, desc }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => { setcampo("tipo", value); if (value === "ADMIN") setcampo("modulos", []); }}
+                      disabled={loadingSalvar}
+                      className={`flex-1 flex flex-col items-start px-4 py-3 rounded-lg border text-left transition-colors disabled:opacity-50 ${
+                        form.tipo === value
+                          ? "border-torg-blue bg-torg-blue/5 ring-1 ring-torg-blue/30"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <span className={`text-sm font-medium ${form.tipo === value ? "text-torg-blue" : "text-torg-dark"}`}>{label}</span>
+                      <span className="text-xs text-torg-gray mt-0.5">{desc}</span>
+                    </button>
                   ))}
-                </select>
+                </div>
               )}
               {proprio && (
-                <p className="mt-1 text-xs text-amber-600">Você não pode alterar sua própria role.</p>
+                <p className="mt-1 text-xs text-amber-600">Você não pode alterar seu próprio tipo.</p>
               )}
-              {erros.role && <p className="mt-1 text-xs text-red-500">{erros.role}</p>}
+              {erros.tipo && <p className="mt-1 text-xs text-red-500">{erros.tipo}</p>}
             </div>
+
+            {/* Módulos — só editável se tipo === USUARIO e não for o próprio */}
+            {form.tipo === "USUARIO" && (
+              <div>
+                <label className="block text-sm font-medium text-torg-dark mb-2">
+                  Módulos <span className="text-red-500">*</span>
+                </label>
+                {proprio ? (
+                  <p className="text-xs text-torg-gray">Você não pode alterar seus próprios módulos.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {MODULOS_OPCOES.map(({ value, label }) => {
+                      const ativo = form.modulos.includes(value);
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => {
+                            setForm((prev) => {
+                              const mods = prev.modulos;
+                              return { ...prev, modulos: mods.includes(value) ? mods.filter((m) => m !== value) : [...mods, value] };
+                            });
+                            if (erros.modulos) setErros((prev) => ({ ...prev, modulos: null }));
+                          }}
+                          disabled={loadingSalvar}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors disabled:opacity-50 ${
+                            ativo
+                              ? "border-torg-blue bg-torg-blue/5 text-torg-blue font-medium"
+                              : "border-gray-200 text-torg-dark hover:border-gray-300"
+                          }`}
+                        >
+                          <span className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 border ${ativo ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>
+                            {ativo && (
+                              <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                                <path d="M1 3l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </span>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {erros.modulos && <p className="mt-1 text-xs text-red-500">{erros.modulos}</p>}
+              </div>
+            )}
 
             {/* Setor */}
             <div>

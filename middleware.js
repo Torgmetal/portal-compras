@@ -36,11 +36,13 @@ export default withAuth(
         // Demais rotas: precisa estar logado
         if (!token) return false;
 
-        // Role gates
-        if (path.startsWith("/comercial") && !["ADMIN", "COMERCIAL"].includes(token.role)) {
+        // Gates por tipo/módulo
+        const isAdmin = token.tipo === "ADMIN";
+        const modulos = token.modulos ?? [];
+        if (path.startsWith("/comercial") && !isAdmin && !modulos.includes("COMERCIAL")) {
           return false;
         }
-        if (path.startsWith("/compras") && !["ADMIN", "COMPRAS"].includes(token.role)) {
+        if (path.startsWith("/compras") && !isAdmin && !modulos.includes("COMPRAS")) {
           return false;
         }
         if (path.startsWith("/admin") && token.role !== "ADMIN") {

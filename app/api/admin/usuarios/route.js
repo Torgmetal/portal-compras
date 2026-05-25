@@ -7,15 +7,31 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarSenhaTemporaria } from "@/lib/gerar-senha";
 
-const ROLES_VALIDAS = ["ADMIN", "COMERCIAL", "ENGENHARIA", "ALMOXARIFADO", "COMPRAS", "PRODUCAO", "FINANCEIRO", "EXPEDICAO"];
+const TIPOS_VALIDOS   = ["ADMIN", "USUARIO"];
+const MODULOS_VALIDOS = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "ALMOXARIFADO", "FINANCEIRO", "EXPEDICAO"];
 
 const schemaPost = z.object({
   name:             z.string().min(2, "Nome deve ter pelo menos 2 caracteres").max(100),
   email:            z.string().email("E-mail inválido").toLowerCase(),
-  role:             z.enum(ROLES_VALIDAS),
+  tipo:             z.enum(TIPOS_VALIDOS),
+  modulos:          z.array(z.enum(MODULOS_VALIDOS)).optional().default([]),
   setor:            z.string().max(100).optional().nullable(),
   podeAlterarVerba: z.boolean().default(false),
 });
+
+/** Selects reutilizáveis */
+const selectUsuario = {
+  id:               true,
+  name:             true,
+  email:            true,
+  tipo:             true,
+  modulos:          { select: { modulo: true } },
+  setor:            true,
+  ativo:            true,
+  podeAlterarVerba: true,
+  createdAt:        true,
+  updatedAt:        true,
+};
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
 
@@ -28,30 +44,24 @@ export async function GET(req) {
   }
 
   const { searchParams } = new URL(req.url);
-  const roleFilter  = searchParams.get("role");
+  const tipoFilter  = searchParams.get("tipo");   // "ADMIN" | "USUARIO"
+  const moduloFilter = searchParams.get("modulo"); // ex: "COMPRAS"
   const ativoParam  = searchParams.get("ativo");
   // ?ativo não enviado ou "true" → só ativos (default)
   // ?ativo=false                 → só inativos
   // ?ativo=todos                 → sem filtro
 
   const where = {};
-  if (roleFilter && ROLES_VALIDAS.includes(roleFilter)) where.role = roleFilter;
+  if (tipoFilter && TIPOS_VALIDOS.includes(tipoFilter)) where.tipo = tipoFilter;
+  if (moduloFilter && MODULOS_VALIDOS.includes(moduloFilter)) {
+    where.modulos = { some: { modulo: moduloFilter } };
+  }
   if (ativoParam === "false")       where.ativo = false;
-  else if (ativoParam !== "todos")  where.ativo = true;   // default: apenas ativos
+  else if (ativoParam !== "todos")  where.ativo = true; // default: apenas ativos
 
   const usuarios = await prisma.user.findMany({
     where,
-    select: {
-      id:               true,
-      name:             true,
-      email:            true,
-      role:             true,
-      setor:            true,
-      ativo:            true,
-      podeAlterarVerba: true,
-      createdAt:        true,
-      updatedAt:        true,
-    },
+    select: selectUsuario,
     orderBy: [{ ativo: "desc" }, { name: "asc" }],
   });
 
@@ -76,6 +86,11 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message ?? "Dados inválidos." }, { status: 400 });
   }
 
+  // USUARIO deve ter ao menos 1 módulo
+  if (body.tipo === "USUARIO" && (!body.modulos || body.modulos.length === 0)) {
+    return NextResponse.json({ success: false, error: "Usuário do tipo USUARIO deve ter pelo menos um módulo." }, { status: 400 });
+  }
+
   // Verifica duplicidade de e-mail
   const existente = await prisma.user.findUnique({ where: { email: body.email } });
   if (existente) {
@@ -90,21 +105,15 @@ export async function POST(req) {
       name:             body.name,
       email:            body.email,
       password:         hash,
-      role:             body.role,
+      tipo:             body.tipo,
       setor:            body.setor ?? null,
       podeAlterarVerba: body.podeAlterarVerba,
       ativo:            true,
+      ...(body.tipo === "USUARIO" && body.modulos?.length > 0 && {
+        modulos: { create: body.modulos.map((m) => ({ modulo: m })) },
+      }),
     },
-    select: {
-      id:               true,
-      name:             true,
-      email:            true,
-      role:             true,
-      setor:            true,
-      ativo:            true,
-      podeAlterarVerba: true,
-      createdAt:        true,
-    },
+    select: selectUsuario,
   });
 
   // [admin-usuarios] Audit: criação de usuário
@@ -116,7 +125,8 @@ export async function POST(req) {
       entityId: novoUsuario.id,
       diff: {
         email:            novoUsuario.email,
-        role:             novoUsuario.role,
+        tipo:             novoUsuario.tipo,
+        modulos:          novoUsuario.modulos.map((m) => m.modulo),
         setor:            novoUsuario.setor,
         podeAlterarVerba: novoUsuario.podeAlterarVerba,
       },
@@ -126,8 +136,8 @@ export async function POST(req) {
   return NextResponse.json({
     success: true,
     data: {
-      usuario:          novoUsuario,
-      senhaTemporaria,  // retornada em plaintext UMA VEZ — tela deve exibir e descartar
+      usuario:        novoUsuario,
+      senhaTemporaria, // retornada em plaintext UMA VEZ — tela deve exibir e descartar
     },
   }, { status: 201 });
 }

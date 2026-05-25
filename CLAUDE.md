@@ -17,6 +17,16 @@ npx vercel env pull .env  # pull env vars from Vercel
 
 No test suite is configured.
 
+## Workflow padrão de desenvolvimento
+
+Todo desenvolvimento segue este fluxo obrigatório:
+
+1. **Desenvolver localmente** — faça as alterações no projeto
+2. **Validar com o servidor de dev** — rode `npm run dev` e confirme que a mudança funciona em `http://localhost:3000`
+3. **Só então subir para main** — `git push origin main` apenas após validação local bem-sucedida
+
+> Nunca faça push direto sem ter rodado e validado localmente primeiro.
+
 ## Local development setup
 
 `.env` is a symlink to `.env.local` — create it once with:

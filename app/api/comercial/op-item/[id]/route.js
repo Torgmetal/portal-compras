@@ -28,7 +28,7 @@ export async function PATCH(req, { params }) {
     return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
   }
   // COMERCIAL precisa da flag podeAlterarVerba pra editar items diretamente.
-  if (user.role === "COMERCIAL" && !user.podeAlterarVerba) {
+  if (user.modulos?.includes("COMERCIAL") && !user.podeAlterarVerba) {
     return NextResponse.json(
       { error: "Voce nao tem permissao pra editar itens diretamente. Use 'Solicitar verba' pra propor alteracao." },
       { status: 403 }

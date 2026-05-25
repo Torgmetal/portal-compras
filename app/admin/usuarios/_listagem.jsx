@@ -23,8 +23,7 @@ import ConfirmModal from "@/components/admin/ConfirmModal";
 
 /* ─── Constantes ────────────────────────────────────────────────── */
 
-const ROLES_LABELS = {
-  ADMIN:        { label: "Admin",        cor: "bg-purple-100 text-purple-700" },
+const MODULO_LABELS = {
   COMERCIAL:    { label: "Comercial",    cor: "bg-blue-100 text-blue-700" },
   ENGENHARIA:   { label: "Engenharia",   cor: "bg-cyan-100 text-cyan-700" },
   COMPRAS:      { label: "Compras",      cor: "bg-orange-100 text-orange-700" },
@@ -34,9 +33,10 @@ const ROLES_LABELS = {
   EXPEDICAO:    { label: "Expedição",    cor: "bg-teal-100 text-teal-700" },
 };
 
-const ROLES_OPCOES = [
-  { value: "", label: "Todas as roles" },
-  ...Object.entries(ROLES_LABELS).map(([value, { label }]) => ({ value, label })),
+const FILTRO_OPCOES = [
+  { value: "",         label: "Todos os usuários" },
+  { value: "ADMIN",    label: "Admin" },
+  ...Object.entries(MODULO_LABELS).map(([value, { label }]) => ({ value, label })),
 ];
 
 /* ─── Componente de senha revelada inline ───────────────────────── */
@@ -101,7 +101,7 @@ export default function ListagemUsuarios() {
   const [erroCarregar, setErroCarregar] = useState(null);
 
   // Filtros (client-side)
-  const [filtroRole, setFiltroRole] = useState("");
+  const [filtroModulo, setFiltroModulo] = useState("");
   const [mostrarInativos, setMostrarInativos] = useState(false);
 
   // Ações em andamento — guarda o id do usuário sendo processado
@@ -139,7 +139,11 @@ export default function ListagemUsuarios() {
 
   const usuariosFiltrados = usuarios.filter((u) => {
     if (!mostrarInativos && !u.ativo) return false;
-    if (filtroRole && u.role !== filtroRole) return false;
+    if (filtroModulo) {
+      if (filtroModulo === "ADMIN") return u.tipo === "ADMIN";
+      const mods = (u.modulos ?? []).map((m) => m.modulo ?? m);
+      return mods.includes(filtroModulo);
+    }
     return true;
   });
 
@@ -242,11 +246,11 @@ export default function ListagemUsuarios() {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
         <div className="relative">
           <select
-            value={filtroRole}
-            onChange={(e) => setFiltroRole(e.target.value)}
+            value={filtroModulo}
+            onChange={(e) => setFiltroModulo(e.target.value)}
             className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg text-torg-dark focus:outline-none focus:ring-2 focus:ring-torg-blue/30 bg-white"
           >
-            {ROLES_OPCOES.map((o) => (
+            {FILTRO_OPCOES.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
@@ -308,7 +312,7 @@ export default function ListagemUsuarios() {
                 <tr className="border-b border-gray-100 bg-gray-50/60">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Nome</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">E-mail</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Role</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Módulos</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Setor</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Verba</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-torg-gray uppercase tracking-wide">Status</th>
@@ -317,7 +321,7 @@ export default function ListagemUsuarios() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {usuariosFiltrados.map((u) => {
-                  const roleInfo = ROLES_LABELS[u.role] ?? { label: u.role, cor: "bg-gray-100 text-gray-600" };
+                  const modsList = (u.modulos ?? []).map((m) => m.modulo ?? m);
                   const proprio = ehProprioUsuario(u.id);
                   const emAcao = loadingAcao === u.id;
 
@@ -341,12 +345,27 @@ export default function ListagemUsuarios() {
                       {/* E-mail */}
                       <td className="px-4 py-3 text-torg-gray">{u.email}</td>
 
-                      {/* Role */}
+                      {/* Módulos */}
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${roleInfo.cor}`}>
-                          {u.role === "ADMIN" && <Shield size={11} />}
-                          {roleInfo.label}
-                        </span>
+                        {u.tipo === "ADMIN" ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                            <Shield size={11} />
+                            Admin
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {modsList.length === 0 ? (
+                              <span className="text-xs text-gray-400">—</span>
+                            ) : modsList.map((m) => {
+                              const info = MODULO_LABELS[m] ?? { label: m, cor: "bg-gray-100 text-gray-600" };
+                              return (
+                                <span key={m} className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${info.cor}`}>
+                                  {info.label}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                       </td>
 
                       {/* Setor */}

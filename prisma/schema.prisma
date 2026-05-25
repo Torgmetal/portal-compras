@@ -13,32 +13,37 @@ datasource db {
 
 // ─── USUÁRIOS / AUTENTICAÇÃO ────────────────────────────────
 
-enum Role {
-  ADMIN
+enum TipoUsuario {
+  ADMIN    // acesso total ao sistema; não tem módulos específicos
+  USUARIO  // acesso restrito aos módulos liberados em UserModulo
+}
+
+enum Modulo {
   COMERCIAL
   ENGENHARIA
-  ALMOXARIFADO
   COMPRAS
   PRODUCAO
+  ALMOXARIFADO
   FINANCEIRO
   EXPEDICAO
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String      @id @default(cuid())
+  email     String      @unique
   name      String
-  password  String   // bcrypt hash
-  role      Role
+  password  String      // bcrypt hash
+  tipo      TipoUsuario
   setor     String?
-  ativo     Boolean  @default(true)
+  ativo     Boolean     @default(true)
   // Permite alterar verba direto, sem passar pelo fluxo de solicitacao
   // pendente de aprovacao do master. Usado pra usuarios COMERCIAL de
   // confianca que precisam ajustar valores frequentemente.
   podeAlterarVerba Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
+  modulos                 UserModulo[]
   opsCriadas              OP[]                @relation("OPCreatedBy")
   rmsCriadas              RM[]                @relation("RMCreatedBy")
   aditivos                Aditivo[]
@@ -96,6 +101,17 @@ model Meta {
   @@unique([modulo, tipo, setor, ano, mes])
   @@index([modulo, ano])
   @@index([modulo, tipo, ano])
+}
+
+model UserModulo {
+  id     String @id @default(cuid())
+  userId String
+  modulo Modulo
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, modulo])
+  @@index([userId])
 }
 
 // ─── OP (ORDEM DE PRODUÇÃO) ─────────────────────────────────

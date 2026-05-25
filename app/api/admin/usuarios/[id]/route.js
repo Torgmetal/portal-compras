@@ -5,15 +5,31 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
-const ROLES_VALIDAS = ["ADMIN", "COMERCIAL", "ENGENHARIA", "ALMOXARIFADO", "COMPRAS", "PRODUCAO", "FINANCEIRO", "EXPEDICAO"];
+const TIPOS_VALIDOS   = ["ADMIN", "USUARIO"];
+const MODULOS_VALIDOS = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "ALMOXARIFADO", "FINANCEIRO", "EXPEDICAO"];
 
 const schemaPut = z.object({
   name:             z.string().min(2).max(100).optional(),
   email:            z.string().email("E-mail inválido").toLowerCase().optional(),
-  role:             z.enum(ROLES_VALIDAS).optional(),
+  tipo:             z.enum(TIPOS_VALIDOS).optional(),
+  modulos:          z.array(z.enum(MODULOS_VALIDOS)).optional(),
   setor:            z.string().max(100).nullable().optional(),
   podeAlterarVerba: z.boolean().optional(),
 });
+
+/** Selects reutilizáveis */
+const selectUsuario = {
+  id:               true,
+  name:             true,
+  email:            true,
+  tipo:             true,
+  modulos:          { select: { modulo: true } },
+  setor:            true,
+  ativo:            true,
+  podeAlterarVerba: true,
+  createdAt:        true,
+  updatedAt:        true,
+};
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
 
@@ -27,17 +43,7 @@ export async function GET(_req, { params }) {
 
   const usuario = await prisma.user.findUnique({
     where: { id: params.id },
-    select: {
-      id:               true,
-      name:             true,
-      email:            true,
-      role:             true,
-      setor:            true,
-      ativo:            true,
-      podeAlterarVerba: true,
-      createdAt:        true,
-      updatedAt:        true,
-    },
+    select: selectUsuario,
   });
 
   if (!usuario) {
@@ -69,14 +75,17 @@ export async function PUT(req, { params }) {
   }
 
   // ── Proteções anti-suicídio ───────────────────────────────────────────────
-  if (ehProprioAdmin && body.role !== undefined) {
-    return NextResponse.json({ success: false, error: "Você não pode alterar sua própria role." }, { status: 400 });
+  if (ehProprioAdmin && body.tipo !== undefined) {
+    return NextResponse.json({ success: false, error: "Você não pode alterar seu próprio tipo." }, { status: 400 });
   }
   if (ehProprioAdmin && body.podeAlterarVerba !== undefined) {
     return NextResponse.json({ success: false, error: "Você não pode alterar seu próprio podeAlterarVerba." }, { status: 400 });
   }
 
-  const existente = await prisma.user.findUnique({ where: { id: alvoId } });
+  const existente = await prisma.user.findUnique({
+    where: { id: alvoId },
+    include: { modulos: { select: { modulo: true } } },
+  });
   if (!existente) {
     return NextResponse.json({ success: false, error: "Usuário não encontrado." }, { status: 404 });
   }
@@ -89,27 +98,49 @@ export async function PUT(req, { params }) {
     }
   }
 
+  // Valida: USUARIO deve ter módulos
+  const novoTipo = body.tipo ?? existente.tipo;
+  if (novoTipo === "USUARIO") {
+    const novosModulos = body.modulos ?? existente.modulos.map((m) => m.modulo);
+    if (!novosModulos || novosModulos.length === 0) {
+      return NextResponse.json({ success: false, error: "Usuário do tipo USUARIO deve ter pelo menos um módulo." }, { status: 400 });
+    }
+  }
+
   const antes = {
     name:             existente.name,
     email:            existente.email,
-    role:             existente.role,
+    tipo:             existente.tipo,
+    modulos:          existente.modulos.map((m) => m.modulo),
     setor:            existente.setor,
     podeAlterarVerba: existente.podeAlterarVerba,
   };
 
-  const atualizado = await prisma.user.update({
-    where: { id: alvoId },
-    data:  body,
-    select: {
-      id:               true,
-      name:             true,
-      email:            true,
-      role:             true,
-      setor:            true,
-      ativo:            true,
-      podeAlterarVerba: true,
-      updatedAt:        true,
-    },
+  // Campos escalares do User (sem modulos — tratados separado)
+  const { modulos: novoModulosBody, ...camposEscalares } = body;
+
+  // Atualiza em transação: campos escalares + deleção/recriação de UserModulo
+  const atualizado = await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: alvoId },
+      data: camposEscalares,
+    });
+
+    // Recria módulos se tipo ou modulos foram enviados
+    const atualizarModulos = body.tipo !== undefined || novoModulosBody !== undefined;
+    if (atualizarModulos) {
+      await tx.userModulo.deleteMany({ where: { userId: alvoId } });
+      if (novoTipo !== "ADMIN") {
+        const modsFinal = novoModulosBody ?? existente.modulos.map((m) => m.modulo);
+        if (modsFinal.length > 0) {
+          await tx.userModulo.createMany({
+            data: modsFinal.map((m) => ({ userId: alvoId, modulo: m })),
+          });
+        }
+      }
+    }
+
+    return tx.user.findUnique({ where: { id: alvoId }, select: selectUsuario });
   });
 
   // [admin-usuarios] Audit: edição de usuário
@@ -119,7 +150,13 @@ export async function PUT(req, { params }) {
       action:   "admin_editar_usuario",
       entity:   "User",
       entityId: alvoId,
-      diff:     { antes, depois: body },
+      diff:     {
+        antes,
+        depois: {
+          ...camposEscalares,
+          ...(novoModulosBody !== undefined && { modulos: novoModulosBody }),
+        },
+      },
     },
   });
 
