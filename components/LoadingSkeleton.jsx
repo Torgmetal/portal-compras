@@ -57,6 +57,20 @@ export function SkeletonKpiCards({ n = 4 }) {
   );
 }
 
+// Tela de loading com logo Torg em fade — usada nos loading.js de cada módulo
+export function TorgLoading() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[65vh] select-none pointer-events-none">
+      <img
+        src="/torg-logo.png"
+        alt="Carregando…"
+        className="w-44 animate-logo-fade"
+        draggable={false}
+      />
+    </div>
+  );
+}
+
 export default function LoadingPage({ titulo = "", kpis = 0, linhas = 8 }) {
   return (
     <div className="space-y-5">

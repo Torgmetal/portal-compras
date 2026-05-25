@@ -51,6 +51,15 @@ module.exports = {
         sans: ['"Saira"', "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
         display: ['"Saira"', "system-ui", "sans-serif"],
       },
+      keyframes: {
+        "logo-fade": {
+          "0%, 100%": { opacity: "0.18" },
+          "50%":       { opacity: "1" },
+        },
+      },
+      animation: {
+        "logo-fade": "logo-fade 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+      },
     },
   },
   plugins: [],

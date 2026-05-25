@@ -1,4 +1,4 @@
-import LoadingPage from '@/components/LoadingSkeleton';
+import { TorgLoading } from '@/components/LoadingSkeleton';
 export default function Loading() {
-  return <LoadingPage titulo="Ordens de Produção" kpis={4} linhas={10} />;
+  return <TorgLoading />;
 }
