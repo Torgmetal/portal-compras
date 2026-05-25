@@ -56,7 +56,9 @@ function fmtISO(d) {
 async function skaLogin() {
   if (!SKA_USER || !SKA_PASS) throw new Error("SKA_USER e SKA_PASS não configurados no .env");
 
-  const resp = await fetch(`${SKA_API_URL}/v1/users/login`, {
+  // Endpoint correto confirmado: POST /v1/auth/login
+  // (POST /v1/users/login retorna "validated: false" mesmo com credenciais corretas)
+  const resp = await fetch(`${SKA_API_URL}/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user: SKA_USER, password: SKA_PASS }),
@@ -69,7 +71,9 @@ async function skaLogin() {
   }
 
   const data = await resp.json();
-  const token = data.token || data.accessToken || data.jwt || data.Token
+  // Estrutura da resposta: { message: "Authentication success", data: [{ token, expiresIn, licenseToken }] }
+  const token = data.data?.[0]?.token
+    || data.token || data.accessToken || data.jwt
     || (typeof data === "string" ? data : null);
 
   if (!token) throw new Error("Token não encontrado na resposta: " + JSON.stringify(data).substring(0, 200));
