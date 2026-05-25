@@ -179,6 +179,7 @@ model OP {
   pedidosOmieAvulsos PedidoOmie[]   // pedidos cadastrados direto na OP (FD avulsos)
   pecasConjunto   PecaConjunto[]
   orcamentos      Orcamento[]    @relation("OrcamentoOP")
+  mesApontamentos MesApontamento[] @relation("MesApontamentosOP")
 
   @@index([numero])
   @@index([status])
@@ -1495,4 +1496,60 @@ model BDMPerfil {
 
   @@index([tipo])
   @@index([codigo])
+}
+
+// ─── INTEGRAÇÃO MES (SYNECO/SKA) ───────────────────────────
+// Apontamentos de produção importados do sistema MES local (SKA Syneco).
+// Sincronizados pelo agente local (scripts/mes-sync-agent.js) que roda
+// via Task Scheduler na máquina do servidor interno.
+
+model MesApontamento {
+  id           String   @id @default(cuid())
+
+  // Identificadores do SKA (chave de upsert)
+  dataApontamento DateTime @db.Date
+  turno        Int      // -2=todos, 1=manhã, 2=tarde, 3=noite
+  opNumero     String   // OrderNum do SKA
+  obra         String?  // Obra (campo livre no SKA)
+  setor        String?  // CostCenter (corte, montagem, solda, etc.)
+  maquina      String?  // Resource/máquina
+  operacao     String?  // Operation
+  codigoPeca   String?  // PartCode
+
+  // Quantidades produzidas
+  produzidoKg  Float    @default(0)
+  produzidoUn  Float    @default(0)
+
+  // Vínculo com OP do portal (resolvido durante sync pelo opNumero)
+  opId         String?
+  op           OP?      @relation("MesApontamentosOP", fields: [opId], references: [id], onDelete: SetNull)
+
+  // Controle de sync
+  syncRunId    String?  // ID do MesSyncLog que criou/atualizou este registro
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([dataApontamento, opNumero, setor, maquina, operacao, codigoPeca])
+  @@index([opId])
+  @@index([dataApontamento])
+  @@index([opNumero])
+  @@index([setor])
+}
+
+// Log de cada execução do sync com o MES SKA.
+model MesSyncLog {
+  id               String   @id @default(cuid())
+  sucesso          Boolean
+  dataInicio       DateTime // período sincronizado (início)
+  dataFim          DateTime // período sincronizado (fim)
+  totalLinhas      Int      @default(0) // linhas retornadas pelo SKA
+  criados          Int      @default(0)
+  atualizados      Int      @default(0)
+  ignorados        Int      @default(0)
+  erro             String?
+  duracaoMs        Int      @default(0)
+  criadoEm         DateTime @default(now())
+
+  @@index([criadoEm])
+  @@index([sucesso])
 }

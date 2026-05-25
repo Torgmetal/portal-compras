@@ -1,0 +1,17 @@
+{
+  "name": "mes-sync-agent",
+  "version": "1.0.0",
+  "description": "Agente de sincronização MES SKA Syneco → Portal Torg",
+  "main": "mes-sync-agent.js",
+  "scripts": {
+    "sync": "node mes-sync-agent.js",
+    "test": "node mes-sync-agent.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
