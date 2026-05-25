@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ClipboardList, FileText, Package } from "lucide-react";
+import { Activity, ClipboardList, FileText, Package, Factory } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -10,6 +10,7 @@ const menu = [
   { href: "/producao/controle", label: "Controle de Produção", icon: ClipboardList },
   { href: "/producao/pecas", label: "Controle de Peças", icon: Package },
   { href: "/producao/romaneios", label: "Romaneios", icon: FileText },
+  { href: "/producao/mes", label: "Rastreabilidade MES", icon: Factory },
 ];
 
 export default function SidebarProducao() {
