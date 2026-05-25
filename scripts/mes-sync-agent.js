@@ -225,9 +225,9 @@ async function enviarPortal(apontamentos, dataInicio, dataFim, duracaoSka) {
   return { criados: totalCriados, atualizados: totalAtualizados, syncId: lastSyncId };
 }
 
-// ─── Main ───────────────────────────────────────────────────────
-async function main() {
-  log("=== Início sync MES ===");
+// ─── Executa um ciclo de sync ────────────────────────────────────
+async function executarSync(motivo) {
+  log(`=== Início sync MES [${motivo}] ===`);
   const tInicio = Date.now();
 
   try {
@@ -237,10 +237,8 @@ async function main() {
     inicio.setDate(inicio.getDate() - SYNC_DIAS_ATRAS);
     inicio.setHours(0); inicio.setMinutes(0); inicio.setSeconds(0);
 
-    // 1. Login
     const token = await skaLogin();
 
-    // 2. Busca dados
     const tSka = Date.now();
     const linhas = await skaFetchDataset242(token, inicio, hoje);
     const duracaoSka = Date.now() - tSka;
@@ -250,29 +248,76 @@ async function main() {
       return;
     }
 
-    // 3. Transforma
     const apontamentos = linhas.map(transformarLinha).filter(Boolean);
     const ignorados = linhas.length - apontamentos.length;
-    log(`Transformados: ${apontamentos.length} válidos, ${ignorados} ignorados (USO-INTERNO, sem Obra, etc.)`);
+    log(`Transformados: ${apontamentos.length} válidos, ${ignorados} ignorados`);
 
     if (apontamentos.length === 0) {
-      log("Nenhum apontamento válido — verifique o mapeamento de campos");
-      if (linhas.length > 0) log("Campos da 1ª linha: " + Object.keys(linhas[0]).join(", "));
+      log("Nenhum apontamento válido — verifique o mapeamento");
+      if (linhas.length > 0) log("Campos: " + Object.keys(linhas[0]).join(", "));
       return;
     }
 
-    // 4. Envia
     const resultado = await enviarPortal(apontamentos, inicio, hoje, duracaoSka);
     log(`Sync OK em ${Date.now() - tInicio}ms — criados: ${resultado.criados}, atualizados: ${resultado.atualizados}`);
-    if (resultado.syncId) log(`Sync ID portal: ${resultado.syncId}`);
+    if (resultado.syncId) log(`Sync ID: ${resultado.syncId}`);
 
   } catch (err) {
     log(`ERRO: ${err.message}`);
     if (err.stack) log(err.stack.split("\n")[1] || "");
-    process.exit(1);
   }
 
-  log("=== Fim sync MES ===\n");
+  log(`=== Fim sync MES ===\n`);
+}
+
+// ─── Verifica se há sync manual pendente no portal ───────────────
+async function verificarSyncPendente() {
+  if (!PORTAL_API_KEY) return false;
+  try {
+    const resp = await fetch(`${PORTAL_API_URL}/api/mes/solicitar-sync`, {
+      headers: { Authorization: `Bearer ${PORTAL_API_KEY}` },
+      timeout: 10000,
+    });
+    if (!resp.ok) return false;
+    const data = await resp.json();
+    return data.pendente === true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// ─── Daemon principal ────────────────────────────────────────────
+const INTERVALO_SYNC_MS    = 60 * 60 * 1000; // sync automático a cada 1 hora
+const INTERVALO_POLLING_MS = 30 * 1000;       // verifica pedido manual a cada 30s
+
+async function main() {
+  log("=== Agente MES iniciado (modo daemon) ===");
+  log(`Sync automático a cada ${INTERVALO_SYNC_MS / 60000} min | polling manual a cada ${INTERVALO_POLLING_MS / 1000}s`);
+
+  // Sync imediato na inicialização
+  await executarSync("inicialização");
+
+  let ultimoSyncAutomatico = Date.now();
+
+  // Loop de polling (a cada 30s)
+  setInterval(async () => {
+    const agora = Date.now();
+
+    // 1. Verifica se há sync manual solicitado pelo portal
+    const pendente = await verificarSyncPendente();
+    if (pendente) {
+      log("Sync manual solicitado pelo portal — executando...");
+      await executarSync("manual");
+      ultimoSyncAutomatico = Date.now(); // reseta o timer do automático
+      return;
+    }
+
+    // 2. Sync automático a cada hora
+    if (agora - ultimoSyncAutomatico >= INTERVALO_SYNC_MS) {
+      await executarSync("agendado");
+      ultimoSyncAutomatico = Date.now();
+    }
+  }, INTERVALO_POLLING_MS);
 }
 
 main();
