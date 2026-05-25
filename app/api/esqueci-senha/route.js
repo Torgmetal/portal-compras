@@ -87,9 +87,9 @@ async function enviarCodigo(req) {
     },
   });
 
-  // Envia email
+  // Envia email — para recuperação de senha o envio é obrigatório (não best-effort)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://workspace.torg.com.br";
-  await sendEmail({
+  const resultado = await sendEmail({
     to: body.email,
     subject: "Código de recuperação de senha — Workspace Torg",
     html: `
@@ -117,6 +117,20 @@ async function enviarCodigo(req) {
     `,
     text: `Olá ${user.name}, seu código de recuperação de senha é: ${codigo}. Este código expira em 15 minutos.`,
   });
+
+  // Se o envio falhou, invalida o token e avisa o usuário
+  if (!resultado.ok) {
+    console.error("[esqueci-senha] falha no envio do email para", body.email, ":", resultado.error);
+    // Invalida o token para não deixar código perdido no banco
+    await prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, used: false },
+      data: { used: true },
+    });
+    return NextResponse.json(
+      { success: false, error: "Não foi possível enviar o e-mail. Tente novamente em alguns minutos." },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({ success: true });
 }
