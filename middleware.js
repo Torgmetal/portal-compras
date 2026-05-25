@@ -39,30 +39,29 @@ export default withAuth(
         // Gates por tipo/módulo
         const isAdmin = token.tipo === "ADMIN";
         const modulos = token.modulos ?? [];
-        if (path.startsWith("/comercial") && !isAdmin && !modulos.includes("COMERCIAL")) {
-          return false;
-        }
-        if (path.startsWith("/compras") && !isAdmin && !modulos.includes("COMPRAS")) {
-          return false;
-        }
-        if (path.startsWith("/admin") && !isAdmin) {
-          return false;
-        }
+
+        // Helper: bloqueia se não for admin e não tiver nenhum dos módulos exigidos
+        const temModulo = (...requeridos) =>
+          isAdmin || requeridos.some(m => modulos.includes(m));
+
+        if (path.startsWith("/comercial")  && !temModulo("COMERCIAL"))  return false;
+        if (path.startsWith("/compras")    && !temModulo("COMPRAS"))     return false;
+        if (path.startsWith("/financeiro") && !temModulo("FINANCEIRO"))  return false;
+        if (path.startsWith("/admin")      && !isAdmin)                  return false;
+
+        // Expedição: módulo EXPEDICAO ou leitura por PRODUCAO/COMERCIAL/ENGENHARIA
         if (
           path.startsWith("/expedicao") &&
-          !isAdmin &&
-          !["EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA"].some(m => modulos.includes(m))
-        ) {
-          return false;
-        }
+          !temModulo("EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA")
+        ) return false;
+
+        // Produção: módulo PRODUCAO ou leitura por EXPEDICAO/COMERCIAL/ENGENHARIA
         if (
           path.startsWith("/producao") &&
-          !isAdmin &&
-          !["PRODUCAO", "EXPEDICAO", "COMERCIAL", "ENGENHARIA"].some(m => modulos.includes(m))
-        ) {
-          return false;
-        }
-        // /rm liberado pra todos os logados (engenharia, almox, compras, admin)
+          !temModulo("PRODUCAO", "EXPEDICAO", "COMERCIAL", "ENGENHARIA")
+        ) return false;
+
+        // /rm liberado pra todos os logados (engenharia, almox, compras, admin, etc.)
         return true;
       },
     },
