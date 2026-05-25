@@ -7,7 +7,6 @@ import { labelCategoria } from "@/lib/op-categorias";
 import RMHeaderActions from "@/components/RMHeaderActions";
 
 // Sempre busca dados frescos do banco
-export const dynamic = "force-dynamic";
 
 
 const STATUS_LABELS = {

@@ -4,7 +4,6 @@ import { requireRole } from "@/lib/session";
 import { isoWeekString, parseSemana, semanaInicio, semanaFim, fmtSemana } from "@/lib/semana";
 import { ExternalLink, FileText, Package } from "lucide-react";
 
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Workspace Torg — Romaneios (Produção)",

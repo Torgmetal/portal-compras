@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { FolderKanban, FileText, Mail, Truck, ChevronRight } from "lucide-react";
 
-export const dynamic = "force-dynamic";
 
 const STATUS_OP = {
   ABERTA:      { label: "Aberta",       className: "bg-torg-blue-50 text-torg-blue" },

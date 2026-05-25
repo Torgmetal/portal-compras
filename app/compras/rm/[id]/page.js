@@ -7,7 +7,6 @@ import { labelCategoria } from "@/lib/op-categorias";
 import RMComprasClient from "./RMComprasClient";
 
 // Sempre busca dados frescos do banco
-export const dynamic = "force-dynamic";
 
 
 export default async function RMComprasDetail({ params }) {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -245,5 +246,7 @@ export async function POST(req) {
           `Descrição: ${body.descricao}\nItens: ${body.itens.length}\n\nAcesse: ${linkRM}`,
   }).catch((e) => console.error("[notificar RM_CRIADA] erro:", e?.message));
 
+  revalidatePath("/rm");
+  revalidatePath("/compras");
   return NextResponse.json({ id: rm.id, numero: rm.numero });
 }

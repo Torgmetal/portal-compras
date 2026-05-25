@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { DADOS_TORG } from "@/lib/empresa";
 import CotacaoFornecedorForm from "./CotacaoFornecedorForm";
 
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Workspace Torg — Upload de Cotação",

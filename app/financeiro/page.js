@@ -3,7 +3,6 @@ import { requireRole } from "@/lib/session";
 import { isoWeekString, parseSemana, semanaInicio, semanaFim } from "@/lib/semana";
 import FinanceiroClient from "./FinanceiroClient";
 
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Workspace Torg — Portal Financeiro",

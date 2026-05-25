@@ -5,7 +5,6 @@ import { PlusCircle, ClipboardList, AlertTriangle } from "lucide-react";
 import RMRowActions from "@/components/RMRowActions";
 
 // Sempre busca dados frescos do banco
-export const dynamic = "force-dynamic";
 
 
 const STATUS_LABELS = {

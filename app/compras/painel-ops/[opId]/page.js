@@ -9,7 +9,6 @@ import OPAcoesClient from "./OPAcoesClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
 import FDAvulsosSection from "@/components/FDAvulsosSection";
 
-export const dynamic = "force-dynamic";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";

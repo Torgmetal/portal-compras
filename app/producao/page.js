@@ -3,7 +3,6 @@ import { requireRole } from "@/lib/session";
 import { isoWeekString, ultimasSemanas, parseSemana, semanaInicio, semanaFim } from "@/lib/semana";
 import ProducaoClient from "./ProducaoClient";
 
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Workspace Torg — Painel de Produção",

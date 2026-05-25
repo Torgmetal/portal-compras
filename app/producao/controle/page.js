@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import ControleClient from "./ControleClient";
 
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Workspace Torg — Controle de Produção",

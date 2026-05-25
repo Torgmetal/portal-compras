@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import EstoqueClient from "./EstoqueClient";
 
-export const dynamic = "force-dynamic";
 
 export default async function EstoquePage() {
   const user = await requireRole(["ADMIN", "COMPRAS"]);

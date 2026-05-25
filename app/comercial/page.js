@@ -5,7 +5,6 @@ import { PlusCircle, FolderKanban, Activity, AlertTriangle, DollarSign } from "l
 import OPRowActions from "./OPRowActions";
 
 // Sempre busca dados frescos do banco
-export const dynamic = "force-dynamic";
 
 
 const STATUS_LABELS = {

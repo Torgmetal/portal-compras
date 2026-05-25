@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import NotificacoesClient from "./NotificacoesClient";
 
-export const dynamic = "force-dynamic";
 
 export default async function NotificacoesPage() {
   const user = await requireRole(["ADMIN", "COMPRAS"]);

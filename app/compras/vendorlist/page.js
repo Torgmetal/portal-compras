@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import VendorListClient from "./VendorListClient";
 
-export const dynamic = "force-dynamic";
 
 export default async function VendorListPage() {
   const user = await requireRole(["ADMIN", "COMPRAS"]);

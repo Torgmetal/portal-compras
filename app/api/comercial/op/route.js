@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -94,5 +95,6 @@ export async function POST(req) {
     },
   });
 
+  revalidatePath("/comercial");
   return NextResponse.json({ id: op.id, numero: op.numero });
 }

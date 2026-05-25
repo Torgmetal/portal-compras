@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import ExpedicaoClient from "./ExpedicaoClient";
 
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Workspace Torg — Portal de Expedição",

@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import NovaRMClient from "./NovaRMClient";
 
-export const dynamic = "force-dynamic";
 
 export default async function NovaRMPage() {
   const user = await requireUser();

@@ -5,7 +5,6 @@ import { FileText, BarChart3, Truck, ClipboardList } from "lucide-react";
 import RMsTabelaSeletor from "./RMsTabelaSeletor";
 
 // Sempre busca dados frescos do banco (sem cache de Server Component)
-export const dynamic = "force-dynamic";
 
 const STATUS_LABELS = {
   ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },

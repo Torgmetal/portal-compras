@@ -7,7 +7,6 @@ import OPDetailClient from "./OPDetailClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
 
 // Sempre busca dados frescos do banco
-export const dynamic = "force-dynamic";
 
 
 export default async function OPDetailPage({ params }) {

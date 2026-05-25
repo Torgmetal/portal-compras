@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { History, ArrowRight, Filter } from "lucide-react";
 
-export const dynamic = "force-dynamic";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";

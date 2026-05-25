@@ -2,7 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import ChecklistClient from "./ChecklistClient";
 
-export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Checklist de Expedição — Workspace Torg",
