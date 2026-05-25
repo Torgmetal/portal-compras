@@ -85,15 +85,19 @@ async function executarSync({ userId = null, mesesAtras = 0 } = {}) {
   let criadosTotal = 0, atualizadosTotal = 0;
   const sumario = [];
   const erros = [];
-  for (const targetDate of targets) {
-    try {
-      const r = await sincronizarMes({ targetDate });
+  // Paraleliza o download+parse+upsert de cada mês (independentes entre si)
+  const resultados = await Promise.allSettled(targets.map((targetDate) => sincronizarMes({ targetDate })));
+  for (let i = 0; i < targets.length; i++) {
+    const res = resultados[i];
+    const targetDate = targets[i];
+    if (res.status === "fulfilled") {
+      const r = res.value;
       criadosTotal += r.criados;
       atualizadosTotal += r.atualizados;
       sumario.push(`${r.parsed.mes}: ${r.parsed.diasComDado}d/${r.parsed.setoresExtraidos.length}set (${r.criados}+/${r.atualizados}~)`);
-    } catch (e) {
+    } else {
       const nomeMes = targetDate.toLocaleString("pt-BR", { month: "long" });
-      erros.push(`${nomeMes}: ${e.message}`);
+      erros.push(`${nomeMes}: ${res.reason?.message ?? "erro desconhecido"}`);
     }
   }
 

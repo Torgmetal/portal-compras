@@ -77,9 +77,10 @@ export async function POST(req) {
   // as demais ficam vinculadas via os CotacaoItens que apontam pra rmItemId delas).
   const rmPrincipal = rms.find((r) => r.id === rmIds[0]) || rms[0];
 
-  const cotacoesCriadas = [];
+  let cotacoesCriadas = [];
   await prisma.$transaction(async (tx) => {
-    for (const f of body.fornecedores) {
+    // Cria todas as cotações (uma por fornecedor) em paralelo
+    cotacoesCriadas = await Promise.all(body.fornecedores.map(async (f) => {
       const token = randomUUID();
       const cot = await tx.cotacao.create({
         data: {
@@ -104,20 +105,20 @@ export async function POST(req) {
           },
         },
       });
-      // Registra envio em todas as RMs envolvidas
-      for (const rm of rms) {
-        await tx.envio.create({
+      // Registra envio em todas as RMs envolvidas (paralelo por RM)
+      await Promise.all(rms.map((rm) =>
+        tx.envio.create({
           data: { rmId: rm.id, fornecedorNome: f.nome, fornecedorEmail: f.email },
-        });
-      }
-      cotacoesCriadas.push({
+        })
+      ));
+      return {
         id: cot.id,
         token: cot.token,
         fornecedorNome: f.nome,
         fornecedorEmail: f.email,
         rmsVinculadas: rms.map((r) => r.numero),
-      });
-    }
+      };
+    }));
 
     // Marca itens PENDENTES como EM_COTACAO
     await tx.rMItem.updateMany({
@@ -128,11 +129,13 @@ export async function POST(req) {
       data: { status: "EM_COTACAO" },
     });
 
-    // Atualiza status das RMs envolvidas
-    for (const rm of rms) {
-      if (rm.status === "ABERTA") {
-        await tx.rM.update({ where: { id: rm.id }, data: { status: "EM_COTACAO" } });
-      }
+    // Atualiza status das RMs que estavam ABERTA para EM_COTACAO (batch)
+    const rmIdsAberta = rms.filter((rm) => rm.status === "ABERTA").map((rm) => rm.id);
+    if (rmIdsAberta.length > 0) {
+      await tx.rM.updateMany({
+        where: { id: { in: rmIdsAberta } },
+        data: { status: "EM_COTACAO" },
+      });
     }
 
     await tx.auditLog.create({

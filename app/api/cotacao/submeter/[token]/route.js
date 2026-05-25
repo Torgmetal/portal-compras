@@ -94,8 +94,9 @@ export async function POST(req, { params }) {
   }
 
   await prisma.$transaction(async (tx) => {
-    for (const it of itensValidos) {
-      await tx.cotacaoItem.update({
+    // Atualiza todos os itens em paralelo (independentes dentro da mesma transação)
+    await Promise.all(itensValidos.map((it) =>
+      tx.cotacaoItem.update({
         where: { id: it.cotacaoItemId },
         data: {
           precoUnit: it.precoUnit,
@@ -104,8 +105,8 @@ export async function POST(req, { params }) {
           ipiPct: it.ipiPct ?? null,
           observacao: it.observacao || null,
         },
-      });
-    }
+      })
+    ));
 
     // Combina observações em um único campo
     const obsParts = [];
