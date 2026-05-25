@@ -11,6 +11,7 @@ export default async function EstoquePage() {
     prisma.estoqueItem.findMany({
       where: { ativo: true },
       orderBy: { descricao: "asc" },
+      take: 1000, // Limite de segurança; catálogo Omie raramente passa disso
     }),
     prisma.configEstoque.findFirst(),
   ]);

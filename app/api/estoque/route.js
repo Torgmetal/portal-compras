@@ -25,9 +25,13 @@ export async function GET(req) {
     ];
   }
 
+  // Limite de segurança: sem busca retorna até 500 (catálogo geral);
+  // com busca retorna até 100 (dropdown de seleção)
+  const limite = busca ? 100 : 500;
   const items = await prisma.estoqueItem.findMany({
     where,
     orderBy: { descricao: "asc" },
+    take: limite,
   });
-  return NextResponse.json({ items });
+  return NextResponse.json({ items, total: items.length, limitado: items.length === limite });
 }

@@ -32,33 +32,50 @@ export default async function ComercialHome({ searchParams }) {
   const user = await requireRole(["ADMIN", "COMERCIAL"]);
   const verFinalizadas = searchParams?.finalizadas === "1";
 
-  const opsRaw = await prisma.oP.findMany({
-    include: {
-      itens: { select: { valorVerba: true } },
-      aditivos: { include: { itens: { select: { valorVerba: true } } } },
-      _count: { select: { rms: true } },
-    },
-  });
-  // Ordena numericamente pelo número em ordem crescente (00, 060, 064, 067, 088...)
-  const ops = opsRaw.sort((a, b) =>
-    (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
-  );
+  // Duas queries paralelas:
+  // 1. KPI (leve, sem _count): busca todos pra calcular totais/verba corretamente
+  // 2. Tabela (completo, filtrado + paginado): só as OPs da aba atual
+  const whereTabela = verFinalizadas
+    ? { OR: [{ status: { in: ["ENCERRADA", "CANCELADA"] } }, { dataFimReal: { not: null } }] }
+    : { status: { notIn: ["ENCERRADA", "CANCELADA"] }, dataFimReal: null };
 
-  const opsComTotaisRaw = ops.map((op) => {
+  const [opsKpiRaw, opsTabelaRaw] = await Promise.all([
+    // Query leve: apenas campos necessários para KPI + cálculo de status
+    prisma.oP.findMany({
+      select: {
+        id: true,
+        status: true,
+        dataInicio: true,
+        dataFimPrevista: true,
+        dataFimReal: true,
+        itens: { select: { valorVerba: true } },
+        aditivos: { include: { itens: { select: { valorVerba: true } } } },
+      },
+    }),
+    // Query completa: filtrada pela aba atual, máx 200 OPs
+    prisma.oP.findMany({
+      where: whereTabela,
+      include: {
+        itens: { select: { valorVerba: true } },
+        aditivos: { include: { itens: { select: { valorVerba: true } } } },
+        _count: { select: { rms: true } },
+      },
+      take: 200,
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  // KPIs calculados sobre todas as OPs (query leve)
+  const opsKpiComStatus = opsKpiRaw.map((op) => {
     const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);
     const verbaAditivos = op.aditivos.reduce(
       (s, a) => s + a.itens.reduce((ss, i) => ss + i.valorVerba, 0),
       0
     );
-    return {
-      ...op,
-      verbaTotal: verbaBase + verbaAditivos,
-      statusCalc: calcStatus(op),
-    };
+    return { ...op, verbaTotal: verbaBase + verbaAditivos, statusCalc: calcStatus(op) };
   });
 
-  // KPIs sempre consideram TODAS as OPs (independente do filtro) pra dar visao geral
-  const kpis = opsComTotaisRaw.reduce(
+  const kpis = opsKpiComStatus.reduce(
     (acc, op) => {
       acc.total += 1;
       if (op.statusCalc === "EM_EXECUCAO") acc.emExecucao += 1;
@@ -71,18 +88,27 @@ export default async function ComercialHome({ searchParams }) {
     { total: 0, emExecucao: 0, atrasadas: 0, verbaAtiva: 0 }
   );
 
-  // Filtro: aba 'Ativas' = todas que nao estao encerradas/canceladas;
-  //         aba 'Finalizadas' = ENCERRADA + CANCELADA
-  const opsComTotais = opsComTotaisRaw.filter((op) =>
-    verFinalizadas
-      ? op.statusCalc === "ENCERRADA" || op.statusCalc === "CANCELADA"
-      : op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
-  );
-
-  const totalAtivas = opsComTotaisRaw.filter(
+  const totalAtivas = opsKpiComStatus.filter(
     (op) => op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
   ).length;
-  const totalFinalizadas = opsComTotaisRaw.length - totalAtivas;
+  const totalFinalizadas = opsKpiComStatus.length - totalAtivas;
+
+  // Tabela: enriquece os dados filtrados e ordena numericamente
+  const opsComTotais = opsTabelaRaw
+    .map((op) => {
+      const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);
+      const verbaAditivos = op.aditivos.reduce(
+        (s, a) => s + a.itens.reduce((ss, i) => ss + i.valorVerba, 0),
+        0
+      );
+      return { ...op, verbaTotal: verbaBase + verbaAditivos, statusCalc: calcStatus(op) };
+    })
+    .sort((a, b) =>
+      (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
+    );
+
+  // Variável mantida por compat com o JSX abaixo (usada apenas na checagem de vazio)
+  const opsComTotaisRaw = opsKpiComStatus;
 
   const cards = [
     { label: "Total OPs",    value: kpis.total,                 color: "bg-torg-blue",     Icon: FolderKanban },
