@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { LogOut, Settings, ChevronDown, Tag, Clock } from "lucide-react";
-import { VERSAO_ATUAL, CHANGELOG } from "@/lib/versao";
+import { VERSAO_ATUAL, BUILD_HASH, BUILD_DATE, CHANGELOG } from "@/lib/versao";
 
 export default function SidebarUserFooter() {
   const { data: session } = useSession();
@@ -51,8 +51,9 @@ export default function SidebarUserFooter() {
           <span className="flex items-center gap-1.5">
             <Tag size={10} />
             <span className="font-mono font-semibold">v{VERSAO_ATUAL}</span>
-            <span className="text-torg-gray/60">Portal Torg</span>
+            <span className="font-mono text-torg-gray/50">#{BUILD_HASH}</span>
           </span>
+          <span className="text-torg-gray/50">{BUILD_DATE}</span>
           <ChevronDown
             size={10}
             className={`transition-transform ${versaoAberta ? "rotate-180" : ""}`}
@@ -61,9 +62,14 @@ export default function SidebarUserFooter() {
 
         {versaoAberta && (
           <div className="absolute bottom-full left-0 right-0 mb-1 mx-3 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-3 space-y-3 max-h-72 overflow-y-auto">
-            <p className="px-3 text-[10px] text-torg-gray uppercase tracking-wider font-semibold">
-              Histórico de versões
-            </p>
+            <div className="px-3 pb-2 border-b border-gray-100">
+              <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold mb-1">
+                Histórico de versões
+              </p>
+              <p className="text-[9px] text-torg-gray/60 font-mono">
+                build {BUILD_HASH} · {BUILD_DATE}
+              </p>
+            </div>
             {CHANGELOG.map((release) => (
               <div key={release.versao} className="px-3">
                 <div className="flex items-center justify-between mb-0.5">
