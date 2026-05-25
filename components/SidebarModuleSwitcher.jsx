@@ -25,7 +25,7 @@ const MODULOS = [
     desc: "OPs, contratos e medições",
     icon: FolderKanban,
     cor: "bg-blue-100 text-blue-700",
-    roles: ["ADMIN", "COMERCIAL"],
+    modulos: ["COMERCIAL"], // null = liberado pra todos; array = requer um desses módulos ou ADMIN
   },
   {
     href: "/compras",
@@ -33,7 +33,7 @@ const MODULOS = [
     desc: "RMs, cotações e pedidos",
     icon: ShoppingCart,
     cor: "bg-orange-100 text-orange-700",
-    roles: ["ADMIN", "COMPRAS"],
+    modulos: ["COMPRAS"],
   },
   {
     href: "/rm",
@@ -41,7 +41,7 @@ const MODULOS = [
     desc: "Criar e acompanhar RMs",
     icon: ClipboardList,
     cor: "bg-cyan-100 text-cyan-700",
-    roles: null, // liberado pra todos os logados
+    modulos: null, // liberado pra todos os logados
   },
   {
     href: "/producao",
@@ -49,7 +49,7 @@ const MODULOS = [
     desc: "Controle e romaneios",
     icon: Factory,
     cor: "bg-green-100 text-green-700",
-    roles: ["ADMIN", "PRODUCAO", "ALMOXARIFADO"],
+    modulos: ["PRODUCAO", "ALMOXARIFADO"],
   },
   {
     href: "/financeiro",
@@ -57,7 +57,7 @@ const MODULOS = [
     desc: "Fluxo de caixa e KPIs",
     icon: DollarSign,
     cor: "bg-pink-100 text-pink-700",
-    roles: ["ADMIN", "FINANCEIRO"],
+    modulos: ["FINANCEIRO"],
   },
   {
     href: "/expedicao",
@@ -65,7 +65,7 @@ const MODULOS = [
     desc: "Romaneios de saída",
     icon: Truck,
     cor: "bg-teal-100 text-teal-700",
-    roles: ["ADMIN", "EXPEDICAO"],
+    modulos: ["EXPEDICAO"],
   },
   {
     href: "/admin/usuarios",
@@ -73,7 +73,8 @@ const MODULOS = [
     desc: "Usuários e configurações",
     icon: Settings,
     cor: "bg-purple-100 text-purple-700",
-    roles: ["ADMIN"],
+    modulos: [], // apenas ADMIN (array vazio = nenhum módulo de usuário acessa)
+    apenasAdmin: true,
   },
 ];
 
@@ -85,7 +86,8 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
   const [aberto, setAberto] = useState(false);
   const ref = useRef(null);
 
-  const role = session?.user?.role;
+  const isAdmin = session?.user?.tipo === "ADMIN";
+  const userModulos = session?.user?.modulos ?? [];
 
   // Fechar ao clicar fora
   useEffect(() => {
@@ -111,11 +113,13 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
     }
   }, [aberto]);
 
-  // Filtrar módulos acessíveis pelo role
+  // Filtrar módulos acessíveis por tipo/modulos
   const modulosVisiveis = MODULOS.filter((m) => {
-    if (!role) return false;
-    if (m.roles === null) return true; // liberado pra todos
-    return m.roles.includes(role);
+    if (!session?.user) return false;
+    if (m.apenasAdmin) return isAdmin;
+    if (m.modulos === null) return true; // liberado pra todos os logados
+    if (isAdmin) return true;
+    return m.modulos.some(mod => userModulos.includes(mod));
   });
 
   // Só mostra o switcher se tem mais de 1 módulo acessível

@@ -45,18 +45,20 @@ export default withAuth(
         if (path.startsWith("/compras") && !isAdmin && !modulos.includes("COMPRAS")) {
           return false;
         }
-        if (path.startsWith("/admin") && token.role !== "ADMIN") {
+        if (path.startsWith("/admin") && !isAdmin) {
           return false;
         }
         if (
           path.startsWith("/expedicao") &&
-          !["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA"].includes(token.role)
+          !isAdmin &&
+          !["EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA"].some(m => modulos.includes(m))
         ) {
           return false;
         }
         if (
           path.startsWith("/producao") &&
-          !["ADMIN", "PRODUCAO", "EXPEDICAO", "COMERCIAL", "ENGENHARIA"].includes(token.role)
+          !isAdmin &&
+          !["PRODUCAO", "EXPEDICAO", "COMERCIAL", "ENGENHARIA"].some(m => modulos.includes(m))
         ) {
           return false;
         }
