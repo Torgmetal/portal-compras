@@ -1506,21 +1506,29 @@ model BDMPerfil {
 model MesApontamento {
   id           String   @id @default(cuid())
 
-  // Identificadores do SKA (chave de upsert)
-  dataApontamento DateTime @db.Date
-  turno        Int      // -2=todos, 1=manhã, 2=tarde, 3=noite
-  opNumero     String   // OrderNum do SKA
-  obra         String?  // Obra (campo livre no SKA)
-  setor        String?  // CostCenter (corte, montagem, solda, etc.)
-  maquina      String?  // Resource/máquina
-  operacao     String?  // Operation
-  codigoPeca   String?  // PartCode
+  // Chave única do SKA — ProductionID é inteiro único por apontamento no dataset 242
+  productionId Int      @unique  // ProductionID do SKA (chave de upsert)
+
+  // Dados do apontamento (dataset 242 — Rastreabilidade de OP e Item [TORG] - Produção)
+  dataInicio   DateTime // Data de Início (DD/MM/YYYY HH:mm:ss no SKA)
+  dataFim      DateTime? // Data de Fim
+  obra         String   // campo "Obra" do SKA = número da OP no portal (T70, T78...)
+  opSka        String?  // campo "OP" do SKA = código interno da peça (1SOC-001, T78C3...)
+  setor        String?  // Setor (Corte, Montagem, Solda, Acabamento, etc.)
+  maquina      String?  // Máquina (LASER CHAPA, MONTAGEM 2, SOLDA 4...)
+  codigoMaquina String? // Código da máquina (09, 30B, 40D...)
+  operacao     String?  // Operação (10, 30, 40, 50...)
+  descricaoItem String? // Desc. Item
+  operador     String?  // nome do operador
+  status       String?  // Produzindo | Finalizado | Finalizado Total | Finalizado Parcial
 
   // Quantidades produzidas
-  produzidoKg  Float    @default(0)
-  produzidoUn  Float    @default(0)
+  produzidoUn  Float    @default(0)  // campo "Produzido" (unidades)
+  rejeitado    Float    @default(0)  // campo "Rejeitado"
+  retrabalhado Float    @default(0)  // campo "Retrabalhado"
+  produzidoKg  Float    @default(0)  // campo "Peso" (kg)
 
-  // Vínculo com OP do portal (resolvido durante sync pelo opNumero)
+  // Vínculo com OP do portal (resolvido durante sync via campo Obra)
   opId         String?
   op           OP?      @relation("MesApontamentosOP", fields: [opId], references: [id], onDelete: SetNull)
 
@@ -1529,11 +1537,11 @@ model MesApontamento {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@unique([dataApontamento, opNumero, setor, maquina, operacao, codigoPeca])
   @@index([opId])
-  @@index([dataApontamento])
-  @@index([opNumero])
+  @@index([obra])
+  @@index([dataInicio])
   @@index([setor])
+  @@index([status])
 }
 
 // Log de cada execução do sync com o MES SKA.

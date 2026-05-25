@@ -5,36 +5,56 @@ import { prisma } from "@/lib/prisma";
 // Endpoint de recebimento de dados do MES SKA/Syneco.
 // Chamado pelo agente local (scripts/mes-sync-agent.js) via HTTPS a cada hora.
 // Auth: Bearer token fixo via MES_SYNC_API_KEY no .env
+//
+// Dataset usado: 242 — "04.4 Rastreabilidade de OP e Item [TORG] - Produção"
+// Campos-chave: ProductionID (único), Obra (= OP portal), Peso (KG), Produzido (UN)
 
 const apontamentoSchema = z.object({
-  dataApontamento: z.string(), // "2026-05-25" ISO date
-  turno:           z.number().int(),
-  opNumero:        z.string(),
-  obra:            z.string().nullable().optional(),
-  setor:           z.string().nullable().optional(),
-  maquina:         z.string().nullable().optional(),
-  operacao:        z.string().nullable().optional(),
-  codigoPeca:      z.string().nullable().optional(),
-  produzidoKg:     z.number().default(0),
-  produzidoUn:     z.number().default(0),
+  productionId:  z.number().int(),             // ProductionID do SKA — chave de upsert
+  dataInicio:    z.string(),                    // "25/05/2026 14:47:37" ou ISO
+  dataFim:       z.string().nullable().optional(),
+  obra:          z.string(),                    // = número da OP no portal (T70, T78...)
+  opSka:         z.string().nullable().optional(), // código peça interno SKA (1SOC-001...)
+  setor:         z.string().nullable().optional(),
+  maquina:       z.string().nullable().optional(),
+  codigoMaquina: z.string().nullable().optional(),
+  operacao:      z.string().nullable().optional(),
+  descricaoItem: z.string().nullable().optional(),
+  operador:      z.string().nullable().optional(),
+  status:        z.string().nullable().optional(),
+  produzidoUn:   z.number().default(0),
+  rejeitado:     z.number().default(0),
+  retrabalhado:  z.number().default(0),
+  produzidoKg:   z.number().default(0),
 });
 
 const bodySchema = z.object({
-  apontamentos: z.array(apontamentoSchema).min(1).max(5000),
-  dataInicio:   z.string(), // periodo sincronizado
+  apontamentos: z.array(apontamentoSchema).min(1).max(10000),
+  dataInicio:   z.string(),
   dataFim:      z.string(),
   duracaoMs:    z.number().int().optional(),
 });
 
+// Converte string "DD/MM/YYYY HH:mm:ss" ou ISO para Date
+function parseData(s) {
+  if (!s) return null;
+  // Formato BR: "25/05/2026 14:47:37"
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+    const [datePart, timePart] = s.split(" ");
+    const [dd, mm, yyyy] = datePart.split("/");
+    const time = timePart || "00:00:00";
+    return new Date(`${yyyy}-${mm}-${dd}T${time}`);
+  }
+  return new Date(s);
+}
+
 export async function POST(req) {
-  // Verifica API key
   const apiKey = process.env.MES_SYNC_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "MES_SYNC_API_KEY não configurada no servidor" }, { status: 503 });
+    return NextResponse.json({ error: "MES_SYNC_API_KEY não configurada" }, { status: 503 });
   }
   const auth = req.headers.get("authorization") || "";
-  const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (provided !== apiKey) {
+  if (auth.slice(7) !== apiKey) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -46,71 +66,82 @@ export async function POST(req) {
   }
 
   const inicio = Date.now();
-  let criados = 0, atualizados = 0, ignorados = 0;
+  let criados = 0, atualizados = 0;
 
-  // Pré-carrega mapa opNumero → opId pra resolver vínculos sem N queries
-  const numerosUnicos = [...new Set(body.apontamentos.map((a) => a.opNumero).filter(Boolean))];
+  // Pré-carrega mapa obra → opId (Obra no SKA = numero da OP no portal)
+  const obrasUnicas = [...new Set(body.apontamentos.map((a) => a.obra).filter(Boolean))];
   const ops = await prisma.oP.findMany({
-    where: { numero: { in: numerosUnicos } },
+    where: { numero: { in: obrasUnicas } },
     select: { id: true, numero: true },
   });
   const opMap = Object.fromEntries(ops.map((o) => [o.numero, o.id]));
 
-  // Log de sync (cria antes pra ter o ID de referência)
   const syncLog = await prisma.mesSyncLog.create({
     data: {
-      sucesso: false, // atualiza no final
-      dataInicio: new Date(body.dataInicio),
-      dataFim:    new Date(body.dataFim),
+      sucesso: false,
+      dataInicio: parseData(body.dataInicio) || new Date(),
+      dataFim:    parseData(body.dataFim) || new Date(),
       totalLinhas: body.apontamentos.length,
     },
   });
 
   try {
-    // Upsert em lotes de 200 pra não sobrecarregar o DB
     const LOTE = 200;
     for (let i = 0; i < body.apontamentos.length; i += LOTE) {
       const lote = body.apontamentos.slice(i, i + LOTE);
       await Promise.all(
         lote.map(async (ap) => {
-          const opId = opMap[ap.opNumero] || null;
+          const opId = opMap[ap.obra] || null;
+          const dataInicioDate = parseData(ap.dataInicio);
+          const dataFimDate    = ap.dataFim ? parseData(ap.dataFim) : null;
+
+          if (!dataInicioDate) return; // ignora registros sem data
+
           const data = {
-            dataApontamento: new Date(ap.dataApontamento),
-            turno:      ap.turno,
-            opNumero:   ap.opNumero,
-            obra:       ap.obra       || null,
-            setor:      ap.setor      || null,
-            maquina:    ap.maquina    || null,
-            operacao:   ap.operacao   || null,
-            codigoPeca: ap.codigoPeca || null,
-            produzidoKg: ap.produzidoKg ?? 0,
-            produzidoUn: ap.produzidoUn ?? 0,
+            productionId:  ap.productionId,
+            dataInicio:    dataInicioDate,
+            dataFim:       dataFimDate,
+            obra:          ap.obra,
+            opSka:         ap.opSka         || null,
+            setor:         ap.setor         || null,
+            maquina:       ap.maquina       || null,
+            codigoMaquina: ap.codigoMaquina || null,
+            operacao:      ap.operacao      || null,
+            descricaoItem: ap.descricaoItem || null,
+            operador:      ap.operador      || null,
+            status:        ap.status        || null,
+            produzidoUn:   ap.produzidoUn   ?? 0,
+            rejeitado:     ap.rejeitado     ?? 0,
+            retrabalhado:  ap.retrabalhado  ?? 0,
+            produzidoKg:   ap.produzidoKg   ?? 0,
             opId,
             syncRunId: syncLog.id,
           };
-          const res = await prisma.mesApontamento.upsert({
-            where: {
-              dataApontamento_opNumero_setor_maquina_operacao_codigoPeca: {
-                dataApontamento: data.dataApontamento,
-                opNumero:   data.opNumero,
-                setor:      data.setor      ?? "",
-                maquina:    data.maquina    ?? "",
-                operacao:   data.operacao   ?? "",
-                codigoPeca: data.codigoPeca ?? "",
-              },
-            },
-            create: data,
-            update: {
-              produzidoKg: data.produzidoKg,
-              produzidoUn: data.produzidoUn,
-              opId:        data.opId,
-              syncRunId:   data.syncRunId,
-            },
+
+          const existing = await prisma.mesApontamento.findUnique({
+            where: { productionId: ap.productionId },
+            select: { id: true },
           });
-          // Prisma upsert não distingue create vs update nativamente,
-          // mas podemos inferir pelo createdAt ≈ updatedAt
-          if (res.createdAt.getTime() === res.updatedAt.getTime()) criados++;
-          else atualizados++;
+
+          if (existing) {
+            await prisma.mesApontamento.update({
+              where: { productionId: ap.productionId },
+              data: {
+                dataFim: data.dataFim,
+                status:  data.status,
+                produzidoUn: data.produzidoUn,
+                rejeitado:   data.rejeitado,
+                retrabalhado: data.retrabalhado,
+                produzidoKg: data.produzidoKg,
+                opId:      data.opId,
+                syncRunId: data.syncRunId,
+              },
+            });
+            atualizados++;
+          } else {
+            await prisma.mesApontamento.create({ data });
+            criados++;
+          }
         })
       );
     }
@@ -118,33 +149,25 @@ export async function POST(req) {
     const duracaoMs = Date.now() - inicio;
     await prisma.mesSyncLog.update({
       where: { id: syncLog.id },
-      data: {
-        sucesso: true,
-        criados,
-        atualizados,
-        ignorados,
-        duracaoMs: body.duracaoMs ?? duracaoMs,
-      },
+      data: { sucesso: true, criados, atualizados, duracaoMs: body.duracaoMs ?? duracaoMs },
     });
 
-    return NextResponse.json({ ok: true, criados, atualizados, ignorados, syncId: syncLog.id });
+    return NextResponse.json({ ok: true, criados, atualizados, syncId: syncLog.id });
   } catch (e) {
     console.error("[mes/sync] erro:", e?.message);
     await prisma.mesSyncLog.update({
       where: { id: syncLog.id },
       data: { sucesso: false, erro: e?.message || "erro desconhecido", duracaoMs: Date.now() - inicio },
     }).catch(() => {});
-    return NextResponse.json({ error: "Erro interno ao processar apontamentos: " + e?.message }, { status: 500 });
+    return NextResponse.json({ error: "Erro interno: " + e?.message }, { status: 500 });
   }
 }
 
-// GET — retorna status do último sync (usado pelo painel do portal)
 export async function GET(req) {
   const apiKey = process.env.MES_SYNC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "não configurado" }, { status: 503 });
   const auth = req.headers.get("authorization") || "";
-  const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (provided !== apiKey) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (auth.slice(7) !== apiKey) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ultimo = await prisma.mesSyncLog.findFirst({ orderBy: { criadoEm: "desc" } });
   return NextResponse.json({ ultimoSync: ultimo });
