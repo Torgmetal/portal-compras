@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { prisma, waitMesTables } from "@/lib/prisma";
 
 // Endpoint de recebimento de dados do MES SKA/Syneco.
 // Chamado pelo agente local (scripts/mes-sync-agent.js) via HTTPS a cada hora.
@@ -59,6 +59,7 @@ function parseData(s) {
 }
 
 export async function POST(req) {
+  await waitMesTables();
   const apiKey = process.env.MES_SYNC_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "MES_SYNC_API_KEY não configurada" }, { status: 503 });
@@ -177,6 +178,7 @@ export async function POST(req) {
 }
 
 export async function GET(req) {
+  await waitMesTables();
   const apiKey = process.env.MES_SYNC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "não configurado" }, { status: 503 });
   const auth = req.headers.get("authorization") || "";

@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma, waitMesTables } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import MesClient from "./MesClient";
 
@@ -7,6 +7,7 @@ export const metadata = {
 };
 
 export default async function MesPage() {
+  await waitMesTables();
   await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL", "COMPRAS"]);
 
   // Data de hoje no fuso Brasil/São Paulo (UTC-3, sem horário de verão desde 2019)

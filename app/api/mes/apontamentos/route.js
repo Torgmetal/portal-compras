@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, waitMesTables } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
 // GET /api/mes/apontamentos
@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/session";
 // Auth: sessão NextAuth (ADMIN, PRODUCAO, COMERCIAL, COMPRAS)
 
 export async function GET(req) {
+  await waitMesTables();
   try {
     await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL", "COMPRAS"]);
   } catch (e) {
