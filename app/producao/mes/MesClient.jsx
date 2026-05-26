@@ -13,11 +13,13 @@ function fmtNum(n, dec = 1) {
 }
 function fmtData(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  // timeZone: "UTC" — dados armazenados como UTC naïve (hora BRT sem offset);
+  // exibir em UTC devolve o horário original do MES sem deslocamento de fuso.
+  return new Date(d).toLocaleString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 function fmtDataCurta(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function tempoRelativo(d) {
   if (!d) return "nunca";

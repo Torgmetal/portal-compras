@@ -15,9 +15,10 @@ export default async function MesPage() {
   const hojeStr = new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Sao_Paulo" })
     .format(new Date()); // retorna "YYYY-MM-DD"
 
-  // Janela de consulta: hoje 00:00 → 23:59 no fuso de SP
-  const de  = new Date(hojeStr + "T00:00:00-03:00");
-  const ate = new Date(hojeStr + "T23:59:59-03:00");
+  // Dados armazenados como UTC naïve (hora BRT salva sem offset).
+  // Comparamos com meia-noite UTC para preservar o dia exato do Brasil.
+  const de  = new Date(hojeStr + "T00:00:00.000Z");
+  const ate = new Date(hojeStr + "T23:59:59.999Z");
 
   const [grupos, totaisPorObra, opsDb, ultimoSync, totalGeral] = await Promise.all([
     prisma.mesApontamento.groupBy({
