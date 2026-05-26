@@ -18,7 +18,7 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
   const [busca, setBusca] = useState("");
   const [filtroCat, setFiltroCat] = useState(null);
   // 3 estados: null = todos | "torg" = apenas Estoque Torg | "outros" = apenas nao-Estoque-Torg
-  const [filtroTorg, setFiltroTorg] = useState("torg");
+  const [filtroTorg, setFiltroTorg] = useState(null);
   const [sincronizando, setSincronizando] = useState(false);
   const [erro, setErro] = useState("");
   const [info, setInfo] = useState("");
@@ -90,9 +90,8 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
         if (data.produtos.error) partes.push(`Produtos: ${data.produtos.error}`);
         else {
           let txt = `${data.produtos.criados} criados, ${data.produtos.atualizados} atualizados`;
-          if (data.produtos.estoqueTorgMarcados !== undefined) {
-            txt += ` (${data.produtos.estoqueTorgMarcados} marcados como Estoque Torg)`;
-          }
+          if (data.produtos.desativados > 0) txt += `, ${data.produtos.desativados} desativados`;
+          if (data.produtos.estoqueTorgMarcados) txt += ` (${data.produtos.estoqueTorgMarcados} Estoque Torg)`;
           partes.push(txt);
         }
       }
@@ -114,14 +113,14 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight inline-flex items-center gap-2">
-            <Package size={26} className="text-torg-blue" /> Estoque Torg
+            <Package size={26} className="text-torg-blue" /> Catálogo Omie
           </h2>
           <p className="text-sm text-torg-gray mt-1">
-            Materiais sincronizados do Omie via ListarPosEstoque.
-            {(config?.palavrasChave || []).length > 0 ? (
-              <> Palavras-chave: <strong>{(config.palavrasChave || []).join(", ")}</strong>.</>
+            Todos os produtos ativos sincronizados do Omie ERP.
+            {config?.ultimaSincProd ? (
+              <> Última sync: <strong>{fmtDataHora(config.ultimaSincProd)}</strong>.</>
             ) : (
-              <> <span className="text-amber-700">Configure palavras-chave pra marcar produtos como Estoque Torg.</span></>
+              <> <span className="text-amber-700">Ainda sem sincronização. Clique em "Sincronizar agora".</span></>
             )}
           </p>
         </div>
@@ -364,14 +363,30 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por descrição ou código..."
+            placeholder="Buscar por descrição, código ou família..."
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-torg-blue"
           />
         </div>
+        <select
+          value={filtroCat || ""}
+          onChange={(e) => setFiltroCat(e.target.value || null)}
+          className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue"
+        >
+          <option value="">Todas as famílias</option>
+          {categorias.map((c) => (
+            <option key={c.codigo} value={c.codigo}>{c.label || c.codigo}</option>
+          ))}
+        </select>
         <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs">
           <button
+            onClick={() => setFiltroTorg(null)}
+            className={`px-3 py-2 ${filtroTorg === null ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}
+          >
+            Todos ({itens.length})
+          </button>
+          <button
             onClick={() => setFiltroTorg("torg")}
-            className={`px-3 py-2 ${filtroTorg === "torg" ? "bg-emerald-600 text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}
+            className={`px-3 py-2 border-l border-gray-300 ${filtroTorg === "torg" ? "bg-emerald-600 text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}
           >
             Estoque Torg ({totalTorg})
           </button>
@@ -381,25 +396,10 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
           >
             Outros ({itens.length - totalTorg})
           </button>
-          <button
-            onClick={() => setFiltroTorg(null)}
-            className={`px-3 py-2 border-l border-gray-300 ${filtroTorg === null ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"}`}
-          >
-            Todos ({itens.length})
-          </button>
         </div>
-        {categorias.length > 1 && (
-          <select
-            value={filtroCat || ""}
-            onChange={(e) => setFiltroCat(e.target.value || null)}
-            className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue"
-          >
-            <option value="">Todas categorias</option>
-            {categorias.map((c) => (
-              <option key={c.codigo} value={c.codigo}>{c.label}</option>
-            ))}
-          </select>
-        )}
+        <span className="text-xs text-torg-gray whitespace-nowrap">
+          {filtrados.length} produto{filtrados.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
       {/* Tabela */}
@@ -424,6 +424,7 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
                   <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Torg</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Código</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Família</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Qtd</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">CMC</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Valor total</th>
@@ -462,6 +463,9 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
                           {i.descricao}
                         </Link>
                       </td>
+                      <td className="px-4 py-3 text-xs text-torg-gray whitespace-nowrap">
+                        {i.categoriaLabel || i.categoriaOmie || <span className="text-gray-300">—</span>}
+                      </td>
                       <td className={`px-4 py-3 text-right tabular-nums whitespace-nowrap font-medium ${
                         semEstoque ? "text-amber-700" : "text-torg-dark"
                       }`}>
@@ -489,7 +493,7 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
       <div className="text-xs text-torg-gray flex items-center gap-4 flex-wrap">
         <span>Última sync produtos: <strong>{fmtDataHora(config?.ultimaSincProd)}</strong></span>
         <span>Última sync movimentações: <strong>{fmtDataHora(config?.ultimaSincMov)}</strong></span>
-        <span className="text-[10px]">Cron automático: produtos 1x/hora, movimentações 1x/hora</span>
+        <span className="text-[10px]">Cron automático: diariamente às 06:00 (produtos) e 06:30 (movimentações)</span>
       </div>
 
       {modalConfig && (
