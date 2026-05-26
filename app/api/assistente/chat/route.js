@@ -1,0 +1,109 @@
+import { NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
+import { getSession } from "@/lib/session";
+import { getToolsParaUser } from "@/lib/assistente/tools";
+import { executarTool } from "@/lib/assistente/executar-tools";
+import { buildSystemPrompt } from "@/lib/assistente/system-prompt";
+
+// Tempo máximo para o loop de tool use (Vercel limit)
+export const maxDuration = 60;
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Modelo barato e rápido — ideal para chat conversacional
+const MODELO = "claude-haiku-4-5";
+
+// Máximo de mensagens do histórico enviadas ao Claude (controle de custo)
+const MAX_HISTORICO = 20;
+
+// Máximo de rodadas de tool use por pergunta (evita loops infinitos)
+const MAX_TOOL_ROUNDS = 5;
+
+export async function POST(req) {
+  // ─── Auth ─────────────────────────────────────────────────────
+  const session = await getSession();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  const user = session.user;
+
+  // ─── Body ─────────────────────────────────────────────────────
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Body inválido" }, { status: 400 });
+  }
+
+  const { mensagens } = body;
+  if (!Array.isArray(mensagens) || mensagens.length === 0) {
+    return NextResponse.json({ error: "Campo 'mensagens' obrigatório" }, { status: 400 });
+  }
+
+  // Limita histórico enviado ao Claude
+  const historico = mensagens.slice(-MAX_HISTORICO).map((m) => ({
+    role:    m.role === "assistant" ? "assistant" : "user",
+    content: String(m.content || ""),
+  }));
+
+  // ─── Ferramentas disponíveis para este usuário ─────────────────
+  const tools = getToolsParaUser(user);
+  const systemPrompt = buildSystemPrompt(user);
+
+  // ─── Loop de tool use ──────────────────────────────────────────
+  let messages = [...historico];
+  let rodada = 0;
+  let respostaFinal = null;
+
+  while (rodada < MAX_TOOL_ROUNDS) {
+    rodada++;
+
+    const response = await anthropic.messages.create({
+      model:      MODELO,
+      max_tokens: 1024,
+      system:     systemPrompt,
+      tools,
+      messages,
+    });
+
+    // Claude terminou — resposta de texto
+    if (response.stop_reason === "end_turn") {
+      const textoBlock = response.content.find((b) => b.type === "text");
+      respostaFinal = textoBlock?.text || "Desculpe, não consegui gerar uma resposta.";
+      break;
+    }
+
+    // Claude quer usar ferramentas
+    if (response.stop_reason === "tool_use") {
+      // Adiciona a resposta do assistente (com os blocos tool_use) ao histórico
+      messages.push({ role: "assistant", content: response.content });
+
+      // Executa cada tool call em paralelo
+      const toolBlocks = response.content.filter((b) => b.type === "tool_use");
+      const resultados = await Promise.all(
+        toolBlocks.map(async (block) => {
+          const resultado = await executarTool(block.name, block.input);
+          return {
+            type:        "tool_result",
+            tool_use_id: block.id,
+            content:     JSON.stringify(resultado),
+          };
+        })
+      );
+
+      // Adiciona os resultados como mensagem do usuário
+      messages.push({ role: "user", content: resultados });
+      continue;
+    }
+
+    // Outro stop_reason inesperado
+    respostaFinal = "Não consegui processar sua solicitação. Tente novamente.";
+    break;
+  }
+
+  if (!respostaFinal) {
+    respostaFinal = "Atingi o limite de consultas para esta resposta. Tente uma pergunta mais específica.";
+  }
+
+  return NextResponse.json({ resposta: respostaFinal });
+}

@@ -2,6 +2,7 @@ import "./globals.css";
 import { StoreProvider } from "@/lib/store";
 import Toast from "@/components/Toast";
 import NextAuthProvider from "@/components/SessionProvider";
+import TorguinhoChat from "@/components/TorguinhoChat";
 
 export const metadata = {
   title: "Workspace Torg",
@@ -16,6 +17,7 @@ export default function RootLayout({ children }) {
           <StoreProvider>
             {children}
             <Toast />
+            <TorguinhoChat />
           </StoreProvider>
         </NextAuthProvider>
       </body>
