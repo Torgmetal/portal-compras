@@ -22,6 +22,7 @@ export async function GET(req) {
   const de      = searchParams.get("de") || null;    // YYYY-MM-DD
   const ate     = searchParams.get("ate") || null;   // YYYY-MM-DD
   const detalhe = searchParams.get("detalhe") === "1"; // retorna linhas individuais
+  const peca    = searchParams.get("peca") || null;  // busca por peça (descricaoItem ou opSka)
 
   // Filtro base
   const where = {};
@@ -35,18 +36,24 @@ export async function GET(req) {
     if (de)  where.dataInicio.gte = new Date(de  + "T00:00:00.000Z");
     if (ate) where.dataInicio.lte = new Date(ate + "T23:59:59.999Z");
   }
+  if (peca) {
+    where.OR = [
+      { descricaoItem: { contains: peca, mode: "insensitive" } },
+      { opSka:         { contains: peca, mode: "insensitive" } },
+    ];
+  }
 
   // Último sync
   const ultimoSync = await prisma.mesSyncLog.findFirst({
     orderBy: { criadoEm: "desc" },
   });
 
-  if (detalhe && obra) {
-    // Modo detalhe: retorna apontamentos individuais de uma OP
+  if (detalhe && (obra || peca)) {
+    // Modo detalhe: retorna apontamentos individuais (por OP ou busca por peça)
     const rows = await prisma.mesApontamento.findMany({
       where,
       orderBy: [{ dataInicio: "desc" }],
-      take: 2000,
+      take: 500,
     });
     return NextResponse.json({ rows, ultimoSync });
   }
