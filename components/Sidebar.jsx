@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { BarChart3, PlusCircle, Package, FolderKanban, Bell, Building2, Boxes, Layers, CalendarClock, ClipboardList } from "lucide-react";
+import { BarChart3, PlusCircle, Package, FolderKanban, Bell, Building2, Boxes, Layers, CalendarClock, ClipboardList, Wrench, ShoppingCart } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban },
-  { href: "/compras", label: "Painel de Compras", icon: BarChart3, exact: true },
+  { href: "/compras", label: "RMs Materiais", icon: Wrench, exact: true, matchAlso: "/compras/rm/" },
+  { href: "/compras/consumiveis", label: "RMs Consumíveis", icon: ShoppingCart },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/cronograma", label: "Entregas", icon: CalendarClock },
   { href: "/compras/saldo-materiais", label: "Saldo Materiais", icon: ClipboardList },
@@ -31,7 +32,7 @@ export default function Sidebar() {
         {menu.filter((m) => !m.masterOnly || session?.user?.role === "ADMIN").map((m) => {
           const Icon = m.icon;
           const active = m.exact
-            ? pathname === m.href || pathname.startsWith("/compras/rm/")
+            ? pathname === m.href || (m.matchAlso && pathname.startsWith(m.matchAlso))
             : pathname.startsWith(m.href);
           return (
             <Link

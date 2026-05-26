@@ -2,31 +2,24 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { FileText, BarChart3, Truck, ClipboardList } from "lucide-react";
-import RMsTabelaSeletor from "./RMsTabelaSeletor";
-
-// Sempre busca dados frescos do banco (sem cache de Server Component)
+import RMsTabelaSeletor from "../RMsTabelaSeletor";
 
 const STATUS_LABELS = {
   ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },
-  EM_COTACAO:    { label: "Em cotação",     className: "bg-torg-orange-50 text-torg-orange-700" },
+  EM_COTACAO:    { label: "Em cotacao",     className: "bg-torg-orange-50 text-torg-orange-700" },
   COTADA:        { label: "Cotada",         className: "bg-torg-blue-100 text-torg-blue-800" },
   PEDIDO_GERADO: { label: "Pedido gerado",  className: "bg-torg-dark text-white" },
   CANCELADA:     { label: "Cancelada",      className: "bg-gray-100 text-gray-500" },
 };
 
-const TIPO_RM_LABELS = {
-  ENGENHARIA: "Engenharia",
-  INTERNA:    "Interna",
-};
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "--");
 
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
-
-export default async function PainelCompras({ searchParams }) {
+export default async function PainelConsumiveis({ searchParams }) {
   const user = await requireRole(["ADMIN", "COMPRAS"]);
   const verArquivadas = searchParams?.arquivadas === "1";
 
   const where = {
-    tipoRM: "ENGENHARIA",
+    tipoRM: "INTERNA",
     ...(verArquivadas
       ? { status: { in: ["PEDIDO_GERADO", "CANCELADA"] } }
       : { status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] } }),
@@ -49,22 +42,16 @@ export default async function PainelCompras({ searchParams }) {
     }),
     prisma.rM.groupBy({
       by: ["status"],
-      where: { tipoRM: "ENGENHARIA" },
+      where: { tipoRM: "INTERNA" },
       _count: { _all: true },
     }),
-    // Carrega categorias customizadas de fornecedor pra disponibilizar
-    // nos filtros do modal de envio de cotacao (alem das built-in)
     prisma.categoriaFornecedor.findMany({
       where: { ativa: true },
       orderBy: [{ ordem: "asc" }, { label: "asc" }],
     }),
   ]);
 
-  // Conta cotacoes por RM considerando consolidadas: uma cotacao consolidada
-  // que tem itens de varias RMs conta pra cada RM envolvida (nao so a primaria).
-  // Wrap em try/catch defensivo — se a query falhar por algum motivo, cai pro
-  // _count.cotacoes original (pode ficar errado pra consolidadas mas pelo
-  // menos a pagina nao crasha).
+  // Conta cotacoes por RM considerando consolidadas
   try {
     const rmIdsListados = rms.map((r) => r.id);
     if (rmIdsListados.length > 0) {
@@ -86,16 +73,13 @@ export default async function PainelCompras({ searchParams }) {
       }
     }
   } catch (e) {
-    console.error("[/compras] Falha contando cotacoes multi-RM:", e?.message);
+    console.error("[/compras/consumiveis] Falha contando cotacoes multi-RM:", e?.message);
   }
 
-  // Pra cada RM: quantas cotacoes RECEBIDA / quantas PENDENTE / atraso
-  // (cotacao pendente com prazoResposta < hoje). Usado nos KPI cards e
-  // na coluna "Ação" da tabela.
+  // Cotacoes recebidas / pendentes / atrasadas por RM
   try {
     const rmIdsListados = rms.map((r) => r.id);
     if (rmIdsListados.length > 0) {
-      // Busca todas cotacoes que tocam essas RMs (primaria ou consolidada)
       const cotsRelacionadas = await prisma.cotacao.findMany({
         where: {
           OR: [
@@ -109,7 +93,6 @@ export default async function PainelCompras({ searchParams }) {
         },
       });
       const agora = Date.now();
-      // Mapa rmId -> { recebidas: Set<cotId>, pendentes: Set<cotId>, atrasadas: Set<cotId> }
       const infoPorRm = new Map();
       const upsert = (rmId) => {
         if (!infoPorRm.has(rmId)) {
@@ -143,7 +126,7 @@ export default async function PainelCompras({ searchParams }) {
       }
     }
   } catch (e) {
-    console.error("[/compras] Falha agregando status de cotacoes:", e?.message);
+    console.error("[/compras/consumiveis] Falha agregando status de cotacoes:", e?.message);
     for (const rm of rms) {
       rm.recebidas = 0; rm.pendentes = 0; rm.atrasadas = 0;
     }
@@ -154,17 +137,13 @@ export default async function PainelCompras({ searchParams }) {
     return acc;
   }, {});
 
-  // "Em Cotação" agrega EM_COTACAO + COTADA — ambos estão no processo
-  // de cotação (aguardando proposta ou já com proposta antes do pedido).
   const emCotacao = (statusCount.EM_COTACAO || 0) + (statusCount.COTADA || 0);
-  // "Total de RMs" considera só ativas (Aberta + Em Cotação + Cotada).
-  // RMs com pedido gerado ou canceladas saem da contagem (estão arquivadas).
   const totalAtivas = (statusCount.ABERTA || 0) + emCotacao;
 
   const cards = [
     { label: "RMs ativas", value: totalAtivas, color: "bg-torg-blue", Icon: FileText },
     { label: "Abertas", value: statusCount.ABERTA || 0, color: "bg-torg-orange", Icon: ClipboardList },
-    { label: "Em cotação", value: emCotacao, color: "bg-torg-blue-700", Icon: BarChart3 },
+    { label: "Em cotacao", value: emCotacao, color: "bg-torg-blue-700", Icon: BarChart3 },
     { label: "Pedido gerado", value: statusCount.PEDIDO_GERADO || 0, color: "bg-torg-dark", Icon: Truck },
   ];
 
@@ -172,12 +151,12 @@ export default async function PainelCompras({ searchParams }) {
     <div className="space-y-6 max-w-7xl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">RMs — Materiais</h2>
-          <p className="text-sm text-torg-gray mt-1">RMs de Engenharia · Vinculadas a OPs</p>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">RMs — Consumiveis / Servicos</h2>
+          <p className="text-sm text-torg-gray mt-1">RMs internas · Almoxarifado e demais setores</p>
         </div>
         <div className="flex gap-2">
           <Link
-            href="/compras"
+            href="/compras/consumiveis"
             className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
               !verArquivadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
             }`}
@@ -185,12 +164,12 @@ export default async function PainelCompras({ searchParams }) {
             Ativas
           </Link>
           <Link
-            href="/compras?arquivadas=1"
+            href="/compras/consumiveis?arquivadas=1"
             className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
               verArquivadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
             }`}
           >
-            Histórico
+            Historico
           </Link>
         </div>
       </div>
@@ -213,8 +192,13 @@ export default async function PainelCompras({ searchParams }) {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <FileText size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-torg-gray text-lg">
-            {verArquivadas ? "Nenhuma RM arquivada" : "Nenhuma RM ativa no momento"}
+            {verArquivadas ? "Nenhuma RM de consumivel no historico" : "Nenhuma RM de consumivel ativa"}
           </p>
+          {!verArquivadas && (
+            <p className="text-sm text-torg-gray mt-2">
+              O Almoxarifado pode criar RMs internas em <strong>/rm/nova</strong> escolhendo o tipo &quot;Interna Torg&quot;.
+            </p>
+          )}
         </div>
       ) : (
         <RMsTabelaSeletor

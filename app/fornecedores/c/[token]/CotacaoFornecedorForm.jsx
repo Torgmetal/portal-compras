@@ -62,6 +62,10 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   );
   const [cnpj, setCnpj] = useState(cotacao.cnpj || "");
   const [razaoSocial, setRazaoSocial] = useState(cotacao.fornecedorNome || "");
+  const [numeroProposta, setNumeroProposta] = useState(cotacao.numeroProposta || "");
+  const [valorTotalProposta, setValorTotalProposta] = useState(
+    cotacao.totalProposta ? String(cotacao.totalProposta) : ""
+  );
   const [prazoEntrega, setPrazoEntrega] = useState(jaEnviou ? obsParsed.prazoEntrega : "");
   const [condicaoPagamento, setCondicaoPagamento] = useState(jaEnviou ? obsParsed.condicaoPagamento : "");
   const [observacaoGeral, setObservacaoGeral] = useState(jaEnviou ? obsParsed.observacao : "");
@@ -295,17 +299,15 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     [linhas]
   );
 
-  // Total líquido: ICMS por dentro (subtrai), IPI por fora (soma)
-  // Fórmula: bruto × (1 − icms/100) × (1 + ipi/100)
-  const totalLiquido = useMemo(
+  // Total com IPI: bruto + IPI (IPI eh imposto por fora, soma na NF)
+  const totalComIPI = useMemo(
     () =>
       linhas.reduce((s, l) => {
         const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
         const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
-        const icms = parseFloat(String(l.icmsPct).replace(",", ".")) || 0;
         const ipi = parseFloat(String(l.ipiPct).replace(",", ".")) || 0;
         const bruto = p * q;
-        return s + bruto * (1 - icms / 100) * (1 + ipi / 100);
+        return s + bruto * (1 + ipi / 100);
       }, 0),
     [linhas]
   );
@@ -325,15 +327,25 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       }))
       .filter((l) => l.precoUnit > 0);
     if (itens.length === 0) {
-      return setErro("Preencha pelo menos um preço unitário maior que zero.");
+      return setErro("Preencha pelo menos um preco unitario maior que zero.");
     }
     const cnpjLimpo = cnpj.replace(/\D/g, "");
     if (cnpjLimpo.length !== 14) {
-      return setErro("Informe o CNPJ da sua empresa (14 dígitos).");
+      return setErro("Informe o CNPJ da sua empresa (14 digitos).");
+    }
+    if (!numeroProposta.trim()) {
+      return setErro("Informe o numero da proposta.");
+    }
+    if (!prazoEntrega.trim()) {
+      return setErro("Informe o prazo de entrega.");
+    }
+    if (!condicaoPagamento.trim()) {
+      return setErro("Informe a condicao de pagamento.");
     }
     setEnviando(true);
     setEnviadoAgora(false);
     try {
+      const totalPropostaNum = parseFloat(String(valorTotalProposta).replace(",", ".")) || null;
       const res = await fetch(`/api/cotacao/submeter/${cotacao.token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -341,6 +353,8 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
           itens,
           cnpj: cnpjLimpo,
           razaoSocial: razaoSocial.trim() || null,
+          numeroProposta: numeroProposta.trim(),
+          totalProposta: totalPropostaNum,
           prazoEntrega: prazoEntrega || null,
           condicaoPagamento: condicaoPagamento || null,
           observacao: observacaoGeral || null,
@@ -781,15 +795,15 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={8} className="px-3 py-2 text-right text-xs text-torg-gray">Total bruto da proposta:</td>
+                    <td colSpan={8} className="px-3 py-2 text-right text-xs text-torg-gray">Subtotal (preco x qtd):</td>
                     <td className="px-3 py-2 text-right font-medium text-torg-dark tabular-nums text-sm">{fmtMoeda(total)}</td>
                   </tr>
-                  <tr>
-                    <td colSpan={8} className="px-3 py-3 text-right text-sm font-semibold text-torg-dark">
-                      Total líquido (custo Torg, ICMS por dentro + IPI por fora):
-                    </td>
-                    <td className="px-3 py-3 text-right font-bold text-torg-orange-700 text-base tabular-nums">{fmtMoeda(totalLiquido)}</td>
-                  </tr>
+                  {totalComIPI !== total && (
+                    <tr>
+                      <td colSpan={8} className="px-3 py-2 text-right text-xs text-torg-gray">Total com IPI:</td>
+                      <td className="px-3 py-2 text-right font-medium text-torg-dark tabular-nums text-sm">{fmtMoeda(totalComIPI)}</td>
+                    </tr>
+                  )}
                 </tfoot>
               </table>
             </div>
@@ -797,9 +811,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
 
           {/* Identificação fiscal */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-torg-dark">Identificação da empresa</h2>
+            <h2 className="text-lg font-semibold text-torg-dark">Identificacao da empresa e proposta</h2>
             <p className="text-xs text-torg-gray -mt-2">
-              Necessário pra emissão do pedido de compra. Preencha uma vez — fica salvo pras próximas cotações.
+              Campos obrigatorios (*) para emissao do pedido de compra.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -814,7 +828,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-torg-dark mb-1">Razão Social</label>
+                <label className="block text-sm font-medium text-torg-dark mb-1">Razao Social</label>
                 <input
                   type="text"
                   value={razaoSocial}
@@ -823,31 +837,57 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-torg-dark mb-1">N da proposta *</label>
+                <input
+                  type="text"
+                  value={numeroProposta}
+                  onChange={(e) => setNumeroProposta(e.target.value)}
+                  placeholder="Ex: PROP-2026-001"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-torg-dark mb-1">Valor total da proposta (R$)</label>
+                <input
+                  type="text"
+                  value={valorTotalProposta}
+                  onChange={(e) => setValorTotalProposta(e.target.value)}
+                  placeholder={totalComIPI > 0 ? fmtMoeda(totalComIPI) : "0,00"}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
+                />
+                <p className="text-[10px] text-torg-gray mt-1">
+                  Valor final conforme sua proposta (com impostos). Se deixar em branco, usamos a soma dos itens.
+                </p>
+              </div>
             </div>
           </div>
 
           {/* Condições gerais */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-torg-dark">Condições</h2>
+            <h2 className="text-lg font-semibold text-torg-dark">Condicoes</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-torg-dark mb-1">Prazo de entrega</label>
+                <label className="block text-sm font-medium text-torg-dark mb-1">Prazo de entrega *</label>
                 <input
                   type="text"
                   value={prazoEntrega}
                   onChange={(e) => setPrazoEntrega(e.target.value)}
-                  placeholder="Ex: 15 dias úteis"
+                  placeholder="Ex: 15 dias uteis"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+                  required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-torg-dark mb-1">Condição de pagamento</label>
+                <label className="block text-sm font-medium text-torg-dark mb-1">Condicao de pagamento *</label>
                 <input
                   type="text"
                   value={condicaoPagamento}
                   onChange={(e) => setCondicaoPagamento(e.target.value)}
                   placeholder="Ex: 30 dias / 28 dias com 2% desc."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+                  required
                 />
               </div>
             </div>

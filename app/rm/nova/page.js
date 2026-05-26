@@ -25,5 +25,7 @@ export default async function NovaRMPage() {
   // Plain object pra Client Component
   const opsData = JSON.parse(JSON.stringify(ops));
 
-  return <NovaRMClient ops={opsData} userSetor={user.setor || ""} />;
+  const userModulos = user.modulos ?? [];
+
+  return <NovaRMClient ops={opsData} userSetor={user.setor || ""} userModulos={userModulos} userTipo={user.tipo} />;
 }

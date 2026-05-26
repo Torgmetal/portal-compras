@@ -36,9 +36,11 @@ const TIPOS_RM = [
   },
 ];
 
-export default function NovaRMClient({ ops, userSetor }) {
+export default function NovaRMClient({ ops, userSetor, userModulos = [], userTipo }) {
   const router = useRouter();
-  const [tipoRM, setTipoRM] = useState("ENGENHARIA");
+  // ALMOXARIFADO sem modulo ENGENHARIA → default INTERNA
+  const isAlmoxSemEng = userTipo !== "ADMIN" && userModulos.includes("ALMOXARIFADO") && !userModulos.includes("ENGENHARIA");
+  const [tipoRM, setTipoRM] = useState(isAlmoxSemEng ? "INTERNA" : "ENGENHARIA");
   const [opSelecionada, setOpSelecionada] = useState("");
   const [categoriasCobertas, setCategoriasCobertas] = useState([]);
   const [tipo, setTipo] = useState("Material");

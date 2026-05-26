@@ -851,6 +851,7 @@ model Cotacao {
   // a "fonte da verdade" do valor da NF — usado pra ajustar precos no Omie
   // proporcionalmente, garantindo que o pedido bata com a proposta.
   totalProposta   Float?
+  numeroProposta  String?       // numero da proposta informado pelo fornecedor
 
   prazoResposta   DateTime?     // limite pra fornecedor responder
   recebidaEm      DateTime?
