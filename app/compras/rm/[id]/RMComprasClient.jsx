@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
   CheckCircle2, Check, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
-  Upload, Sparkles,
+  Upload, Sparkles, RotateCcw, Package,
 } from "lucide-react";
 import {
   labelCategoria, CATEGORIAS_MATERIAL, CATEGORIAS_SERVICOS_TERCEIRIZADOS,
@@ -43,7 +43,7 @@ const STATUS_ITEM_LABELS = {
 // mostra como "Sem proposta" pro usuario perceber que precisa re-cotar.
 const STATUS_SEM_PROPOSTA = { label: "Sem proposta", className: "bg-amber-50 text-amber-700" };
 
-export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null, categoriasCustom = [] }) {
+export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null, categoriasCustom = [], pedidos = [] }) {
   const router = useRouter();
   const isAdmin = userRole === "ADMIN";
   // Lista mesclada (built-in + custom do banco)
@@ -455,6 +455,11 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
         </div>
       )}
 
+      {/* Pedidos gerados */}
+      {pedidos.length > 0 && (
+        <PedidosGerados pedidos={pedidos} rmId={rm.id} onRevertido={() => router.refresh()} isAdmin={isAdmin} userRole={userRole} />
+      )}
+
       {/* Cotações */}
       {rm.cotacoes.length > 0 ? (
         <CotacoesList rm={rm} outrasRMs={outrasRMs} />
@@ -516,6 +521,133 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
         />
       )}
     </>
+  );
+}
+
+// ─── PEDIDOS GERADOS (com opcao de reverter) ──
+
+function PedidosGerados({ pedidos, rmId, onRevertido, isAdmin, userRole }) {
+  const [revertendo, setRevertendo] = useState(null);
+  const [confirmando, setConfirmando] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const handleReverter = async (pedido) => {
+    setRevertendo(pedido.id);
+    setConfirmando(null);
+    try {
+      const res = await fetch(`/api/pedido-omie/${pedido.id}/reverter`, { method: "POST" });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setToast({ ok: true, msg: `Pedido ${pedido.numeroPedido || ""} revertido. Itens voltaram para cotação.` });
+      setTimeout(() => { setToast(null); onRevertido(); }, 2000);
+    } catch (e) {
+      setToast({ ok: false, msg: `Erro: ${e.message}` });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setRevertendo(null);
+    }
+  };
+
+  const podeReverter = isAdmin || userRole === "COMPRAS";
+  const pedidosAtivos = pedidos.filter((p) => p.status === "CRIADO");
+  const pedidosRevertidos = pedidos.filter((p) => p.status === "REVERTIDO");
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100">
+        <h3 className="text-lg font-semibold text-torg-dark inline-flex items-center gap-2">
+          <Package size={18} className="text-torg-blue" />
+          Pedidos de Compra ({pedidosAtivos.length})
+        </h3>
+        <p className="text-xs text-torg-gray mt-1">
+          Pedidos gerados no Omie a partir dos vencedores desta RM. Para comprar de outro fornecedor, cancele o pedido no Omie e reverta aqui.
+        </p>
+      </div>
+
+      {toast && (
+        <div className={`mx-6 mt-3 text-xs rounded-lg px-3 py-2 ${
+          toast.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"
+        }`}>
+          {toast.ok ? "✓ " : "✗ "}{toast.msg}
+        </div>
+      )}
+
+      <ul className="divide-y divide-gray-100">
+        {pedidosAtivos.map((p) => (
+          <li key={p.id} className="px-6 py-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-torg-dark font-semibold">{p.fornecedorNome}</p>
+                  {p.numeroPedido && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-torg-dark text-white font-medium">
+                      #{p.numeroPedido}
+                    </span>
+                  )}
+                  {p.faturamentoDireto && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
+                      FD
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-torg-gray mt-0.5">
+                  {p.rmItens.length} {p.rmItens.length === 1 ? "item" : "itens"} desta RM
+                  {" · "}{new Date(p.createdAt).toLocaleDateString("pt-BR")}
+                </p>
+              </div>
+              <span className="text-torg-orange-700 font-semibold tabular-nums text-sm">
+                {Number(p.total || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </span>
+              {podeReverter && (
+                <>
+                  {confirmando === p.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-red-600 font-medium">Cancelou no Omie?</span>
+                      <button
+                        onClick={() => handleReverter(p)}
+                        disabled={revertendo === p.id}
+                        className="px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-1 disabled:opacity-50"
+                      >
+                        {revertendo === p.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                        Sim, reverter
+                      </button>
+                      <button
+                        onClick={() => setConfirmando(null)}
+                        className="px-2 py-1.5 text-xs text-torg-gray hover:text-torg-dark"
+                      >
+                        Não
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmando(p.id)}
+                      className="px-3 py-1.5 text-xs bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-medium inline-flex items-center gap-1"
+                      title="Reverter pedido: volta os itens pro status Cotado e desmarca vencedores. Cancele o pedido no Omie antes!"
+                    >
+                      <RotateCcw size={12} /> Reverter pedido
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {pedidosRevertidos.length > 0 && (
+        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/60">
+          <p className="text-xs text-torg-gray mb-2">Revertidos anteriormente:</p>
+          {pedidosRevertidos.map((p) => (
+            <div key={p.id} className="flex items-center gap-2 text-xs text-gray-400 mb-1">
+              <RotateCcw size={10} />
+              <span className="line-through">{p.fornecedorNome}</span>
+              {p.numeroPedido && <span>#{p.numeroPedido}</span>}
+              <span>{Number(p.total || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -740,12 +872,31 @@ function reCopiarEmail(cachedData) {
 }
 
 function CotacoesList({ rm, outrasRMs = [] }) {
+  const router = useRouter();
   const [modalVincular, setModalVincular] = useState(null); // cotação selecionada
   const [copiado, setCopiado] = useState(null);
   const [modalManual, setModalManual] = useState(null);
   const [emailToast, setEmailToast] = useState(null);
   const [emailsCache, setEmailsCache] = useState({}); // cotId -> { html, text, to, subject }
+  const [cancelando, setCancelando] = useState(null);
+  const [confirmCancelar, setConfirmCancelar] = useState(null);
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  const handleCancelarCotacao = async (cotId) => {
+    setCancelando(cotId);
+    setConfirmCancelar(null);
+    try {
+      const res = await fetch(`/api/cotacao/${cotId}/cancelar`, { method: "POST" });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      router.refresh();
+    } catch (e) {
+      setEmailToast({ id: cotId, ok: false, msg: `Erro ao cancelar: ${e.message}` });
+      setTimeout(() => setEmailToast(null), 5000);
+    } finally {
+      setCancelando(null);
+    }
+  };
 
   // Pre-fetch dos emails das cotacoes ativas. Cacheia no state pra que o
   // clipboard.write seja sincrono no clique (sem perder user gesture).
@@ -887,6 +1038,39 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                   >
                     <Plus size={12} /> Vincular RM
                   </button>
+                )}
+                {c.status !== "CANCELADA" && (
+                  <>
+                    {confirmCancelar === c.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-red-600 font-medium">Cancelar cotação?</span>
+                        <button
+                          onClick={() => handleCancelarCotacao(c.id)}
+                          disabled={cancelando === c.id}
+                          className="px-2 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {cancelando === c.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                          Sim
+                        </button>
+                        <button
+                          onClick={() => setConfirmCancelar(null)}
+                          className="px-2 py-1.5 text-xs text-torg-gray hover:text-torg-dark font-medium"
+                        >
+                          Não
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmCancelar(c.id)}
+                        disabled={cancelando === c.id}
+                        className="px-3 py-1.5 text-xs bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-medium inline-flex items-center gap-1 disabled:opacity-50"
+                        title="Cancelar esta cotação — itens voltam para o status anterior"
+                      >
+                        {cancelando === c.id ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
+                        Cancelar
+                      </button>
+                    )}
+                  </>
                 )}
                 <button
                   onClick={() => handleEnviarEmail(c)}

@@ -1300,8 +1300,6 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const [editCustoValor, setEditCustoValor] = useState("");
   const [editandoPerda, setEditandoPerda] = useState(false);
   const [editPerdaValor, setEditPerdaValor] = useState("");
-  const [editandoCustoGeral, setEditandoCustoGeral] = useState(false);
-  const [editCustoGeralValor, setEditCustoGeralValor] = useState("");
   const [filtroSetor, setFiltroSetor] = useState("");
   const [toast, setToast] = useState(null);
   const [analisandoIA, setAnalisandoIA] = useState(false);
@@ -1557,36 +1555,6 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
     }
   };
 
-  const salvarCustoGeral = async () => {
-    const custo = parseFloat(editCustoGeralValor);
-    if (isNaN(custo) || custo <= 0) {
-      setEditandoCustoGeral(false);
-      return;
-    }
-    const itensSemOmie = itens.filter((i) => !i.codigoOmie);
-    if (itensSemOmie.length === 0) {
-      showToast("Todos os itens ja tem cadastro Omie");
-      setEditandoCustoGeral(false);
-      return;
-    }
-    try {
-      const promises = itensSemOmie.map((item) =>
-        fetch(`/api/comercial/estudo/${estudoId}/itens`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemId: item.id, custoUnitario: custo }),
-        }).then((r) => r.json())
-      );
-      await Promise.all(promises);
-      setItens((prev) => prev.map((i) => !i.codigoOmie ? { ...i, custoUnitario: custo } : i));
-      showToast(`R$ ${custo.toFixed(2)}/kg aplicado em ${itensSemOmie.length} itens`);
-    } catch (e) {
-      showToast(`Erro: ${e.message}`);
-    } finally {
-      setEditandoCustoGeral(false);
-    }
-  };
-
   const salvarPerda = async () => {
     const valor = parseFloat(editPerdaValor);
     const perda = isNaN(valor) ? 0 : Math.max(0, Math.min(100, valor));
@@ -1655,53 +1623,6 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                   ? <>{estudo.percPerda}% <span className="text-base font-normal text-torg-gray">(+ {fmtNum(pesoTotalItens * estudo.percPerda / 100, 0)} kg)</span></>
                   : <span className="text-gray-300 text-lg">editar</span>
                 }
-              </p>
-            )}
-          </div>
-          <div className="w-px h-10 bg-gray-200" />
-          <div>
-            <p className="text-xs text-torg-gray uppercase tracking-wider font-medium">
-              R$/kg geral
-            </p>
-            {editandoCustoGeral ? (
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-lg font-bold text-torg-gray">R$</span>
-                <input
-                  type="number"
-                  autoFocus
-                  value={editCustoGeralValor}
-                  onChange={(e) => setEditCustoGeralValor(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") salvarCustoGeral();
-                    if (e.key === "Escape") setEditandoCustoGeral(false);
-                  }}
-                  onBlur={salvarCustoGeral}
-                  className="w-20 px-2 py-1 border border-torg-blue rounded-lg text-lg font-bold text-right outline-none focus:ring-1 focus:ring-torg-blue/30"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                />
-              </div>
-            ) : (
-              <p
-                onClick={() => {
-                  const semOmie = itens.filter((i) => !i.codigoOmie);
-                  const custoAtual = semOmie.find((i) => i.custoUnitario > 0)?.custoUnitario || "";
-                  setEditandoCustoGeral(true);
-                  setEditCustoGeralValor(custoAtual);
-                }}
-                className="text-2xl font-bold text-torg-blue cursor-pointer hover:text-torg-dark hover:underline transition-colors"
-                title="Clique para definir R$/kg para todos os itens sem Omie"
-              >
-                {(() => {
-                  const semOmie = itens.filter((i) => !i.codigoOmie);
-                  const comCusto = semOmie.filter((i) => i.custoUnitario > 0);
-                  if (comCusto.length > 0) {
-                    const custoMedio = comCusto.reduce((s, i) => s + i.custoUnitario, 0) / comCusto.length;
-                    return <>R$ {fmtNum(custoMedio, 2)} <span className="text-base font-normal text-torg-gray">({semOmie.length} itens)</span></>;
-                  }
-                  return <span className="text-gray-300 text-lg">editar</span>;
-                })()}
               </p>
             )}
           </div>

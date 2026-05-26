@@ -289,17 +289,18 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
   const [salvandoCusto, setSalvandoCusto] = useState(false);
   const custoTimer = useRef(null);
 
-  // Calculos derivados
-  const areaEfetiva = areaCalc.areaTotal * (1 + pinturaPerda / 100);
-  const custoPinturaTotal = pinturaMetodo === "M2"
-    ? areaEfetiva * (parseFloat(custoM2) || 0)
+  // Calculos derivados — perda aplicada sobre o CUSTO, nao sobre a area
+  const custoBase = pinturaMetodo === "M2"
+    ? areaCalc.areaTotal * (parseFloat(custoM2) || 0)
     : pinturaMetodo === "LITRO"
       ? (parseFloat(rendimento) || 0) > 0
-        ? (areaEfetiva / parseFloat(rendimento)) * (parseFloat(custoLitro) || 0)
+        ? (areaCalc.areaTotal / parseFloat(rendimento)) * (parseFloat(custoLitro) || 0)
         : 0
       : (parseFloat(custoKg) || 0) * pesoTotalKg; // KG
+  const perdaDecimal = (parseFloat(pinturaPerda) || 0) / 100;
+  const custoPinturaTotal = custoBase * (1 + perdaDecimal);
   const custoPinturaKgCalc = pinturaMetodo === "KG"
-    ? (parseFloat(custoKg) || 0)
+    ? (parseFloat(custoKg) || 0) * (1 + perdaDecimal)
     : pesoTotalKg > 0 ? custoPinturaTotal / pesoTotalKg : 0;
 
   const esquemaObj = ESQUEMAS.find((e) => e.id === esquema) || null;
@@ -331,14 +332,18 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
       const cl = campos.pinturaCustoLitro !== undefined ? parseFloat(String(campos.pinturaCustoLitro).replace(",", ".")) || 0 : parseFloat(custoLitro) || 0;
       const ck = campos.custoPinturaKg !== undefined ? parseFloat(String(campos.custoPinturaKg).replace(",", ".")) || 0 : parseFloat(custoKg) || 0;
 
-      let kgCalc;
+      // Perda aplicada sobre o custo total, nao sobre a area
+      const perdaDec = perda / 100;
+      let custoBaseCalc;
       if (metodo === "KG") {
-        kgCalc = ck;
+        custoBaseCalc = ck * pesoTotalKg;
+      } else if (metodo === "M2") {
+        custoBaseCalc = areaCalc.areaTotal * cm2;
       } else {
-        const aEf = areaCalc.areaTotal * (1 + perda / 100);
-        const custoTotal = metodo === "M2" ? aEf * cm2 : rend > 0 ? (aEf / rend) * cl : 0;
-        kgCalc = pesoTotalKg > 0 ? custoTotal / pesoTotalKg : 0;
+        custoBaseCalc = rend > 0 ? (areaCalc.areaTotal / rend) * cl : 0;
       }
+      const custoTotalComPerda = custoBaseCalc * (1 + perdaDec);
+      const kgCalc = pesoTotalKg > 0 ? custoTotalComPerda / pesoTotalKg : 0;
       body.custoPinturaKg = Math.round(kgCalc * 100) / 100;
       body.areaTotal = Math.round(areaCalc.areaTotal * 100) / 100;
 
@@ -615,33 +620,8 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
 
               <div className="flex items-center gap-6 mt-3">
                 <div>
-                  <p className="text-xs text-torg-gray">Area bruta</p>
-                  <p className="text-lg font-bold text-torg-dark">{fmtNum(areaCalc.areaTotal, 1)} <span className="text-xs font-normal text-torg-gray">m²</span></p>
-                </div>
-                <div className="flex items-center gap-1 text-torg-gray">×</div>
-                <div>
-                  <p className="text-xs text-torg-gray">Perda</p>
-                  <div className="flex items-center gap-1">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={pinturaPerda}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setPinturaPerda(v);
-                          debounceCusto({ pinturaPercPerda: v });
-                        }}
-                        className="w-16 pl-2 pr-5 py-1.5 border border-gray-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none bg-white"
-                      />
-                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-torg-gray pointer-events-none">%</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 text-torg-gray">=</div>
-                <div>
-                  <p className="text-xs text-torg-gray">Area efetiva</p>
-                  <p className="text-lg font-bold text-emerald-600">{fmtNum(areaEfetiva, 1)} <span className="text-xs font-normal text-torg-gray">m²</span></p>
+                  <p className="text-xs text-torg-gray">Area total dos perfis</p>
+                  <p className="text-lg font-bold text-emerald-600">{fmtNum(areaCalc.areaTotal, 1)} <span className="text-xs font-normal text-torg-gray">m²</span></p>
                 </div>
               </div>
 
@@ -748,7 +728,7 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
               {/* Campos de custo */}
               <div className="bg-white rounded-lg px-3 py-3 border border-gray-100">
                 {pinturaMetodo === "M2" ? (
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-wrap">
                     <div>
                       <label className="text-xs font-semibold text-torg-gray block mb-1">Custo por m²</label>
                       <div className="relative">
@@ -768,12 +748,12 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
                     </div>
                     <div className="flex items-center gap-1 text-torg-gray pt-5">×</div>
                     <div className="pt-5">
-                      <p className="text-sm text-torg-dark">{fmtNum(areaEfetiva, 1)} m²</p>
+                      <p className="text-sm text-torg-dark">{fmtNum(areaCalc.areaTotal, 1)} m²</p>
                     </div>
                     <div className="flex items-center gap-1 text-torg-gray pt-5">=</div>
                     <div>
-                      <label className="text-xs font-semibold text-torg-gray block mb-1">Custo total</label>
-                      <p className="text-lg font-bold text-torg-dark">R$ {fmtNum(custoPinturaTotal, 2)}</p>
+                      <label className="text-xs font-semibold text-torg-gray block mb-1">Custo base</label>
+                      <p className="text-sm font-semibold text-torg-dark">R$ {fmtNum(custoBase, 2)}</p>
                     </div>
                   </div>
                 ) : pinturaMetodo === "LITRO" ? (
@@ -817,18 +797,18 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
                     </div>
                     <div className="flex items-center gap-4 pt-1 border-t border-gray-50">
                       <div className="text-xs text-torg-gray">
-                        Consumo: <strong className="text-torg-dark">{parseFloat(rendimento) > 0 ? fmtNum(areaEfetiva / parseFloat(rendimento), 1) : "—"} L</strong>
+                        Consumo: <strong className="text-torg-dark">{parseFloat(rendimento) > 0 ? fmtNum(areaCalc.areaTotal / parseFloat(rendimento), 1) : "—"} L</strong>
                       </div>
                       <div className="flex items-center gap-1 text-torg-gray">→</div>
                       <div>
-                        <p className="text-xs text-torg-gray">Custo total</p>
-                        <p className="text-lg font-bold text-torg-dark">R$ {fmtNum(custoPinturaTotal, 2)}</p>
+                        <p className="text-xs text-torg-gray">Custo base</p>
+                        <p className="text-sm font-semibold text-torg-dark">R$ {fmtNum(custoBase, 2)}</p>
                       </div>
                     </div>
                   </div>
                 ) : (
                   /* Metodo KG */
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-wrap">
                     <div>
                       <label className="text-xs font-semibold text-torg-gray block mb-1">Custo por kg</label>
                       <div className="relative">
@@ -853,13 +833,51 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
                     </div>
                     <div className="flex items-center gap-1 text-torg-gray pt-5">=</div>
                     <div>
-                      <label className="text-xs font-semibold text-torg-gray block mb-1">Custo total</label>
-                      <p className="text-lg font-bold text-torg-dark">R$ {fmtNum(custoPinturaTotal, 2)}</p>
+                      <label className="text-xs font-semibold text-torg-gray block mb-1">Custo base</label>
+                      <p className="text-sm font-semibold text-torg-dark">R$ {fmtNum(custoBase, 2)}</p>
                     </div>
                   </div>
                 )}
 
-                {/* Equivalente R$/kg (so exibe nos metodos M2 e LITRO) */}
+                {/* Perda + Total final — sempre visivel quando tem custo base */}
+                {custoBase > 0 && (
+                  <div className="flex items-center gap-4 flex-wrap mt-3 pt-3 border-t border-gray-100">
+                    <div>
+                      <label className="text-xs font-semibold text-torg-gray block mb-1">Custo base</label>
+                      <p className="text-sm text-torg-dark">R$ {fmtNum(custoBase, 2)}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-torg-gray pt-5">+</div>
+                    <div>
+                      <label className="text-xs font-semibold text-torg-gray block mb-1">Perda</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={pinturaPerda}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setPinturaPerda(v);
+                            debounceCusto({ pinturaPercPerda: v });
+                          }}
+                          className="w-16 pl-2 pr-5 py-1.5 border border-gray-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none bg-white"
+                        />
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-torg-gray pointer-events-none">%</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-torg-gray pt-5">=</div>
+                    <div>
+                      <label className="text-xs font-semibold text-amber-600 block mb-1">Custo total</label>
+                      <p className="text-lg font-bold text-torg-dark">R$ {fmtNum(custoPinturaTotal, 2)}</p>
+                    </div>
+                    {perdaDecimal > 0 && (
+                      <div className="pt-5 text-xs text-torg-gray">
+                        (+R$ {fmtNum(custoPinturaTotal - custoBase, 2)} de perda)
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Equivalente R$/kg (metodos M2 e LITRO) */}
                 {custoPinturaTotal > 0 && pinturaMetodo !== "KG" && (
                   <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
                     <span className="text-xs text-torg-gray">Equivalente:</span>
@@ -867,11 +885,11 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
                     <span className="text-[10px] text-torg-gray">(atualizado automaticamente na aba Custos)</span>
                   </div>
                 )}
-                {/* Equivalente R$/m² (so exibe no metodo KG) */}
-                {custoPinturaTotal > 0 && pinturaMetodo === "KG" && areaEfetiva > 0 && (
+                {/* Equivalente R$/m² (metodo KG) */}
+                {custoPinturaTotal > 0 && pinturaMetodo === "KG" && areaCalc.areaTotal > 0 && (
                   <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
                     <span className="text-xs text-torg-gray">Equivalente:</span>
-                    <span className="text-xs font-bold text-torg-blue">R$ {fmtNum(custoPinturaTotal / areaEfetiva, 2)}/m²</span>
+                    <span className="text-xs font-bold text-torg-blue">R$ {fmtNum(custoPinturaTotal / areaCalc.areaTotal, 2)}/m²</span>
                     <span className="text-[10px] text-torg-gray">(atualizado automaticamente na aba Custos)</span>
                   </div>
                 )}

@@ -201,6 +201,28 @@ export default async function RMComprasDetail({ params }) {
     }],
   };
 
+  // Pedidos de compra vinculados aos itens desta RM
+  const pedidosVinculados = await prisma.pedidoOmie.findMany({
+    where: {
+      rmItens: { some: { rmId: rm.id } },
+    },
+    select: {
+      id: true,
+      fornecedorNome: true,
+      numeroPedido: true,
+      codigoPedido: true,
+      total: true,
+      status: true,
+      faturamentoDireto: true,
+      createdAt: true,
+      rmItens: {
+        where: { rmId: rm.id },
+        select: { id: true, descricao: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
   // Categorias custom de fornecedor pra filtro/chips no modal de envio
   const categoriasCustom = await prisma.categoriaFornecedor.findMany({
     where: { ativa: true },
@@ -224,6 +246,7 @@ export default async function RMComprasDetail({ params }) {
         userRole={user.role}
         dadosMapa={dadosMapaSerial}
         categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
+        pedidos={JSON.parse(JSON.stringify(pedidosVinculados))}
       />
     </div>
   );
