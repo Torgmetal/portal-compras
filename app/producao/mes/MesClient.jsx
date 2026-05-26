@@ -801,7 +801,7 @@ export default function MesClient({
         <div>
           <h1 className="text-2xl font-bold text-torg-dark flex items-center gap-2">
             <Factory size={24} className="text-torg-blue" />
-            Rastreabilidade MES
+            Rastreabilidade Syneco
           </h1>
           <p className="text-sm text-torg-gray mt-0.5">
             Dados do SKA Syneco — dataset 242 (Rastreabilidade de OP e Item)

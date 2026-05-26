@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/session";
 import MesClient from "./MesClient";
 
 export const metadata = {
-  title: "Workspace Torg — Rastreabilidade MES",
+  title: "Workspace Torg — Rastreabilidade Syneco",
 };
 
 export default async function MesPage() {
