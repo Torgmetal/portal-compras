@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Activity, ChevronDown, ChevronRight, Weight, Package,
   AlertCircle, Loader2, X, Search, Filter, Factory,
@@ -539,149 +539,150 @@ function ViewPorSetor({ grupos }) {
 
 // ─── View: Por Peça ───────────────────────────────────────────────────────────
 function ViewPorPeca({ de, ate }) {
-  const [busca,      setBusca]      = useState("");
-  const [rows,       setRows]       = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [erro,       setErro]       = useState(null);
-  const [buscaFeita, setBuscaFeita] = useState("");
+  const [busca,   setBusca]   = useState("");
+  const [todos,   setTodos]   = useState([]); // todos os rows do período
+  const [loading, setLoading] = useState(false);
+  const [erro,    setErro]    = useState(null);
 
-  async function pesquisar() {
-    const termo = busca.trim();
-    if (!termo) return;
+  // Carrega todos os apontamentos do período ao montar ou quando a data muda
+  useEffect(() => {
+    let ativo = true;
     setLoading(true);
     setErro(null);
-    try {
-      const qs = new URLSearchParams({ detalhe: "1", peca: termo });
-      if (de)  qs.set("de",  de);
-      if (ate) qs.set("ate", ate);
-      const r = await fetch(`/api/mes/apontamentos?${qs}`);
-      if (!r.ok) throw new Error(await r.text());
-      const data = await r.json();
-      setRows(data.rows || []);
-      setBuscaFeita(termo);
-    } catch (e) {
-      setErro(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+    setBusca("");
+    const qs = new URLSearchParams({ detalhe: "1" });
+    if (de)  qs.set("de",  de);
+    if (ate) qs.set("ate", ate);
+    fetch(`/api/mes/apontamentos?${qs}`)
+      .then(r => r.json())
+      .then(d => { if (ativo) { setTodos(d.rows || []); setLoading(false); } })
+      .catch(e => { if (ativo) { setErro(e.message); setLoading(false); } });
+    return () => { ativo = false; };
+  }, [de, ate]);
+
+  // Filtra client-side conforme o usuário digita
+  const filtrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return todos;
+    return todos.filter(r =>
+      (r.opSka         || "").toLowerCase().includes(termo) ||
+      (r.descricaoItem || "").toLowerCase().includes(termo) ||
+      (r.obra          || "").toLowerCase().includes(termo) ||
+      (r.setor         || "").toLowerCase().includes(termo) ||
+      (r.maquina       || "").toLowerCase().includes(termo)
+    );
+  }, [todos, busca]);
+
+  const tabela = (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50/60 sticky top-0">
+          <tr>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Peça (SKA)</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">OP</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Setor</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Máquina</th>
+            <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">KG</th>
+            <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">UN</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Status</th>
+            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Data</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {filtrados.map(r => {
+            const st = STATUS_CONFIG[r.status] || { cor: "text-gray-500 bg-gray-50", icone: "·" };
+            return (
+              <tr key={r.id} className="hover:bg-gray-50/50">
+                <td className="px-4 py-2 font-mono text-xs text-gray-700">{r.opSka || "—"}</td>
+                <td className="px-4 py-2 text-gray-700 max-w-[160px] truncate" title={r.descricaoItem}>
+                  {r.descricaoItem || "—"}
+                </td>
+                <td className="px-4 py-2 font-bold text-torg-blue text-xs">{r.obra}</td>
+                <td className="px-4 py-2">
+                  {r.setor && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${corSetor(r.setor)}`}>
+                      {r.setor}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-gray-600">{r.maquina || "—"}</td>
+                <td className="px-4 py-2 text-right font-medium">{fmtNum(r.produzidoKg)}</td>
+                <td className="px-4 py-2 text-right font-medium">{fmtNum(r.produzidoUn, 0)}</td>
+                <td className="px-4 py-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cor}`}>
+                    {st.icone} {r.status || "—"}
+                  </span>
+                </td>
+                <td className="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
+                  {fmtDataCurta(r.dataInicio)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
-      {/* Campo de busca */}
+      {/* Campo de filtro */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && pesquisar()}
-              placeholder="Nome da peça ou código SKA (ex: COLUNA-01, T78B144)..."
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-torg-blue"
-            />
-          </div>
-          <button
-            onClick={pesquisar}
-            disabled={!busca.trim() || loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-torg-blue text-white text-sm font-medium hover:bg-torg-blue/90 disabled:opacity-50"
-          >
-            {loading
-              ? <Loader2 size={14} className="animate-spin" />
-              : <Search size={14} />
-            }
-            Buscar
-          </button>
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            placeholder="Filtrar por peça, código SKA, OP, setor, máquina..."
+            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-torg-blue"
+            disabled={loading}
+          />
+          {busca && (
+            <button
+              onClick={() => setBusca("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
-        <p className="text-xs text-gray-400 mt-2">
-          Busca no período selecionado nos filtros. Insensível a maiúsculas/minúsculas.
-          Máximo 500 resultados.
-        </p>
       </div>
 
       {erro && (
         <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           <AlertCircle size={15} /> {erro}
+          <button onClick={() => setErro(null)} className="ml-auto"><X size={14} /></button>
         </div>
       )}
 
-      {/* Resultados */}
-      {rows.length > 0 && (
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-12 text-torg-gray">
+          <Loader2 size={20} className="animate-spin" />
+          <span>Carregando peças do período...</span>
+        </div>
+      ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-50">
+          <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
             <span className="text-sm font-medium text-torg-dark">
-              {rows.length} apontamento{rows.length !== 1 ? "s" : ""} para{" "}
-              <em>&ldquo;{buscaFeita}&rdquo;</em>
+              {busca.trim()
+                ? `${filtrados.length} de ${todos.length} apontamentos`
+                : `${todos.length} apontamentos no período`
+              }
             </span>
+            {todos.length >= 1000 && (
+              <span className="text-xs text-gray-400 flex items-center gap-1">
+                <Info size={11} /> Limite de 1.000 registros — refine o período se necessário
+              </span>
+            )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50/60 sticky top-0">
-                <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Peça (SKA)</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">OP</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Setor</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Máquina</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">KG</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">UN</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Status</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Data</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {rows.map(r => {
-                  const st = STATUS_CONFIG[r.status] || { cor: "text-gray-500 bg-gray-50", icone: "·" };
-                  return (
-                    <tr key={r.id} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-2 font-mono text-xs text-gray-700">{r.opSka || "—"}</td>
-                      <td className="px-4 py-2 text-gray-700 max-w-[160px] truncate" title={r.descricaoItem}>
-                        {r.descricaoItem || "—"}
-                      </td>
-                      <td className="px-4 py-2 font-bold text-torg-blue text-xs">{r.obra}</td>
-                      <td className="px-4 py-2">
-                        {r.setor && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${corSetor(r.setor)}`}>
-                            {r.setor}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-gray-600">{r.maquina || "—"}</td>
-                      <td className="px-4 py-2 text-right font-medium">{fmtNum(r.produzidoKg)}</td>
-                      <td className="px-4 py-2 text-right font-medium">{fmtNum(r.produzidoUn, 0)}</td>
-                      <td className="px-4 py-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cor}`}>
-                          {st.icone} {r.status || "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
-                        {fmtDataCurta(r.dataInicio)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
-      {!loading && rows.length === 0 && buscaFeita && (
-        <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-2">
-          <Search size={32} className="opacity-30" />
-          <span className="text-sm">
-            Nenhuma peça encontrada para <em>&ldquo;{buscaFeita}&rdquo;</em>
-          </span>
-        </div>
-      )}
-
-      {!buscaFeita && !loading && (
-        <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-2">
-          <Search size={32} className="opacity-30" />
-          <span className="text-sm">Digite o nome ou código de uma peça para buscar</span>
-          <span className="text-xs text-gray-400">
-            Busca por descrição ou código SKA nos apontamentos do período
-          </span>
+          {filtrados.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-2">
+              <Search size={32} className="opacity-30" />
+              <span className="text-sm">Nenhuma peça encontrada para &ldquo;{busca}&rdquo;</span>
+            </div>
+          ) : tabela}
         </div>
       )}
     </div>

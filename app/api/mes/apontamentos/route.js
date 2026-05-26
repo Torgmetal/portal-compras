@@ -48,12 +48,13 @@ export async function GET(req) {
     orderBy: { criadoEm: "desc" },
   });
 
-  if (detalhe && (obra || peca)) {
-    // Modo detalhe: retorna apontamentos individuais (por OP ou busca por peça)
+  if (detalhe) {
+    // Modo detalhe: retorna apontamentos individuais
+    // Suporta: por OP (obra=), por peça (peca=), ou todos no período (somente com filtro de data)
     const rows = await prisma.mesApontamento.findMany({
       where,
       orderBy: [{ dataInicio: "desc" }],
-      take: 500,
+      take: 1000,
     });
     return NextResponse.json({ rows, ultimoSync });
   }
