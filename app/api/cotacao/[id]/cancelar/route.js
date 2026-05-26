@@ -4,7 +4,8 @@ import { requireRole } from "@/lib/session";
 
 // POST /api/cotacao/[id]/cancelar
 // Cancela uma cotacao: muda status para CANCELADA, desmarca vencedores,
-// e recalcula status dos RMItems (se nao tem outra cotacao RECEBIDA, volta pra EM_COTACAO).
+// reverte pedidos vinculados (marca como REVERTIDO), e recalcula status
+// dos RMItems e da RM. Tudo em uma transacao so.
 
 export async function POST(req, { params }) {
   try {
@@ -16,6 +17,10 @@ export async function POST(req, { params }) {
       include: {
         itens: {
           select: { id: true, rmItemId: true, vencedor: true },
+        },
+        pedidosOmie: {
+          where: { status: "CRIADO" },
+          select: { id: true, numeroPedido: true, fornecedorNome: true, total: true },
         },
       },
     });
@@ -34,50 +39,74 @@ export async function POST(req, { params }) {
       );
     }
 
-    // Verifica se algum item desta cotacao ja virou pedido
-    const temPedido = await prisma.cotacaoItem.findFirst({
-      where: {
-        cotacaoId: id,
-        vencedor: true,
-        rmItem: { status: "PEDIDO_GERADO" },
-      },
-    });
-    if (temPedido) {
-      return NextResponse.json(
-        { success: false, error: "Esta cotação tem itens que já viraram pedido. Reverta o pedido antes de cancelar a cotação." },
-        { status: 400 }
-      );
-    }
-
     const rmItemIds = cotacao.itens.map((i) => i.rmItemId);
     const cotItemIds = cotacao.itens.map((i) => i.id);
+    const pedidosParaReverter = cotacao.pedidosOmie || [];
 
     await prisma.$transaction(async (tx) => {
-      // 1. Marca cotacao como CANCELADA
+      // 1. Reverte pedidos vinculados a esta cotacao (se houver)
+      for (const pedido of pedidosParaReverter) {
+        // Busca RMItems vinculados a este pedido
+        const itensDoPedido = await tx.rMItem.findMany({
+          where: { pedidoOmieId: pedido.id },
+          select: { id: true },
+        });
+        const pedidoRmItemIds = itensDoPedido.map((i) => i.id);
+
+        // Marca pedido como REVERTIDO
+        await tx.pedidoOmie.update({
+          where: { id: pedido.id },
+          data: { status: "REVERTIDO" },
+        });
+
+        // Desvincula RMItems do pedido (status sera recalculado abaixo)
+        if (pedidoRmItemIds.length > 0) {
+          await tx.rMItem.updateMany({
+            where: { id: { in: pedidoRmItemIds } },
+            data: { pedidoOmieId: null },
+          });
+        }
+
+        // Audit do pedido revertido
+        await tx.auditLog.create({
+          data: {
+            userId: user.id,
+            action: "REVERTER_PEDIDO",
+            entity: "PedidoOmie",
+            entityId: pedido.id,
+            diff: {
+              pedidoNumero: pedido.numeroPedido,
+              fornecedor: pedido.fornecedorNome,
+              total: pedido.total,
+              motivo: "Cancelamento da cotação",
+              itensRevertidos: pedidoRmItemIds.length,
+            },
+          },
+        });
+      }
+
+      // 2. Marca cotacao como CANCELADA
       await tx.cotacao.update({
         where: { id },
         data: { status: "CANCELADA" },
       });
 
-      // 2. Desmarca vencedores desta cotacao
+      // 3. Desmarca vencedores desta cotacao
       await tx.cotacaoItem.updateMany({
         where: { id: { in: cotItemIds }, vencedor: true },
         data: { vencedor: false },
       });
 
-      // 3. Recalcula status de cada RMItem afetado
-      // Se o item tem outra cotacao RECEBIDA com preco > 0, fica COTADO
-      // Se tem outra cotacao PENDENTE, fica EM_COTACAO
-      // Senao, volta pra PENDENTE
+      // 4. Recalcula status de cada RMItem afetado
       for (const rmItemId of rmItemIds) {
         const rmItem = await tx.rMItem.findUnique({
           where: { id: rmItemId },
-          select: { status: true },
+          select: { status: true, pedidoOmieId: true },
         });
-        // Nao mexe em itens ja PEDIDO_GERADO ou CANCELADO (de outro pedido)
-        if (!rmItem || rmItem.status === "PEDIDO_GERADO" || rmItem.status === "CANCELADO") {
-          continue;
-        }
+        // Nao mexe em itens CANCELADO ou que ainda apontam pra outro pedido ativo
+        if (!rmItem || rmItem.status === "CANCELADO") continue;
+        // Se o item aponta pra outro pedido (nao desta cotacao), nao mexe
+        if (rmItem.pedidoOmieId) continue;
 
         // Busca outras cotacoes (nao canceladas) que cotaram este item
         const outrasCotacoes = await tx.cotacaoItem.findMany({
@@ -113,7 +142,7 @@ export async function POST(req, { params }) {
         });
       }
 
-      // 4. Recalcula status da RM
+      // 5. Recalcula status da RM
       const rmId = cotacao.rmId;
       const itensRM = await tx.rMItem.findMany({
         where: { rmId },
@@ -141,7 +170,7 @@ export async function POST(req, { params }) {
         data: { status: novoStatusRM },
       });
 
-      // 5. Audit log
+      // 6. Audit log da cotacao
       await tx.auditLog.create({
         data: {
           userId: user.id,
@@ -153,12 +182,16 @@ export async function POST(req, { params }) {
             statusAnterior: cotacao.status,
             total: cotacao.total,
             itens: rmItemIds.length,
+            pedidosRevertidos: pedidosParaReverter.map((p) => p.numeroPedido),
           },
         },
       });
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      pedidosRevertidos: pedidosParaReverter.length,
+    });
   } catch (e) {
     const status =
       e.message === "Unauthorized" ? 401 :

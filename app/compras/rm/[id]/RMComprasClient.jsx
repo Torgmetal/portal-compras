@@ -1042,21 +1042,23 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                 {c.status !== "CANCELADA" && (
                   <>
                     {confirmCancelar === c.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-red-600 font-medium">Cancelar cotação?</span>
+                      <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                        <span className="text-xs text-red-700 font-medium">
+                          Cancelar cotação{c.status === "RECEBIDA" ? " e reverter pedido" : ""}?
+                        </span>
                         <button
                           onClick={() => handleCancelarCotacao(c.id)}
                           disabled={cancelando === c.id}
-                          className="px-2 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-1 disabled:opacity-50"
+                          className="px-2 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-1 disabled:opacity-50"
                         >
                           {cancelando === c.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                          Sim
+                          Confirmar
                         </button>
                         <button
                           onClick={() => setConfirmCancelar(null)}
-                          className="px-2 py-1.5 text-xs text-torg-gray hover:text-torg-dark font-medium"
+                          className="px-2 py-1 text-xs text-torg-gray hover:text-torg-dark font-medium"
                         >
-                          Não
+                          Voltar
                         </button>
                       </div>
                     ) : (
@@ -1064,7 +1066,7 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                         onClick={() => setConfirmCancelar(c.id)}
                         disabled={cancelando === c.id}
                         className="px-3 py-1.5 text-xs bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-medium inline-flex items-center gap-1 disabled:opacity-50"
-                        title="Cancelar esta cotação — itens voltam para o status anterior"
+                        title="Cancelar esta cotação — reverte pedidos e itens voltam para cotação"
                       >
                         {cancelando === c.id ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
                         Cancelar
