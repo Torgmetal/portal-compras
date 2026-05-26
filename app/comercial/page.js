@@ -113,7 +113,6 @@ export default async function ComercialHome({ searchParams }) {
     { label: "Total OPs",    value: kpis.total,                 color: "bg-torg-blue",     Icon: FolderKanban },
     { label: "Em execução",  value: kpis.emExecucao,            color: "bg-torg-orange",   Icon: Activity },
     { label: "Atrasadas",    value: kpis.atrasadas,             color: "bg-red-500",       Icon: AlertTriangle },
-    { label: "Verba ativa",  value: fmtMoeda(kpis.verbaAtiva),  color: "bg-torg-dark",     Icon: DollarSign },
   ];
 
   return (
@@ -156,7 +155,7 @@ export default async function ComercialHome({ searchParams }) {
       </div>
 
       {!verFinalizadas && opsComTotaisRaw.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {cards.map((c) => (
             <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
               <div className={`${c.color} p-2.5 rounded-lg`}>
@@ -200,7 +199,6 @@ export default async function ComercialHome({ searchParams }) {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Obra</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fim previsto</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">RMs</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-3 py-3 w-10"></th>
@@ -220,10 +218,9 @@ export default async function ComercialHome({ searchParams }) {
                       <td className="px-6 py-3 text-torg-gray">{op.obra || "—"}</td>
                       <td className="px-6 py-3 text-torg-gray">{fmtData(op.dataInicio)}</td>
                       <td className="px-6 py-3 text-torg-gray">{fmtData(op.dataFimPrevista)}</td>
-                      <td className="px-6 py-3 text-right text-torg-dark font-medium tabular-nums">{fmtMoeda(op.verbaTotal)}</td>
                       <td className="px-6 py-3 text-center text-torg-gray">{op._count.rms}</td>
-                      <td className="px-6 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        <span className={`inline-block text-xs text-center px-3 py-1 rounded-full font-medium ${s.className}`}>
                           {s.label}
                         </span>
                       </td>
