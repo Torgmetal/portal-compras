@@ -44,6 +44,7 @@ export default async function PainelOPDetalhe({ params }) {
                 select: {
                   id: true, rmItemId: true, precoUnit: true, qtdCotada: true,
                   icmsPct: true, ipiPct: true, vencedor: true, observacao: true,
+                  prazoEntrega: true,
                 },
               },
               pedidosOmie: {
@@ -104,6 +105,7 @@ export default async function PainelOPDetalhe({ params }) {
           select: {
             id: true, rmItemId: true, precoUnit: true, qtdCotada: true,
             icmsPct: true, ipiPct: true, vencedor: true, observacao: true,
+            prazoEntrega: true,
           },
         },
         pedidosOmie: {

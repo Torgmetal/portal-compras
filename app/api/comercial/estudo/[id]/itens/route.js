@@ -25,21 +25,27 @@ export async function GET(req, { params }) {
 // ── POST /api/comercial/estudo/[id]/itens ── Criar item ──
 
 const criarItemSchema = z.object({
-  setor: z.string().optional(),
-  projeto: z.string().optional(),
+  setor: z.string().nullish(),
+  projeto: z.string().nullish(),
   tipoMaterial: z.enum([
     "PERFIL_W", "PERFIL_U", "PERFIL_L", "TUBO_REDONDO", "TUBO_QUADRADO",
     "TUBO_RETANGULAR", "CHAPA", "BARRA_REDONDA", "BARRA_CHATA",
     "BARRA_QUADRADA", "BARRA_ROSCADA", "TELA", "GRADE_PISO", "DEGRAU", "OUTRO",
-  ]).optional(),
+  ]).nullish(),
   descricao: z.string().min(1, "Descrição é obrigatória"),
-  norma: z.string().optional(),
-  comprimento: z.number().min(0).optional(),
+  norma: z.string().nullish(),
+  comprimento: z.number().min(0).nullish(),
   pesoUnitario: z.number().min(0, "Peso unitário deve ser >= 0"),
-  quantidade: z.number().int().min(1).optional(),
+  quantidade: z.number().int().min(1).nullish(),
   pesoTotal: z.number().min(0),
-  areaPintura: z.number().min(0).optional(),
-  ordem: z.number().int().optional(),
+  areaPintura: z.number().min(0).nullish(),
+  ordem: z.number().int().nullish(),
+  // Vinculacao Omie
+  codigoOmie: z.string().nullish(),
+  descricaoOmie: z.string().nullish(),
+  custoUnitario: z.number().min(0).nullish(),
+  // Campo auxiliar do matching (nao salva no DB)
+  matchScore: z.number().nullish(),
 });
 
 export async function POST(req, { params }) {
@@ -71,7 +77,7 @@ export async function POST(req, { params }) {
     }
 
     const criados = await prisma.pesoProjetoItem.createMany({
-      data: parsed.map((p) => ({
+      data: parsed.map(({ matchScore, ...p }) => ({
         estudoId: id,
         ...p,
         tipoMaterial: p.tipoMaterial || "OUTRO",

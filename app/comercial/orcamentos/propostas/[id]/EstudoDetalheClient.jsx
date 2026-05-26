@@ -6,8 +6,16 @@ import {
   DollarSign, Calculator, BarChart3, Loader2, AlertCircle,
   Save, CheckCircle2, Clock, Edit3, Link2, Paperclip, Trash2,
   Plus, X, Search, FileText, Download, ChevronDown, Sparkles,
-  Check, Info,
+  Check, Info, FolderDown, FolderOpen, RefreshCw,
+  Wrench, Bolt, Paintbrush, Landmark, CalendarDays,
 } from "lucide-react";
+import AbaProdutividade from "./AbaProdutividade";
+import AbaAcessorios from "./AbaAcessorios";
+import AbaParafusos from "./AbaParafusos";
+import AbaPintura from "./AbaPintura";
+import AbaCustos from "./AbaCustos";
+import AbaCronograma from "./AbaCronograma";
+import AbaImpostos from "./AbaImpostos";
 
 const STATUS_LABELS = {
   RASCUNHO: { label: "Rascunho", cor: "bg-gray-100 text-gray-700", icon: Edit3 },
@@ -18,10 +26,15 @@ const STATUS_LABELS = {
 
 const ABAS = [
   { id: "geral", label: "Geral", icon: FileSpreadsheet },
-  { id: "peso", label: "Peso Projeto", icon: Scale },
+  { id: "produtividade", label: "Produtividade", icon: Calculator },
+  { id: "materiais", label: "Materiais", icon: Scale },
+  { id: "acessorios", label: "Acessorios", icon: Wrench },
+  { id: "parafusos", label: "Parafusos", icon: Bolt },
+  { id: "pintura", label: "Pintura", icon: Paintbrush },
   { id: "custos", label: "Custos", icon: DollarSign },
-  { id: "bdi", label: "BDI / Impostos", icon: Calculator },
+  { id: "impostos", label: "Impostos", icon: Landmark },
   { id: "resumo", label: "Resumo", icon: BarChart3 },
+  { id: "cronograma", label: "Cronograma", icon: CalendarDays },
 ];
 
 const TIPO_MATERIAL_LABELS = {
@@ -223,20 +236,105 @@ function AbaGeral({ estudo, onSave }) {
 
 // ── Secao de Documentos (usada dentro da aba Peso) ─────────
 
-function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate }) {
+function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate, sharepointUrl }) {
   const [docs, setDocs] = useState(docsProp || []);
   const [uploading, setUploading] = useState(false);
   const [erroUpload, setErroUpload] = useState("");
+  const [showImportSP, setShowImportSP] = useState(false);
   const fileRef = useRef(null);
+  const folderRef = useRef(null);
+  const [uploadProgresso, setUploadProgresso] = useState(""); // "3 de 15..."
+  const [convertendo, setConvertendo] = useState(new Set()); // IDs de docs sendo convertidos
+
+  // Converter DWG/DXF para PDF via CloudConvert
+  const converterDwg = async (docId, docNome) => {
+    setConvertendo((prev) => new Set(prev).add(docId));
+    try {
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/converter-dwg`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ docId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Falha na conversao");
+
+      if (json.jaExistia) {
+        // PDF ja existe, nao duplicar
+        return json.data;
+      }
+
+      // Adicionar o PDF convertido a lista
+      setDocs((prev) => {
+        const novos = [json.data, ...prev];
+        onUpdate?.(novos);
+        return novos;
+      });
+      return json.data;
+    } catch (err) {
+      console.warn(`Conversao DWG falhou para ${docNome}:`, err);
+      setErroUpload((prev) => {
+        const msg = `Conversao ${docNome}: ${err.message}`;
+        return prev ? `${prev} | ${msg}` : msg;
+      });
+      return null;
+    } finally {
+      setConvertendo((prev) => {
+        const next = new Set(prev);
+        next.delete(docId);
+        return next;
+      });
+    }
+  };
+
+  // Converter todos os DWGs pendentes de uma vez
+  const converterTodosDwg = async () => {
+    const dwgs = docs.filter((d) => {
+      const ext = d.tipo?.toLowerCase();
+      if (ext !== "dwg" && ext !== "dxf") return false;
+      // Verificar se ja tem PDF convertido
+      const pdfName = d.nome.replace(/\.(dwg|dxf)$/i, ".pdf");
+      return !docs.some((p) => p.nome === pdfName && p.observacao?.includes("Convertido de DWG"));
+    });
+    if (dwgs.length === 0) return;
+
+    for (const dwg of dwgs) {
+      await converterDwg(dwg.id, dwg.nome);
+    }
+  };
 
   const handleUpload = async (e) => {
-    const files = e.target.files;
-    if (!files?.length) return;
+    const fileList = e.target.files;
+    if (!fileList?.length) return;
+
+    // Filtrar tipos suportados (inclui CAD para armazenamento, exclui modelos 3D e binarios pesados)
+    const tiposAceitos = ["pdf","xlsx","xls","csv","docx","doc","eml","msg","png","jpg","jpeg","dwg","dxf"];
+    const files = Array.from(fileList).filter((f) => {
+      if (f.name.startsWith(".") || f.size === 0) return false;
+      const ext = f.name.split(".").pop()?.toLowerCase();
+      return tiposAceitos.includes(ext);
+    });
+
+    const ignorados = fileList.length - files.length;
+    if (files.length === 0) {
+      setErroUpload(`Nenhum arquivo suportado encontrado (${fileList.length} arquivo(s) ignorado(s))`);
+      return;
+    }
 
     setUploading(true);
     setErroUpload("");
+    let enviados = 0;
+    const dwgsParaConverter = []; // { id, nome } dos DWGs que precisam conversao
+
+    if (ignorados > 0) {
+      setUploadProgresso(`${files.length} arquivo(s) suportado(s), ${ignorados} ignorado(s) (CAD/binario)`);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
 
     for (const file of files) {
+      enviados++;
+      if (files.length > 1) {
+        setUploadProgresso(`${enviados} de ${files.length}: ${file.name}`);
+      }
       try {
         // 1. Upload do arquivo para o Vercel Blob
         const formData = new FormData();
@@ -266,13 +364,31 @@ function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate }) {
           onUpdate?.(novos);
           return novos;
         });
+
+        // Marcar DWG/DXF para conversao automatica
+        if (ext === "dwg" || ext === "dxf") {
+          dwgsParaConverter.push({ id: regJson.data.id, nome: file.name });
+        }
       } catch (err) {
-        setErroUpload(err.message);
+        console.warn(`Upload falhou para ${file.name}:`, err);
+        setErroUpload((prev) => {
+          const msg = `${file.name}: ${err.message}`;
+          return prev ? `${prev} | ${msg}` : msg;
+        });
       }
     }
 
     setUploading(false);
+    setUploadProgresso("");
     if (fileRef.current) fileRef.current.value = "";
+    if (folderRef.current) folderRef.current.value = "";
+
+    // Auto-converter DWGs apos upload (em background, sem travar o upload)
+    if (dwgsParaConverter.length > 0) {
+      for (const dwg of dwgsParaConverter) {
+        converterDwg(dwg.id, dwg.nome);
+      }
+    }
   };
 
   const handleExcluir = async (docId) => {
@@ -292,6 +408,14 @@ function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate }) {
     }
   };
 
+  // Contar DWGs pendentes de conversao
+  const dwgsPendentes = docs.filter((d) => {
+    const ext = d.tipo?.toLowerCase();
+    if (ext !== "dwg" && ext !== "dxf") return false;
+    const pdfName = d.nome.replace(/\.(dwg|dxf)$/i, ".pdf");
+    return !docs.some((p) => p.nome === pdfName && p.observacao?.includes("Convertido de DWG"));
+  });
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -299,76 +423,215 @@ function SecaoDocumentos({ estudoId, documentos: docsProp, onUpdate }) {
           <Paperclip size={16} />
           Documentos ({docs.length})
         </h3>
-        <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-torg-dark cursor-pointer transition-colors">
-          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-          {uploading ? "Enviando..." : "Upload"}
-          <input
-            ref={fileRef}
-            type="file"
-            multiple
-            accept=".pdf,.xlsx,.xls,.csv,.dxf,.dwg,.docx,.doc,.eml,.msg,.png,.jpg,.jpeg"
-            onChange={handleUpload}
-            className="hidden"
-            disabled={uploading}
-          />
-        </label>
+        <div className="flex items-center gap-2">
+          {/* Botao converter todos DWGs pendentes */}
+          {dwgsPendentes.length > 0 && convertendo.size === 0 && (
+            <button
+              onClick={converterTodosDwg}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-50 hover:bg-amber-100 rounded-xl text-sm font-medium text-amber-700 transition-colors"
+              title={`Converter ${dwgsPendentes.length} DWG(s) para PDF`}
+            >
+              <RefreshCw size={14} />
+              Converter {dwgsPendentes.length} DWG{dwgsPendentes.length > 1 ? "s" : ""}
+            </button>
+          )}
+          {sharepointUrl && (
+            <button
+              onClick={() => setShowImportSP(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-torg-blue/10 hover:bg-torg-blue/20 rounded-xl text-sm font-medium text-torg-blue transition-colors"
+            >
+              <FolderDown size={14} />
+              Importar SharePoint
+            </button>
+          )}
+          <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-torg-dark cursor-pointer transition-colors">
+            {uploading ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}
+            {uploading ? "Enviando..." : "Upload Pasta"}
+            <input
+              ref={folderRef}
+              type="file"
+              // @ts-ignore - webkitdirectory e nao-padrao mas funciona em todos os browsers modernos
+              webkitdirectory=""
+              directory=""
+              onChange={handleUpload}
+              className="hidden"
+              disabled={uploading}
+            />
+          </label>
+          <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-torg-dark cursor-pointer transition-colors">
+            <Upload size={14} />
+            Arquivos
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept=".pdf,.xlsx,.xls,.csv,.dxf,.dwg,.docx,.doc,.eml,.msg,.png,.jpg,.jpeg,.DWG,.DXF"
+              onChange={handleUpload}
+              className="hidden"
+              disabled={uploading}
+            />
+          </label>
+        </div>
       </div>
+
+      {/* Barra de conversao DWG em andamento */}
+      {convertendo.size > 0 && (
+        <div className="flex items-center gap-2 p-3 bg-amber-50 text-amber-700 rounded-xl text-sm mb-3">
+          <Loader2 size={16} className="animate-spin shrink-0" />
+          <span>Convertendo {convertendo.size} DWG{convertendo.size > 1 ? "s" : ""} para PDF...</span>
+        </div>
+      )}
+
+      {uploading && uploadProgresso && (
+        <div className="flex items-center gap-2 p-3 bg-torg-blue/5 text-torg-blue rounded-xl text-sm mb-3">
+          <Loader2 size={16} className="animate-spin shrink-0" />
+          <span className="truncate">{uploadProgresso}</span>
+        </div>
+      )}
 
       {erroUpload && (
         <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-xl text-sm mb-3">
-          <AlertCircle size={16} />
-          {erroUpload}
-          <button onClick={() => setErroUpload("")} className="ml-auto"><X size={14} /></button>
+          <AlertCircle size={16} className="shrink-0" />
+          <span className="truncate">{erroUpload}</span>
+          <button onClick={() => setErroUpload("")} className="ml-auto shrink-0"><X size={14} /></button>
         </div>
       )}
 
       {docs.length === 0 ? (
-        <div
-          className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-torg-blue/30 transition-colors"
-          onClick={() => fileRef.current?.click()}
-        >
-          <Upload size={28} className="text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-torg-gray">Arraste ou clique para enviar documentos</p>
-          <p className="text-xs text-gray-400 mt-1">PDFs, planilhas Excel, desenhos, e-mails</p>
+        <div className="space-y-3">
+          {sharepointUrl && (
+            <button
+              onClick={() => setShowImportSP(true)}
+              className="w-full border-2 border-dashed border-torg-blue/20 rounded-xl p-5 text-center cursor-pointer hover:border-torg-blue/40 hover:bg-torg-blue/5 transition-colors"
+            >
+              <FolderDown size={28} className="text-torg-blue/50 mx-auto mb-2" />
+              <p className="text-sm font-medium text-torg-blue">Importar documentos do SharePoint</p>
+              <p className="text-xs text-torg-gray mt-1">Puxar PDFs e imagens da pasta do projeto</p>
+            </button>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div
+              className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-torg-blue/30 transition-colors"
+              onClick={() => folderRef.current?.click()}
+            >
+              <FolderOpen size={24} className="text-gray-300 mx-auto mb-2" />
+              <p className="text-sm font-medium text-torg-gray">Upload de pasta</p>
+              <p className="text-xs text-gray-400 mt-1">Selecione uma pasta inteira</p>
+            </div>
+            <div
+              className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-torg-blue/30 transition-colors"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload size={24} className="text-gray-300 mx-auto mb-2" />
+              <p className="text-sm font-medium text-torg-gray">Upload de arquivos</p>
+              <p className="text-xs text-gray-400 mt-1">PDFs, planilhas, desenhos</p>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
-          {docs.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex items-center gap-3 p-3 bg-gray-50/80 rounded-xl group hover:bg-gray-100/80 transition-colors"
-            >
-              <div className="w-9 h-9 bg-white border border-gray-200 rounded-lg flex items-center justify-center shrink-0">
-                <FileText size={16} className="text-torg-blue" />
+          {docs.map((doc) => {
+            const ext = doc.tipo?.toLowerCase();
+            const isDwg = ext === "dwg" || ext === "dxf";
+            const isConverting = convertendo.has(doc.id);
+            const pdfName = isDwg ? doc.nome.replace(/\.(dwg|dxf)$/i, ".pdf") : null;
+            const temPdf = isDwg && docs.some((p) => p.nome === pdfName && p.observacao?.includes("Convertido de DWG"));
+            const isConvertedPdf = doc.observacao?.includes("Convertido de DWG");
+
+            return (
+              <div
+                key={doc.id}
+                className="flex items-center gap-3 p-3 bg-gray-50/80 rounded-xl group hover:bg-gray-100/80 transition-colors"
+              >
+                <div className={`w-9 h-9 border rounded-lg flex items-center justify-center shrink-0 ${
+                  isDwg ? "bg-amber-50 border-amber-200" : isConvertedPdf ? "bg-emerald-50 border-emerald-200" : "bg-white border-gray-200"
+                }`}>
+                  {isConverting ? (
+                    <Loader2 size={16} className="text-amber-500 animate-spin" />
+                  ) : (
+                    <FileText size={16} className={isDwg ? "text-amber-600" : isConvertedPdf ? "text-emerald-600" : "text-torg-blue"} />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-torg-dark truncate">{doc.nome}</p>
+                    {isDwg && temPdf && (
+                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-medium">
+                        PDF gerado
+                      </span>
+                    )}
+                    {isDwg && !temPdf && !isConverting && (
+                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium">
+                        DWG
+                      </span>
+                    )}
+                    {isConverting && (
+                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium animate-pulse">
+                        Convertendo...
+                      </span>
+                    )}
+                    {isConvertedPdf && (
+                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-medium">
+                        Convertido
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-torg-gray">
+                    {doc.categoria && <span className="capitalize">{doc.categoria}</span>}
+                    {doc.tamanho && <span> · {fmtBytes(doc.tamanho)}</span>}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Botao converter individual pra DWGs sem PDF */}
+                  {isDwg && !temPdf && !isConverting && (
+                    <button
+                      onClick={() => converterDwg(doc.id, doc.nome)}
+                      className="p-1.5 hover:bg-amber-50 rounded-lg transition-colors"
+                      title="Converter para PDF"
+                    >
+                      <RefreshCw size={14} className="text-amber-600" />
+                    </button>
+                  )}
+                  <a
+                    href={doc.blobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 hover:bg-white rounded-lg transition-colors"
+                    title="Abrir"
+                  >
+                    <ExternalLink size={14} className="text-torg-gray" />
+                  </a>
+                  <button
+                    onClick={() => handleExcluir(doc.id)}
+                    className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={14} className="text-red-400" />
+                  </button>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-torg-dark truncate">{doc.nome}</p>
-                <p className="text-xs text-torg-gray">
-                  {doc.categoria && <span className="capitalize">{doc.categoria}</span>}
-                  {doc.tamanho && <span> · {fmtBytes(doc.tamanho)}</span>}
-                </p>
-              </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <a
-                  href={doc.blobUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 hover:bg-white rounded-lg transition-colors"
-                  title="Abrir"
-                >
-                  <ExternalLink size={14} className="text-torg-gray" />
-                </a>
-                <button
-                  onClick={() => handleExcluir(doc.id)}
-                  className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Excluir"
-                >
-                  <Trash2 size={14} className="text-red-400" />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+      )}
+
+      {/* Modal importar SharePoint */}
+      {showImportSP && (
+        <ModalImportarSharePoint
+          estudoId={estudoId}
+          onClose={() => setShowImportSP(false)}
+          onImportados={async () => {
+            // Recarregar documentos do backend
+            try {
+              const res = await fetch(`/api/comercial/estudo/${estudoId}/documentos`);
+              const json = await res.json();
+              if (json.success) {
+                setDocs(json.data);
+                onUpdate?.(json.data);
+              }
+            } catch { /* silencioso */ }
+          }}
+        />
       )}
     </div>
   );
@@ -379,6 +642,289 @@ function categoriaFromExt(ext) {
   if (["eml", "msg"].includes(ext)) return "email";
   if (["xlsx", "xls", "csv"].includes(ext)) return "cotacao";
   return "documento";
+}
+
+// ── Modal Importar do SharePoint ──────────────────────────
+
+function ModalImportarSharePoint({ estudoId, onClose, onImportados }) {
+  const [carregando, setCarregando] = useState(true);
+  const [importando, setImportando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [dados, setDados] = useState(null); // { pastas, totalArquivos, jaImportados }
+  const [selecionados, setSelecionados] = useState(new Set());
+  const [progresso, setProgresso] = useState(""); // mensagem de progresso
+
+  useEffect(() => {
+    listarArquivos();
+  }, []);
+
+  const listarArquivos = async () => {
+    setCarregando(true);
+    setErro("");
+    try {
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/importar-sharepoint`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setDados(json.data);
+
+      // Pre-selecionar arquivos que ainda nao foram importados
+      const novos = new Set();
+      for (const [, arquivos] of Object.entries(json.data.pastas)) {
+        for (const arq of arquivos) {
+          if (!arq.jaImportado) novos.add(arq.id);
+        }
+      }
+      setSelecionados(novos);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const toggleArquivo = (id) => {
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const togglePasta = (nomePasta) => {
+    const arqsDaPasta = (dados?.pastas[nomePasta] || []).filter((a) => !a.jaImportado);
+    const todosSelect = arqsDaPasta.every((a) => selecionados.has(a.id));
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      for (const a of arqsDaPasta) {
+        if (todosSelect) next.delete(a.id);
+        else next.add(a.id);
+      }
+      return next;
+    });
+  };
+
+  const handleImportar = async () => {
+    if (selecionados.size === 0) return;
+    setImportando(true);
+    setErro("");
+    setProgresso(`Importando ${selecionados.size} arquivo(s)...`);
+
+    try {
+      // Montar lista de arquivos selecionados
+      const arquivosParaImportar = [];
+      for (const [pasta, arquivos] of Object.entries(dados.pastas)) {
+        for (const arq of arquivos) {
+          if (selecionados.has(arq.id) && !arq.jaImportado) {
+            arquivosParaImportar.push({ id: arq.id, name: arq.name, folder: pasta });
+          }
+        }
+      }
+
+      if (arquivosParaImportar.length === 0) {
+        setErro("Todos os arquivos selecionados ja foram importados");
+        return;
+      }
+
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/importar-sharepoint`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arquivos: arquivosParaImportar }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+
+      const qtdImportados = json.data.importados.filter((i) => i.status === "importado").length;
+      const qtdJaExistiam = json.data.importados.filter((i) => i.status === "ja_existe").length;
+      const qtdFalhas = json.data.falhas.length;
+
+      setProgresso(
+        [
+          qtdImportados > 0 && `${qtdImportados} importado(s)`,
+          qtdJaExistiam > 0 && `${qtdJaExistiam} ja existia(m)`,
+          qtdFalhas > 0 && `${qtdFalhas} falha(s)`,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      );
+
+      // Atualizar lista de documentos no parent
+      onImportados?.();
+
+      // Recarregar a lista pra atualizar status jaImportado
+      await listarArquivos();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  const totalPastas = dados ? Object.keys(dados.pastas).length : 0;
+  const totalNovos = dados
+    ? Object.values(dados.pastas).flat().filter((a) => !a.jaImportado).length
+    : 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-torg-blue/10 rounded-xl flex items-center justify-center">
+              <FolderDown size={20} className="text-torg-blue" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-torg-dark">Importar do SharePoint</h2>
+              <p className="text-sm text-torg-gray">
+                {carregando
+                  ? "Listando arquivos..."
+                  : dados
+                  ? `${dados.totalArquivos} arquivo(s) em ${totalPastas} pasta(s)`
+                  : "Erro ao listar"}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg" disabled={importando}>
+            <X size={20} className="text-gray-400" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {carregando && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Loader2 size={32} className="animate-spin text-torg-blue mb-3" />
+              <p className="text-sm text-torg-gray">Lendo pasta do SharePoint...</p>
+            </div>
+          )}
+
+          {erro && !carregando && (
+            <div className="flex items-center gap-2 p-4 bg-red-50 text-red-700 rounded-xl text-sm mb-3">
+              <AlertCircle size={16} className="shrink-0" />
+              <p>{erro}</p>
+              <button onClick={listarArquivos} className="ml-auto text-red-600 hover:text-red-800 font-medium underline">
+                Tentar novamente
+              </button>
+            </div>
+          )}
+
+          {dados && !carregando && (
+            <div className="space-y-3">
+              {Object.entries(dados.pastas)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([pasta, arquivos]) => {
+                  const novos = arquivos.filter((a) => !a.jaImportado);
+                  const todosSelecionados = novos.length > 0 && novos.every((a) => selecionados.has(a.id));
+                  const algunsSelecionados = novos.some((a) => selecionados.has(a.id));
+
+                  return (
+                    <div key={pasta} className="border border-gray-100 rounded-xl overflow-hidden">
+                      {/* Pasta header */}
+                      <div
+                        className="flex items-center gap-3 px-4 py-3 bg-gray-50/80 cursor-pointer hover:bg-gray-100/80 transition-colors"
+                        onClick={() => togglePasta(pasta)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={todosSelecionados}
+                          ref={(el) => {
+                            if (el) el.indeterminate = algunsSelecionados && !todosSelecionados;
+                          }}
+                          onChange={() => togglePasta(pasta)}
+                          className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue/30"
+                          disabled={novos.length === 0}
+                        />
+                        <FolderOpen size={16} className="text-torg-blue shrink-0" />
+                        <span className="text-sm font-semibold text-torg-dark flex-1 truncate">
+                          {pasta}
+                        </span>
+                        <span className="text-xs text-torg-gray">
+                          {arquivos.length} arquivo(s)
+                          {novos.length < arquivos.length && (
+                            <span className="text-emerald-600 ml-1">
+                              · {arquivos.length - novos.length} ja importado(s)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+
+                      {/* Lista de arquivos */}
+                      <div className="divide-y divide-gray-50">
+                        {arquivos.map((arq) => (
+                          <label
+                            key={arq.id}
+                            className={`flex items-center gap-3 px-4 py-2 text-sm cursor-pointer transition-colors ${
+                              arq.jaImportado
+                                ? "bg-emerald-50/30 text-torg-gray"
+                                : selecionados.has(arq.id)
+                                ? "bg-torg-blue/5"
+                                : "hover:bg-gray-50/50"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={arq.jaImportado || selecionados.has(arq.id)}
+                              disabled={arq.jaImportado}
+                              onChange={() => toggleArquivo(arq.id)}
+                              className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue/30 disabled:opacity-50"
+                            />
+                            <FileText size={14} className={arq.jaImportado ? "text-emerald-500" : "text-gray-400"} />
+                            <span className="flex-1 truncate">{arq.name}</span>
+                            <span className="text-xs text-gray-400">{fmtBytes(arq.size)}</span>
+                            {arq.jaImportado && (
+                              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                                importado
+                              </span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl shrink-0">
+          <div className="text-sm text-torg-gray">
+            {progresso || (
+              <>
+                <strong className="text-torg-dark">{selecionados.size}</strong> selecionado(s)
+                {totalNovos > 0 && <span> de {totalNovos} novo(s)</span>}
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              disabled={importando}
+              className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark transition-colors"
+            >
+              {importando ? "Aguarde..." : "Fechar"}
+            </button>
+            <button
+              onClick={handleImportar}
+              disabled={selecionados.size === 0 || importando || carregando}
+              className="flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {importando ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <FolderDown size={16} />
+              )}
+              {importando ? "Importando..." : `Importar ${selecionados.size} arquivo(s)`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Modal Novo Item ────────────────────────────────────────
@@ -603,34 +1149,29 @@ function ModalRevisaoIA({ resultado, onClose, onConfirmar, salvando }) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-              <Sparkles size={20} className="text-purple-600" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-torg-dark">Resultado da Analise</h2>
-              <p className="text-sm text-torg-gray">
-                {resultado.itens.length} itens encontrados
-                {resultado.docsAnalisados?.length > 0 && ` em ${resultado.docsAnalisados.length} documento(s)`}
-              </p>
-            </div>
+          <div>
+            <h2 className="text-base font-semibold text-torg-dark">Itens extraidos</h2>
+            <p className="text-sm text-torg-gray">
+              {resultado.itens.length} itens
+              {resultado.docsAnalisados?.length > 0 && ` · ${resultado.docsAnalisados.length} doc${resultado.docsAnalisados.length > 1 ? "s" : ""}`}
+            </p>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
-            <X size={20} className="text-gray-400" />
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg">
+            <X size={18} className="text-gray-400" />
           </button>
         </div>
 
         {/* Info do projeto */}
         {(resultado.composicao || resultado.observacoes || resultado.pesoTotalProjeto) && (
-          <div className="px-6 py-3 bg-purple-50/50 border-b border-purple-100/50 shrink-0">
-            <div className="flex items-start gap-2 text-sm">
-              <Info size={16} className="text-purple-500 mt-0.5 shrink-0" />
-              <div className="space-y-1 text-torg-gray">
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 shrink-0">
+            <div className="flex items-start gap-2 text-sm text-torg-gray">
+              <Info size={14} className="text-torg-gray mt-0.5 shrink-0" />
+              <div className="space-y-0.5">
                 {resultado.pesoTotalProjeto && (
-                  <p>Peso total do projeto estimado: <strong className="text-torg-dark">{fmtNum(resultado.pesoTotalProjeto, 0)} kg</strong></p>
+                  <p>Peso estimado: <strong className="text-torg-dark">{fmtNum(resultado.pesoTotalProjeto, 0)} kg</strong></p>
                 )}
-                {resultado.composicao && <p>Composicao: {resultado.composicao}</p>}
-                {resultado.observacoes && <p>{resultado.observacoes}</p>}
+                {resultado.composicao && <p className="text-xs">{resultado.composicao}</p>}
+                {resultado.observacoes && <p className="text-xs">{resultado.observacoes}</p>}
               </div>
             </div>
           </div>
@@ -653,11 +1194,10 @@ function ModalRevisaoIA({ resultado, onClose, onConfirmar, salvando }) {
                   <th className="px-3 py-2">Descricao</th>
                   <th className="px-3 py-2">Setor</th>
                   <th className="px-3 py-2">Tipo</th>
-                  <th className="px-3 py-2">Norma</th>
-                  <th className="px-3 py-2 text-right">Comp.</th>
-                  <th className="px-3 py-2 text-right">Peso un.</th>
                   <th className="px-3 py-2 text-right">Qtd</th>
-                  <th className="px-3 py-2 text-right">Peso total</th>
+                  <th className="px-3 py-2 text-right">Peso (kg)</th>
+                  <th className="px-3 py-2 text-right">R$/kg</th>
+                  <th className="px-3 py-2 text-right">Custo</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -679,6 +1219,9 @@ function ModalRevisaoIA({ resultado, onClose, onConfirmar, salvando }) {
                     </td>
                     <td className="px-3 py-2 font-medium text-torg-dark whitespace-nowrap">
                       {item.descricao}
+                      {!item.codigoOmie && item.custoUnitario > 0 && (
+                        <span className="text-amber-500 ml-1 text-[10px]" title="Sem cadastro Omie — custo estimado">*</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-torg-gray text-xs whitespace-nowrap">
                       {item.setor || "—"}
@@ -686,20 +1229,17 @@ function ModalRevisaoIA({ resultado, onClose, onConfirmar, salvando }) {
                     <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap">
                       {TIPO_MATERIAL_LABELS[item.tipoMaterial] || item.tipoMaterial || "—"}
                     </td>
-                    <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap">
-                      {item.norma || "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right text-torg-dark whitespace-nowrap">
-                      {item.comprimento ? fmtNum(item.comprimento) : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right text-torg-dark whitespace-nowrap">
-                      {fmtNum(item.pesoUnitario)}
-                    </td>
                     <td className="px-3 py-2 text-right text-torg-dark whitespace-nowrap">
                       {item.quantidade}
                     </td>
-                    <td className="px-3 py-2 text-right font-semibold text-torg-dark whitespace-nowrap">
+                    <td className="px-3 py-2 text-right font-medium text-torg-dark whitespace-nowrap">
                       {fmtNum(item.pesoTotal, 0)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-torg-gray whitespace-nowrap">
+                      {item.custoUnitario ? fmtNum(item.custoUnitario, 2) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-torg-dark whitespace-nowrap">
+                      {item.custoUnitario ? fmtMoeda(item.custoUnitario * item.pesoTotal) : "—"}
                     </td>
                   </tr>
                 ))}
@@ -711,9 +1251,20 @@ function ModalRevisaoIA({ resultado, onClose, onConfirmar, salvando }) {
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl shrink-0">
           <div className="text-sm text-torg-gray">
-            <strong className="text-torg-dark">{selecionados.size}</strong> de {resultado.itens.length} selecionados
-            {" · "}
-            <strong className="text-torg-blue">{fmtNum(pesoSelecionado, 0)} kg</strong>
+            <span><strong className="text-torg-dark">{selecionados.size}</strong> selecionados</span>
+            <span className="mx-2 text-gray-300">·</span>
+            <span><strong className="text-torg-dark">{fmtNum(pesoSelecionado, 0)} kg</strong></span>
+            {(() => {
+              const custoEstimado = itensSelecionados.reduce((s, i) => s + (i.custoUnitario ? i.custoUnitario * i.pesoTotal : 0), 0);
+              const semOmie = itensSelecionados.filter(i => !i.codigoOmie).length;
+              return custoEstimado > 0 ? (
+                <>
+                  <span className="mx-2 text-gray-300">·</span>
+                  <span>Custo: <strong className="text-torg-dark">{fmtMoeda(custoEstimado)}</strong></span>
+                  {semOmie > 0 && <span className="text-xs text-amber-600 ml-1">({semOmie} sem cadastro*)</span>}
+                </>
+              ) : null;
+            })()}
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -725,10 +1276,10 @@ function ModalRevisaoIA({ resultado, onClose, onConfirmar, salvando }) {
             <button
               onClick={() => onConfirmar(itensSelecionados)}
               disabled={selecionados.size === 0 || salvando}
-              className="flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-medium hover:bg-torg-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {salvando ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-              Adicionar {selecionados.size} {selecionados.size === 1 ? "item" : "itens"}
+              Confirmar {selecionados.size} {selecionados.size === 1 ? "item" : "itens"}
             </button>
           </div>
         </div>
@@ -748,9 +1299,11 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const [filtroSetor, setFiltroSetor] = useState("");
   const [toast, setToast] = useState(null);
   const [analisandoIA, setAnalisandoIA] = useState(false);
+  const [progressoIA, setProgressoIA] = useState(null); // { loteAtual, totalLotes, itensAcumulados }
   const [resultadoIA, setResultadoIA] = useState(null);
   const [salvandoIA, setSalvandoIA] = useState(false);
-  const [textoExtra, setTextoExtra] = useState("");
+  // Filtro de docs padrao: analisar apenas docs de estrutura metalica (-MET-)
+  const filtroDocsIA = "MET";
 
   // Setores unicos para filtro
   const setores = [...new Set(itens.map((i) => i.setor).filter(Boolean))].sort();
@@ -777,26 +1330,93 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // ── IA: analisar documentos ──
+  // ── Calcular docs filtrados para IA ──
+  const docsParaIA = (estudo.documentos || []).filter((d) => {
+    if (filtroDocsIA === "todos") return true;
+    return d.nome?.toUpperCase().includes(`-${filtroDocsIA}-`);
+  });
+
+  // ── IA: analisar documentos (em lotes) ──
   const handleAnalisarIA = async () => {
     setAnalisandoIA(true);
+    setProgressoIA(null);
+    const todosItens = [];
+    let pesoTotal = null;
+    let composicao = null;
+    let observacoes = [];
+    let docsAnalisados = [];
+
+    // Filtrar docIds com base no filtro selecionado
+    const docIdsFiltrados = docsParaIA.map((d) => d.id);
+
     try {
-      const res = await fetch(`/api/comercial/estudo/${estudoId}/analisar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ textoExtra: textoExtra.trim() || undefined }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error);
-      if (!json.data.itens?.length) {
-        showToast("Nenhum item encontrado nos documentos");
+      // Primeira chamada para descobrir quantos lotes existem
+      let loteAtual = 0;
+      let totalLotes = 1;
+      let concluido = false;
+
+      while (!concluido) {
+        setProgressoIA({ loteAtual: loteAtual + 1, totalLotes, itensAcumulados: todosItens.length });
+
+        const res = await fetch(`/api/comercial/estudo/${estudoId}/analisar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            docIds: docIdsFiltrados.length < (estudo.documentos?.length || 0) ? docIdsFiltrados : undefined,
+            textoExtra: undefined,
+            lote: loteAtual,
+          }),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error);
+
+        const { data } = json;
+        // Atualizar paginacao
+        if (data.paginacao) {
+          totalLotes = data.paginacao.totalLotes;
+          concluido = data.paginacao.concluido;
+        } else {
+          concluido = true;
+        }
+
+        // Acumular resultados
+        if (data.itens?.length) todosItens.push(...data.itens);
+        if (data.pesoTotalProjeto) pesoTotal = (pesoTotal || 0) + data.pesoTotalProjeto;
+        if (data.composicao) composicao = data.composicao;
+        if (data.observacoes) observacoes.push(data.observacoes);
+        if (data.docsAnalisados?.length) docsAnalisados.push(...data.docsAnalisados);
+
+        loteAtual++;
+        setProgressoIA({ loteAtual, totalLotes, itensAcumulados: todosItens.length });
+      }
+
+      if (!todosItens.length) {
+        showToast("Nenhum item de peso encontrado nos documentos");
         return;
       }
-      setResultadoIA(json.data);
+
+      setResultadoIA({
+        itens: todosItens,
+        pesoTotalProjeto: pesoTotal,
+        composicao,
+        observacoes: observacoes.join(" | "),
+        docsAnalisados,
+      });
     } catch (e) {
       showToast(`Erro: ${e.message}`);
+      // Se ja acumulou itens, mostrar parcial
+      if (todosItens.length > 0) {
+        setResultadoIA({
+          itens: todosItens,
+          pesoTotalProjeto: pesoTotal,
+          composicao,
+          observacoes: observacoes.join(" | ") + " (analise parcial - erro no lote seguinte)",
+          docsAnalisados,
+        });
+      }
     } finally {
       setAnalisandoIA(false);
+      setProgressoIA(null);
     }
   };
 
@@ -946,24 +1566,65 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
               ))}
             </select>
           )}
-          <button
-            onClick={handleAnalisarIA}
-            disabled={analisandoIA || (estudo.documentos?.length || 0) === 0}
-            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            title={!estudo.documentos?.length ? "Envie documentos primeiro" : "Analisar documentos com IA"}
-          >
-            {analisandoIA ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-            {analisandoIA ? "Analisando..." : "Analisar com IA"}
-          </button>
+          {(estudo.documentos?.length || 0) > 0 && (
+            <button
+              onClick={handleAnalisarIA}
+              disabled={analisandoIA}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-torg-dark rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {analisandoIA ? <Loader2 size={15} className="animate-spin text-torg-gray" /> : <Sparkles size={15} className="text-torg-gray" />}
+              {analisandoIA
+                ? progressoIA
+                  ? `Analisando... (${progressoIA.itensAcumulados} itens)`
+                  : "Analisando..."
+                : "Analisar com IA"}
+            </button>
+          )}
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-torg-blue text-white rounded-xl text-sm font-medium hover:bg-torg-dark transition-colors"
           >
-            <Plus size={16} />
+            <Plus size={15} />
             Novo Item
           </button>
         </div>
       </div>
+
+      {/* Progresso da analise IA */}
+      {analisandoIA && progressoIA && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-torg-dark flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin text-torg-gray" />
+              Analisando documentos...
+            </span>
+            <span className="text-xs text-torg-gray">
+              Lote {progressoIA.loteAtual}/{progressoIA.totalLotes} · {progressoIA.itensAcumulados} itens
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-1.5">
+            <div
+              className="bg-torg-blue h-1.5 rounded-full transition-all duration-500"
+              style={{ width: `${Math.max(5, (progressoIA.loteAtual / progressoIA.totalLotes) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Aviso de itens sem cadastro Omie */}
+      {itens.length > 0 && (() => {
+        const semOmie = itens.filter(i => !i.codigoOmie);
+        if (semOmie.length === 0) return null;
+        return (
+          <div className="flex items-start gap-2.5 px-3.5 py-2.5 bg-amber-50/70 border border-amber-100 rounded-xl text-xs text-amber-700">
+            <AlertCircle size={14} className="mt-0.5 shrink-0" />
+            <span>
+              <strong>{semOmie.length} {semOmie.length === 1 ? "item" : "itens"}</strong> sem vinculo no cadastro Omie — custo estimado pela media da familia.
+              Cadastre no Omie para valores exatos.
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Composicao por tipo */}
       {Object.keys(totaisPorTipo).length > 0 && (
@@ -996,17 +1657,19 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
             Envie documentos do projeto e use a IA para extrair automaticamente, ou adicione manualmente
           </p>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleAnalisarIA}
-              disabled={analisandoIA || (estudo.documentos?.length || 0) === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {analisandoIA ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              {analisandoIA ? "Analisando..." : "Analisar com IA"}
-            </button>
+            {(estudo.documentos?.length || 0) > 0 && (
+              <button
+                onClick={handleAnalisarIA}
+                disabled={analisandoIA}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-torg-dark rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {analisandoIA ? <Loader2 size={15} className="animate-spin text-torg-gray" /> : <Sparkles size={15} className="text-torg-gray" />}
+                {analisandoIA ? "Analisando..." : "Analisar com IA"}
+              </button>
+            )}
             <button
               onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-medium hover:bg-torg-dark transition-colors"
             >
               <Plus size={16} />
               Adicionar manualmente
@@ -1018,16 +1681,18 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50/60">
-                <tr className="text-left text-xs font-semibold text-torg-gray uppercase tracking-wider">
-                  <th className="px-4 py-3 w-8">#</th>
-                  <th className="px-4 py-3">Setor</th>
-                  <th className="px-4 py-3">Descricao</th>
-                  <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3 text-right">Comp. (m)</th>
-                  <th className="px-4 py-3 text-right">Peso un. (kg/m)</th>
-                  <th className="px-4 py-3 text-right">Qtd</th>
-                  <th className="px-4 py-3 text-right">Peso total (kg)</th>
-                  <th className="px-4 py-3 w-20"></th>
+                <tr className="text-left text-xs font-semibold text-torg-gray uppercase tracking-wider whitespace-nowrap">
+                  <th className="pl-4 pr-2 py-3 w-8">#</th>
+                  <th className="px-2 py-3">Setor</th>
+                  <th className="px-2 py-3">Descricao</th>
+                  <th className="px-2 py-3">Tipo</th>
+                  <th className="px-2 py-3 text-right">Comp.</th>
+                  <th className="px-2 py-3 text-right">Peso un.</th>
+                  <th className="px-2 py-3 text-right">Qtd</th>
+                  <th className="px-2 py-3 text-right">Peso total</th>
+                  <th className="px-2 py-3 text-right">R$/kg</th>
+                  <th className="px-2 py-3 text-right">Custo</th>
+                  <th className="px-2 py-3 w-14"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -1038,68 +1703,69 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                       key={item.id}
                       className={`group transition-colors ${isEditando ? "bg-torg-blue/5" : "hover:bg-gray-50/50"}`}
                     >
-                      <td className="px-4 py-2.5 text-torg-gray text-xs">{idx + 1}</td>
+                      <td className="pl-4 pr-2 py-2.5 text-torg-gray text-xs">{idx + 1}</td>
 
                       {isEditando ? (
                         <>
-                          <td className="px-4 py-2">
+                          <td className="px-2 py-2">
                             <input
                               type="text"
                               value={editValores.setor}
                               onChange={(e) => setEditValores((p) => ({ ...p, setor: e.target.value }))}
-                              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-torg-blue"
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-sm outline-none focus:border-torg-blue"
                               placeholder="Setor"
                             />
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-2 py-2">
                             <input
                               type="text"
                               value={editValores.descricao}
                               onChange={(e) => setEditValores((p) => ({ ...p, descricao: e.target.value }))}
-                              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-torg-blue"
+                              className="w-full px-2 py-1 border border-gray-200 rounded-lg text-sm outline-none focus:border-torg-blue"
                             />
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-torg-gray">
+                          <td className="px-2 py-2.5 text-xs text-torg-gray">
                             {TIPO_MATERIAL_LABELS[detectTipoMaterial(editValores.descricao)] || "Outro"}
                           </td>
-                          <td className="px-4 py-2 text-right">
+                          <td className="px-2 py-2 text-right">
                             <input
                               type="number"
                               value={editValores.comprimento}
                               onChange={(e) => setEditValores((p) => ({ ...p, comprimento: e.target.value }))}
-                              className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
+                              className="w-16 px-1.5 py-1 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
                               step="0.01"
                               min="0"
                             />
                           </td>
-                          <td className="px-4 py-2 text-right">
+                          <td className="px-2 py-2 text-right">
                             <input
                               type="number"
                               value={editValores.pesoUnitario}
                               onChange={(e) => setEditValores((p) => ({ ...p, pesoUnitario: e.target.value }))}
-                              className="w-20 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
+                              className="w-16 px-1.5 py-1 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
                               step="0.01"
                               min="0"
                             />
                           </td>
-                          <td className="px-4 py-2 text-right">
+                          <td className="px-2 py-2 text-right">
                             <input
                               type="number"
                               value={editValores.quantidade}
                               onChange={(e) => setEditValores((p) => ({ ...p, quantidade: e.target.value }))}
-                              className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
+                              className="w-12 px-1.5 py-1 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
                               min="1"
                             />
                           </td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-torg-dark">
+                          <td className="px-2 py-2.5 text-right font-semibold text-torg-dark text-xs">
                             {(() => {
                               const pu = parseFloat(editValores.pesoUnitario) || 0;
                               const c = parseFloat(editValores.comprimento) || 0;
                               const q = parseInt(editValores.quantidade) || 1;
-                              return fmtNum(c > 0 ? pu * c * q : pu * q, 2);
+                              return fmtNum(c > 0 ? pu * c * q : pu * q, 1);
                             })()}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td colSpan={2}></td>
+                          <td className="px-2 py-2.5">
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={salvarEdicao}
@@ -1120,35 +1786,47 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                         </>
                       ) : (
                         <>
-                          <td className="px-4 py-2.5 text-torg-gray text-xs whitespace-nowrap">
+                          <td className="px-2 py-2 text-torg-gray text-xs whitespace-nowrap">
                             {item.setor || "—"}
                           </td>
-                          <td className="px-4 py-2.5 font-medium text-torg-dark whitespace-nowrap">
+                          <td className="px-2 py-2 font-medium text-torg-dark text-xs">
                             {item.descricao}
                             {item.norma && (
-                              <span className="ml-2 text-xs text-torg-gray font-normal">{item.norma}</span>
+                              <span className="ml-1.5 text-[10px] text-torg-gray font-normal">{item.norma}</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-torg-gray whitespace-nowrap">
+                          <td className="px-2 py-2 text-xs text-torg-gray whitespace-nowrap">
                             {TIPO_MATERIAL_LABELS[item.tipoMaterial] || "Outro"}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-torg-dark whitespace-nowrap">
+                          <td className="px-2 py-2 text-right text-xs text-torg-dark whitespace-nowrap">
                             {item.comprimento ? fmtNum(item.comprimento) : "—"}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-torg-dark whitespace-nowrap">
+                          <td className="px-2 py-2 text-right text-xs text-torg-dark whitespace-nowrap">
                             {fmtNum(item.pesoUnitario)}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-torg-dark whitespace-nowrap">
+                          <td className="px-2 py-2 text-right text-xs text-torg-dark whitespace-nowrap">
                             {item.quantidade}
                           </td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-torg-dark whitespace-nowrap">
-                            {fmtNum(item.pesoTotal, 2)}
+                          <td className="px-2 py-2 text-right text-xs font-semibold text-torg-dark whitespace-nowrap">
+                            {fmtNum(item.pesoTotal, 1)}
                           </td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <td className="px-2 py-2 text-right text-xs text-torg-gray whitespace-nowrap">
+                            {item.custoUnitario > 0
+                              ? <>{fmtNum(item.custoUnitario, 2)}{!item.codigoOmie && <span className="text-amber-500 ml-0.5" title="Estimado (sem cadastro Omie)">*</span>}</>
+                              : "—"
+                            }
+                          </td>
+                          <td className="px-2 py-2 text-right text-xs text-torg-dark whitespace-nowrap">
+                            {item.custoUnitario > 0
+                              ? fmtMoeda(item.custoUnitario * item.pesoTotal)
+                              : "—"
+                            }
+                          </td>
+                          <td className="px-2 py-2">
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={() => iniciarEdicao(item)}
-                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
                                 title="Editar"
                               >
                                 <Edit3 size={14} className="text-torg-gray" />
@@ -1156,7 +1834,7 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                               <button
                                 onClick={() => handleExcluirItem(item.id)}
                                 disabled={excluindoId === item.id}
-                                className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-1 hover:bg-red-50 rounded-lg transition-colors"
                                 title="Excluir"
                               >
                                 {excluindoId === item.id ? (
@@ -1174,37 +1852,64 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                 })}
               </tbody>
               <tfoot className="bg-gray-50/60 border-t border-gray-200">
-                <tr className="font-semibold text-sm">
-                  <td colSpan={7} className="px-4 py-3 text-right text-torg-dark uppercase text-xs tracking-wider">
-                    Total {filtroSetor ? `(${filtroSetor})` : ""}
-                  </td>
-                  <td className="px-4 py-3 text-right text-torg-dark">
-                    {fmtNum(pesoTotalItens, 0)} kg
-                  </td>
-                  <td></td>
-                </tr>
-                {estudo.percPerda > 0 && (
-                  <tr className="text-sm text-amber-700">
-                    <td colSpan={7} className="px-4 py-2 text-right text-xs uppercase tracking-wider">
-                      + Perdas e ligacoes ({estudo.percPerda}%)
-                    </td>
-                    <td className="px-4 py-2 text-right font-semibold">
-                      {fmtNum(pesoTotalItens * estudo.percPerda / 100, 0)} kg
-                    </td>
-                    <td></td>
-                  </tr>
-                )}
-                {estudo.percPerda > 0 && (
-                  <tr className="text-sm font-bold">
-                    <td colSpan={7} className="px-4 py-3 text-right text-torg-blue text-xs uppercase tracking-wider">
-                      Total geral
-                    </td>
-                    <td className="px-4 py-3 text-right text-torg-blue text-base">
-                      {fmtNum(pesoTotalItens * (1 + estudo.percPerda / 100), 0)} kg
-                    </td>
-                    <td></td>
-                  </tr>
-                )}
+                {(() => {
+                  const custoTotal = itensFiltrados.reduce((s, i) => s + ((i.custoUnitario || 0) * (i.pesoTotal || 0)), 0);
+                  const pesoComCusto = itensFiltrados.filter(i => i.custoUnitario > 0).reduce((s, i) => s + i.pesoTotal, 0);
+                  const cmcMedio = pesoComCusto > 0 ? custoTotal / pesoComCusto : 0;
+                  const temPerda = estudo.percPerda > 0;
+                  const pesoComPerda = pesoTotalItens * (1 + (estudo.percPerda || 0) / 100);
+                  const custoComPerda = custoTotal * (1 + (estudo.percPerda || 0) / 100);
+
+                  return (
+                    <>
+                      <tr className="text-xs">
+                        <td colSpan={7} className="px-2 py-2.5 text-right text-torg-dark font-semibold uppercase tracking-wider">
+                          Subtotal {filtroSetor ? `(${filtroSetor})` : ""}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-torg-dark font-semibold whitespace-nowrap">
+                          {fmtNum(pesoTotalItens, 0)} kg
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-torg-gray whitespace-nowrap">
+                          {cmcMedio > 0 ? fmtNum(cmcMedio, 2) : ""}
+                        </td>
+                        <td className="px-2 py-2.5 text-right text-torg-dark font-semibold whitespace-nowrap">
+                          {custoTotal > 0 ? fmtMoeda(custoTotal) : ""}
+                        </td>
+                        <td></td>
+                      </tr>
+                      {temPerda && (
+                        <tr className="text-xs text-amber-700">
+                          <td colSpan={7} className="px-2 py-2 text-right uppercase tracking-wider">
+                            + Perdas e ligacoes ({estudo.percPerda}%)
+                          </td>
+                          <td className="px-2 py-2 text-right font-medium whitespace-nowrap">
+                            {fmtNum(pesoTotalItens * estudo.percPerda / 100, 0)} kg
+                          </td>
+                          <td></td>
+                          <td className="px-2 py-2 text-right font-medium whitespace-nowrap">
+                            {custoTotal > 0 ? fmtMoeda(custoTotal * estudo.percPerda / 100) : ""}
+                          </td>
+                          <td></td>
+                        </tr>
+                      )}
+                      {temPerda && (
+                        <tr className="text-xs border-t border-gray-200">
+                          <td colSpan={7} className="px-2 py-2.5 text-right text-torg-blue font-bold uppercase tracking-wider">
+                            Total geral
+                          </td>
+                          <td className="px-2 py-2.5 text-right text-torg-blue font-bold whitespace-nowrap">
+                            {fmtNum(pesoComPerda, 0)} kg
+                          </td>
+                          <td></td>
+                          <td className="px-2 py-2.5 text-right text-torg-blue font-bold whitespace-nowrap">
+                            {custoComPerda > 0 ? fmtMoeda(custoComPerda) : ""}
+                          </td>
+                          <td></td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })()}
               </tfoot>
             </table>
           </div>
@@ -1215,6 +1920,7 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
       <SecaoDocumentos
         estudoId={estudoId}
         documentos={estudo.documentos}
+        sharepointUrl={estudo.sharepointUrl}
         onUpdate={(docs) => {
           if (docs) onEstudoUpdate?.({ documentos: docs });
         }}
@@ -1429,19 +2135,17 @@ export default function EstudoDetalheClient({ estudoId }) {
       {/* Abas */}
       <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-100 p-1 shadow-sm">
         {ABAS.map((aba) => {
-          const Icon = aba.icon;
           const ativo = abaAtiva === aba.id;
           return (
             <button
               key={aba.id}
               onClick={() => setAbaAtiva(aba.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 ativo
                   ? "bg-torg-blue text-white shadow-sm"
                   : "text-torg-gray hover:bg-gray-50 hover:text-torg-dark"
               }`}
             >
-              <Icon size={16} />
               {aba.label}
             </button>
           );
@@ -1451,31 +2155,64 @@ export default function EstudoDetalheClient({ estudoId }) {
       {/* Conteudo da aba */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         {abaAtiva === "geral" && <AbaGeral estudo={estudo} onSave={handleSave} />}
-        {abaAtiva === "peso" && (
+        {abaAtiva === "produtividade" && (
+          <AbaProdutividade
+            estudo={estudo}
+            estudoId={estudoId}
+            onEstudoUpdate={handleEstudoUpdate}
+          />
+        )}
+        {abaAtiva === "materiais" && (
           <AbaPesoProjeto
             estudo={estudo}
             estudoId={estudoId}
             onEstudoUpdate={handleEstudoUpdate}
           />
         )}
-        {abaAtiva === "custos" && (
-          <AbaEmConstrucao
-            titulo="Custos"
-            descricao="Materia prima, parafusos, tintas, engenharia, qualidade, transporte, fabricacao e montagem. Sera habilitado na Fase 4."
-            icon={DollarSign}
+        {abaAtiva === "acessorios" && (
+          <AbaAcessorios
+            estudo={estudo}
+            estudoId={estudoId}
           />
         )}
-        {abaAtiva === "bdi" && (
-          <AbaEmConstrucao
-            titulo="BDI / Impostos"
-            descricao="Configuracao de CFOP, aliquotas de impostos, margem de lucro e composicao do BDI. Sera habilitado na Fase 5."
-            icon={Calculator}
+        {abaAtiva === "parafusos" && (
+          <AbaParafusos
+            estudo={estudo}
+            estudoId={estudoId}
+            onEstudoUpdate={handleEstudoUpdate}
+          />
+        )}
+        {abaAtiva === "pintura" && (
+          <AbaPintura
+            estudo={estudo}
+            estudoId={estudoId}
+            onEstudoUpdate={handleEstudoUpdate}
+          />
+        )}
+        {abaAtiva === "custos" && (
+          <AbaCustos
+            estudo={estudo}
+            estudoId={estudoId}
+            onEstudoUpdate={handleEstudoUpdate}
+          />
+        )}
+        {abaAtiva === "cronograma" && (
+          <AbaCronograma
+            estudo={estudo}
+            estudoId={estudoId}
+          />
+        )}
+        {abaAtiva === "impostos" && (
+          <AbaImpostos
+            estudo={estudo}
+            estudoId={estudoId}
+            onEstudoUpdate={handleEstudoUpdate}
           />
         )}
         {abaAtiva === "resumo" && (
           <AbaEmConstrucao
             titulo="Resumo Comercial"
-            descricao="Visao consolidada do estudo com exportacao para Excel e geracao da proposta tecnica comercial (PTC). Sera habilitado na Fase 6."
+            descricao="Visao consolidada do estudo com exportacao para Excel e geracao da proposta tecnica comercial (PTC)."
             icon={BarChart3}
           />
         )}

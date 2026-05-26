@@ -13,6 +13,7 @@ const itemSchema = z.object({
   icmsPct: z.number().min(0).optional().nullable(),
   ipiPct: z.number().min(0).optional().nullable(),
   observacao: z.string().optional().nullable(),
+  prazoEntrega: z.string().optional().nullable(), // "YYYY-MM-DD" ou null
 });
 
 const schema = z.object({
@@ -104,6 +105,7 @@ export async function POST(req, { params }) {
           icmsPct: it.icmsPct ?? null,
           ipiPct: it.ipiPct ?? null,
           observacao: it.observacao || null,
+          prazoEntrega: it.prazoEntrega ? new Date(it.prazoEntrega) : null,
         },
       })
     ));

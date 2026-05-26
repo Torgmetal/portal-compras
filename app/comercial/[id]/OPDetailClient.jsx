@@ -78,6 +78,26 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
     }
   }
 
+  // Toggle faturamento direto inline (sem abrir modal)
+  async function handleToggleFD(item) {
+    const novoValor = !item.faturamentoDireto;
+    const endpoint = item.aditivoId
+      ? `/api/comercial/aditivo-item/${item.id}`
+      : `/api/comercial/op-item/${item.id}`;
+    try {
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ faturamentoDireto: novoValor }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      alert(`Erro ao alterar faturamento: ${e.message}`);
+    }
+  }
+
   async function excluirOP() {
     if (!window.confirm(
       `EXCLUIR DEFINITIVAMENTE a OP ${op.numero}?\n\n` +
@@ -107,237 +127,275 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
     return base + aditivos;
   }, [op]);
 
+  const temFD = (op.kpisFinanceiros?.verbaFD || 0) > 0;
+
   return (
     <>
       {/* Cabeçalho */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight font-mono">
-                OP {op.numero}
-              </h2>
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.className}`}>
-                {s.label}
-              </span>
-              {!encerradaOuCancelada && (
-                <button
-                  onClick={() => setModalEditarOP(true)}
-                  className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-torg-blue-50 transition-colors"
-                  title="Editar dados da OP (número, cliente, obra, datas)"
-                >
-                  <Pencil size={12} /> Editar
-                </button>
-              )}
-            </div>
-            <p className="text-torg-dark font-medium mt-1">{op.cliente}</p>
-            {op.obra && <p className="text-sm text-torg-gray">{op.obra}</p>}
-            {op.descricao && <p className="text-sm text-torg-gray mt-2">{op.descricao}</p>}
-          </div>
-          <div className="text-right text-sm space-y-3 min-w-[300px]">
-            {/* Valor TOTAL do contrato (inclui FD em nome do cliente) */}
-            <div>
-              <div className="flex items-center justify-end gap-1.5">
-                <p className="text-torg-gray">Valor total do contrato</p>
-                {!op.kpisFinanceiros?.contratoExplicito && (
-                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded uppercase font-semibold tracking-wide" title="Valor implicito (Receita + Verba FD). Edite a OP pra preencher o total exato.">
-                    auto
+      <div className="space-y-4">
+        {/* Identidade da OP */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-extrabold text-torg-dark tracking-tight font-mono">
+                    OP {op.numero}
+                  </h2>
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${s.className}`}>
+                    {s.label}
                   </span>
-                )}
+                  {!encerradaOuCancelada && (
+                    <button
+                      onClick={() => setModalEditarOP(true)}
+                      className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-torg-blue-50 transition-colors"
+                      title="Editar dados da OP"
+                    >
+                      <Pencil size={12} /> Editar
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-1 text-sm">
+                  <span className="font-semibold text-torg-dark">{op.cliente}</span>
+                  {op.obra && (
+                    <>
+                      <span className="text-gray-300">·</span>
+                      <span className="text-torg-gray">{op.obra}</span>
+                    </>
+                  )}
+                </div>
+                {op.descricao && <p className="text-xs text-torg-gray mt-1.5 max-w-xl">{op.descricao}</p>}
               </div>
-              <p className="text-2xl font-extrabold text-torg-blue tabular-nums" title="Valor cheio do contrato com o cliente — Receita Torg + valor em Faturamento Direto">
-                {fmtMoeda(op.kpisFinanceiros?.valorTotalContrato || 0)}
-              </p>
             </div>
+            <div className="flex items-center gap-5 text-sm shrink-0">
+              <div className="text-center">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wider font-medium">Início</p>
+                <p className="text-torg-dark font-semibold mt-0.5">{fmtData(op.dataInicio)}</p>
+              </div>
+              <div className="w-px h-8 bg-gray-200" />
+              <div className="text-center">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wider font-medium">Fim previsto</p>
+                <p className="text-torg-dark font-semibold mt-0.5">{fmtData(op.dataFimPrevista)}</p>
+              </div>
+              <div className="w-px h-8 bg-gray-200" />
+              <div className="text-center">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wider font-medium">RMs</p>
+                <p className="text-torg-dark font-semibold mt-0.5">{op._count.rms}</p>
+              </div>
+              <div className="w-px h-8 bg-gray-200" />
+              <a href="#pedidos-omie" className="text-center hover:bg-torg-blue-50 px-2 py-1 -my-1 rounded-lg transition-colors">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wider font-medium">Pedidos</p>
+                <p className="text-torg-dark font-semibold mt-0.5">
+                  {op.resumoPedidos?.criados || 0}
+                  {op.resumoPedidos?.fdPendentes > 0 && (
+                    <span className="text-[10px] text-amber-700 ml-0.5">+{op.resumoPedidos.fdPendentes}</span>
+                  )}
+                </p>
+              </a>
+            </div>
+          </div>
+          <p className="text-[10px] text-torg-gray mt-3 pt-3 border-t border-gray-50">
+            Criada por {op.createdBy?.name} em {fmtData(op.createdAt)}
+          </p>
+        </div>
 
-            {/* Receita Torg: o que a Torg fatura em seu nome */}
-            <div className="pt-2 border-t border-gray-100">
-              <p className="text-[11px] text-torg-gray">Receita Torg (faturamento em nosso nome)</p>
-              <p className="text-lg font-bold text-torg-dark tabular-nums">
-                {fmtMoeda(op.kpisFinanceiros?.receitaBruta || 0)}
-              </p>
-              {(op.resumoMedicoes?.totalMedido || 0) > 0 && (
-                <>
-                  <div className="flex justify-end items-baseline gap-2 mt-0.5 text-[11px] tabular-nums">
-                    <span className="text-torg-gray">já faturado:</span>
-                    <span className="text-torg-dark font-semibold">{fmtMoeda(op.resumoMedicoes.totalMedido)}</span>
-                    <span className="text-[10px] text-torg-gray">({(op.resumoMedicoes.pctMedido || 0).toFixed(1)}%)</span>
-                  </div>
-                  <div className="flex justify-end items-baseline gap-2 text-[11px] tabular-nums">
-                    <span className="text-torg-gray">saldo a faturar:</span>
-                    <span className={`font-semibold ${
-                      (op.resumoMedicoes?.saldoAMedir || 0) < 0 ? "text-red-600" : "text-emerald-700"
-                    }`}>
-                      {fmtMoeda(op.resumoMedicoes?.saldoAMedir || 0)}
-                    </span>
-                  </div>
-                </>
+        {/* KPIs financeiros em cards */}
+        <div className={`grid gap-4 ${temFD ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 lg:grid-cols-3"}`}>
+          {/* Card: Valor Total do Contrato */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center gap-1.5 mb-3">
+              <p className="text-xs font-medium text-torg-gray uppercase tracking-wider">Valor do Contrato</p>
+              {!op.kpisFinanceiros?.contratoExplicito && (
+                <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide" title="Valor implícito (Receita + Verba FD). Edite a OP pra preencher o total exato.">
+                  auto
+                </span>
               )}
             </div>
+            <p className="text-2xl font-extrabold text-torg-dark tabular-nums" title="Valor cheio do contrato com o cliente">
+              {fmtMoeda(op.kpisFinanceiros?.valorTotalContrato || 0)}
+            </p>
+            {(op.resumoPedidos?.valorTotal || 0) > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="flex items-baseline justify-between text-xs tabular-nums">
+                  <span className="text-torg-gray">Total em pedidos</span>
+                  <span className="text-torg-dark font-semibold">{fmtMoeda(op.resumoPedidos.valorTotal)}</span>
+                </div>
+              </div>
+            )}
+          </div>
 
-            {/* Verba Torg (não-FD) — custo Torg paga */}
-            <div className="pt-2 border-t border-gray-100">
-              <p className="text-[11px] text-torg-gray">
-                Verba Torg
-                <span className="text-torg-gray text-[10px] ml-1">(materiais em nosso nome)</span>
-              </p>
-              <p className="text-lg font-bold text-torg-orange-700 tabular-nums">
-                {fmtMoeda(op.kpisFinanceiros?.verbaTorg || 0)}
-              </p>
-              {(op.kpisFinanceiros?.pedidosTorg || 0) > 0 && (
-                <div className="flex justify-end items-baseline gap-2 mt-0.5 text-[11px] tabular-nums">
-                  <span className="text-torg-gray">já em pedidos:</span>
+          {/* Card: Receita Torg */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <p className="text-xs font-medium text-torg-gray uppercase tracking-wider mb-3">Receita Torg</p>
+            <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
+              {fmtMoeda(op.kpisFinanceiros?.receitaBruta || 0)}
+            </p>
+            {!(op.kpisFinanceiros?.receitaBruta) && (
+              <p className="text-[11px] text-torg-gray mt-2">Nenhuma receita cadastrada</p>
+            )}
+            {(op.resumoMedicoes?.totalMedido || 0) > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+                <div className="flex items-baseline justify-between text-xs tabular-nums">
+                  <span className="text-torg-gray">Faturado</span>
+                  <span className="text-torg-dark font-semibold">
+                    {fmtMoeda(op.resumoMedicoes.totalMedido)}
+                    <span className="text-torg-gray font-normal ml-1">({(op.resumoMedicoes.pctMedido || 0).toFixed(0)}%)</span>
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between text-xs tabular-nums">
+                  <span className="text-torg-gray">Saldo</span>
+                  <span className={`font-semibold ${
+                    (op.resumoMedicoes?.saldoAMedir || 0) < 0 ? "text-red-600" : "text-emerald-700"
+                  }`}>
+                    {fmtMoeda(op.resumoMedicoes?.saldoAMedir || 0)}
+                  </span>
+                </div>
+                {/* Barra de progresso do faturamento */}
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
+                  <div
+                    className="h-full bg-torg-blue rounded-full transition-all"
+                    style={{ width: `${Math.min(op.resumoMedicoes.pctMedido || 0, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Card: Verba Torg */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <p className="text-xs font-medium text-torg-gray uppercase tracking-wider mb-3">
+              Verba Torg
+              <span className="normal-case text-[10px] font-normal ml-1">(nosso nome)</span>
+            </p>
+            <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
+              {fmtMoeda(op.kpisFinanceiros?.verbaTorg || 0)}
+            </p>
+            {(op.kpisFinanceiros?.pedidosTorg || 0) > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="flex items-baseline justify-between text-xs tabular-nums">
+                  <span className="text-torg-gray">Em pedidos</span>
                   <span className="text-torg-dark font-semibold">{fmtMoeda(op.kpisFinanceiros.pedidosTorg)}</span>
                 </div>
-              )}
-            </div>
-
-            {/* Verba Faturamento Direto — separada (paga pelo cliente, não consome margem Torg) */}
-            {(op.kpisFinanceiros?.verbaFD || 0) > 0 && (
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-[11px] text-torg-gray">
-                  Verba FD
-                  <span className="text-torg-gray text-[10px] ml-1">(faturamento direto em nome do cliente)</span>
-                </p>
-                <p className="text-lg font-bold text-purple-700 tabular-nums">
-                  {fmtMoeda(op.kpisFinanceiros.verbaFD)}
-                </p>
-                {(op.kpisFinanceiros?.pedidosFD || 0) > 0 && (
-                  <div className="flex justify-end items-baseline gap-2 mt-0.5 text-[11px] tabular-nums">
-                    <span className="text-torg-gray">já em pedidos:</span>
-                    <span className="text-torg-dark font-semibold">{fmtMoeda(op.kpisFinanceiros.pedidosFD)}</span>
-                  </div>
-                )}
-                {(op.kpisFinanceiros?.excedenteFD || 0) > 0 && (
-                  <div className="flex justify-end items-baseline gap-2 text-[11px] tabular-nums">
-                    <span className="text-red-600">⚠ excedente FD:</span>
-                    <span className="text-red-700 font-bold">{fmtMoeda(op.kpisFinanceiros.excedenteFD)}</span>
+                {/* Barra de progresso */}
+                {(op.kpisFinanceiros?.verbaTorg || 0) > 0 && (
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-2">
+                    <div
+                      className="h-full bg-torg-orange rounded-full transition-all"
+                      style={{ width: `${Math.min((op.kpisFinanceiros.pedidosTorg / op.kpisFinanceiros.verbaTorg) * 100, 100)}%` }}
+                    />
                   </div>
                 )}
               </div>
             )}
+          </div>
 
-            <p className="text-[10px] text-torg-gray pt-1">
-              Criada por {op.createdBy?.name} em {fmtData(op.createdAt)}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-5 border-t border-gray-100 text-sm">
-          <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-torg-blue" />
-            <div>
-              <p className="text-torg-gray text-xs">Início</p>
-              <p className="text-torg-dark font-medium">{fmtData(op.dataInicio)}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock size={16} className="text-torg-blue" />
-            <div>
-              <p className="text-torg-gray text-xs">Fim previsto</p>
-              <p className="text-torg-dark font-medium">{fmtData(op.dataFimPrevista)}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <FileText size={16} className="text-torg-blue" />
-            <div>
-              <p className="text-torg-gray text-xs">RMs vinculadas</p>
-              <p className="text-torg-dark font-medium">{op._count.rms}</p>
-            </div>
-          </div>
-          <a href="#pedidos-omie" className="flex items-center gap-2 hover:bg-torg-blue-50 -mx-2 px-2 py-1 rounded transition-colors">
-            <Truck size={16} className="text-torg-blue" />
-            <div>
-              <p className="text-torg-gray text-xs">Pedidos vinculados</p>
-              <p className="text-torg-dark font-medium">
-                {op.resumoPedidos?.criados || 0}
-                {op.resumoPedidos?.fdPendentes > 0 && (
-                  <span className="text-[10px] text-amber-700 font-medium ml-1" title="FDs avulsos registrados, pendentes de criação no Omie">
-                    +{op.resumoPedidos.fdPendentes} FD
-                  </span>
-                )}
-                {op.resumoPedidos?.erros > 0 && (
-                  <span className="text-[10px] text-red-600 font-medium ml-1" title="Pedidos via cotação que falharam na criação">
-                    +{op.resumoPedidos.erros} c/erro
-                  </span>
-                )}
+          {/* Card: Verba FD (só aparece se tem itens FD) */}
+          {temFD && (
+            <div className="bg-white rounded-xl shadow-sm border border-torg-orange/20 p-5">
+              <p className="text-xs font-medium text-torg-gray uppercase tracking-wider mb-3">
+                Verba FD
+                <span className="normal-case text-[10px] font-normal ml-1">(nome do cliente)</span>
               </p>
-              {op.resumoPedidos?.valorTotal > 0 && (
-                <p className="text-[10px] text-torg-orange-700 font-medium tabular-nums">
-                  {fmtMoeda(op.resumoPedidos.valorTotal)}
-                </p>
-              )}
+              <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
+                {fmtMoeda(op.kpisFinanceiros.verbaFD)}
+              </p>
+              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+                {(op.kpisFinanceiros?.pedidosFD || 0) > 0 && (
+                  <div className="flex items-baseline justify-between text-xs tabular-nums">
+                    <span className="text-torg-gray">Em pedidos</span>
+                    <span className="text-torg-dark font-semibold">{fmtMoeda(op.kpisFinanceiros.pedidosFD)}</span>
+                  </div>
+                )}
+                {(op.kpisFinanceiros?.excedenteFD || 0) > 0 && (
+                  <div className="flex items-baseline justify-between text-xs tabular-nums">
+                    <span className="text-red-600 font-medium">Excedente</span>
+                    <span className="text-red-700 font-bold">{fmtMoeda(op.kpisFinanceiros.excedenteFD)}</span>
+                  </div>
+                )}
+                {(op.kpisFinanceiros?.pedidosFD || 0) > 0 && (op.kpisFinanceiros?.verbaFD || 0) > 0 && (
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        (op.kpisFinanceiros.pedidosFD / op.kpisFinanceiros.verbaFD) > 1 ? "bg-red-500" : "bg-torg-orange"
+                      }`}
+                      style={{ width: `${Math.min((op.kpisFinanceiros.pedidosFD / op.kpisFinanceiros.verbaFD) * 100, 100)}%` }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
-          </a>
+          )}
         </div>
 
         {/* Ações */}
-        <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-gray-100">
-          <button
-            onClick={() => setModalAditivo(true)}
-            disabled={encerradaOuCancelada}
-            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Plus size={16} /> Novo Aditivo
-          </button>
-          <button
-            onClick={() => setModalRevisao(true)}
-            disabled={encerradaOuCancelada}
-            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Edit3 size={16} /> Registrar Revisão
-          </button>
-          {isMaster && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setModalPrazo(true)}
+              onClick={() => setModalAditivo(true)}
+              disabled={encerradaOuCancelada}
+              className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus size={16} /> Novo Aditivo
+            </button>
+            <button
+              onClick={() => setModalRevisao(true)}
               disabled={encerradaOuCancelada}
               className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Clock size={16} /> Ajustar Prazo
+              <Edit3 size={16} /> Registrar Revisão
             </button>
-          )}
+            {isMaster && (
+              <button
+                onClick={() => setModalPrazo(true)}
+                disabled={encerradaOuCancelada}
+                className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Clock size={16} /> Ajustar Prazo
+              </button>
+            )}
 
-          <div className="flex-1" />
+            <div className="flex-1" />
 
-          {encerradaOuCancelada ? (
-            <button
-              onClick={() => executarAcaoStatus("reabrir")}
-              disabled={!!acaoStatus}
-              className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50"
-            >
-              {acaoStatus === "reabrir" ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-              Reabrir OP
-            </button>
-          ) : (
-            <button
-              onClick={() => executarAcaoStatus("finalizar")}
-              disabled={!!acaoStatus}
-              className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange-700 font-medium flex items-center gap-2 disabled:opacity-50"
-            >
-              {acaoStatus === "finalizar" ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              Finalizar OP
-            </button>
-          )}
+            {encerradaOuCancelada ? (
+              <button
+                onClick={() => executarAcaoStatus("reabrir")}
+                disabled={!!acaoStatus}
+                className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50"
+              >
+                {acaoStatus === "reabrir" ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                Reabrir OP
+              </button>
+            ) : (
+              <button
+                onClick={() => executarAcaoStatus("finalizar")}
+                disabled={!!acaoStatus}
+                className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange-700 font-medium flex items-center gap-2 disabled:opacity-50"
+              >
+                {acaoStatus === "finalizar" ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Finalizar OP
+              </button>
+            )}
 
-          {isMaster && (
-            <button
-              onClick={excluirOP}
-              disabled={!!acaoStatus}
-              title={op._count.rms > 0 ? "OP tem RMs vinculadas — use Cancelar pra arquivar" : "Excluir definitivamente"}
-              className="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm rounded-lg hover:bg-red-50 font-medium flex items-center gap-2 disabled:opacity-50"
-            >
-              {acaoStatus === "excluir" ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-              Excluir
-            </button>
+            {isMaster && (
+              <button
+                onClick={excluirOP}
+                disabled={!!acaoStatus}
+                title={op._count.rms > 0 ? "OP tem RMs vinculadas — use Cancelar pra arquivar" : "Excluir definitivamente"}
+                className="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm rounded-lg hover:bg-red-50 font-medium flex items-center gap-2 disabled:opacity-50"
+              >
+                {acaoStatus === "excluir" ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                Excluir
+              </button>
+            )}
+          </div>
+
+          {erroAcao && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2 mt-2">
+              <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+              <span>{erroAcao}</span>
+            </div>
           )}
         </div>
-
-        {erroAcao && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2 mt-3">
-            <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-            <span>{erroAcao}</span>
-          </div>
-        )}
       </div>
 
       {/* KPIs financeiros: Receita / Verba / Margem com impostos detalhados */}
@@ -663,6 +721,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
             setModalVerba({ tipo: "op", itemId: item.id, atual: item.valorVerba, descricao: item.descricao })
           }
           onEditar={(item) => setModalEditarItem({ tipo: "op", item })}
+          onToggleFD={podeAlterarVerbaDireto && !encerradaOuCancelada ? handleToggleFD : null}
           isMaster={isMaster}
           podeAlterarVerbaDireto={podeAlterarVerbaDireto}
         />
@@ -691,6 +750,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                   setModalVerba({ tipo: "aditivo", itemId: item.id, atual: item.valorVerba, descricao: item.descricao })
                 }
                 onEditar={(item) => setModalEditarItem({ tipo: "aditivo", item })}
+                onToggleFD={podeAlterarVerbaDireto && !encerradaOuCancelada ? handleToggleFD : null}
                 isMaster={isMaster}
                 podeAlterarVerbaDireto={podeAlterarVerbaDireto}
               />
@@ -2153,7 +2213,7 @@ function localLabel(codigo) {
   return null;
 }
 
-function ItensTabela({ itens, onSolicitarVerba, onEditar, isMaster, podeAlterarVerbaDireto = false }) {
+function ItensTabela({ itens, onSolicitarVerba, onEditar, onToggleFD, isMaster, podeAlterarVerbaDireto = false }) {
   if (!itens || itens.length === 0) {
     return <p className="px-6 py-4 text-sm text-torg-gray">Nenhum item.</p>;
   }
@@ -2161,22 +2221,22 @@ function ItensTabela({ itens, onSolicitarVerba, onEditar, isMaster, podeAlterarV
   return (
     <div className="space-y-4">
       {materiais.length > 0 && (
-        <BlocoItens titulo="Materiais" itens={materiais} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
+        <BlocoItens titulo="Materiais" itens={materiais} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} onToggleFD={onToggleFD} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
       )}
       {servicos.length > 0 && (
-        <BlocoItens titulo="Serviços Terceirizados" itens={servicos} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
+        <BlocoItens titulo="Serviços Terceirizados" itens={servicos} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} onToggleFD={onToggleFD} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
       )}
       {alugueis.length > 0 && (
-        <BlocoItens titulo="Aluguéis e Equipamentos" itens={alugueis} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} aluguel />
+        <BlocoItens titulo="Aluguéis e Equipamentos" itens={alugueis} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} onToggleFD={onToggleFD} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} aluguel />
       )}
       {outros.length > 0 && (
-        <BlocoItens titulo="Outros" itens={outros} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
+        <BlocoItens titulo="Outros" itens={outros} onSolicitarVerba={onSolicitarVerba} onEditar={onEditar} onToggleFD={onToggleFD} isMaster={isMaster} podeAlterarVerbaDireto={podeAlterarVerbaDireto} />
       )}
     </div>
   );
 }
 
-function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, isMaster, podeAlterarVerbaDireto = false, aluguel }) {
+function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isMaster, podeAlterarVerbaDireto = false, aluguel }) {
   return (
     <div>
       <p className="px-6 pt-4 text-xs font-semibold text-torg-gray uppercase tracking-wide">{titulo}</p>
@@ -2243,8 +2303,26 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, isMaster, podeA
                     )}
                   </td>
                   <td className="px-4 py-2 text-center">
-                    {it.faturamentoDireto && (
-                      <span className="text-xs bg-torg-orange-100 text-torg-orange-700 px-2 py-0.5 rounded-full">Direto</span>
+                    {onToggleFD ? (
+                      <button
+                        onClick={() => onToggleFD(it)}
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                          it.faturamentoDireto
+                            ? "bg-torg-orange/10 text-torg-orange border-torg-orange/30 hover:bg-torg-orange/20"
+                            : "bg-torg-blue/10 text-torg-blue border-torg-blue/20 hover:bg-torg-blue/20"
+                        }`}
+                        title={it.faturamentoDireto ? "Clique para mudar para Torg" : "Clique para mudar para Faturamento Direto"}
+                      >
+                        {it.faturamentoDireto ? "Direto" : "Torg"}
+                      </button>
+                    ) : (
+                      <span className={`text-xs font-medium px-2.5 py-0.5 rounded-lg border ${
+                        it.faturamentoDireto
+                          ? "bg-torg-orange/10 text-torg-orange border-torg-orange/30"
+                          : "bg-torg-blue/10 text-torg-blue border-torg-blue/20"
+                      }`}>
+                        {it.faturamentoDireto ? "Direto" : "Torg"}
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-2 text-right">

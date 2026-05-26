@@ -666,7 +666,7 @@ function ModalEnviarConsolidada({ rms, onClose, onSent, categoriasFornecedor = C
       const email = f.email.toLowerCase();
       if (emailsVistos.has(email)) continue;
       emailsVistos.add(email);
-      out.push({ nome: f.razaoSocial, email, nCodOmie: f.nCodOmie || null, cnpj: f.cnpj || null });
+      out.push({ fornecedorId: f.id, nome: f.razaoSocial, email, nCodOmie: f.nCodOmie || null, cnpj: f.cnpj || null });
     }
     for (const f of fornecedoresLinhas) {
       const email = String(f.email || "").trim().toLowerCase();

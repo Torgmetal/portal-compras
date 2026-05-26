@@ -179,9 +179,23 @@ export default function NovaOP() {
           ))}
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end items-center gap-4">
-          <span className="text-sm text-torg-gray">Total da verba contratada:</span>
-          <span className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</span>
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            {itens.filter((it) => it.faturamentoDireto && it.descricao.trim()).length > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-torg-orange/10 border border-torg-orange/20 rounded-lg text-xs font-semibold text-torg-orange">
+                {itens.filter((it) => it.faturamentoDireto && it.descricao.trim()).length} {itens.filter((it) => it.faturamentoDireto && it.descricao.trim()).length === 1 ? "item" : "itens"} com faturamento direto
+              </span>
+            )}
+            {itens.filter((it) => !it.faturamentoDireto && it.descricao.trim()).length > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-torg-blue/10 border border-torg-blue/20 rounded-lg text-xs font-medium text-torg-blue">
+                {itens.filter((it) => !it.faturamentoDireto && it.descricao.trim()).length} via Torg
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-torg-gray">Total da verba contratada:</span>
+            <span className="text-xl font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</span>
+          </div>
         </div>
       </div>
 

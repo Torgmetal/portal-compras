@@ -3,7 +3,7 @@ import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles } from "lucide-react";
+import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles, CalendarDays } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const fmtMoeda = (v) =>
@@ -56,6 +56,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         icmsPct: it.icmsPct != null ? String(it.icmsPct) : "",
         ipiPct: it.ipiPct != null ? String(it.ipiPct) : "",
         observacao: it.observacao || "",
+        prazoEntrega: it.prazoEntrega ? new Date(it.prazoEntrega).toISOString().slice(0, 10) : "",
       };
     })
   );
@@ -320,6 +321,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         icmsPct: parseFloat(String(l.icmsPct).replace(",", ".")) || 0,
         ipiPct: parseFloat(String(l.ipiPct).replace(",", ".")) || 0,
         observacao: l.observacao || null,
+        prazoEntrega: l.prazoEntrega || null,
       }))
       .filter((l) => l.precoUnit > 0);
     if (itens.length === 0) {
@@ -663,6 +665,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. *</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">ICMS %</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">IPI %</th>
+                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">Prazo entrega</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total bruto</th>
                   </tr>
                 </thead>
@@ -761,6 +764,14 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                             className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
                           />
                         </td>
+                        <td className="px-2 py-2 text-center align-top">
+                          <input
+                            type="date"
+                            value={l.prazoEntrega}
+                            onChange={(e) => setLinha(l.id, "prazoEntrega", e.target.value)}
+                            className={`w-[130px] border rounded px-1.5 py-1 text-xs tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
+                          />
+                        </td>
                         <td className="px-2 py-2 text-right text-torg-dark font-medium tabular-nums text-xs align-top pt-3">
                           {totalBruto > 0 ? fmtMoeda(totalBruto) : "—"}
                         </td>
@@ -770,11 +781,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={7} className="px-3 py-2 text-right text-xs text-torg-gray">Total bruto da proposta:</td>
+                    <td colSpan={8} className="px-3 py-2 text-right text-xs text-torg-gray">Total bruto da proposta:</td>
                     <td className="px-3 py-2 text-right font-medium text-torg-dark tabular-nums text-sm">{fmtMoeda(total)}</td>
                   </tr>
                   <tr>
-                    <td colSpan={7} className="px-3 py-3 text-right text-sm font-semibold text-torg-dark">
+                    <td colSpan={8} className="px-3 py-3 text-right text-sm font-semibold text-torg-dark">
                       Total líquido (custo Torg, ICMS por dentro + IPI por fora):
                     </td>
                     <td className="px-3 py-3 text-right font-bold text-torg-orange-700 text-base tabular-nums">{fmtMoeda(totalLiquido)}</td>

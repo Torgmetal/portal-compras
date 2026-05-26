@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
 const fornecedorSchema = z.object({
+  fornecedorId: z.string().optional().nullable(), // ID do cadastro unificado
   nome: z.string().min(1),
   email: z.string().email(),
   cnpj: z.string().optional().nullable(),
@@ -85,6 +86,7 @@ export async function POST(req) {
       const cot = await tx.cotacao.create({
         data: {
           rmId: rmPrincipal.id,
+          fornecedorId: f.fornecedorId || null,
           fornecedorNome: f.nome,
           fornecedorEmail: f.email,
           cnpj: f.cnpj || null,

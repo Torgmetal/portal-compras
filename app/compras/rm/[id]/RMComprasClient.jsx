@@ -1816,7 +1816,7 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
       const email = f.email.toLowerCase();
       if (emailsVistos.has(email)) continue;
       emailsVistos.add(email);
-      out.push({ nome: f.razaoSocial, email, nCodOmie: f.nCodOmie || null, cnpj: f.cnpj || null });
+      out.push({ fornecedorId: f.id, nome: f.razaoSocial, email, nCodOmie: f.nCodOmie || null, cnpj: f.cnpj || null });
     }
     // 2) Avulsos
     for (const f of fornecedoresLinhas) {

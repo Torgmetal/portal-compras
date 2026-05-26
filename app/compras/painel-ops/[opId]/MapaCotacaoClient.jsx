@@ -587,6 +587,11 @@ export default function MapaCotacaoClient({ op }) {
                             ICMS {cell.icmsPct}% · IPI {cell.ipiPct}%
                           </div>
                         )}
+                        {cell.prazoEntrega && (
+                          <div className="text-[9px] text-torg-blue tabular-nums leading-tight mt-0.5" title="Prazo de entrega informado pelo fornecedor">
+                            📦 {new Date(cell.prazoEntrega).toLocaleDateString("pt-BR")}
+                          </div>
+                        )}
                         {isVencedor && (
                           <Award size={12} className="inline text-torg-orange-700 mt-0.5" />
                         )}
@@ -1309,6 +1314,7 @@ function buildMatriz(op) {
           ipiPct: ipi,
           qtdCotada: ci.qtdCotada,
           vencedor: ci.vencedor,
+          prazoEntrega: ci.prazoEntrega || null,
         });
       }
     }

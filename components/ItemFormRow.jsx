@@ -222,17 +222,20 @@ export default function ItemFormRow({ item, onChange, onRemove, canRemove, compa
           </select>
         </div>
 
-        {/* Faturamento direto */}
+        {/* Faturamento */}
         <div>
-          <label className="block text-xs font-medium text-torg-gray mb-1">Fat. direto</label>
-          <div className="flex items-center h-[34px]">
-            <input
-              type="checkbox" checked={item.faturamentoDireto}
-              onChange={(e) => setKey("faturamentoDireto", e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-torg-orange focus:ring-torg-orange"
-            />
-            <span className="ml-2 text-xs text-torg-gray">Fora Omie financeiro</span>
-          </div>
+          <label className="block text-xs font-medium text-torg-gray mb-1">Faturamento</label>
+          <button
+            type="button"
+            onClick={() => setKey("faturamentoDireto", !item.faturamentoDireto)}
+            className={`h-[34px] px-3 rounded-lg text-xs font-semibold border transition-colors w-full ${
+              item.faturamentoDireto
+                ? "bg-torg-orange/10 text-torg-orange border-torg-orange/30 hover:bg-torg-orange/20"
+                : "bg-torg-blue/10 text-torg-blue border-torg-blue/20 hover:bg-torg-blue/20"
+            }`}
+          >
+            {item.faturamentoDireto ? "Direto (cliente)" : "Torg"}
+          </button>
         </div>
       </div>
     </div>

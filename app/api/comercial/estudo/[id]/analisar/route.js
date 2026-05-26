@@ -2,9 +2,28 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
+import { readFileSync } from "fs";
+import { join } from "path";
+import { matchItensComOmie } from "@/lib/match-omie";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+// Fallback: se ANTHROPIC_API_KEY estiver vazia (processo pai override),
+// ler diretamente do .env.local
+function getAnthropicKey() {
+  const envKey = process.env.ANTHROPIC_API_KEY;
+  if (envKey && envKey.startsWith("sk-ant-")) return envKey;
+  try {
+    const envFile = readFileSync(join(process.cwd(), ".env.local"), "utf-8");
+    const match = envFile.match(/^ANTHROPIC_API_KEY=(.+)$/m);
+    if (match) return match[1].trim();
+  } catch { /* noop */ }
+  return null;
+}
+
+// Maximo de docs por lote (cada PDF pode ter ~1-5MB em base64)
+const MAX_DOCS_POR_LOTE = 5;
 
 const SYSTEM_PROMPT = `Voce e um engenheiro orcamentista de uma metalurgica (Torg Metal) especializada em estruturas metalicas.
 Seu trabalho e analisar documentos de projetos (PDFs, planilhas, listas de materiais, desenhos tecnicos, e-mails de clientes) e extrair todos os itens de material com seus pesos para um levantamento de peso de projeto (EPC - Estudo de Precificacao Comercial).
@@ -96,10 +115,6 @@ function getMediaType(tipo) {
     png: "image/png",
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    xls: "application/vnd.ms-excel",
-    csv: "text/csv",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   };
   return map[tipo?.toLowerCase()] || "application/octet-stream";
 }
@@ -109,7 +124,8 @@ export async function POST(req, { params }) {
     const user = await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
 
-    if (!process.env.ANTHROPIC_API_KEY) {
+    const apiKey = getAnthropicKey();
+    if (!apiKey) {
       return NextResponse.json(
         { success: false, error: "ANTHROPIC_API_KEY nao configurada no servidor" },
         { status: 500 }
@@ -117,7 +133,9 @@ export async function POST(req, { params }) {
     }
 
     const body = await req.json();
-    const { docIds, textoExtra } = body; // docIds opcionais, textoExtra = contexto adicional
+    const { docIds, textoExtra, lote, loteSize } = body;
+    // lote = indice do lote atual (0-based)
+    // loteSize = quantos docs por lote (default MAX_DOCS_POR_LOTE)
 
     // Buscar estudo com orcamento e documentos
     const estudo = await prisma.propostaEstudo.findUnique({
@@ -141,21 +159,43 @@ export async function POST(req, { params }) {
 
     // Tipos suportados para enviar ao Claude
     const tiposSuportados = ["pdf", "png", "jpg", "jpeg"];
-    const docsParaAnalisar = docs.filter((d) => tiposSuportados.includes(d.tipo?.toLowerCase()));
+    const todosDocsSuportados = docs.filter((d) => tiposSuportados.includes(d.tipo?.toLowerCase()));
 
-    if (docsParaAnalisar.length === 0 && !textoExtra) {
+    if (todosDocsSuportados.length === 0 && !textoExtra) {
       return NextResponse.json(
         { success: false, error: "Nenhum documento suportado encontrado. Envie PDFs ou imagens para analise." },
         { status: 400 }
       );
     }
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    // Paginacao por lotes
+    const tamLote = Math.min(loteSize || MAX_DOCS_POR_LOTE, MAX_DOCS_POR_LOTE);
+    const loteAtual = lote ?? 0;
+    const totalLotes = Math.ceil(todosDocsSuportados.length / tamLote);
+    const inicio = loteAtual * tamLote;
+    const docsParaAnalisar = todosDocsSuportados.slice(inicio, inicio + tamLote);
+
+    // Se nao tem docs neste lote (lote invalido), retornar vazio
+    if (docsParaAnalisar.length === 0 && !textoExtra) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          itens: [],
+          pesoTotalProjeto: null,
+          composicao: null,
+          observacoes: null,
+          docsAnalisados: [],
+          paginacao: { loteAtual, totalLotes, totalDocs: todosDocsSuportados.length, concluido: true },
+        },
+      });
+    }
+
+    const anthropic = new Anthropic({ apiKey });
 
     // Montar conteudo da mensagem
     const content = [];
 
-    // Adicionar documentos
+    // Adicionar documentos do lote atual
     for (const doc of docsParaAnalisar) {
       try {
         const base64 = await fetchBlobAsBase64(doc.blobUrl);
@@ -177,9 +217,23 @@ export async function POST(req, { params }) {
           text: `[Documento: ${doc.nome} | Categoria: ${doc.categoria || "geral"}]`,
         });
       } catch (err) {
-        // Pula documentos que falharem no download
         console.error(`Falha ao processar ${doc.nome}:`, err.message);
       }
+    }
+
+    // Se nenhum doc foi carregado com sucesso
+    if (content.length === 0 && !textoExtra) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          itens: [],
+          pesoTotalProjeto: null,
+          composicao: null,
+          observacoes: "Falha ao baixar documentos deste lote",
+          docsAnalisados: [],
+          paginacao: { loteAtual, totalLotes, totalDocs: todosDocsSuportados.length, concluido: loteAtual >= totalLotes - 1 },
+        },
+      });
     }
 
     // Contexto do projeto
@@ -188,9 +242,7 @@ export async function POST(req, { params }) {
       `CLIENTE: ${estudo.orcamento.cliente}`,
       estudo.orcamento.obra ? `OBRA: ${estudo.orcamento.obra}` : null,
       estudo.referencia ? `REFERENCIA: ${estudo.referencia}` : null,
-      estudo.itensPerso?.length > 0
-        ? `ITENS JA CADASTRADOS (${estudo.itensPerso.length}): ${estudo.itensPerso.map(i => i.descricao).join(", ")}`
-        : "NENHUM ITEM CADASTRADO AINDA",
+      totalLotes > 1 ? `LOTE ${loteAtual + 1} de ${totalLotes} (${docsParaAnalisar.length} documentos neste lote)` : null,
     ].filter(Boolean).join("\n");
 
     content.push({
@@ -199,7 +251,7 @@ export async function POST(req, { params }) {
     });
 
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content }],
@@ -219,7 +271,7 @@ export async function POST(req, { params }) {
     }
 
     // Sanitizar itens
-    const itens = (resultado.itens || []).map((item, idx) => ({
+    const itensBrutos = (resultado.itens || []).map((item, idx) => ({
       descricao: String(item.descricao || "").trim(),
       setor: item.setor || null,
       tipoMaterial: item.tipoMaterial || "OUTRO",
@@ -230,6 +282,15 @@ export async function POST(req, { params }) {
       pesoTotal: Number(item.pesoTotal) || 0,
       ordem: idx,
     })).filter((i) => i.descricao && i.pesoTotal > 0);
+
+    // Vincular com cadastro Omie (best-effort)
+    let itens;
+    try {
+      itens = await matchItensComOmie(itensBrutos);
+    } catch (err) {
+      console.error("Erro no match Omie (continuando sem vinculacao):", err.message);
+      itens = itensBrutos.map((i) => ({ ...i, codigoOmie: null, descricaoOmie: null, custoUnitario: null }));
+    }
 
     // Log
     await prisma.auditLog.create({
@@ -242,7 +303,9 @@ export async function POST(req, { params }) {
           docsAnalisados: docsParaAnalisar.map((d) => d.nome),
           itensExtraidos: itens.length,
           pesoTotalProjeto: resultado.pesoTotalProjeto,
-          modelo: "claude-sonnet-4-20250514",
+          modelo: "claude-sonnet-4-6",
+          lote: loteAtual,
+          totalLotes,
         },
       },
     });
@@ -255,10 +318,23 @@ export async function POST(req, { params }) {
         composicao: resultado.composicao,
         observacoes: resultado.observacoes,
         docsAnalisados: docsParaAnalisar.map((d) => d.nome),
+        paginacao: {
+          loteAtual,
+          totalLotes,
+          totalDocs: todosDocsSuportados.length,
+          concluido: loteAtual >= totalLotes - 1,
+        },
       },
     });
   } catch (e) {
     console.error("Erro na analise IA:", e);
+    // Se for erro de tamanho, dar mensagem amigavel
+    if (e.message?.includes("maximum size") || e.message?.includes("request_too_large")) {
+      return NextResponse.json(
+        { success: false, error: "Documentos muito grandes. Tente selecionar menos documentos ou use a analise por lotes." },
+        { status: 413 }
+      );
+    }
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
   }

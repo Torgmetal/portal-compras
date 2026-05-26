@@ -11,9 +11,9 @@ import { requireUser } from "@/lib/session";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-// Limite: 20MB por arquivo. Vercel Blob aceita ate 500MB mas vamos manter
-// modesto pra evitar abuso.
-const MAX_SIZE = 20 * 1024 * 1024;
+// Limite: 50MB por arquivo. Vercel Blob aceita ate 500MB.
+// DWG/DXF de projetos estruturais podem passar de 20MB.
+const MAX_SIZE = 50 * 1024 * 1024;
 
 export async function POST(req) {
   try {
