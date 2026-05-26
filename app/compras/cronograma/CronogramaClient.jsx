@@ -266,52 +266,52 @@ export default function CronogramaClient() {
       )}
 
       {/* Filtros + acoes */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-sm text-torg-gray">
-          <Filter size={16} />
-          <span className="font-medium">Filtros:</span>
-        </div>
-        <select
-          value={filtroOP}
-          onChange={(e) => { setFiltroOP(e.target.value); setFiltroRM(""); }}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
-        >
-          <option value="">Todas as OPs</option>
-          {ops.map(([id, label]) => (
-            <option key={id} value={id}>{label}</option>
-          ))}
-        </select>
-        <select
-          value={filtroRM}
-          onChange={(e) => setFiltroRM(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
-        >
-          <option value="">Todas as RMs</option>
-          {rms.map(([id, label]) => (
-            <option key={id} value={id}>{label}</option>
-          ))}
-        </select>
-        <select
-          value={filtroFornecedor}
-          onChange={(e) => setFiltroFornecedor(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
-        >
-          <option value="">Todos os fornecedores</option>
-          {fornecedores.map((f) => (
-            <option key={f} value={f}>{f}</option>
-          ))}
-        </select>
-
-        {(filtroOP || filtroRM || filtroFornecedor || filtroStatus) && (
-          <button
-            onClick={() => { setFiltroOP(""); setFiltroRM(""); setFiltroFornecedor(""); setFiltroStatus(""); }}
-            className="text-xs text-torg-gray hover:text-red-600 underline"
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-sm text-torg-gray">
+            <Filter size={16} />
+            <span className="font-medium">Filtros:</span>
+          </div>
+          <select
+            value={filtroOP}
+            onChange={(e) => { setFiltroOP(e.target.value); setFiltroRM(""); }}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
           >
-            Limpar filtros
-          </button>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
+            <option value="">Todas as OPs</option>
+            {ops.map(([id, label]) => (
+              <option key={id} value={id}>{label}</option>
+            ))}
+          </select>
+          <select
+            value={filtroRM}
+            onChange={(e) => setFiltroRM(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
+          >
+            <option value="">Todas as RMs</option>
+            {rms.map(([id, label]) => (
+              <option key={id} value={id}>{label}</option>
+            ))}
+          </select>
+          <select
+            value={filtroFornecedor}
+            onChange={(e) => setFiltroFornecedor(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
+          >
+            <option value="">Todos os fornecedores</option>
+            {fornecedores.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+          {(filtroOP || filtroRM || filtroFornecedor || filtroStatus) && (
+            <button
+              onClick={() => { setFiltroOP(""); setFiltroRM(""); setFiltroFornecedor(""); setFiltroStatus(""); }}
+              className="text-xs text-torg-gray hover:text-red-600 underline"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={syncOmie}
             disabled={syncing}
