@@ -1411,6 +1411,7 @@ model PropostaEstudo {
   tipoObra          String?         // PIPE_RACK, ESTRUTURAL_PESADA, ESTRUTURAL_MEDIA, etc.
   hhPorTon          Float?          // Hh/ton conforme tipo de obra
   custoMoKg         Float?          // R$/kg mão de obra calculado
+  produtividadeMix  Json?           // [{tipoObraId, label, pesoKg, hhTon}] — breakdown IA
 
   // Percentuais de perda e configurações
   percPerda         Float           @default(12)  // % de perda sobre matéria prima
