@@ -1298,6 +1298,8 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const [editValores, setEditValores] = useState({});
   const [editandoCustoId, setEditandoCustoId] = useState(null);
   const [editCustoValor, setEditCustoValor] = useState("");
+  const [editandoPerda, setEditandoPerda] = useState(false);
+  const [editPerdaValor, setEditPerdaValor] = useState("");
   const [filtroSetor, setFiltroSetor] = useState("");
   const [toast, setToast] = useState(null);
   const [analisandoIA, setAnalisandoIA] = useState(false);
@@ -1553,6 +1555,26 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
     }
   };
 
+  const salvarPerda = async () => {
+    const valor = parseFloat(editPerdaValor);
+    const perda = isNaN(valor) ? 0 : Math.max(0, Math.min(100, valor));
+    try {
+      const res = await fetch(`/api/comercial/estudo/${estudoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ percPerda: perda }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      onEstudoUpdate?.({ percPerda: perda });
+      showToast("Perda atualizada");
+    } catch (e) {
+      showToast(`Erro: ${e.message}`);
+    } finally {
+      setEditandoPerda(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header com totais e acoes */}
@@ -1567,19 +1589,43 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
             <p className="text-xs text-torg-gray uppercase tracking-wider font-medium">Itens</p>
             <p className="text-2xl font-bold text-torg-dark">{qtdItens}</p>
           </div>
-          {estudo.percPerda > 0 && (
-            <>
-              <div className="w-px h-10 bg-gray-200" />
-              <div>
-                <p className="text-xs text-torg-gray uppercase tracking-wider font-medium">
-                  Perda ({estudo.percPerda}%)
-                </p>
-                <p className="text-2xl font-bold text-amber-600">
-                  + {fmtNum(pesoTotalItens * estudo.percPerda / 100, 0)} kg
-                </p>
+          <div className="w-px h-10 bg-gray-200" />
+          <div>
+            <p className="text-xs text-torg-gray uppercase tracking-wider font-medium">
+              Perda
+            </p>
+            {editandoPerda ? (
+              <div className="flex items-center gap-1 mt-0.5">
+                <input
+                  type="number"
+                  autoFocus
+                  value={editPerdaValor}
+                  onChange={(e) => setEditPerdaValor(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") salvarPerda();
+                    if (e.key === "Escape") setEditandoPerda(false);
+                  }}
+                  onBlur={salvarPerda}
+                  className="w-16 px-2 py-1 border border-torg-blue rounded-lg text-lg font-bold text-right outline-none focus:ring-1 focus:ring-torg-blue/30"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                />
+                <span className="text-lg font-bold text-amber-600">%</span>
               </div>
-            </>
-          )}
+            ) : (
+              <p
+                onClick={() => { setEditandoPerda(true); setEditPerdaValor(estudo.percPerda ?? 12); }}
+                className="text-2xl font-bold text-amber-600 cursor-pointer hover:text-amber-700 hover:underline transition-colors"
+                title="Clique para editar % de perda"
+              >
+                {estudo.percPerda > 0
+                  ? <>{estudo.percPerda}% <span className="text-base font-normal text-torg-gray">(+ {fmtNum(pesoTotalItens * estudo.percPerda / 100, 0)} kg)</span></>
+                  : <span className="text-gray-300 text-lg">editar</span>
+                }
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
