@@ -60,6 +60,7 @@ const updateSchema = z.object({
     grupo: z.string(),
     pesoKg: z.number(),
     hhTon: z.number(),
+    kgmMedio: z.number().nullable().optional(),
     elementosIdentificados: z.string().optional(),
   })).nullable().optional(),
   percPerda: z.number().min(0).max(100).optional(),

@@ -400,6 +400,7 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
                     <tr className="text-left text-xs text-torg-gray bg-gray-50/60 border-b border-gray-100">
                       <th className="py-2.5 px-4 font-medium">Tipo estrutural</th>
                       <th className="py-2.5 px-4 font-medium">Grupo</th>
+                      <th className="py-2.5 px-4 font-medium text-right">kg/m medio</th>
                       <th className="py-2.5 px-4 font-medium text-right">Peso (kg)</th>
                       <th className="py-2.5 px-4 font-medium text-right">%</th>
                       <th className="py-2.5 px-4 font-medium text-right">Hh/ton</th>
@@ -435,6 +436,9 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
                               {m.grupo || "—"}
                             </span>
                           </td>
+                          <td className="py-2 px-4 text-right text-sm tabular-nums text-torg-gray">
+                            {m.kgmMedio ? fmtNum(m.kgmMedio, 1) : "—"}
+                          </td>
                           <td className="py-2 px-4 text-right">
                             <input
                               type="number"
@@ -465,6 +469,7 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
                     {/* Totais */}
                     <tr className="bg-torg-blue/5 font-semibold">
                       <td className="py-3 px-4 text-sm text-torg-dark">Total ponderado</td>
+                      <td className="py-3 px-4"></td>
                       <td className="py-3 px-4"></td>
                       <td className="py-3 px-4 text-right text-sm tabular-nums">{fmtPeso(mixTotais.pesoTotal)}</td>
                       <td className="py-3 px-4 text-right text-sm tabular-nums">100%</td>

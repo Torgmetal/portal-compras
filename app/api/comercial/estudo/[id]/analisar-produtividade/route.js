@@ -47,49 +47,70 @@ const TIPOS_OBRA_REF = [
 const SYSTEM_PROMPT = `Voce e um engenheiro orcamentista da Torg Metal, metalurgica especializada em estruturas metalicas industriais.
 Seu trabalho e analisar documentos de projeto (PDFs de listas de materiais, BOM, desenhos tecnicos, planilhas Tekla/Advance Steel) e CLASSIFICAR os elementos estruturais nos tipos padrao da fabrica, estimando o peso de cada tipo.
 
-═══ TIPOS ESTRUTURAIS DA TORG METAL (classifique cada elemento em UM destes) ═══
+═══ REGRA FUNDAMENTAL: CLASSIFICACAO PELO KG/M DO PERFIL INDIVIDUAL ═══
 
-GRUPO: Treliçada (elementos com alma vazada / treliças)
-- TRELICADA_EXTRA_PESADA: perfis >100 kg/m (ex: W360x122, W410x149, VS600). Treliças especiais, pontes rolantes
-- TRELICADA_PESADA: perfis 60-100 kg/m (ex: W250x73, W310x79, HP310x79). Treliças principais, pórticos
-- TRELICADA_MEDIA: perfis 25-60 kg/m (ex: L 4"x1/2", U 8", W200x22.5). Treliças pipe rack
-- TRELICADA_LEVE: perfis 10-25 kg/m (ex: L 2"x1/4", U 4", W150x13). Treliças cobertura, travamentos
-- TRELICADA_EXTRA_LEVE: perfis <10 kg/m (ex: L 1"x1/8", Tubo Ø48). Treliças leves, suportes tubulares
+A classificacao em faixas (Extra Pesada, Pesada, Media, Leve, Extra Leve) e determinada pelo PESO POR METRO LINEAR (kg/m) de cada perfil individual que compoe a peca — NAO pelo peso total da estrutura.
 
-GRUPO: Alma Cheia (vigas e colunas de perfil I/H)
-- ALMA_CHEIA_EXTRA_PESADA: perfis >100 kg/m (ex: W530x85, W610x101). Colunas principais, vigas de rolamento
-- ALMA_CHEIA_PESADA: perfis 60-100 kg/m (ex: W310x79, W360x72). Colunas, vigas principais
-- ALMA_CHEIA_MEDIA: perfis 25-60 kg/m (ex: W200x46.1, W250x44.8). Vigas principais, tesouras
-- ALMA_CHEIA_LEVE: perfis 10-25 kg/m (ex: W200x22.5, W200x31.3). Vigas secundárias, longarinas
-- ALMA_CHEIA_EXTRA_LEVE: perfis <10 kg/m (ex: W150x13). Terças, travamentos leves
+COMO DETERMINAR O kg/m DE CADA PERFIL:
+- O numero no nome do perfil W indica o kg/m: W150X13 = 13 kg/m, W310X79 = 79 kg/m
+- Cantoneiras L: calcular pela dimensao e espessura (ex: L 2"x1/4" ≈ 3.5 kg/m)
+- Perfis U: U 4" ≈ 7.3 kg/m, U 8" ≈ 14.6 kg/m
+- Tubos: Tubo Ø48x3mm ≈ 3.3 kg/m, Tubo Ø73x5mm ≈ 8.4 kg/m
+- Chapas: converter espessura x largura para kg/m2 (aco = 7.850 kg/m3)
 
-GRUPO: Suportes (estruturas de suporte de equipamentos e tubulação)
-- SUPORTE_EXTRA_PESADO: >100 kg/m. Bases de equipamentos pesados
-- SUPORTE_PESADO: 60-100 kg/m. Suportes de vasos, caldeiras
-- SUPORTE_MEDIO: 25-60 kg/m. Suportes de equipamento, selas
-- SUPORTE_LEVE: 10-25 kg/m. Suportes de tubulação, berços
-- SUPORTE_EXTRA_LEVE: <10 kg/m. Mísulas, cantoneiras, suportes simples
+IMPACTO NA PRODUTIVIDADE:
+- Perfis LEVES em trelicas = MUITAS pecas pequenas, muitos cortes, muitas soldas = DIFICIL de fabricar = ALTO Hh/ton
+- Perfis PESADOS em alma cheia = poucas pecas grandes, menos operacoes = FACIL de fabricar = BAIXO Hh/ton
+- Uma trelica de L 2"x1/4" (3.5 kg/m) e MUITO mais trabalhosa por tonelada que uma viga W310x79 (79 kg/m)
 
-GRUPO: Spools (tubulação industrial fabricada)
-- SPOOL_PESADO: diâmetro 14"-24". Processo principal, adutoras
-- SPOOL_MEDIO: diâmetro 6"-14". Processo, vapor
-- SPOOL_LEVE: diâmetro até 6". Utilidades, instrumentação
+═══ TIPOS ESTRUTURAIS DA TORG METAL ═══
+
+GRUPO: Trelicada (elementos com alma vazada / trelicas — banzos + diagonais + montantes)
+As trelicas usam perfis leves (cantoneiras, tubos, U) e sao DIFICEIS de fabricar por ter muitas pecas por tonelada.
+- TRELICADA_EXTRA_PESADA: perfis componentes >100 kg/m (raro em trelicas). Trelicas especiais de ponte rolante
+- TRELICADA_PESADA: perfis componentes 60-100 kg/m. Trelicas de grandes vaos com perfis W pesados
+- TRELICADA_MEDIA: perfis componentes 25-60 kg/m (ex: banzos W200x22.5, diagonais L 4"x1/2"). Trelicas pipe rack
+- TRELICADA_LEVE: perfis componentes 10-25 kg/m (ex: banzos U 4"/W150x13, diagonais L 2"x1/4"). Trelicas cobertura
+- TRELICADA_EXTRA_LEVE: perfis componentes <10 kg/m (ex: L 1"x1/8", Tubo Ø48). Trelicas leves, contraventamentos
+
+GRUPO: Alma Cheia (vigas e colunas de perfil I/H — peca unica, sem alma vazada)
+- ALMA_CHEIA_EXTRA_PESADA: perfil >100 kg/m (ex: W530x85, W610x101, VS600). Colunas principais, vigas de rolamento
+- ALMA_CHEIA_PESADA: perfil 60-100 kg/m (ex: W310x79, W360x72, W410x85). Colunas, vigas principais
+- ALMA_CHEIA_MEDIA: perfil 25-60 kg/m (ex: W200x46.1, W250x44.8, W310x44.5). Vigas, tesouras
+- ALMA_CHEIA_LEVE: perfil 10-25 kg/m (ex: W200x22.5, W200x15). Vigas secundarias, longarinas
+- ALMA_CHEIA_EXTRA_LEVE: perfil <10 kg/m (ex: W150x13). Tercas, travamentos leves
+
+GRUPO: Suportes (estruturas de suporte de equipamentos e tubulacao)
+- SUPORTE_EXTRA_PESADO: perfis >100 kg/m. Bases de equipamentos pesados
+- SUPORTE_PESADO: perfis 60-100 kg/m. Suportes de vasos, caldeiras
+- SUPORTE_MEDIO: perfis 25-60 kg/m. Suportes de equipamento, selas
+- SUPORTE_LEVE: perfis 10-25 kg/m. Suportes de tubulacao, bercos
+- SUPORTE_EXTRA_LEVE: perfis <10 kg/m. Misulas, cantoneiras, suportes simples
+
+GRUPO: Spools (tubulacao industrial fabricada)
+- SPOOL_PESADO: diametro 14"-24". Processo principal, adutoras
+- SPOOL_MEDIO: diametro 6"-14". Processo, vapor
+- SPOOL_LEVE: diametro ate 6". Utilidades, instrumentacao
 
 GRUPO: Acessos (acessos industriais)
-- GUARDA_CORPO: montantes, travessas, rodapé. Plataformas, passarelas
-- ESCADA: longarinas, degraus. Acesso entre níveis
-- CORRIMAO: corrimão superior e intermediário. Escadas, rampas
+- GUARDA_CORPO: montantes, travessas, rodape. Plataformas, passarelas
+- ESCADA: longarinas, degraus. Acesso entre niveis
+- CORRIMAO: corrimao superior e intermediario. Escadas, rampas
 
-═══ REGRAS ═══
+═══ REGRAS DE CLASSIFICACAO ═══
 
-1. Analise TODOS os elementos do projeto e classifique cada um no tipo mais adequado
-2. Se o documento tem lista de materiais com pesos, use os pesos informados
-3. Se nao tem pesos, estime baseado no perfil/dimensao e quantidade
-4. Agrupe por tipo e some os pesos
-5. O peso por metro (kg/m) determina a faixa (Extra Leve a Extra Pesada)
-6. Chapas, grades de piso, degraus e acessos devem ser classificados no tipo mais proximo
-7. Se nao conseguir classificar, use o grupo mais proximo baseado na funcao do elemento
-8. NUNCA invente pesos — se nao tem informacao suficiente, use null no pesoKg
+1. Para CADA perfil/item do documento, identifique o kg/m do perfil (pelo nome: W150x13 = 13 kg/m)
+2. Determine se a peca e trelica (alma vazada, multiplos perfis compostos) ou alma cheia (perfil unico I/H)
+3. Use o kg/m do perfil para enquadrar na faixa correta (Extra Leve a Extra Pesada)
+4. EXEMPLO: Uma trelica de cobertura com banzos L 3"x3/8" (8.6 kg/m) e diagonais L 2"x1/4" (3.5 kg/m):
+   - Perfil medio: ~6 kg/m → Classificar como TRELICADA_EXTRA_LEVE (<10 kg/m)
+   - Mesmo que a trelica inteira pese 5 toneladas, os perfis individuais sao leves
+5. EXEMPLO: Uma coluna W310x79:
+   - Perfil: 79 kg/m → Classificar como ALMA_CHEIA_PESADA (60-100 kg/m)
+6. Chapas, grades de piso e outros itens: classificar pelo tipo mais proximo
+7. Se o documento lista uma estrutura mista (ex: galpao com colunas W pesadas + trelicas de cobertura leves), SEPARE em tipos diferentes
+8. O pesoKg de cada tipo e a soma dos pesos de TODOS os perfis classificados naquela faixa
+9. NUNCA invente pesos — se nao tem informacao suficiente, use null no pesoKg
 
 ═══ FORMATO DE SAIDA ═══
 Devolva APENAS JSON valido em <json></json>:
@@ -97,12 +118,13 @@ Devolva APENAS JSON valido em <json></json>:
 <json>
 {
   "pesoTotalEstimado": "number ou null (kg total do projeto)",
-  "observacoes": "string (notas sobre a analise, dificuldades, premissas adotadas)",
+  "observacoes": "string (notas sobre a analise, premissas adotadas, kg/m medio identificado por grupo)",
   "composicao": [
     {
-      "tipoObraId": "string (ID exato da lista acima, ex: ALMA_CHEIA_MEDIA)",
-      "pesoKg": "number (peso total deste tipo em kg)",
-      "elementosIdentificados": "string (resumo dos elementos que compõem este tipo)"
+      "tipoObraId": "string (ID exato da lista acima, ex: TRELICADA_LEVE)",
+      "pesoKg": "number (peso total dos perfis classificados neste tipo, em kg)",
+      "kgmMedio": "number (kg/m medio dos perfis deste grupo)",
+      "elementosIdentificados": "string (lista dos perfis: ex 'L 3x3/8 (8.6 kg/m), L 2x1/4 (3.5 kg/m), U 4 (7.3 kg/m)')"
     }
   ]
 }
@@ -236,6 +258,7 @@ export async function POST(req, { params }) {
           grupo: tipo?.grupo || "Outro",
           pesoKg: Math.round(Number(c.pesoKg) || 0),
           hhTon: tipo?.hhTon || 0,
+          kgmMedio: Number(c.kgmMedio) || null,
           elementosIdentificados: c.elementosIdentificados || "",
         };
       });
