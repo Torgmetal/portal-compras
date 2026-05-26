@@ -129,20 +129,20 @@ export async function POST(req, { params }) {
 
 const updateItemSchema = z.object({
   itemId: z.string().min(1),
-  setor: z.string().optional(),
-  projeto: z.string().optional(),
+  setor: z.string().nullish(),
+  projeto: z.string().nullish(),
   tipoMaterial: z.enum([
     "PERFIL_W", "PERFIL_U", "PERFIL_L", "TUBO_REDONDO", "TUBO_QUADRADO",
     "TUBO_RETANGULAR", "CHAPA", "BARRA_REDONDA", "BARRA_CHATA",
     "BARRA_QUADRADA", "BARRA_ROSCADA", "TELA", "GRADE_PISO", "DEGRAU", "OUTRO",
   ]).optional(),
   descricao: z.string().min(1).optional(),
-  norma: z.string().optional(),
-  comprimento: z.number().min(0).optional(),
+  norma: z.string().nullish(),
+  comprimento: z.number().min(0).nullish(),
   pesoUnitario: z.number().min(0).optional(),
   quantidade: z.number().int().min(1).optional(),
   pesoTotal: z.number().min(0).optional(),
-  areaPintura: z.number().min(0).optional(),
+  areaPintura: z.number().min(0).nullish(),
   ordem: z.number().int().optional(),
   custoUnitario: z.number().min(0).nullish(),
 });

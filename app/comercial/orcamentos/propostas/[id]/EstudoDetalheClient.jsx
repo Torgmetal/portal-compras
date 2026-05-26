@@ -1529,7 +1529,10 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
     }
   };
 
+  const salvandoCustoRef = useRef(false);
   const salvarCustoRapido = async (itemId) => {
+    if (salvandoCustoRef.current) return;
+    salvandoCustoRef.current = true;
     const custo = parseFloat(editCustoValor) || null;
     try {
       const res = await fetch(`/api/comercial/estudo/${estudoId}/itens`, {
@@ -1546,6 +1549,7 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
     } finally {
       setEditandoCustoId(null);
       setEditCustoValor("");
+      salvandoCustoRef.current = false;
     }
   };
 
