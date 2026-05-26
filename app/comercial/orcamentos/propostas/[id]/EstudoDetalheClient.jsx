@@ -1296,6 +1296,8 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const [excluindoId, setExcluindoId] = useState(null);
   const [editandoId, setEditandoId] = useState(null);
   const [editValores, setEditValores] = useState({});
+  const [editandoCustoId, setEditandoCustoId] = useState(null);
+  const [editCustoValor, setEditCustoValor] = useState("");
   const [filtroSetor, setFiltroSetor] = useState("");
   const [toast, setToast] = useState(null);
   const [analisandoIA, setAnalisandoIA] = useState(false);
@@ -1524,6 +1526,26 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
       showToast("Item atualizado");
     } catch (e) {
       showToast(`Erro: ${e.message}`);
+    }
+  };
+
+  const salvarCustoRapido = async (itemId) => {
+    const custo = parseFloat(editCustoValor) || null;
+    try {
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/itens`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId, custoUnitario: custo }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setItens((prev) => prev.map((i) => i.id === itemId ? { ...i, custoUnitario: custo } : i));
+      showToast("Custo atualizado");
+    } catch (e) {
+      showToast(`Erro: ${e.message}`);
+    } finally {
+      setEditandoCustoId(null);
+      setEditCustoValor("");
     }
   };
 
@@ -1833,11 +1855,37 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                           <td className="px-2 py-2 text-right text-xs font-semibold text-torg-dark whitespace-nowrap">
                             {fmtNum(item.pesoTotal, 1)}
                           </td>
-                          <td className="px-2 py-2 text-right text-xs text-torg-gray whitespace-nowrap">
-                            {item.custoUnitario > 0
-                              ? <>{fmtNum(item.custoUnitario, 2)}{!item.codigoOmie && <span className="text-amber-500 ml-0.5" title="Estimado (sem cadastro Omie)">*</span>}</>
-                              : "—"
-                            }
+                          <td className="px-2 py-2 text-right text-xs whitespace-nowrap">
+                            {editandoCustoId === item.id ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <input
+                                  type="number"
+                                  autoFocus
+                                  value={editCustoValor}
+                                  onChange={(e) => setEditCustoValor(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") salvarCustoRapido(item.id);
+                                    if (e.key === "Escape") { setEditandoCustoId(null); setEditCustoValor(""); }
+                                  }}
+                                  onBlur={() => salvarCustoRapido(item.id)}
+                                  className="w-20 px-1.5 py-0.5 border border-torg-blue rounded-lg text-sm text-right outline-none focus:ring-1 focus:ring-torg-blue/30"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                            ) : (
+                              <span
+                                onClick={() => { setEditandoCustoId(item.id); setEditCustoValor(item.custoUnitario || ""); }}
+                                className="cursor-pointer hover:text-torg-blue hover:underline transition-colors text-torg-gray"
+                                title="Clique para editar R$/kg"
+                              >
+                                {item.custoUnitario > 0
+                                  ? <>{fmtNum(item.custoUnitario, 2)}{!item.codigoOmie && <span className="text-amber-500 ml-0.5" title="Estimado (sem cadastro Omie)">*</span>}</>
+                                  : <span className="text-gray-300">editar</span>
+                                }
+                              </span>
+                            )}
                           </td>
                           <td className="px-2 py-2 text-right text-xs text-torg-dark whitespace-nowrap">
                             {item.custoUnitario > 0
