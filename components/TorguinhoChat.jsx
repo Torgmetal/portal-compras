@@ -99,20 +99,6 @@ export default function TorguinhoChat() {
       .catch(() => setConfig({ ativo: true, modulosHabilitados: [] }));
   }, [status]);
 
-  // Só mostra para usuários autenticados com config carregada e ativo
-  if (status !== "authenticated" || !config) return null;
-  if (!config.ativo) return null;
-
-  // Verifica restrição de módulo
-  const user = session?.user;
-  if (config.modulosHabilitados?.length > 0 && user?.tipo !== "ADMIN") {
-    const userModulos = user?.modulos ?? [];
-    const temAcesso = config.modulosHabilitados.some(m => userModulos.includes(m));
-    if (!temAcesso) return null;
-  }
-
-  const nome = session?.user?.name?.split(" ")[0] || "colega";
-
   // Scroll automático para o fim
   useEffect(() => {
     if (aberto) fimRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -120,18 +106,28 @@ export default function TorguinhoChat() {
 
   // Foca input ao abrir
   useEffect(() => {
-    if (aberto) {
-      setTimeout(() => inputRef.current?.focus(), 150);
-      // Mensagem de boas-vindas na primeira abertura
-      if (!iniciado) {
-        setIniciado(true);
-        setMensagens([{
-          role: "assistant",
-          content: `E aí, ${nome}! 👷 Sou o Torguinho, assistente da Torg Metal!\n\nPosso te ajudar com dúvidas sobre metalurgia, processos, materiais e também consultar dados do portal — como OPs, estoque e produção. O que você precisa? 🔩`,
-        }]);
-      }
+    if (!aberto || !config) return;
+    setTimeout(() => inputRef.current?.focus(), 150);
+    // Mensagem de boas-vindas na primeira abertura
+    if (!iniciado) {
+      const nome = session?.user?.name?.split(" ")[0] || "colega";
+      setIniciado(true);
+      setMensagens([{
+        role: "assistant",
+        content: `E aí, ${nome}! 👷 Sou o Torguinho, assistente da Torg Metal!\n\nPosso te ajudar com dúvidas sobre metalurgia, processos, materiais e também consultar dados do portal — como OPs, estoque e produção. O que você precisa? 🔩`,
+      }]);
     }
-  }, [aberto]);
+  }, [aberto, config]);
+
+  // ─── Visibilidade (calculada APÓS todos os hooks) ─────────────────────────
+  const user = session?.user;
+  const temAcesso = !config?.modulosHabilitados?.length ||
+    user?.tipo === "ADMIN" ||
+    (user?.modulos ?? []).some(m => config.modulosHabilitados.includes(m));
+
+  if (status !== "authenticated" || !config || !config.ativo || !temAcesso) return null;
+
+  const nome = user?.name?.split(" ")[0] || "colega";
 
   async function enviar() {
     const texto = input.trim();
