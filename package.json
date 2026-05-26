@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && prisma generate && next build",
+    "build": "prisma migrate deploy && prisma generate && node scripts/ensure-mes-tables.mjs && next build",
     "start": "next start",
     "postinstall": "prisma generate",
     "atualizar": "node scripts/atualizar.mjs"
