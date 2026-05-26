@@ -53,7 +53,7 @@ function parseData(s) {
     const [datePart, timePart] = s.split(" ");
     const [dd, mm, yyyy] = datePart.split("/");
     const time = timePart || "00:00:00";
-    return new Date(`${yyyy}-${mm}-${dd}T${time}`);
+    return new Date(`${yyyy}-${mm}-${dd}T${time}.000Z`); // armazena como UTC naïve (BRT sem offset)
   }
   return new Date(s);
 }

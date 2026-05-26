@@ -29,10 +29,11 @@ export async function GET(req) {
   if (setor)  where.setor  = { contains: setor, mode: "insensitive" };
   if (status) where.status = status;
   if (de || ate) {
+    // Datas armazenadas como UTC naïve (horário BRT sem offset aplicado).
+    // Comparamos com meia-noite UTC para preservar o dia exato do Brasil.
     where.dataInicio = {};
-    // Interpreta datas no fuso Brasil/São Paulo (UTC-3)
-    if (de)  where.dataInicio.gte = new Date(de  + "T00:00:00-03:00");
-    if (ate) where.dataInicio.lte = new Date(ate + "T23:59:59-03:00");
+    if (de)  where.dataInicio.gte = new Date(de  + "T00:00:00.000Z");
+    if (ate) where.dataInicio.lte = new Date(ate + "T23:59:59.999Z");
   }
 
   // Último sync

@@ -81,70 +81,51 @@ async function skaLogin() {
   return token;
 }
 
-// ─── Busca dataset 242 com paginação ───────────────────────────
+// ─── Busca dataset 242 — SKA ignora page/pageSize, retorna tudo em 1 chamada ──
 async function skaFetchDataset242(token, startDate, endDate) {
-  const allRows = [];
-  let page = 1;
-  const PAGE_SIZE = 500;
-
   const startStr = fmtISO(startDate);
   const endStr   = fmtISO(endDate);
   log(`Buscando dataset 242: ${startStr} → ${endStr}`);
 
-  while (true) {
-    // Parâmetros com prefixo # (URL-encoded como %23) — formato exigido pelo SKA dataset 242
-    // Valores "Todos" = sem filtro (retorna tudo)
-    const qs = [
-      "interval=0",
-      `%23StartDate=${encodeURIComponent(startStr)}`,
-      `%23EndDate=${encodeURIComponent(endStr)}`,
-      "%23OP=Todos",
-      "%23Item=Todos",
-      "%23Obra=Todos",
-      "%23Setor=Todos",
-      "%23Status=TODOS",
-      "%23Resource=Todos",
-      "%23Resource_concat=Todos",
-      `page=${page}`,
-      `pageSize=${PAGE_SIZE}`,
-    ].join("&");
+  // SKA ignora os parâmetros page/pageSize e devolve o dataset completo numa única resposta
+  const qs = [
+    "interval=0",
+    `%23StartDate=${encodeURIComponent(startStr)}`,
+    `%23EndDate=${encodeURIComponent(endStr)}`,
+    "%23OP=Todos",
+    "%23Item=Todos",
+    "%23Obra=Todos",
+    "%23Setor=Todos",
+    "%23Status=TODOS",
+    "%23Resource=Todos",
+    "%23Resource_concat=Todos",
+    "page=1",
+    "pageSize=99999",
+  ].join("&");
 
-    log(`  Página ${page}...`);
-    const resp = await fetch(`${SKA_API_URL}/v1/dataset/${SKA_DATASET_ID}/run?${qs}`, {
-      method: "GET",
-      headers: { token },
-      timeout: 60000,
-    });
+  const resp = await fetch(`${SKA_API_URL}/v1/dataset/${SKA_DATASET_ID}/run?${qs}`, {
+    method: "GET",
+    headers: { token },
+    timeout: 120000,
+  });
 
-    if (!resp.ok) {
-      const txt = await resp.text().catch(() => "");
-      throw new Error(`Dataset ${SKA_DATASET_ID} erro (${resp.status}): ${txt.substring(0, 300)}`);
-    }
-
-    const data = await resp.json();
-    const rows = Array.isArray(data) ? data
-      : (data.data || data.rows || data.result || []);
-
-    if (!Array.isArray(rows)) {
-      throw new Error("Formato inesperado: " + JSON.stringify(data).substring(0, 200));
-    }
-
-    allRows.push(...rows);
-    log(`  Página ${page}: ${rows.length} registros (total: ${allRows.length})`);
-
-    if (rows.length < PAGE_SIZE) break;  // última página
-    page++;
-    if (page > 50) { log("  AVISO: limite de 50 páginas atingido"); break; }
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    throw new Error(`Dataset ${SKA_DATASET_ID} erro (${resp.status}): ${txt.substring(0, 300)}`);
   }
 
-  log(`Total SKA: ${allRows.length} registros`);
+  const data = await resp.json();
+  const rows = Array.isArray(data) ? data
+    : (data.data || data.rows || data.result || []);
 
-  // Log diagnóstico dos campos (primeira vez ou quando há dados)
-  if (allRows.length > 0 && page === 1) {
-    log(`Campos do dataset: ${Object.keys(allRows[0]).join(", ")}`);
+  if (!Array.isArray(rows)) {
+    throw new Error("Formato inesperado: " + JSON.stringify(data).substring(0, 200));
   }
 
-  return allRows;
+  log(`Total SKA: ${rows.length} registros`);
+  if (rows.length > 0) log(`Campos do dataset: ${Object.keys(rows[0]).join(", ")}`);
+
+  return rows;
 }
 
 // ─── Transforma linha SKA → apontamento portal ─────────────────
@@ -232,17 +213,21 @@ async function main() {
 
   try {
     const hoje = new Date();
-    hoje.setSeconds(59); hoje.setMinutes(59); hoje.setHours(23);
-    const inicio = new Date(hoje);
-    inicio.setDate(inicio.getDate() - SYNC_DIAS_ATRAS);
-    inicio.setHours(0); inicio.setMinutes(0); inicio.setSeconds(0);
+    hoje.setHours(23); hoje.setMinutes(59); hoje.setSeconds(59);
+
+    const fimGeral = new Date(hoje);
+    const inicioGeral = new Date(hoje);
+    inicioGeral.setDate(inicioGeral.getDate() - SYNC_DIAS_ATRAS);
+    inicioGeral.setHours(0); inicioGeral.setMinutes(0); inicioGeral.setSeconds(0);
+
+    log(`Período total: ${inicioGeral.toISOString().split("T")[0]} → ${fimGeral.toISOString().split("T")[0]} (${SYNC_DIAS_ATRAS} dias)`);
 
     // 1. Login
     const token = await skaLogin();
 
-    // 2. Busca dados
+    // 2. Busca todo o período de uma vez (SKA retorna ~30k/página, break na página vazia)
     const tSka = Date.now();
-    const linhas = await skaFetchDataset242(token, inicio, hoje);
+    const linhas = await skaFetchDataset242(token, inicioGeral, fimGeral);
     const duracaoSka = Date.now() - tSka;
 
     if (linhas.length === 0) {
@@ -262,9 +247,8 @@ async function main() {
     }
 
     // 4. Envia
-    const resultado = await enviarPortal(apontamentos, inicio, hoje, duracaoSka);
-    log(`Sync OK em ${Date.now() - tInicio}ms — criados: ${resultado.criados}, atualizados: ${resultado.atualizados}`);
-    if (resultado.syncId) log(`Sync ID portal: ${resultado.syncId}`);
+    const resultado = await enviarPortal(apontamentos, inicioGeral, fimGeral, duracaoSka);
+    log(`Sync completo em ${((Date.now() - tInicio)/1000).toFixed(1)}s — total: ${linhas.length} linhas SKA | criados: ${resultado.criados} | atualizados: ${resultado.atualizados}`);
 
   } catch (err) {
     log(`ERRO: ${err.message}`);

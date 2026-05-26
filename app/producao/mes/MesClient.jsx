@@ -55,7 +55,7 @@ const STATUS_CONFIG = {
 };
 
 // ─── Modal de detalhe de OP ───────────────────────────────────────
-function ModalDetalhe({ obra, opInfo, onClose }) {
+function ModalDetalhe({ obra, opInfo, onClose, de, ate }) {
   const [rows, setRows]     = useState([]);
   const [loading, setLoad]  = useState(true);
   const [erro, setErro]     = useState(null);
@@ -63,12 +63,15 @@ function ModalDetalhe({ obra, opInfo, onClose }) {
 
   useState(() => {
     let ativo = true;
-    fetch(`/api/mes/apontamentos?obra=${encodeURIComponent(obra)}&detalhe=1`)
+    const qs = new URLSearchParams({ obra, detalhe: "1" });
+    if (de)  qs.set("de",  de);
+    if (ate) qs.set("ate", ate);
+    fetch(`/api/mes/apontamentos?${qs}`)
       .then(r => r.json())
       .then(d => { if (ativo) { setRows(d.rows || []); setLoad(false); } })
       .catch(e => { if (ativo) { setErro(e.message); setLoad(false); } });
     return () => { ativo = false; };
-  }, [obra]);
+  }, [obra, de, ate]);
 
   const filtrados = useMemo(() => {
     if (!busca.trim()) return rows;
@@ -568,6 +571,8 @@ export default function MesClient({
           obra={detalheObra}
           opInfo={opMap[detalheObra]}
           onClose={() => setDetalheObra(null)}
+          de={de}
+          ate={ate}
         />
       )}
     </div>
