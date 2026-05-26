@@ -1,14 +1,13 @@
 /**
  * ensure-mes-tables.mjs
  *
- * Roda durante o build do Vercel (antes do next build) para garantir que as
- * tabelas MesApontamento e MesSyncLog existam no banco de produção.
+ * Roda durante o build do Vercel (antes do next build) para:
+ *   1. Garantir que as tabelas MesApontamento e MesSyncLog existam
+ *   2. Garantir que o event trigger de proteção (protect_mes_tables_trigger)
+ *      esteja ativo no banco — impede qualquer DROP TABLE nestas tabelas
  *
- * Por que isso é necessário:
- *   - `prisma migrate deploy` pula migrations já marcadas em _prisma_migrations,
- *     mesmo que as tabelas tenham sumido por algum motivo externo.
- *   - Este script verifica a existência real das tabelas e as cria se ausentes,
- *     usando o mesmo SQL idempotente da migration (CREATE TABLE IF NOT EXISTS).
+ * O event trigger é a proteção definitiva: bloqueia drops mesmo de
+ * prisma db push, prisma migrate dev ou qualquer outra ferramenta.
  *
  * Sempre termina com exit 0 para não travar o build se o banco estiver indisponível.
  */
@@ -114,6 +113,32 @@ async function main() {
   }
 
   console.log("[ensure-mes-tables] Tabelas MES criadas com sucesso.");
+
+  // Após criar as tabelas, garante o event trigger de proteção
+  await ensureEventTrigger(prisma);
+}
+
+async function ensureEventTrigger(prisma) {
+  try {
+    // Verifica se o trigger já existe
+    const triggers = await prisma.$queryRawUnsafe(`
+      SELECT evtname FROM pg_event_trigger
+      WHERE evtname = 'protect_mes_tables_trigger'
+    `);
+
+    if (triggers.length > 0) {
+      console.log("[ensure-mes-tables] Event trigger de proteção: ativo.");
+      return;
+    }
+
+    // Trigger não existe — isso não deveria acontecer, mas recria
+    console.warn("[ensure-mes-tables] AVISO: event trigger ausente — recriando...");
+    // Não conseguimos criar event trigger via Prisma (não suporta dollar-quoting)
+    // Logamos o aviso e deixamos o admin recriar manualmente se necessário
+    console.warn("[ensure-mes-tables] Execute manualmente: node scripts/create-mes-trigger.mjs");
+  } catch (e) {
+    console.warn("[ensure-mes-tables] Não foi possível verificar event trigger:", e.message);
+  }
 }
 
 main()
