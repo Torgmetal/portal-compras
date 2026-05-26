@@ -114,9 +114,11 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
         if (data.produtos.error) {
           partes.push(`Produtos: ${data.produtos.error}`);
         } else {
-          let txt = `${data.produtos.total ?? "?"} produtos importados`;
+          let txt = `${data.produtos.total ?? "?"} produtos`;
+          if (data.produtos.fonteUsada)  txt += ` via ${data.produtos.fonteUsada}`;
           if (data.produtos.criados)     txt += `, ${data.produtos.criados} novos`;
           if (data.produtos.desativados) txt += `, ${data.produtos.desativados} desativados`;
+          if (data.produtos.enriquecidos) txt += `, ${data.produtos.enriquecidos} famílias`;
           if (data.produtos.erros?.length) txt += ` ⚠ ${data.produtos.erros[0]}`;
           partes.push(txt);
         }
