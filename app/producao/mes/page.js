@@ -9,12 +9,14 @@ export const metadata = {
 export default async function MesPage() {
   await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL", "COMPRAS"]);
 
-  // Sumário inicial: últimos 30 dias
-  const ate = new Date();
-  ate.setHours(23, 59, 59);
-  const de = new Date(ate);
-  de.setDate(de.getDate() - 30);
-  de.setHours(0, 0, 0);
+  // Data de hoje no fuso Brasil/São Paulo (UTC-3, sem horário de verão desde 2019)
+  // Vercel roda em UTC, então usamos Intl para pegar a data correta em SP
+  const hojeStr = new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Sao_Paulo" })
+    .format(new Date()); // retorna "YYYY-MM-DD"
+
+  // Janela de consulta: hoje 00:00 → 23:59 no fuso de SP
+  const de  = new Date(hojeStr + "T00:00:00-03:00");
+  const ate = new Date(hojeStr + "T23:59:59-03:00");
 
   const [grupos, totaisPorObra, opsDb, ultimoSync, totalGeral] = await Promise.all([
     prisma.mesApontamento.groupBy({
@@ -67,8 +69,8 @@ export default async function MesPage() {
       setoresDisponiveis={setoresUnicos}
       ultimoSync={JSON.parse(JSON.stringify(ultimoSync))}
       totalGeralBanco={totalGeral}
-      deInicial={de.toISOString().slice(0, 10)}
-      ateInicial={ate.toISOString().slice(0, 10)}
+      deInicial={hojeStr}
+      ateInicial={hojeStr}
     />
   );
 }

@@ -29,8 +29,9 @@ export async function GET(req) {
   if (status) where.status = status;
   if (de || ate) {
     where.dataInicio = {};
-    if (de)  where.dataInicio.gte = new Date(de + "T00:00:00");
-    if (ate) where.dataInicio.lte = new Date(ate + "T23:59:59");
+    // Interpreta datas no fuso Brasil/São Paulo (UTC-3)
+    if (de)  where.dataInicio.gte = new Date(de  + "T00:00:00-03:00");
+    if (ate) where.dataInicio.lte = new Date(ate + "T23:59:59-03:00");
   }
 
   // Último sync
