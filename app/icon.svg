@@ -1,40 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
-  <!-- Fundo navy arredondado -->
-  <rect width="400" height="400" rx="72" fill="#002945"/>
-
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="769 201 393 401">
   <!--
-    Símbolo geométrico extraído da torg-logo.svg
-    Bounding box original: x:789–1142, y:221–582 (w:353, h:361)
-    Centro original: (965.5, 401.5)
-    Scale: 320/361 ≈ 0.886 para caber em 320×320 dentro de 400×400
-    tx = 200 − 965.5×0.886 ≈ −655   ty = 200 − 401.5×0.886 ≈ −156
+    Símbolo geométrico da Torg Metal — fundo transparente
+    Bounding box com padding: x:769–1162, y:201–602
   -->
-  <g transform="translate(-655, -156) scale(0.886)">
 
-    <!-- Pilar direito (mais alto) — branco puro -->
-    <path fill="white"
-      d="M1091.5,264.58v317.77h15.21c19.46,0,35.24-16.21,35.24-36.2V221.02
-         l-41.24,26.47C1094.98,251.18,1091.5,257.64,1091.5,264.58z"/>
+  <!-- Pilar direito (mais alto) — navy escuro -->
+  <path fill="#002945"
+    d="M1091.5,264.58v317.77h15.21c19.46,0,35.24-16.21,35.24-36.2V221.02
+       l-41.24,26.47C1094.98,251.18,1091.5,257.64,1091.5,264.58z"/>
 
-    <!-- Pilar central (médio) — branco 80% -->
-    <path fill="rgba(255,255,255,0.80)"
-      d="M1066.27,221.02l-41.23,26.48c-5.73,3.68-9.22,10.14-9.22,17.09
-         v107.59l50.45,32.39V221.02z"/>
+  <!-- Pilar central — navy médio -->
+  <path fill="#004878"
+    d="M1066.27,221.02l-41.23,26.48c-5.73,3.68-9.22,10.14-9.22,17.09
+       v107.59l50.45,32.39V221.02z"/>
 
-    <!-- Pilar esquerdo (menor) — branco 60% -->
-    <path fill="rgba(255,255,255,0.60)"
-      d="M990.59,221.02l-41.23,26.47c-5.74,3.68-9.22,10.14-9.22,17.09
-         v63.32l50.45,32.39V221.02z"/>
+  <!-- Pilar esquerdo (menor) — navy mais claro -->
+  <path fill="#006EAB"
+    d="M990.59,221.02l-41.23,26.47c-5.74,3.68-9.22,10.14-9.22,17.09
+       v63.32l50.45,32.39V221.02z"/>
 
-    <!-- Seta principal — torg-blue (#006EAB) -->
-    <path fill="#006EAB"
-      d="M940.28,374.2l-140.07,80.2c-6.83,4.39-10.98,12.08-10.98,20.35
-         l-0.97,82.22c-0.16,13.7,10.81,24.9,24.41,24.9h126.92L940.28,374.2z"/>
+  <!-- Seta principal — torg-blue -->
+  <path fill="#006EAB"
+    d="M940.28,374.2l-140.07,80.2c-6.83,4.39-10.98,12.08-10.98,20.35
+       l-0.97,82.22c-0.16,13.7,10.81,24.9,24.41,24.9h126.92L940.28,374.2z"/>
 
-    <!-- Acento da seta — azul mais claro -->
-    <path fill="#3BA8D8"
-      d="M801.06,418.16l138.95-89.21v-40.3L799.58,416.2
-         C798.46,417.21,799.79,418.97,801.06,418.16z"/>
+  <!-- Acento da seta — azul mais claro -->
+  <path fill="#3BA8D8"
+    d="M801.06,418.16l138.95-89.21v-40.3L799.58,416.2
+       C798.46,417.21,799.79,418.97,801.06,418.16z"/>
 
-  </g>
 </svg>
