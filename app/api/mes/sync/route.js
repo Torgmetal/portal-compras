@@ -140,14 +140,25 @@ export async function POST(req) {
             where:  { productionId: ap.productionId },
             create: data,
             update: {
-              dataFim:      data.dataFim,
-              status:       data.status,
-              produzidoUn:  data.produzidoUn,
-              rejeitado:    data.rejeitado,
-              retrabalhado: data.retrabalhado,
-              produzidoKg:  data.produzidoKg,
-              opId:         data.opId,
-              syncRunId:    data.syncRunId,
+              // Atualiza TODOS os campos a cada sync — garante que mudanças
+              // no SKA (setor, máquina, operador, status, peso, etc.) sejam refletidas.
+              dataInicio:    data.dataInicio,
+              dataFim:       data.dataFim,
+              obra:          data.obra,
+              opSka:         data.opSka,
+              setor:         data.setor,
+              maquina:       data.maquina,
+              codigoMaquina: data.codigoMaquina,
+              operacao:      data.operacao,
+              descricaoItem: data.descricaoItem,
+              operador:      data.operador,
+              status:        data.status,
+              produzidoUn:   data.produzidoUn,
+              rejeitado:     data.rejeitado,
+              retrabalhado:  data.retrabalhado,
+              produzidoKg:   data.produzidoKg,
+              opId:          data.opId,
+              syncRunId:     data.syncRunId,
             },
           });
           // Prisma upsert não informa se foi create ou update — comparamos datas
