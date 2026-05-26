@@ -144,6 +144,7 @@ const updateItemSchema = z.object({
   pesoTotal: z.number().min(0).optional(),
   areaPintura: z.number().min(0).optional(),
   ordem: z.number().int().optional(),
+  custoUnitario: z.number().min(0).nullish(),
 });
 
 export async function PATCH(req, { params }) {

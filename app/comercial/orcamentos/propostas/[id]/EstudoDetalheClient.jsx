@@ -1483,6 +1483,7 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
       comprimento: item.comprimento || "",
       pesoUnitario: item.pesoUnitario,
       quantidade: item.quantidade,
+      custoUnitario: item.custoUnitario ?? "",
     });
   };
 
@@ -1493,6 +1494,7 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
       const qtd = parseInt(editValores.quantidade) || 1;
       const pesoTotal = comp > 0 ? pu * comp * qtd : pu * qtd;
 
+      const custoUnit = parseFloat(editValores.custoUnitario) || null;
       const res = await fetch(`/api/comercial/estudo/${estudoId}/itens`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1505,6 +1507,7 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
           quantidade: qtd,
           pesoTotal,
           tipoMaterial: detectTipoMaterial(editValores.descricao),
+          custoUnitario: custoUnit,
         }),
       });
       const json = await res.json();
@@ -1764,7 +1767,27 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                               return fmtNum(c > 0 ? pu * c * q : pu * q, 1);
                             })()}
                           </td>
-                          <td colSpan={2}></td>
+                          <td className="px-2 py-2 text-right">
+                            <input
+                              type="number"
+                              value={editValores.custoUnitario}
+                              onChange={(e) => setEditValores((p) => ({ ...p, custoUnitario: e.target.value }))}
+                              className="w-20 px-1.5 py-1 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-torg-blue"
+                              step="0.01"
+                              min="0"
+                              placeholder="R$/kg"
+                            />
+                          </td>
+                          <td className="px-2 py-2.5 text-right text-xs text-torg-dark whitespace-nowrap">
+                            {(() => {
+                              const pu = parseFloat(editValores.pesoUnitario) || 0;
+                              const c = parseFloat(editValores.comprimento) || 0;
+                              const q = parseInt(editValores.quantidade) || 1;
+                              const peso = c > 0 ? pu * c * q : pu * q;
+                              const custo = parseFloat(editValores.custoUnitario) || 0;
+                              return custo > 0 ? fmtMoeda(custo * peso) : "—";
+                            })()}
+                          </td>
                           <td className="px-2 py-2.5">
                             <div className="flex items-center gap-1">
                               <button
