@@ -1809,3 +1809,17 @@ enum RecebimentoOrigem {
   MANUAL    // usuario registrou manualmente
   OMIE_SYNC // detectado automaticamente pelo sync
 }
+
+// ─── CONFIGURAÇÃO DO ASSISTENTE IA (Torguinho) ──────────────────────────────
+
+model ConfigAssistente {
+  id                 String   @id @default(cuid())
+  ativo              Boolean  @default(true)
+  // Módulos que podem usar o chat. Vazio = todos os módulos habilitados.
+  modulosHabilitados String[] @default([])
+  // claude-haiku-4-5 (barato) ou claude-sonnet-4-5 (mais capaz)
+  modelo             String   @default("claude-haiku-4-5")
+  // Instrução extra adicionada ao final do system prompt
+  instrucaoExtra     String?
+  updatedAt          DateTime @updatedAt
+}

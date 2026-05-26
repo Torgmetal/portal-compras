@@ -85,13 +85,31 @@ export default function TorguinhoChat() {
   const [input,      setInput]      = useState("");
   const [carregando, setCarregando] = useState(false);
   const [iniciado,   setIniciado]   = useState(false);
+  const [config,     setConfig]     = useState(null); // null = ainda carregando
 
-  const fimRef    = useRef(null);
-  const inputRef  = useRef(null);
-  const abortRef  = useRef(null);
+  const fimRef   = useRef(null);
+  const inputRef = useRef(null);
 
-  // Só mostra para usuários autenticados
-  if (status !== "authenticated") return null;
+  // Carrega config ao montar
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    fetch("/api/assistente/config")
+      .then(r => r.json())
+      .then(setConfig)
+      .catch(() => setConfig({ ativo: true, modulosHabilitados: [] }));
+  }, [status]);
+
+  // Só mostra para usuários autenticados com config carregada e ativo
+  if (status !== "authenticated" || !config) return null;
+  if (!config.ativo) return null;
+
+  // Verifica restrição de módulo
+  const user = session?.user;
+  if (config.modulosHabilitados?.length > 0 && user?.tipo !== "ADMIN") {
+    const userModulos = user?.modulos ?? [];
+    const temAcesso = config.modulosHabilitados.some(m => userModulos.includes(m));
+    if (!temAcesso) return null;
+  }
 
   const nome = session?.user?.name?.split(" ")[0] || "colega";
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSession } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import { getToolsParaUser } from "@/lib/assistente/tools";
 import { executarTool } from "@/lib/assistente/executar-tools";
 import { buildSystemPrompt } from "@/lib/assistente/system-prompt";
@@ -10,8 +11,8 @@ export const maxDuration = 60;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Modelo barato e rápido — ideal para chat conversacional
-const MODELO = "claude-haiku-4-5";
+// Modelo padrão — pode ser sobrescrito pela ConfigAssistente no banco
+const MODELO_DEFAULT = "claude-haiku-4-5";
 
 // Máximo de mensagens do histórico enviadas ao Claude (controle de custo)
 const MAX_HISTORICO = 20;
@@ -46,9 +47,17 @@ export async function POST(req) {
     content: String(m.content || ""),
   }));
 
+  // ─── Carrega config do banco (modelo + instrução extra) ───────
+  let configDb = null;
+  try {
+    configDb = await prisma.configAssistente.findFirst();
+  } catch { /* usa defaults se banco indisponível */ }
+
+  const modelo = configDb?.modelo || MODELO_DEFAULT;
+
   // ─── Ferramentas disponíveis para este usuário ─────────────────
   const tools = getToolsParaUser(user);
-  const systemPrompt = buildSystemPrompt(user);
+  const systemPrompt = buildSystemPrompt(user, configDb?.instrucaoExtra);
 
   // ─── Loop de tool use ──────────────────────────────────────────
   let messages = [...historico];
@@ -59,7 +68,7 @@ export async function POST(req) {
     rodada++;
 
     const response = await anthropic.messages.create({
-      model:      MODELO,
+      model:      modelo,
       max_tokens: 1024,
       system:     systemPrompt,
       tools,
