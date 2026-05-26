@@ -1856,7 +1856,12 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                             {fmtNum(item.pesoTotal, 1)}
                           </td>
                           <td className="px-2 py-2 text-right text-xs whitespace-nowrap">
-                            {editandoCustoId === item.id ? (
+                            {item.codigoOmie ? (
+                              // Omie: valor fixo, não editável
+                              <span className="text-torg-gray">
+                                {item.custoUnitario > 0 ? fmtNum(item.custoUnitario, 2) : "—"}
+                              </span>
+                            ) : editandoCustoId === item.id ? (
                               <div className="flex items-center justify-end gap-1">
                                 <input
                                   type="number"
@@ -1881,7 +1886,7 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                                 title="Clique para editar R$/kg"
                               >
                                 {item.custoUnitario > 0
-                                  ? <>{fmtNum(item.custoUnitario, 2)}{!item.codigoOmie && <span className="text-amber-500 ml-0.5" title="Estimado (sem cadastro Omie)">*</span>}</>
+                                  ? <>{fmtNum(item.custoUnitario, 2)}<span className="text-amber-500 ml-0.5" title="Manual (sem cadastro Omie)">*</span></>
                                   : <span className="text-gray-300">editar</span>
                                 }
                               </span>
