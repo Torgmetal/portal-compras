@@ -2,17 +2,34 @@
 import { useState, useMemo } from "react";
 import { Save, Loader2, Info, ChevronDown } from "lucide-react";
 
-// ── Tipos de obra com Hh/ton padrão ──
+// ── Tipos de obra com Hh/ton padrão (fonte: TORG_Modelo_Completo.xlsx — aba Manual) ──
 const TIPOS_OBRA = [
-  { id: "PIPE_RACK", label: "Pipe Rack", hhTon: 20.0 },
-  { id: "ESTRUTURAL_PESADA", label: "Estrutural Pesada (>=500kg)", hhTon: 20.4 },
-  { id: "ESTRUTURAL_MEDIA", label: "Estrutural Media (150-500kg)", hhTon: 22.2 },
-  { id: "COBERTURA_ALMA_CHEIA", label: "Cobertura Alma Cheia", hhTon: 25.7 },
-  { id: "ESTRUTURAL_LEVE", label: "Estrutural Leve (<150kg)", hhTon: 28.6 },
-  { id: "COBERTURA_TRELICADA", label: "Cobertura Trelicada", hhTon: 34.7 },
-  { id: "GUARDA_CORPO_ESCADA", label: "Guarda-corpo / Escada", hhTon: 41.7 },
-  { id: "ACESSOS_INDUSTRIAIS", label: "Acessos Industriais", hhTon: 50.0 },
-  { id: "SUPORTES_ESPECIAIS", label: "Suportes Especiais", hhTon: 82.3 },
+  // 1. Estruturas Treliçadas
+  { id: "TRELICADA_EXTRA_PESADA", label: "Treliçada Extra Pesada (100+ kg/m)", hhTon: 22.2, grupo: "Treliçada" },
+  { id: "TRELICADA_PESADA",       label: "Treliçada Pesada (60–100 kg/m)",     hhTon: 28.6, grupo: "Treliçada" },
+  { id: "TRELICADA_MEDIA",        label: "Treliçada Média (25–60 kg/m)",       hhTon: 45.5, grupo: "Treliçada" },
+  { id: "TRELICADA_LEVE",         label: "Treliçada Leve (10–25 kg/m)",        hhTon: 66.7, grupo: "Treliçada" },
+  { id: "TRELICADA_EXTRA_LEVE",   label: "Treliçada Extra Leve (0–10 kg/m)",   hhTon: 125,  grupo: "Treliçada" },
+  // 2. Estruturas Alma Cheia
+  { id: "ALMA_CHEIA_EXTRA_PESADA", label: "Alma Cheia Extra Pesada (100+ kg/m)", hhTon: 18.2, grupo: "Alma Cheia" },
+  { id: "ALMA_CHEIA_PESADA",       label: "Alma Cheia Pesada (60–100 kg/m)",     hhTon: 22.2, grupo: "Alma Cheia" },
+  { id: "ALMA_CHEIA_MEDIA",        label: "Alma Cheia Média (25–60 kg/m)",       hhTon: 28.6, grupo: "Alma Cheia" },
+  { id: "ALMA_CHEIA_LEVE",         label: "Alma Cheia Leve (10–25 kg/m)",        hhTon: 40,   grupo: "Alma Cheia" },
+  { id: "ALMA_CHEIA_EXTRA_LEVE",   label: "Alma Cheia Extra Leve (0–10 kg/m)",   hhTon: 66.7, grupo: "Alma Cheia" },
+  // 3. Suportes
+  { id: "SUPORTE_EXTRA_PESADO", label: "Suporte Extra Pesado (100+ kg/m)",  hhTon: 20,   grupo: "Suportes" },
+  { id: "SUPORTE_PESADO",       label: "Suporte Pesado (60–100 kg/m)",      hhTon: 33.3, grupo: "Suportes" },
+  { id: "SUPORTE_MEDIO",        label: "Suporte Médio (25–60 kg/m)",        hhTon: 50,   grupo: "Suportes" },
+  { id: "SUPORTE_LEVE",         label: "Suporte Leve (10–25 kg/m)",         hhTon: 66.7, grupo: "Suportes" },
+  { id: "SUPORTE_EXTRA_LEVE",   label: "Suporte Extra Leve (0–10 kg/m)",    hhTon: 100,  grupo: "Suportes" },
+  // 4. Spools (Tubulação Industrial)
+  { id: "SPOOL_PESADO", label: "Spool Pesado (14\"–24\")", hhTon: 66.7, grupo: "Spools" },
+  { id: "SPOOL_MEDIO",  label: "Spool Médio (6\"–14\")",   hhTon: 76.9, grupo: "Spools" },
+  { id: "SPOOL_LEVE",   label: "Spool Leve (até 6\")",     hhTon: 100,  grupo: "Spools" },
+  // 5. Acessos Industriais
+  { id: "GUARDA_CORPO", label: "Guarda-corpo",  hhTon: 41.7, grupo: "Acessos" },
+  { id: "ESCADA",       label: "Escada",        hhTon: 45.5, grupo: "Acessos" },
+  { id: "CORRIMAO",     label: "Corrimão",      hhTon: 55.6, grupo: "Acessos" },
 ];
 
 // ── Premissas da fábrica (fixas, exibidas como referência) ──
@@ -31,55 +48,75 @@ PREMISSAS.horasHomemMes = PREMISSAS.horasDia * PREMISSAS.diasMes * PREMISSAS.pes
 // Custo Hh considera APENAS a folha (mão de obra direta)
 PREMISSAS.custoHh = PREMISSAS.custoFolhaMes / PREMISSAS.horasHomemMes;
 
-// ── Detalhamento por tipo (famílias internas para referência) ──
+// ── Detalhamento por tipo (exemplos e aplicações da planilha Manual) ──
 const DETALHE_TIPOS = {
-  PIPE_RACK: [
-    { familia: "Viga Pesada", kgHh: 55 },
-    { familia: "Coluna Pesada", kgHh: 50 },
-    { familia: "Viga Leve", kgHh: 42 },
-    { familia: "Tirante / Contraventamento", kgHh: 38 },
+  // Treliçadas
+  TRELICADA_EXTRA_PESADA: [
+    { familia: "W360x122, W410x149, VS600", kgHh: 45, nota: "Treliças especiais, pontes rolantes" },
   ],
-  ESTRUTURAL_PESADA: [
-    { familia: "Tala / Chapa", kgHh: 64 },
-    { familia: "Viga Pesada (>300kg)", kgHh: 51 },
-    { familia: "Coluna Pesada (>300kg)", kgHh: 49 },
-    { familia: "Viga Media", kgHh: 45 },
-    { familia: "Coluna Media", kgHh: 43 },
+  TRELICADA_PESADA: [
+    { familia: "W250x73, W310x79, HP310x79", kgHh: 35, nota: "Treliças principais, pórticos" },
   ],
-  ESTRUTURAL_MEDIA: [
-    { familia: "Viga (150-300kg)", kgHh: 45 },
-    { familia: "Coluna (150-300kg)", kgHh: 43 },
-    { familia: "Diagonal / Tirante", kgHh: 38 },
-    { familia: "Cantoneira Ligacao", kgHh: 23 },
+  TRELICADA_MEDIA: [
+    { familia: "L 4\"x1/2\", U 8\", W200x22.5", kgHh: 22, nota: "Treliças pipe rack, suportes grandes" },
   ],
-  ESTRUTURAL_LEVE: [
-    { familia: "Perfil <150kg", kgHh: 35 },
-    { familia: "Terça / Longarinas", kgHh: 30 },
-    { familia: "Contraventamento", kgHh: 28 },
+  TRELICADA_LEVE: [
+    { familia: "L 2\"x1/4\", L 3\"x3/8\", U 4\", W150x13", kgHh: 15, nota: "Treliças cobertura, travamentos" },
   ],
-  COBERTURA_ALMA_CHEIA: [
-    { familia: "Viga Principal", kgHh: 42 },
-    { familia: "Terça", kgHh: 35 },
-    { familia: "Tirante / Mao francesa", kgHh: 30 },
+  TRELICADA_EXTRA_LEVE: [
+    { familia: "L 1\"x1/8\", L 1.1/2\"x3/16\", Tubo Ø48", kgHh: 8, nota: "Treliças leves, suportes tubulares" },
   ],
-  COBERTURA_TRELICADA: [
-    { familia: "Banzo Superior", kgHh: 32 },
-    { familia: "Banzo Inferior", kgHh: 30 },
-    { familia: "Diagonal / Montante", kgHh: 25 },
+  // Alma Cheia
+  ALMA_CHEIA_EXTRA_PESADA: [
+    { familia: "W530x85, W610x101, VS600", kgHh: 55, nota: "Colunas principais, vigas de rolamento" },
   ],
-  GUARDA_CORPO_ESCADA: [
-    { familia: "Guarda-corpo", kgHh: 22 },
-    { familia: "Escada marinheiro", kgHh: 20 },
-    { familia: "Escada c/ lance", kgHh: 25 },
+  ALMA_CHEIA_PESADA: [
+    { familia: "W310x79, W360x72, W410x85", kgHh: 45, nota: "Colunas, vigas principais" },
   ],
-  ACESSOS_INDUSTRIAIS: [
-    { familia: "Plataforma", kgHh: 22 },
-    { familia: "Passarela", kgHh: 20 },
-    { familia: "Suporte de tubulacao", kgHh: 18 },
+  ALMA_CHEIA_MEDIA: [
+    { familia: "W200x46.1(H), W250x44.8, W310x44.5", kgHh: 35, nota: "Vigas principais, tesouras" },
   ],
-  SUPORTES_ESPECIAIS: [
-    { familia: "Suporte c/ detalhe especial", kgHh: 12 },
-    { familia: "Pecas pequenas avulsas", kgHh: 10 },
+  ALMA_CHEIA_LEVE: [
+    { familia: "W200x22.5, W200x31.3", kgHh: 25, nota: "Vigas secundárias, longarinas" },
+  ],
+  ALMA_CHEIA_EXTRA_LEVE: [
+    { familia: "W150x13, W150x22.5(H)", kgHh: 15, nota: "Terças, travamentos leves" },
+  ],
+  // Suportes
+  SUPORTE_EXTRA_PESADO: [
+    { familia: "Estruturas suporte pesadas", kgHh: 50, nota: "Bases de equipamentos pesados" },
+  ],
+  SUPORTE_PESADO: [
+    { familia: "Pórticos grandes, treliças suporte", kgHh: 30, nota: "Suportes de vasos, caldeira" },
+  ],
+  SUPORTE_MEDIO: [
+    { familia: "W200x46.1(H), pórticos", kgHh: 20, nota: "Suportes de equipamento, selas" },
+  ],
+  SUPORTE_LEVE: [
+    { familia: "W150x13+chapas, consoles", kgHh: 15, nota: "Suportes de tubulação, berços" },
+  ],
+  SUPORTE_EXTRA_LEVE: [
+    { familia: "Mísulas, cantoneiras, U pequeno", kgHh: 10, nota: "Suportes de tubulação simples" },
+  ],
+  // Spools
+  SPOOL_PESADO: [
+    { familia: "Tubulação 14\"–24\"", kgHh: 15, nota: "Processo principal, adutoras" },
+  ],
+  SPOOL_MEDIO: [
+    { familia: "Tubulação 6\"–14\"", kgHh: 13, nota: "Processo, vapor" },
+  ],
+  SPOOL_LEVE: [
+    { familia: "Tubulação até 6\"", kgHh: 10, nota: "Utilidades, instrumentação" },
+  ],
+  // Acessos
+  GUARDA_CORPO: [
+    { familia: "Montantes, travessas, rodapé (Tubo Ø48+Ø27)", kgHh: 24, nota: "Plataformas, passarelas" },
+  ],
+  ESCADA: [
+    { familia: "Longarinas, degraus (Chapa 9,5mm+grade piso)", kgHh: 22, nota: "Acesso entre níveis" },
+  ],
+  CORRIMAO: [
+    { familia: "Corrimão superior, intermediário (Tubo Ø48+Ø27)", kgHh: 18, nota: "Escadas, rampas" },
   ],
 };
 
@@ -167,10 +204,14 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-torg-dark appearance-none cursor-pointer focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue transition-all"
               >
                 <option value="">Selecione o tipo de obra...</option>
-                {TIPOS_OBRA.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label} — {t.hhTon} Hh/ton
-                  </option>
+                {["Treliçada", "Alma Cheia", "Suportes", "Spools", "Acessos"].map((grupo) => (
+                  <optgroup key={grupo} label={`── ${grupo}`}>
+                    {TIPOS_OBRA.filter((t) => t.grupo === grupo).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label} — {t.hhTon} Hh/ton
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
               <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
@@ -295,9 +336,10 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
             <table className="w-full">
               <thead>
                 <tr className="text-left text-xs text-torg-gray bg-gray-50/60 border-b border-gray-100">
-                  <th className="py-2.5 px-4 font-medium">Familia</th>
+                  <th className="py-2.5 px-4 font-medium">Exemplos de Perfis</th>
+                  <th className="py-2.5 px-4 font-medium">Aplicação</th>
                   <th className="py-2.5 px-4 font-medium text-right">kg/Hh</th>
-                  <th className="py-2.5 px-4 font-medium text-right">Hh/ton equiv.</th>
+                  <th className="py-2.5 px-4 font-medium text-right">Hh/ton</th>
                   <th className="py-2.5 px-4 font-medium text-right">R$/kg</th>
                 </tr>
               </thead>
@@ -308,6 +350,7 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
                   return (
                     <tr key={d.familia} className="hover:bg-gray-50/30 transition-colors">
                       <td className="py-2.5 px-4 text-sm text-torg-dark">{d.familia}</td>
+                      <td className="py-2.5 px-4 text-sm text-torg-gray">{d.nota}</td>
                       <td className="py-2.5 px-4 text-right text-sm tabular-nums">{fmtNum(d.kgHh, 1)}</td>
                       <td className="py-2.5 px-4 text-right text-sm tabular-nums text-torg-gray">{fmtNum(hhTonEquiv, 1)}</td>
                       <td className="py-2.5 px-4 text-right text-sm tabular-nums font-medium">R$ {fmtNum(custoKg)}</td>
