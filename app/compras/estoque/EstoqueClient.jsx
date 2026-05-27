@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -18,6 +18,12 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
   const router = useRouter();
   const [itens, setItens] = useState(itensIniciais || []);
   const [config, setConfig] = useState(configInicial);
+
+  // Sincroniza estado local quando o server re-renderiza após router.refresh()
+  // (useState só usa o valor inicial uma vez; precisamos de useEffect para receber
+  //  os novos itensIniciais vindos do server após sync)
+  useEffect(() => { setItens(itensIniciais || []); }, [itensIniciais]);
+  useEffect(() => { setConfig(configInicial); }, [configInicial]);
 
   // ── Filtros ────────────────────────────────────────────────────────────────
   const [busca, setBusca] = useState("");

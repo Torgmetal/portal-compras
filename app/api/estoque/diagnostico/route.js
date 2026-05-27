@@ -99,66 +99,72 @@ export async function GET() {
   // 2) Testes críticos: variaçoes de ListarProdutos para descobrir o que funciona
   resultado.testesComFiltro = [];
 
-  // 2a) Com família real (código numérico do ConsultarProduto — "Tinta e Solvente")
-  // Se retornar produtos, a abordagem por família funciona com códigos numéricos
-  const familiaRealTeste = "7318288399"; // codigo_familia retornado pelo ConsultarProduto
+  // 2a) ListarProdutos com filtro de data — pode contornar erro 4474
+  // A hipotese: sem filtro o Omie tenta retornar TODOS os produtos e bate em um
+  // produto corrompido antes de paginar. Com filtro de data, talvez pule o corrompido.
   {
-    const teste = { categoria: familiaRealTeste, descricao: "codigo real (Tinta e Solvente)" };
+    const hoje = new Date();
+    const dtFinal = `${String(hoje.getDate()).padStart(2,"0")}/${String(hoje.getMonth()+1).padStart(2,"0")}/${hoje.getFullYear()}`;
+    const teste = { categoria: "data_2020", descricao: "ListarProdutos filtrar_por_data_de 01/01/2020" };
     try {
       const data = await callOmie(OMIE_PROD_URL, {
         call: "ListarProdutos",
         app_key: APP_KEY, app_secret: APP_SECRET,
-        param: [{ pagina: 1, registros_por_pagina: 3, filtrar_apenas_familia: familiaRealTeste }],
+        param: [{ pagina: 1, registros_por_pagina: 5, filtrar_por_data_de: "01/01/2020", filtrar_por_data_ate: dtFinal }],
       });
-      const lista = data.produto_servico_cadastro || [];
+      const lista = data.produto_servico_cadastro || data.registros || [];
       teste.ok = true;
       teste.totalNaPagina = lista.length;
       teste.totalRegistros = Number(data.total_de_registros) || null;
       teste.totalPaginas = Number(data.total_de_paginas) || null;
-      teste.exemplo = lista[0] ? { codigo: lista[0].codigo, descricao: lista[0].descricao, codigo_familia: lista[0].codigo_familia, descricao_familia: lista[0].descricao_familia } : null;
+      teste.camposResposta = Object.keys(data);
+      teste.exemplo = lista[0] ? { codigo: lista[0].codigo, descricao: lista[0].descricao, codigo_familia: lista[0].codigo_familia } : null;
     } catch (e) { teste.ok = false; teste.erro = e.message; }
     resultado.testesComFiltro.push(teste);
   }
 
-  // 2b) SEM apenas_importado_api (omitido) — pode ser que "N" estava filtrando errado
+  // 2b) ListarProdutos com filtrar_apenas_tipo: "P" (só produtos, nao servicos)
   {
-    const teste = { categoria: "sem_filtro_importado", descricao: "ListarProdutos sem apenas_importado_api" };
+    const teste = { categoria: "tipo_P", descricao: "ListarProdutos filtrar_apenas_tipo P" };
     try {
       const data = await callOmie(OMIE_PROD_URL, {
         call: "ListarProdutos",
         app_key: APP_KEY, app_secret: APP_SECRET,
-        param: [{ pagina: 1, registros_por_pagina: 3 }],
+        param: [{ pagina: 1, registros_por_pagina: 5, filtrar_apenas_tipo: "P" }],
       });
-      const lista = data.produto_servico_cadastro || [];
+      const lista = data.produto_servico_cadastro || data.registros || [];
       teste.ok = true;
       teste.totalNaPagina = lista.length;
       teste.totalRegistros = Number(data.total_de_registros) || null;
       teste.totalPaginas = Number(data.total_de_paginas) || null;
-      teste.exemplo = lista[0] ? { codigo: lista[0].codigo, descricao: lista[0].descricao, codigo_familia: lista[0].codigo_familia, descricao_familia: lista[0].descricao_familia } : null;
+      teste.exemplo = lista[0] ? { codigo: lista[0].codigo, descricao: lista[0].descricao } : null;
     } catch (e) { teste.ok = false; teste.erro = e.message; }
     resultado.testesComFiltro.push(teste);
   }
 
-  // 2c) apenas_importado_api: "S" (só produtos importados via API)
+  // 2c) ListarProdutosResumido com filtro de data
   {
-    const teste = { categoria: "importado_api_S", descricao: "apenas_importado_api: S" };
+    const hoje = new Date();
+    const dtFinal = `${String(hoje.getDate()).padStart(2,"0")}/${String(hoje.getMonth()+1).padStart(2,"0")}/${hoje.getFullYear()}`;
+    const teste = { categoria: "resumido_data_2020", descricao: "ListarProdutosResumido filtrar_por_data_de 01/01/2020" };
     try {
       const data = await callOmie(OMIE_PROD_URL, {
-        call: "ListarProdutos",
+        call: "ListarProdutosResumido",
         app_key: APP_KEY, app_secret: APP_SECRET,
-        param: [{ pagina: 1, registros_por_pagina: 3, apenas_importado_api: "S" }],
+        param: [{ pagina: 1, registros_por_pagina: 5, filtrar_por_data_de: "01/01/2020", filtrar_por_data_ate: dtFinal }],
       });
-      const lista = data.produto_servico_cadastro || [];
+      const lista = data.produto_servico_resumido || data.produto_resumido || data.registros || [];
       teste.ok = true;
       teste.totalNaPagina = lista.length;
       teste.totalRegistros = Number(data.total_de_registros) || null;
       teste.totalPaginas = Number(data.total_de_paginas) || null;
-      teste.exemplo = lista[0] ? { codigo: lista[0].codigo, descricao: lista[0].descricao, codigo_familia: lista[0].codigo_familia, descricao_familia: lista[0].descricao_familia } : null;
+      teste.camposResposta = Object.keys(data);
+      teste.exemplo = lista[0] || null;
     } catch (e) { teste.ok = false; teste.erro = e.message; }
     resultado.testesComFiltro.push(teste);
   }
 
-  // 2d) ConsultarProduto por código EXTERNO — testa produto Materia Prima conhecido
+  // 2d) ConsultarProduto por código EXTERNO — Materia Prima familia 7318288389
   {
     const teste = { categoria: "consultar_101000047", descricao: "ConsultarProduto CHAPA AÇO (codigo externo)" };
     try {
@@ -172,6 +178,28 @@ export async function GET() {
       teste.codigo_familia = data.codigo_familia;
       teste.descricao_familia = data.descricao_familia;
       teste.inativo = data.inativo;
+      teste.nCodProd = data.codigo_produto;
+    } catch (e) { teste.ok = false; teste.erro = e.message; }
+    resultado.testesComFiltro.push(teste);
+  }
+
+  // 2e) ObterEstoqueProduto via /estoque/resumo/ — endpoint alternativo que pode
+  // retornar lista de produtos quando xCodigo bate em varios. Testa com letra "A".
+  {
+    const OMIE_RESUMO_URL = "https://app.omie.com.br/api/v1/estoque/resumo/";
+    const teste = { categoria: "ObterEstoqueProduto_A", descricao: "ObterEstoqueProduto xCodigo=A (busca ampla)" };
+    try {
+      const data = await callOmie(OMIE_RESUMO_URL, {
+        call: "ObterEstoqueProduto",
+        app_key: APP_KEY, app_secret: APP_SECRET,
+        param: [{ xCodigo: "A" }],
+      });
+      // Quando bate em varios, retorna lista; quando bate em um, retorna detalhe
+      const lista = data.produto_servico_cadastro || data.produtos || data.lista || [];
+      teste.ok = true;
+      teste.camposResposta = Object.keys(data);
+      teste.totalNaPagina = Array.isArray(lista) ? lista.length : null;
+      teste.exemplo = Array.isArray(lista) ? lista[0] : data; // se retornou produto unico, mostra completo
     } catch (e) { teste.ok = false; teste.erro = e.message; }
     resultado.testesComFiltro.push(teste);
   }
