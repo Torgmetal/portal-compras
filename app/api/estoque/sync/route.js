@@ -27,14 +27,14 @@ export async function POST(req) {
     try {
       resultado.produtos = await sincronizarProdutos();
     } catch (e) {
-      resultado.produtos = { error: e.message };
+      resultado.produtos = { error: String(e?.message || e) };
     }
   }
   if (fazMovs) {
     try {
       resultado.movimentacoes = await sincronizarMovimentacoes(diasAtras);
     } catch (e) {
-      resultado.movimentacoes = { error: e.message };
+      resultado.movimentacoes = { error: String(e?.message || e) };
     }
   }
 

@@ -93,7 +93,13 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
     try {
       const res = await fetch("/api/estoque/diagnostico");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) {
+        // Vercel pode retornar { error: { message: "..." } } em vez de { error: "string" }
+        const errMsg = typeof data.error === "string"
+          ? data.error
+          : (data.error?.message || JSON.stringify(data.error) || "Erro");
+        throw new Error(errMsg);
+      }
       setDiagnostico(data);
     } catch (e) {
       setErro(e.message);
