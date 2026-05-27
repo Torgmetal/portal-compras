@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
-  Trash2, Upload, FileSpreadsheet, X, Wrench, Building2, Plus,
+  Trash2, Upload, FileSpreadsheet, X, Columns3, Building2, Plus,
 } from "lucide-react";
 import {
   labelCategoria,
@@ -24,7 +24,7 @@ const TIPOS_RM = [
     codigo: "ENGENHARIA",
     label: "Engenharia",
     desc: "Lista do Tekla pra fabricação. Vincula OP e tipo de material do escopo.",
-    icon: Wrench,
+    icon: Columns3,
     cor: "torg-blue",
   },
   {
