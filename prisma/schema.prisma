@@ -26,6 +26,7 @@ enum Modulo {
   ALMOXARIFADO
   FINANCEIRO
   EXPEDICAO
+  RH
 }
 
 model User {
@@ -1054,6 +1055,192 @@ model Notificacao {
   @@index([lida])
   @@index([createdAt])
   @@index([tipo])
+}
+
+// ─── RH — RECURSOS HUMANOS ──────────────────────────────────
+
+model Setor {
+  id            String   @id @default(cuid())
+  nome          String   @unique
+  sigla         String?
+  cor           String?  // pra organograma
+  gestorId      String?
+  gestor        Funcionario? @relation("GestorSetor", fields: [gestorId], references: [id])
+  funcionarios  Funcionario[] @relation("FuncionarioSetor")
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Cargo {
+  id            String   @id @default(cuid())
+  nome          String
+  nivel         String?  // OPERACIONAL, TECNICO, SUPERVISAO, GERENCIA, DIRETORIA
+  categoria     String?  // agrupamento (ex: Produção, Administrativo, Engenharia)
+  salarioBase   Float?
+  cbo           String?  // Classificação Brasileira de Ocupações
+  funcionarios  Funcionario[]
+  competencias  CargoCompetencia[]
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([nivel])
+  @@index([categoria])
+}
+
+model Funcionario {
+  id              String    @id @default(cuid())
+  nome            String
+  cpf             String?   @unique
+  rg              String?
+  dataNascimento  DateTime?
+  email           String?
+  telefone        String?
+  endereco        String?
+  cidadeUF        String?
+  // Vínculo empregatício
+  matricula       String?   @unique
+  dataAdmissao    DateTime
+  dataDemissao    DateTime?
+  setorId         String
+  setor           Setor     @relation("FuncionarioSetor", fields: [setorId], references: [id])
+  cargoId         String
+  cargo           Cargo     @relation(fields: [cargoId], references: [id])
+  salario         Float?
+  tipoContrato    String    @default("CLT") // CLT, PJ, ESTAGIO, JOVEM_APRENDIZ, TEMPORARIO
+  jornadaHoras    Int       @default(44)    // horas semanais
+  turno           String?   // ADMINISTRATIVO, PRODUCAO_1, PRODUCAO_2, NOTURNO
+  // Status
+  status          String    @default("ATIVO") // ATIVO, AFASTADO, FERIAS, DEMITIDO
+  ativo           Boolean   @default(true)
+  foto            String?
+  observacao      String?
+
+  setoresGeridos  Setor[]   @relation("GestorSetor")
+  pontos          Ponto[]
+  ferias          Ferias[]
+  beneficios      FuncionarioBeneficio[]
+  competencias    FuncionarioCompetencia[]
+  dependentes     Dependente[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([setorId])
+  @@index([cargoId])
+  @@index([status])
+  @@index([ativo])
+}
+
+model Dependente {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  nome            String
+  parentesco      String    // CONJUGE, FILHO, FILHA, OUTROS
+  dataNascimento  DateTime?
+  cpf             String?
+  createdAt       DateTime  @default(now())
+
+  @@index([funcionarioId])
+}
+
+model Ponto {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  data            DateTime  @db.Date
+  entrada1        String?   // HH:mm
+  saida1          String?
+  entrada2        String?
+  saida2          String?
+  horasTrabalhadas Float?
+  horasExtras     Float     @default(0)
+  bancoHoras      Float     @default(0) // acumulado positivo/negativo
+  tipo            String    @default("NORMAL") // NORMAL, FALTA, ATESTADO, COMPENSACAO, FERIADO
+  observacao      String?
+  createdAt       DateTime  @default(now())
+
+  @@unique([funcionarioId, data])
+  @@index([data])
+}
+
+model Ferias {
+  id                  String    @id @default(cuid())
+  funcionarioId       String
+  funcionario         Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  periodoAquisInicio  DateTime  // inicio do periodo aquisitivo
+  periodoAquisFim     DateTime  // fim do periodo aquisitivo
+  dataInicio          DateTime? // inicio do gozo
+  dataFim             DateTime? // fim do gozo
+  diasGozo            Int?
+  diasVendidos        Int       @default(0) // abono pecuniario
+  status              String    @default("PENDENTE") // PENDENTE, AGENDADO, EM_GOZO, CONCLUIDO, VENCIDO
+  observacao          String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([funcionarioId])
+  @@index([status])
+}
+
+model Beneficio {
+  id            String   @id @default(cuid())
+  nome          String   @unique // VT, VR, VA, PLANO_SAUDE, PLANO_ODONTO, SEGURO_VIDA, etc.
+  tipo          String   // VALE, SAUDE, SEGURO, OUTRO
+  valorPadrao   Float?
+  ativo         Boolean  @default(true)
+  funcionarios  FuncionarioBeneficio[]
+  createdAt     DateTime @default(now())
+}
+
+model FuncionarioBeneficio {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  beneficioId     String
+  beneficio       Beneficio @relation(fields: [beneficioId], references: [id])
+  valorMensal     Float
+  ativo           Boolean   @default(true)
+  dataInicio      DateTime  @default(now())
+  dataFim         DateTime?
+
+  @@unique([funcionarioId, beneficioId])
+}
+
+model Competencia {
+  id          String   @id @default(cuid())
+  nome        String   @unique
+  categoria   String?  // TECNICA, COMPORTAMENTAL, GESTAO, SEGURANCA
+  descricao   String?
+  cargos      CargoCompetencia[]
+  funcionarios FuncionarioCompetencia[]
+  createdAt   DateTime @default(now())
+}
+
+model CargoCompetencia {
+  id              String    @id @default(cuid())
+  cargoId         String
+  cargo           Cargo     @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  competenciaId   String
+  competencia     Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  nivelEsperado   Int       @default(3) // 1-5
+
+  @@unique([cargoId, competenciaId])
+}
+
+model FuncionarioCompetencia {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  competenciaId   String
+  competencia     Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  nivelAtual      Int       @default(1) // 1-5
+  avaliadoEm      DateTime?
+  avaliadoPor     String?
+
+  @@unique([funcionarioId, competenciaId])
 }
 
 // ─── ESTOQUE TORG ──────────────────────────────────────────

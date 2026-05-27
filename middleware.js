@@ -59,6 +59,7 @@ export default withAuth(
         if (path.startsWith("/expedicao")  && !temModulo("EXPEDICAO"))   return false;
         if (path.startsWith("/producao")   && !temModulo("PRODUCAO"))    return false;
         if (path.startsWith("/rm")         && !temModulo("ENGENHARIA", "ALMOXARIFADO"))  return false;
+        if (path.startsWith("/rh")         && !temModulo("RH"))            return false;
         if (path.startsWith("/admin")      && !isAdmin)                  return false;
 
         return true;
