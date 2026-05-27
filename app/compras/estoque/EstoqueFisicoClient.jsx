@@ -7,8 +7,7 @@ import {
 
 const fmtPeso = (kg) => {
   if (!kg && kg !== 0) return "—";
-  if (kg >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ton`;
-  return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
+  return `${Number(kg).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
 };
 const fmtQtd = (v) => (v != null ? Number(v).toLocaleString("pt-BR") : "—");
 const fmtDataHora = (d) =>
