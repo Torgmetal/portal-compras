@@ -523,8 +523,26 @@ function DiagnosticoPanel({ diagnostico, onClose }) {
           </div>
         </div>
       ) : (
-        <div className="bg-amber-100 border border-amber-300 rounded p-2 text-xs text-amber-800">
-          ⚠️ ListarFamilias retornou vazio — as famílias vêm diretamente do ListarProdutos.
+        <div className="bg-amber-100 border border-amber-300 rounded p-2 text-xs text-amber-800 space-y-1">
+          <p>⚠️ ListarFamilias retornou vazio.</p>
+          {diagnostico.familiasCamposResposta && (
+            <p className="text-[10px]">Campos da resposta: <span className="font-mono">{diagnostico.familiasCamposResposta.join(", ")}</span></p>
+          )}
+          {diagnostico.familiasTotalRegistros !== undefined && (
+            <p className="text-[10px]">total_de_registros: <strong>{String(diagnostico.familiasTotalRegistros)}</strong></p>
+          )}
+          {diagnostico.familiasRespostaBruta && (
+            <details>
+              <summary className="cursor-pointer text-amber-800 text-[10px]">Ver resposta bruta completa</summary>
+              <pre className="text-[10px] bg-white border border-amber-200 rounded p-2 mt-1 overflow-x-auto max-h-48">{JSON.stringify(diagnostico.familiasRespostaBruta, null, 2)}</pre>
+            </details>
+          )}
+          {diagnostico.familiaExemplo && (
+            <details>
+              <summary className="cursor-pointer text-amber-800 text-[10px]">Ver 1ª família (campos reais)</summary>
+              <pre className="text-[10px] bg-white border border-amber-200 rounded p-2 mt-1 overflow-x-auto">{JSON.stringify(diagnostico.familiaExemplo, null, 2)}</pre>
+            </details>
+          )}
         </div>
       )}
 

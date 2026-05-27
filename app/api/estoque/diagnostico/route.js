@@ -50,7 +50,7 @@ export async function GET() {
 
   const resultado = { categoriasConfig };
 
-  // 1) ListarFamilias — sempre tenta primeiro
+  // 1) ListarFamilias — expõe resposta bruta para identificar campos reais
   try {
     const data = await callOmie(OMIE_FAMILIAS_URL, {
       call: "ListarFamilias",
@@ -58,14 +58,40 @@ export async function GET() {
       app_secret: APP_SECRET,
       param: [{ pagina: 1, registros_por_pagina: 100 }],
     });
-    const lista = data.familia_cadastro || data.familias_cadastro || [];
-    resultado.familias = lista.map((f) => ({
-      codigo: String(f.codigo || f.codigo_familia || f.cCodFamilia || ""),
-      descricao: String(f.descricao || f.cDescricao || ""),
-      inativa: f.inativa === "S" || f.cInativa === "S",
-    }));
-    resultado.totalFamilias = Number(data.total_de_registros) || resultado.familias.length;
-    resultado.totalPaginasFamilias = Number(data.total_de_paginas) || 1;
+    // Expõe todos os campos da resposta para debug
+    resultado.familiasCamposResposta = Object.keys(data);
+    resultado.familiasTotalRegistros = data.total_de_registros ?? data.nTotRegistros ?? null;
+
+    // Tenta todos os campos possíveis onde o array de famílias pode estar
+    const lista =
+      data.familia_cadastro ||
+      data.familias_cadastro ||
+      data.lista_familias ||
+      data.familias ||
+      (Array.isArray(data.registros) ? data.registros : null) ||
+      [];
+
+    if (lista.length > 0) {
+      // Expõe o 1º item bruto para ver os campos reais
+      resultado.familiaExemplo = lista[0];
+      resultado.familias = lista.map((f) => ({
+        codigo: String(
+          f.cCodFamilia || f.nCodFamilia || f.codigo || f.codigo_familia ||
+          f.id || f.cCod || f.cod || ""
+        ),
+        descricao: String(
+          f.cDesFamilia || f.descricao || f.cDescricao || f.nome ||
+          f.cNome || f.descricao_familia || ""
+        ),
+        inativa: f.inativa === "S" || f.cInativa === "S" || f.inativo === "S",
+        _raw: f, // inclui objeto completo para debug
+      }));
+    } else {
+      resultado.familias = [];
+      // Expõe resposta bruta completa quando lista está vazia
+      resultado.familiasRespostaBruta = data;
+    }
+    resultado.totalFamilias = Number(data.total_de_registros || data.nTotRegistros) || lista.length;
   } catch (e) {
     resultado.familiasErro = e.message;
   }
