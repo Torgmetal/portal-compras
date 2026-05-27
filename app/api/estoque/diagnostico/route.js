@@ -96,38 +96,83 @@ export async function GET() {
     resultado.familiasErro = e.message;
   }
 
-  // 2) ListarProdutos COM filtro por familia — uma chamada por categoria configurada
+  // 2) Testes críticos: variaçoes de ListarProdutos para descobrir o que funciona
   resultado.testesComFiltro = [];
-  for (const codigoFamilia of categoriasConfig) {
-    const teste = { categoria: codigoFamilia };
+
+  // 2a) Com família real (código numérico do ConsultarProduto — "Tinta e Solvente")
+  // Se retornar produtos, a abordagem por família funciona com códigos numéricos
+  const familiaRealTeste = "7318288399"; // codigo_familia retornado pelo ConsultarProduto
+  {
+    const teste = { categoria: familiaRealTeste, descricao: "codigo real (Tinta e Solvente)" };
     try {
       const data = await callOmie(OMIE_PROD_URL, {
         call: "ListarProdutos",
-        app_key: APP_KEY,
-        app_secret: APP_SECRET,
-        param: [{
-          pagina: 1,
-          registros_por_pagina: 5,
-          apenas_importado_api: "N",
-          filtrar_apenas_familia: codigoFamilia,
-        }],
+        app_key: APP_KEY, app_secret: APP_SECRET,
+        param: [{ pagina: 1, registros_por_pagina: 3, filtrar_apenas_familia: familiaRealTeste }],
       });
       const lista = data.produto_servico_cadastro || [];
       teste.ok = true;
       teste.totalNaPagina = lista.length;
       teste.totalRegistros = Number(data.total_de_registros) || null;
       teste.totalPaginas = Number(data.total_de_paginas) || null;
-      teste.exemplo = lista[0] ? {
-        codigo: lista[0].codigo,
-        descricao: lista[0].descricao,
-        unidade: lista[0].unidade,
-        codigo_familia: lista[0].codigo_familia,
-        descricao_familia: lista[0].descricao_familia,
-      } : null;
-    } catch (e) {
-      teste.ok = false;
-      teste.erro = e.message;
-    }
+      teste.exemplo = lista[0] ? { codigo: lista[0].codigo, descricao: lista[0].descricao, codigo_familia: lista[0].codigo_familia, descricao_familia: lista[0].descricao_familia } : null;
+    } catch (e) { teste.ok = false; teste.erro = e.message; }
+    resultado.testesComFiltro.push(teste);
+  }
+
+  // 2b) SEM apenas_importado_api (omitido) — pode ser que "N" estava filtrando errado
+  {
+    const teste = { categoria: "sem_filtro_importado", descricao: "ListarProdutos sem apenas_importado_api" };
+    try {
+      const data = await callOmie(OMIE_PROD_URL, {
+        call: "ListarProdutos",
+        app_key: APP_KEY, app_secret: APP_SECRET,
+        param: [{ pagina: 1, registros_por_pagina: 3 }],
+      });
+      const lista = data.produto_servico_cadastro || [];
+      teste.ok = true;
+      teste.totalNaPagina = lista.length;
+      teste.totalRegistros = Number(data.total_de_registros) || null;
+      teste.totalPaginas = Number(data.total_de_paginas) || null;
+      teste.exemplo = lista[0] ? { codigo: lista[0].codigo, descricao: lista[0].descricao, codigo_familia: lista[0].codigo_familia, descricao_familia: lista[0].descricao_familia } : null;
+    } catch (e) { teste.ok = false; teste.erro = e.message; }
+    resultado.testesComFiltro.push(teste);
+  }
+
+  // 2c) apenas_importado_api: "S" (só produtos importados via API)
+  {
+    const teste = { categoria: "importado_api_S", descricao: "apenas_importado_api: S" };
+    try {
+      const data = await callOmie(OMIE_PROD_URL, {
+        call: "ListarProdutos",
+        app_key: APP_KEY, app_secret: APP_SECRET,
+        param: [{ pagina: 1, registros_por_pagina: 3, apenas_importado_api: "S" }],
+      });
+      const lista = data.produto_servico_cadastro || [];
+      teste.ok = true;
+      teste.totalNaPagina = lista.length;
+      teste.totalRegistros = Number(data.total_de_registros) || null;
+      teste.totalPaginas = Number(data.total_de_paginas) || null;
+      teste.exemplo = lista[0] ? { codigo: lista[0].codigo, descricao: lista[0].descricao, codigo_familia: lista[0].codigo_familia, descricao_familia: lista[0].descricao_familia } : null;
+    } catch (e) { teste.ok = false; teste.erro = e.message; }
+    resultado.testesComFiltro.push(teste);
+  }
+
+  // 2d) ConsultarProduto por código EXTERNO — testa produto Materia Prima conhecido
+  {
+    const teste = { categoria: "consultar_101000047", descricao: "ConsultarProduto CHAPA AÇO (codigo externo)" };
+    try {
+      const data = await callOmie(OMIE_PROD_URL, {
+        call: "ConsultarProduto",
+        app_key: APP_KEY, app_secret: APP_SECRET,
+        param: [{ codigo: "101000047" }],
+      });
+      teste.ok = true;
+      teste.descricao_produto = data.descricao;
+      teste.codigo_familia = data.codigo_familia;
+      teste.descricao_familia = data.descricao_familia;
+      teste.inativo = data.inativo;
+    } catch (e) { teste.ok = false; teste.erro = e.message; }
     resultado.testesComFiltro.push(teste);
   }
 
@@ -137,9 +182,8 @@ export async function GET() {
       call: "ListarProdutosResumido",
       app_key: APP_KEY,
       app_secret: APP_SECRET,
-      param: [{ pagina: 1, registros_por_pagina: 3, apenas_importado_api: "N" }],
+      param: [{ pagina: 1, registros_por_pagina: 3 }],
     });
-    // Tenta vários nomes de campo que Omie pode usar
     const lista =
       data.produto_servico_resumido ||
       data.produto_resumido ||
@@ -151,20 +195,20 @@ export async function GET() {
       totalNaPagina: lista.length,
       totalRegistros: Number(data.total_de_registros || data.nTotRegistros) || null,
       totalPaginas:   Number(data.total_de_paginas   || data.nTotPaginas)   || null,
-      camposResposta: Object.keys(data), // expõe nomes reais dos campos
-      exemplo: lista[0] || null,         // mostra 1 produto para inspecionar campos
+      camposResposta: Object.keys(data),
+      exemplo: lista[0] || null,
     };
   } catch (e) {
     resultado.produtosResumido = { ok: false, erro: e.message };
   }
 
-  // 4) ListarProdutos SEM filtro — expõe resposta bruta para debugar
+  // 4) ListarProdutos SEM filtro — sem apenas_importado_api (parâmetro omitido)
   try {
     const data = await callOmie(OMIE_PROD_URL, {
       call: "ListarProdutos",
       app_key: APP_KEY,
       app_secret: APP_SECRET,
-      param: [{ pagina: 1, registros_por_pagina: 3, apenas_importado_api: "N" }],
+      param: [{ pagina: 1, registros_por_pagina: 3 }],
     });
     const lista =
       data.produto_servico_cadastro ||
