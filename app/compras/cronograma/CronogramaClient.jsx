@@ -4,7 +4,8 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, Package, Clock, AlertTriangle,
   CheckCircle2, CalendarDays, Truck, Filter, RefreshCw,
-  ChevronDown, ChevronRight, ExternalLink, ArrowUpDown,
+  ChevronDown, ChevronRight, ExternalLink, List, LayoutGrid,
+  FileText, MapPin,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -23,47 +24,37 @@ const diasAte = (d) => {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 };
 
-const STATUS_PRIORITY = { ATRASADO: 0, PROXIMO: 1, PARCIAL: 2, NO_PRAZO: 3, SEM_PRAZO: 4, ENTREGUE: 5 };
-
 const STATUS_CFG = {
-  ATRASADO:  { label: "Atrasado",     Icon: AlertTriangle, badge: "bg-red-100 text-red-700",     dot: "bg-red-500",     tab: "border-red-300 bg-red-50 text-red-700",     tabActive: "border-red-500 bg-red-100 text-red-800 ring-1 ring-red-300" },
-  PROXIMO:   { label: "Prox. 7 dias", Icon: Clock,         badge: "bg-amber-100 text-amber-700", dot: "bg-amber-500",   tab: "border-amber-300 bg-amber-50 text-amber-700", tabActive: "border-amber-500 bg-amber-100 text-amber-800 ring-1 ring-amber-300" },
-  PARCIAL:   { label: "Parcial",      Icon: Package,       badge: "bg-teal-100 text-teal-700",   dot: "bg-teal-500",    tab: "border-teal-300 bg-teal-50 text-teal-700",   tabActive: "border-teal-500 bg-teal-100 text-teal-800 ring-1 ring-teal-300" },
-  NO_PRAZO:  { label: "No prazo",     Icon: CalendarDays,  badge: "bg-sky-100 text-sky-700",     dot: "bg-torg-blue",   tab: "border-sky-300 bg-sky-50 text-sky-700",     tabActive: "border-sky-500 bg-sky-100 text-sky-800 ring-1 ring-sky-300" },
-  SEM_PRAZO: { label: "Sem prazo",    Icon: Package,       badge: "bg-gray-100 text-gray-600",   dot: "bg-gray-400",    tab: "border-gray-300 bg-gray-50 text-gray-600",   tabActive: "border-gray-500 bg-gray-200 text-gray-800 ring-1 ring-gray-300" },
-  ENTREGUE:  { label: "Entregue",     Icon: CheckCircle2,  badge: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", tab: "border-emerald-300 bg-emerald-50 text-emerald-700", tabActive: "border-emerald-500 bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300" },
+  ATRASADO:  { label: "Atrasado",     Icon: AlertTriangle, cor: "red",     badge: "bg-red-100 text-red-700",         dot: "bg-red-500",     border: "border-red-300",   headerBg: "bg-red-50" },
+  PROXIMO:   { label: "Próx. 7 dias", Icon: Clock,         cor: "amber",   badge: "bg-amber-100 text-amber-700",     dot: "bg-amber-500",   border: "border-amber-300", headerBg: "bg-amber-50" },
+  NO_PRAZO:  { label: "No prazo",     Icon: CalendarDays,  cor: "sky",     badge: "bg-sky-100 text-sky-700",         dot: "bg-torg-blue",   border: "border-sky-300",   headerBg: "bg-sky-50" },
+  SEM_PRAZO: { label: "Sem prazo",    Icon: Package,       cor: "gray",    badge: "bg-gray-100 text-gray-600",       dot: "bg-gray-400",    border: "border-gray-300",  headerBg: "bg-gray-50" },
+  ENTREGUE:  { label: "Entregue",     Icon: CheckCircle2,  cor: "emerald", badge: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", border: "border-emerald-300", headerBg: "bg-emerald-50" },
 };
 
-const COLUNAS_SORT = [
-  { key: "status",       label: "Status" },
-  { key: "prazoEntrega", label: "Prazo" },
-  { key: "fornecedor",   label: "Fornecedor" },
-  { key: "descricao",    label: "Descricao" },
-  { key: "valorBruto",   label: "Valor" },
-];
+const KANBAN_ORDER = ["ATRASADO", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "ENTREGUE"];
 
 export default function CronogramaClient() {
-  const [itens, setItens] = useState([]);
+  const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
-  const [filtroOP, setFiltroOP] = useState("");
-  const [filtroRM, setFiltroRM] = useState("");
   const [filtroFornecedor, setFiltroFornecedor] = useState("");
+  const [filtroOP, setFiltroOP] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [expandido, setExpandido] = useState(null);
   const [registrando, setRegistrando] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
-  const [ordenacao, setOrdenacao] = useState({ campo: "status", dir: "asc" });
+  const [visao, setVisao] = useState("kanban"); // "kanban" | "tabela"
 
   const fetchData = async () => {
     setLoading(true);
     setErro("");
     try {
-      const res = await fetch("/api/compras/cronograma");
+      const res = await fetch("/api/compras/entregas");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao carregar");
-      setItens(data.data || []);
+      setPedidos(data.data || []);
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -89,130 +80,77 @@ export default function CronogramaClient() {
     }
   };
 
-  // Filtros + ordenacao
-  const itensFiltrados = useMemo(() => {
-    let lista = itens;
-    if (filtroOP) lista = lista.filter((it) => it.opId === filtroOP);
-    if (filtroRM) lista = lista.filter((it) => it.rmId === filtroRM);
-    if (filtroFornecedor) lista = lista.filter((it) => it.fornecedor === filtroFornecedor);
-    if (filtroStatus) lista = lista.filter((it) => (it.statusEntrega || "SEM_PRAZO") === filtroStatus);
+  // Filtros
+  const pedidosFiltrados = useMemo(() => {
+    let lista = pedidos;
+    if (filtroFornecedor) lista = lista.filter((p) => p.fornecedor === filtroFornecedor);
+    if (filtroOP) lista = lista.filter((p) => p.opId === filtroOP);
+    if (filtroStatus) lista = lista.filter((p) => p.statusEntrega === filtroStatus);
     return lista;
-  }, [itens, filtroOP, filtroRM, filtroFornecedor, filtroStatus]);
+  }, [pedidos, filtroFornecedor, filtroOP, filtroStatus]);
 
-  // Agrupa por status (pra KPIs e tabs — usa itens SEM filtroStatus)
-  const grupos = useMemo(() => {
-    const base = itens.filter((it) => {
-      if (filtroOP && it.opId !== filtroOP) return false;
-      if (filtroRM && it.rmId !== filtroRM) return false;
-      if (filtroFornecedor && it.fornecedor !== filtroFornecedor) return false;
-      return true;
-    });
-    const map = { ATRASADO: [], PROXIMO: [], PARCIAL: [], NO_PRAZO: [], SEM_PRAZO: [], ENTREGUE: [] };
-    for (const it of base) {
-      const key = it.statusEntrega || "SEM_PRAZO";
-      if (map[key]) map[key].push(it);
-      else map.SEM_PRAZO.push(it);
+  // Agrupados por status (pra kanban — ignora filtroStatus)
+  const gruposKanban = useMemo(() => {
+    let base = pedidos;
+    if (filtroFornecedor) base = base.filter((p) => p.fornecedor === filtroFornecedor);
+    if (filtroOP) base = base.filter((p) => p.opId === filtroOP);
+    const map = {};
+    for (const key of KANBAN_ORDER) map[key] = [];
+    for (const p of base) {
+      const key = p.statusEntrega || "SEM_PRAZO";
+      if (map[key]) map[key].push(p);
+      else map.SEM_PRAZO.push(p);
     }
     return map;
-  }, [itens, filtroOP, filtroRM, filtroFornecedor]);
+  }, [pedidos, filtroFornecedor, filtroOP]);
 
-  // Ordenacao
-  const itensOrdenados = useMemo(() => {
-    const lista = [...itensFiltrados];
-    const { campo, dir } = ordenacao;
-    const mult = dir === "asc" ? 1 : -1;
+  // Listas únicas pra filtros
+  const fornecedores = useMemo(() => {
+    return [...new Set(pedidos.map((p) => p.fornecedor))].sort();
+  }, [pedidos]);
 
-    lista.sort((a, b) => {
-      if (campo === "status") {
-        const pa = STATUS_PRIORITY[a.statusEntrega || "SEM_PRAZO"] ?? 3;
-        const pb = STATUS_PRIORITY[b.statusEntrega || "SEM_PRAZO"] ?? 3;
-        if (pa !== pb) return (pa - pb) * mult;
-        // Dentro do mesmo status, ordena por prazo
-        const da = a.prazoEntrega ? new Date(a.prazoEntrega).getTime() : Infinity;
-        const db = b.prazoEntrega ? new Date(b.prazoEntrega).getTime() : Infinity;
-        return (da - db) * mult;
-      }
-      if (campo === "prazoEntrega") {
-        const da = a.prazoEntrega ? new Date(a.prazoEntrega).getTime() : Infinity;
-        const db = b.prazoEntrega ? new Date(b.prazoEntrega).getTime() : Infinity;
-        return (da - db) * mult;
-      }
-      if (campo === "valorBruto") {
-        return ((a.valorBruto || 0) - (b.valorBruto || 0)) * mult;
-      }
-      if (campo === "fornecedor" || campo === "descricao") {
-        return (a[campo] || "").localeCompare(b[campo] || "") * mult;
-      }
-      return 0;
-    });
-
-    return lista;
-  }, [itensFiltrados, ordenacao]);
-
-  // OPs, RMs e fornecedores unicos
   const ops = useMemo(() => {
     const set = new Map();
-    for (const it of itens) set.set(it.opId, `OP ${it.opNumero} — ${it.opCliente || ""}`);
+    for (const p of pedidos) {
+      if (p.opId) set.set(p.opId, `OP ${p.opNumero} — ${p.opCliente || ""}`);
+    }
     return Array.from(set.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [itens]);
-
-  // RMs filtradas pela OP selecionada (cascata)
-  const rms = useMemo(() => {
-    const base = filtroOP ? itens.filter((it) => it.opId === filtroOP) : itens;
-    const set = new Map();
-    for (const it of base) set.set(it.rmId, `RM ${it.rmNumero}`);
-    return Array.from(set.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [itens, filtroOP]);
-
-  const fornecedores = useMemo(() => {
-    const set = new Set(itens.map((it) => it.fornecedor));
-    return Array.from(set).sort();
-  }, [itens]);
+  }, [pedidos]);
 
   // KPIs
-  const totalBase = useMemo(() => {
-    return itens.filter((it) => {
-      if (filtroOP && it.opId !== filtroOP) return false;
-      if (filtroRM && it.rmId !== filtroRM) return false;
-      if (filtroFornecedor && it.fornecedor !== filtroFornecedor) return false;
+  const kpis = useMemo(() => {
+    const base = pedidos.filter((p) => {
+      if (filtroFornecedor && p.fornecedor !== filtroFornecedor) return false;
+      if (filtroOP && p.opId !== filtroOP) return false;
       return true;
-    }).length;
-  }, [itens, filtroOP, filtroFornecedor]);
+    });
+    const porStatus = {};
+    for (const key of KANBAN_ORDER) porStatus[key] = 0;
+    let valorAtrasado = 0;
+    for (const p of base) {
+      const k = p.statusEntrega || "SEM_PRAZO";
+      porStatus[k] = (porStatus[k] || 0) + 1;
+      if (k === "ATRASADO") valorAtrasado += p.total || 0;
+    }
+    return { total: base.length, ...porStatus, valorAtrasado };
+  }, [pedidos, filtroFornecedor, filtroOP]);
 
-  const kpis = useMemo(() => ({
-    total: totalBase,
-    atrasados: grupos.ATRASADO.length,
-    proximos: grupos.PROXIMO.length,
-    noPrazo: grupos.NO_PRAZO.length,
-    semPrazo: grupos.SEM_PRAZO.length,
-    entregues: grupos.ENTREGUE.length,
-    valorAtrasado: grupos.ATRASADO.reduce((s, it) => s + (it.valorBruto || 0), 0),
-  }), [totalBase, grupos]);
-
-  const handleSort = (campo) => {
-    setOrdenacao((prev) =>
-      prev.campo === campo
-        ? { campo, dir: prev.dir === "asc" ? "desc" : "asc" }
-        : { campo, dir: "asc" }
-    );
-  };
-
-  const registrarEntrega = async (cotacaoItemId) => {
-    setRegistrando(cotacaoItemId);
+  const registrarEntrega = async (pedidoId) => {
+    setRegistrando(pedidoId);
     try {
-      const res = await fetch("/api/compras/cronograma", {
+      const res = await fetch("/api/compras/entregas", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cotacaoItemId }),
+        body: JSON.stringify({ pedidoId }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || "Erro");
       }
-      setItens((prev) => prev.map((it) =>
-        it.id === cotacaoItemId
-          ? { ...it, statusEntrega: "ENTREGUE" }
-          : it
+      setPedidos((prev) => prev.map((p) =>
+        p.id === pedidoId
+          ? { ...p, statusEntrega: "ENTREGUE", dataEntregaReal: new Date().toISOString() }
+          : p
       ));
       setExpandido(null);
     } catch (e) {
@@ -247,26 +185,64 @@ export default function CronogramaClient() {
     <div className="space-y-5">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KPICard label="Total itens" value={kpis.total} Icon={Package} color="torg-blue" onClick={() => setFiltroStatus("")} active={!filtroStatus} />
-        <KPICard label="Atrasados" value={kpis.atrasados} Icon={AlertTriangle} color="red" highlight={kpis.atrasados > 0} onClick={() => setFiltroStatus(filtroStatus === "ATRASADO" ? "" : "ATRASADO")} active={filtroStatus === "ATRASADO"} />
-        <KPICard label="Prox. 7 dias" value={kpis.proximos} Icon={Clock} color="amber" onClick={() => setFiltroStatus(filtroStatus === "PROXIMO" ? "" : "PROXIMO")} active={filtroStatus === "PROXIMO"} />
-        <KPICard label="No prazo" value={kpis.noPrazo} Icon={CalendarDays} color="torg-blue" onClick={() => setFiltroStatus(filtroStatus === "NO_PRAZO" ? "" : "NO_PRAZO")} active={filtroStatus === "NO_PRAZO"} />
-        <KPICard label="Sem prazo" value={kpis.semPrazo} Icon={Package} color="gray" onClick={() => setFiltroStatus(filtroStatus === "SEM_PRAZO" ? "" : "SEM_PRAZO")} active={filtroStatus === "SEM_PRAZO"} />
-        <KPICard label="Entregues" value={kpis.entregues} Icon={CheckCircle2} color="emerald" onClick={() => setFiltroStatus(filtroStatus === "ENTREGUE" ? "" : "ENTREGUE")} active={filtroStatus === "ENTREGUE"} />
+        {KANBAN_ORDER.map((key) => {
+          const cfg = STATUS_CFG[key];
+          const count = kpis[key] || 0;
+          const isActive = filtroStatus === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setFiltroStatus(isActive ? "" : key)}
+              className={`rounded-xl shadow-sm border p-3 flex items-center gap-2.5 transition-all text-left ${
+                isActive
+                  ? "border-torg-blue ring-1 ring-torg-blue/30 bg-white"
+                  : key === "ATRASADO" && count > 0
+                  ? "bg-red-50 border-red-300 ring-1 ring-red-200"
+                  : "bg-white border-gray-100 hover:border-gray-200"
+              }`}
+            >
+              <div className={`p-2 rounded-lg bg-${cfg.cor}-100`}>
+                <cfg.Icon size={16} className={`text-${cfg.cor}-600`} />
+              </div>
+              <div>
+                <p className="text-[11px] text-torg-gray leading-tight">{cfg.label}</p>
+                <p className={`text-lg font-extrabold tabular-nums ${
+                  key === "ATRASADO" && count > 0 ? "text-red-700" : "text-torg-dark"
+                }`}>{count}</p>
+              </div>
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setFiltroStatus("")}
+          className={`rounded-xl shadow-sm border p-3 flex items-center gap-2.5 transition-all text-left ${
+            !filtroStatus
+              ? "border-torg-blue ring-1 ring-torg-blue/30 bg-white"
+              : "bg-white border-gray-100 hover:border-gray-200"
+          }`}
+        >
+          <div className="p-2 rounded-lg bg-torg-blue-50">
+            <Package size={16} className="text-torg-blue" />
+          </div>
+          <div>
+            <p className="text-[11px] text-torg-gray leading-tight">Total</p>
+            <p className="text-lg font-extrabold tabular-nums text-torg-dark">{kpis.total}</p>
+          </div>
+        </button>
       </div>
 
       {kpis.valorAtrasado > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-3 text-sm">
           <AlertTriangle size={18} className="text-red-600 flex-shrink-0" />
           <p className="text-red-800">
-            <strong>{kpis.atrasados} ite{kpis.atrasados === 1 ? "m" : "ns"}</strong> em atraso,
-            totalizando <strong>{fmtMoeda(kpis.valorAtrasado)}</strong> em materiais pendentes.
+            <strong>{kpis.ATRASADO} pedido{kpis.ATRASADO !== 1 ? "s" : ""}</strong> em atraso,
+            totalizando <strong>{fmtMoeda(kpis.valorAtrasado)}</strong>.
           </p>
         </div>
       )}
 
-      {/* Filtros + acoes */}
-      <div className="flex items-center justify-between gap-3">
+      {/* Filtros + toggle visao */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 text-sm text-torg-gray">
             <Filter size={16} />
@@ -274,21 +250,11 @@ export default function CronogramaClient() {
           </div>
           <select
             value={filtroOP}
-            onChange={(e) => { setFiltroOP(e.target.value); setFiltroRM(""); }}
+            onChange={(e) => setFiltroOP(e.target.value)}
             className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
           >
             <option value="">Todas as OPs</option>
             {ops.map(([id, label]) => (
-              <option key={id} value={id}>{label}</option>
-            ))}
-          </select>
-          <select
-            value={filtroRM}
-            onChange={(e) => setFiltroRM(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
-          >
-            <option value="">Todas as RMs</option>
-            {rms.map(([id, label]) => (
               <option key={id} value={id}>{label}</option>
             ))}
           </select>
@@ -302,9 +268,9 @@ export default function CronogramaClient() {
               <option key={f} value={f}>{f}</option>
             ))}
           </select>
-          {(filtroOP || filtroRM || filtroFornecedor || filtroStatus) && (
+          {(filtroOP || filtroFornecedor || filtroStatus) && (
             <button
-              onClick={() => { setFiltroOP(""); setFiltroRM(""); setFiltroFornecedor(""); setFiltroStatus(""); }}
+              onClick={() => { setFiltroOP(""); setFiltroFornecedor(""); setFiltroStatus(""); }}
               className="text-xs text-torg-gray hover:text-red-600 underline"
             >
               Limpar filtros
@@ -312,6 +278,31 @@ export default function CronogramaClient() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {/* Toggle Kanban / Tabela */}
+          <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setVisao("kanban")}
+              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 ${
+                visao === "kanban"
+                  ? "bg-torg-blue text-white font-medium"
+                  : "bg-white text-torg-gray hover:bg-gray-50"
+              }`}
+              title="Visão Kanban"
+            >
+              <LayoutGrid size={14} /> Kanban
+            </button>
+            <button
+              onClick={() => setVisao("tabela")}
+              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 ${
+                visao === "tabela"
+                  ? "bg-torg-blue text-white font-medium"
+                  : "bg-white text-torg-gray hover:bg-gray-50"
+              }`}
+              title="Visão Lista"
+            >
+              <List size={14} /> Lista
+            </button>
+          </div>
           <button
             onClick={syncOmie}
             disabled={syncing}
@@ -343,7 +334,7 @@ export default function CronogramaClient() {
             {syncResult.error ? (
               <><AlertCircle size={16} /> Erro: {syncResult.error}</>
             ) : syncResult.sincronizados > 0 ? (
-              <><CheckCircle2 size={16} /> {syncResult.sincronizados} pedido{syncResult.sincronizados !== 1 ? "s" : ""} atualizado{syncResult.sincronizados !== 1 ? "s" : ""} ({syncResult.total} consultados)</>
+              <><CheckCircle2 size={16} /> {syncResult.sincronizados} pedido{syncResult.sincronizados !== 1 ? "s" : ""} atualizado{syncResult.sincronizados !== 1 ? "s" : ""}</>
             ) : (
               <><Package size={16} /> Nenhuma entrega nova detectada ({syncResult.total} pedidos consultados)</>
             )}
@@ -352,73 +343,231 @@ export default function CronogramaClient() {
         </div>
       )}
 
-      {/* Tabela ou estado vazio */}
-      {itensOrdenados.length === 0 && !filtroStatus ? (
+      {/* Conteúdo */}
+      {pedidos.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <Truck size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-torg-gray text-lg">Nenhum item vencedor encontrado</p>
+          <p className="text-torg-gray text-lg">Nenhum pedido de compra encontrado</p>
           <p className="text-sm text-gray-400 mt-1">
-            Marque itens como vencedores no Mapa de Cotacao pra acompanhar os prazos aqui.
+            Gere pedidos a partir do Mapa de Cotação pra acompanhar as entregas aqui.
           </p>
         </div>
-      ) : itensOrdenados.length === 0 && filtroStatus ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-          <Package size={36} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-torg-gray">Nenhum item com status <strong>{STATUS_CFG[filtroStatus]?.label}</strong></p>
-          <button onClick={() => setFiltroStatus("")} className="text-sm text-torg-blue hover:underline mt-2">
-            Mostrar todos
-          </button>
-        </div>
+      ) : visao === "kanban" ? (
+        <KanbanView
+          grupos={gruposKanban}
+          filtroStatus={filtroStatus}
+          expandido={expandido}
+          setExpandido={setExpandido}
+          registrarEntrega={registrarEntrega}
+          registrando={registrando}
+        />
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Contador */}
-          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/60">
-            <span className="text-xs text-torg-gray">
-              {itensOrdenados.length} ite{itensOrdenados.length !== 1 ? "ns" : "m"}
-              {filtroStatus && <> &mdash; {STATUS_CFG[filtroStatus]?.label}</>}
+        <TabelaView
+          pedidos={pedidosFiltrados}
+          expandido={expandido}
+          setExpandido={setExpandido}
+          registrarEntrega={registrarEntrega}
+          registrando={registrando}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── Kanban View ────────────────────────────────────────────────── */
+
+function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando }) {
+  const colunas = filtroStatus
+    ? KANBAN_ORDER.filter((k) => k === filtroStatus)
+    : KANBAN_ORDER;
+
+  return (
+    <div className={`grid gap-4 ${
+      colunas.length === 1
+        ? "grid-cols-1 max-w-2xl"
+        : colunas.length <= 3
+        ? `grid-cols-1 md:grid-cols-${colunas.length}`
+        : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+    }`}>
+      {colunas.map((key) => {
+        const cfg = STATUS_CFG[key];
+        const lista = grupos[key] || [];
+        return (
+          <div key={key} className={`rounded-xl border ${cfg.border} bg-white flex flex-col min-h-[200px]`}>
+            {/* Cabeçalho da coluna */}
+            <div className={`px-3 py-2.5 ${cfg.headerBg} rounded-t-xl border-b ${cfg.border} flex items-center justify-between`}>
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                <span className="text-sm font-semibold text-torg-dark">{cfg.label}</span>
+              </div>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfg.badge}`}>
+                {lista.length}
+              </span>
+            </div>
+
+            {/* Cards */}
+            <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[600px]">
+              {lista.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">Nenhum pedido</p>
+              ) : (
+                lista.map((p) => (
+                  <PedidoCard
+                    key={p.id}
+                    pedido={p}
+                    cfg={cfg}
+                    isExpanded={expandido === p.id}
+                    onToggle={() => setExpandido(expandido === p.id ? null : p.id)}
+                    onRegistrarEntrega={() => registrarEntrega(p.id)}
+                    registrando={registrando === p.id}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── Pedido Card (Kanban) ───────────────────────────────────────── */
+
+function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando }) {
+  const p = pedido;
+  const dias = diasAte(p.prazoEntregaPrevisto);
+  const diasLabel = dias !== null
+    ? dias < 0 ? `${Math.abs(dias)}d atraso` : dias === 0 ? "Hoje" : `em ${dias}d`
+    : null;
+
+  return (
+    <div
+      className={`border rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm ${
+        isExpanded ? "ring-1 ring-torg-blue/30 border-torg-blue-200 bg-sky-50/30" : "border-gray-200 bg-white"
+      }`}
+      onClick={onToggle}
+    >
+      {/* Header: número + valor */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-mono font-bold text-torg-blue">
+          #{p.numero}
+        </span>
+        <span className="text-xs font-semibold text-torg-dark tabular-nums">
+          {fmtMoeda(p.total)}
+        </span>
+      </div>
+
+      {/* Fornecedor */}
+      <p className="text-sm font-medium text-torg-dark leading-snug truncate" title={p.fornecedor}>
+        {p.fornecedor}
+      </p>
+
+      {/* OP + prazo */}
+      <div className="flex items-center justify-between mt-2 text-[11px] text-torg-gray">
+        <span className="truncate">
+          {p.opNumero ? `OP ${p.opNumero}` : "Sem OP"}
+          {p.opCliente ? ` · ${p.opCliente}` : ""}
+        </span>
+        {p.qtdItens > 0 && (
+          <span className="text-gray-400 shrink-0 ml-2">{p.qtdItens} ite{p.qtdItens !== 1 ? "ns" : "m"}</span>
+        )}
+      </div>
+
+      {/* Prazo */}
+      {p.prazoEntregaPrevisto && (
+        <div className="flex items-center gap-1.5 mt-2 text-[11px]">
+          <CalendarDays size={11} className="text-torg-gray" />
+          <span className="text-torg-gray">{fmtDataCurta(p.prazoEntregaPrevisto)}</span>
+          {diasLabel && (
+            <span className={`font-medium ${
+              p.statusEntrega === "ATRASADO" ? "text-red-600" :
+              p.statusEntrega === "PROXIMO" ? "text-amber-600" :
+              "text-torg-gray"
+            }`}>
+              ({diasLabel})
             </span>
-            <span className="text-xs text-gray-400">
-              Clique em uma linha para ver detalhes
-            </span>
+          )}
+        </div>
+      )}
+
+      {/* FD badge */}
+      {p.faturamentoDireto && (
+        <span className="inline-block mt-1.5 text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded font-medium">
+          FD
+        </span>
+      )}
+
+      {/* Expandido: detalhes */}
+      {isExpanded && (
+        <div className="mt-3 pt-3 border-t border-gray-100 space-y-2" onClick={(e) => e.stopPropagation()}>
+          {/* Itens do pedido */}
+          {p.itens.length > 0 && (
+            <div>
+              <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1 font-semibold">Itens</p>
+              <div className="space-y-1">
+                {p.itens.slice(0, 5).map((it, i) => (
+                  <div key={i} className="text-xs text-torg-dark flex justify-between">
+                    <span className="truncate flex-1 mr-2">{it.descricao}</span>
+                    <span className="text-torg-gray shrink-0 tabular-nums">
+                      {it.qtd != null ? `${Number(it.qtd).toFixed(it.unidade === "KG" ? 1 : 0)} ${it.unidade || ""}` : ""}
+                    </span>
+                  </div>
+                ))}
+                {p.itens.length > 5 && (
+                  <p className="text-[10px] text-gray-400">+ {p.itens.length - 5} itens</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Recebimentos */}
+          {p.temRecebimento && (
+            <div>
+              <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1 font-semibold">Recebimentos</p>
+              {p.recebimentos.slice(0, 3).map((r) => (
+                <div key={r.id} className="text-xs flex items-center gap-2 text-torg-dark">
+                  <CheckCircle2 size={10} className="text-emerald-500" />
+                  <span>{fmtData(r.dataRecebimento)}</span>
+                  {r.nfNumero && <span className="text-torg-gray">NF {r.nfNumero}</span>}
+                  <span className="text-torg-gray tabular-nums">{r.qtdRecebida}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Datas */}
+          <div className="flex gap-4 text-[11px]">
+            <div>
+              <span className="text-torg-gray">Criado: </span>
+              <span className="text-torg-dark">{fmtData(p.createdAt)}</span>
+            </div>
+            {p.dataEntregaReal && (
+              <div>
+                <span className="text-torg-gray">Entregue: </span>
+                <span className="text-emerald-700 font-medium">{fmtData(p.dataEntregaReal)}</span>
+              </div>
+            )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50/60 border-b border-gray-100">
-                  <SortHeader campo="status" label="Status" ordenacao={ordenacao} onSort={handleSort} className="w-[120px]" />
-                  <SortHeader campo="prazoEntrega" label="Prazo" ordenacao={ordenacao} onSort={handleSort} className="w-[140px]" />
-                  <SortHeader campo="fornecedor" label="Fornecedor" ordenacao={ordenacao} onSort={handleSort} />
-                  <SortHeader campo="descricao" label="Material / Descricao" ordenacao={ordenacao} onSort={handleSort} className="min-w-[280px]" />
-                  <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[70px]">OP</th>
-                  <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[60px]">RM</th>
-                  <SortHeader campo="valorBruto" label="Valor" ordenacao={ordenacao} onSort={handleSort} className="w-[110px] text-right" align="right" />
-                  <th className="px-3 py-2.5 w-[40px]" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {itensOrdenados.map((item) => {
-                  const status = item.statusEntrega || "SEM_PRAZO";
-                  const cfg = STATUS_CFG[status];
-                  const dias = diasAte(item.prazoEntrega);
-                  const isExpanded = expandido === item.id;
-
-                  return (
-                    <ItemRows
-                      key={item.id}
-                      item={item}
-                      status={status}
-                      cfg={cfg}
-                      dias={dias}
-                      isExpanded={isExpanded}
-                      onToggle={() => setExpandido(isExpanded ? null : item.id)}
-                      onRegistrarEntrega={() => registrarEntrega(item.id)}
-                      registrando={registrando === item.id}
-                    />
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* Ações */}
+          <div className="flex gap-2 pt-2">
+            {p.opId && (
+              <Link
+                href={`/compras/painel-ops/${p.opId}`}
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-sky-100 text-torg-blue rounded-lg hover:bg-sky-200 font-medium"
+              >
+                <ExternalLink size={10} /> Ver OP
+              </Link>
+            )}
+            {p.statusEntrega !== "ENTREGUE" && (
+              <button
+                onClick={onRegistrarEntrega}
+                disabled={registrando}
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 font-medium disabled:opacity-50"
+              >
+                {registrando ? <Loader2 size={10} className="animate-spin" /> : <CheckCircle2 size={10} />}
+                Marcar entregue
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -426,35 +575,73 @@ export default function CronogramaClient() {
   );
 }
 
-/* ─── Subcomponents ─── */
+/* ─── Tabela View ────────────────────────────────────────────────── */
 
-function SortHeader({ campo, label, ordenacao, onSort, className = "", align = "left" }) {
-  const active = ordenacao.campo === campo;
+function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando }) {
+  if (pedidos.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+        <Package size={36} className="mx-auto text-gray-300 mb-3" />
+        <p className="text-torg-gray">Nenhum pedido encontrado com esses filtros</p>
+      </div>
+    );
+  }
+
   return (
-    <th
-      onClick={() => onSort(campo)}
-      className={`px-3 py-2.5 text-${align} text-[11px] font-semibold text-torg-gray uppercase tracking-wider cursor-pointer hover:text-torg-dark select-none ${className}`}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {active ? (
-          ordenacao.dir === "asc"
-            ? <ChevronDown size={12} className="text-torg-blue" />
-            : <ChevronDown size={12} className="text-torg-blue rotate-180" />
-        ) : (
-          <ArrowUpDown size={10} className="text-gray-300" />
-        )}
-      </span>
-    </th>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/60">
+        <span className="text-xs text-torg-gray">
+          {pedidos.length} pedido{pedidos.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50/60 border-b border-gray-100">
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[110px]">Status</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[90px]">Nº Pedido</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider">Fornecedor</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[120px]">OP</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[100px]">Prazo</th>
+              <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[60px]">Itens</th>
+              <th className="px-4 py-2.5 text-right text-[11px] font-semibold text-torg-gray uppercase tracking-wider w-[110px]">Valor</th>
+              <th className="px-2 py-2.5 w-[30px]" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {pedidos.map((p) => {
+              const cfg = STATUS_CFG[p.statusEntrega || "SEM_PRAZO"];
+              const dias = diasAte(p.prazoEntregaPrevisto);
+              const diasLabel = dias !== null
+                ? dias < 0 ? `${Math.abs(dias)}d atraso` : dias === 0 ? "Hoje" : `${dias}d`
+                : null;
+              const isExp = expandido === p.id;
+
+              return (
+                <TabelaRow
+                  key={p.id}
+                  pedido={p}
+                  cfg={cfg}
+                  dias={dias}
+                  diasLabel={diasLabel}
+                  isExpanded={isExp}
+                  onToggle={() => setExpandido(isExp ? null : p.id)}
+                  onRegistrarEntrega={() => registrarEntrega(p.id)}
+                  registrando={registrando === p.id}
+                />
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
-function ItemRows({ item, status, cfg, dias, isExpanded, onToggle, onRegistrarEntrega, registrando }) {
-  const Icon = cfg.Icon;
-  const diasLabel = dias !== null
-    ? dias < 0 ? `${Math.abs(dias)}d atraso` : dias === 0 ? "Hoje" : `${dias}d`
-    : null;
-  const diasColor = status === "ATRASADO" ? "text-red-600 font-semibold" : status === "PROXIMO" ? "text-amber-600 font-medium" : "text-torg-gray";
+function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando }) {
+  const diasColor = p.statusEntrega === "ATRASADO" ? "text-red-600 font-semibold"
+    : p.statusEntrega === "PROXIMO" ? "text-amber-600 font-medium"
+    : "text-torg-gray";
 
   return (
     <>
@@ -462,61 +649,53 @@ function ItemRows({ item, status, cfg, dias, isExpanded, onToggle, onRegistrarEn
         onClick={onToggle}
         className={`cursor-pointer transition-colors ${
           isExpanded ? "bg-sky-50/50" : "hover:bg-gray-50/80"
-        } ${status === "ENTREGUE" ? "opacity-60" : ""}`}
+        } ${p.statusEntrega === "ENTREGUE" ? "opacity-60" : ""}`}
       >
-        {/* Status badge */}
-        <td className="px-3 py-2.5">
+        <td className="px-4 py-2.5">
           <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded whitespace-nowrap ${cfg.badge}`}>
             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
             {cfg.label}
           </span>
         </td>
-
-        {/* Prazo */}
-        <td className="px-3 py-2.5">
-          {item.prazoEntrega ? (
+        <td className="px-4 py-2.5">
+          <span className="font-mono font-semibold text-torg-blue text-xs">
+            #{p.numero}
+          </span>
+          {p.faturamentoDireto && (
+            <span className="ml-1 text-[9px] px-1 py-0.5 bg-purple-50 text-purple-600 rounded font-medium">FD</span>
+          )}
+        </td>
+        <td className="px-4 py-2.5">
+          <span className="text-sm font-medium text-torg-dark truncate block max-w-[250px]" title={p.fornecedor}>
+            {p.fornecedor}
+          </span>
+        </td>
+        <td className="px-4 py-2.5">
+          {p.opNumero ? (
+            <div>
+              <span className="text-xs font-mono text-torg-gray bg-gray-100 px-1.5 py-0.5 rounded">{p.opNumero}</span>
+              {p.opCliente && <p className="text-[10px] text-torg-gray mt-0.5 truncate max-w-[100px]">{p.opCliente}</p>}
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">—</span>
+          )}
+        </td>
+        <td className="px-4 py-2.5">
+          {p.prazoEntregaPrevisto ? (
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-torg-dark tabular-nums">{fmtDataCurta(item.prazoEntrega)}</span>
+              <span className="text-sm font-medium text-torg-dark tabular-nums">{fmtDataCurta(p.prazoEntregaPrevisto)}</span>
               {diasLabel && <span className={`text-[10px] tabular-nums ${diasColor}`}>{diasLabel}</span>}
             </div>
           ) : (
             <span className="text-xs text-gray-400">Sem prazo</span>
           )}
         </td>
-
-        {/* Fornecedor */}
-        <td className="px-3 py-2.5">
-          <span className="text-sm font-medium text-torg-dark truncate block max-w-[200px]" title={item.fornecedor}>
-            {item.fornecedor}
-          </span>
+        <td className="px-4 py-2.5 text-center">
+          <span className="text-xs text-torg-gray tabular-nums">{p.qtdItens}</span>
         </td>
-
-        {/* Material / Descricao */}
-        <td className="px-3 py-2.5">
-          <p className="text-sm text-torg-dark leading-snug" title={item.descricao}>
-            {item.descricao}
-          </p>
-          {item.material && item.material !== item.descricao && (
-            <p className="text-[10px] text-torg-gray mt-0.5">{item.material}</p>
-          )}
+        <td className="px-4 py-2.5 text-right">
+          <span className="text-sm font-semibold text-torg-dark tabular-nums">{fmtMoeda(p.total)}</span>
         </td>
-
-        {/* OP */}
-        <td className="px-3 py-2.5">
-          <span className="text-xs font-mono text-torg-gray bg-gray-100 px-1.5 py-0.5 rounded">{item.opNumero}</span>
-        </td>
-
-        {/* RM */}
-        <td className="px-3 py-2.5">
-          <span className="text-xs text-torg-gray">{item.rmNumero}</span>
-        </td>
-
-        {/* Valor */}
-        <td className="px-3 py-2.5 text-right">
-          <span className="text-sm font-semibold text-torg-dark tabular-nums">{fmtMoeda(item.valorBruto)}</span>
-        </td>
-
-        {/* Expand icon */}
         <td className="px-2 py-2.5 text-center">
           {isExpanded
             ? <ChevronDown size={14} className="text-torg-blue" />
@@ -525,50 +704,71 @@ function ItemRows({ item, status, cfg, dias, isExpanded, onToggle, onRegistrarEn
         </td>
       </tr>
 
-      {/* Linha expandida */}
       {isExpanded && (
         <tr className="bg-sky-50/30">
           <td colSpan={8} className="px-4 py-3">
-            <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
-              <div>
-                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-0.5">Cliente</p>
-                <p className="font-medium text-torg-dark">{item.opCliente || "—"}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-0.5">Quantidade</p>
-                <p className="font-medium text-torg-dark tabular-nums">
-                  {typeof item.qtd === "number" ? item.qtd.toFixed(2) : item.qtd} {item.unidade}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-0.5">Preco unit.</p>
-                <p className="font-medium text-torg-dark tabular-nums">{fmtMoeda(item.precoUnit)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-0.5">Valor total</p>
-                <p className="font-medium text-torg-dark tabular-nums">{fmtMoeda(item.valorBruto)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-0.5">Prazo completo</p>
-                <p className="font-medium text-torg-dark">{fmtData(item.prazoEntrega)}</p>
-              </div>
-              {item.pedido && (
-                <div>
-                  <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-0.5">Pedido Omie</p>
-                  <p className="font-medium text-torg-blue">{item.pedido.numero || "s/n"}</p>
+            {/* Itens do pedido */}
+            {p.itens.length > 0 && (
+              <div className="mb-3">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1.5 font-semibold">Itens do pedido</p>
+                <div className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50/80">
+                        <th className="px-3 py-1.5 text-left text-torg-gray font-medium">Descrição</th>
+                        <th className="px-3 py-1.5 text-right text-torg-gray font-medium w-[80px]">Qtd</th>
+                        <th className="px-3 py-1.5 text-right text-torg-gray font-medium w-[90px]">Preço unit.</th>
+                        <th className="px-3 py-1.5 text-left text-torg-gray font-medium w-[90px]">Prazo item</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {p.itens.map((it, i) => (
+                        <tr key={i}>
+                          <td className="px-3 py-1.5 text-torg-dark">{it.descricao}</td>
+                          <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">
+                            {it.qtd != null ? `${Number(it.qtd).toFixed(it.unidade === "KG" ? 1 : 0)} ${it.unidade || ""}` : "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">
+                            {it.precoUnit ? fmtMoeda(it.precoUnit) : "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-torg-gray">
+                            {it.prazoEntrega ? fmtDataCurta(it.prazoEntrega) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="flex gap-2 mt-3 pt-3 border-t border-sky-100">
-              <Link
-                href={`/compras/painel-ops/${item.opId}`}
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-sky-100 text-torg-blue rounded-lg hover:bg-sky-200 font-medium"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ExternalLink size={12} /> Ver Mapa
-              </Link>
-              {status !== "ENTREGUE" && (
+            {/* Recebimentos */}
+            {p.temRecebimento && (
+              <div className="mb-3">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1 font-semibold">Recebimentos</p>
+                {p.recebimentos.map((r) => (
+                  <div key={r.id} className="text-xs flex items-center gap-2 text-torg-dark py-0.5">
+                    <CheckCircle2 size={11} className="text-emerald-500" />
+                    <span>{fmtData(r.dataRecebimento)}</span>
+                    {r.nfNumero && <span className="text-torg-gray font-mono">NF {r.nfNumero}</span>}
+                    <span className="text-torg-gray tabular-nums">{r.qtdRecebida} un</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Ações */}
+            <div className="flex gap-2 pt-2 border-t border-sky-100">
+              {p.opId && (
+                <Link
+                  href={`/compras/painel-ops/${p.opId}`}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-sky-100 text-torg-blue rounded-lg hover:bg-sky-200 font-medium"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink size={12} /> Ver OP
+                </Link>
+              )}
+              {p.statusEntrega !== "ENTREGUE" && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onRegistrarEntrega(); }}
                   disabled={registrando}
@@ -583,30 +783,5 @@ function ItemRows({ item, status, cfg, dias, isExpanded, onToggle, onRegistrarEn
         </tr>
       )}
     </>
-  );
-}
-
-function KPICard({ label, value, Icon, color, highlight = false, onClick, active = false }) {
-  const bgClass = highlight
-    ? `bg-red-50 border-red-300 ring-1 ring-red-200`
-    : active
-    ? `bg-white border-torg-blue ring-1 ring-torg-blue/30`
-    : "bg-white border-gray-100 hover:border-gray-200";
-
-  return (
-    <div
-      onClick={onClick}
-      className={`rounded-xl shadow-sm border p-3 flex items-center gap-2.5 cursor-pointer transition-all ${bgClass}`}
-    >
-      <div className={`p-2 rounded-lg bg-${color}-100`}>
-        <Icon size={16} className={`text-${color}-600`} />
-      </div>
-      <div>
-        <p className="text-[11px] text-torg-gray leading-tight">{label}</p>
-        <p className={`text-lg font-extrabold tabular-nums ${highlight ? `text-${color}-700` : "text-torg-dark"}`}>
-          {value}
-        </p>
-      </div>
-    </div>
   );
 }
