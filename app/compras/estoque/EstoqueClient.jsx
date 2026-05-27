@@ -14,7 +14,7 @@ const fmtQtd = (v, unidade = "") =>
 const fmtDataHora = (d) =>
   d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
-export default function EstoqueClient({ itensIniciais, configInicial, isAdmin }) {
+export default function EstoqueClient({ itensIniciais, configInicial }) {
   const router = useRouter();
   const [itens, setItens] = useState(itensIniciais || []);
   const [config, setConfig] = useState(configInicial);
@@ -29,7 +29,7 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
   const [busca, setBusca] = useState("");
   const [filtroFamilia, setFiltroFamilia] = useState("");  // codigo da familia
   const [filtroEstoque, setFiltroEstoque] = useState("");  // "" | "com" | "sem"
-  const [filtroTorg, setFiltroTorg] = useState("");        // "" | "torg" | "outros"
+  const [filtroTipo, setFiltroTipo] = useState("");        // "" | "materia" | "outros"
 
   // ── Estados de UI ──────────────────────────────────────────────────────────
   const [sincronizando, setSincronizando] = useState(false);
@@ -53,16 +53,17 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
       .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [itens]);
 
-  const totalTorg   = useMemo(() => itens.filter((i) => i.estoqueTorg).length, [itens]);
-  const totalComEst = useMemo(() => itens.filter((i) => i.qtdAtual > 0).length,  [itens]);
+  const isMateriaPrima = (i) => /mat[eé]ria[\s_-]*prima/i.test(i.categoriaLabel || "");
+  const totalMateria = useMemo(() => itens.filter(isMateriaPrima).length, [itens]);
+  const totalComEst  = useMemo(() => itens.filter((i) => i.qtdAtual > 0).length, [itens]);
 
   const filtrados = useMemo(() => {
     return itens.filter((i) => {
       if (filtroFamilia && i.categoriaOmie !== filtroFamilia) return false;
-      if (filtroEstoque === "com"  && !(i.qtdAtual > 0))  return false;
-      if (filtroEstoque === "sem"  &&   i.qtdAtual > 0)   return false;
-      if (filtroTorg    === "torg" && !i.estoqueTorg)      return false;
-      if (filtroTorg    === "outros" &&  i.estoqueTorg)    return false;
+      if (filtroEstoque === "com"    && !(i.qtdAtual > 0))  return false;
+      if (filtroEstoque === "sem"    &&   i.qtdAtual > 0)   return false;
+      if (filtroTipo    === "materia" && !isMateriaPrima(i)) return false;
+      if (filtroTipo    === "outros"  &&  isMateriaPrima(i)) return false;
       if (busca) {
         const b = busca.toLowerCase();
         const hay = `${i.descricao} ${i.codigoOmie} ${i.categoriaLabel || ""}`.toLowerCase();
@@ -70,9 +71,9 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
       }
       return true;
     });
-  }, [itens, busca, filtroFamilia, filtroEstoque, filtroTorg]);
+  }, [itens, busca, filtroFamilia, filtroEstoque, filtroTipo]);
 
-  const temFiltroAtivo = busca || filtroFamilia || filtroEstoque || filtroTorg;
+  const temFiltroAtivo = busca || filtroFamilia || filtroEstoque || filtroTipo;
 
   // KPIs dos itens filtrados
   const valorTotal       = useMemo(() => filtrados.reduce((s, i) => s + (Number(i.cmc) || 0) * (Number(i.qtdAtual) || 0), 0), [filtrados]);
@@ -84,7 +85,7 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
     setBusca("");
     setFiltroFamilia("");
     setFiltroEstoque("");
-    setFiltroTorg("");
+    setFiltroTipo("");
   };
 
   const rodarDiagnostico = async () => {
@@ -226,7 +227,7 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-xs text-torg-gray">Total no catálogo</p>
           <p className="text-xl font-extrabold text-torg-dark tabular-nums mt-1">{itens.length}</p>
-          <p className="text-[10px] text-torg-gray mt-0.5">{totalTorg} Matéria Prima · {totalComEst} com qtd</p>
+          <p className="text-[10px] text-torg-gray mt-0.5">{totalMateria} Matéria Prima · {totalComEst} com qtd</p>
         </div>
       </div>
 
@@ -274,20 +275,20 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
           </div>
 
-          {/* Tipo Torg */}
+          {/* Tipo */}
           <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs">
             {[
-              { val: "",       label: `Todos (${itens.length})` },
-              { val: "torg",   label: `Matéria Prima (${totalTorg})` },
-              { val: "outros", label: `Outros (${itens.length - totalTorg})` },
+              { val: "",         label: `Todos (${itens.length})` },
+              { val: "materia",  label: `Matéria Prima (${totalMateria})` },
+              { val: "outros",   label: `Outros (${itens.length - totalMateria})` },
             ].map(({ val, label }) => (
               <button
                 key={val}
-                onClick={() => setFiltroTorg(val)}
+                onClick={() => setFiltroTipo(val)}
                 className={`px-3 py-2 transition-colors ${
-                  filtroTorg === val
+                  filtroTipo === val
                     ? val === "" ? "bg-torg-blue text-white"
-                      : val === "torg" ? "bg-emerald-600 text-white"
+                      : val === "materia" ? "bg-emerald-600 text-white"
                       : "bg-gray-600 text-white"
                     : "bg-white text-torg-gray hover:bg-gray-50"
                 } ${val !== "" ? "border-l border-gray-200" : ""}`}
@@ -339,9 +340,6 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
             <table className="w-full text-sm">
               <thead className="bg-gray-50/60 border-b border-gray-100">
                 <tr>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap w-10">
-                    Torg
-                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                     Código
                   </th>
@@ -371,25 +369,6 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
                   const semEstoque = !(i.qtdAtual > 0);
                   return (
                     <tr key={i.id} className={`hover:bg-gray-50 transition-colors ${semEstoque ? "opacity-60" : ""}`}>
-                      {/* Toggle Torg */}
-                      <td className="px-3 py-3 text-center">
-                        {isAdmin ? (
-                          <ToggleEstoqueTorg
-                            itemId={i.id}
-                            initial={i.estoqueTorg}
-                            onChanged={(v) =>
-                              setItens((prev) =>
-                                prev.map((x) => (x.id === i.id ? { ...x, estoqueTorg: v } : x))
-                              )
-                            }
-                          />
-                        ) : (
-                          <span
-                            title={i.estoqueTorg ? "Matéria Prima" : "Outro"}
-                            className={`inline-block w-3 h-3 rounded-full ${i.estoqueTorg ? "bg-emerald-500" : "bg-gray-200"}`}
-                          />
-                        )}
-                      </td>
                       {/* Código */}
                       <td className="px-4 py-3 font-mono text-xs text-torg-gray whitespace-nowrap">
                         {i.codigoOmie}
@@ -448,50 +427,6 @@ export default function EstoqueClient({ itensIniciais, configInicial, isAdmin })
   );
 }
 
-// ── Toggle Estoque Torg (admin) ────────────────────────────────────────────────
-function ToggleEstoqueTorg({ itemId, initial, onChanged }) {
-  const [valor, setValor] = useState(!!initial);
-  const [salvando, setSalvando] = useState(false);
-
-  const toggle = async () => {
-    if (salvando) return;
-    const novo = !valor;
-    setSalvando(true);
-    setValor(novo);
-    try {
-      const res = await fetch(`/api/estoque/item/${itemId}/torg`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estoqueTorg: novo }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Erro");
-      }
-      onChanged?.(novo);
-    } catch (e) {
-      setValor(!novo);
-      alert("Falhou: " + e.message);
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  return (
-    <button
-      onClick={toggle}
-      disabled={salvando}
-      title={valor ? "Matéria Prima — clique para desmarcar" : "Outro — clique para marcar como Matéria Prima"}
-      className={`relative inline-flex items-center h-5 w-9 rounded-full transition-colors ${
-        valor ? "bg-emerald-500" : "bg-gray-300"
-      } ${salvando ? "opacity-50" : "hover:opacity-80"}`}
-    >
-      <span className={`inline-block w-4 h-4 transform bg-white rounded-full shadow transition-transform ${
-        valor ? "translate-x-4" : "translate-x-0.5"
-      }`} />
-    </button>
-  );
-}
 
 // ── Painel de diagnóstico ──────────────────────────────────────────────────────
 function DiagnosticoPanel({ diagnostico, onClose }) {
