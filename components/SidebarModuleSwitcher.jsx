@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import {
   FolderKanban,
   ShoppingCart,
-  ClipboardList,
+  Columns3,
   Factory,
   DollarSign,
   Truck,
@@ -39,7 +39,7 @@ const MODULOS = [
     href: "/rm",
     label: "Requisições",
     desc: "Criar e acompanhar RMs",
-    icon: ClipboardList,
+    icon: Columns3,
     cor: "bg-cyan-100 text-cyan-700",
     modulos: ["ENGENHARIA", "ALMOXARIFADO"],
   },
