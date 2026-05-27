@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import XLSX from "xlsx";
+import * as XLSX from "xlsx";
 
 export async function GET() {
   try {
@@ -100,7 +100,8 @@ export async function GET() {
     XLSX.utils.book_append_sheet(wb, wsRef, "Referência");
 
     // Gerar buffer
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const buf = Buffer.from(out);
 
     return new NextResponse(buf, {
       headers: {
