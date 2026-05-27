@@ -308,11 +308,12 @@ export async function GET() {
     resultado.posEstoque = { ok: false, erro: e.message };
   }
 
-  // 6) ListarMovEstoque — outro endpoint que nao depende do cadastro de produtos
+  // 6) ListarMovEstoque — 365 dias para capturar produtos com movimentacao historica
+  // (incluindo chapas de aco que foram a zero). Expoe campos reais da resposta.
   try {
     const ate = new Date();
     const de = new Date();
-    de.setDate(de.getDate() - 7);
+    de.setFullYear(de.getFullYear() - 1); // 365 dias atras
     const fmt = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
     const data = await callOmie(OMIE_MOV_URL, {
       call: "ListarMovEstoque",
@@ -320,17 +321,27 @@ export async function GET() {
       app_secret: APP_SECRET,
       param: [{
         nPagina: 1,
-        nRegPorPagina: 10,
+        nRegPorPagina: 20,
         dDtInicial: fmt(de),
         dDtFinal: fmt(ate),
       }],
     });
-    const lista = data.movimentos || [];
+    // Tenta varios campos possiveis onde o array de movimentos pode estar
+    const lista =
+      data.movimentos ||
+      data.listaMovimentos ||
+      data.lista_movimentos ||
+      data.registros ||
+      (Array.isArray(data) ? data : []);
     resultado.movEstoque = {
       ok: true,
       totalNaPagina: lista.length,
-      totalPaginas: Number(data.nTotPaginas) || null,
+      totalPaginas: Number(data.nTotPaginas || data.total_de_paginas) || null,
+      totalRegistros: Number(data.nTotRegistros || data.nRegistros || data.total_de_registros) || null,
+      camposResposta: Object.keys(data), // campos reais da resposta para debug
       exemplo: lista[0] || null,
+      // Se lista vazia expoe resposta bruta para identificar campo correto
+      respostaBruta: lista.length === 0 ? data : undefined,
     };
   } catch (e) {
     resultado.movEstoque = { ok: false, erro: e.message };

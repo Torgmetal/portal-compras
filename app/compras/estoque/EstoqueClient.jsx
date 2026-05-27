@@ -549,9 +549,20 @@ function DiagnosticoPanel({ diagnostico, onClose }) {
       {/* Testes com filtro */}
       {diagnostico.testesComFiltro?.map((t, i) => (
         <div key={i} className={`rounded p-2 text-xs ${t.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
-          {t.ok
-            ? <>✓ <strong>ListarProdutos (familia {t.categoria}):</strong> {t.totalRegistros ?? "?"} produtos em {t.totalPaginas ?? "?"} páginas</>
-            : <>✗ <strong>ListarProdutos (familia {t.categoria}):</strong> {t.erro}</>}
+          {t.ok ? (
+            t.descricao_produto != null ? (
+              // Resultado de ConsultarProduto
+              <>
+                <p>✓ <strong>ConsultarProduto ({t.categoria}):</strong> {t.descricao_produto || "?"}</p>
+                <p className="mt-1">família: <strong>{t.descricao_familia || "—"}</strong> (código: <code>{t.codigo_familia || "—"}</code>)</p>
+                {t.inativo !== undefined && <p className="mt-0.5">inativo: {String(t.inativo)}</p>}
+              </>
+            ) : (
+              <>✓ <strong>ListarProdutos ({t.descricao || t.categoria}):</strong> {t.totalRegistros ?? "?"} produtos em {t.totalPaginas ?? "?"} páginas{t.totalNaPagina != null ? ` (${t.totalNaPagina} na pg1)` : ""}</>
+            )
+          ) : (
+            <>✗ <strong>{t.descricao || t.categoria}:</strong> {t.erro}</>
+          )}
         </div>
       ))}
 
@@ -626,9 +637,22 @@ function DiagnosticoPanel({ diagnostico, onClose }) {
       {/* ListarMovEstoque */}
       {diagnostico.movEstoque && (
         <div className={`rounded p-2 text-xs ${diagnostico.movEstoque.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
-          {diagnostico.movEstoque.ok
-            ? <>✓ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.totalNaPagina} movimentações na 1ª página</>
-            : <>✗ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.erro}</>}
+          {diagnostico.movEstoque.ok ? (
+            <>
+              <p>✓ <strong>ListarMovEstoque (365 dias):</strong> {diagnostico.movEstoque.totalNaPagina ?? "?"} movs na pg1, {diagnostico.movEstoque.totalPaginas ?? "?"} págs, {diagnostico.movEstoque.totalRegistros ?? "?"} total</p>
+              {diagnostico.movEstoque.camposResposta && (
+                <p className="mt-1 text-amber-700">Campos: <span className="font-mono">{diagnostico.movEstoque.camposResposta.join(", ")}</span></p>
+              )}
+              {diagnostico.movEstoque.exemplo && (
+                <details className="mt-1">
+                  <summary className="cursor-pointer">Ver exemplo de movimento</summary>
+                  <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto max-h-40">{JSON.stringify(diagnostico.movEstoque.exemplo, null, 2)}</pre>
+                </details>
+              )}
+            </>
+          ) : (
+            <>✗ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.erro}</>
+          )}
         </div>
       )}
     </div>
