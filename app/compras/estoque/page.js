@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import EstoqueClient from "./EstoqueClient";
+import EstoquePageWrapper from "./EstoquePageWrapper";
 
+export const dynamic = "force-dynamic";
 
 export default async function EstoquePage() {
   const user = await requireRole(["ADMIN", "COMPRAS"]);
@@ -10,7 +11,7 @@ export default async function EstoquePage() {
     prisma.estoqueItem.findMany({
       where: { ativo: true },
       orderBy: { descricao: "asc" },
-      take: 1000, // Limite de segurança; catálogo Omie raramente passa disso
+      take: 1000,
     }),
     prisma.configEstoque.findFirst(),
   ]);
@@ -18,5 +19,5 @@ export default async function EstoquePage() {
   const data = JSON.parse(JSON.stringify(items));
   const cfg = JSON.parse(JSON.stringify(config || { categoriasOmie: ["3.1"], ultimaSincProd: null, ultimaSincMov: null }));
 
-  return <EstoqueClient itensIniciais={data} configInicial={cfg} isAdmin={user.role === "ADMIN"} />;
+  return <EstoquePageWrapper itensIniciais={data} configInicial={cfg} isAdmin={user.role === "ADMIN"} />;
 }

@@ -1159,6 +1159,45 @@ model EstoqueAlocacao {
   @@index([movimentacaoId])
 }
 
+// ─── ESTOQUE FÍSICO (MATÉRIA-PRIMA) ────────────────────────
+// Dados importados da planilha "Estoque MP.xlsx" no SharePoint.
+// Cada linha representa um lote/peça de material no pátio da fábrica.
+// Recarregado por completo a cada sync (delete + insert).
+model EstoqueFisico {
+  id          String    @id @default(cuid())
+  perfil      String    // Tipo: W, L, Ø, CH, TB, U, C, etc.
+  bitola      String    // Dimensão: 310X79, 4X1/2, 12.7, etc.
+  qtd         Int       @default(1)
+  comprimento Float?    // mm
+  largura     Float?    // mm
+  area        Float?    // m²
+  peso        Float     @default(0) // kg
+  origem      String?   // De onde veio
+  destino     String?   // Para onde vai
+  obra        String?   // Código da obra (T67, T60, etc.)
+  aco         String?   // Grau do aço (A36, A572-Gr 50, etc.)
+  dataLanc    DateTime? // Data de lançamento
+  inspCorr    String?   // Nº inspeção / corrida
+  opReserva   String?   // OP de reserva
+  sheet       String    // Aba de origem: ESTOQUE_01 | SAIDA_ESTOQUE
+  createdAt   DateTime  @default(now())
+
+  @@index([perfil])
+  @@index([aco])
+  @@index([obra])
+  @@index([sheet])
+}
+
+// Metadata da ultima sync do estoque físico SharePoint.
+model EstoqueFisicoSync {
+  id            String   @id @default("singleton")
+  ultimaSync    DateTime
+  totalItens    Int      @default(0)
+  pesoTotalKg   Float    @default(0)
+  sheets        String[] // quais abas foram importadas
+  updatedAt     DateTime @updatedAt
+}
+
 // ─── CONTROLE DE PECAS (CONJUNTOS) ─────────────────────────
 // Lista de Estrutura (LE / FORM 21) importada por OP. Cada conjunto tem
 // marca unica dentro da OP, qte/peso/descricao e status que avanca pelo
