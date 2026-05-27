@@ -10,6 +10,7 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const opId = searchParams.get("opId");
+    const tipoRM = searchParams.get("tipoRM"); // "ENGENHARIA" | "INTERNA" | null (tudo)
 
     // Busca todos os RMItems ativos (nao cancelados) com suas cotacoes vencedoras e pedidos
     const where = {
@@ -17,6 +18,7 @@ export async function GET(req) {
       rm: {
         status: { not: "CANCELADA" },
         ...(opId ? { opId } : {}),
+        ...(tipoRM ? { tipoRM } : {}),
       },
     };
 
@@ -138,9 +140,9 @@ export async function GET(req) {
         rmItemId: item.id,
         rmId: item.rm.id,
         rmNumero: item.rm.numero,
-        opId: item.rm.op.id,
-        opNumero: item.rm.op.numero,
-        opCliente: item.rm.op.cliente,
+        opId: item.rm.op?.id || null,
+        opNumero: item.rm.op?.numero || null,
+        opCliente: item.rm.op?.cliente || null,
         qtd: qtdEfetiva,
         qtdRecebida: qtdRecebidaFinal,
         status: item.status,
@@ -156,7 +158,7 @@ export async function GET(req) {
       });
 
       // Acumula OPs e RMs unicas
-      grupo.ops.set(item.rm.op.id, `OP ${item.rm.op.numero}`);
+      if (item.rm.op) grupo.ops.set(item.rm.op.id, `OP ${item.rm.op.numero}`);
       grupo.rms.set(item.rm.id, `RM ${item.rm.numero}`);
     }
 

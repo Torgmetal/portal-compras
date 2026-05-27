@@ -9,7 +9,7 @@ export default async function SaldoMateriaisPage() {
     <div>
       <h1 className="text-2xl font-bold text-torg-dark">Saldo de Materiais</h1>
       <p className="text-torg-gray mt-1 mb-6">
-        Acompanhamento consolidado dos materiais solicitados, pedidos e recebidos
+        Acompanhamento consolidado: solicitado, pedido e recebido — por tipo de RM
       </p>
       <SaldoMateriaisClient />
     </div>

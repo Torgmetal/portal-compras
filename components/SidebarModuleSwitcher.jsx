@@ -41,7 +41,7 @@ const MODULOS = [
     desc: "Criar e acompanhar RMs",
     icon: ClipboardList,
     cor: "bg-cyan-100 text-cyan-700",
-    modulos: ["ENGENHARIA"],
+    modulos: ["ENGENHARIA", "ALMOXARIFADO"],
   },
   {
     href: "/producao",

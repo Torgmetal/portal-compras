@@ -28,13 +28,26 @@ export default async function MinhasRMs({ searchParams }) {
 
   // ADMIN e COMPRAS veem tudo; demais (engenharia, almoxarifado) veem só as suas
   const isAdminOuCompras = ["ADMIN", "COMPRAS"].includes(user.role);
+  const modulos = user.modulos ?? [];
   const baseWhere = isAdminOuCompras ? {} : { createdById: user.id };
   const statusFilter = verArquivadas
     ? { status: { in: ["PEDIDO_GERADO", "CANCELADA"] } }
     : { status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] } };
 
+  // Filtra por tipo de RM conforme modulo do usuario:
+  // - ALMOXARIFADO (sem ENGENHARIA): ve so INTERNA
+  // - ENGENHARIA (sem ALMOXARIFADO): ve so ENGENHARIA
+  // - Ambos, ADMIN ou COMPRAS: ve tudo
+  const isAlmoxSemEng = !isAdminOuCompras && modulos.includes("ALMOXARIFADO") && !modulos.includes("ENGENHARIA");
+  const isEngSemAlmox = !isAdminOuCompras && modulos.includes("ENGENHARIA") && !modulos.includes("ALMOXARIFADO");
+  const tipoFilter = isAlmoxSemEng
+    ? { tipoRM: "INTERNA" }
+    : isEngSemAlmox
+      ? { tipoRM: "ENGENHARIA" }
+      : {};
+
   const rms = await prisma.rM.findMany({
-    where: { ...baseWhere, ...statusFilter },
+    where: { ...baseWhere, ...statusFilter, ...tipoFilter },
     orderBy: { createdAt: "desc" },
     take: 50,
     include: {
@@ -49,12 +62,18 @@ export default async function MinhasRMs({ searchParams }) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">
-            {isAdminOuCompras ? "Todas as RMs" : "Minhas RMs"}
+            {isAdminOuCompras
+              ? "Todas as RMs"
+              : isAlmoxSemEng
+                ? "RMs Internas"
+                : "Minhas RMs"}
           </h2>
           <p className="text-sm text-torg-gray mt-1">
             {verArquivadas
               ? "RMs concluídas (com pedido gerado) e canceladas."
-              : "Requisições em andamento. Quando viram pedido aparecem no histórico."}
+              : isAlmoxSemEng
+                ? "Requisições internas (consumíveis, serviços, EPIs). Quando viram pedido aparecem no histórico."
+                : "Requisições em andamento. Quando viram pedido aparecem no histórico."}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -94,7 +113,9 @@ export default async function MinhasRMs({ searchParams }) {
           {!verArquivadas && (
             <>
               <p className="text-sm text-torg-gray mt-1 mb-4">
-                Crie sua primeira RM escolhendo a OP de origem.
+                {isAlmoxSemEng
+                  ? "Crie sua primeira RM interna pra solicitar materiais de consumo."
+                  : "Crie sua primeira RM escolhendo a OP de origem."}
               </p>
               <Link
                 href="/rm/nova"
@@ -112,8 +133,18 @@ export default async function MinhasRMs({ searchParams }) {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nº RM</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP / Obra</th>
+                  {/* Tipo: so mostra se vendo todos os tipos (ADMIN/COMPRAS/ambos modulos) */}
+                  {!isAlmoxSemEng && !isEngSemAlmox && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  )}
+                  {/* OP / Obra: so mostra se nao for visao exclusiva interna */}
+                  {!isAlmoxSemEng && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">OP / Obra</th>
+                  )}
+                  {/* Setor: mostra pra visao interna (quem pediu) */}
+                  {isAlmoxSemEng && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Setor</th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Itens</th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cotações</th>
@@ -134,27 +165,33 @@ export default async function MinhasRMs({ searchParams }) {
                           {rm.numero}
                         </Link>
                       </td>
-                      <td className="px-6 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.className}`}>
-                          {t.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-torg-dark">
-                        {rm.op ? (
-                          <>
-                            <span className="font-mono">{rm.op.numero}</span>
-                            <span className="text-xs text-torg-gray block">{rm.op.cliente}</span>
-                          </>
-                        ) : (
-                          <span className="text-torg-gray text-xs">—</span>
-                        )}
-                      </td>
+                      {!isAlmoxSemEng && !isEngSemAlmox && (
+                        <td className="px-6 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.className}`}>
+                            {t.label}
+                          </span>
+                        </td>
+                      )}
+                      {!isAlmoxSemEng && (
+                        <td className="px-6 py-3 text-torg-dark">
+                          {rm.op ? (
+                            <>
+                              <span className="font-mono">{rm.op.numero}</span>
+                              <span className="text-xs text-torg-gray block">{rm.op.cliente}</span>
+                            </>
+                          ) : (
+                            <span className="text-torg-gray text-xs">—</span>
+                          )}
+                        </td>
+                      )}
+                      {isAlmoxSemEng && (
+                        <td className="px-6 py-3 text-torg-gray text-xs">{rm.setor || "—"}</td>
+                      )}
                       <td className="px-6 py-3 text-torg-dark max-w-xs truncate">{rm.descricao}</td>
                       <td className="px-6 py-3 text-center text-torg-gray">{rm._count.itens}</td>
                       <td className="px-6 py-3 text-center text-torg-gray">{rm._count.cotacoes}</td>
                       <td className="px-6 py-3 text-torg-gray text-xs">
                         {rm.createdBy?.name}
-                        {rm.setor && <span className="text-torg-gray/70"> · {rm.setor}</span>}
                       </td>
                       <td className="px-6 py-3 text-torg-gray">{fmtData(rm.createdAt)}</td>
                       <td className="px-6 py-3">

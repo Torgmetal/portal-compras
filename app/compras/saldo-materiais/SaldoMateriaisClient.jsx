@@ -20,6 +20,7 @@ const fmtDataCurta = (d) => {
 };
 
 export default function SaldoMateriaisClient() {
+  const [tipoRM, setTipoRM] = useState("ENGENHARIA"); // "ENGENHARIA" | "INTERNA"
   const [materiais, setMateriais] = useState([]);
   const [pesoTotais, setPesoTotais] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,11 +32,12 @@ export default function SaldoMateriaisClient() {
   const [expandido, setExpandido] = useState(null);
   const [modalRecebimento, setModalRecebimento] = useState(null); // { rmItemId, descricao, qtd, unidade, jaRecebido }
 
-  const fetchData = async () => {
+  const fetchData = async (tipo) => {
+    const t = tipo || tipoRM;
     setLoading(true);
     setErro("");
     try {
-      const res = await fetch("/api/compras/saldo-materiais");
+      const res = await fetch(`/api/compras/saldo-materiais?tipoRM=${t}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao carregar");
       setMateriais(data.data || []);
@@ -45,6 +47,16 @@ export default function SaldoMateriaisClient() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const trocarTipo = (t) => {
+    setTipoRM(t);
+    setFiltroOP("");
+    setFiltroFornecedor("");
+    setFiltroSituacao("");
+    setBusca("");
+    setExpandido(null);
+    fetchData(t);
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -121,6 +133,30 @@ export default function SaldoMateriaisClient() {
 
   return (
     <div className="space-y-5">
+      {/* Abas: Materiais de Obra vs Consumíveis */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        <button
+          onClick={() => trocarTipo("ENGENHARIA")}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tipoRM === "ENGENHARIA"
+              ? "bg-white text-torg-dark shadow-sm"
+              : "text-torg-gray hover:text-torg-dark"
+          }`}
+        >
+          Materiais de Obra
+        </button>
+        <button
+          onClick={() => trocarTipo("INTERNA")}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tipoRM === "INTERNA"
+              ? "bg-white text-torg-dark shadow-sm"
+              : "text-torg-gray hover:text-torg-dark"
+          }`}
+        >
+          Consumíveis / Serviços
+        </button>
+      </div>
+
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KPI label="Materiais distintos" value={kpis.total} Icon={Layers} color="torg-blue"
@@ -378,8 +414,14 @@ function MaterialRow({ mat, isExpanded, onToggle, onRegistrar }) {
                     <tr key={d.rmItemId}>
                       <td className="px-2 py-1.5 font-mono text-torg-gray">{d.rmNumero}</td>
                       <td className="px-2 py-1.5">
-                        <span className="font-medium text-torg-dark">OP {d.opNumero}</span>
-                        <span className="text-torg-gray ml-1">— {d.opCliente}</span>
+                        {d.opNumero ? (
+                          <>
+                            <span className="font-medium text-torg-dark">OP {d.opNumero}</span>
+                            <span className="text-torg-gray ml-1">— {d.opCliente}</span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-torg-gray">Interna</span>
+                        )}
                       </td>
                       <td className="px-2 py-1.5 text-right tabular-nums">{fmtQtd(d.qtd, mat.unidade)}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums">
