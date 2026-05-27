@@ -546,6 +546,65 @@ function DiagnosticoPanel({ diagnostico, onClose }) {
         </div>
       )}
 
+      {/* ListarProdutosResumido — campos reais */}
+      {diagnostico.produtosResumido && (
+        <div className={`rounded p-2 text-xs ${diagnostico.produtosResumido.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
+          {diagnostico.produtosResumido.ok ? (
+            <>
+              <p>✓ <strong>ListarProdutosResumido (sem filtro):</strong> {diagnostico.produtosResumido.totalNaPagina ?? "?"} produtos na pg1, {diagnostico.produtosResumido.totalRegistros ?? "?"} total</p>
+              {diagnostico.produtosResumido.camposResposta && (
+                <p className="mt-1 text-amber-700">Campos da resposta: <span className="font-mono">{diagnostico.produtosResumido.camposResposta.join(", ")}</span></p>
+              )}
+              {diagnostico.produtosResumido.exemplo && (
+                <details className="mt-1">
+                  <summary className="cursor-pointer text-emerald-700">Ver exemplo</summary>
+                  <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto">{JSON.stringify(diagnostico.produtosResumido.exemplo, null, 2)}</pre>
+                </details>
+              )}
+            </>
+          ) : <>✗ <strong>ListarProdutosResumido:</strong> {diagnostico.produtosResumido.erro}</>}
+        </div>
+      )}
+
+      {/* ListarProdutos completo — campos reais */}
+      {diagnostico.produtosCompleto && (
+        <div className={`rounded p-2 text-xs ${diagnostico.produtosCompleto.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
+          {diagnostico.produtosCompleto.ok ? (
+            <>
+              <p>✓ <strong>ListarProdutos (sem filtro):</strong> {diagnostico.produtosCompleto.totalNaPagina ?? "?"} na pg1, {diagnostico.produtosCompleto.totalRegistros ?? "?"} total, {diagnostico.produtosCompleto.totalPaginas ?? "?"} páginas</p>
+              {diagnostico.produtosCompleto.camposResposta && (
+                <p className="mt-1 text-amber-700">Campos: <span className="font-mono">{diagnostico.produtosCompleto.camposResposta.join(", ")}</span></p>
+              )}
+              {diagnostico.produtosCompleto.exemplo && (
+                <details className="mt-1">
+                  <summary className="cursor-pointer text-emerald-700">Ver 1º produto retornado</summary>
+                  <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto">{JSON.stringify(diagnostico.produtosCompleto.exemplo, null, 2)}</pre>
+                </details>
+              )}
+            </>
+          ) : <>✗ <strong>ListarProdutos (sem filtro):</strong> {diagnostico.produtosCompleto.erro}</>}
+        </div>
+      )}
+
+      {/* ConsultarProduto — teste com 1º produto do ListarPosEstoque */}
+      {diagnostico.consultarProdutoTeste && (
+        <div className={`rounded p-2 text-xs ${diagnostico.consultarProdutoTeste.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
+          {diagnostico.consultarProdutoTeste.ok ? (
+            <>
+              <p>✓ <strong>ConsultarProduto</strong> (código <code>{diagnostico.consultarProdutoTeste.codigoTestado}</code>, nCodProd={diagnostico.consultarProdutoTeste.nCodProd})</p>
+              <p className="mt-1">familia: <strong>{diagnostico.consultarProdutoTeste.descricao_familia || "—"}</strong> (código: {diagnostico.consultarProdutoTeste.codigo_familia || "—"})</p>
+              {diagnostico.consultarProdutoTeste.camposResposta && (
+                <p className="mt-1 text-amber-700">Campos: <span className="font-mono">{diagnostico.consultarProdutoTeste.camposResposta.join(", ")}</span></p>
+              )}
+              <details className="mt-1">
+                <summary className="cursor-pointer text-emerald-700">Variantes de campo família</summary>
+                <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto">{JSON.stringify(diagnostico.consultarProdutoTeste.familiaVariantes, null, 2)}</pre>
+              </details>
+            </>
+          ) : <>✗ <strong>ConsultarProduto:</strong> {diagnostico.consultarProdutoTeste.erro}</>}
+        </div>
+      )}
+
       {/* ListarMovEstoque */}
       {diagnostico.movEstoque && (
         <div className={`rounded p-2 text-xs ${diagnostico.movEstoque.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>

@@ -105,41 +105,100 @@ export async function GET() {
     resultado.testesComFiltro.push(teste);
   }
 
-  // 3) ListarProdutosResumido — testa sem filtro pra documentar
+  // 3) ListarProdutosResumido — sem filtro, expõe campos reais da resposta
   try {
     const data = await callOmie(OMIE_PROD_URL, {
       call: "ListarProdutosResumido",
       app_key: APP_KEY,
       app_secret: APP_SECRET,
-      param: [{ pagina: 1, registros_por_pagina: 10, apenas_importado_api: "N" }],
+      param: [{ pagina: 1, registros_por_pagina: 3, apenas_importado_api: "N" }],
     });
-    const lista = data.produto_servico_resumido || data.produto_resumido || [];
+    // Tenta vários nomes de campo que Omie pode usar
+    const lista =
+      data.produto_servico_resumido ||
+      data.produto_resumido ||
+      data.produto_servico_cadastro ||
+      data.produtos ||
+      [];
     resultado.produtosResumido = {
       ok: true,
       totalNaPagina: lista.length,
-      totalRegistros: Number(data.total_de_registros) || null,
-      totalPaginas: Number(data.total_de_paginas) || null,
+      totalRegistros: Number(data.total_de_registros || data.nTotRegistros) || null,
+      totalPaginas:   Number(data.total_de_paginas   || data.nTotPaginas)   || null,
+      camposResposta: Object.keys(data), // expõe nomes reais dos campos
+      exemplo: lista[0] || null,         // mostra 1 produto para inspecionar campos
     };
   } catch (e) {
     resultado.produtosResumido = { ok: false, erro: e.message };
   }
 
-  // 4) ListarProdutos SEM filtro — o que estava quebrando
+  // 4) ListarProdutos SEM filtro — expõe resposta bruta para debugar
   try {
     const data = await callOmie(OMIE_PROD_URL, {
       call: "ListarProdutos",
       app_key: APP_KEY,
       app_secret: APP_SECRET,
-      param: [{ pagina: 1, registros_por_pagina: 5, apenas_importado_api: "N" }],
+      param: [{ pagina: 1, registros_por_pagina: 3, apenas_importado_api: "N" }],
     });
-    const lista = data.produto_servico_cadastro || [];
+    const lista =
+      data.produto_servico_cadastro ||
+      data.produto_cadastro ||
+      data.produtos ||
+      [];
     resultado.produtosCompleto = {
       ok: true,
       totalNaPagina: lista.length,
-      totalPaginas: Number(data.total_de_paginas) || null,
+      totalRegistros: Number(data.total_de_registros || data.nTotRegistros) || null,
+      totalPaginas:   Number(data.total_de_paginas   || data.nTotPaginas)   || null,
+      camposResposta: Object.keys(data), // nomes reais dos campos da resposta
+      exemplo: lista[0] ? {              // 1º produto com todos os campos expostos
+        ...lista[0],
+      } : null,
     };
   } catch (e) {
     resultado.produtosCompleto = { ok: false, erro: e.message };
+  }
+
+  // 4b) ConsultarProduto — testa com o 1º produto do ListarPosEstoque (nCodProd)
+  // para verificar se o endpoint funciona e quais campos retorna
+  try {
+    const hoje = new Date();
+    const dDataPosicao = `${String(hoje.getDate()).padStart(2,"0")}/${String(hoje.getMonth()+1).padStart(2,"0")}/${hoje.getFullYear()}`;
+    const posData = await callOmie(OMIE_ESTOQUE_URL, {
+      call: "ListarPosEstoque",
+      app_key: APP_KEY,
+      app_secret: APP_SECRET,
+      param: [{ nPagina: 1, nRegPorPagina: 1, dDataPosicao }],
+    });
+    const primeiroProd = (posData.produtos || [])[0];
+    if (primeiroProd?.nCodProd) {
+      const det = await callOmie(OMIE_PROD_URL, {
+        call: "ConsultarProduto",
+        app_key: APP_KEY,
+        app_secret: APP_SECRET,
+        param: [{ codigo_produto: Number(primeiroProd.nCodProd) }],
+      });
+      resultado.consultarProdutoTeste = {
+        ok: true,
+        codigoTestado: primeiroProd.cCodigo,
+        nCodProd: primeiroProd.nCodProd,
+        camposResposta: Object.keys(det),
+        codigo_familia: det.codigo_familia || null,
+        descricao_familia: det.descricao_familia || null,
+        // Mostra campos de família com variações de nome
+        familiaVariantes: {
+          codigo_familia:    det.codigo_familia,
+          descricao_familia: det.descricao_familia,
+          cCodFamilia:       det.cCodFamilia,
+          cDesFamilia:       det.cDesFamilia,
+          familia:           det.familia,
+        },
+      };
+    } else {
+      resultado.consultarProdutoTeste = { ok: false, erro: "Nenhum produto em ListarPosEstoque para testar" };
+    }
+  } catch (e) {
+    resultado.consultarProdutoTeste = { ok: false, erro: e.message };
   }
 
   // 5) ListarPosEstoque — endpoint ALTERNATIVO. Le da tabela de posicao de estoque,
