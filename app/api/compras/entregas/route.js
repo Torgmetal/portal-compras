@@ -36,7 +36,13 @@ export async function GET(req) {
             id: true,
             fornecedorNome: true,
             fornecedor: { select: { razaoSocial: true } },
-            rm: { select: { id: true, numero: true } },
+            rm: {
+              select: {
+                id: true, numero: true,
+                opId: true,
+                op: { select: { id: true, numero: true, cliente: true, obra: true } },
+              },
+            },
             itens: {
               where: { vencedor: true },
               select: {
@@ -142,6 +148,11 @@ export async function GET(req) {
         || p.cotacao?.fornecedorNome
         || "—";
 
+      // OP: prioriza vínculo direto, fallback pra cotação→RM→OP
+      const opDireta = p.op;
+      const opViaCotacao = p.cotacao?.rm?.op;
+      const op = opDireta || opViaCotacao || null;
+
       return {
         id: p.id,
         numero: p.numeroPedido || p.codigoPedido || "s/n",
@@ -155,10 +166,10 @@ export async function GET(req) {
         dataEntregaReal: p.dataEntregaReal,
         createdAt: p.createdAt,
         observacao: p.observacao,
-        opId: p.op?.id || null,
-        opNumero: p.op?.numero || null,
-        opCliente: p.op?.cliente || null,
-        opObra: p.op?.obra || null,
+        opId: op?.id || null,
+        opNumero: op?.numero || null,
+        opCliente: op?.cliente || null,
+        opObra: op?.obra || null,
         rmId: p.cotacao?.rm?.id || null,
         rmNumero: p.cotacao?.rm?.numero || null,
         cotacaoId: p.cotacaoId,
