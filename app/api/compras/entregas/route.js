@@ -87,25 +87,6 @@ export async function GET(req) {
     const em7dias = new Date(agora.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const data = pedidos.map((p) => {
-      // Calcular status de entrega baseado no prazo
-      const prazo = p.prazoEntregaPrevisto ? new Date(p.prazoEntregaPrevisto) : null;
-      let statusCalc = p.statusEntrega || "SEM_PRAZO";
-
-      // Recalcula se não foi marcado manualmente como entregue
-      if (p.dataEntregaReal) {
-        statusCalc = "ENTREGUE";
-      } else if (prazo) {
-        if (prazo < agora) {
-          statusCalc = "ATRASADO";
-        } else if (prazo <= em7dias) {
-          statusCalc = "PROXIMO";
-        } else {
-          statusCalc = "NO_PRAZO";
-        }
-      } else {
-        statusCalc = "SEM_PRAZO";
-      }
-
       // Itens do pedido — vem da cotação (vencedores) ou dos rmItens diretos
       const itensCotacao = p.cotacao?.itens?.map((ci) => ({
         descricao: ci.rmItem?.descricao || "—",
@@ -127,6 +108,34 @@ export async function GET(req) {
 
       const itens = itensCotacao.length > 0 ? itensCotacao : itensDiretos;
 
+      // Prazo: usa PedidoOmie.prazoEntregaPrevisto; se null, calcula
+      // o prazo mais tardio dos CotacaoItems vencedores (fallback)
+      let prazoFinal = p.prazoEntregaPrevisto;
+      if (!prazoFinal && itensCotacao.length > 0) {
+        const prazosItens = itensCotacao
+          .filter((ci) => ci.prazoEntrega)
+          .map((ci) => new Date(ci.prazoEntrega).getTime());
+        if (prazosItens.length > 0) {
+          prazoFinal = new Date(Math.max(...prazosItens));
+        }
+      }
+
+      // Calcular status de entrega baseado no prazo
+      const prazo = prazoFinal ? new Date(prazoFinal) : null;
+      let statusCalc = "SEM_PRAZO";
+
+      if (p.dataEntregaReal) {
+        statusCalc = "ENTREGUE";
+      } else if (prazo) {
+        if (prazo < agora) {
+          statusCalc = "ATRASADO";
+        } else if (prazo <= em7dias) {
+          statusCalc = "PROXIMO";
+        } else {
+          statusCalc = "NO_PRAZO";
+        }
+      }
+
       // Nome do fornecedor: prioriza cadastro unificado
       const fornecedor = p.cotacao?.fornecedor?.razaoSocial
         || p.fornecedorNome
@@ -142,7 +151,7 @@ export async function GET(req) {
         statusEntrega: statusCalc,
         faturamentoDireto: p.faturamentoDireto,
         criadoManualmente: p.criadoManualmente,
-        prazoEntregaPrevisto: p.prazoEntregaPrevisto,
+        prazoEntregaPrevisto: prazoFinal || p.prazoEntregaPrevisto,
         dataEntregaReal: p.dataEntregaReal,
         createdAt: p.createdAt,
         observacao: p.observacao,
