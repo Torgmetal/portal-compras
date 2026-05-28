@@ -1,6 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Briefcase, PlusCircle, Loader2, AlertCircle, X, Users, ChevronDown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import {
+  Briefcase, PlusCircle, Loader2, AlertCircle, X, Users, ChevronDown,
+  Download, Upload, FileSpreadsheet, CheckCircle2, XCircle,
+} from "lucide-react";
 
 const NIVEIS = [
   { value: "OPERACIONAL", label: "Operacional", cor: "bg-gray-100 text-gray-700" },
@@ -22,12 +25,21 @@ export default function CargosClient() {
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", cbo: "" });
 
-  useEffect(() => {
+  // Import Excel
+  const fileRef = useRef(null);
+  const [importando, setImportando] = useState(false);
+  const [modalImport, setModalImport] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+
+  const carregar = () => {
+    setCarregando(true);
     fetch("/api/rh/cargos").then((r) => r.json())
       .then((d) => { if (!d.success) throw new Error(d.error); setCargos(d.data || []); })
       .catch((e) => setErro(e.message))
       .finally(() => setCarregando(false));
-  }, []);
+  };
+
+  useEffect(() => { carregar(); }, []);
 
   const salvar = async () => {
     setSalvando(true);
@@ -55,6 +67,47 @@ export default function CargosClient() {
     }
   };
 
+  // Baixar modelo Excel
+  const baixarModelo = async () => {
+    try {
+      const res = await fetch("/api/rh/cargos/template");
+      if (!res.ok) throw new Error("Erro ao gerar modelo");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "modelo-cargos-torg.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setErro(e.message);
+    }
+  };
+
+  // Importar planilha
+  const importarPlanilha = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    fileRef.current.value = "";
+
+    setImportando(true);
+    setErro("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/rh/cargos/importar", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok && !data.detalhes) throw new Error(data.error || "Erro na importação");
+      setImportResult(data);
+      setModalImport(true);
+      if (data.criados > 0) carregar();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setImportando(false);
+    }
+  };
+
   if (carregando) {
     return <div className="flex items-center justify-center py-20 text-torg-gray"><Loader2 size={20} className="animate-spin mr-2" /> Carregando cargos…</div>;
   }
@@ -69,15 +122,27 @@ export default function CargosClient() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Cargos</h2>
           <p className="text-sm text-torg-gray mt-1">Funções e níveis hierárquicos</p>
         </div>
-        <button onClick={() => setModal(true)}
-          className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2">
-          <PlusCircle size={16} /> Novo Cargo
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={baixarModelo}
+            className="px-3 py-2 text-sm text-torg-blue border border-torg-blue/30 rounded-lg hover:bg-torg-blue/5 inline-flex items-center gap-2 font-medium">
+            <Download size={15} /> Baixar modelo
+          </button>
+          <button onClick={() => fileRef.current?.click()} disabled={importando}
+            className="px-3 py-2 text-sm text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 inline-flex items-center gap-2 font-medium disabled:opacity-50">
+            {importando ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+            {importando ? "Importando…" : "Importar planilha"}
+          </button>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={importarPlanilha} className="hidden" />
+          <button onClick={() => setModal(true)}
+            className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2">
+            <PlusCircle size={16} /> Novo Cargo
+          </button>
+        </div>
       </div>
 
       {erro && (
@@ -133,7 +198,7 @@ export default function CargosClient() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal Novo Cargo */}
       {modal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !salvando && setModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
@@ -186,6 +251,74 @@ export default function CargosClient() {
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
                 {salvando ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
                 {salvando ? "Salvando…" : "Criar Cargo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Resultado Importação */}
+      {modalImport && importResult && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setModalImport(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <FileSpreadsheet size={20} className="text-torg-blue" />
+                <h3 className="text-lg font-bold text-torg-dark">Resultado da importação</h3>
+              </div>
+              <button onClick={() => setModalImport(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-5 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-2xl font-extrabold text-torg-dark">{importResult.total}</p>
+                  <p className="text-[10px] text-torg-gray uppercase tracking-wider mt-1">Total linhas</p>
+                </div>
+                <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                  <p className="text-2xl font-extrabold text-emerald-700">{importResult.criados}</p>
+                  <p className="text-[10px] text-emerald-600 uppercase tracking-wider mt-1">Criados</p>
+                </div>
+                <div className={`rounded-xl p-3 text-center ${importResult.erros > 0 ? "bg-red-50" : "bg-gray-50"}`}>
+                  <p className={`text-2xl font-extrabold ${importResult.erros > 0 ? "text-red-600" : "text-torg-gray"}`}>{importResult.erros}</p>
+                  <p className={`text-[10px] uppercase tracking-wider mt-1 ${importResult.erros > 0 ? "text-red-500" : "text-torg-gray"}`}>Erros</p>
+                </div>
+              </div>
+              {importResult.detalhes?.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-torg-gray uppercase tracking-wider mb-2">Detalhes por linha</p>
+                  <div className="bg-white rounded-xl border border-gray-100 overflow-hidden max-h-[300px] overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50/60 border-b border-gray-100 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">Linha</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">Nome</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-500">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {importResult.detalhes.map((d, i) => (
+                          <tr key={i} className={d.ok ? "" : "bg-red-50/50"}>
+                            <td className="px-3 py-1.5 text-torg-gray tabular-nums">{d.linha}</td>
+                            <td className="px-3 py-1.5 text-torg-dark font-medium truncate max-w-[180px]">{d.nome || "—"}</td>
+                            <td className="px-3 py-1.5">
+                              {d.ok ? (
+                                <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={12} /> Criado</span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-red-600"><XCircle size={12} /> {d.erro}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t border-gray-100 flex justify-end shrink-0">
+              <button onClick={() => setModalImport(false)}
+                className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90">
+                Fechar
               </button>
             </div>
           </div>
