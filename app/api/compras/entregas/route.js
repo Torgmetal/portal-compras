@@ -38,7 +38,7 @@ export async function GET(req) {
             fornecedor: { select: { razaoSocial: true } },
             rm: {
               select: {
-                id: true, numero: true,
+                id: true, numero: true, tipoRM: true,
                 opId: true,
                 op: { select: { id: true, numero: true, cliente: true, obra: true } },
               },
@@ -62,6 +62,10 @@ export async function GET(req) {
               },
             },
           },
+        },
+        // RM atendida (FD avulsos) — precisa do tipoRM pra separar consumíveis
+        rmAtendida: {
+          select: { id: true, numero: true, tipoRM: true },
         },
         // Itens de RM vinculados diretamente ao pedido (FD avulsos)
         rmItens: {
@@ -153,6 +157,9 @@ export async function GET(req) {
       const opViaCotacao = p.cotacao?.rm?.op;
       const op = opDireta || opViaCotacao || null;
 
+      // Tipo de RM: ENGENHARIA ou INTERNA (consumíveis)
+      const tipoRM = p.cotacao?.rm?.tipoRM || p.rmAtendida?.tipoRM || "ENGENHARIA";
+
       return {
         id: p.id,
         numero: p.numeroPedido || p.codigoPedido || "s/n",
@@ -162,6 +169,7 @@ export async function GET(req) {
         statusEntrega: statusCalc,
         faturamentoDireto: p.faturamentoDireto,
         criadoManualmente: p.criadoManualmente,
+        tipoRM,
         prazoEntregaPrevisto: prazoFinal || p.prazoEntregaPrevisto,
         dataEntregaReal: p.dataEntregaReal,
         createdAt: p.createdAt,
@@ -170,8 +178,8 @@ export async function GET(req) {
         opNumero: op?.numero || null,
         opCliente: op?.cliente || null,
         opObra: op?.obra || null,
-        rmId: p.cotacao?.rm?.id || null,
-        rmNumero: p.cotacao?.rm?.numero || null,
+        rmId: p.cotacao?.rm?.id || p.rmAtendida?.id || null,
+        rmNumero: p.cotacao?.rm?.numero || p.rmAtendida?.numero || null,
         cotacaoId: p.cotacaoId,
         qtdItens: itens.length,
         itens,

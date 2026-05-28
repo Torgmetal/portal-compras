@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, Package, Clock, AlertTriangle,
   CheckCircle2, CalendarDays, Truck, Filter, RefreshCw,
   ChevronDown, ChevronRight, ExternalLink, List, LayoutGrid,
-  FileText, MapPin,
+  FileText, MapPin, Wrench,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -35,9 +35,10 @@ const STATUS_CFG = {
 const KANBAN_ORDER = ["ATRASADO", "PROXIMO", "NO_PRAZO", "SEM_PRAZO", "ENTREGUE"];
 
 export default function CronogramaClient() {
-  const [pedidos, setPedidos] = useState([]);
+  const [pedidosTodos, setPedidosTodos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [abaEntregas, setAbaEntregas] = useState("ENGENHARIA"); // "ENGENHARIA" | "INTERNA"
   const [filtroFornecedor, setFiltroFornecedor] = useState("");
   const [filtroOP, setFiltroOP] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
@@ -47,6 +48,24 @@ export default function CronogramaClient() {
   const [syncResult, setSyncResult] = useState(null);
   const [visao, setVisao] = useState("kanban"); // "kanban" | "tabela"
 
+  // Filtro por tipo de RM — separa entregas de materiais (OP) vs consumíveis
+  const pedidos = useMemo(
+    () => pedidosTodos.filter((p) => (p.tipoRM || "ENGENHARIA") === abaEntregas),
+    [pedidosTodos, abaEntregas]
+  );
+
+  // Contagem por aba pra badges
+  const countPorAba = useMemo(() => {
+    const eng = pedidosTodos.filter((p) => (p.tipoRM || "ENGENHARIA") === "ENGENHARIA");
+    const int = pedidosTodos.filter((p) => (p.tipoRM || "ENGENHARIA") === "INTERNA");
+    return {
+      ENGENHARIA: eng.length,
+      ENGENHARIA_ATRASADO: eng.filter((p) => p.statusEntrega === "ATRASADO").length,
+      INTERNA: int.length,
+      INTERNA_ATRASADO: int.filter((p) => p.statusEntrega === "ATRASADO").length,
+    };
+  }, [pedidosTodos]);
+
   const fetchData = async () => {
     setLoading(true);
     setErro("");
@@ -54,7 +73,7 @@ export default function CronogramaClient() {
       const res = await fetch("/api/compras/entregas");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao carregar");
-      setPedidos(data.data || []);
+      setPedidosTodos(data.data || []);
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -147,7 +166,7 @@ export default function CronogramaClient() {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error || "Erro");
       }
-      setPedidos((prev) => prev.map((p) =>
+      setPedidosTodos((prev) => prev.map((p) =>
         p.id === pedidoId
           ? { ...p, statusEntrega: "ENTREGUE", dataEntregaReal: new Date().toISOString() }
           : p
@@ -181,8 +200,56 @@ export default function CronogramaClient() {
     );
   }
 
+  const trocarAba = (aba) => {
+    setAbaEntregas(aba);
+    setFiltroFornecedor("");
+    setFiltroOP("");
+    setFiltroStatus("");
+    setExpandido(null);
+  };
+
   return (
     <div className="space-y-5">
+      {/* Abas: Materiais vs Consumíveis */}
+      <div className="flex gap-1 border-b border-gray-200">
+        <button onClick={() => trocarAba("ENGENHARIA")}
+          className={`px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2 border-b-2 transition-colors ${
+            abaEntregas === "ENGENHARIA"
+              ? "border-torg-blue text-torg-blue"
+              : "border-transparent text-torg-gray hover:text-torg-dark hover:border-gray-300"
+          }`}>
+          <Truck size={15} /> Materiais (OP)
+          {countPorAba.ENGENHARIA > 0 && (
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-torg-gray">
+              {countPorAba.ENGENHARIA}
+            </span>
+          )}
+          {countPorAba.ENGENHARIA_ATRASADO > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+              {countPorAba.ENGENHARIA_ATRASADO} atraso
+            </span>
+          )}
+        </button>
+        <button onClick={() => trocarAba("INTERNA")}
+          className={`px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2 border-b-2 transition-colors ${
+            abaEntregas === "INTERNA"
+              ? "border-torg-blue text-torg-blue"
+              : "border-transparent text-torg-gray hover:text-torg-dark hover:border-gray-300"
+          }`}>
+          <Wrench size={15} /> Consumíveis
+          {countPorAba.INTERNA > 0 && (
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-torg-gray">
+              {countPorAba.INTERNA}
+            </span>
+          )}
+          {countPorAba.INTERNA_ATRASADO > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+              {countPorAba.INTERNA_ATRASADO} atraso
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {KANBAN_ORDER.map((key) => {
@@ -248,16 +315,18 @@ export default function CronogramaClient() {
             <Filter size={16} />
             <span className="font-medium">Filtros:</span>
           </div>
-          <select
-            value={filtroOP}
-            onChange={(e) => setFiltroOP(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
-          >
-            <option value="">Todas as OPs</option>
-            {ops.map(([id, label]) => (
-              <option key={id} value={id}>{label}</option>
-            ))}
-          </select>
+          {abaEntregas === "ENGENHARIA" && (
+            <select
+              value={filtroOP}
+              onChange={(e) => setFiltroOP(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-1 focus:ring-torg-blue"
+            >
+              <option value="">Todas as OPs</option>
+              {ops.map(([id, label]) => (
+                <option key={id} value={id}>{label}</option>
+              ))}
+            </select>
+          )}
           <select
             value={filtroFornecedor}
             onChange={(e) => setFiltroFornecedor(e.target.value)}
