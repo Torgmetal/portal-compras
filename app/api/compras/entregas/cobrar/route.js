@@ -1,6 +1,6 @@
 // POST /api/compras/entregas/cobrar — envia email de cobranca ao fornecedor
-// de um pedido com entrega atrasada. Lista os itens do pedido, prazo original,
-// dias de atraso e mensagem opcional do comprador.
+// de um pedido com entrega atrasada. Lista os itens pendentes (descontando
+// recebimentos parciais por rmItemId), prazo original e dias de atraso.
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -14,13 +14,10 @@ const schema = z.object({
   mensagem: z.string().optional(),
 });
 
-function escapeHtml(s) {
+function esc(s) {
   return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function fmtData(d) {
@@ -30,8 +27,8 @@ function fmtData(d) {
 
 function fmtQtd(qtd, unidade) {
   if (qtd == null) return "—";
-  const decimals = unidade === "KG" ? 1 : 0;
-  return `${Number(qtd).toFixed(decimals)} ${unidade || ""}`.trim();
+  const dec = unidade === "KG" ? 1 : 0;
+  return `${Number(qtd).toFixed(dec)} ${unidade || ""}`.trim();
 }
 
 export async function POST(req) {
@@ -59,6 +56,7 @@ export async function POST(req) {
     );
   }
 
+  // ── Buscar pedido com itens + recebimentos por item ──
   const pedido = await prisma.pedidoOmie.findUnique({
     where: { id: body.pedidoId },
     select: {
@@ -68,8 +66,6 @@ export async function POST(req) {
       fornecedorNome: true,
       total: true,
       prazoEntregaPrevisto: true,
-      statusEntrega: true,
-      observacao: true,
       opId: true,
       op: { select: { numero: true, cliente: true, obra: true } },
       cotacao: {
@@ -89,19 +85,43 @@ export async function POST(req) {
           itens: {
             where: { vencedor: true },
             select: {
+              id: true,
               precoUnit: true,
               qtdCotada: true,
               prazoEntrega: true,
+              rmItemId: true,
               rmItem: {
-                select: { descricao: true, qtd: true, unidade: true, peso: true },
+                select: {
+                  id: true,
+                  descricao: true,
+                  qtd: true,
+                  unidade: true,
+                  peso: true,
+                  recebimentos: {
+                    select: { qtdRecebida: true },
+                  },
+                },
               },
             },
           },
         },
       },
       rmItens: {
-        select: { descricao: true, qtd: true, unidade: true, peso: true },
-        take: 20,
+        select: {
+          id: true,
+          descricao: true,
+          qtd: true,
+          unidade: true,
+          peso: true,
+          recebimentos: {
+            select: { qtdRecebida: true },
+          },
+        },
+        take: 30,
+      },
+      recebimentos: {
+        select: { qtdRecebida: true, dataRecebimento: true, nfNumero: true },
+        orderBy: { dataRecebimento: "desc" },
       },
     },
   });
@@ -110,7 +130,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Pedido nao encontrado." }, { status: 404 });
   }
 
-  // Resolver email do fornecedor
+  // ── Resolver email ──
   const emailFornecedor =
     pedido.cotacao?.fornecedor?.email ||
     pedido.cotacao?.fornecedorEmail ||
@@ -123,10 +143,8 @@ export async function POST(req) {
     );
   }
 
-  // CC nos emails adicionais
   const emailsCC = pedido.cotacao?.fornecedor?.emailsAdicionais?.filter(Boolean) || [];
 
-  // Dados do pedido
   const numPedido = pedido.numeroPedido || pedido.codigoPedido || "s/n";
   const nomeFornecedor =
     pedido.cotacao?.fornecedor?.razaoSocial ||
@@ -134,96 +152,146 @@ export async function POST(req) {
     pedido.cotacao?.fornecedorNome ||
     "Fornecedor";
 
-  // Itens
-  const itensCotacao = pedido.cotacao?.itens?.map((ci) => ({
-    descricao: ci.rmItem?.descricao || "—",
-    qtd: ci.rmItem?.peso > 0 ? Number(ci.rmItem.peso) : ci.rmItem?.qtd,
-    unidade: ci.rmItem?.peso > 0 ? "KG" : ci.rmItem?.unidade,
-  })) || [];
+  // ── Montar itens com saldo pendente ──
+  // Prioriza itens da cotacao (vencedores); fallback pra rmItens diretos
+  const itensCotacao = pedido.cotacao?.itens?.map((ci) => {
+    const ri = ci.rmItem;
+    const qtdOriginal = ri?.peso > 0 ? Number(ri.peso) : (ri?.qtd || 0);
+    const unidade = ri?.peso > 0 ? "KG" : (ri?.unidade || "UN");
+    const totalRecebido = (ri?.recebimentos || []).reduce((s, r) => s + (r.qtdRecebida || 0), 0);
+    const qtdPendente = Math.max(0, qtdOriginal - totalRecebido);
+    return {
+      descricao: ri?.descricao || "—",
+      qtdOriginal,
+      unidade,
+      totalRecebido,
+      qtdPendente,
+    };
+  }) || [];
 
-  const itensDiretos = pedido.rmItens?.map((ri) => ({
-    descricao: ri.descricao || "—",
-    qtd: ri.peso > 0 ? Number(ri.peso) : ri.qtd,
-    unidade: ri.peso > 0 ? "KG" : ri.unidade,
-  })) || [];
+  const itensDiretos = pedido.rmItens?.map((ri) => {
+    const qtdOriginal = ri.peso > 0 ? Number(ri.peso) : (ri.qtd || 0);
+    const unidade = ri.peso > 0 ? "KG" : (ri.unidade || "UN");
+    const totalRecebido = (ri.recebimentos || []).reduce((s, r) => s + (r.qtdRecebida || 0), 0);
+    const qtdPendente = Math.max(0, qtdOriginal - totalRecebido);
+    return {
+      descricao: ri.descricao || "—",
+      qtdOriginal,
+      unidade,
+      totalRecebido,
+      qtdPendente,
+    };
+  }) || [];
 
-  const itens = itensCotacao.length > 0 ? itensCotacao : itensDiretos;
+  const todosItens = itensCotacao.length > 0 ? itensCotacao : itensDiretos;
 
-  // Prazo e dias de atraso
+  // Separar: pendentes (qtdPendente > 0) e ja entregues
+  const itensPendentes = todosItens.filter((it) => it.qtdPendente > 0);
+  const temParcial = todosItens.some((it) => it.totalRecebido > 0);
+
+  // ── Dados complementares ──
   const prazo = pedido.prazoEntregaPrevisto;
   const prazoTxt = fmtData(prazo);
   const diasAtraso = prazo
-    ? Math.ceil((Date.now() - new Date(prazo).getTime()) / (1000 * 60 * 60 * 24))
+    ? Math.max(0, Math.ceil((Date.now() - new Date(prazo).getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
 
-  // OP info
   const op = pedido.op || pedido.cotacao?.rm?.op;
   const opLabel = op?.numero ? `OP ${op.numero}${op.cliente ? ` — ${op.cliente}` : ""}` : null;
 
   const subject = `Cobranca de Entrega — Pedido #${numPedido} (Torg Metal)`;
 
-  // Tabela de itens HTML
-  const itensHtml = itens.length > 0
+  // ── Email HTML ──
+  // Tabela de itens pendentes
+  const tabelaItensPendentes = itensPendentes.length > 0
     ? `<table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;">
         <thead>
           <tr style="background:#f7fafc;">
-            <th style="text-align:left;padding:8px 10px;border-bottom:1px solid #e2e8f0;color:#4a5568;">Item</th>
-            <th style="text-align:right;padding:8px 10px;border-bottom:1px solid #e2e8f0;color:#4a5568;width:100px;">Qtd</th>
+            <th style="text-align:left;padding:8px 10px;border-bottom:2px solid #e2e8f0;color:#4a5568;">Item</th>
+            <th style="text-align:right;padding:8px 10px;border-bottom:2px solid #e2e8f0;color:#4a5568;width:110px;">Pedido</th>
+            ${temParcial ? `<th style="text-align:right;padding:8px 10px;border-bottom:2px solid #e2e8f0;color:#38a169;width:110px;">Recebido</th>` : ""}
+            <th style="text-align:right;padding:8px 10px;border-bottom:2px solid #e2e8f0;color:#c53030;width:110px;font-weight:700;">Pendente</th>
           </tr>
         </thead>
         <tbody>
-          ${itens.map((it) => `
+          ${itensPendentes.map((it) => `
             <tr>
-              <td style="padding:6px 10px;border-bottom:1px solid #edf2f7;color:#2d3748;">${escapeHtml(it.descricao)}</td>
-              <td style="padding:6px 10px;border-bottom:1px solid #edf2f7;color:#4a5568;text-align:right;">${fmtQtd(it.qtd, it.unidade)}</td>
+              <td style="padding:6px 10px;border-bottom:1px solid #edf2f7;color:#2d3748;">${esc(it.descricao)}</td>
+              <td style="padding:6px 10px;border-bottom:1px solid #edf2f7;color:#718096;text-align:right;">${fmtQtd(it.qtdOriginal, it.unidade)}</td>
+              ${temParcial ? `<td style="padding:6px 10px;border-bottom:1px solid #edf2f7;color:#38a169;text-align:right;">${it.totalRecebido > 0 ? fmtQtd(it.totalRecebido, it.unidade) : "—"}</td>` : ""}
+              <td style="padding:6px 10px;border-bottom:1px solid #edf2f7;color:#c53030;text-align:right;font-weight:600;">${fmtQtd(it.qtdPendente, it.unidade)}</td>
             </tr>
           `).join("")}
         </tbody>
       </table>`
     : "";
 
-  // Mensagem customizada
+  // Itens ja totalmente entregues (se houver parcial)
+  const itensEntregues = todosItens.filter((it) => it.qtdPendente <= 0 && it.totalRecebido > 0);
+
   const mensagemExtra = body.mensagem?.trim()
     ? `<div style="background:#fffff0;border:1px solid #fefcbf;border-radius:8px;padding:14px;margin:16px 0;">
         <p style="color:#744210;font-size:13px;margin:0;line-height:1.5;">
           <strong>Mensagem do comprador:</strong><br>
-          ${escapeHtml(body.mensagem.trim()).replace(/\n/g, "<br>")}
+          ${esc(body.mensagem.trim()).replace(/\n/g, "<br>")}
         </p>
       </div>`
     : "";
 
+  // Texto de intro muda se tem entrega parcial
+  const introEntrega = temParcial
+    ? `Verificamos que o <strong>Pedido de Compra #${esc(numPedido)}</strong> possui
+       <strong>entrega parcial</strong> — alguns itens ja foram recebidos, porem
+       <strong style="color:#c53030;">${itensPendentes.length} ite${itensPendentes.length !== 1 ? "ns" : "m"} ainda ${itensPendentes.length !== 1 ? "estao" : "esta"} pendente${itensPendentes.length !== 1 ? "s" : ""}</strong>
+       ${diasAtraso > 0 ? `com <strong style="color:#c53030;">${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""} de atraso</strong>` : ""}.`
+    : `Verificamos que o <strong>Pedido de Compra #${esc(numPedido)}</strong> consta com entrega
+       ${diasAtraso > 0
+         ? `<strong style="color:#c53030;">em atraso de ${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}</strong>`
+         : "pendente"}.`;
+
   const html = `
-    <div style="font-family:-apple-system,system-ui,sans-serif;max-width:620px;margin:0 auto;color:#2d3748;">
+    <div style="font-family:-apple-system,system-ui,sans-serif;max-width:640px;margin:0 auto;color:#2d3748;">
       <h2 style="color:#c53030;margin-top:0;">Cobranca de Entrega</h2>
-      <p style="color:#4a5568;line-height:1.5;">
-        Ola <strong>${escapeHtml(nomeFornecedor)}</strong>,
+
+      <p style="color:#4a5568;line-height:1.6;">
+        Ola <strong>${esc(nomeFornecedor)}</strong>,
       </p>
-      <p style="color:#4a5568;line-height:1.5;">
-        Verificamos que o <strong>Pedido de Compra #${escapeHtml(numPedido)}</strong> consta com entrega
-        ${diasAtraso > 0
-          ? `<strong style="color:#c53030;">em atraso de ${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}</strong>`
-          : "pendente"}.
+
+      <p style="color:#4a5568;line-height:1.6;">
+        ${introEntrega}
         O prazo previsto era <strong>${prazoTxt}</strong>.
       </p>
-      <p style="color:#4a5568;line-height:1.5;">
+
+      <p style="color:#4a5568;line-height:1.6;">
         Solicitamos, por gentileza, uma <strong>previsao atualizada de entrega</strong> ou
-        confirmacao do despacho do material.
+        confirmacao do despacho dos itens pendentes.
       </p>
 
       ${mensagemExtra}
 
       <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
-        <tr><td style="padding:6px 0;color:#718096;">Pedido</td><td style="padding:6px 0;"><strong>#${escapeHtml(numPedido)}</strong></td></tr>
+        <tr><td style="padding:6px 0;color:#718096;width:150px;">Pedido</td><td style="padding:6px 0;"><strong>#${esc(numPedido)}</strong></td></tr>
         <tr><td style="padding:6px 0;color:#718096;">Prazo previsto</td><td style="padding:6px 0;"><strong>${prazoTxt}</strong></td></tr>
         ${diasAtraso > 0 ? `<tr><td style="padding:6px 0;color:#718096;">Dias em atraso</td><td style="padding:6px 0;"><strong style="color:#c53030;">${diasAtraso}</strong></td></tr>` : ""}
-        ${opLabel ? `<tr><td style="padding:6px 0;color:#718096;">Referencia</td><td style="padding:6px 0;">${escapeHtml(opLabel)}</td></tr>` : ""}
+        ${opLabel ? `<tr><td style="padding:6px 0;color:#718096;">Referencia</td><td style="padding:6px 0;">${esc(opLabel)}</td></tr>` : ""}
       </table>
 
-      ${itens.length > 0 ? `<p style="color:#4a5568;font-weight:600;margin-bottom:4px;">Itens do pedido:</p>${itensHtml}` : ""}
+      ${itensPendentes.length > 0
+        ? `<p style="color:#c53030;font-weight:700;margin-bottom:4px;font-size:14px;">
+            Itens pendentes de entrega:
+          </p>
+          ${tabelaItensPendentes}`
+        : ""}
+
+      ${itensEntregues.length > 0
+        ? `<p style="color:#38a169;font-size:12px;margin-top:16px;">
+            ✓ ${itensEntregues.length} ite${itensEntregues.length !== 1 ? "ns ja" : "m ja"} recebido${itensEntregues.length !== 1 ? "s" : ""} — obrigado.
+          </p>`
+        : ""}
 
       <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;">
       <p style="color:#4a5568;line-height:1.5;font-size:13px;">
-        Favor responder este email com a previsao atualizada.<br>
+        Favor responder este email com a previsao atualizada de entrega dos itens pendentes.<br>
         Agradecemos a atencao.
       </p>
       <p style="color:#a0aec0;font-size:12px;line-height:1.4;">
@@ -233,29 +301,32 @@ export async function POST(req) {
     </div>
   `;
 
-  // Texto plano
-  const textLines = [
+  // ── Texto plano ──
+  const tl = [
     `Ola ${nomeFornecedor},`,
     "",
-    `O Pedido de Compra #${numPedido} consta com entrega ${diasAtraso > 0 ? `em atraso de ${diasAtraso} dia(s)` : "pendente"}.`,
+    temParcial
+      ? `O Pedido #${numPedido} possui entrega parcial — ${itensPendentes.length} ite${itensPendentes.length !== 1 ? "ns" : "m"} pendente${itensPendentes.length !== 1 ? "s" : ""}${diasAtraso > 0 ? ` com ${diasAtraso} dia(s) de atraso` : ""}.`
+      : `O Pedido #${numPedido} consta com entrega ${diasAtraso > 0 ? `em atraso de ${diasAtraso} dia(s)` : "pendente"}.`,
     `Prazo previsto: ${prazoTxt}.`,
     "",
-    "Solicitamos uma previsao atualizada de entrega ou confirmacao do despacho.",
+    "Solicitamos previsao atualizada de entrega dos itens pendentes.",
   ];
   if (body.mensagem?.trim()) {
-    textLines.push("", `Mensagem do comprador: ${body.mensagem.trim()}`);
+    tl.push("", `Mensagem do comprador: ${body.mensagem.trim()}`);
   }
-  if (itens.length > 0) {
-    textLines.push("", "Itens do pedido:");
-    itens.forEach((it) => textLines.push(`  - ${it.descricao} (${fmtQtd(it.qtd, it.unidade)})`));
+  if (itensPendentes.length > 0) {
+    tl.push("", "ITENS PENDENTES:");
+    itensPendentes.forEach((it) => {
+      const partes = [`  - ${it.descricao}: ${fmtQtd(it.qtdPendente, it.unidade)} pendente`];
+      if (it.totalRecebido > 0) partes[0] += ` (${fmtQtd(it.totalRecebido, it.unidade)} ja recebido)`;
+      tl.push(partes[0]);
+    });
   }
-  textLines.push(
-    "",
-    "Favor responder com a previsao atualizada.",
-    "",
-    "Atenciosamente,",
-    "Equipe de Compras — Torg Metal"
-  );
+  if (itensEntregues.length > 0) {
+    tl.push("", `${itensEntregues.length} ite${itensEntregues.length !== 1 ? "ns ja" : "m ja"} recebido${itensEntregues.length !== 1 ? "s" : ""}.`);
+  }
+  tl.push("", "Favor responder com a previsao atualizada.", "", "Atenciosamente,", "Equipe de Compras — Torg Metal");
 
   const destinatarios = [emailFornecedor, ...emailsCC];
 
@@ -263,7 +334,7 @@ export async function POST(req) {
     to: destinatarios,
     subject,
     html,
-    text: textLines.join("\n"),
+    text: tl.join("\n"),
     replyTo: user.email,
   });
 
@@ -284,10 +355,18 @@ export async function POST(req) {
         email: emailFornecedor,
         cc: emailsCC,
         diasAtraso,
+        itensPendentes: itensPendentes.length,
+        itensEntregues: itensEntregues.length,
+        temParcial,
         resendId: result.id,
       },
     },
   });
 
-  return NextResponse.json({ ok: true, emailEnviadoPara: emailFornecedor });
+  return NextResponse.json({
+    ok: true,
+    emailEnviadoPara: emailFornecedor,
+    itensPendentes: itensPendentes.length,
+    itensEntregues: itensEntregues.length,
+  });
 }

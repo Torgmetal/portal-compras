@@ -889,11 +889,15 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
   const p = pedido;
   const [mensagem, setMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
-  const [resultado, setResultado] = useState(null); // { ok, email?, error? }
+  const [resultado, setResultado] = useState(null); // { ok, email?, error?, pendentes?, entregues? }
 
   const diasAtraso = p.prazoEntregaPrevisto
     ? Math.max(0, Math.ceil((Date.now() - new Date(p.prazoEntregaPrevisto).getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
+
+  // Calcula recebido total por pedido (soma dos recebimentos)
+  const totalRecebido = (p.recebimentos || []).reduce((s, r) => s + (r.qtdRecebida || 0), 0);
+  const temParcial = totalRecebido > 0;
 
   const enviar = async () => {
     setEnviando(true);
@@ -906,7 +910,10 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao enviar");
-      setResultado({ ok: true, email: data.emailEnviadoPara });
+      setResultado({
+        ok: true, email: data.emailEnviadoPara,
+        pendentes: data.itensPendentes, entregues: data.itensEntregues,
+      });
     } catch (e) {
       setResultado({ ok: false, error: e.message });
     } finally {
@@ -928,7 +935,9 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
             </div>
             <div>
               <h3 className="text-base font-bold text-torg-dark">Cobrar fornecedor</h3>
-              <p className="text-xs text-torg-gray">Enviar email de cobranca de entrega</p>
+              <p className="text-xs text-torg-gray">
+                {temParcial ? "Entrega parcial — cobrar itens pendentes" : "Enviar email de cobranca de entrega"}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
@@ -970,14 +979,31 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
             )}
           </div>
 
-          {/* Itens */}
+          {/* Aviso entrega parcial */}
+          {temParcial && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm flex items-start gap-2">
+              <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-amber-800">
+                Este pedido possui <strong>recebimentos parciais</strong>. O email ira listar somente
+                os itens ainda pendentes (descontando o que ja foi entregue).
+              </p>
+            </div>
+          )}
+
+          {/* Itens do pedido */}
           {p.itens?.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-torg-gray uppercase tracking-wide mb-2">
-                Itens que serao incluidos no email
+                Itens do pedido ({p.itens.length})
               </p>
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-36 overflow-y-auto">
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-44 overflow-y-auto">
                 <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50/80 sticky top-0">
+                      <th className="px-3 py-1.5 text-left text-torg-gray font-medium">Descricao</th>
+                      <th className="px-3 py-1.5 text-right text-torg-gray font-medium w-[70px]">Qtd</th>
+                    </tr>
+                  </thead>
                   <tbody className="divide-y divide-gray-50">
                     {p.itens.map((it, i) => (
                       <tr key={i}>
@@ -990,6 +1016,9 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
                   </tbody>
                 </table>
               </div>
+              <p className="text-[10px] text-torg-gray mt-1.5 italic">
+                O saldo pendente por item sera calculado automaticamente com base nos recebimentos registrados.
+              </p>
             </div>
           )}
 
@@ -1010,15 +1039,28 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
 
           {/* Resultado */}
           {resultado && (
-            <div className={`rounded-lg px-4 py-3 text-sm flex items-center gap-2 ${
+            <div className={`rounded-lg px-4 py-3 text-sm ${
               resultado.ok
                 ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
                 : "bg-red-50 border border-red-200 text-red-700"
             }`}>
               {resultado.ok ? (
-                <><CheckCircle2 size={16} /> Email enviado para <strong>{resultado.email}</strong></>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={16} />
+                    <span>Email enviado para <strong>{resultado.email}</strong></span>
+                  </div>
+                  {(resultado.pendentes > 0 || resultado.entregues > 0) && (
+                    <p className="text-xs text-emerald-700 ml-6">
+                      {resultado.pendentes} ite{resultado.pendentes !== 1 ? "ns" : "m"} pendente{resultado.pendentes !== 1 ? "s" : ""}
+                      {resultado.entregues > 0 && ` · ${resultado.entregues} ja entregue${resultado.entregues !== 1 ? "s" : ""}`}
+                    </p>
+                  )}
+                </div>
               ) : (
-                <><AlertCircle size={16} /> {resultado.error}</>
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={16} /> {resultado.error}
+                </div>
               )}
             </div>
           )}
