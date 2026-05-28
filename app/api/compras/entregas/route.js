@@ -35,7 +35,8 @@ export async function GET(req) {
           select: {
             id: true,
             fornecedorNome: true,
-            fornecedor: { select: { razaoSocial: true } },
+            fornecedorEmail: true,
+            fornecedor: { select: { razaoSocial: true, email: true } },
             rm: {
               select: {
                 id: true, numero: true, tipoRM: true,
@@ -160,10 +161,14 @@ export async function GET(req) {
       // Tipo de RM: ENGENHARIA ou INTERNA (consumíveis)
       const tipoRM = p.cotacao?.rm?.tipoRM || p.rmAtendida?.tipoRM || "ENGENHARIA";
 
+      // Email do fornecedor (pra cobrança de entrega)
+      const fornecedorEmail = p.cotacao?.fornecedor?.email || p.cotacao?.fornecedorEmail || null;
+
       return {
         id: p.id,
         numero: p.numeroPedido || p.codigoPedido || "s/n",
         fornecedor,
+        fornecedorEmail,
         total: p.total,
         status: p.status,
         statusEntrega: statusCalc,

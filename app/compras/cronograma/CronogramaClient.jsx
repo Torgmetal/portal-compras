@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, Package, Clock, AlertTriangle,
   CheckCircle2, CalendarDays, Truck, Filter, RefreshCw,
   ChevronDown, ChevronRight, ExternalLink, List, LayoutGrid,
-  FileText, MapPin, Wrench,
+  FileText, MapPin, Wrench, Mail, Send, X,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -47,6 +47,7 @@ export default function CronogramaClient() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const [visao, setVisao] = useState("kanban"); // "kanban" | "tabela"
+  const [modalCobrar, setModalCobrar] = useState(null); // pedido obj ou null
 
   // Filtro por tipo de RM — separa entregas de materiais (OP) vs consumíveis
   const pedidos = useMemo(
@@ -428,6 +429,7 @@ export default function CronogramaClient() {
           setExpandido={setExpandido}
           registrarEntrega={registrarEntrega}
           registrando={registrando}
+          onCobrar={setModalCobrar}
         />
       ) : (
         <TabelaView
@@ -436,6 +438,15 @@ export default function CronogramaClient() {
           setExpandido={setExpandido}
           registrarEntrega={registrarEntrega}
           registrando={registrando}
+          onCobrar={setModalCobrar}
+        />
+      )}
+
+      {/* Modal de cobrança */}
+      {modalCobrar && (
+        <ModalCobrarFornecedor
+          pedido={modalCobrar}
+          onClose={() => setModalCobrar(null)}
         />
       )}
     </div>
@@ -444,7 +455,7 @@ export default function CronogramaClient() {
 
 /* ─── Kanban View ────────────────────────────────────────────────── */
 
-function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando }) {
+function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando, onCobrar }) {
   const colunas = filtroStatus
     ? KANBAN_ORDER.filter((k) => k === filtroStatus)
     : KANBAN_ORDER;
@@ -487,6 +498,7 @@ function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEn
                     onToggle={() => setExpandido(expandido === p.id ? null : p.id)}
                     onRegistrarEntrega={() => registrarEntrega(p.id)}
                     registrando={registrando === p.id}
+                    onCobrar={onCobrar}
                   />
                 ))
               )}
@@ -500,7 +512,7 @@ function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEn
 
 /* ─── Pedido Card (Kanban) ───────────────────────────────────────── */
 
-function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando }) {
+function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar }) {
   const p = pedido;
   const dias = diasAte(p.prazoEntregaPrevisto);
   const diasLabel = dias !== null
@@ -617,7 +629,7 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
           </div>
 
           {/* Ações */}
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-2 pt-2 flex-wrap">
             {p.opId && (
               <Link
                 href={`/compras/painel-ops/${p.opId}`}
@@ -636,6 +648,14 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
                 Marcar entregue
               </button>
             )}
+            {p.statusEntrega === "ATRASADO" && p.fornecedorEmail && (
+              <button
+                onClick={() => onCobrar(p)}
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
+              >
+                <Mail size={10} /> Cobrar
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -645,7 +665,7 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
 
 /* ─── Tabela View ────────────────────────────────────────────────── */
 
-function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando }) {
+function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar }) {
   if (pedidos.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
@@ -696,6 +716,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
                   onToggle={() => setExpandido(isExp ? null : p.id)}
                   onRegistrarEntrega={() => registrarEntrega(p.id)}
                   registrando={registrando === p.id}
+                  onCobrar={onCobrar}
                 />
               );
             })}
@@ -706,7 +727,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
   );
 }
 
-function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando }) {
+function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar }) {
   const diasColor = p.statusEntrega === "ATRASADO" ? "text-red-600 font-semibold"
     : p.statusEntrega === "PROXIMO" ? "text-amber-600 font-medium"
     : "text-torg-gray";
@@ -826,7 +847,7 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
             )}
 
             {/* Ações */}
-            <div className="flex gap-2 pt-2 border-t border-sky-100">
+            <div className="flex gap-2 pt-2 border-t border-sky-100 flex-wrap">
               {p.opId && (
                 <Link
                   href={`/compras/painel-ops/${p.opId}`}
@@ -846,10 +867,186 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
                   Marcar entregue
                 </button>
               )}
+              {p.statusEntrega === "ATRASADO" && p.fornecedorEmail && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onCobrar(p); }}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
+                >
+                  <Mail size={12} /> Cobrar fornecedor
+                </button>
+              )}
             </div>
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+/* ─── Modal: Cobrar Fornecedor ──────────────────────────────────── */
+
+function ModalCobrarFornecedor({ pedido, onClose }) {
+  const p = pedido;
+  const [mensagem, setMensagem] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState(null); // { ok, email?, error? }
+
+  const diasAtraso = p.prazoEntregaPrevisto
+    ? Math.max(0, Math.ceil((Date.now() - new Date(p.prazoEntregaPrevisto).getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  const enviar = async () => {
+    setEnviando(true);
+    setResultado(null);
+    try {
+      const res = await fetch("/api/compras/entregas/cobrar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pedidoId: p.id, mensagem: mensagem.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao enviar");
+      setResultado({ ok: true, email: data.emailEnviadoPara });
+    } catch (e) {
+      setResultado({ ok: false, error: e.message });
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-red-100">
+              <Mail size={18} className="text-red-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-torg-dark">Cobrar fornecedor</h3>
+              <p className="text-xs text-torg-gray">Enviar email de cobranca de entrega</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-4">
+          {/* Info do pedido */}
+          <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-torg-gray">Pedido</span>
+              <span className="font-mono font-bold text-torg-blue">#{p.numero}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-torg-gray">Fornecedor</span>
+              <span className="font-medium text-torg-dark">{p.fornecedor}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-torg-gray">Email</span>
+              <span className="text-torg-dark text-xs">{p.fornecedorEmail}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-torg-gray">Prazo previsto</span>
+              <span className="font-medium text-torg-dark">{fmtData(p.prazoEntregaPrevisto)}</span>
+            </div>
+            {diasAtraso > 0 && (
+              <div className="flex justify-between">
+                <span className="text-torg-gray">Dias em atraso</span>
+                <span className="font-bold text-red-600">{diasAtraso} dia{diasAtraso !== 1 ? "s" : ""}</span>
+              </div>
+            )}
+            {p.opNumero && (
+              <div className="flex justify-between">
+                <span className="text-torg-gray">OP</span>
+                <span className="text-torg-dark">{p.opNumero}{p.opCliente ? ` — ${p.opCliente}` : ""}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Itens */}
+          {p.itens?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-torg-gray uppercase tracking-wide mb-2">
+                Itens que serao incluidos no email
+              </p>
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-36 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <tbody className="divide-y divide-gray-50">
+                    {p.itens.map((it, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-1.5 text-torg-dark">{it.descricao}</td>
+                        <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap">
+                          {it.qtd != null ? `${Number(it.qtd).toFixed(it.unidade === "KG" ? 1 : 0)} ${it.unidade || ""}` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Mensagem opcional */}
+          <div>
+            <label className="block text-xs font-semibold text-torg-gray uppercase tracking-wide mb-1.5">
+              Mensagem adicional <span className="font-normal lowercase">(opcional)</span>
+            </label>
+            <textarea
+              value={mensagem}
+              onChange={(e) => setMensagem(e.target.value)}
+              placeholder="Ex: Necessitamos urgente para atender prazo do cliente..."
+              rows={3}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-torg-blue focus:border-torg-blue resize-none"
+              disabled={enviando || resultado?.ok}
+            />
+          </div>
+
+          {/* Resultado */}
+          {resultado && (
+            <div className={`rounded-lg px-4 py-3 text-sm flex items-center gap-2 ${
+              resultado.ok
+                ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}>
+              {resultado.ok ? (
+                <><CheckCircle2 size={16} /> Email enviado para <strong>{resultado.email}</strong></>
+              ) : (
+                <><AlertCircle size={16} /> {resultado.error}</>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100"
+          >
+            {resultado?.ok ? "Fechar" : "Cancelar"}
+          </button>
+          {!resultado?.ok && (
+            <button
+              onClick={enviar}
+              disabled={enviando}
+              className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {enviando ? (
+                <><Loader2 size={14} className="animate-spin" /> Enviando...</>
+              ) : (
+                <><Send size={14} /> Enviar cobranca</>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
