@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { BarChart3, PlusCircle, Package, FolderKanban, Bell, Building2, Boxes, Layers, CalendarClock, ClipboardList, RailSymbol, ShoppingCart } from "lucide-react";
+import { BarChart3, PlusCircle, Package, FolderKanban, Bell, Building2, Boxes, Layers, Truck, ClipboardList, RailSymbol, ShoppingCart } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -11,7 +11,7 @@ const menu = [
   { href: "/compras", label: "RMs Materiais", icon: RailSymbol, exact: true, matchAlso: "/compras/rm/" },
   { href: "/compras/consumiveis", label: "RMs Consumíveis", icon: ShoppingCart },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
-  { href: "/compras/cronograma", label: "Entregas", icon: CalendarClock },
+  { href: "/compras/cronograma", label: "Entregas", icon: Truck },
   { href: "/compras/saldo-materiais", label: "Saldo Materiais", icon: ClipboardList },
   { href: "/compras/estoque", label: "Estoque", icon: Boxes },
   { href: "/compras/materiais", label: "Materiais por OP", icon: Layers },
