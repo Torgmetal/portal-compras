@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import {
-  Warehouse, Search, RefreshCw, Loader2, AlertCircle,
+  Warehouse, Search, Truck, Loader2, AlertCircle,
   ChevronDown, ChevronRight, X, Layers, Weight,
 } from "lucide-react";
 
@@ -160,7 +160,7 @@ export default function EstoqueFisicoClient() {
           disabled={sincronizando}
           className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50"
         >
-          {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
           {sincronizando ? "Importando…" : "Sincronizar SharePoint"}
         </button>
       </div>
