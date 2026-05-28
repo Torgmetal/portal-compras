@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { downloadFileByPath, getAccessToken } from "@/lib/sharepoint";
-import XLSX from "xlsx";
+import * as XLSX from "xlsx";
 
 export const maxDuration = 60;
 
