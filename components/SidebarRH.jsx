@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Building2, Briefcase, Clock,
-  CalendarDays, Heart, Network, Award,
+  CalendarDays, Heart, Network, Award, FileText,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -13,6 +13,7 @@ const menu = [
   { href: "/rh/funcionarios", label: "Funcionários", icon: Users },
   { href: "/rh/setores", label: "Setores", icon: Building2 },
   { href: "/rh/cargos", label: "Cargos", icon: Briefcase },
+  { href: "/rh/documentos", label: "Documentos", icon: FileText },
   { href: "/rh/organograma", label: "Organograma", icon: Network },
   { href: "/rh/ponto", label: "Controle de Ponto", icon: Clock },
   { href: "/rh/ferias", label: "Férias", icon: CalendarDays },

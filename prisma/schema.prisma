@@ -1123,6 +1123,7 @@ model Funcionario {
   beneficios      FuncionarioBeneficio[]
   competencias    FuncionarioCompetencia[]
   dependentes     Dependente[]
+  documentos      Documento[]
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -1241,6 +1242,35 @@ model FuncionarioCompetencia {
   avaliadoPor     String?
 
   @@unique([funcionarioId, competenciaId])
+}
+
+// ─── DOCUMENTOS (RH) ───────────────────────────────────────
+
+model Documento {
+  id              String    @id @default(cuid())
+  nome            String    // Ex: "ASO Periódico", "NR-35 Trabalho em Altura"
+  tipo            String    // ASO, NR_10, NR_12, NR_33, NR_35, PPRA, PCMSO, CNH, PASSAPORTE, CERTIDAO, CERTIFICADO, ALVARA, LICENCA_AMBIENTAL, AVCB, ISO, OUTRO
+  categoria       String    // SAUDE_SEGURANCA, PESSOAL, TREINAMENTO, EMPRESA
+  descricao       String?
+  // Vínculo — null = documento da empresa
+  funcionarioId   String?
+  funcionario     Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  // Datas
+  dataEmissao     DateTime?
+  dataValidade    DateTime?
+  // Detalhes
+  orgaoEmissor    String?   // Clínica, órgão, certificadora
+  numeroDocumento String?   // Número / protocolo
+  observacao      String?
+  ativo           Boolean   @default(true)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([funcionarioId])
+  @@index([categoria])
+  @@index([dataValidade])
+  @@index([tipo])
 }
 
 // ─── ESTOQUE TORG ──────────────────────────────────────────
