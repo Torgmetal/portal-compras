@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   FileText, PlusCircle, Loader2, AlertCircle, X, Search,
   ChevronDown, ShieldAlert, ShieldCheck, Clock, Building2,
   Users, AlertTriangle, CalendarClock, Download, Upload,
-  FileSpreadsheet, CheckCircle2, XCircle,
+  FileSpreadsheet, CheckCircle2, XCircle, ClipboardCheck,
+  ChevronRight, UserX, CircleAlert, BadgeCheck, Factory,
 } from "lucide-react";
 
 const CATEGORIAS = [
@@ -63,6 +64,7 @@ function calcStatus(dataValidade) {
 }
 
 export default function DocumentosClient() {
+  const [abaAtiva, setAbaAtiva] = useState("documentos"); // "documentos" | "compliance"
   const [documentos, setDocumentos] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
   const [stats, setStats] = useState({});
@@ -80,6 +82,12 @@ export default function DocumentosClient() {
   const [importando, setImportando] = useState(false);
   const [modalImport, setModalImport] = useState(false);
   const [importResult, setImportResult] = useState(null);
+
+  // Compliance CCT
+  const [compliance, setCompliance] = useState(null);
+  const [carregandoCompliance, setCarregandoCompliance] = useState(false);
+  const [complianceExpandido, setComplianceExpandido] = useState({});
+  const [filtroCompliance, setFiltroCompliance] = useState("TODOS"); // TODOS, PENDENCIAS, CONFORMES
 
   const [form, setForm] = useState({
     nome: "", tipo: "", categoria: "SAUDE_SEGURANCA", descricao: "",
@@ -201,6 +209,36 @@ export default function DocumentosClient() {
     }
   };
 
+  // Carregar compliance
+  const carregarCompliance = useCallback(async () => {
+    setCarregandoCompliance(true);
+    try {
+      const res = await fetch("/api/rh/documentos/compliance");
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setCompliance(data);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregandoCompliance(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (abaAtiva === "compliance" && !compliance) carregarCompliance();
+  }, [abaAtiva, compliance, carregarCompliance]);
+
+  const toggleExpandido = (id) => {
+    setComplianceExpandido((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const funcionariosCompliance = useMemo(() => {
+    if (!compliance?.funcionarios) return [];
+    if (filtroCompliance === "PENDENCIAS") return compliance.funcionarios.filter((f) => f.percentual < 100);
+    if (filtroCompliance === "CONFORMES") return compliance.funcionarios.filter((f) => f.percentual === 100);
+    return compliance.funcionarios;
+  }, [compliance, filtroCompliance]);
+
   // Tipos disponíveis baseado na categoria selecionada no form
   const tiposDisponiveis = TIPOS[form.categoria] || [];
 
@@ -220,24 +258,73 @@ export default function DocumentosClient() {
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Documentos</h2>
           <p className="text-sm text-torg-gray mt-1">Controle de documentos e validades</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={baixarModelo}
-            className="px-3 py-2 text-sm text-torg-blue border border-torg-blue/30 rounded-lg hover:bg-torg-blue/5 inline-flex items-center gap-2 font-medium">
-            <Download size={15} /> Baixar modelo
-          </button>
-          <button onClick={() => fileRef.current?.click()} disabled={importando}
-            className="px-3 py-2 text-sm text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 inline-flex items-center gap-2 font-medium disabled:opacity-50">
-            {importando ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-            {importando ? "Importando…" : "Importar planilha"}
-          </button>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={importarPlanilha} className="hidden" />
-          <button onClick={abrirNovo}
-            className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2">
-            <PlusCircle size={16} /> Novo Documento
-          </button>
-        </div>
+        {abaAtiva === "documentos" && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={baixarModelo}
+              className="px-3 py-2 text-sm text-torg-blue border border-torg-blue/30 rounded-lg hover:bg-torg-blue/5 inline-flex items-center gap-2 font-medium">
+              <Download size={15} /> Baixar modelo
+            </button>
+            <button onClick={() => fileRef.current?.click()} disabled={importando}
+              className="px-3 py-2 text-sm text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50 inline-flex items-center gap-2 font-medium disabled:opacity-50">
+              {importando ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+              {importando ? "Importando…" : "Importar planilha"}
+            </button>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={importarPlanilha} className="hidden" />
+            <button onClick={abrirNovo}
+              className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2">
+              <PlusCircle size={16} /> Novo Documento
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        <button onClick={() => setAbaAtiva("documentos")}
+          className={`px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2 border-b-2 transition-colors ${
+            abaAtiva === "documentos"
+              ? "border-torg-blue text-torg-blue"
+              : "border-transparent text-torg-gray hover:text-torg-dark hover:border-gray-300"
+          }`}>
+          <FileText size={15} /> Documentos
+        </button>
+        <button onClick={() => setAbaAtiva("compliance")}
+          className={`px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2 border-b-2 transition-colors ${
+            abaAtiva === "compliance"
+              ? "border-torg-blue text-torg-blue"
+              : "border-transparent text-torg-gray hover:text-torg-dark hover:border-gray-300"
+          }`}>
+          <ClipboardCheck size={15} /> Conformidade CCT
+          {compliance?.resumo?.totalPendencias > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+              {compliance.resumo.totalPendencias}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {erro && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" /> {erro}
+        </div>
+      )}
+
+      {/* ═══════ ABA COMPLIANCE CCT ═══════ */}
+      {abaAtiva === "compliance" && (
+        <CompliancePanel
+          compliance={compliance}
+          carregando={carregandoCompliance}
+          funcionarios={funcionariosCompliance}
+          filtro={filtroCompliance}
+          setFiltro={setFiltroCompliance}
+          expandido={complianceExpandido}
+          toggleExpandido={toggleExpandido}
+          onRecarregar={carregarCompliance}
+        />
+      )}
+
+      {/* ═══════ ABA DOCUMENTOS ═══════ */}
+      {abaAtiva === "documentos" && (<>
       {/* KPI Cards de alertas */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         <KpiCard label="Total" valor={stats.totalDocs || 0} cor="bg-white" textCor="text-torg-dark" />
@@ -257,12 +344,6 @@ export default function DocumentosClient() {
           ativo={filtroStatus === "VENCIDO"} />
         <KpiCard label="Sem validade" valor={stats.semValidade || 0} cor="bg-gray-50" textCor="text-torg-gray" />
       </div>
-
-      {erro && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
-          <AlertCircle size={14} className="mt-0.5 shrink-0" /> {erro}
-        </div>
-      )}
 
       {/* Filtros */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
@@ -370,6 +451,7 @@ export default function DocumentosClient() {
           </div>
         </div>
       )}
+      </>)}
 
       {/* Modal Novo Documento */}
       {modalAberto && (
@@ -547,6 +629,233 @@ export default function DocumentosClient() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════ COMPLIANCE PANEL ═══════
+const STATUS_ICON = {
+  OK: { icon: CheckCircle2, cor: "text-emerald-600", bg: "bg-emerald-50", label: "OK" },
+  VENCIDO: { icon: ShieldAlert, cor: "text-red-600", bg: "bg-red-50", label: "Vencido" },
+  VENCENDO: { icon: AlertTriangle, cor: "text-orange-600", bg: "bg-orange-50", label: "Vence em 30d" },
+  AUSENTE: { icon: XCircle, cor: "text-red-600", bg: "bg-red-50", label: "Ausente" },
+};
+
+function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFiltro, expandido, toggleExpandido, onRecarregar }) {
+  if (carregando) {
+    return (
+      <div className="flex items-center justify-center py-20 text-torg-gray">
+        <Loader2 size={20} className="animate-spin mr-2" /> Verificando conformidade…
+      </div>
+    );
+  }
+
+  if (!compliance) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <ClipboardCheck size={48} className="mx-auto text-gray-300 mb-4" />
+        <p className="text-torg-gray text-lg font-medium">Erro ao carregar conformidade</p>
+        <button onClick={onRecarregar} className="mt-4 px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue/90">
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
+
+  const { resumo, empresa } = compliance;
+  const pctCor = (p) => p === 100 ? "text-emerald-600" : p >= 70 ? "text-yellow-600" : "text-red-600";
+  const pctBg = (p) => p === 100 ? "bg-emerald-500" : p >= 70 ? "bg-yellow-500" : "bg-red-500";
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Compliance */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <div className={`w-3 h-3 rounded-full ${pctBg(resumo.percentualGeral)}`} />
+            <span className={`text-3xl font-extrabold ${pctCor(resumo.percentualGeral)}`}>{resumo.percentualGeral}%</span>
+          </div>
+          <p className="text-[10px] text-torg-gray uppercase tracking-wider">Conformidade geral</p>
+        </div>
+        <div className="bg-emerald-50 rounded-xl p-4 text-center">
+          <p className="text-3xl font-extrabold text-emerald-700">{resumo.funcionariosConformes}</p>
+          <p className="text-[10px] text-emerald-600 uppercase tracking-wider mt-1">Conformes</p>
+        </div>
+        <div className={`rounded-xl p-4 text-center ${resumo.funcionariosComPendencia > 0 ? "bg-red-50" : "bg-gray-50"}`}>
+          <p className={`text-3xl font-extrabold ${resumo.funcionariosComPendencia > 0 ? "text-red-600" : "text-torg-gray"}`}>{resumo.funcionariosComPendencia}</p>
+          <p className={`text-[10px] uppercase tracking-wider mt-1 ${resumo.funcionariosComPendencia > 0 ? "text-red-500" : "text-torg-gray"}`}>Com pendências</p>
+        </div>
+        <div className={`rounded-xl p-4 text-center ${resumo.totalPendencias > 0 ? "bg-orange-50" : "bg-gray-50"}`}>
+          <p className={`text-3xl font-extrabold ${resumo.totalPendencias > 0 ? "text-orange-600" : "text-torg-gray"}`}>{resumo.totalPendencias}</p>
+          <p className={`text-[10px] uppercase tracking-wider mt-1 ${resumo.totalPendencias > 0 ? "text-orange-500" : "text-torg-gray"}`}>Total pendências</p>
+        </div>
+        <div className={`rounded-xl p-4 text-center ${resumo.empresa.pendentes > 0 ? "bg-amber-50" : "bg-emerald-50"}`}>
+          <p className={`text-3xl font-extrabold ${resumo.empresa.pendentes > 0 ? "text-amber-700" : "text-emerald-700"}`}>{resumo.empresa.percentual}%</p>
+          <p className={`text-[10px] uppercase tracking-wider mt-1 ${resumo.empresa.pendentes > 0 ? "text-amber-600" : "text-emerald-600"}`}>Empresa</p>
+        </div>
+      </div>
+
+      {/* Documentos da Empresa */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+          <Building2 size={18} className="text-amber-600" />
+          <h3 className="text-sm font-bold text-torg-dark">Documentos da Empresa (CCT)</h3>
+          <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
+            resumo.empresa.pendentes > 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
+          }`}>{resumo.empresa.ok}/{resumo.empresa.total} OK</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {empresa.map((item) => {
+            const st = STATUS_ICON[item.status];
+            const StIcon = st.icon;
+            return (
+              <div key={item.regra.tipo} className={`px-5 py-3 flex items-center gap-3 ${item.status !== "OK" ? st.bg + "/40" : ""}`}>
+                <StIcon size={16} className={st.cor} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-torg-dark">{item.regra.nome}</p>
+                  <p className="text-[10px] text-torg-gray">
+                    {item.regra.referenciaCCT}
+                    {item.regra.validadeMeses && <> · Validade: {item.regra.validadeMeses} meses</>}
+                  </p>
+                </div>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${st.bg} ${st.cor}`}>
+                  {st.label}
+                </span>
+                {item.documento && (
+                  <span className="text-[10px] text-torg-gray hidden sm:block">
+                    {item.documento.nome}
+                    {item.documento.dataValidade && <> · Val: {new Date(item.documento.dataValidade).toLocaleDateString("pt-BR")}</>}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Filtros Funcionários */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="text-sm font-bold text-torg-dark flex items-center gap-2">
+          <Users size={16} /> Funcionários
+        </p>
+        <div className="flex gap-1 ml-4">
+          {[
+            { key: "TODOS", label: "Todos" },
+            { key: "PENDENCIAS", label: "Com pendências" },
+            { key: "CONFORMES", label: "Conformes" },
+          ].map((f) => (
+            <button key={f.key} onClick={() => setFiltro(f.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                filtro === f.key ? "bg-torg-blue text-white" : "bg-gray-100 text-torg-gray hover:bg-gray-200"
+              }`}>{f.label}</button>
+          ))}
+        </div>
+        <p className="text-xs text-torg-gray ml-auto">{funcionarios.length} funcionário{funcionarios.length !== 1 ? "s" : ""}</p>
+        <button onClick={onRecarregar} className="text-xs text-torg-blue hover:underline">Atualizar</button>
+      </div>
+
+      {/* Lista por funcionário */}
+      {funcionarios.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+          <BadgeCheck size={48} className="mx-auto text-emerald-300 mb-4" />
+          <p className="text-torg-gray text-lg font-medium">
+            {filtro === "PENDENCIAS" ? "Nenhum funcionário com pendência!" : "Nenhum funcionário encontrado"}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {funcionarios.map((f) => {
+            const aberto = expandido[f.funcionario.id];
+            const pendentes = f.itens.filter((i) => i.status !== "OK");
+            return (
+              <div key={f.funcionario.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <button onClick={() => toggleExpandido(f.funcionario.id)}
+                  className="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50/50 transition-colors text-left">
+                  <ChevronRight size={16} className={`text-torg-gray shrink-0 transition-transform ${aberto ? "rotate-90" : ""}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-torg-dark">{f.funcionario.nome}</span>
+                      {f.funcionario.matricula && <span className="text-[10px] text-torg-gray">#{f.funcionario.matricula}</span>}
+                      {f.funcionario.producao && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-100 text-indigo-700">
+                          <Factory size={9} /> Produção
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-torg-gray">{f.funcionario.setor}{f.funcionario.cargo ? ` · ${f.funcionario.cargo}` : ""}</p>
+                  </div>
+                  {/* Barra de progresso mini */}
+                  <div className="hidden sm:flex items-center gap-2 shrink-0">
+                    <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${pctBg(f.percentual)}`} style={{ width: `${f.percentual}%` }} />
+                    </div>
+                    <span className={`text-xs font-bold tabular-nums ${pctCor(f.percentual)}`}>{f.percentual}%</span>
+                  </div>
+                  {/* Badges resumo */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {f.ausentes > 0 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+                        <XCircle size={10} /> {f.ausentes}
+                      </span>
+                    )}
+                    {f.vencidos > 0 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+                        <ShieldAlert size={10} /> {f.vencidos}
+                      </span>
+                    )}
+                    {f.vencendo > 0 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700">
+                        <AlertTriangle size={10} /> {f.vencendo}
+                      </span>
+                    )}
+                    {f.percentual === 100 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                        <BadgeCheck size={10} /> OK
+                      </span>
+                    )}
+                  </div>
+                </button>
+                {aberto && (
+                  <div className="border-t border-gray-100 divide-y divide-gray-50">
+                    {f.itens.map((item) => {
+                      const st = STATUS_ICON[item.status];
+                      const StIcon = st.icon;
+                      return (
+                        <div key={item.regra.tipo} className={`px-5 py-2.5 pl-12 flex items-center gap-3 ${item.status !== "OK" ? st.bg + "/40" : ""}`}>
+                          <StIcon size={14} className={st.cor} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-torg-dark">{item.regra.nome}</p>
+                            <p className="text-[10px] text-torg-gray">{item.regra.referenciaCCT}</p>
+                          </div>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${st.bg} ${st.cor}`}>
+                            {st.label}
+                          </span>
+                          {item.documento && item.documento.dataValidade && (
+                            <span className="text-[10px] text-torg-gray tabular-nums hidden sm:block">
+                              Val: {new Date(item.documento.dataValidade).toLocaleDateString("pt-BR")}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Legenda */}
+      <div className="bg-gray-50 rounded-xl border border-gray-100 p-4">
+        <p className="text-[10px] font-bold text-torg-gray uppercase tracking-wider mb-2">Referência: CCT SINDIMAQ/SINAEES 2025–2027</p>
+        <div className="flex flex-wrap gap-4 text-[10px] text-torg-gray">
+          <span className="inline-flex items-center gap-1"><CheckCircle2 size={10} className="text-emerald-600" /> Documento dentro da validade</span>
+          <span className="inline-flex items-center gap-1"><AlertTriangle size={10} className="text-orange-600" /> Vence nos próximos 30 dias</span>
+          <span className="inline-flex items-center gap-1"><ShieldAlert size={10} className="text-red-600" /> Documento vencido</span>
+          <span className="inline-flex items-center gap-1"><XCircle size={10} className="text-red-600" /> Documento ausente</span>
+        </div>
+      </div>
     </div>
   );
 }
