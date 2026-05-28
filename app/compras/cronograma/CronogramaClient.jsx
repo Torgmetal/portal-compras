@@ -302,8 +302,7 @@ export default function CronogramaClient() {
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-3 text-sm">
           <AlertTriangle size={18} className="text-red-600 flex-shrink-0" />
           <p className="text-red-800">
-            <strong>{kpis.ATRASADO} pedido{kpis.ATRASADO !== 1 ? "s" : ""}</strong> em atraso,
-            totalizando <strong>{fmtMoeda(kpis.valorAtrasado)}</strong>.
+            <strong>{kpis.ATRASADO} pedido{kpis.ATRASADO !== 1 ? "s" : ""}</strong> em atraso.
           </p>
         </div>
       )}
