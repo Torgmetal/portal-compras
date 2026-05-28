@@ -63,6 +63,12 @@ function parseSheet(ws, sheetTag) {
       opReserva = String(r[12] || "").trim() || null;
     }
 
+    // Perfis W, H e HP sao sempre A572-Gr 50 na Torg
+    const PERFIS_A572 = ["W", "H", "HP"];
+    if (PERFIS_A572.includes(perfil) && (!aco || aco.toUpperCase().includes("A36") || aco.toUpperCase() === "A-36")) {
+      aco = "A572-Gr 50";
+    }
+
     items.push({
       perfil,
       bitola,
