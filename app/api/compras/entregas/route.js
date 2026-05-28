@@ -22,6 +22,7 @@ export async function GET(req) {
         faturamentoDireto: true,
         criadoManualmente: true,
         prazoEntregaPrevisto: true,
+        prazoOriginal: true,
         dataEntregaReal: true,
         statusEntrega: true,
         createdAt: true,
@@ -89,6 +90,18 @@ export async function GET(req) {
             nfNumero: true,
           },
           orderBy: { dataRecebimento: "desc" },
+        },
+        // Historico de postergacoes de prazo
+        prazoHistorico: {
+          select: {
+            id: true,
+            prazoAnterior: true,
+            prazoNovo: true,
+            motivo: true,
+            criadoEm: true,
+            alteradoPor: { select: { name: true } },
+          },
+          orderBy: { criadoEm: "asc" },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -190,6 +203,9 @@ export async function GET(req) {
         itens,
         recebimentos: p.recebimentos,
         temRecebimento: p.recebimentos.length > 0,
+        prazoOriginal: p.prazoOriginal || null,
+        prazoHistorico: p.prazoHistorico || [],
+        foiPostergado: (p.prazoHistorico?.length || 0) > 0,
       };
     });
 

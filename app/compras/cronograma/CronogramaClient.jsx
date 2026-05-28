@@ -6,6 +6,7 @@ import {
   CheckCircle2, CalendarDays, Truck, Filter, RefreshCw,
   ChevronDown, ChevronRight, ExternalLink, List, LayoutGrid,
   FileText, MapPin, Wrench, Mail, Send, X,
+  CalendarClock, History,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -48,6 +49,7 @@ export default function CronogramaClient() {
   const [syncResult, setSyncResult] = useState(null);
   const [visao, setVisao] = useState("kanban"); // "kanban" | "tabela"
   const [modalCobrar, setModalCobrar] = useState(null); // pedido obj ou null
+  const [modalPrazo, setModalPrazo] = useState(null); // pedido obj ou null
 
   // Filtro por tipo de RM — separa entregas de materiais (OP) vs consumíveis
   const pedidos = useMemo(
@@ -430,6 +432,7 @@ export default function CronogramaClient() {
           registrarEntrega={registrarEntrega}
           registrando={registrando}
           onCobrar={setModalCobrar}
+          onAtualizarPrazo={setModalPrazo}
         />
       ) : (
         <TabelaView
@@ -439,6 +442,7 @@ export default function CronogramaClient() {
           registrarEntrega={registrarEntrega}
           registrando={registrando}
           onCobrar={setModalCobrar}
+          onAtualizarPrazo={setModalPrazo}
         />
       )}
 
@@ -449,13 +453,22 @@ export default function CronogramaClient() {
           onClose={() => setModalCobrar(null)}
         />
       )}
+
+      {/* Modal de atualizar prazo */}
+      {modalPrazo && (
+        <ModalAtualizarPrazo
+          pedido={modalPrazo}
+          onClose={() => setModalPrazo(null)}
+          onSalvo={fetchData}
+        />
+      )}
     </div>
   );
 }
 
 /* ─── Kanban View ────────────────────────────────────────────────── */
 
-function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando, onCobrar }) {
+function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo }) {
   const colunas = filtroStatus
     ? KANBAN_ORDER.filter((k) => k === filtroStatus)
     : KANBAN_ORDER;
@@ -499,6 +512,7 @@ function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEn
                     onRegistrarEntrega={() => registrarEntrega(p.id)}
                     registrando={registrando === p.id}
                     onCobrar={onCobrar}
+                    onAtualizarPrazo={onAtualizarPrazo}
                   />
                 ))
               )}
@@ -512,7 +526,7 @@ function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEn
 
 /* ─── Pedido Card (Kanban) ───────────────────────────────────────── */
 
-function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar }) {
+function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo }) {
   const p = pedido;
   const dias = diasAte(p.prazoEntregaPrevisto);
   const diasLabel = dias !== null
@@ -569,12 +583,19 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
         </div>
       )}
 
-      {/* FD badge */}
-      {p.faturamentoDireto && (
-        <span className="inline-block mt-1.5 text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded font-medium">
-          FD
-        </span>
-      )}
+      {/* Badges */}
+      <div className="flex gap-1 mt-1.5 flex-wrap">
+        {p.faturamentoDireto && (
+          <span className="inline-block text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded font-medium">
+            FD
+          </span>
+        )}
+        {p.foiPostergado && (
+          <span className="inline-block text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-medium">
+            Postergado
+          </span>
+        )}
+      </div>
 
       {/* Expandido: detalhes */}
       {isExpanded && (
@@ -614,6 +635,11 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
             </div>
           )}
 
+          {/* Timeline de prazos */}
+          {p.prazoHistorico?.length > 0 && (
+            <TimelinePrazos historico={p.prazoHistorico} prazoOriginal={p.prazoOriginal} />
+          )}
+
           {/* Datas */}
           <div className="flex gap-4 text-[11px]">
             <div>
@@ -637,6 +663,14 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
               >
                 <ExternalLink size={10} /> Ver OP
               </Link>
+            )}
+            {p.statusEntrega !== "ENTREGUE" && (
+              <button
+                onClick={() => onAtualizarPrazo(p)}
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium"
+              >
+                <CalendarClock size={10} /> Atualizar prazo
+              </button>
             )}
             {p.statusEntrega !== "ENTREGUE" && (
               <button
@@ -665,7 +699,7 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
 
 /* ─── Tabela View ────────────────────────────────────────────────── */
 
-function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar }) {
+function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo }) {
   if (pedidos.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
@@ -717,6 +751,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
                   onRegistrarEntrega={() => registrarEntrega(p.id)}
                   registrando={registrando === p.id}
                   onCobrar={onCobrar}
+                  onAtualizarPrazo={onAtualizarPrazo}
                 />
               );
             })}
@@ -727,7 +762,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
   );
 }
 
-function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar }) {
+function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo }) {
   const diasColor = p.statusEntrega === "ATRASADO" ? "text-red-600 font-semibold"
     : p.statusEntrega === "PROXIMO" ? "text-amber-600 font-medium"
     : "text-torg-gray";
@@ -772,7 +807,12 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
         <td className="px-4 py-2.5">
           {p.prazoEntregaPrevisto ? (
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-torg-dark tabular-nums">{fmtDataCurta(p.prazoEntregaPrevisto)}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-torg-dark tabular-nums">{fmtDataCurta(p.prazoEntregaPrevisto)}</span>
+                {p.foiPostergado && (
+                  <span className="text-[9px] px-1 py-0.5 bg-amber-50 text-amber-700 rounded font-medium">Post.</span>
+                )}
+              </div>
               {diasLabel && <span className={`text-[10px] tabular-nums ${diasColor}`}>{diasLabel}</span>}
             </div>
           ) : (
@@ -846,6 +886,13 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
               </div>
             )}
 
+            {/* Timeline de prazos */}
+            {p.prazoHistorico?.length > 0 && (
+              <div className="mb-3">
+                <TimelinePrazos historico={p.prazoHistorico} prazoOriginal={p.prazoOriginal} />
+              </div>
+            )}
+
             {/* Ações */}
             <div className="flex gap-2 pt-2 border-t border-sky-100 flex-wrap">
               {p.opId && (
@@ -856,6 +903,14 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
                 >
                   <ExternalLink size={12} /> Ver OP
                 </Link>
+              )}
+              {p.statusEntrega !== "ENTREGUE" && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onAtualizarPrazo(p); }}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium"
+                >
+                  <CalendarClock size={12} /> Atualizar prazo
+                </button>
               )}
               {p.statusEntrega !== "ENTREGUE" && (
                 <button
@@ -1079,6 +1134,211 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
                 <><Loader2 size={14} className="animate-spin" /> Enviando...</>
               ) : (
                 <><Send size={14} /> Enviar cobranca</>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Timeline de Prazos ───────────────────────────────────────── */
+
+function TimelinePrazos({ historico, prazoOriginal }) {
+  if (!historico || historico.length === 0) return null;
+
+  return (
+    <div>
+      <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-2 font-semibold flex items-center gap-1">
+        <History size={10} /> Historico de prazos
+      </p>
+      <div className="relative pl-4 space-y-2">
+        {/* Linha vertical */}
+        <div className="absolute left-[7px] top-1 bottom-1 w-px bg-gray-200" />
+
+        {/* Prazo original */}
+        {prazoOriginal && (
+          <div className="relative flex items-start gap-2">
+            <div className="absolute left-[-13px] top-1 w-2.5 h-2.5 rounded-full bg-gray-300 ring-2 ring-white" />
+            <div className="text-xs">
+              <span className="text-torg-gray">Prazo original:</span>{" "}
+              <span className="font-medium text-torg-dark">{fmtData(prazoOriginal)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Cada postergacao */}
+        {historico.map((h, i) => (
+          <div key={h.id} className="relative flex items-start gap-2">
+            <div className={`absolute left-[-13px] top-1 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
+              i === historico.length - 1 ? "bg-amber-500" : "bg-amber-300"
+            }`} />
+            <div className="text-xs space-y-0.5">
+              <div>
+                <span className="text-torg-gray">Novo prazo:</span>{" "}
+                <span className="font-medium text-amber-700">{fmtData(h.prazoNovo)}</span>
+                <span className="text-[10px] text-gray-400 ml-2">
+                  em {fmtData(h.criadoEm)} por {h.alteradoPor?.name || "—"}
+                </span>
+              </div>
+              {h.motivo && (
+                <p className="text-[10px] text-torg-gray italic">{h.motivo}</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Modal: Atualizar Prazo ───────────────────────────────────── */
+
+function ModalAtualizarPrazo({ pedido, onClose, onSalvo }) {
+  const p = pedido;
+  const [novoPrazo, setNovoPrazo] = useState("");
+  const [motivo, setMotivo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState(false);
+
+  const salvar = async () => {
+    if (!novoPrazo) { setErro("Selecione a nova data"); return; }
+    setSalvando(true);
+    setErro("");
+    try {
+      const res = await fetch("/api/compras/entregas/prazo", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pedidoId: p.id, novoPrazo, motivo: motivo.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar");
+      setSucesso(true);
+      onSalvo?.();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-amber-100">
+              <CalendarClock size={18} className="text-amber-700" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-torg-dark">Atualizar prazo de entrega</h3>
+              <p className="text-xs text-torg-gray">Pedido #{p.numero} — {p.fornecedor}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-4">
+          {/* Prazo atual */}
+          <div className="bg-gray-50 rounded-xl p-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-torg-gray">Prazo atual</span>
+              <span className="font-medium text-torg-dark">
+                {p.prazoEntregaPrevisto ? fmtData(p.prazoEntregaPrevisto) : "Nao definido"}
+              </span>
+            </div>
+            {p.prazoOriginal && (
+              <div className="flex justify-between mt-1">
+                <span className="text-torg-gray">Prazo original</span>
+                <span className="text-xs text-gray-500">{fmtData(p.prazoOriginal)}</span>
+              </div>
+            )}
+            {p.prazoHistorico?.length > 0 && (
+              <div className="flex justify-between mt-1">
+                <span className="text-torg-gray">Postergacoes</span>
+                <span className="text-xs text-amber-700 font-medium">{p.prazoHistorico.length}x</span>
+              </div>
+            )}
+          </div>
+
+          {/* Timeline existente */}
+          {p.prazoHistorico?.length > 0 && (
+            <TimelinePrazos historico={p.prazoHistorico} prazoOriginal={p.prazoOriginal} />
+          )}
+
+          {/* Nova data */}
+          {!sucesso && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-torg-gray uppercase tracking-wide mb-1">
+                  Novo prazo de entrega
+                </label>
+                <input
+                  type="date"
+                  value={novoPrazo}
+                  onChange={(e) => setNovoPrazo(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-torg-gray uppercase tracking-wide mb-1">
+                  Motivo / observacao <span className="font-normal">(opcional)</span>
+                </label>
+                <textarea
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  placeholder="Ex: Fornecedor informou atraso na producao"
+                  rows={2}
+                  maxLength={500}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Erro */}
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-center gap-2">
+              <AlertCircle size={14} /> {erro}
+            </div>
+          )}
+
+          {/* Sucesso */}
+          {sucesso && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg px-4 py-3 flex items-center gap-2">
+              <CheckCircle2 size={16} />
+              <span>Prazo atualizado com sucesso!</span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100"
+          >
+            {sucesso ? "Fechar" : "Cancelar"}
+          </button>
+          {!sucesso && (
+            <button
+              onClick={salvar}
+              disabled={salvando || !novoPrazo}
+              className="px-4 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {salvando ? (
+                <><Loader2 size={14} className="animate-spin" /> Salvando...</>
+              ) : (
+                <><CalendarClock size={14} /> Salvar novo prazo</>
               )}
             </button>
           )}

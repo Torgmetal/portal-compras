@@ -60,6 +60,7 @@ model User {
   orcamentosCriados       Orcamento[]          @relation("OrcamentoCriadoPor")
   estudosCriados          PropostaEstudo[]     @relation("EstudoCriadoPor")
   recebimentos            Recebimento[]
+  prazoHistoricos         PrazoHistorico[]
 }
 
 model PasswordResetToken {
@@ -753,15 +754,35 @@ model PedidoOmie {
 
   // Rastreamento de entrega — preenchido a partir do prazo do fornecedor vencedor
   prazoEntregaPrevisto DateTime? // data mais tarde entre prazos dos itens vencedores
+  prazoOriginal        DateTime? // primeiro prazo acordado (set uma vez, nunca muda)
   dataEntregaReal      DateTime? // quando de fato chegou
   statusEntrega        String?   // NO_PRAZO | PROXIMO | ATRASADO | ENTREGUE
 
   rmItens           RMItem[]
   recebimentos      Recebimento[]
+  prazoHistorico    PrazoHistorico[]
 
   @@index([cotacaoId])
   @@index([opId])
   @@index([status])
+}
+
+// Historico de alteracoes de prazo de entrega de um pedido.
+// Cada registro = uma postergacao (ou antecipacao) informada pelo fornecedor.
+model PrazoHistorico {
+  id             String   @id @default(cuid())
+  pedidoId       String
+  pedido         PedidoOmie @relation(fields: [pedidoId], references: [id])
+
+  prazoAnterior  DateTime?  // prazo que estava antes (null = primeira vez definido)
+  prazoNovo      DateTime   // novo prazo informado pelo fornecedor
+  motivo         String?    // observacao livre (ex: "Fornecedor informou atraso na siderurgica")
+
+  alteradoPorId  String
+  alteradoPor    User       @relation(fields: [alteradoPorId], references: [id])
+  criadoEm       DateTime   @default(now())
+
+  @@index([pedidoId])
 }
 
 model RMItem {
