@@ -1082,7 +1082,13 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
                 </div>
               )}
 
-              <p className="text-torg-gray pt-1">Ficamos no aguardo. Desde ja agradecemos a atencao e parceria.</p>
+              <div className="bg-gray-50 rounded-lg p-3 text-center mt-2">
+                <p className="text-[10px] text-torg-gray mb-1">O fornecedor recebera um link para informar a nova data:</p>
+                <span className="inline-block text-[10px] bg-torg-blue text-white px-3 py-1 rounded font-medium">
+                  Informar previsao de entrega
+                </span>
+              </div>
+              <p className="text-torg-gray pt-1">Voce tambem pode responder este email diretamente.</p>
               <p className="text-torg-gray">Atenciosamente, Equipe de Compras — Torg Metal</p>
             </div>
           </div>

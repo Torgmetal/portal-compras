@@ -3,6 +3,7 @@
 // recebimentos parciais por rmItemId), prazo original e dias de atraso.
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
@@ -65,6 +66,7 @@ export async function POST(req) {
       fornecedorNome: true,
       total: true,
       prazoEntregaPrevisto: true,
+      tokenEntrega: true,
       opId: true,
       op: { select: { numero: true, cliente: true, obra: true } },
       cotacao: {
@@ -150,6 +152,18 @@ export async function POST(req) {
     pedido.fornecedorNome ||
     pedido.cotacao?.fornecedorNome ||
     "Fornecedor";
+
+  // ── Gerar/reutilizar token publico ──
+  let tokenEntrega = pedido.tokenEntrega;
+  if (!tokenEntrega) {
+    tokenEntrega = crypto.randomBytes(24).toString("hex");
+    await prisma.pedidoOmie.update({
+      where: { id: pedido.id },
+      data: { tokenEntrega },
+    });
+  }
+  const baseUrl = process.env.NEXTAUTH_URL || `https://${process.env.VERCEL_URL}`;
+  const linkEntrega = `${baseUrl}/fornecedores/entrega/${tokenEntrega}`;
 
   // ── Montar itens com saldo pendente ──
   // Prioriza itens da cotacao (vencedores); fallback pra rmItens diretos
@@ -288,9 +302,23 @@ export async function POST(req) {
           </p>`
         : ""}
 
+      <div style="background:#f7fafc;border-radius:8px;padding:16px 20px;margin:24px 0;text-align:center;">
+        <p style="color:#4a5568;font-size:13px;margin:0 0 12px 0;">
+          Para informar a nova previsao de entrega, clique no botao abaixo:
+        </p>
+        <a href="${linkEntrega}" target="_blank"
+           style="display:inline-block;background:#006EAB;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 28px;border-radius:8px;">
+          Informar previsao de entrega
+        </a>
+        <p style="color:#a0aec0;font-size:11px;margin:10px 0 0 0;">
+          Ou copie e cole este link no navegador:<br>
+          <a href="${linkEntrega}" style="color:#006EAB;word-break:break-all;">${linkEntrega}</a>
+        </p>
+      </div>
+
       <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;">
       <p style="color:#4a5568;line-height:1.5;font-size:13px;">
-        Ficamos no aguardo de um retorno com a previsao de entrega dos itens acima.<br>
+        Voce tambem pode responder este email diretamente com a previsao atualizada.<br>
         Desde ja agradecemos a atencao e parceria.
       </p>
       <p style="color:#a0aec0;font-size:12px;line-height:1.4;">
@@ -321,7 +349,8 @@ export async function POST(req) {
   if (itensEntregues.length > 0) {
     tl.push("", `${itensEntregues.length} ite${itensEntregues.length !== 1 ? "ns ja" : "m ja"} recebido${itensEntregues.length !== 1 ? "s" : ""} — agradecemos o envio.`);
   }
-  tl.push("", "Ficamos no aguardo de um retorno.", "Desde ja agradecemos a atencao e parceria.", "", "Atenciosamente,", "Equipe de Compras — Torg Metal");
+  tl.push("", `Para informar a nova previsao de entrega, acesse: ${linkEntrega}`);
+  tl.push("", "Voce tambem pode responder este email diretamente.", "Desde ja agradecemos a atencao e parceria.", "", "Atenciosamente,", "Equipe de Compras — Torg Metal");
 
   const destinatarios = [emailFornecedor, ...emailsCC];
 

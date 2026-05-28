@@ -757,6 +757,9 @@ model PedidoOmie {
   prazoOriginal        DateTime? // primeiro prazo acordado (set uma vez, nunca muda)
   dataEntregaReal      DateTime? // quando de fato chegou
   statusEntrega        String?   // NO_PRAZO | PROXIMO | ATRASADO | ENTREGUE
+  // Token publico p/ fornecedor informar nova data de entrega (gerado ao
+  // enviar email de acompanhamento). Acessivel em /fornecedores/entrega/[token]
+  tokenEntrega         String?   @unique
 
   rmItens           RMItem[]
   recebimentos      Recebimento[]
@@ -778,8 +781,8 @@ model PrazoHistorico {
   prazoNovo      DateTime   // novo prazo informado pelo fornecedor
   motivo         String?    // observacao livre (ex: "Fornecedor informou atraso na siderurgica")
 
-  alteradoPorId  String
-  alteradoPor    User       @relation(fields: [alteradoPorId], references: [id])
+  alteradoPorId  String?    // null = fornecedor informou via portal publico
+  alteradoPor    User?      @relation(fields: [alteradoPorId], references: [id])
   criadoEm       DateTime   @default(now())
 
   @@index([pedidoId])
