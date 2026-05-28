@@ -11,7 +11,6 @@ export const runtime = "nodejs";
 
 const schema = z.object({
   pedidoId: z.string().min(1, "pedidoId obrigatorio"),
-  mensagem: z.string().optional(),
 });
 
 function esc(s) {
@@ -229,14 +228,6 @@ export async function POST(req) {
   // Itens ja totalmente entregues (se houver parcial)
   const itensEntregues = todosItens.filter((it) => it.qtdPendente <= 0 && it.totalRecebido > 0);
 
-  const mensagemExtra = body.mensagem?.trim()
-    ? `<div style="background:#fffff0;border:1px solid #fefcbf;border-radius:8px;padding:14px;margin:16px 0;">
-        <p style="color:#744210;font-size:13px;margin:0;line-height:1.5;">
-          <strong>Mensagem do comprador:</strong><br>
-          ${esc(body.mensagem.trim()).replace(/\n/g, "<br>")}
-        </p>
-      </div>`
-    : "";
 
   // Texto de intro muda se tem entrega parcial
   const introEntrega = temParcial
@@ -266,8 +257,6 @@ export async function POST(req) {
         Solicitamos, por gentileza, uma <strong>previsao atualizada de entrega</strong> ou
         confirmacao do despacho dos itens pendentes.
       </p>
-
-      ${mensagemExtra}
 
       <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
         <tr><td style="padding:6px 0;color:#718096;width:150px;">Pedido</td><td style="padding:6px 0;"><strong>#${esc(numPedido)}</strong></td></tr>
@@ -312,9 +301,6 @@ export async function POST(req) {
     "",
     "Solicitamos previsao atualizada de entrega dos itens pendentes.",
   ];
-  if (body.mensagem?.trim()) {
-    tl.push("", `Mensagem do comprador: ${body.mensagem.trim()}`);
-  }
   if (itensPendentes.length > 0) {
     tl.push("", "ITENS PENDENTES:");
     itensPendentes.forEach((it) => {

@@ -887,15 +887,13 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
 
 function ModalCobrarFornecedor({ pedido, onClose }) {
   const p = pedido;
-  const [mensagem, setMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
-  const [resultado, setResultado] = useState(null); // { ok, email?, error?, pendentes?, entregues? }
+  const [resultado, setResultado] = useState(null);
 
   const diasAtraso = p.prazoEntregaPrevisto
     ? Math.max(0, Math.ceil((Date.now() - new Date(p.prazoEntregaPrevisto).getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
 
-  // Calcula recebido total por pedido (soma dos recebimentos)
   const totalRecebido = (p.recebimentos || []).reduce((s, r) => s + (r.qtdRecebida || 0), 0);
   const temParcial = totalRecebido > 0;
 
@@ -906,7 +904,7 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
       const res = await fetch("/api/compras/entregas/cobrar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pedidoId: p.id, mensagem: mensagem.trim() || undefined }),
+        body: JSON.stringify({ pedidoId: p.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao enviar");
@@ -979,62 +977,59 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
             )}
           </div>
 
-          {/* Aviso entrega parcial */}
-          {temParcial && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm flex items-start gap-2">
-              <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
-              <p className="text-amber-800">
-                Este pedido possui <strong>recebimentos parciais</strong>. O email ira listar somente
-                os itens ainda pendentes (descontando o que ja foi entregue).
-              </p>
-            </div>
-          )}
-
-          {/* Itens do pedido */}
-          {p.itens?.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-torg-gray uppercase tracking-wide mb-2">
-                Itens do pedido ({p.itens.length})
-              </p>
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-44 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-50/80 sticky top-0">
-                      <th className="px-3 py-1.5 text-left text-torg-gray font-medium">Descricao</th>
-                      <th className="px-3 py-1.5 text-right text-torg-gray font-medium w-[70px]">Qtd</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {p.itens.map((it, i) => (
-                      <tr key={i}>
-                        <td className="px-3 py-1.5 text-torg-dark">{it.descricao}</td>
-                        <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums whitespace-nowrap">
-                          {it.qtd != null ? `${Number(it.qtd).toFixed(it.unidade === "KG" ? 1 : 0)} ${it.unidade || ""}` : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-[10px] text-torg-gray mt-1.5 italic">
-                O saldo pendente por item sera calculado automaticamente com base nos recebimentos registrados.
-              </p>
-            </div>
-          )}
-
-          {/* Mensagem opcional */}
+          {/* Preview da mensagem padrao */}
           <div>
-            <label className="block text-xs font-semibold text-torg-gray uppercase tracking-wide mb-1.5">
-              Mensagem adicional <span className="font-normal lowercase">(opcional)</span>
-            </label>
-            <textarea
-              value={mensagem}
-              onChange={(e) => setMensagem(e.target.value)}
-              placeholder="Ex: Necessitamos urgente para atender prazo do cliente..."
-              rows={3}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-torg-blue focus:border-torg-blue resize-none"
-              disabled={enviando || resultado?.ok}
-            />
+            <p className="text-xs font-semibold text-torg-gray uppercase tracking-wide mb-2">
+              Mensagem que sera enviada
+            </p>
+            <div className="bg-white border border-gray-200 rounded-lg p-4 text-xs text-torg-dark leading-relaxed space-y-2">
+              <p>Ola <strong>{p.fornecedor}</strong>,</p>
+              {temParcial ? (
+                <p>
+                  Verificamos que o Pedido de Compra <strong>#{p.numero}</strong> possui entrega parcial —
+                  alguns itens ja foram recebidos, porem restam itens pendentes
+                  {diasAtraso > 0 && <> com <strong className="text-red-600">{diasAtraso} dia{diasAtraso !== 1 ? "s" : ""} de atraso</strong></>}.
+                  O prazo previsto era <strong>{fmtData(p.prazoEntregaPrevisto)}</strong>.
+                </p>
+              ) : (
+                <p>
+                  Verificamos que o Pedido de Compra <strong>#{p.numero}</strong> consta com entrega
+                  {diasAtraso > 0
+                    ? <> <strong className="text-red-600">em atraso de {diasAtraso} dia{diasAtraso !== 1 ? "s" : ""}</strong></>
+                    : " pendente"}.
+                  O prazo previsto era <strong>{fmtData(p.prazoEntregaPrevisto)}</strong>.
+                </p>
+              )}
+              <p>Solicitamos, por gentileza, uma previsao atualizada de entrega ou confirmacao do despacho dos itens pendentes.</p>
+
+              {/* Itens inline */}
+              {p.itens?.length > 0 && (
+                <div className="mt-2">
+                  <p className="font-semibold text-red-700 mb-1">Itens pendentes de entrega:</p>
+                  <div className="border border-gray-100 rounded overflow-hidden max-h-32 overflow-y-auto">
+                    <table className="w-full text-[11px]">
+                      <tbody className="divide-y divide-gray-50">
+                        {p.itens.map((it, i) => (
+                          <tr key={i}>
+                            <td className="px-2 py-1 text-torg-dark">{it.descricao}</td>
+                            <td className="px-2 py-1 text-right text-torg-gray tabular-nums whitespace-nowrap">
+                              {it.qtd != null ? `${Number(it.qtd).toFixed(it.unidade === "KG" ? 1 : 0)} ${it.unidade || ""}` : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {temParcial && (
+                    <p className="text-[10px] text-torg-gray mt-1 italic">
+                      O saldo pendente por item sera descontado automaticamente com base nos recebimentos.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <p className="text-torg-gray pt-1">Atenciosamente, Equipe de Compras — Torg Metal</p>
+            </div>
           </div>
 
           {/* Resultado */}
