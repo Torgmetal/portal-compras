@@ -3,15 +3,19 @@ import { useState, useEffect, useRef } from "react";
 import {
   Building2, PlusCircle, Loader2, AlertCircle, X, Users,
   Download, Upload, FileSpreadsheet, CheckCircle2, XCircle,
+  Pencil, Trash2,
 } from "lucide-react";
+
+const FORM_VAZIO = { nome: "", sigla: "", cor: "#006EAB" };
 
 export default function SetoresClient() {
   const [setores, setSetores] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
-  const [modal, setModal] = useState(false);
+  const [modal, setModal] = useState(null); // null | "novo" | setor obj (editar)
   const [salvando, setSalvando] = useState(false);
-  const [form, setForm] = useState({ nome: "", sigla: "", cor: "#006EAB" });
+  const [form, setForm] = useState(FORM_VAZIO);
+  const [excluindo, setExcluindo] = useState(null); // id
 
   // Import Excel
   const fileRef = useRef(null);
@@ -29,24 +33,72 @@ export default function SetoresClient() {
 
   useEffect(() => { carregar(); }, []);
 
+  const abrirNovo = () => {
+    setForm(FORM_VAZIO);
+    setModal("novo");
+    setErro("");
+  };
+
+  const abrirEditar = (setor) => {
+    setForm({ nome: setor.nome, sigla: setor.sigla || "", cor: setor.cor || "#006EAB" });
+    setModal(setor);
+    setErro("");
+  };
+
+  const editando = modal && modal !== "novo";
+  const modalAberto = modal !== null;
+
   const salvar = async () => {
     setSalvando(true);
     setErro("");
     try {
-      const res = await fetch("/api/rh/setores", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, sigla: form.sigla || null, cor: form.cor || null }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setSetores((prev) => [...prev, { ...data.data, _count: { funcionarios: 0 } }]);
-      setModal(false);
-      setForm({ nome: "", sigla: "", cor: "#006EAB" });
+      const payload = { nome: form.nome, sigla: form.sigla || null, cor: form.cor || null };
+
+      if (editando) {
+        // PATCH
+        const res = await fetch("/api/rh/setores", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: modal.id, ...payload }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setSetores((prev) => prev.map((s) =>
+          s.id === modal.id ? { ...s, nome: form.nome, sigla: form.sigla || null, cor: form.cor || null } : s
+        ));
+      } else {
+        // POST
+        const res = await fetch("/api/rh/setores", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setSetores((prev) => [...prev, { ...data.data, _count: { funcionarios: 0 } }]);
+      }
+      setModal(null);
+      setForm(FORM_VAZIO);
     } catch (e) {
       setErro(e.message);
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const excluir = async (setor) => {
+    if (!confirm(`Desativar o setor "${setor.nome}"?`)) return;
+    setExcluindo(setor.id);
+    setErro("");
+    try {
+      const res = await fetch(`/api/rh/setores?id=${setor.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSetores((prev) => prev.filter((s) => s.id !== setor.id));
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setExcluindo(null);
     }
   };
 
@@ -113,14 +165,14 @@ export default function SetoresClient() {
             {importando ? "Importando…" : "Importar planilha"}
           </button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={importarPlanilha} className="hidden" />
-          <button onClick={() => setModal(true)}
+          <button onClick={abrirNovo}
             className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2">
             <PlusCircle size={16} /> Novo Setor
           </button>
         </div>
       </div>
 
-      {erro && (
+      {erro && !modalAberto && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertCircle size={14} className="mt-0.5" /> {erro}
         </div>
@@ -135,15 +187,33 @@ export default function SetoresClient() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {setores.map((s) => (
-            <div key={s.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
+            <div key={s.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow group relative">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
                   style={{ backgroundColor: s.cor || "#006EAB" }}>
                   {s.sigla || s.nome.charAt(0)}
                 </div>
-                <div>
-                  <h3 className="font-bold text-torg-dark">{s.nome}</h3>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-torg-dark truncate">{s.nome}</h3>
                   {s.sigla && <p className="text-[10px] text-torg-gray">{s.sigla}</p>}
+                </div>
+                {/* Ações — visíveis no hover */}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => abrirEditar(s)}
+                    className="p-1.5 rounded-lg hover:bg-gray-100 text-torg-gray hover:text-torg-blue"
+                    title="Editar setor"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => excluir(s)}
+                    disabled={excluindo === s.id}
+                    className="p-1.5 rounded-lg hover:bg-red-50 text-torg-gray hover:text-red-600 disabled:opacity-50"
+                    title="Desativar setor"
+                  >
+                    {excluindo === s.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  </button>
                 </div>
               </div>
               <div className="flex items-center justify-between text-sm">
@@ -157,27 +227,35 @@ export default function SetoresClient() {
         </div>
       )}
 
-      {/* Modal Novo Setor */}
-      {modal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !salvando && setModal(false)}>
+      {/* Modal Novo/Editar Setor */}
+      {modalAberto && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !salvando && setModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-torg-dark">Novo Setor</h3>
-              <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              <div className="flex items-center gap-2">
+                {editando ? <Pencil size={18} className="text-torg-blue" /> : <PlusCircle size={18} className="text-torg-blue" />}
+                <h3 className="text-lg font-bold text-torg-dark">{editando ? "Editar Setor" : "Novo Setor"}</h3>
+              </div>
+              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
+              {erro && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+                  <AlertCircle size={14} className="mt-0.5" /> {erro}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-torg-gray mb-1">Nome do setor *</label>
                 <input type="text" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })}
                   placeholder="Ex: Produção, Administrativo, Engenharia…"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:outline-none" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Sigla</label>
                   <input type="text" value={form.sigla} onChange={(e) => setForm({ ...form, sigla: e.target.value })}
                     placeholder="PROD" maxLength={6}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:outline-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Cor</label>
@@ -190,11 +268,11 @@ export default function SetoresClient() {
               </div>
             </div>
             <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+              <button onClick={() => setModal(null)} className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
               <button onClick={salvar} disabled={salvando || !form.nome}
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
-                {salvando ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-                {salvando ? "Salvando…" : "Criar Setor"}
+                {salvando ? <Loader2 size={14} className="animate-spin" /> : editando ? <Pencil size={14} /> : <PlusCircle size={14} />}
+                {salvando ? "Salvando…" : editando ? "Salvar alterações" : "Criar Setor"}
               </button>
             </div>
           </div>
