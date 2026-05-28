@@ -43,7 +43,7 @@ const STATUS_ITEM_LABELS = {
 // mostra como "Sem proposta" pro usuario perceber que precisa re-cotar.
 const STATUS_SEM_PROPOSTA = { label: "Sem proposta", className: "bg-amber-50 text-amber-700" };
 
-export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null, categoriasCustom = [], pedidos = [] }) {
+export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null, apiBaseMapa = null, categoriasCustom = [], pedidos = [] }) {
   const router = useRouter();
   const isAdmin = userRole === "ADMIN";
   // Lista mesclada (built-in + custom do banco)
@@ -448,10 +448,13 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
           <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg px-4 py-2 mb-2 text-xs text-torg-dark flex items-start gap-2">
             <span>💡</span>
             <span>
-              Mapa filtrado pra esta RM. Clique nas células pra escolher vencedores e gerar os pedidos. O botão "Gerar Pedidos Omie" abaixo cria pedidos pra <strong>todos os itens vencedores dessa OP</strong> (não só desta RM).
+              {rm.opId
+                ? <>Mapa filtrado pra esta RM. Clique nas células pra escolher vencedores e gerar os pedidos. O botão &quot;Gerar Pedidos Omie&quot; abaixo cria pedidos pra <strong>todos os itens vencedores dessa OP</strong> (não só desta RM).</>
+                : <>Mapa de cotações desta RM. Clique nas células pra escolher vencedores e gerar pedidos no Omie.</>
+              }
             </span>
           </div>
-          <MapaCotacaoClient op={dadosMapa} />
+          <MapaCotacaoClient op={dadosMapa} apiBase={apiBaseMapa || undefined} />
         </div>
       )}
 

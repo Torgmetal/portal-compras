@@ -60,7 +60,10 @@ function abrirOutlookMailto(to, subject) {
   document.body.removeChild(a);
 }
 
-export default function MapaCotacaoClient({ op }) {
+export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
+  // apiBase: prefixo para endpoints gerar-pedidos e sugerir-vencedores.
+  // Default: /api/op/{op.id} (fluxo OP). Para RMs sem OP: /api/rm/{rmId}.
+  const apiBase = apiBaseProp || `/api/op/${op.id}`;
   const router = useRouter();
   const [loading, setLoading] = useState(null);
   const [erro, setErro] = useState("");
@@ -179,7 +182,7 @@ export default function MapaCotacaoClient({ op }) {
   // O modal chama com cotacoesIds=[id] pra gerar 1 por vez.
   const gerarPedidos = async ({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds }) => {
     setErro("");
-    const res = await fetch(`/api/op/${op.id}/gerar-pedidos`, {
+    const res = await fetch(`${apiBase}/gerar-pedidos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds }),
@@ -193,7 +196,7 @@ export default function MapaCotacaoClient({ op }) {
     setLoading("sugerir");
     setErro("");
     try {
-      const res = await fetch(`/api/op/${op.id}/sugerir-vencedores`, { method: "POST" });
+      const res = await fetch(`${apiBase}/sugerir-vencedores`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
       router.refresh();
