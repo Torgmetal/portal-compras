@@ -60,6 +60,15 @@ function abrirOutlookMailto(to, subject) {
   document.body.removeChild(a);
 }
 
+// Extrai mensagem de erro de qualquer formato (string, Error, Zod, objeto)
+function extractError(e) {
+  if (!e) return "Erro desconhecido";
+  if (typeof e === "string") return e;
+  if (typeof e.message === "string") return e.message;
+  if (Array.isArray(e)) return e.map((x) => x?.message || String(x)).join("; ");
+  try { return JSON.stringify(e); } catch { return String(e); }
+}
+
 export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
   // apiBase: prefixo para endpoints gerar-pedidos e sugerir-vencedores.
   // Default: /api/op/{op.id} (fluxo OP). Para RMs sem OP: /api/rm/{rmId}.
@@ -88,7 +97,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
       const res2 = await fetch(`/api/cotacao/${cotacaoId}/preview-email?format=json`);
       if (!res2.ok) {
         const d = await res2.json().catch(() => ({}));
-        throw new Error(d.error || "Falha ao montar email");
+        throw new Error(extractError(d.error) || "Falha ao montar email");
       }
       const emailData = await res2.json();
       setEmailRevisaoCache((prev) => ({ ...prev, [cotacaoId]: emailData }));
@@ -166,7 +175,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
         body: JSON.stringify({ vencedor: !jaVencedor }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) throw new Error(extractError(data.error) || "Erro");
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -188,7 +197,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
       body: JSON.stringify({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Erro");
+    if (!res.ok) throw new Error(extractError(data.error) || "Erro");
     return data.resultados || [];
   };
 
@@ -198,7 +207,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
     try {
       const res = await fetch(`${apiBase}/sugerir-vencedores`, { method: "POST" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) throw new Error(extractError(data.error) || "Erro");
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -230,7 +239,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
         body: JSON.stringify({ totalProposta: valor }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) throw new Error(extractError(data.error) || "Erro");
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -249,7 +258,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
         body: JSON.stringify({ vencedor: !todosJaVencedores }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) throw new Error(extractError(data.error) || "Erro");
       router.refresh();
     } catch (e) {
       setErro(e.message);

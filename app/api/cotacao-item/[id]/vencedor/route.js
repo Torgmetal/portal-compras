@@ -13,7 +13,12 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Apenas Admin ou Compras pode marcar vencedor." }, { status: 403 });
   }
 
-  const body = schema.parse(await req.json());
+  let body;
+  try {
+    body = schema.parse(await req.json());
+  } catch (e) {
+    return NextResponse.json({ error: "Dados inválidos: " + (e.issues?.[0]?.message || e.message) }, { status: 400 });
+  }
 
   const cotItem = await prisma.cotacaoItem.findUnique({
     where: { id: params.id },
