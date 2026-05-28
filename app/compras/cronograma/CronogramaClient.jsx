@@ -983,24 +983,23 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
               Mensagem que sera enviada
             </p>
             <div className="bg-white border border-gray-200 rounded-lg p-4 text-xs text-torg-dark leading-relaxed space-y-2">
-              <p>Ola <strong>{p.fornecedor}</strong>,</p>
+              <p>Prezado(a) <strong>{p.fornecedor}</strong>,</p>
               {temParcial ? (
                 <p>
-                  Verificamos que o Pedido de Compra <strong>#{p.numero}</strong> possui entrega parcial —
-                  alguns itens ja foram recebidos, porem restam itens pendentes
-                  {diasAtraso > 0 && <> com <strong className="text-red-600">{diasAtraso} dia{diasAtraso !== 1 ? "s" : ""} de atraso</strong></>}.
-                  O prazo previsto era <strong>{fmtData(p.prazoEntregaPrevisto)}</strong>.
+                  Gostaríamos de verificar o andamento do Pedido de Compra <strong>#{p.numero}</strong>.
+                  Parte dos itens ja foi entregue, porem {p.itens?.length || "alguns"} ite{(p.itens?.length || 2) !== 1 ? "ns" : "m"} encontra{(p.itens?.length || 2) !== 1 ? "m" : ""}-se pendente{(p.itens?.length || 2) !== 1 ? "s" : ""}
+                  {diasAtraso > 0
+                    ? <> e o prazo acordado (<strong>{fmtData(p.prazoEntregaPrevisto)}</strong>) foi ultrapassado em <strong>{diasAtraso} dia{diasAtraso !== 1 ? "s" : ""}</strong></>
+                    : <> com prazo previsto para <strong>{fmtData(p.prazoEntregaPrevisto)}</strong></>}.
                 </p>
               ) : (
                 <p>
-                  Verificamos que o Pedido de Compra <strong>#{p.numero}</strong> consta com entrega
-                  {diasAtraso > 0
-                    ? <> <strong className="text-red-600">em atraso de {diasAtraso} dia{diasAtraso !== 1 ? "s" : ""}</strong></>
-                    : " pendente"}.
-                  O prazo previsto era <strong>{fmtData(p.prazoEntregaPrevisto)}</strong>.
+                  Gostaríamos de verificar o andamento do Pedido de Compra <strong>#{p.numero}</strong>,
+                  cujo prazo de entrega estava previsto para <strong>{fmtData(p.prazoEntregaPrevisto)}</strong>
+                  {diasAtraso > 0 && <> e encontra-se com <strong>{diasAtraso} dia{diasAtraso !== 1 ? "s" : ""}</strong> alem do prazo acordado</>}.
                 </p>
               )}
-              <p>Solicitamos, por gentileza, uma previsao atualizada de entrega ou confirmacao do despacho dos itens pendentes.</p>
+              <p>Pedimos, por gentileza, que nos envie uma previsao atualizada de entrega ou a confirmacao de despacho dos materiais pendentes.</p>
 
               {/* Itens inline */}
               {p.itens?.length > 0 && (
@@ -1028,7 +1027,8 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
                 </div>
               )}
 
-              <p className="text-torg-gray pt-1">Atenciosamente, Equipe de Compras — Torg Metal</p>
+              <p className="text-torg-gray pt-1">Ficamos no aguardo. Desde ja agradecemos a atencao e parceria.</p>
+              <p className="text-torg-gray">Atenciosamente, Equipe de Compras — Torg Metal</p>
             </div>
           </div>
 

@@ -189,7 +189,17 @@ export async function POST(req) {
   const temParcial = todosItens.some((it) => it.totalRecebido > 0);
 
   // ── Dados complementares ──
-  const prazo = pedido.prazoEntregaPrevisto;
+  // Prazo: usa PedidoOmie.prazoEntregaPrevisto; fallback pro prazo mais tardio
+  // dos CotacaoItems vencedores (mesma logica de entregas/route GET)
+  let prazo = pedido.prazoEntregaPrevisto;
+  if (!prazo && pedido.cotacao?.itens?.length > 0) {
+    const prazosItens = pedido.cotacao.itens
+      .filter((ci) => ci.prazoEntrega)
+      .map((ci) => new Date(ci.prazoEntrega).getTime());
+    if (prazosItens.length > 0) {
+      prazo = new Date(Math.max(...prazosItens));
+    }
+  }
   const prazoTxt = fmtData(prazo);
   const diasAtraso = prazo
     ? Math.max(0, Math.ceil((Date.now() - new Date(prazo).getTime()) / (1000 * 60 * 60 * 24)))
@@ -198,7 +208,7 @@ export async function POST(req) {
   const op = pedido.op || pedido.cotacao?.rm?.op;
   const opLabel = op?.numero ? `OP ${op.numero}${op.cliente ? ` — ${op.cliente}` : ""}` : null;
 
-  const subject = `Cobranca de Entrega — Pedido #${numPedido} (Torg Metal)`;
+  const subject = `Acompanhamento de Entrega — Pedido #${numPedido} (Torg Metal)`;
 
   // ── Email HTML ──
   // Tabela de itens pendentes
@@ -231,42 +241,42 @@ export async function POST(req) {
 
   // Texto de intro muda se tem entrega parcial
   const introEntrega = temParcial
-    ? `Verificamos que o <strong>Pedido de Compra #${esc(numPedido)}</strong> possui
-       <strong>entrega parcial</strong> — alguns itens ja foram recebidos, porem
-       <strong style="color:#c53030;">${itensPendentes.length} ite${itensPendentes.length !== 1 ? "ns" : "m"} ainda ${itensPendentes.length !== 1 ? "estao" : "esta"} pendente${itensPendentes.length !== 1 ? "s" : ""}</strong>
-       ${diasAtraso > 0 ? `com <strong style="color:#c53030;">${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""} de atraso</strong>` : ""}.`
-    : `Verificamos que o <strong>Pedido de Compra #${esc(numPedido)}</strong> consta com entrega
-       ${diasAtraso > 0
-         ? `<strong style="color:#c53030;">em atraso de ${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}</strong>`
-         : "pendente"}.`;
+    ? `Gostaríamos de verificar o andamento do <strong>Pedido de Compra #${esc(numPedido)}</strong>.
+       Identificamos que parte dos itens ja foi entregue, porem
+       <strong>${itensPendentes.length} ite${itensPendentes.length !== 1 ? "ns" : "m"}</strong> ainda
+       ${itensPendentes.length !== 1 ? "encontram-se" : "encontra-se"} pendente${itensPendentes.length !== 1 ? "s" : ""}
+       ${diasAtraso > 0 ? `e o prazo acordado (<strong>${prazoTxt}</strong>) foi ultrapassado em <strong>${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}</strong>` : `com prazo previsto para <strong>${prazoTxt}</strong>`}.`
+    : `Gostaríamos de verificar o andamento do <strong>Pedido de Compra #${esc(numPedido)}</strong>,
+       cujo prazo de entrega estava previsto para <strong>${prazoTxt}</strong>${diasAtraso > 0
+         ? ` e encontra-se com <strong>${diasAtraso} dia${diasAtraso !== 1 ? "s" : ""}</strong> alem do prazo acordado`
+         : ""}.`;
 
   const html = `
     <div style="font-family:-apple-system,system-ui,sans-serif;max-width:640px;margin:0 auto;color:#2d3748;">
-      <h2 style="color:#c53030;margin-top:0;">Cobranca de Entrega</h2>
+      <h2 style="color:#006EAB;margin-top:0;">Acompanhamento de Entrega</h2>
 
       <p style="color:#4a5568;line-height:1.6;">
-        Ola <strong>${esc(nomeFornecedor)}</strong>,
+        Prezado(a) <strong>${esc(nomeFornecedor)}</strong>,
       </p>
 
       <p style="color:#4a5568;line-height:1.6;">
         ${introEntrega}
-        O prazo previsto era <strong>${prazoTxt}</strong>.
       </p>
 
       <p style="color:#4a5568;line-height:1.6;">
-        Solicitamos, por gentileza, uma <strong>previsao atualizada de entrega</strong> ou
-        confirmacao do despacho dos itens pendentes.
+        Pedimos, por gentileza, que nos envie uma <strong>previsao atualizada de entrega</strong>
+        ou a confirmacao de despacho dos materiais pendentes para que possamos nos programar internamente.
       </p>
 
       <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
         <tr><td style="padding:6px 0;color:#718096;width:150px;">Pedido</td><td style="padding:6px 0;"><strong>#${esc(numPedido)}</strong></td></tr>
-        <tr><td style="padding:6px 0;color:#718096;">Prazo previsto</td><td style="padding:6px 0;"><strong>${prazoTxt}</strong></td></tr>
-        ${diasAtraso > 0 ? `<tr><td style="padding:6px 0;color:#718096;">Dias em atraso</td><td style="padding:6px 0;"><strong style="color:#c53030;">${diasAtraso}</strong></td></tr>` : ""}
+        <tr><td style="padding:6px 0;color:#718096;">Prazo acordado</td><td style="padding:6px 0;"><strong>${prazoTxt}</strong></td></tr>
+        ${diasAtraso > 0 ? `<tr><td style="padding:6px 0;color:#718096;">Dias alem do prazo</td><td style="padding:6px 0;"><strong style="color:#c53030;">${diasAtraso}</strong></td></tr>` : ""}
         ${opLabel ? `<tr><td style="padding:6px 0;color:#718096;">Referencia</td><td style="padding:6px 0;">${esc(opLabel)}</td></tr>` : ""}
       </table>
 
       ${itensPendentes.length > 0
-        ? `<p style="color:#c53030;font-weight:700;margin-bottom:4px;font-size:14px;">
+        ? `<p style="color:#4a5568;font-weight:700;margin-bottom:4px;font-size:14px;">
             Itens pendentes de entrega:
           </p>
           ${tabelaItensPendentes}`
@@ -274,14 +284,14 @@ export async function POST(req) {
 
       ${itensEntregues.length > 0
         ? `<p style="color:#38a169;font-size:12px;margin-top:16px;">
-            ✓ ${itensEntregues.length} ite${itensEntregues.length !== 1 ? "ns ja" : "m ja"} recebido${itensEntregues.length !== 1 ? "s" : ""} — obrigado.
+            ✓ ${itensEntregues.length} ite${itensEntregues.length !== 1 ? "ns ja" : "m ja"} recebido${itensEntregues.length !== 1 ? "s" : ""} — agradecemos o envio.
           </p>`
         : ""}
 
       <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;">
       <p style="color:#4a5568;line-height:1.5;font-size:13px;">
-        Favor responder este email com a previsao atualizada de entrega dos itens pendentes.<br>
-        Agradecemos a atencao.
+        Ficamos no aguardo de um retorno com a previsao de entrega dos itens acima.<br>
+        Desde ja agradecemos a atencao e parceria.
       </p>
       <p style="color:#a0aec0;font-size:12px;line-height:1.4;">
         Atenciosamente,<br>
@@ -292,14 +302,13 @@ export async function POST(req) {
 
   // ── Texto plano ──
   const tl = [
-    `Ola ${nomeFornecedor},`,
+    `Prezado(a) ${nomeFornecedor},`,
     "",
     temParcial
-      ? `O Pedido #${numPedido} possui entrega parcial — ${itensPendentes.length} ite${itensPendentes.length !== 1 ? "ns" : "m"} pendente${itensPendentes.length !== 1 ? "s" : ""}${diasAtraso > 0 ? ` com ${diasAtraso} dia(s) de atraso` : ""}.`
-      : `O Pedido #${numPedido} consta com entrega ${diasAtraso > 0 ? `em atraso de ${diasAtraso} dia(s)` : "pendente"}.`,
-    `Prazo previsto: ${prazoTxt}.`,
+      ? `Gostaríamos de verificar o andamento do Pedido #${numPedido}. Parte dos itens ja foi entregue, porem ${itensPendentes.length} ite${itensPendentes.length !== 1 ? "ns" : "m"} encontra${itensPendentes.length !== 1 ? "m" : ""}-se pendente${itensPendentes.length !== 1 ? "s" : ""}${diasAtraso > 0 ? ` e o prazo acordado (${prazoTxt}) foi ultrapassado em ${diasAtraso} dia(s)` : ` com prazo previsto para ${prazoTxt}`}.`
+      : `Gostaríamos de verificar o andamento do Pedido #${numPedido}, cujo prazo de entrega estava previsto para ${prazoTxt}${diasAtraso > 0 ? ` e encontra-se com ${diasAtraso} dia(s) alem do prazo acordado` : ""}.`,
     "",
-    "Solicitamos previsao atualizada de entrega dos itens pendentes.",
+    "Pedimos, por gentileza, que nos envie uma previsao atualizada de entrega ou a confirmacao de despacho dos materiais pendentes.",
   ];
   if (itensPendentes.length > 0) {
     tl.push("", "ITENS PENDENTES:");
@@ -310,9 +319,9 @@ export async function POST(req) {
     });
   }
   if (itensEntregues.length > 0) {
-    tl.push("", `${itensEntregues.length} ite${itensEntregues.length !== 1 ? "ns ja" : "m ja"} recebido${itensEntregues.length !== 1 ? "s" : ""}.`);
+    tl.push("", `${itensEntregues.length} ite${itensEntregues.length !== 1 ? "ns ja" : "m ja"} recebido${itensEntregues.length !== 1 ? "s" : ""} — agradecemos o envio.`);
   }
-  tl.push("", "Favor responder com a previsao atualizada.", "", "Atenciosamente,", "Equipe de Compras — Torg Metal");
+  tl.push("", "Ficamos no aguardo de um retorno.", "Desde ja agradecemos a atencao e parceria.", "", "Atenciosamente,", "Equipe de Compras — Torg Metal");
 
   const destinatarios = [emailFornecedor, ...emailsCC];
 
