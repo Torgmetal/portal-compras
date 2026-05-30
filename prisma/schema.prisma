@@ -1950,6 +1950,29 @@ model ParafusoItem {
   @@index([tipo])
 }
 
+// ── Catálogo de Tintas ─────────────────────────────────────
+// Banco de dados de produtos de tinta com SV% (Sólidos por Volume).
+// Usado no cálculo de rendimento: Rt = (SV% × 10) / Espessura_µm.
+// Populado via seed com ~60 produtos das normas Petrobras e fabricantes.
+
+model TintaProduto {
+  id                String   @id @default(cuid())
+  nome              String   // "Tinta de Fundo Epóxi-Zinco Poliamida"
+  fabricante        String?  // "Akzo Nobel", "Jotun", "Weg", "Sumaré SW", etc.
+  norma             String?  // "N-1277", "N-2677", etc.
+  resinaTipo        String   // EPOXI, PU, ETIL_SILICATO, ACRILICA, ESMALTE, VERNIZ, SILICONE, ANTIFOULING, ALQUIDICA, EPOXI_MASTIC, EPOXI_AMIDA
+  svPct             Float    // Sólidos por Volume (%) — dado-chave para cálculo de rendimento
+  diluentePct       Float    @default(10)  // % de diluente recomendado (varia por resina)
+  ativo             Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  pinturaItens      PinturaItem[]
+
+  @@index([resinaTipo])
+  @@index([ativo])
+}
+
 // ── Pintura ────────────────────────────────────────────────
 
 enum TipoPintura {
@@ -1982,10 +2005,27 @@ model PinturaItem {
   observacao      String?
   ordem           Int             @default(0)
 
+  // ── Campos de cálculo de engenharia (v2) ──────────────────
+  // Vinculo ao catálogo de tintas (opcional — pode preencher SV% manualmente)
+  tintaProdutoId    String?
+  tintaProduto      TintaProduto?  @relation(fields: [tintaProdutoId], references: [id])
+  // Snapshot dos dados do produto no momento da seleção
+  svPct             Float?         // Sólidos por Volume (%) — snapshot ou manual
+  resinaTipo        String?        // tipo de resina (EPOXI, PU, etc.)
+  // Configuração de aplicação
+  etapa             String?        // PRIMER, INTERMEDIARIO, ACABAMENTO
+  metodoAplicacao   String?        // PINCEL, ROLO, PISTOLA_CONV, AIRLESS
+  percPerdas        Float?         // % de perda (depende do método: Airless 15%, Pistola 40%, etc.)
+  // Quantidades calculadas (snapshot para cotação)
+  litrosNecessarios Float?         // = Área / Rp (rendimento prático)
+  galoesNecessarios Int?           // = ceil(litros / 3.6) — galão padrão 3,6L
+  diluenteLitros    Float?         // = litros × diluentePct do produto
+
   createdAt       DateTime        @default(now())
 
   @@index([estudoId])
   @@index([tipoPintura])
+  @@index([tintaProdutoId])
 }
 
 model CustoItem {
