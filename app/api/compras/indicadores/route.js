@@ -31,9 +31,15 @@ export async function GET(req) {
     // ─── 4. ATENDIMENTO INTERNO ──────────────────────────────
     const atendimento = await calcularAtendimento(dataInicio, dataFim);
 
+    // ─── 5. NOTA DO SETOR COMPRAS ──────────────────────────────
+    // Média ponderada dos 4 indicadores, normalizada 0-100.
+    // Pesos: OTIF 30%, Savings 20%, Atendimento 25%, Scorecard 25%
+    const notaSetor = calcularNotaSetor({ otif, savings, atendimento, scorecard });
+
     return NextResponse.json({
       success: true,
       periodo: { de: dataInicio.toISOString(), ate: dataFim.toISOString() },
+      notaSetor,
       scorecard,
       savings,
       otif,
@@ -568,6 +574,83 @@ async function calcularAtendimento(dataInicio, dataFim) {
     faixas,
     detalhe: detalheConcluido.sort((a, b) => new Date(b.pedidoEm) - new Date(a.pedidoEm)),
     backlog,
+  };
+}
+
+// ─── NOTA DO SETOR ───────────────────────────────────────────
+// Calcula nota composta do setor Compras (0–100) com pesos por indicador.
+// Cada indicador é normalizado pra escala 0–100 antes de ponderar.
+function calcularNotaSetor({ otif, savings, atendimento, scorecard }) {
+  const pesos = {
+    otif: 0.30,
+    savings: 0.20,
+    atendimento: 0.25,
+    scorecard: 0.25,
+  };
+
+  const indicadores = [];
+
+  // OTIF: pctOTIF já é 0-100
+  if (otif.resumo.totalPedidos > 0) {
+    indicadores.push({
+      id: "otif",
+      label: "OTIF",
+      peso: pesos.otif,
+      nota: otif.resumo.pctOTIF,
+      detalhe: `${otif.resumo.pctOTIF}% (${otif.resumo.otif}/${otif.resumo.totalPedidos})`,
+    });
+  }
+
+  // Savings: normaliza pctSavings para 0-100.
+  // 0% savings = 50, savings positivo sobe até 100, negativo desce até 0.
+  // Fórmula: clamp(50 + pctSavings, 0, 100)
+  if (savings.resumo.qtdObras > 0) {
+    const notaSavings = Math.max(0, Math.min(100, 50 + savings.resumo.pctSavings));
+    indicadores.push({
+      id: "savings",
+      label: "Savings",
+      peso: pesos.savings,
+      nota: Math.round(notaSavings * 10) / 10,
+      detalhe: `${savings.resumo.pctSavings}% economia`,
+    });
+  }
+
+  // Atendimento: pctDentroAlvo já é 0-100
+  if (atendimento.resumo.totalProcessados > 0) {
+    indicadores.push({
+      id: "atendimento",
+      label: "Atendimento",
+      peso: pesos.atendimento,
+      nota: atendimento.resumo.pctDentroAlvo,
+      detalhe: `${atendimento.resumo.mediaRespPedido}d média, ${atendimento.resumo.pctDentroAlvo}% no alvo`,
+    });
+  }
+
+  // Scorecard: média das notas finais dos fornecedores (já 0-100)
+  const fornecedoresComNota = scorecard.fornecedores.filter((f) => f.notaFinal !== null);
+  if (fornecedoresComNota.length > 0) {
+    const media = fornecedoresComNota.reduce((s, f) => s + f.notaFinal, 0) / fornecedoresComNota.length;
+    indicadores.push({
+      id: "scorecard",
+      label: "Fornecedores",
+      peso: pesos.scorecard,
+      nota: Math.round(media * 10) / 10,
+      detalhe: `${media.toFixed(1)} média de ${fornecedoresComNota.length} fornecedor(es)`,
+    });
+  }
+
+  // Nota final: média ponderada (rebalanceia pesos se algum indicador não tem dados)
+  let notaFinal = null;
+  if (indicadores.length > 0) {
+    const pesoTotal = indicadores.reduce((s, i) => s + i.peso, 0);
+    notaFinal = indicadores.reduce((s, i) => s + i.nota * i.peso, 0) / pesoTotal;
+    notaFinal = Math.round(notaFinal * 10) / 10;
+  }
+
+  return {
+    nota: notaFinal,
+    indicadores,
+    pesos,
   };
 }
 

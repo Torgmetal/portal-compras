@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, Trophy, TrendingUp, TrendingDown,
   Package, Truck, Star, ChevronDown, ChevronUp, Info, Target, Clock,
-  AlertTriangle,
+  AlertTriangle, ShoppingCart, ArrowRight, BarChart3,
 } from "lucide-react";
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -856,6 +857,162 @@ export function AtendimentoClient() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VISÃO GERAL — SETORES (/indicadores)
+// ═══════════════════════════════════════════════════════════════
+
+const SETORES = [
+  {
+    id: "compras",
+    label: "Compras",
+    desc: "Scorecard, Savings, OTIF e Atendimento",
+    icon: ShoppingCart,
+    cor: "bg-torg-blue",
+    href: "/indicadores/compras",
+    apiEndpoint: "/api/compras/indicadores",
+  },
+  // Futuros setores:
+  // { id: "producao", label: "Produção", ... },
+];
+
+export function VisaoGeralClient() {
+  const [periodo, setPeriodo] = useState("tudo");
+  const [dadosSetores, setDadosSetores] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState(null);
+
+  const carregar = async (p) => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const range = calcRange(p || periodo);
+      const resultados = {};
+
+      await Promise.all(
+        SETORES.map(async (setor) => {
+          try {
+            const res = await fetch(`${setor.apiEndpoint}?de=${range.de}&ate=${range.ate}`);
+            const json = await res.json();
+            if (json.success) resultados[setor.id] = json;
+          } catch {
+            // Setor sem dados — ignora
+          }
+        })
+      );
+
+      setDadosSetores(resultados);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { carregar(); }, [periodo]);
+
+  if (loading) return <LoadingState />;
+  if (erro) return <ErroState erro={erro} onRetry={() => carregar()} />;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-torg-dark">Indicadores por Setor</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Visão consolidada do desempenho de cada departamento
+          </p>
+        </div>
+        <PeriodoSelector periodo={periodo} setPeriodo={setPeriodo} onRecarregar={() => carregar()} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        {SETORES.map((setor) => (
+          <SetorCard key={setor.id} setor={setor} dados={dadosSetores[setor.id]} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SetorCard({ setor, dados }) {
+  const router = useRouter();
+  const notaSetor = dados?.notaSetor;
+  const nota = notaSetor?.nota;
+
+  return (
+    <div
+      onClick={() => router.push(setor.href)}
+      className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-torg-blue-100 transition-all cursor-pointer group"
+    >
+      {/* Header */}
+      <div className={`${setor.cor} rounded-t-xl px-5 py-4 flex items-center justify-between`}>
+        <div className="flex items-center gap-3">
+          <setor.icon size={24} className="text-white" />
+          <div>
+            <h3 className="text-white font-bold text-lg">{setor.label}</h3>
+            <p className="text-white/70 text-xs">{setor.desc}</p>
+          </div>
+        </div>
+        <ArrowRight size={20} className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
+      </div>
+
+      {/* Nota geral */}
+      <div className="px-5 py-4 border-b border-gray-50">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-500">Nota do Setor</span>
+          <span className={`text-3xl font-bold ${corNota(nota)}`}>
+            {nota != null ? nota.toFixed(1) : "—"}
+          </span>
+        </div>
+        {nota != null && (
+          <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                nota >= 80 ? "bg-emerald-500" : nota >= 60 ? "bg-amber-400" : "bg-red-400"
+              }`}
+              style={{ width: `${Math.min(nota, 100)}%` }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Indicadores breakdown */}
+      {notaSetor?.indicadores?.length > 0 && (
+        <div className="px-5 py-3 space-y-2">
+          {notaSetor.indicadores.map((ind) => (
+            <div key={ind.id} className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600">{ind.label}</span>
+                <span className="text-[10px] text-gray-400">({(ind.peso * 100).toFixed(0)}%)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-20 bg-gray-200 rounded-full h-1.5">
+                  <div
+                    className={`h-full rounded-full ${
+                      ind.nota >= 80 ? "bg-emerald-500" : ind.nota >= 60 ? "bg-amber-400" : "bg-red-400"
+                    }`}
+                    style={{ width: `${Math.min(ind.nota, 100)}%` }}
+                  />
+                </div>
+                <span className={`text-xs font-bold w-10 text-right ${corNota(ind.nota)}`}>
+                  {ind.nota.toFixed(1)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="px-5 py-3 border-t border-gray-50">
+        <span className="text-xs text-torg-blue font-medium group-hover:underline flex items-center gap-1">
+          Ver indicadores detalhados <ArrowRight size={12} />
+        </span>
+      </div>
     </div>
   );
 }

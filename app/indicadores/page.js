@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/session";
-import { DashboardClient } from "./IndicadoresClient";
+import { VisaoGeralClient } from "./IndicadoresClient";
 
 export default async function IndicadoresPage() {
   await requireRole(["ADMIN", "COMPRAS"]);
-  return <DashboardClient />;
+  return <VisaoGeralClient />;
 }

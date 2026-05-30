@@ -1,5 +1,5 @@
 import { requireRole } from "@/lib/session";
-import { AtendimentoClient } from "../IndicadoresClient";
+import { AtendimentoClient } from "../../IndicadoresClient";
 
 export default async function AtendimentoPage() {
   await requireRole(["ADMIN", "COMPRAS"]);
