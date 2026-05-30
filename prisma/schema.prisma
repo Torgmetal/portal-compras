@@ -749,6 +749,12 @@ model PedidoOmie {
   rmAtendidaId      String?
   rmAtendida        RM?      @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
 
+  // Itens reais do pedido no Omie (sincronizados via ConsultarPedCompra).
+  // Quando alguem edita o pedido direto no Omie (adiciona/remove itens),
+  // esse campo reflete o estado real. Array de objetos:
+  // [{ descricao, qtd, unidade, valorUnit, qtdRecebida }]
+  itensOmie         Json?
+
   createdById       String?
   createdAt         DateTime @default(now())
 

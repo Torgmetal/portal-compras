@@ -27,6 +27,7 @@ export async function GET(req) {
         statusEntrega: true,
         createdAt: true,
         observacao: true,
+        itensOmie: true,
         opId: true,
         op: {
           select: { id: true, numero: true, cliente: true, obra: true },
@@ -111,7 +112,19 @@ export async function GET(req) {
     const em7dias = new Date(agora.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const data = pedidos.map((p) => {
-      // Itens do pedido — vem da cotação (vencedores) ou dos rmItens diretos
+      // Itens do pedido — prioriza itensOmie (sincronizados do Omie, reflete
+      // edições manuais), fallback pra cotação vencedores, depois rmItens diretos
+      const itensOmieSynced = Array.isArray(p.itensOmie) && p.itensOmie.length > 0
+        ? p.itensOmie.map((it) => ({
+            descricao: it.descricao || "—",
+            material: null,
+            qtd: it.qtd,
+            unidade: it.unidade || "KG",
+            precoUnit: it.valorUnit || null,
+            prazoEntrega: null,
+          }))
+        : null;
+
       const itensCotacao = p.cotacao?.itens?.map((ci) => ({
         descricao: ci.rmItem?.descricao || "—",
         material: ci.rmItem?.material,
@@ -130,7 +143,7 @@ export async function GET(req) {
         prazoEntrega: null,
       })) || [];
 
-      const itens = itensCotacao.length > 0 ? itensCotacao : itensDiretos;
+      const itens = itensOmieSynced || (itensCotacao.length > 0 ? itensCotacao : itensDiretos);
 
       // Prazo: usa PedidoOmie.prazoEntregaPrevisto; se null, calcula
       // o prazo mais tardio dos CotacaoItems vencedores (fallback)
