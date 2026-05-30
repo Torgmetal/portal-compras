@@ -194,346 +194,259 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               </a>
             </div>
           </div>
-          <p className="text-[10px] text-torg-gray mt-3 pt-3 border-t border-gray-50">
-            Criada por {op.createdBy?.name} em {fmtData(op.createdAt)}
-          </p>
-        </div>
 
-        {/* KPIs financeiros em cards */}
-        <div className={`grid gap-4 ${temFD ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 lg:grid-cols-3"}`}>
-          {/* Card: Valor Total do Contrato */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <div className="flex items-center gap-1.5 mb-3">
-              <p className="text-xs font-medium text-torg-gray uppercase tracking-wider">Valor do Contrato</p>
-              {!op.kpisFinanceiros?.contratoExplicito && (
-                <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide" title="Valor implícito (Receita + Verba FD). Edite a OP pra preencher o total exato.">
-                  auto
-                </span>
-              )}
-            </div>
-            <p className="text-2xl font-extrabold text-torg-dark tabular-nums" title="Valor cheio do contrato com o cliente">
-              {fmtMoeda(op.kpisFinanceiros?.valorTotalContrato || 0)}
-            </p>
-            {(op.resumoPedidos?.valorTotal || 0) > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <div className="flex items-baseline justify-between text-xs tabular-nums">
-                  <span className="text-torg-gray">Total em pedidos</span>
-                  <span className="text-torg-dark font-semibold">{fmtMoeda(op.resumoPedidos.valorTotal)}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Card: Receita Torg */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <p className="text-xs font-medium text-torg-gray uppercase tracking-wider mb-3">Receita Torg</p>
-            <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
-              {fmtMoeda(op.kpisFinanceiros?.receitaBruta || 0)}
-            </p>
-            {!(op.kpisFinanceiros?.receitaBruta) && (
-              <p className="text-[11px] text-torg-gray mt-2">Nenhuma receita cadastrada</p>
-            )}
-            {(op.resumoMedicoes?.totalMedido || 0) > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
-                <div className="flex items-baseline justify-between text-xs tabular-nums">
-                  <span className="text-torg-gray">Faturado</span>
-                  <span className="text-torg-dark font-semibold">
-                    {fmtMoeda(op.resumoMedicoes.totalMedido)}
-                    <span className="text-torg-gray font-normal ml-1">({(op.resumoMedicoes.pctMedido || 0).toFixed(0)}%)</span>
-                  </span>
-                </div>
-                <div className="flex items-baseline justify-between text-xs tabular-nums">
-                  <span className="text-torg-gray">Saldo</span>
-                  <span className={`font-semibold ${
-                    (op.resumoMedicoes?.saldoAMedir || 0) < 0 ? "text-red-600" : "text-emerald-700"
-                  }`}>
-                    {fmtMoeda(op.resumoMedicoes?.saldoAMedir || 0)}
-                  </span>
-                </div>
-                {/* Barra de progresso do faturamento */}
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
-                  <div
-                    className="h-full bg-torg-blue rounded-full transition-all"
-                    style={{ width: `${Math.min(op.resumoMedicoes.pctMedido || 0, 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Card: Verba Torg */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <p className="text-xs font-medium text-torg-gray uppercase tracking-wider mb-3">
-              Verba Torg
-              <span className="normal-case text-[10px] font-normal ml-1">(nosso nome)</span>
-            </p>
-            <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
-              {fmtMoeda(op.kpisFinanceiros?.verbaTorg || 0)}
-            </p>
-            {(op.kpisFinanceiros?.pedidosTorg || 0) > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <div className="flex items-baseline justify-between text-xs tabular-nums">
-                  <span className="text-torg-gray">Em pedidos</span>
-                  <span className="text-torg-dark font-semibold">{fmtMoeda(op.kpisFinanceiros.pedidosTorg)}</span>
-                </div>
-                {/* Barra de progresso */}
-                {(op.kpisFinanceiros?.verbaTorg || 0) > 0 && (
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-2">
-                    <div
-                      className="h-full bg-torg-orange rounded-full transition-all"
-                      style={{ width: `${Math.min((op.kpisFinanceiros.pedidosTorg / op.kpisFinanceiros.verbaTorg) * 100, 100)}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card: Verba FD (só aparece se tem itens FD) */}
-          {temFD && (
-            <div className="bg-white rounded-xl shadow-sm border border-torg-orange/20 p-5">
-              <p className="text-xs font-medium text-torg-gray uppercase tracking-wider mb-3">
-                Verba FD
-                <span className="normal-case text-[10px] font-normal ml-1">(nome do cliente)</span>
-              </p>
-              <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
-                {fmtMoeda(op.kpisFinanceiros.verbaFD)}
-              </p>
-              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
-                {(op.kpisFinanceiros?.pedidosFD || 0) > 0 && (
-                  <div className="flex items-baseline justify-between text-xs tabular-nums">
-                    <span className="text-torg-gray">Em pedidos</span>
-                    <span className="text-torg-dark font-semibold">{fmtMoeda(op.kpisFinanceiros.pedidosFD)}</span>
-                  </div>
-                )}
-                {(op.kpisFinanceiros?.excedenteFD || 0) > 0 && (
-                  <div className="flex items-baseline justify-between text-xs tabular-nums">
-                    <span className="text-red-600 font-medium">Excedente</span>
-                    <span className="text-red-700 font-bold">{fmtMoeda(op.kpisFinanceiros.excedenteFD)}</span>
-                  </div>
-                )}
-                {(op.kpisFinanceiros?.pedidosFD || 0) > 0 && (op.kpisFinanceiros?.verbaFD || 0) > 0 && (
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        (op.kpisFinanceiros.pedidosFD / op.kpisFinanceiros.verbaFD) > 1 ? "bg-red-500" : "bg-torg-orange"
-                      }`}
-                      style={{ width: `${Math.min((op.kpisFinanceiros.pedidosFD / op.kpisFinanceiros.verbaFD) * 100, 100)}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Ações */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-3">
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Ações */}
+          <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
             <button
               onClick={() => setModalAditivo(true)}
               disabled={encerradaOuCancelada}
-              className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3.5 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus size={16} /> Novo Aditivo
+              <Plus size={14} /> Novo Aditivo
             </button>
             <button
               onClick={() => setModalRevisao(true)}
               disabled={encerradaOuCancelada}
-              className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3.5 py-2 bg-white border border-gray-200 text-torg-dark text-xs rounded-lg hover:bg-gray-50 font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Edit3 size={16} /> Registrar Revisão
+              <Edit3 size={14} /> Registrar Revisão
             </button>
             {isMaster && (
               <button
                 onClick={() => setModalPrazo(true)}
                 disabled={encerradaOuCancelada}
-                className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3.5 py-2 bg-white border border-gray-200 text-torg-dark text-xs rounded-lg hover:bg-gray-50 font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Clock size={16} /> Ajustar Prazo
+                <Clock size={14} /> Ajustar Prazo
               </button>
             )}
-
             <div className="flex-1" />
-
             {encerradaOuCancelada ? (
               <button
                 onClick={() => executarAcaoStatus("reabrir")}
                 disabled={!!acaoStatus}
-                className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50"
+                className="px-3.5 py-2 bg-white border border-gray-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5 disabled:opacity-50"
               >
-                {acaoStatus === "reabrir" ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                {acaoStatus === "reabrir" ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                 Reabrir OP
               </button>
             ) : (
               <button
                 onClick={() => executarAcaoStatus("finalizar")}
                 disabled={!!acaoStatus}
-                className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange-700 font-medium flex items-center gap-2 disabled:opacity-50"
+                className="px-3.5 py-2 bg-torg-orange text-white text-xs rounded-lg hover:bg-torg-orange-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
               >
-                {acaoStatus === "finalizar" ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                {acaoStatus === "finalizar" ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                 Finalizar OP
               </button>
             )}
-
             {isMaster && (
               <button
                 onClick={excluirOP}
                 disabled={!!acaoStatus}
                 title={op._count.rms > 0 ? "OP tem RMs vinculadas — use Cancelar pra arquivar" : "Excluir definitivamente"}
-                className="px-4 py-2 bg-white border border-red-300 text-red-600 text-sm rounded-lg hover:bg-red-50 font-medium flex items-center gap-2 disabled:opacity-50"
+                className="px-3.5 py-2 bg-white border border-red-200 text-red-500 text-xs rounded-lg hover:bg-red-50 font-medium flex items-center gap-1.5 disabled:opacity-50"
               >
-                {acaoStatus === "excluir" ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                {acaoStatus === "excluir" ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                 Excluir
               </button>
             )}
           </div>
-
           {erroAcao && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2 mt-2">
-              <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2 flex items-start gap-2 mt-2">
+              <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
               <span>{erroAcao}</span>
             </div>
           )}
+          <p className="text-[10px] text-torg-gray mt-2">
+            Criada por {op.createdBy?.name} em {fmtData(op.createdAt)}
+          </p>
         </div>
       </div>
 
-      {/* KPIs financeiros: Receita / Verba / Margem com impostos detalhados */}
+      {/* Resumo Financeiro */}
       {op.kpisFinanceiros && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
-          {/* Linha 1: RECEITA — em AZUL (entrada) */}
-          <div>
-            <p className="text-xs uppercase tracking-wide text-torg-blue font-semibold mb-3">
-              Receita do contrato (entrada)
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-torg-gray">Receita bruta total</p>
-                <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
-                  {fmtMoeda(op.kpisFinanceiros.receitaBruta)}
-                </p>
-                <p className="text-[10px] text-torg-gray mt-0.5">
-                  {(op.receitas || []).length} {((op.receitas || []).length === 1) ? "receita" : "receitas"} cadastrada(s)
-                </p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Métricas principais */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100 border-b border-gray-100">
+            {/* Contrato */}
+            <div className="p-4">
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider">Contrato</p>
+                {!op.kpisFinanceiros?.contratoExplicito && (
+                  <span className="text-[8px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-semibold uppercase" title="Valor implícito">auto</span>
+                )}
               </div>
-              <div>
-                <p className="text-xs text-torg-gray">Impostos estimados</p>
-                <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
-                  − {fmtMoeda(op.kpisFinanceiros.totalImpostos)}
-                </p>
-                <p className="text-[10px] text-torg-gray mt-0.5">
-                  Detalhado por tipo abaixo
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-torg-gray">Receita líquida</p>
-                <p className="text-2xl font-extrabold text-torg-blue tabular-nums">
-                  {fmtMoeda(op.kpisFinanceiros.receitaLiquida)}
-                </p>
-                <p className="text-[10px] text-torg-gray mt-0.5">Bruto − impostos</p>
-              </div>
+              <p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtMoeda(op.kpisFinanceiros?.valorTotalContrato || 0)}</p>
+              {(op.resumoPedidos?.valorTotal || 0) > 0 && (
+                <p className="text-[10px] text-torg-gray mt-1 tabular-nums">Pedidos: {fmtMoeda(op.resumoPedidos.valorTotal)}</p>
+              )}
             </div>
-
-            {/* Detalhe dos impostos por tipo */}
-            {op.kpisFinanceiros.impostosDetalhados && op.kpisFinanceiros.totalImpostos > 0 && (
-              <div className="mt-4 bg-torg-orange-50/30 border border-torg-orange-100 rounded-lg p-3">
-                <p className="text-[11px] uppercase tracking-wide text-torg-orange-700 font-semibold mb-2">
-                  Detalhamento dos impostos
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                  {[
-                    { key: "icms", label: "ICMS" },
-                    { key: "ipi", label: "IPI" },
-                    { key: "pis", label: "PIS" },
-                    { key: "cofins", label: "COFINS" },
-                    { key: "iss", label: "ISS" },
-                    { key: "irrf", label: "IRRF" },
-                    { key: "csll", label: "CSLL" },
-                  ].map((imp) => {
-                    const valor = op.kpisFinanceiros.impostosDetalhados[imp.key] || 0;
-                    return (
-                      <div key={imp.key}>
-                        <p className="text-[10px] text-torg-gray font-semibold uppercase">{imp.label}</p>
-                        <p className={`text-sm font-bold tabular-nums ${valor > 0 ? "text-torg-orange-700" : "text-gray-300"}`}>
-                          {valor > 0 ? fmtMoeda(valor) : "—"}
-                        </p>
-                      </div>
-                    );
-                  })}
+            {/* Receita Bruta */}
+            <div className="p-4">
+              <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Receita Torg</p>
+              <p className="text-lg font-extrabold text-torg-blue tabular-nums">{fmtMoeda(op.kpisFinanceiros?.receitaBruta || 0)}</p>
+              {(op.resumoMedicoes?.totalMedido || 0) > 0 && (
+                <div className="mt-1.5">
+                  <div className="flex items-baseline justify-between text-[10px] tabular-nums">
+                    <span className="text-torg-gray">Faturado</span>
+                    <span className="text-torg-dark font-semibold">{(op.resumoMedicoes.pctMedido || 0).toFixed(0)}%</span>
+                  </div>
+                  <div className="h-1 bg-gray-100 rounded-full overflow-hidden mt-1">
+                    <div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${Math.min(op.resumoMedicoes.pctMedido || 0, 100)}%` }} />
+                  </div>
                 </div>
+              )}
+            </div>
+            {/* Verba Torg */}
+            <div className="p-4">
+              <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Verba Torg</p>
+              <p className="text-lg font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(op.kpisFinanceiros?.verbaTorg || 0)}</p>
+              {(op.kpisFinanceiros?.pedidosTorg || 0) > 0 && (op.kpisFinanceiros?.verbaTorg || 0) > 0 && (
+                <div className="mt-1.5">
+                  <div className="flex items-baseline justify-between text-[10px] tabular-nums">
+                    <span className="text-torg-gray">Pedidos</span>
+                    <span className="text-torg-dark font-semibold">{((op.kpisFinanceiros.pedidosTorg / op.kpisFinanceiros.verbaTorg) * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="h-1 bg-gray-100 rounded-full overflow-hidden mt-1">
+                    <div className="h-full bg-torg-orange rounded-full transition-all" style={{ width: `${Math.min((op.kpisFinanceiros.pedidosTorg / op.kpisFinanceiros.verbaTorg) * 100, 100)}%` }} />
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Verba FD */}
+            {temFD ? (
+              <div className="p-4">
+                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Verba FD</p>
+                <p className="text-lg font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(op.kpisFinanceiros.verbaFD)}</p>
+                {(op.kpisFinanceiros?.excedenteFD || 0) > 0 && (
+                  <p className="text-[10px] text-red-600 font-medium mt-1">Excedente: {fmtMoeda(op.kpisFinanceiros.excedenteFD)}</p>
+                )}
+              </div>
+            ) : (
+              <div className="p-4">
+                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Verba FD</p>
+                <p className="text-lg font-extrabold text-gray-300">—</p>
+                <p className="text-[10px] text-torg-gray mt-1">Sem itens FD</p>
               </div>
             )}
           </div>
 
-          <div className="border-t border-gray-100" />
+          {/* Duas colunas: Receita | Despesa */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
+            {/* Coluna: Receita (entrada) */}
+            <div className="p-5">
+              <p className="text-[11px] uppercase tracking-wide text-torg-blue font-semibold mb-3">
+                Receita do contrato (entrada)
+              </p>
+              <div className="space-y-2.5">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-torg-gray">Receita bruta</span>
+                  <span className="text-sm font-semibold text-torg-dark tabular-nums">{fmtMoeda(op.kpisFinanceiros.receitaBruta)}</span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-torg-gray">Impostos estimados</span>
+                  <span className="text-sm font-semibold text-torg-orange-700 tabular-nums">− {fmtMoeda(op.kpisFinanceiros.totalImpostos)}</span>
+                </div>
+                <div className="flex items-baseline justify-between pt-2 border-t border-gray-100">
+                  <span className="text-sm font-semibold text-torg-dark">Receita líquida</span>
+                  <span className="text-base font-bold text-torg-blue tabular-nums">{fmtMoeda(op.kpisFinanceiros.receitaLiquida)}</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-torg-gray mt-2">{(op.receitas || []).length} receita(s) cadastrada(s)</p>
 
-          {/* Linha 2: VERBA — em LARANJA (despesa) */}
-          <div>
-            <p className="text-xs uppercase tracking-wide text-torg-orange-700 font-semibold mb-3">
-              Verba pra compras (despesa)
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-torg-gray">Verba estimada</p>
-                <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
-                  {fmtMoeda(op.kpisFinanceiros.verbaTotal)}
-                </p>
-                <p className="text-[10px] text-torg-gray mt-0.5">Base + aditivos</p>
+              {/* Impostos detalhados */}
+              {op.kpisFinanceiros.impostosDetalhados && op.kpisFinanceiros.totalImpostos > 0 && (
+                <div className="mt-3 bg-torg-orange-50/30 border border-torg-orange-100 rounded-lg p-3">
+                  <p className="text-[10px] uppercase tracking-wide text-torg-orange-700 font-semibold mb-2">Impostos</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { key: "icms", label: "ICMS" },
+                      { key: "ipi", label: "IPI" },
+                      { key: "pis", label: "PIS" },
+                      { key: "cofins", label: "COFINS" },
+                      { key: "iss", label: "ISS" },
+                      { key: "irrf", label: "IRRF" },
+                      { key: "csll", label: "CSLL" },
+                    ].map((imp) => {
+                      const valor = op.kpisFinanceiros.impostosDetalhados[imp.key] || 0;
+                      if (valor === 0) return null;
+                      return (
+                        <div key={imp.key}>
+                          <p className="text-[9px] text-torg-gray font-semibold uppercase">{imp.label}</p>
+                          <p className="text-xs font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(valor)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Coluna: Despesa (saída) */}
+            <div className="p-5">
+              <p className="text-[11px] uppercase tracking-wide text-torg-orange-700 font-semibold mb-3">
+                Verba pra compras (despesa)
+              </p>
+              <div className="space-y-2.5">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-torg-gray">Verba estimada</span>
+                  <span className="text-sm font-semibold text-torg-dark tabular-nums">{fmtMoeda(op.kpisFinanceiros.verbaTotal)}</span>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm text-torg-gray">Já em pedidos</span>
+                  <span className="text-sm font-semibold text-torg-dark tabular-nums">
+                    {fmtMoeda(op.kpisFinanceiros.totalEmPedidos)}
+                    <span className="text-[10px] text-torg-gray font-normal ml-1">({op.kpisFinanceiros.consumoPct.toFixed(1)}%)</span>
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between pt-2 border-t border-gray-100">
+                  <span className="text-sm font-semibold text-torg-dark">Saldo restante</span>
+                  <span className={`text-base font-bold tabular-nums ${
+                    op.kpisFinanceiros.saldo < 0 ? "text-red-600" : op.kpisFinanceiros.consumoPct >= 70 ? "text-torg-orange-700" : "text-emerald-700"
+                  }`}>
+                    {fmtMoeda(op.kpisFinanceiros.saldo)}
+                  </span>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-torg-gray">Já em pedidos</p>
-                <p className="text-2xl font-extrabold text-torg-orange-700 tabular-nums">
-                  {fmtMoeda(op.kpisFinanceiros.totalEmPedidos)}
-                </p>
-                <p className="text-[10px] text-torg-gray mt-0.5">
-                  {op.kpisFinanceiros.consumoPct.toFixed(1)}% da verba
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-torg-gray">Saldo restante</p>
-                <p className={`text-2xl font-extrabold tabular-nums ${
-                  op.kpisFinanceiros.saldo < 0
-                    ? "text-red-600"
-                    : op.kpisFinanceiros.consumoPct >= 70
-                    ? "text-torg-orange-700"
-                    : "text-torg-dark"
-                }`}>
-                  {fmtMoeda(op.kpisFinanceiros.saldo)}
-                </p>
-                {op.kpisFinanceiros.saldo < 0 && (
-                  <p className="text-[10px] text-red-600 mt-0.5 font-medium">⚠ verba estourada</p>
-                )}
-                {op.kpisFinanceiros.saldo >= 0 && op.kpisFinanceiros.consumoPct >= 70 && (
-                  <p className="text-[10px] text-torg-orange-700 mt-0.5 font-medium">⚠ acima de 70%</p>
-                )}
+              {op.kpisFinanceiros.saldo < 0 && (
+                <p className="text-[10px] text-red-600 font-medium mt-1.5">⚠ verba estourada</p>
+              )}
+              {op.kpisFinanceiros.saldo >= 0 && op.kpisFinanceiros.consumoPct >= 70 && (
+                <p className="text-[10px] text-torg-orange-700 font-medium mt-1.5">⚠ acima de 70%</p>
+              )}
+              {/* Barra de consumo */}
+              <div className="mt-3">
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      op.kpisFinanceiros.consumoPct > 100 ? "bg-red-500" : op.kpisFinanceiros.consumoPct >= 70 ? "bg-torg-orange" : "bg-emerald-500"
+                    }`}
+                    style={{ width: `${Math.min(op.kpisFinanceiros.consumoPct, 100)}%` }}
+                  />
+                </div>
+                <p className="text-[10px] text-torg-gray mt-1">Base + aditivos</p>
               </div>
             </div>
           </div>
 
           {/* Margem prevista */}
           {op.kpisFinanceiros.receitaBruta > 0 && (
-            <div className="border-t border-gray-100 pt-4 flex items-center justify-between flex-wrap gap-2">
+            <div className="border-t border-gray-100 px-5 py-3 flex items-center justify-between bg-gray-50/50">
               <p className="text-xs text-torg-gray uppercase tracking-wide font-semibold">
                 Margem prevista (líquido − verba)
               </p>
-              <div className="text-right">
-                <p className={`text-xl font-extrabold tabular-nums ${
-                  op.kpisFinanceiros.margemPrevista < 0
-                    ? "text-red-600"
-                    : op.kpisFinanceiros.margemPct < 10
-                    ? "text-torg-orange-700"
-                    : "text-torg-dark"
-                }`}>
-                  {fmtMoeda(op.kpisFinanceiros.margemPrevista)}
-                  <span className="text-sm text-torg-gray font-medium ml-2">
-                    ({op.kpisFinanceiros.margemPct.toFixed(1)}%)
-                  </span>
-                </p>
-              </div>
+              <p className={`text-lg font-extrabold tabular-nums ${
+                op.kpisFinanceiros.margemPrevista < 0 ? "text-red-600" : op.kpisFinanceiros.margemPct < 10 ? "text-torg-orange-700" : "text-torg-dark"
+              }`}>
+                {fmtMoeda(op.kpisFinanceiros.margemPrevista)}
+                <span className="text-xs text-torg-gray font-medium ml-2">({op.kpisFinanceiros.margemPct.toFixed(1)}%)</span>
+              </p>
             </div>
           )}
         </div>
       )}
+
 
       {/* Faturamento e Dados Fiscais do Cliente */}
       <FaturamentoCard
