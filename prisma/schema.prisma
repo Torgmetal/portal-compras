@@ -1584,6 +1584,7 @@ model Orcamento {
   valor           Float?            // valor total do orçamento
   porte           PorteOrcamento?
   dataSolicitada  DateTime?         // data em que o cliente pediu
+  prazoEntrega    DateTime?         // prazo para entregar a proposta ao cliente
   dataEnvio       DateTime?         // data em que enviamos a proposta
   dataFechamento  DateTime?         // data do aceite / perda
   status          StatusOrcamento   @default(ORCAMENTO)

@@ -48,6 +48,7 @@ const updateSchema = z.object({
   valor: z.number().nullable().optional(),
   porte: z.enum(["ATE_1_2M", "DE_1_2M_A_10M", "DE_10M_A_50M", "ACIMA_50M"]).nullable().optional(),
   dataSolicitada: z.string().nullable().optional(),
+  prazoEntrega: z.string().nullable().optional(),
   dataEnvio: z.string().nullable().optional(),
   dataFechamento: z.string().nullable().optional(),
   status: z.enum(["ORCAMENTO", "EM_NEGOCIACAO", "FECHADA", "PERDIDA"]).optional(),
@@ -113,6 +114,7 @@ export async function PATCH(req, { params }) {
   if (body.valor !== undefined) data.valor = body.valor;
   if (body.porte !== undefined) data.porte = body.porte;
   if (body.dataSolicitada !== undefined) data.dataSolicitada = body.dataSolicitada ? new Date(body.dataSolicitada) : null;
+  if (body.prazoEntrega !== undefined) data.prazoEntrega = body.prazoEntrega ? new Date(body.prazoEntrega) : null;
   if (body.dataEnvio !== undefined) data.dataEnvio = body.dataEnvio ? new Date(body.dataEnvio) : null;
   if (body.dataFechamento !== undefined) data.dataFechamento = body.dataFechamento ? new Date(body.dataFechamento) : null;
   if (body.status !== undefined) data.status = body.status;
