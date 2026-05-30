@@ -88,6 +88,22 @@ export async function POST(req, { params }) {
         continue;
       }
 
+      // Criar registro antes para gerar o token
+      const registro = await prisma.freteCotacao.create({
+        data: {
+          estudoId: id,
+          fornecedorId: forn.id,
+          fornecedorNome: forn.nome.trim().toUpperCase(),
+          fornecedorEmail: forn.email,
+          status: "PENDENTE",
+          observacao: observacao || undefined,
+        },
+      });
+
+      const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+      const linkCotacao = `${baseUrl}/fornecedores/frete/${registro.token}`;
+
       const html = `
         <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto">
           <div style="background:#006EAB;padding:20px 24px;border-radius:12px 12px 0 0">
@@ -131,8 +147,13 @@ export async function POST(req, { params }) {
             </table>
             ${prazoResposta ? `<p style="color:#333;font-size:14px;margin:0 0 8px"><strong>Prazo para resposta:</strong> ${escapeHtml(prazoResposta)}</p>` : ""}
             ${observacao ? `<p style="color:#333;font-size:14px;margin:0 0 8px"><strong>Observacao:</strong> ${escapeHtml(observacao)}</p>` : ""}
-            <p style="color:#333;font-size:14px;margin:16px 0 0">
-              Favor enviar cotacao respondendo este email.
+            <div style="text-align:center;margin:24px 0 16px">
+              <a href="${linkCotacao}" style="display:inline-block;background:#006EAB;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">
+                Preencher Cotacao
+              </a>
+            </div>
+            <p style="color:#999;font-size:12px;text-align:center;margin:0 0 8px">
+              Ou acesse o link: <a href="${linkCotacao}" style="color:#006EAB">${linkCotacao}</a>
             </p>
             <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0"/>
             <p style="color:#999;font-size:11px;margin:0">
@@ -158,7 +179,10 @@ export async function POST(req, { params }) {
         prazoResposta ? `Prazo para resposta: ${prazoResposta}` : "",
         observacao ? `Observacao: ${observacao}` : "",
         ``,
-        `Favor enviar cotacao respondendo este email.`,
+        `Preencha sua cotacao pelo link abaixo:`,
+        linkCotacao,
+        ``,
+        `Em caso de duvidas, responda diretamente este email.`,
       ].filter(Boolean).join("\n");
 
       const emailResult = await sendEmail({
@@ -170,18 +194,13 @@ export async function POST(req, { params }) {
         replyTo: user.email || undefined,
       });
 
-      // Criar registro da cotacao
-      await prisma.freteCotacao.create({
-        data: {
-          estudoId: id,
-          fornecedorId: forn.id,
-          fornecedorNome: forn.nome.trim().toUpperCase(),
-          fornecedorEmail: forn.email,
-          status: "PENDENTE",
-          observacao: observacao || undefined,
-          enviadoEm: emailResult.ok ? new Date() : undefined,
-        },
-      });
+      // Atualizar enviadoEm no registro ja criado
+      if (emailResult.ok) {
+        await prisma.freteCotacao.update({
+          where: { id: registro.id },
+          data: { enviadoEm: new Date() },
+        });
+      }
 
       resultados.push({
         fornecedor: forn.nome,

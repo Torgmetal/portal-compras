@@ -1823,6 +1823,7 @@ model FreteCotacao {
   estudoId        String
   estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
 
+  token           String          @unique @default(cuid()) // acesso publico sem login
   fornecedorId    String?         // ref ao fornecedor (pode ser removido do vendor list)
   fornecedorNome  String          // nome da transportadora (snapshot)
   fornecedorEmail String          // email para onde foi enviado
