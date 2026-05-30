@@ -550,8 +550,14 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
                     const cell = it.celulas.find((c) => c?.cotacaoId === f.cotacaoId);
                     if (!cell || cell.precoUnit <= 0) {
                       return (
-                        <td key={f.cotacaoId} className="px-3 py-2 text-center text-torg-gray text-xs">
-                          —
+                        <td key={f.cotacaoId} className="px-3 py-2 text-center text-xs">
+                          {cell?.semEstoque ? (
+                            <span className="text-red-400 font-medium" title="Fornecedor informou que não tem este item">
+                              s/ estoque
+                            </span>
+                          ) : (
+                            <span className="text-torg-gray">—</span>
+                          )}
                         </td>
                       );
                     }
@@ -1327,6 +1333,7 @@ function buildMatriz(op) {
           qtdCotada: ci.qtdCotada,
           vencedor: ci.vencedor,
           prazoEntrega: ci.prazoEntrega || null,
+          semEstoque: ci.semEstoque || false,
         });
       }
     }

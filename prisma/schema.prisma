@@ -919,6 +919,7 @@ model CotacaoItem {
   icmsPct        Float?
   ipiPct         Float?
   observacao     String?
+  semEstoque     Boolean   @default(false) // fornecedor marcou que não tem esse item
   vencedor       Boolean   @default(false) // marcado quando o compras escolhe
   prazoEntrega   DateTime? // data prevista de entrega informada pelo fornecedor
 

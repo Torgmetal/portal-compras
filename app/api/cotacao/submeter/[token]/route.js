@@ -14,6 +14,7 @@ const itemSchema = z.object({
   ipiPct: z.number().min(0).optional().nullable(),
   observacao: z.string().optional().nullable(),
   prazoEntrega: z.string().optional().nullable(), // "YYYY-MM-DD" ou null
+  semEstoque: z.boolean().optional().default(false),
 });
 
 const schema = z.object({
@@ -50,18 +51,19 @@ export async function POST(req, { params }) {
   // ou de inputs do form que possam ter casas extras.
   const round2 = (n) => (n == null ? n : Math.round(Number(n) * 100) / 100);
 
-  // Filtra apenas itens válidos da própria cotação
+  // Filtra apenas itens válidos da própria cotação (com preço OU marcados semEstoque)
   const idsValidos = new Set(cotacao.itens.map((i) => i.id));
   const itensValidos = body.itens
-    .filter((it) => idsValidos.has(it.cotacaoItemId) && it.precoUnit > 0)
+    .filter((it) => idsValidos.has(it.cotacaoItemId) && (it.precoUnit > 0 || it.semEstoque))
     .map((it) => ({
       ...it,
-      precoUnit: round2(it.precoUnit),
-      qtdCotada: round2(it.qtdCotada),
-      icmsPct: it.icmsPct != null ? round2(it.icmsPct) : null,
-      ipiPct: it.ipiPct != null ? round2(it.ipiPct) : null,
+      precoUnit: it.semEstoque ? 0 : round2(it.precoUnit),
+      qtdCotada: it.semEstoque ? 0 : round2(it.qtdCotada),
+      icmsPct: it.semEstoque ? null : (it.icmsPct != null ? round2(it.icmsPct) : null),
+      ipiPct: it.semEstoque ? null : (it.ipiPct != null ? round2(it.ipiPct) : null),
     }));
-  if (itensValidos.length === 0) {
+  const itensComPreco = itensValidos.filter((it) => !it.semEstoque && it.precoUnit > 0);
+  if (itensComPreco.length === 0) {
     return NextResponse.json({ error: "Preencha ao menos um preço unitário." }, { status: 400 });
   }
 
@@ -107,6 +109,7 @@ export async function POST(req, { params }) {
           icmsPct: it.icmsPct ?? null,
           ipiPct: it.ipiPct ?? null,
           observacao: it.observacao || null,
+          semEstoque: it.semEstoque || false,
           prazoEntrega: it.prazoEntrega ? new Date(it.prazoEntrega) : null,
         },
       })
