@@ -50,6 +50,7 @@ export default function CronogramaClient() {
   const [visao, setVisao] = useState("kanban"); // "kanban" | "tabela"
   const [modalCobrar, setModalCobrar] = useState(null); // pedido obj ou null
   const [modalPrazo, setModalPrazo] = useState(null); // pedido obj ou null
+  const [ajustandoOmie, setAjustandoOmie] = useState(null); // pedidoId durante ajuste
 
   // Filtro por tipo de RM — separa entregas de materiais (OP) vs consumíveis
   const pedidos = useMemo(
@@ -179,6 +180,35 @@ export default function CronogramaClient() {
       alert("Falha: " + e.message);
     } finally {
       setRegistrando(null);
+    }
+  };
+
+  const ajustarOmie = async (pedido) => {
+    const confirmMsg = `Ajustar quantidades do pedido #${pedido.numero} no Omie para igualar ao recebimento real da NF?\n\nIsso altera o peso/quantidade pedida para o peso real recebido, permitindo fechar o pedido no Omie.`;
+    if (!confirm(confirmMsg)) return;
+
+    setAjustandoOmie(pedido.id);
+    try {
+      const res = await fetch("/api/compras/entregas/ajustar-omie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pedidoId: pedido.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao ajustar");
+
+      if (data.ajustados === 0) {
+        alert(data.mensagem || "Nenhum item precisou de ajuste.");
+      } else {
+        const resumo = data.ajustes
+          .map((a) => `• ${a.descricao}: ${a.qtdOriginal.toFixed(2)} → ${a.qtdRecebida.toFixed(2)} ${a.unidade}`)
+          .join("\n");
+        alert(`Pedido #${pedido.numero} ajustado no Omie!\n\n${data.ajustados} item(ns):\n${resumo}`);
+      }
+    } catch (e) {
+      alert("Falha ao ajustar: " + e.message);
+    } finally {
+      setAjustandoOmie(null);
     }
   };
 
@@ -513,6 +543,8 @@ function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEn
                     registrando={registrando === p.id}
                     onCobrar={onCobrar}
                     onAtualizarPrazo={onAtualizarPrazo}
+                    onAjustarOmie={ajustarOmie}
+                    ajustandoOmie={ajustandoOmie === p.id}
                   />
                 ))
               )}
@@ -526,7 +558,7 @@ function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEn
 
 /* ─── Pedido Card (Kanban) ───────────────────────────────────────── */
 
-function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo }) {
+function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onAjustarOmie, ajustandoOmie }) {
   const p = pedido;
   const dias = diasAte(p.prazoEntregaPrevisto);
   const diasLabel = dias !== null
@@ -720,6 +752,17 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
                 className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
               >
                 <Mail size={10} /> Cobrar
+              </button>
+            )}
+            {p.temRecebimento && p.codigoPedido && (
+              <button
+                onClick={() => onAjustarOmie(p)}
+                disabled={ajustandoOmie}
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 font-medium disabled:opacity-50"
+                title="Ajustar quantidades do pedido no Omie para igualar ao recebimento real (NF)"
+              >
+                {ajustandoOmie ? <Loader2 size={10} className="animate-spin" /> : <Wrench size={10} />}
+                Ajustar Omie
               </button>
             )}
           </div>

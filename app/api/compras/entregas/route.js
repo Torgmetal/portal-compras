@@ -180,6 +180,7 @@ export async function GET(req) {
       return {
         id: p.id,
         numero: p.numeroPedido || p.codigoPedido || "s/n",
+        codigoPedido: p.codigoPedido || null,
         fornecedor,
         fornecedorEmail,
         total: p.total,
