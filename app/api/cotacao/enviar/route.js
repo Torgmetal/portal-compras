@@ -46,10 +46,17 @@ export async function POST(req) {
     return NextResponse.json({ error: "Informe ao menos uma RM (rmId ou rmIds)." }, { status: 400 });
   }
 
-  // Busca todas as RMs envolvidas
+  // Busca todas as RMs envolvidas (com vinculo OPItem/AditivoItem pra derivar faturamento)
   const rms = await prisma.rM.findMany({
     where: { id: { in: rmIds } },
-    include: { itens: true },
+    include: {
+      itens: {
+        include: {
+          opItem: { select: { faturamentoDireto: true } },
+          aditivoItem: { select: { faturamentoDireto: true } },
+        },
+      },
+    },
   });
   if (rms.length === 0) return NextResponse.json({ error: "RM(s) não encontrada(s)." }, { status: 404 });
   if (rms.length !== rmIds.length) {
@@ -78,6 +85,12 @@ export async function POST(req) {
   // as demais ficam vinculadas via os CotacaoItens que apontam pra rmItemId delas).
   const rmPrincipal = rms.find((r) => r.id === rmIds[0]) || rms[0];
 
+  // Deriva faturamento: se ALGUM item cotável é faturamento direto, marca "Cliente".
+  const algumFD = itensCotaveis.some(
+    (it) => it.opItem?.faturamentoDireto || it.aditivoItem?.faturamentoDireto
+  );
+  const faturamento = algumFD ? "Cliente" : "Torg";
+
   let cotacoesCriadas = [];
   await prisma.$transaction(async (tx) => {
     // Cria todas as cotações (uma por fornecedor) em paralelo
@@ -91,6 +104,7 @@ export async function POST(req) {
           fornecedorEmail: f.email,
           cnpj: f.cnpj || null,
           nCodOmie: f.nCodOmie || null,
+          faturamento,
           prazoResposta: prazo,
           observacao: body.observacaoExtra || null,
           token,
