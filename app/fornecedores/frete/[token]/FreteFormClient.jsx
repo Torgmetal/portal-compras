@@ -120,11 +120,14 @@ export default function FreteFormClient() {
       {/* Header */}
       <div className="bg-[#006EAB] text-white">
         <div className="max-w-2xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-3 mb-2">
-            <Truck size={28} />
-            <h1 className="text-xl font-bold">Cotacao de Frete</h1>
+          <div className="flex items-center gap-4 mb-2">
+            <img src="/torg-logo-white.png" alt="Torg Metal" className="h-8" />
+            <div className="h-6 w-px bg-white/30" />
+            <div className="flex items-center gap-2">
+              <Truck size={22} />
+              <h1 className="text-lg font-bold">Cotacao de Frete</h1>
+            </div>
           </div>
-          <p className="text-blue-100 text-sm">Torg Metal Estruturas</p>
         </div>
       </div>
 
