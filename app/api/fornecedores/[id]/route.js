@@ -66,10 +66,10 @@ export async function PATCH(req, { params }) {
   const existe = await prisma.fornecedor.findUnique({ where: { id: params.id } });
   if (!existe) return NextResponse.json({ error: "Nao encontrado." }, { status: 404 });
 
-  // Sanitiza campos com transformacao + normaliza nomes pra Title Case
+  // Sanitiza campos com transformacao + normaliza nomes pra MAIÚSCULO
   const dataUpdate = { ...body };
-  if (body.razaoSocial !== undefined) dataUpdate.razaoSocial = titleCaseNome(body.razaoSocial);
-  if (body.nomeFantasia !== undefined) dataUpdate.nomeFantasia = body.nomeFantasia ? titleCaseNome(body.nomeFantasia) : null;
+  if (body.razaoSocial !== undefined) dataUpdate.razaoSocial = body.razaoSocial.trim().toUpperCase();
+  if (body.nomeFantasia !== undefined) dataUpdate.nomeFantasia = body.nomeFantasia ? body.nomeFantasia.trim().toUpperCase() : null;
   if (body.cnpj !== undefined) dataUpdate.cnpj = body.cnpj?.replace(/\D/g, "") || null;
   if (body.email !== undefined) dataUpdate.email = body.email.trim().toLowerCase();
   if (body.emailsAdicionais !== undefined) dataUpdate.emailsAdicionais = body.emailsAdicionais.map((e) => e.trim().toLowerCase());

@@ -99,9 +99,9 @@ export async function POST(req) {
     return NextResponse.json({ error: validacao.erro }, { status: 400 });
   }
 
-  // Normaliza nomes pra Title Case
-  const razaoNormalizada = titleCaseNome(body.razaoSocial);
-  const fantasiaNormalizada = body.nomeFantasia ? titleCaseNome(body.nomeFantasia) : null;
+  // Normaliza nomes pra MAIÚSCULO
+  const razaoNormalizada = body.razaoSocial.trim().toUpperCase();
+  const fantasiaNormalizada = body.nomeFantasia ? body.nomeFantasia.trim().toUpperCase() : null;
 
   // Verifica duplicata (nome similar já existente)
   const chave = chaveNormalizacao(razaoNormalizada);

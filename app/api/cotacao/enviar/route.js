@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
-import { titleCaseNome } from "@/lib/normalizar-nome";
 
 const fornecedorSchema = z.object({
   fornecedorId: z.string().optional().nullable(), // ID do cadastro unificado
@@ -102,7 +101,7 @@ export async function POST(req) {
         data: {
           rmId: rmPrincipal.id,
           fornecedorId: f.fornecedorId || null,
-          fornecedorNome: titleCaseNome(f.nome),
+          fornecedorNome: f.nome.trim().toUpperCase(),
           fornecedorEmail: f.email,
           cnpj: f.cnpj || null,
           nCodOmie: f.nCodOmie || null,
@@ -126,13 +125,13 @@ export async function POST(req) {
       // Registra envio em todas as RMs envolvidas (paralelo por RM)
       await Promise.all(rms.map((rm) =>
         tx.envio.create({
-          data: { rmId: rm.id, fornecedorNome: titleCaseNome(f.nome), fornecedorEmail: f.email },
+          data: { rmId: rm.id, fornecedorNome: f.nome.trim().toUpperCase(), fornecedorEmail: f.email },
         })
       ));
       return {
         id: cot.id,
         token: cot.token,
-        fornecedorNome: titleCaseNome(f.nome),
+        fornecedorNome: f.nome.trim().toUpperCase(),
         fornecedorEmail: f.email,
         rmsVinculadas: rms.map((r) => r.numero),
       };
