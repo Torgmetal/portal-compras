@@ -14,6 +14,7 @@ import {
   ChevronDown,
   LayoutGrid,
   Users,
+  Activity,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -67,6 +68,14 @@ const MODULOS = [
     icon: Truck,
     cor: "bg-teal-100 text-teal-700",
     modulos: ["EXPEDICAO"],
+  },
+  {
+    href: "/indicadores",
+    label: "Indicadores",
+    desc: "Scorecard, Savings e OTIF",
+    icon: Activity,
+    cor: "bg-indigo-100 text-indigo-700",
+    modulos: ["COMPRAS"],
   },
   {
     href: "/rh",

@@ -56,6 +56,7 @@ export default withAuth(
 
         if (path.startsWith("/comercial")  && !temModulo("COMERCIAL"))  return false;
         if (path.startsWith("/compras")    && !temModulo("COMPRAS"))     return false;
+        if (path.startsWith("/indicadores") && !temModulo("COMPRAS"))    return false;
         if (path.startsWith("/financeiro") && !temModulo("FINANCEIRO"))  return false;
         if (path.startsWith("/expedicao")  && !temModulo("EXPEDICAO"))   return false;
         if (path.startsWith("/producao")   && !temModulo("PRODUCAO"))    return false;
