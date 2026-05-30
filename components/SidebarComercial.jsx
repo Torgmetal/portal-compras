@@ -17,7 +17,7 @@ const menu = [
       { href: "/comercial/orcamentos/acompanhamento", label: "Acompanhamento", icon: CalendarClock },
       { href: "/comercial/orcamentos/propostas", label: "Propostas", icon: FilePlus2 },
       { href: "/comercial/orcamentos/pipeline", label: "Pipeline", icon: GitBranchPlus },
-      { href: "/comercial/orcamentos/kpis", label: "KPIs", icon: BarChart3 },
+      { href: "/comercial/orcamentos/kpis", label: "Indicadores", icon: BarChart3 },
     ],
   },
   { href: "/comercial/aprovacoes", label: "Aprovações", icon: Inbox, masterOnly: true },

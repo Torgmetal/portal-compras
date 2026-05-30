@@ -180,7 +180,7 @@ export default function KPIsClient() {
   if (loading) {
     return (
       <div className="max-w-7xl space-y-6">
-        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">KPIs Comercial</h2>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Indicadores Comercial</h2>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <Loader2 size={32} className="mx-auto text-torg-blue animate-spin mb-3" />
           <p className="text-torg-gray">Carregando indicadores...</p>
@@ -192,7 +192,7 @@ export default function KPIsClient() {
   if (erro) {
     return (
       <div className="max-w-7xl space-y-6">
-        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">KPIs Comercial</h2>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Indicadores Comercial</h2>
         <div className="bg-white rounded-xl shadow-sm border border-red-100 p-12 text-center">
           <AlertCircle size={40} className="mx-auto text-red-400 mb-3" />
           <p className="text-red-600 mb-3">{erro}</p>
@@ -207,7 +207,7 @@ export default function KPIsClient() {
       {/* Header + Seletor de Ano */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">KPIs Comercial</h2>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Indicadores Comercial</h2>
           <p className="text-sm text-torg-gray mt-1">Indicadores de desempenho do setor comercial.</p>
         </div>
         <div className="flex items-center gap-2">
