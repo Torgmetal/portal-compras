@@ -85,7 +85,7 @@ function CardEmpresa({ empresa, totalSetores, totalFuncionarios }) {
   );
 }
 
-function CardSetor({ setor, expandido, onToggle }) {
+function CardSetor({ setor, expandido, onToggle, destaque = false }) {
   const cor = setor.cor || "#006EAB";
   const totalMembros = setor.funcionarios?.length || 0;
   const gestor = setor.gestor;
@@ -97,7 +97,11 @@ function CardSetor({ setor, expandido, onToggle }) {
 
       <button
         onClick={onToggle}
-        className="group bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all min-w-[220px] max-w-[280px] overflow-hidden text-left"
+        className={`group rounded-xl shadow-sm border hover:shadow-md transition-all overflow-hidden text-left ${
+          destaque
+            ? "bg-gradient-to-b from-torg-dark/[0.03] to-white border-torg-blue/20 min-w-[260px] max-w-[320px]"
+            : "bg-white border-gray-100 min-w-[220px] max-w-[280px]"
+        }`}
       >
         {/* Barra de cor do setor */}
         <div className="h-1.5 w-full" style={{ backgroundColor: cor }} />
@@ -357,38 +361,73 @@ export default function OrganoClient() {
 
       {/* Organograma visual */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 overflow-x-auto">
-        <div className="flex flex-col items-center min-w-fit">
-          {/* Card da empresa no topo */}
-          <CardEmpresa
-            empresa={dados.empresa}
-            totalSetores={dados.totalSetores}
-            totalFuncionarios={dados.totalFuncionarios}
-          />
+        {(() => {
+          const diretoria = dados.setores.filter((s) =>
+            s.nome.toLowerCase().includes("diretoria")
+          );
+          const demais = dados.setores.filter(
+            (s) => !s.nome.toLowerCase().includes("diretoria")
+          );
 
-          {/* Linha horizontal conectando setores */}
-          {dados.setores.length > 1 && (
-            <div className="flex items-start">
-              <div
-                className="h-px bg-gray-300"
-                style={{
-                  width: `${(dados.setores.length - 1) * 300}px`,
-                }}
+          return (
+            <div className="flex flex-col items-center min-w-fit">
+              {/* Card da empresa no topo */}
+              <CardEmpresa
+                empresa={dados.empresa}
+                totalSetores={dados.totalSetores}
+                totalFuncionarios={dados.totalFuncionarios}
               />
+
+              {/* Nível da Diretoria (acima dos demais) */}
+              {diretoria.length > 0 && (
+                <>
+                  <div className="flex gap-6 justify-center">
+                    {diretoria.map((setor) => (
+                      <CardSetor
+                        key={setor.id}
+                        setor={setor}
+                        expandido={!!expandidos[setor.id]}
+                        onToggle={() => toggleSetor(setor.id)}
+                        destaque
+                      />
+                    ))}
+                  </div>
+
+                  {/* Conector da diretoria para os setores abaixo */}
+                  {demais.length > 0 && (
+                    <div className="w-px h-6 bg-gray-300" />
+                  )}
+                </>
+              )}
+
+              {/* Linha horizontal conectando setores do nível operacional */}
+              {demais.length > 1 && (
+                <div className="flex items-start">
+                  <div
+                    className="h-px bg-gray-300"
+                    style={{
+                      width: `${(demais.length - 1) * 300}px`,
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Grid dos demais setores */}
+              {demais.length > 0 && (
+                <div className="flex gap-6 flex-wrap justify-center">
+                  {demais.map((setor) => (
+                    <CardSetor
+                      key={setor.id}
+                      setor={setor}
+                      expandido={!!expandidos[setor.id]}
+                      onToggle={() => toggleSetor(setor.id)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Grid de setores */}
-          <div className="flex gap-6 flex-wrap justify-center">
-            {dados.setores.map((setor) => (
-              <CardSetor
-                key={setor.id}
-                setor={setor}
-                expandido={!!expandidos[setor.id]}
-                onToggle={() => toggleSetor(setor.id)}
-              />
-            ))}
-          </div>
-        </div>
+          );
+        })()}
       </div>
     </div>
   );
