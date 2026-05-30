@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
 import { notificarEvento } from "@/lib/email";
 import { criarNotificacao } from "@/lib/notificacoes";
+import { titleCaseNome } from "@/lib/normalizar-nome";
 
 const itemSchema = z.object({
   cotacaoItemId: z.string().min(1),
@@ -134,7 +135,7 @@ export async function POST(req, { params }) {
         observacao: obsCombinada,
         cnpj: cnpjLimpo || cotacao.cnpj,
         nCodOmie: nCodOmieResolvido || cotacao.nCodOmie,
-        fornecedorNome: body.razaoSocial?.trim() || cotacao.fornecedorNome,
+        fornecedorNome: body.razaoSocial ? titleCaseNome(body.razaoSocial) : cotacao.fornecedorNome,
         ...(eRevisao ? { numeroRevisao: { increment: 1 } } : {}),
       },
     });
