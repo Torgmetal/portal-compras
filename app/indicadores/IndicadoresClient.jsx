@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import {
   Loader2, AlertCircle, RefreshCw, Trophy, TrendingUp, TrendingDown,
-  Package, Truck, Star, ChevronDown, ChevronUp, Info, Target,
+  Package, Truck, Star, ChevronDown, ChevronUp, Info, Target, Clock,
+  AlertTriangle,
 } from "lucide-react";
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -184,7 +185,8 @@ export function DashboardClient() {
   if (loading) return <LoadingState />;
   if (erro) return <ErroState erro={erro} onRetry={recarregar} />;
 
-  const { scorecard, savings, otif } = dados;
+  const { scorecard, savings, otif, atendimento } = dados;
+  const atd = atendimento?.resumo || {};
 
   return (
     <div className="space-y-6">
@@ -197,7 +199,7 @@ export function DashboardClient() {
       </div>
 
       {/* Cards resumo */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <CardResumo
           icon={Target}
           label="OTIF"
@@ -219,6 +221,14 @@ export function DashboardClient() {
           valor={fmtPct(otif.resumo.pctOnTime)}
           sub={`${otif.resumo.onTime}/${otif.resumo.totalPedidos} no prazo`}
           cor={otif.resumo.pctOnTime >= 90 ? "emerald" : otif.resumo.pctOnTime >= 70 ? "amber" : "red"}
+        />
+        <CardResumo
+          icon={Clock}
+          label="Lead Time"
+          valor={`${atd.mediaRespPedido || 0} dias`}
+          sub={`${fmtPct(atd.pctDentroAlvo)} em ≤ ${atd.alvo || 5}d`}
+          cor={atd.mediaRespPedido <= 5 ? "emerald" : atd.mediaRespPedido <= 10 ? "amber" : "red"}
+          meta={atd.backlogQtd > 0 ? `${atd.backlogQtd} cotações pendentes` : null}
         />
         <CardResumo
           icon={Trophy}
@@ -633,6 +643,219 @@ function ProgressoOTIF({ label, valor, meta, detalhe }) {
         <span className="text-[10px] text-gray-400">{detalhe}</span>
         <span className="text-[10px] text-gray-400">Meta: {meta}%</span>
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ATENDIMENTO INTERNO (/indicadores/atendimento)
+// ═══════════════════════════════════════════════════════════════
+export function AtendimentoClient() {
+  const { periodo, setPeriodo, dados, loading, erro, recarregar } = useIndicadores();
+  const [verTodos, setVerTodos] = useState(false);
+  const [abaAtd, setAbaAtd] = useState("pipeline"); // pipeline | backlog
+
+  if (loading) return <LoadingState />;
+  if (erro) return <ErroState erro={erro} onRetry={recarregar} />;
+
+  const { resumo, faixas, detalhe, backlog } = dados.atendimento;
+  const totalFaixas = faixas.ate3 + faixas.ate7 + faixas.ate15 + faixas.acima15;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-torg-dark">Atendimento Interno</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Tempo entre a resposta do fornecedor e a geração do pedido de compra
+          </p>
+        </div>
+        <PeriodoSelector periodo={periodo} setPeriodo={setPeriodo} onRecarregar={recarregar} />
+      </div>
+
+      {/* Cards de lead time */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <MiniCard
+          label="Lead Time Médio"
+          valor={`${resumo.mediaRespPedido} dias úteis`}
+          cor={resumo.mediaRespPedido <= 5 ? "emerald" : resumo.mediaRespPedido <= 10 ? "amber" : "red"}
+        />
+        <MiniCard label="RM → RFQ" valor={`${resumo.mediaRmRfq} dias úteis`} />
+        <MiniCard label="Pipeline Total" valor={`${resumo.mediaRmPedido} dias úteis`} />
+        <MiniCard
+          label={`Dentro do alvo (≤ ${resumo.alvo}d)`}
+          valor={fmtPct(resumo.pctDentroAlvo)}
+          cor={resumo.pctDentroAlvo >= 80 ? "emerald" : resumo.pctDentroAlvo >= 60 ? "amber" : "red"}
+        />
+        <MiniCard
+          label="Backlog Pendente"
+          valor={`${resumo.backlogQtd} cotações`}
+          cor={resumo.backlogQtd === 0 ? "emerald" : resumo.backlogQtd <= 5 ? "amber" : "red"}
+        />
+      </div>
+
+      {/* Distribuição por faixas */}
+      {totalFaixas > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-semibold text-torg-dark text-sm mb-3">Distribuição por Faixa de Tempo</h3>
+          <div className="flex h-8 rounded-lg overflow-hidden">
+            {faixas.ate3 > 0 && (
+              <div className="bg-emerald-500 flex items-center justify-center text-white text-[10px] font-bold" style={{ width: `${(faixas.ate3 / totalFaixas) * 100}%` }}>
+                ≤3d ({faixas.ate3})
+              </div>
+            )}
+            {faixas.ate7 > 0 && (
+              <div className="bg-torg-blue flex items-center justify-center text-white text-[10px] font-bold" style={{ width: `${(faixas.ate7 / totalFaixas) * 100}%` }}>
+                4-7d ({faixas.ate7})
+              </div>
+            )}
+            {faixas.ate15 > 0 && (
+              <div className="bg-amber-400 flex items-center justify-center text-white text-[10px] font-bold" style={{ width: `${(faixas.ate15 / totalFaixas) * 100}%` }}>
+                8-15d ({faixas.ate15})
+              </div>
+            )}
+            {faixas.acima15 > 0 && (
+              <div className="bg-red-400 flex items-center justify-center text-white text-[10px] font-bold" style={{ width: `${(faixas.acima15 / totalFaixas) * 100}%` }}>
+                &gt;15d ({faixas.acima15})
+              </div>
+            )}
+          </div>
+          <div className="flex justify-between mt-2 text-[10px] text-gray-400">
+            <span>Rápido</span>
+            <span>Total: {totalFaixas} cotações processadas</span>
+            <span>Lento</span>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs pipeline vs backlog */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        <button
+          onClick={() => setAbaAtd("pipeline")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
+            abaAtd === "pipeline" ? "bg-white text-torg-dark shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Pipeline concluído ({detalhe.length})
+        </button>
+        <button
+          onClick={() => setAbaAtd("backlog")}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-1 ${
+            abaAtd === "backlog" ? "bg-white text-torg-dark shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Backlog pendente ({backlog.length})
+          {backlog.length > 0 && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
+        </button>
+      </div>
+
+      {/* Tabela pipeline concluído */}
+      {abaAtd === "pipeline" && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-xs text-gray-500">Cotações processadas — resposta do fornecedor até pedido gerado</p>
+            {detalhe.length > 15 && (
+              <button onClick={() => setVerTodos(!verTodos)} className="text-xs text-torg-blue hover:underline flex items-center gap-1">
+                {verTodos ? "Mostrar menos" : `Ver todos (${detalhe.length})`}
+              </button>
+            )}
+          </div>
+          {detalhe.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 text-sm">
+              <Clock size={24} className="mx-auto mb-2" />
+              Nenhuma cotação processada no período
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50/60">
+                  <tr>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">RM</th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">OP</th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">RM Criada</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">RFQ Enviada</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Resposta</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Pedido</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">RM→RFQ</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Resp→Pedido</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {(verTodos ? detalhe : detalhe.slice(0, 15)).map((d) => {
+                    const corLead = d.diasRespPedido <= 3 ? "text-emerald-600" : d.diasRespPedido <= 7 ? "text-torg-blue" : d.diasRespPedido <= 15 ? "text-amber-600" : "text-red-600";
+                    return (
+                      <tr key={d.cotacaoId} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-torg-dark">{d.rmNumero}</td>
+                        <td className="px-4 py-2 text-gray-500">{d.opNumero}</td>
+                        <td className="px-4 py-2 text-gray-600 max-w-[160px] truncate">{d.fornecedor}</td>
+                        <td className="px-3 py-2 text-center text-gray-400 text-xs">{fmtData(d.rmCriada)}</td>
+                        <td className="px-3 py-2 text-center text-gray-400 text-xs">{fmtData(d.rfqEnviada)}</td>
+                        <td className="px-3 py-2 text-center text-gray-400 text-xs">{fmtData(d.respostaEm)}</td>
+                        <td className="px-3 py-2 text-center text-gray-500 text-xs font-medium">{fmtData(d.pedidoEm)}</td>
+                        <td className="px-3 py-2 text-center text-gray-500 text-xs">{d.diasRmRfq}d</td>
+                        <td className={`px-3 py-2 text-center text-xs font-bold ${corLead}`}>{d.diasRespPedido}d</td>
+                        <td className="px-3 py-2 text-center text-gray-600 text-xs font-medium">{d.diasRmPedido}d</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tabela backlog */}
+      {abaAtd === "backlog" && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-xs text-gray-500">
+              Cotações respondidas pelo fornecedor que ainda não viraram pedido
+            </p>
+          </div>
+          {backlog.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 text-sm">
+              <Clock size={24} className="mx-auto mb-2" />
+              Nenhuma cotação pendente — tudo processado!
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50/60">
+                  <tr>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">RM</th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">OP</th>
+                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Respondeu em</th>
+                    <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Dias esperando</th>
+                    <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase">Valor</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {backlog.map((b) => {
+                    const corDias = b.diasEsperando <= 5 ? "text-emerald-600" : b.diasEsperando <= 10 ? "text-amber-600" : "text-red-600";
+                    return (
+                      <tr key={b.cotacaoId} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-torg-dark">{b.rmNumero}</td>
+                        <td className="px-4 py-2 text-gray-500">{b.opNumero}</td>
+                        <td className="px-4 py-2 text-gray-600 max-w-[180px] truncate">{b.fornecedor}</td>
+                        <td className="px-3 py-2 text-center text-gray-500 text-xs">{fmtData(b.respostaEm)}</td>
+                        <td className={`px-3 py-2 text-center font-bold text-xs ${corDias}`}>
+                          {b.diasEsperando}d úteis
+                          {b.diasEsperando > 10 && <AlertTriangle size={11} className="inline ml-1 text-red-400" />}
+                        </td>
+                        <td className="px-4 py-2 text-right text-gray-600 tabular-nums text-xs">{fmtMoeda(b.valorCotacao)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

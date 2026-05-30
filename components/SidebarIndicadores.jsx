@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Activity, Trophy, TrendingUp, Package } from "lucide-react";
+import { Activity, Trophy, TrendingUp, Package, Clock } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -11,6 +11,7 @@ const menu = [
   { href: "/indicadores/scorecard", label: "Scorecard Fornecedores", icon: Trophy },
   { href: "/indicadores/savings", label: "Savings por Obra", icon: TrendingUp },
   { href: "/indicadores/otif", label: "OTIF", icon: Package },
+  { href: "/indicadores/atendimento", label: "Atendimento Interno", icon: Clock },
 ];
 
 export default function SidebarIndicadores() {

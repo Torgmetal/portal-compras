@@ -28,12 +28,16 @@ export async function GET(req) {
     // ─── 3. OTIF ─────────────────────────────────────────────
     const otif = await calcularOTIF(dataInicio, dataFim);
 
+    // ─── 4. ATENDIMENTO INTERNO ──────────────────────────────
+    const atendimento = await calcularAtendimento(dataInicio, dataFim);
+
     return NextResponse.json({
       success: true,
       periodo: { de: dataInicio.toISOString(), ate: dataFim.toISOString() },
       scorecard,
       savings,
       otif,
+      atendimento,
     });
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
@@ -426,7 +430,166 @@ async function calcularOTIF(dataInicio, dataFim) {
   };
 }
 
+// ─── ATENDIMENTO INTERNO ─────────────────────────────────────
+// Mede a eficiência do departamento de Compras no pipeline:
+//   RM criada → RFQ enviada → Fornecedor respondeu → Pedido gerado
+// Foco: tempo entre resposta do fornecedor e geração do pedido.
+async function calcularAtendimento(dataInicio, dataFim) {
+  // 1) Cotações respondidas que geraram pedido — mede lead time de compra
+  const cotacoesComPedido = await prisma.cotacao.findMany({
+    where: {
+      recebidaEm: { not: null },
+      pedidosOmie: { some: { status: { not: "ERRO" } } },
+    },
+    select: {
+      id: true,
+      fornecedorNome: true,
+      fornecedor: { select: { razaoSocial: true } },
+      createdAt: true,
+      recebidaEm: true,
+      rm: {
+        select: {
+          id: true,
+          numero: true,
+          createdAt: true,
+          op: { select: { numero: true } },
+        },
+      },
+      pedidosOmie: {
+        where: { status: { not: "ERRO" } },
+        select: { id: true, numeroPedido: true, createdAt: true, total: true },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+      },
+    },
+  });
+
+  // 2) Cotações respondidas PENDENTES — backlog (respondeu, mas não gerou pedido)
+  const cotacoesPendentes = await prisma.cotacao.findMany({
+    where: {
+      recebidaEm: { not: null },
+      status: "RECEBIDA",
+      pedidosOmie: { none: {} },
+      rm: { status: { notIn: ["CANCELADA", "PEDIDO_GERADO"] } },
+    },
+    select: {
+      id: true,
+      fornecedorNome: true,
+      fornecedor: { select: { razaoSocial: true } },
+      recebidaEm: true,
+      total: true,
+      rm: {
+        select: {
+          numero: true,
+          createdAt: true,
+          op: { select: { numero: true } },
+        },
+      },
+    },
+  });
+
+  // ── Calcular lead times ──
+  const agora = new Date();
+  const detalheConcluido = [];
+  const faixas = { ate3: 0, ate7: 0, ate15: 0, acima15: 0 };
+  let somaLeadRespPedido = 0;   // dias úteis: resposta → pedido
+  let somaLeadRmPedido = 0;     // dias úteis: RM criada → pedido
+  let somaLeadRmRfq = 0;        // dias úteis: RM criada → RFQ enviada
+
+  for (const cot of cotacoesComPedido) {
+    const pedido = cot.pedidosOmie[0];
+    if (!pedido) continue;
+
+    const diasRespPedido = diasUteis(cot.recebidaEm, pedido.createdAt);
+    const diasRmRfq = diasUteis(cot.rm.createdAt, cot.createdAt);
+    const diasRmPedido = diasUteis(cot.rm.createdAt, pedido.createdAt);
+
+    somaLeadRespPedido += diasRespPedido;
+    somaLeadRmPedido += diasRmPedido;
+    somaLeadRmRfq += diasRmRfq;
+
+    if (diasRespPedido <= 3) faixas.ate3++;
+    else if (diasRespPedido <= 7) faixas.ate7++;
+    else if (diasRespPedido <= 15) faixas.ate15++;
+    else faixas.acima15++;
+
+    const fornecedor = cot.fornecedor?.razaoSocial || cot.fornecedorNome;
+
+    detalheConcluido.push({
+      cotacaoId: cot.id,
+      rmNumero: cot.rm.numero,
+      opNumero: cot.rm.op?.numero || "—",
+      fornecedor,
+      rmCriada: cot.rm.createdAt,
+      rfqEnviada: cot.createdAt,
+      respostaEm: cot.recebidaEm,
+      pedidoEm: pedido.createdAt,
+      pedidoNumero: pedido.numeroPedido || "—",
+      diasRmRfq,
+      diasRespPedido,
+      diasRmPedido,
+    });
+  }
+
+  const total = detalheConcluido.length;
+  const mediaRespPedido = total > 0 ? Math.round((somaLeadRespPedido / total) * 10) / 10 : 0;
+  const mediaRmPedido = total > 0 ? Math.round((somaLeadRmPedido / total) * 10) / 10 : 0;
+  const mediaRmRfq = total > 0 ? Math.round((somaLeadRmRfq / total) * 10) / 10 : 0;
+
+  // ── Backlog: cotações respondidas sem pedido ──
+  const backlog = cotacoesPendentes.map((cot) => {
+    const diasEsperando = diasUteis(cot.recebidaEm, agora);
+    return {
+      cotacaoId: cot.id,
+      rmNumero: cot.rm.numero,
+      opNumero: cot.rm.op?.numero || "—",
+      fornecedor: cot.fornecedor?.razaoSocial || cot.fornecedorNome,
+      respostaEm: cot.recebidaEm,
+      diasEsperando,
+      valorCotacao: cot.total,
+    };
+  }).sort((a, b) => b.diasEsperando - a.diasEsperando);
+
+  // ── Pct dentro do alvo (≤ 5 dias úteis) ──
+  const dentroAlvo = detalheConcluido.filter((d) => d.diasRespPedido <= 5).length;
+  const pctDentroAlvo = total > 0 ? Math.round((dentroAlvo / total) * 1000) / 10 : 0;
+
+  return {
+    resumo: {
+      totalProcessados: total,
+      mediaRespPedido,     // dias úteis: fornecedor respondeu → pedido gerado
+      mediaRmRfq,          // dias úteis: RM criada → RFQ enviada
+      mediaRmPedido,       // dias úteis: RM criada → pedido gerado (pipeline total)
+      pctDentroAlvo,       // % processados em ≤ 5 dias úteis
+      alvo: 5,             // meta em dias úteis
+      backlogQtd: backlog.length,
+      backlogValor: backlog.reduce((s, b) => s + (b.valorCotacao || 0), 0),
+    },
+    faixas,
+    detalhe: detalheConcluido.sort((a, b) => new Date(b.pedidoEm) - new Date(a.pedidoEm)),
+    backlog,
+  };
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────
+
+// Conta dias úteis entre duas datas (exclui sábado e domingo)
+function diasUteis(de, ate) {
+  const inicio = new Date(de);
+  const fim = new Date(ate);
+  if (fim <= inicio) return 0;
+  let dias = 0;
+  const cursor = new Date(inicio);
+  cursor.setHours(0, 0, 0, 0);
+  const alvo = new Date(fim);
+  alvo.setHours(0, 0, 0, 0);
+  while (cursor < alvo) {
+    cursor.setDate(cursor.getDate() + 1);
+    const dow = cursor.getDay();
+    if (dow !== 0 && dow !== 6) dias++;
+  }
+  return dias;
+}
 
 // Adiciona N dias úteis a uma data (pula sábado e domingo)
 function adicionarDiasUteis(data, dias) {
