@@ -556,7 +556,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
           </div>
         )}
 
-        <form onSubmit={submit} className="space-y-6">
+        <form onSubmit={submit} noValidate className="space-y-6">
           {/* Anexar proposta (PDF) */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-start justify-between flex-wrap gap-3">
