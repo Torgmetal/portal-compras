@@ -185,7 +185,7 @@ function SolicitarCotacaoModal({ onClose, onEnviar, estudoId }) {
   const buscarFornecedores = async (termo) => {
     setCarregando(true);
     try {
-      const params = new URLSearchParams({ busca: termo });
+      const params = new URLSearchParams({ busca: termo, categoria: "TRANSPORTE" });
       const res = await fetch(`/api/fornecedores?${params}`);
       const json = await res.json();
       setFornecedores(json.fornecedores || []);
@@ -226,10 +226,7 @@ function SolicitarCotacaoModal({ onClose, onEnviar, estudoId }) {
     }
   };
 
-  // Filtrar transportadoras com categoria TRANSPORTE primeiro, depois todas
-  const transportadoras = fornecedores.filter((f) => f.categorias?.includes("TRANSPORTE"));
-  const outros = fornecedores.filter((f) => !f.categorias?.includes("TRANSPORTE"));
-  const listaExibida = busca ? fornecedores : [...transportadoras, ...outros];
+  const listaExibida = fornecedores;
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -237,7 +234,7 @@ function SolicitarCotacaoModal({ onClose, onEnviar, estudoId }) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <div>
             <h2 className="text-lg font-bold text-torg-dark">Solicitar Cotacao de Frete</h2>
-            <p className="text-sm text-torg-gray mt-0.5">Selecione as transportadoras do Vendor List</p>
+            <p className="text-sm text-torg-gray mt-0.5">Fornecedores com categoria Transporte</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={20} className="text-gray-400" /></button>
         </div>
@@ -275,12 +272,8 @@ function SolicitarCotacaoModal({ onClose, onEnviar, estudoId }) {
             <p className="text-sm text-torg-gray text-center py-8">Nenhum fornecedor encontrado</p>
           ) : (
             <div className="space-y-1">
-              {!busca && transportadoras.length > 0 && (
-                <p className="text-xs font-semibold text-teal-600 uppercase tracking-wide pt-2 pb-1">Transportadoras</p>
-              )}
               {listaExibida.map((f) => {
                 const marcado = selecionados.some((s) => s.id === f.id);
-                const isTransp = f.categorias?.includes("TRANSPORTE");
                 return (
                   <button
                     key={f.id}
@@ -296,18 +289,12 @@ function SolicitarCotacaoModal({ onClose, onEnviar, estudoId }) {
                       {marcado && <Check size={12} className="text-white" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-torg-dark truncate">{f.nomeFantasia || f.razaoSocial}</span>
-                        {isTransp && <span className="text-[10px] px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded font-medium">TRANSPORTE</span>}
-                      </div>
+                      <span className="text-sm font-medium text-torg-dark truncate block">{f.nomeFantasia || f.razaoSocial}</span>
                       <span className="text-xs text-torg-gray">{f.email || "sem email"}{f.cidade ? ` — ${f.cidade}/${f.uf}` : ""}</span>
                     </div>
                   </button>
                 );
               })}
-              {!busca && outros.length > 0 && transportadoras.length > 0 && (
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-3 pb-1">Outros Fornecedores</p>
-              )}
             </div>
           )}
         </div>
