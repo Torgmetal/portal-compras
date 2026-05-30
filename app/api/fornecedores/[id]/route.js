@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CATEGORIAS_FORNECEDOR_BUILTIN } from "@/lib/fornecedor-categorias";
+import { titleCaseNome, chaveNormalizacao } from "@/lib/normalizar-nome";
 
 const CODIGOS_BUILTIN = new Set(CATEGORIAS_FORNECEDOR_BUILTIN.map((c) => c.codigo));
 
@@ -65,16 +66,34 @@ export async function PATCH(req, { params }) {
   const existe = await prisma.fornecedor.findUnique({ where: { id: params.id } });
   if (!existe) return NextResponse.json({ error: "Nao encontrado." }, { status: 404 });
 
-  // Sanitiza campos com transformacao
+  // Sanitiza campos com transformacao + normaliza nomes pra Title Case
   const dataUpdate = { ...body };
-  if (body.razaoSocial !== undefined) dataUpdate.razaoSocial = body.razaoSocial.trim();
-  if (body.nomeFantasia !== undefined) dataUpdate.nomeFantasia = body.nomeFantasia?.trim() || null;
+  if (body.razaoSocial !== undefined) dataUpdate.razaoSocial = titleCaseNome(body.razaoSocial);
+  if (body.nomeFantasia !== undefined) dataUpdate.nomeFantasia = body.nomeFantasia ? titleCaseNome(body.nomeFantasia) : null;
   if (body.cnpj !== undefined) dataUpdate.cnpj = body.cnpj?.replace(/\D/g, "") || null;
   if (body.email !== undefined) dataUpdate.email = body.email.trim().toLowerCase();
   if (body.emailsAdicionais !== undefined) dataUpdate.emailsAdicionais = body.emailsAdicionais.map((e) => e.trim().toLowerCase());
   if (body.telefone !== undefined) dataUpdate.telefone = body.telefone?.trim() || null;
-  if (body.contato !== undefined) dataUpdate.contato = body.contato?.trim() || null;
-  if (body.cidade !== undefined) dataUpdate.cidade = body.cidade?.trim() || null;
+  if (body.contato !== undefined) dataUpdate.contato = body.contato ? titleCaseNome(body.contato) : null;
+  if (body.cidade !== undefined) dataUpdate.cidade = body.cidade ? titleCaseNome(body.cidade) : null;
+
+  // Verifica duplicata ao alterar razaoSocial (outro fornecedor com nome similar)
+  if (body.razaoSocial !== undefined) {
+    const chave = chaveNormalizacao(dataUpdate.razaoSocial);
+    if (chave) {
+      const existentes = await prisma.fornecedor.findMany({
+        where: { ativo: true, id: { not: params.id } },
+        select: { id: true, razaoSocial: true },
+      });
+      const dup = existentes.find((f) => chaveNormalizacao(f.razaoSocial) === chave);
+      if (dup) {
+        return NextResponse.json(
+          { error: `Já existe um fornecedor com nome similar: "${dup.razaoSocial}".` },
+          { status: 409 }
+        );
+      }
+    }
+  }
   if (body.uf !== undefined) dataUpdate.uf = body.uf?.trim().toUpperCase() || null;
   if (body.observacao !== undefined) dataUpdate.observacao = body.observacao?.trim() || null;
   if (body.nCodOmie !== undefined) dataUpdate.nCodOmie = body.nCodOmie?.trim() || null;
