@@ -463,6 +463,8 @@ export default function CronogramaClient() {
           registrando={registrando}
           onCobrar={setModalCobrar}
           onAtualizarPrazo={setModalPrazo}
+          onAjustarOmie={ajustarOmie}
+          ajustandoOmie={ajustandoOmie}
         />
       ) : (
         <TabelaView
@@ -498,7 +500,7 @@ export default function CronogramaClient() {
 
 /* ─── Kanban View ────────────────────────────────────────────────── */
 
-function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo }) {
+function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onAjustarOmie, ajustandoOmie }) {
   const colunas = filtroStatus
     ? KANBAN_ORDER.filter((k) => k === filtroStatus)
     : KANBAN_ORDER;
@@ -543,7 +545,7 @@ function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEn
                     registrando={registrando === p.id}
                     onCobrar={onCobrar}
                     onAtualizarPrazo={onAtualizarPrazo}
-                    onAjustarOmie={ajustarOmie}
+                    onAjustarOmie={onAjustarOmie}
                     ajustandoOmie={ajustandoOmie === p.id}
                   />
                 ))
