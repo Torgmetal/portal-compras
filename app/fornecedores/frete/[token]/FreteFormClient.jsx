@@ -47,7 +47,7 @@ export default function FreteFormClient() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!valorCotado || !prazoEntrega.trim()) {
-      setErroEnvio("Preencha o valor e o prazo de entrega");
+      setErroEnvio("Preencha o valor e os dias de viagem");
       return;
     }
     setEnviando(true);
@@ -106,7 +106,7 @@ export default function FreteFormClient() {
               <p className="text-sm text-emerald-600 font-medium">Valor cotado</p>
               <p className="text-2xl font-bold text-emerald-800">{fmtMoeda(parseFloat(valorCotado) || dados.valorCotado)}</p>
               {(prazoEntrega || dados.prazoEntrega) && (
-                <p className="text-sm text-emerald-600 mt-1">Prazo: {prazoEntrega || dados.prazoEntrega}</p>
+                <p className="text-sm text-emerald-600 mt-1">Dias de viagem: {prazoEntrega || dados.prazoEntrega}</p>
               )}
             </div>
           ) : null}
@@ -129,22 +129,11 @@ export default function FreteFormClient() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Info do projeto */}
+        {/* Referencia do projeto */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Dados do Projeto</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs text-gray-400">Referencia</p>
-              <p className="text-sm font-bold text-gray-800">{dados.ref}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Cliente</p>
-              <p className="text-sm font-bold text-gray-800">{dados.cliente}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Obra</p>
-              <p className="text-sm font-bold text-gray-800">{dados.obra}</p>
-            </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-400">Referencia</span>
+            <span className="text-sm font-bold text-gray-800">{dados.ref}</span>
           </div>
         </div>
 
@@ -213,13 +202,13 @@ export default function FreteFormClient() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Prazo de Entrega <span className="text-red-400">*</span>
+                Dias de Viagem <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
                 value={prazoEntrega}
                 onChange={(e) => setPrazoEntrega(e.target.value)}
-                placeholder="Ex: 3 dias uteis, 1 semana..."
+                placeholder="Ex: 2 dias, 4 dias..."
                 required
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#006EAB]/30 focus:border-[#006EAB] outline-none"
               />

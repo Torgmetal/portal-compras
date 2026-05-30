@@ -25,7 +25,7 @@ export async function GET(req, { params }) {
       return NextResponse.json({ success: false, error: "Cotacao nao encontrada" }, { status: 404 });
     }
 
-    // Nao expor dados internos
+    // Nao expor dados internos — sem cliente/obra/ref
     return NextResponse.json({
       success: true,
       data: {
@@ -38,8 +38,6 @@ export async function GET(req, { params }) {
         anexoNome: cotacao.anexoNome,
         respondidoEm: cotacao.respondidoEm,
         ref: `EPC-${cotacao.estudo?.orcamento?.numero || "???"}`,
-        cliente: cotacao.estudo?.orcamento?.cliente || "—",
-        obra: cotacao.estudo?.orcamento?.obra || "—",
         itens: cotacao.estudo?.itensFretes || [],
       },
     });

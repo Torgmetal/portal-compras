@@ -706,7 +706,7 @@ export default function AbaFretes({ estudo, estudoId }) {
                             type="text"
                             value={cotacaoEditPrazo}
                             onChange={(e) => setCotacaoEditPrazo(e.target.value)}
-                            placeholder="Prazo"
+                            placeholder="Dias de viagem"
                             className="w-24 px-2 py-1 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-torg-blue/30 outline-none"
                           />
                           <button
