@@ -39,6 +39,7 @@ export default withAuth(
           path.startsWith("/api/cotacao/anexar/") ||
           path.startsWith("/api/fornecedores/entrega/") ||
           path.startsWith("/api/frete-cotacao/") ||
+          path.startsWith("/api/estudo-cotacao/") ||
           // Sync MES — autenticado por Bearer API key própria (não NextAuth)
           path.startsWith("/api/mes/")
         ) {

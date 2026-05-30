@@ -1765,6 +1765,7 @@ model PropostaEstudo {
   itensCronograma   CronogramaItem[]
   itensFretes       FreteItem[]
   cotacoesFretes    FreteCotacao[]
+  cotacoesEstudo    EstudoCotacao[]
   documentos        PropostaDocumento[]
 
   @@index([orcamentoId])
@@ -1845,6 +1846,63 @@ model FreteCotacao {
 
   @@index([estudoId])
   @@index([fornecedorId])
+}
+
+// Cotação de Materiais/Acessórios — solicitação de preço unitário por item
+// enviada a fornecedores. Diferente de FreteCotacao (valor unico total),
+// aqui cada item tem precoUnitario individual preenchido pelo fornecedor.
+model EstudoCotacao {
+  id              String          @id @default(cuid())
+  estudoId        String
+  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  token           String          @unique @default(cuid()) // acesso publico sem login
+  tipo            String          // "MATERIAIS" ou "ACESSORIOS"
+  fornecedorId    String?         // ref ao fornecedor (pode ser removido do vendor list)
+  fornecedorNome  String          // nome do fornecedor (snapshot)
+  fornecedorEmail String          // email para onde foi enviado
+
+  status          String          @default("PENDENTE") // PENDENTE, RECEBIDA, SELECIONADA, RECUSADA
+  prazoEntrega    String?         // "15 dias uteis", "30 dias", etc.
+  condicaoPgto    String?         // "30/60/90 DDL", "28 DDL", etc.
+  observacao      String?         // obs do fornecedor ao responder
+  observacaoInterna String?       // obs interna da equipe Torg
+
+  // Anexo da cotacao recebida (PDF, imagem, etc.)
+  anexoUrl        String?
+  anexoNome       String?
+
+  enviadoEm       DateTime?       // quando o email foi disparado
+  respondidoEm    DateTime?       // quando a cotacao foi registrada
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  itens           EstudoCotacaoItem[]
+
+  @@index([estudoId])
+  @@index([fornecedorId])
+  @@index([tipo])
+}
+
+// Item de cotação — snapshot do item + preço preenchido pelo fornecedor
+model EstudoCotacaoItem {
+  id              String          @id @default(cuid())
+  cotacaoId       String
+  cotacao         EstudoCotacao   @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+
+  descricao       String          // "Telha TP40 0,50mm Galvalume", "W200x15 A572 Gr50"
+  especificacao   String?         // detalhes tecnicos
+  unidade         String          @default("un")
+  quantidade      Float           @default(0)
+
+  // Preenchido pelo fornecedor
+  precoUnitario   Float?          // R$ por unidade
+  observacao      String?         // obs do fornecedor sobre este item
+
+  ordem           Int             @default(0)
+
+  @@index([cotacaoId])
 }
 
 // Cenário de Faturamento — eventos de pagamento com classificação fiscal

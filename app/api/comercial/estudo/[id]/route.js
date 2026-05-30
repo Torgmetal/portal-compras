@@ -33,6 +33,10 @@ export async function GET(req, { params }) {
         itensCronograma: { orderBy: { ordem: "asc" } },
         itensFretes: { orderBy: { ordem: "asc" } },
         cotacoesFretes: { orderBy: { createdAt: "desc" } },
+        cotacoesEstudo: {
+          orderBy: { createdAt: "desc" },
+          include: { itens: { orderBy: { ordem: "asc" } } },
+        },
         documentos: { orderBy: { criadoEm: "desc" } },
       },
     });
