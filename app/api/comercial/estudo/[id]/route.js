@@ -29,6 +29,7 @@ export async function GET(req, { params }) {
         itensFaturamento: { orderBy: { ordem: "asc" } },
         itensCronograma: { orderBy: { ordem: "asc" } },
         itensFretes: { orderBy: { ordem: "asc" } },
+        cotacoesFretes: { orderBy: { createdAt: "desc" } },
         documentos: { orderBy: { criadoEm: "desc" } },
       },
     });

@@ -1764,6 +1764,7 @@ model PropostaEstudo {
   itensFaturamento  FaturamentoEvento[]
   itensCronograma   CronogramaItem[]
   itensFretes       FreteItem[]
+  cotacoesFretes    FreteCotacao[]
   documentos        PropostaDocumento[]
 
   @@index([orcamentoId])
@@ -1814,6 +1815,35 @@ model FreteItem {
   createdAt       DateTime        @default(now())
 
   @@index([estudoId])
+}
+
+// Cotação de Frete — solicitação de orçamento enviada a transportadoras
+model FreteCotacao {
+  id              String          @id @default(cuid())
+  estudoId        String
+  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  fornecedorId    String?         // ref ao fornecedor (pode ser removido do vendor list)
+  fornecedorNome  String          // nome da transportadora (snapshot)
+  fornecedorEmail String          // email para onde foi enviado
+
+  status          String          @default("PENDENTE") // PENDENTE, RECEBIDA, SELECIONADA, RECUSADA
+  valorCotado     Float?          // R$ valor total cotado pela transportadora
+  prazoEntrega    String?         // "3 dias uteis", "1 semana", etc.
+  observacao      String?
+
+  // Anexo da cotacao recebida (PDF, imagem, etc.)
+  anexoUrl        String?         // URL no Vercel Blob
+  anexoNome       String?         // nome do arquivo
+
+  enviadoEm       DateTime?       // quando o email foi disparado
+  respondidoEm    DateTime?       // quando a cotacao foi registrada
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([estudoId])
+  @@index([fornecedorId])
 }
 
 // Cenário de Faturamento — eventos de pagamento com classificação fiscal
