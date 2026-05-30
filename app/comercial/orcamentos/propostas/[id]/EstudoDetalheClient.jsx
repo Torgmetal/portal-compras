@@ -2261,23 +2261,25 @@ export default function EstudoDetalheClient({ estudoId }) {
       </div>
 
       {/* Abas */}
-      <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-100 p-1 shadow-sm">
-        {ABAS.map((aba) => {
-          const ativo = abaAtiva === aba.id;
-          return (
-            <button
-              key={aba.id}
-              onClick={() => setAbaAtiva(aba.id)}
-              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                ativo
-                  ? "bg-torg-blue text-white shadow-sm"
-                  : "text-torg-gray hover:bg-gray-50 hover:text-torg-dark"
-              }`}
-            >
-              {aba.label}
-            </button>
-          );
-        })}
+      <div className="overflow-x-auto bg-white rounded-xl border border-gray-100 p-1 shadow-sm">
+        <div className="flex items-center gap-1 min-w-max">
+          {ABAS.map((aba) => {
+            const ativo = abaAtiva === aba.id;
+            return (
+              <button
+                key={aba.id}
+                onClick={() => setAbaAtiva(aba.id)}
+                className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                  ativo
+                    ? "bg-torg-blue text-white shadow-sm"
+                    : "text-torg-gray hover:bg-gray-50 hover:text-torg-dark"
+                }`}
+              >
+                {aba.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Conteudo da aba */}
