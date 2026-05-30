@@ -1763,6 +1763,7 @@ model PropostaEstudo {
   itensCusto        CustoItem[]
   itensFaturamento  FaturamentoEvento[]
   itensCronograma   CronogramaItem[]
+  itensFretes       FreteItem[]
   documentos        PropostaDocumento[]
 
   @@index([orcamentoId])
@@ -1787,6 +1788,29 @@ model CronogramaItem {
 
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+
+  @@index([estudoId])
+}
+
+// Frete — custos de transporte calculados por distancia da obra
+model FreteItem {
+  id              String          @id @default(cuid())
+  estudoId        String
+  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  descricao       String          // "Frete estruturas metalicas", "Frete montagem", etc.
+  origem          String?         // Cidade/UF de origem (ex: "Contagem/MG")
+  destino         String?         // Cidade/UF da obra (ex: "Macae/RJ")
+  distanciaKm     Float           @default(0)   // km entre origem e destino
+  pesoTon         Float           @default(0)   // peso em toneladas a transportar
+  tipoVeiculo     String?         // TRUCK, CARRETA, BITREM, RODOTREM, etc.
+  quantidadeViagens Int           @default(1)   // numero de viagens necessarias
+  custoPorViagem  Float           @default(0)   // R$ custo por viagem
+  custoTotal      Float           @default(0)   // R$ total = quantidadeViagens × custoPorViagem
+  observacao      String?
+  ordem           Int             @default(0)
+
+  createdAt       DateTime        @default(now())
 
   @@index([estudoId])
 }

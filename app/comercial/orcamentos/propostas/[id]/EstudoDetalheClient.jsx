@@ -7,7 +7,7 @@ import {
   Save, CheckCircle2, Clock, Edit3, Link2, Paperclip, Trash2,
   Plus, X, Search, FileText, Download, ChevronDown, Sparkles,
   Check, Info, FolderDown, FolderOpen, RefreshCw,
-  Wrench, Bolt, Paintbrush, Landmark, CalendarDays,
+  Wrench, Bolt, Paintbrush, Landmark, CalendarDays, Truck,
 } from "lucide-react";
 import AbaProdutividade from "./AbaProdutividade";
 import AbaAcessorios from "./AbaAcessorios";
@@ -16,6 +16,7 @@ import AbaPintura from "./AbaPintura";
 import AbaCustos from "./AbaCustos";
 import AbaCronograma from "./AbaCronograma";
 import AbaImpostos from "./AbaImpostos";
+import AbaFretes from "./AbaFretes";
 
 const STATUS_LABELS = {
   RASCUNHO: { label: "Rascunho", cor: "bg-gray-100 text-gray-700", icon: Edit3 },
@@ -32,6 +33,7 @@ const ABAS = [
   { id: "parafusos", label: "Parafusos", icon: Bolt },
   { id: "pintura", label: "Pintura", icon: Paintbrush },
   { id: "custos", label: "Custos", icon: DollarSign },
+  { id: "fretes", label: "Fretes", icon: Truck },
   { id: "impostos", label: "Impostos", icon: Landmark },
   { id: "resumo", label: "Resumo", icon: BarChart3 },
   { id: "cronograma", label: "Cronograma", icon: CalendarDays },
@@ -2320,6 +2322,12 @@ export default function EstudoDetalheClient({ estudoId }) {
             estudo={estudo}
             estudoId={estudoId}
             onEstudoUpdate={handleEstudoUpdate}
+          />
+        )}
+        {abaAtiva === "fretes" && (
+          <AbaFretes
+            estudo={estudo}
+            estudoId={estudoId}
           />
         )}
         {abaAtiva === "cronograma" && (
