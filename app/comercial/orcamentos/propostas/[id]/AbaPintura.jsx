@@ -69,15 +69,20 @@ function SeletorTinta({ catalogo, value, onChange, loading }) {
 
   const selecionado = catalogo.find((t) => t.id === value);
 
-  // Agrupar por resina
+  // Agrupar por fabricante
   const grupos = useMemo(() => {
     const map = {};
     for (const t of filtrados) {
-      const grupo = RESINAS[t.resinaTipo]?.label || t.resinaTipo;
+      const grupo = t.fabricante || "Normas Petrobras";
       if (!map[grupo]) map[grupo] = [];
       map[grupo].push(t);
     }
-    return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
+    // Normas Petrobras primeiro, depois fabricantes em ordem alfabética
+    return Object.entries(map).sort((a, b) => {
+      if (a[0] === "Normas Petrobras") return -1;
+      if (b[0] === "Normas Petrobras") return 1;
+      return a[0].localeCompare(b[0]);
+    });
   }, [filtrados]);
 
   return (
@@ -135,10 +140,10 @@ function SeletorTinta({ catalogo, value, onChange, loading }) {
                         t.id === value ? "bg-torg-blue/10" : ""
                       }`}
                     >
-                      <div>
+                      <div className="min-w-0">
                         <span className="text-torg-dark">{t.nome}</span>
-                        {t.fabricante && <span className="text-xs text-torg-gray ml-1.5">({t.fabricante})</span>}
                         {t.norma && <span className="text-xs text-torg-blue ml-1.5">{t.norma}</span>}
+                        <span className="text-[10px] text-torg-gray ml-1.5">{RESINAS[t.resinaTipo]?.label || t.resinaTipo}</span>
                       </div>
                       <span className="text-xs font-semibold text-torg-dark whitespace-nowrap ml-2">
                         SV {t.svPct}%
