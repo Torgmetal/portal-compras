@@ -17,6 +17,7 @@ import AbaCustos from "./AbaCustos";
 import AbaCronograma from "./AbaCronograma";
 import AbaImpostos from "./AbaImpostos";
 import AbaFretes from "./AbaFretes";
+import AbaResumo from "./AbaResumo";
 
 const STATUS_LABELS = {
   RASCUNHO: { label: "Rascunho", cor: "bg-gray-100 text-gray-700", icon: Edit3 },
@@ -2346,11 +2347,7 @@ export default function EstudoDetalheClient({ estudoId }) {
           />
         )}
         {abaAtiva === "resumo" && (
-          <AbaEmConstrucao
-            titulo="Resumo Comercial"
-            descricao="Visao consolidada do estudo com exportacao para Excel e geracao da proposta tecnica comercial (PTC)."
-            icon={BarChart3}
-          />
+          <AbaResumo estudo={estudo} />
         )}
       </div>
 
