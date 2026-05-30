@@ -116,7 +116,7 @@ export async function GET(req) {
         descricao: ci.rmItem?.descricao || "—",
         material: ci.rmItem?.material,
         qtd: ci.rmItem?.peso > 0 ? Number(ci.rmItem.peso) : ci.rmItem?.qtd,
-        unidade: ci.rmItem?.peso > 0 ? "KG" : ci.rmItem?.unidade,
+        unidade: "KG",
         precoUnit: ci.precoUnit,
         prazoEntrega: ci.prazoEntrega,
       })) || [];
@@ -125,7 +125,7 @@ export async function GET(req) {
         descricao: ri.descricao || "—",
         material: ri.material,
         qtd: ri.peso > 0 ? Number(ri.peso) : ri.qtd,
-        unidade: ri.peso > 0 ? "KG" : ri.unidade,
+        unidade: "KG",
         precoUnit: null,
         prazoEntrega: null,
       })) || [];

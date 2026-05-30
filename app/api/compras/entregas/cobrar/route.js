@@ -170,7 +170,7 @@ export async function POST(req) {
   const itensCotacao = pedido.cotacao?.itens?.map((ci) => {
     const ri = ci.rmItem;
     const qtdOriginal = ri?.peso > 0 ? Number(ri.peso) : (ri?.qtd || 0);
-    const unidade = ri?.peso > 0 ? "KG" : (ri?.unidade || "UN");
+    const unidade = "KG";
     const totalRecebido = (ri?.recebimentos || []).reduce((s, r) => s + (r.qtdRecebida || 0), 0);
     const qtdPendente = Math.max(0, qtdOriginal - totalRecebido);
     return {
@@ -184,7 +184,7 @@ export async function POST(req) {
 
   const itensDiretos = pedido.rmItens?.map((ri) => {
     const qtdOriginal = ri.peso > 0 ? Number(ri.peso) : (ri.qtd || 0);
-    const unidade = ri.peso > 0 ? "KG" : (ri.unidade || "UN");
+    const unidade = "KG";
     const totalRecebido = (ri.recebimentos || []).reduce((s, r) => s + (r.qtdRecebida || 0), 0);
     const qtdPendente = Math.max(0, qtdOriginal - totalRecebido);
     return {

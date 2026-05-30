@@ -110,7 +110,7 @@ export async function GET(req) {
         grupos.set(key, {
           descricao: item.descricao.trim(),
           material: item.material || null,
-          unidade: item.peso > 0 ? "KG" : item.unidade,
+          unidade: "KG",
           ehMaterial: item.peso > 0, // true = materia prima (tem peso), false = parafuso/tinta/acessorio
           itens: [],
           ops: new Map(),
