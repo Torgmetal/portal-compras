@@ -670,7 +670,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             <div className="px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-torg-dark">Itens solicitados</h2>
               <p className="text-xs text-torg-gray mt-1">
-                Preencha o preço unitário e ajuste a quantidade se necessário. Itens sem preço serão ignorados. Se não tiver algum item, marque <strong>&quot;Não tenho&quot;</strong>.
+                Preencha o preço unitário e ajuste a quantidade se necessário. Itens sem preço serão ignorados. Se não tiver algum item, marque <strong>&quot;Sem estoque&quot;</strong>.
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -679,7 +679,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                   <tr>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[70px]">Não tenho</th>
+                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[80px]">Sem estoque</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd RM</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd cotada *</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. *</th>
@@ -746,7 +746,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                             <p className="mt-1 text-[10px] text-torg-blue font-medium">✓ conferido</p>
                           )}
                         </td>
-                        {/* Toggle "Não tenho" */}
+                        {/* Toggle "Sem estoque" */}
                         <td className="px-2 py-2 text-center align-top pt-2.5">
                           <button
                             type="button"
@@ -756,7 +756,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                                 ? "bg-red-100 text-red-700 border border-red-200 hover:bg-red-50"
                                 : "bg-gray-100 text-gray-400 border border-gray-200 hover:bg-gray-200 hover:text-gray-600"
                             }`}
-                            title={l.semEstoque ? "Clique pra desmarcar" : "Marcar que não tem este item"}
+                            title={l.semEstoque ? "Clique pra desmarcar" : "Marcar como sem estoque"}
                           >
                             <PackageX size={11} />
                             {l.semEstoque ? "Sem" : "—"}
