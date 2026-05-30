@@ -769,11 +769,11 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
                         <td className="py-2 px-2 text-center">{item.demaos || 1}x</td>
                         <td className="py-2 px-2 text-center text-xs">{METODOS_APLICACAO[item.metodoAplicacao]?.label || "—"}</td>
                         <td className="py-2 px-2 text-center text-xs">{item.percPerdas != null ? `${item.percPerdas}%` : "—"}</td>
-                        <td className="py-2 px-2 text-right text-xs text-torg-gray">{calc ? fmtNum(calc.rendimentoTeorico, 2) : "—"}</td>
-                        <td className="py-2 px-2 text-right text-xs text-torg-gray">{calc ? fmtNum(calc.rendimentoPratico, 2) : "—"}</td>
-                        <td className="py-2 px-2 text-right font-semibold text-torg-blue">{calc ? fmtNum(calc.litros, 1) : "—"}</td>
-                        <td className="py-2 px-2 text-right font-bold text-emerald-600">{calc ? calc.galoes : "—"}</td>
-                        <td className="py-2 px-2 text-right text-xs text-amber-600">{calc ? fmtNum(calc.diluente, 1) : "—"}</td>
+                        <td className="py-2 px-2 text-right text-xs text-torg-gray whitespace-nowrap">{calc ? fmtNum(calc.rendimentoTeorico, 2) : "—"}</td>
+                        <td className="py-2 px-2 text-right text-xs text-torg-gray whitespace-nowrap">{calc ? fmtNum(calc.rendimentoPratico, 2) : "—"}</td>
+                        <td className="py-2 px-2 text-right font-semibold text-torg-blue whitespace-nowrap">{calc ? fmtNum(calc.litros, 1) : "—"}</td>
+                        <td className="py-2 px-2 text-right font-bold text-emerald-600 whitespace-nowrap">{calc ? calc.galoes : "—"}</td>
+                        <td className="py-2 px-2 text-right text-xs text-amber-600 whitespace-nowrap">{calc ? fmtNum(calc.diluente, 1) : "—"}</td>
                         <td className="py-2 px-2">
                           <div className="flex items-center gap-1">
                             <button onClick={() => { setEditando(item); setShowModal(true); }} className="p-1 text-gray-400 hover:text-torg-blue hover:bg-torg-blue/5 rounded transition-colors"><Edit3 size={13} /></button>
@@ -788,11 +788,11 @@ export default function AbaPintura({ estudo, estudoId, onEstudoUpdate }) {
                 </tbody>
                 {resumoCamadas.length > 0 && (
                   <tfoot>
-                    <tr className="bg-gray-50/80 border-t border-gray-200">
+                    <tr className="bg-gray-50/80 border-t border-gray-200 whitespace-nowrap">
                       <td colSpan={9} className="py-2.5 px-3 text-xs font-semibold text-torg-dark text-right">Total</td>
-                      <td className="py-2.5 px-2 text-right text-sm font-bold text-torg-blue">{fmtNum(totalLitros, 1)} L</td>
-                      <td className="py-2.5 px-2 text-right text-sm font-bold text-emerald-600">{totalGaloes} gl</td>
-                      <td className="py-2.5 px-2 text-right text-xs font-semibold text-amber-600">{fmtNum(totalDiluente, 1)} L</td>
+                      <td className="py-2.5 px-2 text-right text-sm font-bold text-torg-blue whitespace-nowrap">{fmtNum(totalLitros, 1)} L</td>
+                      <td className="py-2.5 px-2 text-right text-sm font-bold text-emerald-600 whitespace-nowrap">{totalGaloes} gl</td>
+                      <td className="py-2.5 px-2 text-right text-xs font-semibold text-amber-600 whitespace-nowrap">{fmtNum(totalDiluente, 1)} L</td>
                       <td></td>
                     </tr>
                   </tfoot>
