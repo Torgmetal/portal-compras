@@ -583,6 +583,27 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
         </div>
       )}
 
+      {/* NF de entrada — aparece direto no card quando tem recebimento */}
+      {p.temRecebimento && (() => {
+        const nfs = [...new Set(p.recebimentos.filter(r => r.nfNumero).map(r => r.nfNumero))];
+        return nfs.length > 0 ? (
+          <div className="flex items-center gap-1.5 mt-2 text-[11px]">
+            <FileText size={11} className="text-emerald-600" />
+            <span className="text-emerald-700 font-medium">
+              NF {nfs.join(", ")}
+            </span>
+          </div>
+        ) : null;
+      })()}
+
+      {/* Data de entrega — quando já entregue */}
+      {p.dataEntregaReal && (
+        <div className="flex items-center gap-1.5 mt-1 text-[11px]">
+          <CheckCircle2 size={11} className="text-emerald-500" />
+          <span className="text-emerald-700 font-medium">Entregue {fmtDataCurta(p.dataEntregaReal)}</span>
+        </div>
+      )}
+
       {/* Badges */}
       <div className="flex gap-1 mt-1.5 flex-wrap">
         {p.faturamentoDireto && (
