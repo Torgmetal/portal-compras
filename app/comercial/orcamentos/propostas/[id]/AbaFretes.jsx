@@ -188,7 +188,7 @@ function SolicitarCotacaoModal({ onClose, onEnviar, estudoId }) {
       const params = new URLSearchParams({ busca: termo });
       const res = await fetch(`/api/fornecedores?${params}`);
       const json = await res.json();
-      if (json.success) setFornecedores(json.data || []);
+      setFornecedores(json.fornecedores || []);
     } catch {} finally {
       setCarregando(false);
     }
