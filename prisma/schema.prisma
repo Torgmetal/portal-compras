@@ -1802,7 +1802,8 @@ model FreteItem {
   origem          String?         // Cidade/UF de origem (ex: "Contagem/MG")
   destino         String?         // Cidade/UF da obra (ex: "Macae/RJ")
   distanciaKm     Float           @default(0)   // km entre origem e destino
-  pesoTon         Float           @default(0)   // peso em toneladas a transportar
+  pesoTon         Float           @default(0)   // peso total em toneladas a transportar
+  pesoPorCarga    Float?                        // peso medio por carga/viagem em toneladas
   tipoVeiculo     String?         // TRUCK, CARRETA, BITREM, RODOTREM, etc.
   quantidadeViagens Int           @default(1)   // numero de viagens necessarias
   custoPorViagem  Float           @default(0)   // R$ custo por viagem

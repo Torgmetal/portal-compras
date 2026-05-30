@@ -33,6 +33,7 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
   const [destino, setDestino] = useState(obraDefault || "");
   const [distanciaKm, setDistanciaKm] = useState("");
   const [pesoTon, setPesoTon] = useState("");
+  const [pesoPorCarga, setPesoPorCarga] = useState("");
   const [tipoVeiculo, setTipoVeiculo] = useState("CARRETA");
   const [quantidadeViagens, setQuantidadeViagens] = useState("1");
   const [custoPorViagem, setCustoPorViagem] = useState("");
@@ -40,7 +41,15 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
-  const custoTotal = (parseFloat(quantidadeViagens) || 0) * (parseFloat(custoPorViagem) || 0);
+  // Auto-calcular viagens quando peso total e peso por carga mudam
+  const pesoTotalNum = parseFloat(pesoTon) || 0;
+  const pesoCargaNum = parseFloat(pesoPorCarga) || 0;
+  const viagensAuto = pesoCargaNum > 0 && pesoTotalNum > 0
+    ? Math.ceil(pesoTotalNum / pesoCargaNum)
+    : null;
+
+  const viagensEfetivas = viagensAuto ?? (parseInt(quantidadeViagens) || 1);
+  const custoTotal = viagensEfetivas * (parseFloat(custoPorViagem) || 0);
 
   const handleSalvar = async () => {
     if (!descricao.trim()) return setErro("Descricao e obrigatoria");
@@ -52,9 +61,10 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
         origem: origem.trim() || undefined,
         destino: destino.trim() || undefined,
         distanciaKm: distanciaKm ? parseFloat(distanciaKm) : 0,
-        pesoTon: pesoTon ? parseFloat(pesoTon) : 0,
+        pesoTon: pesoTotalNum,
+        pesoPorCarga: pesoCargaNum || undefined,
         tipoVeiculo: tipoVeiculo || undefined,
-        quantidadeViagens: quantidadeViagens ? parseInt(quantidadeViagens) : 1,
+        quantidadeViagens: viagensEfetivas,
         custoPorViagem: custoPorViagem ? parseFloat(custoPorViagem) : 0,
         custoTotal,
         observacao: observacao.trim() || undefined,
@@ -122,31 +132,7 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-torg-dark mb-1">Distancia (km)</label>
-              <input
-                type="number"
-                value={distanciaKm}
-                onChange={(e) => setDistanciaKm(e.target.value)}
-                placeholder="0"
-                min="0"
-                step="1"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-torg-dark mb-1">Peso (ton)</label>
-              <input
-                type="number"
-                value={pesoTon}
-                onChange={(e) => setPesoTon(e.target.value)}
-                placeholder="0"
-                min="0"
-                step="0.01"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Tipo Veiculo</label>
               <select
@@ -159,21 +145,66 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-torg-dark mb-1">Qtd Viagens</label>
+              <label className="block text-sm font-semibold text-torg-dark mb-1">Distancia (km)</label>
               <input
                 type="number"
-                value={quantidadeViagens}
-                onChange={(e) => setQuantidadeViagens(e.target.value)}
-                placeholder="1"
-                min="1"
+                value={distanciaKm}
+                onChange={(e) => setDistanciaKm(e.target.value)}
+                placeholder="0"
+                min="0"
                 step="1"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-torg-dark mb-1">Peso Total (ton)</label>
+              <input
+                type="number"
+                value={pesoTon}
+                onChange={(e) => setPesoTon(e.target.value)}
+                placeholder="0"
+                min="0"
+                step="0.01"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-torg-dark mb-1">Peso/Carga (ton)</label>
+              <input
+                type="number"
+                value={pesoPorCarga}
+                onChange={(e) => setPesoPorCarga(e.target.value)}
+                placeholder="Ex: 25"
+                min="0"
+                step="0.01"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-torg-dark mb-1">Qtd Viagens</label>
+              {viagensAuto !== null ? (
+                <div className="px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm font-semibold text-torg-blue">
+                  {viagensAuto} <span className="text-xs font-normal text-blue-400">(auto)</span>
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  value={quantidadeViagens}
+                  onChange={(e) => setQuantidadeViagens(e.target.value)}
+                  placeholder="1"
+                  min="1"
+                  step="1"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Custo/Viagem (R$)</label>
               <input
@@ -284,6 +315,7 @@ export default function AbaFretes({ estudo, estudoId }) {
       destino: item.destino || "",
       distanciaKm: item.distanciaKm || 0,
       pesoTon: item.pesoTon || 0,
+      pesoPorCarga: item.pesoPorCarga || "",
       tipoVeiculo: item.tipoVeiculo || "CARRETA",
       quantidadeViagens: item.quantidadeViagens || 1,
       custoPorViagem: item.custoPorViagem || 0,
@@ -297,12 +329,23 @@ export default function AbaFretes({ estudo, estudoId }) {
   };
 
   const saveEdit = async () => {
-    const custoTotal = (editValores.quantidadeViagens || 0) * (editValores.custoPorViagem || 0);
+    const pesoT = editValores.pesoTon || 0;
+    const pesoC = parseFloat(editValores.pesoPorCarga) || 0;
+    const viagensCalc = pesoC > 0 && pesoT > 0
+      ? Math.ceil(pesoT / pesoC)
+      : (editValores.quantidadeViagens || 1);
+    const custoTotal = viagensCalc * (editValores.custoPorViagem || 0);
     try {
       const res = await fetch(`/api/comercial/estudo/${estudoId}/fretes`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: editandoId, ...editValores, custoTotal }),
+        body: JSON.stringify({
+          itemId: editandoId,
+          ...editValores,
+          pesoPorCarga: pesoC || undefined,
+          quantidadeViagens: viagensCalc,
+          custoTotal,
+        }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
@@ -385,6 +428,7 @@ export default function AbaFretes({ estudo, estudoId }) {
                 <th className="py-2.5 px-2">Origem → Destino</th>
                 <th className="py-2.5 px-2 text-right">Dist. (km)</th>
                 <th className="py-2.5 px-2 text-right">Peso (ton)</th>
+                <th className="py-2.5 px-2 text-right">Peso/Carga</th>
                 <th className="py-2.5 px-2">Veiculo</th>
                 <th className="py-2.5 px-2 text-right">Viagens</th>
                 <th className="py-2.5 px-2 text-right">R$/Viagem</th>
@@ -442,6 +486,17 @@ export default function AbaFretes({ estudo, estudoId }) {
                         />
                       </td>
                       <td className="py-1.5 px-2">
+                        <input
+                          type="number"
+                          value={editValores.pesoPorCarga}
+                          onChange={(e) => setEditValores((v) => ({ ...v, pesoPorCarga: e.target.value }))}
+                          placeholder="—"
+                          min="0"
+                          step="0.01"
+                          className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none"
+                        />
+                      </td>
+                      <td className="py-1.5 px-2">
                         <select
                           value={editValores.tipoVeiculo}
                           onChange={(e) => setEditValores((v) => ({ ...v, tipoVeiculo: e.target.value }))}
@@ -472,7 +527,12 @@ export default function AbaFretes({ estudo, estudoId }) {
                         />
                       </td>
                       <td className="py-1.5 px-2 text-right text-xs font-medium tabular-nums text-torg-dark">
-                        {fmtMoeda((editValores.quantidadeViagens || 0) * (editValores.custoPorViagem || 0))}
+                        {(() => {
+                          const pc = parseFloat(editValores.pesoPorCarga) || 0;
+                          const pt = editValores.pesoTon || 0;
+                          const v = pc > 0 && pt > 0 ? Math.ceil(pt / pc) : (editValores.quantidadeViagens || 1);
+                          return fmtMoeda(v * (editValores.custoPorViagem || 0));
+                        })()}
                       </td>
                       <td className="py-1.5 px-2">
                         <div className="flex items-center gap-1">
@@ -500,6 +560,9 @@ export default function AbaFretes({ estudo, estudoId }) {
                       </td>
                       <td className="py-2 px-2 text-right tabular-nums">{fmtNum(item.distanciaKm)}</td>
                       <td className="py-2 px-2 text-right tabular-nums">{fmtNum(item.pesoTon, 2)}</td>
+                      <td className="py-2 px-2 text-right tabular-nums text-torg-gray">
+                        {item.pesoPorCarga ? fmtNum(item.pesoPorCarga, 2) : "—"}
+                      </td>
                       <td className="py-2 px-2">
                         <span className="text-xs px-1.5 py-0.5 bg-gray-100 rounded text-torg-dark">
                           {VEICULO_LABEL[item.tipoVeiculo] || item.tipoVeiculo || "—"}
@@ -542,7 +605,7 @@ export default function AbaFretes({ estudo, estudoId }) {
                   <td className="py-2.5 px-2 text-right text-xs font-bold text-torg-dark tabular-nums">
                     {fmtNum(totalPeso, 2)} ton
                   </td>
-                  <td className="py-2.5 px-2"></td>
+                  <td className="py-2.5 px-2" colSpan={2}></td>
                   <td className="py-2.5 px-2 text-right text-xs font-bold text-torg-dark tabular-nums">
                     {totalViagens}
                   </td>
