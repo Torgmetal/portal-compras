@@ -86,6 +86,23 @@ export async function GET(req) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 
+  // Detalhamento das propostas (ganhas e perdidas)
+  const mapProposta = (o) => ({
+    id: o.id,
+    numero: o.numero,
+    cliente: o.cliente,
+    obra: o.obra || null,
+    valor: o.valor || 0,
+    vendedor: o.vendedor || null,
+    tipoVenda: o.tipoVenda || null,
+    porte: o.porte || null,
+    dataSolicitada: o.dataSolicitada,
+    dataFechamento: o.dataFechamento,
+    opId: o.opId || null,
+    opNumero: o.op?.numero || null,
+    motivoPerda: o.motivoPerda || null,
+  });
+
   const winRate = {
     totalComDesfecho: comDesfecho.length,
     ganhas: ganhas.length,
@@ -104,6 +121,8 @@ export async function GET(req) {
       taxa: d.total > 0 ? Math.round((d.ganhas / d.total) * 1000) / 10 : 0,
     })),
     motivosPerda: motivosRank,
+    propostasGanhas: ganhas.map(mapProposta),
+    propostasPerdidas: perdidas.map(mapProposta),
   };
 
   // ─── 2. MARGEM BRUTA POR CONTRATO ──────────────────────────

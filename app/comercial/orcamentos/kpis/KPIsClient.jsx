@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   Loader2, AlertCircle, BarChart3, DollarSign, TrendingUp,
-  FileCheck2, XCircle, ChevronDown, Calendar, Clock, Target,
+  FileCheck2, XCircle, ChevronDown, ChevronUp, Calendar, Clock, Target,
   Percent, PieChart, Activity, Users, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Timer, Zap,
+  ArrowUpRight, ArrowDownRight, Timer, Zap, ExternalLink,
 } from "lucide-react";
 
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -110,80 +111,7 @@ export default function KPIsClient() {
       </div>
 
       {/* ════════ 1. WIN RATE ════════ */}
-      <Section icon={Target} title="Win Rate" subtitle="Taxa de conversao de propostas">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Numero grande */}
-          <div className="flex flex-col items-center justify-center bg-gray-50/50 rounded-xl p-6">
-            <p className="text-5xl font-black text-torg-dark tabular-nums">{winRate.taxa}%</p>
-            <p className="text-sm text-torg-gray mt-2">
-              {winRate.ganhas} ganhas de {winRate.totalComDesfecho} com desfecho
-            </p>
-            <div className="flex items-center gap-4 mt-3 text-xs">
-              <span className="flex items-center gap-1 text-green-600">
-                <FileCheck2 size={12} /> {winRate.ganhas} ganhas ({fmtMoedaCurto(winRate.valorGanho)})
-              </span>
-              <span className="flex items-center gap-1 text-red-500">
-                <XCircle size={12} /> {winRate.perdidas} perdidas ({fmtMoedaCurto(winRate.valorPerdido)})
-              </span>
-            </div>
-          </div>
-
-          {/* Por tipo de venda */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Por Tipo de Venda</p>
-            <div className="space-y-2.5">
-              {winRate.porTipo.map((t) => (
-                <div key={t.tipo}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-torg-dark">{TIPO_LABELS[t.tipo] || t.tipo}</span>
-                    <span className="text-xs font-bold text-torg-dark tabular-nums">{t.taxa}%</span>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${Math.max(t.taxa, 2)}%` }} />
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{t.ganhas}/{t.total} propostas</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Por porte */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Por Porte</p>
-            <div className="space-y-2.5">
-              {winRate.porPorte.map((p) => (
-                <div key={p.porte}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-torg-dark">{PORTE_LABELS[p.porte] || p.porte}</span>
-                    <span className="text-xs font-bold text-torg-dark tabular-nums">{p.taxa}%</span>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${Math.max(p.taxa, 2)}%` }} />
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{p.ganhas}/{p.total} propostas</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Motivos de perda */}
-        {winRate.motivosPerda.length > 0 && (
-          <div className="mt-6 pt-5 border-t border-gray-100">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-              <XCircle size={12} className="text-red-400" /> Principais Motivos de Perda
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {winRate.motivosPerda.map((m) => (
-                <div key={m.motivo} className="bg-red-50/50 border border-red-100 rounded-lg p-3">
-                  <p className="text-2xl font-extrabold text-red-600 tabular-nums">{m.count}</p>
-                  <p className="text-xs text-red-700/70 mt-0.5 line-clamp-2">{m.motivo}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </Section>
+      <WinRateSection winRate={winRate} />
 
       {/* ════════ 2. MARGEM BRUTA ════════ */}
       <Section icon={DollarSign} title="Margem Bruta por Contrato" subtitle="Qualidade da venda — receita vs. custo direto">
@@ -496,6 +424,200 @@ export default function KPIsClient() {
         })()}
       </Section>
     </div>
+  );
+}
+
+// ─── WIN RATE (com paineis clicaveis) ──────────────────────────
+
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "--");
+
+function WinRateSection({ winRate }) {
+  const [abaAberta, setAbaAberta] = useState(null); // "ganhas" | "perdidas" | null
+
+  const toggleAba = (aba) => setAbaAberta((prev) => (prev === aba ? null : aba));
+
+  return (
+    <Section icon={Target} title="Win Rate" subtitle="Taxa de conversao de propostas">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Numero grande */}
+        <div className="flex flex-col items-center justify-center bg-gray-50/50 rounded-xl p-6">
+          <p className="text-5xl font-black text-torg-dark tabular-nums">{winRate.taxa}%</p>
+          <p className="text-sm text-torg-gray mt-2">
+            {winRate.ganhas} ganhas de {winRate.totalComDesfecho} com desfecho
+          </p>
+          {/* Botoes clicaveis */}
+          <div className="flex items-center gap-3 mt-4">
+            <button
+              onClick={() => toggleAba("ganhas")}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                abaAberta === "ganhas"
+                  ? "bg-green-600 text-white"
+                  : "bg-green-50 text-green-700 hover:bg-green-100"
+              }`}
+            >
+              <FileCheck2 size={12} />
+              {winRate.ganhas} ganhas ({fmtMoedaCurto(winRate.valorGanho)})
+              {abaAberta === "ganhas" ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            <button
+              onClick={() => toggleAba("perdidas")}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                abaAberta === "perdidas"
+                  ? "bg-red-500 text-white"
+                  : "bg-red-50 text-red-600 hover:bg-red-100"
+              }`}
+            >
+              <XCircle size={12} />
+              {winRate.perdidas} perdidas
+              {abaAberta === "perdidas" ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Por tipo de venda */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Por Tipo de Venda</p>
+          <div className="space-y-2.5">
+            {winRate.porTipo.map((t) => (
+              <div key={t.tipo}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-torg-dark">{TIPO_LABELS[t.tipo] || t.tipo}</span>
+                  <span className="text-xs font-bold text-torg-dark tabular-nums">{t.taxa}%</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${Math.max(t.taxa, 2)}%` }} />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">{t.ganhas}/{t.total} propostas</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Por porte */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Por Porte</p>
+          <div className="space-y-2.5">
+            {winRate.porPorte.map((p) => (
+              <div key={p.porte}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-torg-dark">{PORTE_LABELS[p.porte] || p.porte}</span>
+                  <span className="text-xs font-bold text-torg-dark tabular-nums">{p.taxa}%</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${Math.max(p.taxa, 2)}%` }} />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">{p.ganhas}/{p.total} propostas</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Tabela de propostas ganhas ── */}
+      {abaAberta === "ganhas" && winRate.propostasGanhas?.length > 0 && (
+        <div className="mt-6 pt-5 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <FileCheck2 size={12} className="text-green-600" />
+            Propostas Ganhas — viraram obra
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-green-50/60">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Proposta</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Obra</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Vendedor</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Fechamento</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">OP Gerada</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {winRate.propostasGanhas.map((p) => (
+                  <tr key={p.id} className="hover:bg-green-50/30">
+                    <td className="px-4 py-2.5 font-mono font-semibold text-torg-blue text-xs">{p.numero}</td>
+                    <td className="px-4 py-2.5 text-torg-dark max-w-[180px] truncate">{p.cliente}</td>
+                    <td className="px-4 py-2.5 text-torg-gray text-xs max-w-[150px] truncate">{p.obra || "--"}</td>
+                    <td className="px-4 py-2.5 text-torg-gray text-xs">{p.vendedor || "--"}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-xs font-medium text-torg-dark">{fmtMoeda(p.valor)}</td>
+                    <td className="px-4 py-2.5 text-torg-gray text-xs">{fmtData(p.dataFechamento)}</td>
+                    <td className="px-4 py-2.5">
+                      {p.opNumero ? (
+                        <Link
+                          href={`/comercial/${p.opId}`}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-torg-blue bg-torg-blue-50 hover:bg-torg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
+                        >
+                          {p.opNumero}
+                          <ExternalLink size={11} />
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-amber-600 flex items-center gap-1">
+                          <AlertTriangle size={11} /> Sem OP
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tabela de propostas perdidas ── */}
+      {abaAberta === "perdidas" && winRate.propostasPerdidas?.length > 0 && (
+        <div className="mt-6 pt-5 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <XCircle size={12} className="text-red-400" />
+            Propostas Perdidas
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-red-50/60">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Proposta</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Obra</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Vendedor</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Motivo da Perda</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {winRate.propostasPerdidas.map((p) => (
+                  <tr key={p.id} className="hover:bg-red-50/30">
+                    <td className="px-4 py-2.5 font-mono font-semibold text-torg-blue text-xs">{p.numero}</td>
+                    <td className="px-4 py-2.5 text-torg-dark max-w-[180px] truncate">{p.cliente}</td>
+                    <td className="px-4 py-2.5 text-torg-gray text-xs max-w-[150px] truncate">{p.obra || "--"}</td>
+                    <td className="px-4 py-2.5 text-torg-gray text-xs">{p.vendedor || "--"}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-xs font-medium text-torg-dark">{fmtMoeda(p.valor)}</td>
+                    <td className="px-4 py-2.5 text-xs text-red-600 max-w-[200px] truncate">{p.motivoPerda || "Nao informado"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Motivos de perda (resumo) */}
+      {winRate.motivosPerda.length > 0 && abaAberta !== "perdidas" && (
+        <div className="mt-6 pt-5 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <XCircle size={12} className="text-red-400" /> Principais Motivos de Perda
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {winRate.motivosPerda.map((m) => (
+              <div key={m.motivo} className="bg-red-50/50 border border-red-100 rounded-lg p-3">
+                <p className="text-2xl font-extrabold text-red-600 tabular-nums">{m.count}</p>
+                <p className="text-xs text-red-700/70 mt-0.5 line-clamp-2">{m.motivo}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 
