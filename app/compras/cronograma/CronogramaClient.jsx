@@ -569,7 +569,7 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
 
   return (
     <div
-      className={`border rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm ${
+      className={`border rounded-lg p-3 cursor-pointer transition-all hover:shadow-sm overflow-hidden ${
         isExpanded ? "ring-1 ring-torg-blue/30 border-torg-blue-200 bg-sky-50/30" : "border-gray-200 bg-white"
       }`}
       onClick={onToggle}
@@ -659,18 +659,16 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
           {p.itens.length > 0 && (
             <div className="bg-gray-50 rounded-md px-2.5 py-2">
               <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1.5 font-semibold">Itens</p>
-              <table className="w-full text-xs">
-                <tbody>
-                  {p.itens.slice(0, 5).map((it, i) => (
-                    <tr key={i}>
-                      <td className="py-0.5 text-torg-dark truncate max-w-[140px]" title={it.descricao}>{it.descricao}</td>
-                      <td className="py-0.5 text-right text-torg-gray tabular-nums whitespace-nowrap pl-2">
-                        {it.qtd != null ? `${Number(it.qtd).toFixed(it.unidade === "KG" ? 1 : 0)} ${it.unidade || ""}` : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-0.5">
+                {p.itens.slice(0, 5).map((it, i) => (
+                  <div key={i} className="flex items-baseline gap-1 text-xs min-w-0">
+                    <span className="truncate text-torg-dark flex-1 min-w-0" title={it.descricao}>{it.descricao}</span>
+                    <span className="text-torg-gray tabular-nums whitespace-nowrap shrink-0">
+                      {it.qtd != null ? `${Number(it.qtd).toFixed(it.unidade === "KG" ? 1 : 0)} ${it.unidade || ""}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
               {p.itens.length > 5 && (
                 <p className="text-[10px] text-gray-400 mt-1">+ {p.itens.length - 5} itens</p>
               )}
@@ -681,23 +679,17 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
           {p.temRecebimento && (
             <div className="bg-emerald-50 rounded-md px-2.5 py-2">
               <p className="text-[10px] text-emerald-700 uppercase tracking-wide mb-1.5 font-semibold">Recebimentos</p>
-              <table className="w-full text-xs">
-                <tbody>
-                  {p.recebimentos.slice(0, 5).map((r) => (
-                    <tr key={r.id}>
-                      <td className="py-0.5 text-torg-dark whitespace-nowrap">{fmtData(r.dataRecebimento)}</td>
-                      <td className="py-0.5 text-right text-torg-gray tabular-nums whitespace-nowrap pl-2">{r.qtdRecebida}</td>
-                      <td className="py-0.5 text-right whitespace-nowrap pl-2">
-                        {r.nfNumero ? (
-                          <span className="text-emerald-700 font-mono text-[10px] font-medium">NF {r.nfNumero}</span>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="space-y-0.5">
+                {p.recebimentos.slice(0, 5).map((r) => (
+                  <div key={r.id} className="flex items-center gap-2 text-xs min-w-0">
+                    <span className="text-torg-dark whitespace-nowrap">{fmtDataCurta(r.dataRecebimento)}</span>
+                    <span className="text-torg-gray tabular-nums whitespace-nowrap">{r.qtdRecebida}</span>
+                    {r.nfNumero && (
+                      <span className="text-emerald-700 font-mono text-[10px] font-medium whitespace-nowrap">NF {r.nfNumero}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
