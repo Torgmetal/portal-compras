@@ -1,13 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ListTodo, CalendarRange } from "lucide-react";
+import { LayoutDashboard, ListTodo, CalendarRange, GanttChart } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/planejamento", label: "Painel Geral", icon: LayoutDashboard, exact: true },
   { href: "/planejamento/programacao", label: "Programação Semanal", icon: CalendarRange },
+  { href: "/planejamento/cronogramas", label: "Cronogramas", icon: GanttChart },
   { href: "/planejamento/tarefas", label: "Tarefas", icon: ListTodo },
 ];
 

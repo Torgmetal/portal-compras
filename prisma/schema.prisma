@@ -59,6 +59,7 @@ model User {
   producaoDiarias         ProducaoDiaria[]     @relation("ProducaoDiariaCreatedBy")
   tarefasPlanejamento     TarefaPlanejamento[] @relation("TarefaPlanejamentoCreatedBy")
   necessidadesSemanais    NecessidadeSemanal[] @relation("NecessidadeSemanalCreatedBy")
+  cronogramaRegistros     CronogramaRegistro[] @relation("CronogramaRegistroCreatedBy")
   passwordResetTokens     PasswordResetToken[]
   orcamentosCriados       Orcamento[]          @relation("OrcamentoCriadoPor")
   estudosCriados          PropostaEstudo[]     @relation("EstudoCriadoPor")
@@ -188,6 +189,7 @@ model OP {
   mesApontamentos MesApontamento[] @relation("MesApontamentosOP")
   tarefasPlanejamento TarefaPlanejamento[]
   necessidadesSemanais NecessidadeSemanal[]
+  cronogramas          Cronograma[]
 
   @@index([numero])
   @@index([status])
@@ -2412,6 +2414,81 @@ model Recebimento {
 enum RecebimentoOrigem {
   MANUAL    // usuario registrou manualmente
   OMIE_SYNC // detectado automaticamente pelo sync
+}
+
+// ─── CRONOGRAMAS (importados do MS Project via SharePoint) ──────────────
+// Cada Cronograma = 1 arquivo .mpp importado. Contém tarefas agrupadas por
+// departamento (Comercial, Engenharia, Suprimentos, Fabricação, Expedição, Montagem).
+
+enum DepartamentoCronograma {
+  COMERCIAL
+  ENGENHARIA
+  SUPRIMENTOS
+  FABRICACAO
+  EXPEDICAO
+  MONTAGEM
+}
+
+model Cronograma {
+  id              String   @id @default(cuid())
+  opNumero        String
+  opId            String?
+  op              OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
+  nomeArquivo     String
+  titulo          String
+  sharepointPath  String
+  dataInicio      DateTime?
+  dataFim         DateTime?
+  ultimoSync      DateTime @default(now())
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tarefas         CronogramaTarefa[]
+
+  @@unique([sharepointPath])
+  @@index([opNumero])
+  @@index([ativo])
+}
+
+model CronogramaTarefa {
+  id                  String   @id @default(cuid())
+  cronogramaId        String
+  cronograma          Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+  uidMpp              Int
+  nome                String
+  departamento        DepartamentoCronograma?
+  dataInicioPrevista  DateTime?
+  dataFimPrevista     DateTime?
+  percentualPrevisto  Float    @default(0)
+  percentualRealizado Float    @default(0)
+  qtdePlanejada       Float    @default(0)
+  qtdeRealizada       Float    @default(0)
+  isSummary           Boolean  @default(false)
+  outlineLevel        Int      @default(0)
+  parentUid           Int?
+  observacao          String?
+  dataRealizacao      DateTime?
+
+  registros           CronogramaRegistro[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([cronogramaId])
+  @@index([departamento])
+}
+
+model CronogramaRegistro {
+  id          String   @id @default(cuid())
+  tarefaId    String
+  tarefa      CronogramaTarefa @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  descricao   String
+  createdById String
+  createdBy   User     @relation("CronogramaRegistroCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([tarefaId])
 }
 
 // ─── PLANEJAMENTO (PCP) ──────────────────────────────────────
