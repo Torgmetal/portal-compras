@@ -76,8 +76,7 @@ export async function DELETE(req) {
     return NextResponse.json({ error: e.message }, { status });
   }
 
-  const url = new URL(req.url);
-  const opNumero = url.searchParams.get("op");
+  const opNumero = new URL(req.url, "http://n").searchParams.get("op");
   if (!opNumero) {
     return NextResponse.json({ error: "Parâmetro 'op' é obrigatório" }, { status: 400 });
   }
