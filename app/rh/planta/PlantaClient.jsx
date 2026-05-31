@@ -431,12 +431,12 @@ export default function PlantaClient() {
                       x={rect.x + rect.w / 2}
                       y={rect.y + rect.h - 10}
                       textAnchor="middle"
-                      fill="rgba(255,255,255,0.7)"
-                      fontSize={10}
+                      fill="rgba(255,255,255,0.75)"
+                      fontSize={12}
                       fontWeight="600"
                       className="pointer-events-none"
                     >
-                      {fmtMoedaCurto(custoPorArea[area.id])}/mês
+                      {fmtMoeda(custoPorArea[area.id])}/mês
                     </text>
                   )}
                   {/* Count badge */}
