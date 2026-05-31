@@ -2,12 +2,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { Loader2, AlertCircle, Users, MapPin } from "lucide-react";
 
+// ─── Setores excluídos do mapa (não ficam na fábrica) ──────────────────────────
+const EXCLUIDOS_MAPA = ["MOI", "VMI", "Montagem Externa"];
+
 // ─── Mapeamento setor → área física ─────────────────────────────────────────────
 const SETOR_MAP = {
   "Preparação": "preparacao",
   "Jato": "jato",
   "Montagem Interna": "montagem",
-  "Montagem Externa": "montagem",
   "Solda": "solda",
   "Pintura": "pintura",
   "Expedição": "expedicao",
@@ -164,6 +166,13 @@ export default function PlantaClient() {
 
     funcionarios
       .filter((f) => f.status !== "INATIVO")
+      .filter((f) => {
+        // Excluir setores que não ficam na fábrica (MOI, VMI, Montagem Externa)
+        const nome = f.setor?.nome || "";
+        return !EXCLUIDOS_MAPA.some(
+          (ex) => nome.toLowerCase() === ex.toLowerCase()
+        );
+      })
       .forEach((f) => {
         const nomeSetor = f.setor?.nome || "";
         const areaId = mapearSetor(nomeSetor);
