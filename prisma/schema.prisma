@@ -1098,6 +1098,7 @@ model Setor {
   gestorId      String?
   gestor        Funcionario? @relation("GestorSetor", fields: [gestorId], references: [id])
   funcionarios  Funcionario[] @relation("FuncionarioSetor")
+  vagas         Vaga[]
   ativo         Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -1112,6 +1113,7 @@ model Cargo {
   cbo           String?  // Classificação Brasileira de Ocupações
   funcionarios  Funcionario[]
   competencias  CargoCompetencia[]
+  vagas         Vaga[]
   ativo         Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -1147,6 +1149,10 @@ model Funcionario {
   ativo           Boolean   @default(true)
   foto            String?
   observacao      String?
+  // Desligamento
+  tipoDesligamento    String?   // VOLUNTARIO, INVOLUNTARIO, JUSTA_CAUSA, TERMINO_CONTRATO
+  motivoDesligamento  String?   // texto livre: motivo informado
+  categoriaDesligamento String? // OUTRO_EMPREGO, INSATISFACAO, CORTE, DESEMPENHO, DISCIPLINAR, ACORDO, OUTROS
 
   setoresGeridos  Setor[]   @relation("GestorSetor")
   pontos          Ponto[]
@@ -1155,6 +1161,8 @@ model Funcionario {
   competencias    FuncionarioCompetencia[]
   dependentes     Dependente[]
   documentos      Documento[]
+  afastamentos    Afastamento[]
+  treinamentos    TreinamentoParticipante[]
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -1163,6 +1171,7 @@ model Funcionario {
   @@index([cargoId])
   @@index([status])
   @@index([ativo])
+  @@index([dataDemissao])
 }
 
 model Dependente {
@@ -1302,6 +1311,152 @@ model Documento {
   @@index([categoria])
   @@index([dataValidade])
   @@index([tipo])
+}
+
+// ─── RH: VAGAS / RECRUTAMENTO ─────────────────────────────
+
+model Vaga {
+  id              String    @id @default(cuid())
+  titulo          String    // Ex: "Soldador MIG/MAG", "Engenheiro de Produção"
+  setorId         String
+  setor           Setor     @relation(fields: [setorId], references: [id])
+  cargoId         String?
+  cargo           Cargo?    @relation(fields: [cargoId], references: [id])
+  quantidade      Int       @default(1)
+  prioridade      String    @default("NORMAL") // URGENTE, ALTA, NORMAL, BAIXA
+  tipo            String    @default("CLT")    // CLT, PJ, ESTAGIO, TEMPORARIO
+  nivelCargo      String?   // OPERACIONAL, TECNICO, SUPERVISAO, GERENCIA
+  justificativa   String?   // por que precisa da vaga
+  requisitos      String?   // requisitos da vaga (texto)
+  salarioFaixa    String?   // faixa salarial prevista
+  // Solicitação
+  solicitanteId   String?   // quem solicitou (userId do sistema)
+  dataAbertura    DateTime  @default(now())
+  // Recrutamento
+  status          String    @default("SOLICITADA") // SOLICITADA, APROVADA, EM_RECRUTAMENTO, PREENCHIDA, CANCELADA
+  dataAprovacao   DateTime?
+  dataFechamento  DateTime? // quando preenchida
+  custoRecrutamento Float?  // total gasto (anúncios, agência, exames)
+  observacaoRH    String?
+  // Resultado
+  funcionarioContratadoNome String? // nome da pessoa contratada (referência)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([setorId])
+  @@index([status])
+  @@index([dataAbertura])
+}
+
+// ─── RH: AFASTAMENTOS ────────────────────────────────────────
+
+model Afastamento {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  dataInicio      DateTime
+  dataFim         DateTime?
+  diasAfastado    Int?      // calculado ou informado manualmente
+  // Natureza (LGPD: nunca expor CID individual)
+  natureza        String    // FISICO, MENTAL, ACIDENTE_TRABALHO, ACIDENTE_TRAJETO, MATERNIDADE, PATERNIDADE
+  categoriaCID    String?   // grupo CID (ex: "M" = musculoesquelético, "F" = transtorno mental) — NUNCA CID completo
+  // Status
+  status          String    @default("EM_ANDAMENTO") // EM_ANDAMENTO, ENCERRADO
+  inss            Boolean   @default(false) // se virou benefício INSS (> 15 dias)
+  observacao      String?   // notas internas RH (sem dados médicos identificáveis)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([funcionarioId])
+  @@index([natureza])
+  @@index([dataInicio])
+  @@index([status])
+}
+
+// ─── RH: ACIDENTES DE TRABALHO (SST) ─────────────────────────
+
+model AcidenteTrabalho {
+  id              String    @id @default(cuid())
+  data            DateTime
+  hora            String?   // HH:mm
+  setorId         String?
+  obra            String?   // nome da obra/local
+  // Classificação
+  tipo            String    // COM_AFASTAMENTO, SEM_AFASTAMENTO, TRAJETO, QUASE_ACIDENTE
+  gravidade       String    @default("LEVE") // LEVE, MODERADO, GRAVE, FATAL
+  diasPerdidos    Int       @default(0)
+  // Envolvido (sem expor dados médicos individuais no dashboard)
+  funcionarioNome String?   // pode ser anônimo no indicador
+  funcionarioId   String?   // referência opcional
+  // Detalhes
+  descricao       String    // o que aconteceu
+  causaRaiz       String?   // análise de causa
+  parteCorpo      String?   // MAOS, OLHOS, PES, COLUNA, CABECA, MEMBROS_SUPERIORES, MEMBROS_INFERIORES, OUTROS
+  agenteRisco     String?   // QUIMICO, FISICO, MECANICO, ERGONOMICO, BIOLOGICO
+  // CAT
+  catEmitida      Boolean   @default(false)
+  catNumero       String?
+  // Ações corretivas
+  acaoCorretiva   String?
+  responsavelAcao String?
+  prazoAcao       DateTime?
+  acaoConcluida   Boolean   @default(false)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([data])
+  @@index([tipo])
+  @@index([setorId])
+}
+
+// ─── RH: TREINAMENTOS / CAPACITAÇÃO ──────────────────────────
+
+model Treinamento {
+  id              String    @id @default(cuid())
+  titulo          String    // Ex: "NR-35 Trabalho em Altura", "Ponte Rolante"
+  tipo            String    // NR_OBRIGATORIO, TECNICO, COMPORTAMENTAL, INTEGRACAO, SST
+  nrRelacionada   String?   // NR-10, NR-12, NR-18, NR-33, NR-35 etc.
+  descricao       String?
+  instrutor       String?   // nome do instrutor/empresa
+  local           String?
+  // Datas
+  dataInicio      DateTime
+  dataFim         DateTime?
+  cargaHoraria    Float     // horas totais
+  // Validade (para NRs com reciclagem)
+  validadeMeses   Int?      // meses até vencer (ex: NR-35 = 24 meses)
+  // Custos
+  custo           Float?    // investimento total
+  certificadoUrl  String?   // URL do certificado geral
+
+  participantes   TreinamentoParticipante[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tipo])
+  @@index([dataInicio])
+}
+
+model TreinamentoParticipante {
+  id              String    @id @default(cuid())
+  treinamentoId   String
+  treinamento     Treinamento @relation(fields: [treinamentoId], references: [id], onDelete: Cascade)
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  presente        Boolean   @default(true)
+  nota            Float?    // nota de avaliação (0-10) se aplicável
+  certificadoUrl  String?   // certificado individual
+  dataVencimento  DateTime? // data em que este treinamento vence pra este funcionário
+
+  createdAt       DateTime  @default(now())
+
+  @@unique([treinamentoId, funcionarioId])
+  @@index([funcionarioId])
+  @@index([dataVencimento])
 }
 
 // ─── ESTOQUE TORG ──────────────────────────────────────────

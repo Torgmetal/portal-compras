@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Users, Search, PlusCircle, Loader2, AlertCircle, X,
   ChevronDown, Edit, UserX, UserCheck, Download, Upload,
-  FileSpreadsheet, CheckCircle2, XCircle,
+  FileSpreadsheet, CheckCircle2, XCircle, UserMinus, MoreVertical,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -43,6 +43,16 @@ export default function FuncionariosClient() {
   const [modalAberto, setModalAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState({});
+
+  // Desligamento
+  const [modalDesligamento, setModalDesligamento] = useState(null); // funcionario selecionado
+  const [desligando, setDesligando] = useState(false);
+  const [formDeslig, setFormDeslig] = useState({
+    dataDemissao: new Date().toISOString().split("T")[0],
+    tipoDesligamento: "VOLUNTARIO",
+    categoriaDesligamento: "",
+    motivoDesligamento: "",
+  });
 
   // Import Excel
   const fileRef = useRef(null);
@@ -180,6 +190,44 @@ export default function FuncionariosClient() {
     }
   };
 
+  // Desligar funcionário
+  const handleDesligar = async () => {
+    setDesligando(true);
+    setErro("");
+    try {
+      const res = await fetch(`/api/rh/funcionarios/${modalDesligamento.id}/desligar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formDeslig),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao desligar funcionário");
+      // Atualizar lista local
+      setFuncionarios((prev) =>
+        prev.map((f) =>
+          f.id === modalDesligamento.id
+            ? { ...f, status: "DEMITIDO", ativo: false, dataDemissao: formDeslig.dataDemissao }
+            : f
+        )
+      );
+      setModalDesligamento(null);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setDesligando(false);
+    }
+  };
+
+  const abrirDesligamento = (func) => {
+    setFormDeslig({
+      dataDemissao: new Date().toISOString().split("T")[0],
+      tipoDesligamento: "VOLUNTARIO",
+      categoriaDesligamento: "",
+      motivoDesligamento: "",
+    });
+    setModalDesligamento(func);
+  };
+
   if (carregando) {
     return (
       <div className="flex items-center justify-center py-20 text-torg-gray">
@@ -293,6 +341,7 @@ export default function FuncionariosClient() {
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Admissão</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Salário</th>
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase w-16">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -321,6 +370,17 @@ export default function FuncionariosClient() {
                       </td>
                       <td className="px-4 py-3 text-right text-xs text-torg-gray tabular-nums">{fmtData(f.dataAdmissao)}</td>
                       <td className="px-4 py-3 text-right font-medium text-torg-dark tabular-nums">{fmtMoeda(f.salario)}</td>
+                      <td className="px-3 py-3 text-center">
+                        {f.status !== "DEMITIDO" && (
+                          <button
+                            onClick={() => abrirDesligamento(f)}
+                            title="Desligar funcionário"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <UserMinus size={14} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -390,6 +450,77 @@ export default function FuncionariosClient() {
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
                 {salvando ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
                 {salvando ? "Salvando…" : "Cadastrar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Desligamento */}
+      {modalDesligamento && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !desligando && setModalDesligamento(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <UserMinus size={20} className="text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-torg-dark">Desligar Funcionário</h3>
+                  <p className="text-sm text-torg-gray">{modalDesligamento.nome}</p>
+                </div>
+              </div>
+              <button onClick={() => setModalDesligamento(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Campo label="Data de desligamento *" type="date" value={formDeslig.dataDemissao}
+                  onChange={(v) => setFormDeslig({ ...formDeslig, dataDemissao: v })} />
+                <Select label="Tipo *" value={formDeslig.tipoDesligamento}
+                  onChange={(v) => setFormDeslig({ ...formDeslig, tipoDesligamento: v })}
+                  options={[
+                    { value: "VOLUNTARIO", label: "Voluntário (pediu demissão)" },
+                    { value: "INVOLUNTARIO", label: "Involuntário (demitido s/ justa causa)" },
+                    { value: "JUSTA_CAUSA", label: "Justa Causa" },
+                    { value: "TERMINO_CONTRATO", label: "Término de Contrato" },
+                  ]} />
+              </div>
+              <Select label="Categoria/Motivo principal" value={formDeslig.categoriaDesligamento}
+                onChange={(v) => setFormDeslig({ ...formDeslig, categoriaDesligamento: v })}
+                options={[
+                  { value: "", label: "— Selecione (opcional) —" },
+                  { value: "OUTRO_EMPREGO", label: "Outro emprego / proposta melhor" },
+                  { value: "INSATISFACAO", label: "Insatisfação / clima" },
+                  { value: "CORTE", label: "Corte / reestruturação" },
+                  { value: "DESEMPENHO", label: "Desempenho insuficiente" },
+                  { value: "DISCIPLINAR", label: "Questão disciplinar" },
+                  { value: "ACORDO", label: "Acordo mútuo" },
+                  { value: "OUTROS", label: "Outros" },
+                ]} />
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">Observações do desligamento</label>
+                <textarea value={formDeslig.motivoDesligamento} onChange={(e) => setFormDeslig({ ...formDeslig, motivoDesligamento: e.target.value })}
+                  rows={3} placeholder="Detalhes adicionais sobre o desligamento…"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800 flex items-start gap-2">
+                <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                <span>
+                  Ao confirmar, o funcionário será marcado como <strong>Demitido</strong> e ficará inativo.
+                  Esta ação pode ser revertida manualmente se necessário.
+                </span>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button onClick={() => setModalDesligamento(null)} disabled={desligando}
+                className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={handleDesligar} disabled={desligando || !formDeslig.dataDemissao}
+                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 inline-flex items-center gap-2 disabled:opacity-50">
+                {desligando ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}
+                {desligando ? "Processando…" : "Confirmar Desligamento"}
               </button>
             </div>
           </div>
