@@ -10,8 +10,8 @@ const AREAS = [
   { id: "MONTAGEM", label: "Montagem", rects: [{ x: 30, y: 255, w: 395, h: 185 }], stroke: "#059669", fill: "#ecfdf5", statusKey: "MONTAGEM" },
   { id: "SOLDA", label: "Solda", rects: [{ x: 440, y: 255, w: 400, h: 185 }], stroke: "#d97706", fill: "#fffbeb", statusKey: "SOLDA" },
   { id: "JATO", label: "Jato", rects: [{ x: 30, y: 470, w: 250, h: 110 }], stroke: "#4f46e5", fill: "#eef2ff", statusKey: "JATO" },
-  { id: "PINTURA", label: "Pintura", rects: [{ x: 890, y: 15, w: 280, h: 425 }], stroke: "#7c3aed", fill: "#f5f3ff", statusKey: "PINTURA" },
-  { id: "EXPEDIDO", label: "Expedição", rects: [{ x: 300, y: 470, w: 310, h: 110 }], stroke: "#0d9488", fill: "#f0fdfa", statusKey: "EXPEDIDO" },
+  { id: "EXPEDIDO", label: "Expedição", rects: [{ x: 890, y: 15, w: 280, h: 200 }], stroke: "#0d9488", fill: "#f0fdfa", statusKey: "EXPEDIDO" },
+  { id: "PINTURA", label: "Pintura", rects: [{ x: 890, y: 235, w: 280, h: 210 }], stroke: "#7c3aed", fill: "#f5f3ff", statusKey: "PINTURA" },
 ];
 
 const FLOW_ORDER = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "JATO", "PINTURA", "EXPEDIDO"];
@@ -257,31 +257,27 @@ export default function MapaProducaoClient() {
               );
             })}
 
-            {/* Flow arrows: Estoque → Prep → Mont → Solda → Jato → Pintura → Exp */}
+            {/* Flow arrows: Estoque → Prep → Mont → Solda → Jato ... Pintura → Exp */}
 
-            {/* 1. Estoque → Preparação (top down) */}
+            {/* 1. Estoque → Preparação */}
             <path d="M435,97 L435,113" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={445} y={108} fill="#94a3b8" fontSize={8} fontWeight="600">①</text>
 
-            {/* 2. Preparação → Montagem (down to left) */}
+            {/* 2. Preparação → Montagem */}
             <path d="M300,237 L300,253" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={310} y={248} fill="#94a3b8" fontSize={8} fontWeight="600">②</text>
 
-            {/* 3. Montagem → Solda (left to right) */}
+            {/* 3. Montagem → Solda */}
             <path d="M427,350 L438,350" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={433} y={342} fill="#94a3b8" fontSize={8} fontWeight="600">③</text>
 
-            {/* 4. Solda → Jato (down to bottom) */}
+            {/* 4. Solda → Jato */}
             <path d="M400,442 L280,468" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={345} y={453} fill="#94a3b8" fontSize={8} fontWeight="600">④</text>
 
-            {/* 5. Jato → Pintura (bottom to Galpão 02) */}
-            <path d="M282,520 Q700,560 888,300" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={600} y={530} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
-
-            {/* 6. Pintura → Expedição (Galpão 02 back to bottom) */}
-            <path d="M888,380 Q750,520 612,478" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={760} y={470} fill="#94a3b8" fontSize={8} fontWeight="600">⑥</text>
+            {/* 5. Pintura → Expedição (up in Galpão 02) */}
+            <path d="M1030,233 L1030,217" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={1040} y={228} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
           </svg>
         </div>
 
