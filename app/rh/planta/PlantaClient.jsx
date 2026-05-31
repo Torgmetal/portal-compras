@@ -1,6 +1,15 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, AlertCircle, Users, MapPin } from "lucide-react";
+import { Loader2, AlertCircle, Users, MapPin, DollarSign } from "lucide-react";
+
+const fmtMoeda = (v) =>
+  v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
+const fmtMoedaCurto = (v) => {
+  if (v == null || v === 0) return "R$ 0";
+  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
+  if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(1).replace(".", ",")}k`;
+  return `R$ ${v.toFixed(0)}`;
+};
 
 // ─── Setores excluídos do mapa (não ficam na fábrica) ──────────────────────────
 const EXCLUIDOS_MAPA = ["MOI", "VMI", "Montagem Externa"];
@@ -186,10 +195,24 @@ export default function PlantaClient() {
     return grupos;
   }, [funcionarios]);
 
-  // Total ativos
+  // Custo por área
+  const custoPorArea = useMemo(() => {
+    const custos = {};
+    AREAS.forEach((a) => {
+      const funcs = porArea[a.id] || [];
+      custos[a.id] = funcs.reduce((s, f) => s + (f.salario ? Number(f.salario) : 0), 0);
+    });
+    return custos;
+  }, [porArea]);
+
+  // Totais
   const totalAtivos = useMemo(
     () => funcionarios.filter((f) => f.status !== "INATIVO").length,
     [funcionarios]
+  );
+  const custoTotalFabrica = useMemo(
+    () => Object.values(custoPorArea).reduce((s, v) => s + v, 0),
+    [custoPorArea]
   );
 
   // Handler de tooltip (posição relativa ao container SVG)
@@ -243,12 +266,17 @@ export default function PlantaClient() {
             detalhes
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-100 shadow-sm px-4 py-2">
-          <Users size={16} className="text-torg-blue" />
-          <span className="text-sm font-semibold text-torg-dark">
-            {totalAtivos}
-          </span>
-          <span className="text-sm text-torg-gray">funcionários ativos</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-100 shadow-sm px-4 py-2">
+            <Users size={16} className="text-torg-blue" />
+            <span className="text-sm font-semibold text-torg-dark">{totalAtivos}</span>
+            <span className="text-sm text-torg-gray">na fábrica</span>
+          </div>
+          <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-100 shadow-sm px-4 py-2">
+            <DollarSign size={16} className="text-emerald-600" />
+            <span className="text-sm font-semibold text-torg-dark">{fmtMoeda(custoTotalFabrica)}</span>
+            <span className="text-sm text-torg-gray">/mês</span>
+          </div>
         </div>
       </div>
 
@@ -372,6 +400,20 @@ export default function PlantaClient() {
                     {area.label}
                     {area.rects.length > 1 ? ` ${ri + 1}` : ""}
                   </text>
+                  {/* Custo do setor */}
+                  {ri === 0 && custoPorArea[area.id] > 0 && (
+                    <text
+                      x={rect.x + rect.w / 2}
+                      y={rect.y + rect.h - 10}
+                      textAnchor="middle"
+                      fill="rgba(255,255,255,0.7)"
+                      fontSize={10}
+                      fontWeight="600"
+                      className="pointer-events-none"
+                    >
+                      {fmtMoedaCurto(custoPorArea[area.id])}/mês
+                    </text>
+                  )}
                   {/* Count badge */}
                   {ri === 0 && (
                     <g className="pointer-events-none">
@@ -457,16 +499,21 @@ export default function PlantaClient() {
       {areaSelecionada && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-in fade-in duration-200">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-torg-dark flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ background: areaSelecionada.stroke }}
-              />
-              {areaSelecionada.label}
-              <span className="text-sm font-normal text-torg-gray ml-2">
-                ({porArea[selectedArea]?.length || 0} funcionários)
-              </span>
-            </h3>
+            <div>
+              <h3 className="text-lg font-bold text-torg-dark flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ background: areaSelecionada.stroke }} />
+                {areaSelecionada.label}
+                <span className="text-sm font-normal text-torg-gray ml-2">
+                  ({porArea[selectedArea]?.length || 0} funcionários)
+                </span>
+              </h3>
+              {custoPorArea[selectedArea] > 0 && (
+                <p className="text-sm text-torg-gray mt-0.5 flex items-center gap-1 ml-5">
+                  <DollarSign size={13} className="text-emerald-600" />
+                  Custo mensal: <span className="font-semibold text-torg-dark">{fmtMoeda(custoPorArea[selectedArea])}</span>
+                </p>
+              )}
+            </div>
             <button
               onClick={() => setSelectedArea(null)}
               className="text-sm text-torg-gray hover:text-torg-dark transition-colors"
@@ -561,25 +608,29 @@ export default function PlantaClient() {
       )}
 
       {/* Legend */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {AREAS.map((area) => (
-          <div
-            key={area.id}
-            className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors"
-            onClick={() =>
-              setSelectedArea(selectedArea === area.id ? null : area.id)
-            }
-          >
-            <div
-              className="w-3 h-3 rounded-full flex-shrink-0"
-              style={{ background: area.stroke }}
-            />
-            <span className="text-torg-dark truncate">{area.label}</span>
-            <span className="text-gray-400 ml-auto text-xs font-medium">
-              {porArea[area.id]?.length || 0}
-            </span>
-          </div>
-        ))}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {AREAS.map((area) => {
+            const qtd = porArea[area.id]?.length || 0;
+            const custo = custoPorArea[area.id] || 0;
+            return (
+              <div
+                key={area.id}
+                className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-colors"
+                onClick={() => setSelectedArea(selectedArea === area.id ? null : area.id)}
+              >
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: area.stroke }} />
+                <div className="min-w-0 flex-1">
+                  <span className="text-torg-dark truncate block">{area.label}</span>
+                  {custo > 0 && (
+                    <span className="text-[10px] text-torg-gray">{fmtMoedaCurto(custo)}/mês</span>
+                  )}
+                </div>
+                <span className="text-gray-400 text-xs font-medium">{qtd}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
