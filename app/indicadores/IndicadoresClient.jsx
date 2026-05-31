@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, RefreshCw, Trophy, TrendingUp, TrendingDown,
   Package, Truck, Star, ChevronDown, ChevronUp, Info, Target, Clock,
-  AlertTriangle, ShoppingCart, ArrowRight, BarChart3,
+  AlertTriangle, ShoppingCart, ArrowRight, BarChart3, Users,
 } from "lucide-react";
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -883,6 +883,15 @@ const SETORES = [
     cor: "bg-torg-orange",
     href: "/indicadores/comercial",
     apiEndpoint: "/api/comercial/indicadores",
+  },
+  {
+    id: "rh",
+    label: "Recursos Humanos",
+    desc: "Turnover, Absenteísmo, Acidentes e Treinamento",
+    icon: Users,
+    cor: "bg-purple-600",
+    href: "/indicadores/rh",
+    apiEndpoint: "/api/rh/indicadores",
   },
   // Futuros setores:
   // { id: "producao", label: "Produção", ... },

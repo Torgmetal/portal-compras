@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   Activity, Trophy, TrendingUp, Package, Clock, ShoppingCart,
   BarChart3, ChevronDown, ChevronRight, Target, DollarSign, Zap, Users, Briefcase,
+  UserMinus, BedDouble, ShieldAlert, GraduationCap, Timer,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
@@ -35,6 +36,20 @@ const setores = [
       { href: "/indicadores/comercial/pipeline", label: "Pipeline", icon: TrendingUp },
       { href: "/indicadores/comercial/tempo-resposta", label: "Tempo Resposta", icon: Zap },
       { href: "/indicadores/comercial/concentracao", label: "Concentração", icon: Users },
+    ],
+  },
+  {
+    id: "rh",
+    label: "Recursos Humanos",
+    icon: Users,
+    base: "/indicadores/rh",
+    sub: [
+      { href: "/indicadores/rh", label: "Dashboard", icon: Activity, exact: true },
+      { href: "/indicadores/rh/turnover", label: "Turnover", icon: UserMinus },
+      { href: "/indicadores/rh/absenteismo", label: "Absenteísmo", icon: BedDouble },
+      { href: "/indicadores/rh/acidentes", label: "Acidentes", icon: ShieldAlert },
+      { href: "/indicadores/rh/treinamento", label: "Treinamento", icon: GraduationCap },
+      { href: "/indicadores/rh/contratacao", label: "Contratação", icon: Timer },
     ],
   },
   // Futuros setores:
