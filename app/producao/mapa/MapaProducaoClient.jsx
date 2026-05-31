@@ -276,8 +276,8 @@ export default function MapaProducaoClient() {
             <text x={650} y={458} fill="#94a3b8" fontSize={8} fontWeight="600">④</text>
 
             {/* 5. Jato → Pintura */}
-            <path d="M842,525 L888,525 L888,400" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={860} y={518} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
+            <path d="M842,525 L1030,525 L1030,447" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={930} y={518} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
 
             {/* 6. Pintura → Expedição (up in Galpão 02) */}
             <path d="M1030,233 L1030,217" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
