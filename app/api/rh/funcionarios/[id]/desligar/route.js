@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { syncDesligamento } from "@/lib/sharepoint-rh";
 
 const desligarSchema = z.object({
   dataDemissao: z.string().min(1, "Data de demissão obrigatória"),
@@ -39,7 +40,13 @@ export async function POST(req, { params }) {
       );
     }
 
-    const funcionario = await prisma.funcionario.findUnique({ where: { id } });
+    const funcionario = await prisma.funcionario.findUnique({
+      where: { id },
+      include: {
+        cargo: { select: { id: true, nome: true } },
+        setor: { select: { id: true, nome: true } },
+      },
+    });
     if (!funcionario) {
       return NextResponse.json(
         { success: false, error: "Funcionário não encontrado" },
@@ -85,6 +92,9 @@ export async function POST(req, { params }) {
         },
       },
     });
+
+    // Sincronizar com planilha SharePoint (fire-and-forget)
+    syncDesligamento(funcionario, data).catch(() => {});
 
     return NextResponse.json({ success: true, data: atualizado });
   } catch (e) {

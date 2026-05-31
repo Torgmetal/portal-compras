@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { syncContratacao } from "@/lib/sharepoint-rh";
 
 const funcionarioSchema = z.object({
   nome: z.string().min(2, "Nome obrigatório"),
@@ -115,6 +116,10 @@ export async function POST(req) {
         dataNascimento: data.dataNascimento ? new Date(data.dataNascimento) : null,
         salario: data.salario || null,
       },
+      include: {
+        cargo: { select: { id: true, nome: true } },
+        setor: { select: { id: true, nome: true } },
+      },
     });
 
     await prisma.auditLog.create({
@@ -126,6 +131,9 @@ export async function POST(req) {
         diff: { nome: data.nome, setor: data.setorId, cargo: data.cargoId },
       },
     });
+
+    // Sincronizar com planilha SharePoint (fire-and-forget)
+    syncContratacao(funcionario).catch(() => {});
 
     return NextResponse.json({ success: true, data: funcionario }, { status: 201 });
   } catch (e) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { syncAjuste } from "@/lib/sharepoint-rh";
 
 const ajusteSchema = z.object({
   tipo: z.enum(["PROMOCAO", "TRANSFERENCIA", "ALTERACAO_SALARIAL", "CORRECAO"], {
@@ -130,6 +131,9 @@ export async function POST(req, { params }) {
         },
       });
     } catch (_) {}
+
+    // Sincronizar com planilha SharePoint (fire-and-forget)
+    syncAjuste(funcionario, antes, depois, data.motivo).catch(() => {});
 
     return NextResponse.json({ success: true, data: funcionario });
   } catch (e) {
