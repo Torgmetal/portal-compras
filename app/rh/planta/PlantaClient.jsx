@@ -24,10 +24,7 @@ const AREAS = [
   {
     id: "preparacao",
     label: "Preparação",
-    rects: [
-      { x: 30, y: 30, w: 380, h: 180 },
-      { x: 430, y: 30, w: 400, h: 180 },
-    ],
+    rects: [{ x: 30, y: 30, w: 800, h: 180 }],
     cor: "rgba(59,130,246,1)",
     fill: "rgba(59,130,246,0.15)",
     stroke: "#3b82f6",
