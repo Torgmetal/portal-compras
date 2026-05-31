@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+
+const getLimiter = createRateLimiter({ name: "frete-cotacao-get", maxRequests: 30, windowMs: 60000 });
+const postLimiter = createRateLimiter({ name: "frete-cotacao-post", maxRequests: 10, windowMs: 60000 });
 
 // ── GET ── Carregar dados da cotacao de frete (publico, sem auth)
 export async function GET(req, { params }) {
+  const rl = getLimiter(req);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Muitas requisições. Tente novamente em instantes." },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
     const { token } = await params;
     const cotacao = await prisma.freteCotacao.findUnique({
@@ -54,6 +66,14 @@ const submitSchema = z.object({
 });
 
 export async function POST(req, { params }) {
+  const rl = postLimiter(req);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Muitas requisições. Tente novamente em instantes." },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
     const { token } = await params;
     const cotacao = await prisma.freteCotacao.findUnique({ where: { token } });

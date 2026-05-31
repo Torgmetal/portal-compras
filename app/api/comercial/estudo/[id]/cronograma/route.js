@@ -47,7 +47,7 @@ const criarSchema = z.union([
 
 export async function POST(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMERCIAL"]);
+    const user = await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const body = await req.json();
     const data = criarSchema.parse(body);
@@ -61,9 +61,10 @@ export async function POST(req, { params }) {
     let proximaOrdem = (ultimo?.ordem ?? -1) + 1;
 
     const itensParaCriar = Array.isArray(data) ? data : [data];
+    const idsCriados = [];
 
     for (const item of itensParaCriar) {
-      await prisma.cronogramaItem.create({
+      const criado = await prisma.cronogramaItem.create({
         data: {
           estudoId: id,
           grupo: item.grupo,
@@ -77,12 +78,27 @@ export async function POST(req, { params }) {
           ordem: proximaOrdem++,
         },
       });
+      idsCriados.push(criado.id);
     }
 
     const itens = await prisma.cronogramaItem.findMany({
       where: { estudoId: id },
       orderBy: { ordem: "asc" },
     });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          user: { connect: { id: user.id } },
+          action: "CRIAR_CRONOGRAMA",
+          entity: "CronogramaItem",
+          entityId: id,
+          diff: { depois: { estudoId: id, idsCriados, itens: itensParaCriar } },
+        },
+      });
+    } catch (e) {
+      console.error("AuditLog error:", e);
+    }
 
     return NextResponse.json({ success: true, data: itens });
   } catch (e) {
@@ -110,10 +126,12 @@ const atualizarSchema = z.object({
 
 export async function PATCH(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMERCIAL"]);
+    const user = await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const body = await req.json();
     const { itemId, ...data } = atualizarSchema.parse(body);
+
+    const antes = await prisma.cronogramaItem.findUnique({ where: { id: itemId } });
 
     await prisma.cronogramaItem.update({
       where: { id: itemId, estudoId: id },
@@ -124,6 +142,20 @@ export async function PATCH(req, { params }) {
       where: { estudoId: id },
       orderBy: { ordem: "asc" },
     });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          user: { connect: { id: user.id } },
+          action: "ATUALIZAR_CRONOGRAMA",
+          entity: "CronogramaItem",
+          entityId: itemId,
+          diff: { antes, depois: data },
+        },
+      });
+    } catch (e) {
+      console.error("AuditLog error:", e);
+    }
 
     return NextResponse.json({ success: true, data: itens });
   } catch (e) {
@@ -138,20 +170,37 @@ export async function PATCH(req, { params }) {
 // ── DELETE — excluir item ou todos ──
 export async function DELETE(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMERCIAL"]);
+    const user = await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const { searchParams } = new URL(req.url);
     const itemId = searchParams.get("itemId");
     const todos = searchParams.get("todos");
 
+    let antes = null;
     if (todos === "true") {
+      antes = await prisma.cronogramaItem.findMany({ where: { estudoId: id } });
       await prisma.cronogramaItem.deleteMany({ where: { estudoId: id } });
     } else if (itemId) {
+      antes = await prisma.cronogramaItem.findUnique({ where: { id: itemId } });
       await prisma.cronogramaItem.delete({
         where: { id: itemId, estudoId: id },
       });
     } else {
       return NextResponse.json({ success: false, error: "itemId ou todos=true obrigatorio" }, { status: 400 });
+    }
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          user: { connect: { id: user.id } },
+          action: "EXCLUIR_CRONOGRAMA",
+          entity: "CronogramaItem",
+          entityId: todos === "true" ? id : itemId,
+          diff: { antes, excluirTodos: todos === "true" },
+        },
+      });
+    } catch (e) {
+      console.error("AuditLog error:", e);
     }
 
     const itens = await prisma.cronogramaItem.findMany({

@@ -49,8 +49,9 @@ const schema = z.object({
 export async function GET(req) {
   try {
     await requireRole(["ADMIN", "COMPRAS"]);
-  } catch {
-    return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   const { searchParams } = new URL(req.url);
@@ -82,8 +83,9 @@ export async function POST(req) {
   let user;
   try {
     user = await requireRole(["ADMIN", "COMPRAS"]);
-  } catch {
-    return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   let body;

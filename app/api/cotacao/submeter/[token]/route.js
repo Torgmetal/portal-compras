@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
 import { notificarEvento } from "@/lib/email";
 import { criarNotificacao } from "@/lib/notificacoes";
+import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+
+const postLimiter = createRateLimiter({ name: "cotacao-submeter-post", maxRequests: 10, windowMs: 60000 });
 
 const itemSchema = z.object({
   cotacaoItemId: z.string().min(1),
@@ -29,6 +32,14 @@ const schema = z.object({
 });
 
 export async function POST(req, { params }) {
+  const rl = postLimiter(req);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Muitas requisições. Tente novamente em instantes." },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   let body;
   try {
     body = schema.parse(await req.json());

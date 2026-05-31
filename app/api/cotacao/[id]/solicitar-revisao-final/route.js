@@ -16,8 +16,9 @@ export async function POST(req, { params }) {
   let user;
   try {
     user = await requireRole(["ADMIN", "COMPRAS"]);
-  } catch {
-    return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   const cot = await prisma.cotacao.findUnique({
@@ -65,7 +66,9 @@ export async function POST(req, { params }) {
   // mantem versao antiga)
   try {
     revalidatePath(`/fornecedores/c/${cot.token}`);
-  } catch { /* nada */ }
+  } catch (e) {
+    console.error("solicitar-revisao-final: falha ao revalidar path do fornecedor:", e);
+  }
 
   return NextResponse.json({
     ok: true,

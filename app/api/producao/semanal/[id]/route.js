@@ -13,8 +13,9 @@ const schema = z.object({
 });
 
 export async function PATCH(req, { params }) {
+  let user;
   try {
-    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
+    user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
@@ -24,16 +25,49 @@ export async function PATCH(req, { params }) {
   } catch {
     return NextResponse.json({ error: "Dados invalidos" }, { status: 400 });
   }
+  const antes = await prisma.producaoSemanal.findUnique({ where: { id: params.id } });
   await prisma.producaoSemanal.update({ where: { id: params.id }, data: body });
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        user: { connect: { id: user.id } },
+        action: "ATUALIZAR_PRODUCAO_SEMANAL",
+        entity: "ProducaoSemanal",
+        entityId: params.id,
+        diff: { antes, depois: body },
+      },
+    });
+  } catch (e) {
+    console.error("AuditLog error:", e);
+  }
+
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_req, { params }) {
+  let user;
   try {
-    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
+    user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
+  const antes = await prisma.producaoSemanal.findUnique({ where: { id: params.id } });
   await prisma.producaoSemanal.delete({ where: { id: params.id } });
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        user: { connect: { id: user.id } },
+        action: "EXCLUIR_PRODUCAO_SEMANAL",
+        entity: "ProducaoSemanal",
+        entityId: params.id,
+        diff: { antes },
+      },
+    });
+  } catch (e) {
+    console.error("AuditLog error:", e);
+  }
+
   return NextResponse.json({ ok: true });
 }

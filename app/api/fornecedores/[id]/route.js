@@ -46,8 +46,9 @@ export async function PATCH(req, { params }) {
   let user;
   try {
     user = await requireRole(["ADMIN", "COMPRAS"]);
-  } catch {
-    return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   let body;
@@ -120,8 +121,9 @@ export async function DELETE(req, { params }) {
   let user;
   try {
     user = await requireRole(["ADMIN", "COMPRAS"]);
-  } catch {
-    return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
   const existe = await prisma.fornecedor.findUnique({ where: { id: params.id } });
   if (!existe) return NextResponse.json({ error: "Nao encontrado." }, { status: 404 });

@@ -44,8 +44,9 @@ export async function POST(req, { params }) {
   let user;
   try {
     user = await requireRole(["ADMIN", "COMPRAS"]);
-  } catch {
-    return NextResponse.json({ error: "Apenas Admin ou Compras." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   let body;
@@ -79,7 +80,9 @@ export async function POST(req, { params }) {
         process.env.OMIE_APP_SECRET
       );
       if (r.codigo) nCodOmieResolvido = String(r.codigo);
-    } catch {}
+    } catch (e) {
+      console.error("lancar-manual: falha ao resolver fornecedor Omie por CNPJ:", e);
+    }
   }
 
   // Mapa rmItemId -> cotacaoItemId existente (se houver)
