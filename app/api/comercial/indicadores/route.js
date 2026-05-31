@@ -415,6 +415,32 @@ export async function GET(req) {
     };
   });
 
+  // ─── NOTA DO SETOR (para card na visão geral) ─────────────
+  // Calcula nota ponderada: WinRate 30%, Margem 25%, TempoResp 20%, Pipeline 15%, Concentracao 10%
+  const notaWR = Math.min((winRatePct / 40) * 100, 100); // meta: 40% WR = 100
+  const notaMargem = Math.min((margemMedia / 20) * 100, 100); // meta: 20% margem = 100
+  const notaTempo = Math.min((tempoResposta.dentroPrazoPct / 100) * 100, 100);
+  const notaPipeline = pipeline.totalPropostas > 0 ? Math.min((pipeline.totalPropostas / 10) * 100, 100) : 0;
+  const notaConc = concentracao.top1 <= 30 ? 100 : concentracao.top1 <= 50 ? 60 : 30;
+
+  const notaGeral =
+    notaWR * 0.3 +
+    notaMargem * 0.25 +
+    notaTempo * 0.2 +
+    notaPipeline * 0.15 +
+    notaConc * 0.1;
+
+  const notaSetor = {
+    nota: Math.round(notaGeral * 10) / 10,
+    indicadores: [
+      { id: "winrate", label: "Win Rate", nota: Math.round(notaWR * 10) / 10, peso: 0.3 },
+      { id: "margem", label: "Margem Bruta", nota: Math.round(notaMargem * 10) / 10, peso: 0.25 },
+      { id: "tempo", label: "Tempo Resposta", nota: Math.round(notaTempo * 10) / 10, peso: 0.2 },
+      { id: "pipeline", label: "Pipeline", nota: Math.round(notaPipeline * 10) / 10, peso: 0.15 },
+      { id: "concentracao", label: "Concentração", nota: Math.round(notaConc * 10) / 10, peso: 0.1 },
+    ],
+  };
+
   return NextResponse.json({
     success: true,
     ano,
@@ -422,6 +448,7 @@ export async function GET(req) {
       totalPropostas: orcamentos.length,
       valorTotal: orcamentos.reduce((s, o) => s + (o.valor || 0), 0),
     },
+    notaSetor,
     winRate,
     margem,
     tempoResposta,

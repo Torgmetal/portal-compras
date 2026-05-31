@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity, Trophy, TrendingUp, Package, Clock, ShoppingCart,
-  BarChart3, ChevronDown, ChevronRight,
+  BarChart3, ChevronDown, ChevronRight, Target, DollarSign, Zap, Users, Briefcase,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
@@ -21,6 +21,20 @@ const setores = [
       { href: "/indicadores/compras/savings", label: "Savings por Obra", icon: TrendingUp },
       { href: "/indicadores/compras/otif", label: "OTIF", icon: Package },
       { href: "/indicadores/compras/atendimento", label: "Atendimento Interno", icon: Clock },
+    ],
+  },
+  {
+    id: "comercial",
+    label: "Comercial",
+    icon: Briefcase,
+    base: "/indicadores/comercial",
+    sub: [
+      { href: "/indicadores/comercial", label: "Dashboard", icon: Activity, exact: true },
+      { href: "/indicadores/comercial/win-rate", label: "Win Rate", icon: Target },
+      { href: "/indicadores/comercial/margem", label: "Margem Bruta", icon: DollarSign },
+      { href: "/indicadores/comercial/pipeline", label: "Pipeline", icon: TrendingUp },
+      { href: "/indicadores/comercial/tempo-resposta", label: "Tempo Resposta", icon: Zap },
+      { href: "/indicadores/comercial/concentracao", label: "Concentração", icon: Users },
     ],
   },
   // Futuros setores:

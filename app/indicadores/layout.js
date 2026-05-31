@@ -2,7 +2,7 @@ import SidebarIndicadores from "@/components/SidebarIndicadores";
 
 export const metadata = {
   title: "Indicadores — Workspace Torg",
-  description: "KPIs de Compras: Scorecard, Savings e OTIF.",
+  description: "KPIs de Compras e Comercial: Scorecard, Savings, OTIF, Win Rate, Pipeline.",
 };
 
 export default function IndicadoresLayout({ children }) {

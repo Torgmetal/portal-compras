@@ -875,6 +875,15 @@ const SETORES = [
     href: "/indicadores/compras",
     apiEndpoint: "/api/compras/indicadores",
   },
+  {
+    id: "comercial",
+    label: "Comercial",
+    desc: "Win Rate, Margem, Pipeline e Concentração",
+    icon: BarChart3,
+    cor: "bg-torg-orange",
+    href: "/indicadores/comercial",
+    apiEndpoint: "/api/comercial/indicadores",
+  },
   // Futuros setores:
   // { id: "producao", label: "Produção", ... },
 ];
