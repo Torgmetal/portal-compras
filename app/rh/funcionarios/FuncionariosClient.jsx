@@ -627,8 +627,8 @@ export default function FuncionariosClient() {
       {/* Modal Ajuste */}
       {modalAjuste && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !ajustando && setModalAjuste(null)}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-torg-blue/10 flex items-center justify-center">
                   <ArrowUpDown size={20} className="text-torg-blue" />
@@ -640,7 +640,7 @@ export default function FuncionariosClient() {
               </div>
               <button onClick={() => setModalAjuste(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
               <Select label="Tipo de ajuste *" value={formAjuste.tipo}
                 onChange={(v) => setFormAjuste({ ...formAjuste, tipo: v })}
                 options={[
@@ -712,7 +712,7 @@ export default function FuncionariosClient() {
                 </span>
               </div>
             </div>
-            <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3">
+            <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
               <button onClick={() => setModalAjuste(null)} disabled={ajustando}
                 className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">
                 Cancelar
