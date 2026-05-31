@@ -215,14 +215,39 @@ export default function PlantaClient() {
     [custoPorArea]
   );
 
-  // Handler de tooltip (posição relativa ao container SVG)
+  // Handler de tooltip (posição relativa ao container SVG, com clamp nas bordas)
   function handleDotHover(e, func) {
     const svgContainer = e.currentTarget.closest(".planta-svg-container");
     if (!svgContainer) return;
-    const rect = svgContainer.getBoundingClientRect();
+    const containerRect = svgContainer.getBoundingClientRect();
+
+    const rawX = e.clientX - containerRect.left;
+    const rawY = e.clientY - containerRect.top;
+
+    const tooltipW = 200;
+    const tooltipH = 60;
+    const gap = 12;
+
+    // Por padrão: à direita e acima do cursor
+    let x = rawX + gap;
+    let y = rawY - gap;
+    let flipX = false;
+    let flipY = false;
+
+    // Se ultrapassa à direita, exibir à esquerda do cursor
+    if (x + tooltipW > containerRect.width) {
+      x = rawX - gap;
+      flipX = true;
+    }
+
+    // Se ultrapassa no topo, exibir abaixo do cursor
+    if (y - tooltipH < 0) {
+      y = rawY + gap;
+      flipY = true;
+    }
+
     setTooltip({
-      x: e.clientX - rect.left + 12,
-      y: e.clientY - rect.top - 10,
+      x, y, flipX, flipY,
       nome: func.nome,
       cargo: func.cargo?.nome || "—",
     });
@@ -486,7 +511,7 @@ export default function PlantaClient() {
             style={{
               left: tooltip.x,
               top: tooltip.y,
-              transform: "translate(0, -100%)",
+              transform: `translate(${tooltip.flipX ? "-100%" : "0"}, ${tooltip.flipY ? "0" : "-100%"})`,
             }}
           >
             <p className="font-bold text-torg-dark">{tooltip.nome}</p>
