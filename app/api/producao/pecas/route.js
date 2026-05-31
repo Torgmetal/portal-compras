@@ -68,6 +68,34 @@ export async function GET(req) {
   return NextResponse.json({ pecas, resumoPorOp: Object.values(porOp) });
 }
 
+export async function DELETE(req) {
+  try {
+    await requireRole(["ADMIN"]);
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
+    return NextResponse.json({ error: e.message }, { status });
+  }
+
+  const url = new URL(req.url);
+  const opNumero = url.searchParams.get("op");
+  if (!opNumero) {
+    return NextResponse.json({ error: "Parâmetro 'op' é obrigatório" }, { status: 400 });
+  }
+
+  const deleted = await prisma.pecaConjunto.deleteMany({ where: { opNumero } });
+
+  await prisma.auditLog.create({
+    data: {
+      acao: "DELETE_PECAS_LOTE",
+      entidade: "PecaConjunto",
+      entidadeId: opNumero,
+      detalhes: { opNumero, totalRemovidas: deleted.count },
+    },
+  });
+
+  return NextResponse.json({ ok: true, removidas: deleted.count });
+}
+
 const schemaPeca = z.object({
   opNumero: z.string().min(1),
   marca: z.string().min(1),

@@ -53,6 +53,14 @@ export async function DELETE(req, { params }) {
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
-  await prisma.pecaConjunto.delete({ where: { id: params.id } });
+  const peca = await prisma.pecaConjunto.delete({ where: { id: params.id } });
+  await prisma.auditLog.create({
+    data: {
+      acao: "DELETE_PECA",
+      entidade: "PecaConjunto",
+      entidadeId: params.id,
+      detalhes: { opNumero: peca.opNumero, marca: peca.marca },
+    },
+  });
   return NextResponse.json({ ok: true });
 }
