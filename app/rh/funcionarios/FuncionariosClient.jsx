@@ -4,6 +4,7 @@ import {
   Users, Search, PlusCircle, Loader2, AlertCircle, X,
   ChevronDown, Edit, UserX, UserCheck, Download, Upload,
   FileSpreadsheet, CheckCircle2, XCircle, UserMinus, MoreVertical,
+  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -53,6 +54,21 @@ export default function FuncionariosClient() {
     categoriaDesligamento: "",
     motivoDesligamento: "",
   });
+
+  // Ajuste (promoção / transferência / salário)
+  const [modalAjuste, setModalAjuste] = useState(null); // funcionário selecionado
+  const [ajustando, setAjustando] = useState(false);
+  const [formAjuste, setFormAjuste] = useState({
+    tipo: "PROMOCAO",
+    cargoId: "",
+    setorId: "",
+    salario: "",
+    dataEfetivacao: new Date().toISOString().split("T")[0],
+    motivo: "",
+  });
+
+  // Menu de ações por funcionário
+  const [menuAberto, setMenuAberto] = useState(null);
 
   // Import Excel
   const fileRef = useRef(null);
@@ -219,6 +235,7 @@ export default function FuncionariosClient() {
   };
 
   const abrirDesligamento = (func) => {
+    setMenuAberto(null);
     setFormDeslig({
       dataDemissao: new Date().toISOString().split("T")[0],
       tipoDesligamento: "VOLUNTARIO",
@@ -226,6 +243,67 @@ export default function FuncionariosClient() {
       motivoDesligamento: "",
     });
     setModalDesligamento(func);
+  };
+
+  // Ajuste
+  const abrirAjuste = (func) => {
+    setMenuAberto(null);
+    setFormAjuste({
+      tipo: "PROMOCAO",
+      cargoId: func.cargo?.id || "",
+      setorId: func.setor?.id || "",
+      salario: func.salario ? Number(func.salario) : "",
+      dataEfetivacao: new Date().toISOString().split("T")[0],
+      motivo: "",
+    });
+    setModalAjuste(func);
+  };
+
+  const handleAjuste = async () => {
+    setAjustando(true);
+    setErro("");
+    try {
+      const body = {
+        tipo: formAjuste.tipo,
+        dataEfetivacao: formAjuste.dataEfetivacao,
+        motivo: formAjuste.motivo || null,
+      };
+      // Só enviar campos que mudaram
+      if (formAjuste.cargoId && formAjuste.cargoId !== modalAjuste.cargo?.id) body.cargoId = formAjuste.cargoId;
+      if (formAjuste.setorId && formAjuste.setorId !== modalAjuste.setor?.id) body.setorId = formAjuste.setorId;
+      if (formAjuste.salario !== "" && Number(formAjuste.salario) !== (modalAjuste.salario ? Number(modalAjuste.salario) : null)) {
+        body.salario = Number(formAjuste.salario);
+      }
+
+      const res = await fetch(`/api/rh/funcionarios/${modalAjuste.id}/ajuste`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao registrar ajuste");
+
+      // Update otimista
+      setFuncionarios((prev) =>
+        prev.map((f) =>
+          f.id === modalAjuste.id
+            ? {
+                ...f,
+                cargo: data.data.cargo || f.cargo,
+                setor: data.data.setor || f.setor,
+                salario: data.data.salario ?? f.salario,
+                cargoId: data.data.cargoId || f.cargoId,
+                setorId: data.data.setorId || f.setorId,
+              }
+            : f
+        )
+      );
+      setModalAjuste(null);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setAjustando(false);
+    }
   };
 
   if (carregando) {
@@ -255,14 +333,10 @@ export default function FuncionariosClient() {
             {importando ? "Importando…" : "Importar planilha"}
           </button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={importarPlanilha} className="hidden" />
-          <button
-            onClick={abrirNovo}
-            disabled={setores.length === 0 || cargos.length === 0}
-            title={setores.length === 0 || cargos.length === 0 ? "Cadastre setores e cargos primeiro" : ""}
-            className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50"
-          >
-            <PlusCircle size={16} /> Novo Funcionário
-          </button>
+          <BotaoAcoes
+            onNovo={abrirNovo}
+            desabilitado={setores.length === 0 || cargos.length === 0}
+          />
         </div>
       </div>
 
@@ -372,13 +446,36 @@ export default function FuncionariosClient() {
                       <td className="px-4 py-3 text-right font-medium text-torg-dark tabular-nums">{fmtMoeda(f.salario)}</td>
                       <td className="px-3 py-3 text-center">
                         {f.status !== "DEMITIDO" && (
-                          <button
-                            onClick={() => abrirDesligamento(f)}
-                            title="Desligar funcionário"
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <UserMinus size={14} />
-                          </button>
+                          <div className="relative">
+                            <button
+                              onClick={() => setMenuAberto(menuAberto === f.id ? null : f.id)}
+                              className="p-1.5 text-gray-400 hover:text-torg-dark hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                            {menuAberto === f.id && (
+                              <>
+                                <div className="fixed inset-0 z-40" onClick={() => setMenuAberto(null)} />
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+                                  <button
+                                    onClick={() => abrirAjuste(f)}
+                                    className="w-full px-3 py-2 text-sm text-left text-torg-dark hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <ArrowUpDown size={14} className="text-torg-blue" />
+                                    Ajuste / Movimentação
+                                  </button>
+                                  <div className="border-t border-gray-100 my-1" />
+                                  <button
+                                    onClick={() => abrirDesligamento(f)}
+                                    className="w-full px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                  >
+                                    <UserMinus size={14} />
+                                    Desligamento
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -527,6 +624,109 @@ export default function FuncionariosClient() {
         </div>
       )}
 
+      {/* Modal Ajuste */}
+      {modalAjuste && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !ajustando && setModalAjuste(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-torg-blue/10 flex items-center justify-center">
+                  <ArrowUpDown size={20} className="text-torg-blue" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-torg-dark">Ajuste / Movimentação</h3>
+                  <p className="text-sm text-torg-gray">{modalAjuste.nome}</p>
+                </div>
+              </div>
+              <button onClick={() => setModalAjuste(null)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <Select label="Tipo de ajuste *" value={formAjuste.tipo}
+                onChange={(v) => setFormAjuste({ ...formAjuste, tipo: v })}
+                options={[
+                  { value: "PROMOCAO", label: "Promoção" },
+                  { value: "TRANSFERENCIA", label: "Transferência de setor" },
+                  { value: "ALTERACAO_SALARIAL", label: "Alteração salarial" },
+                  { value: "CORRECAO", label: "Correção de cadastro" },
+                ]} />
+
+              <Campo label="Data de efetivação *" type="date" value={formAjuste.dataEfetivacao}
+                onChange={(v) => setFormAjuste({ ...formAjuste, dataEfetivacao: v })} />
+
+              {/* Campos condicionais por tipo */}
+              {(formAjuste.tipo === "PROMOCAO" || formAjuste.tipo === "CORRECAO") && (
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <p className="text-xs font-bold text-torg-gray uppercase tracking-wider flex items-center gap-2">
+                    <Pencil size={12} /> Novo cargo
+                  </p>
+                  <Select label="Cargo" value={formAjuste.cargoId}
+                    onChange={(v) => setFormAjuste({ ...formAjuste, cargoId: v })}
+                    options={cargos.map((c) => ({ value: c.id, label: c.nome }))} />
+                  <div className="flex items-center gap-2 text-xs text-torg-gray">
+                    <span>Atual:</span>
+                    <span className="font-medium text-torg-dark">{modalAjuste.cargo?.nome || "—"}</span>
+                  </div>
+                </div>
+              )}
+
+              {(formAjuste.tipo === "TRANSFERENCIA" || formAjuste.tipo === "CORRECAO") && (
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <p className="text-xs font-bold text-torg-gray uppercase tracking-wider flex items-center gap-2">
+                    <ArrowRightLeft size={12} /> Novo setor
+                  </p>
+                  <Select label="Setor" value={formAjuste.setorId}
+                    onChange={(v) => setFormAjuste({ ...formAjuste, setorId: v })}
+                    options={setores.map((s) => ({ value: s.id, label: s.nome }))} />
+                  <div className="flex items-center gap-2 text-xs text-torg-gray">
+                    <span>Atual:</span>
+                    <span className="font-medium text-torg-dark">{modalAjuste.setor?.nome || "—"}</span>
+                  </div>
+                </div>
+              )}
+
+              {(formAjuste.tipo === "ALTERACAO_SALARIAL" || formAjuste.tipo === "PROMOCAO" || formAjuste.tipo === "CORRECAO") && (
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <p className="text-xs font-bold text-torg-gray uppercase tracking-wider flex items-center gap-2">
+                    <DollarSign size={12} /> Salário
+                  </p>
+                  <Campo label="Novo salário (R$)" type="number" value={formAjuste.salario}
+                    onChange={(v) => setFormAjuste({ ...formAjuste, salario: v })} />
+                  <div className="flex items-center gap-2 text-xs text-torg-gray">
+                    <span>Atual:</span>
+                    <span className="font-medium text-torg-dark">{fmtMoeda(modalAjuste.salario)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">Motivo / justificativa</label>
+                <textarea value={formAjuste.motivo || ""} onChange={(e) => setFormAjuste({ ...formAjuste, motivo: e.target.value })}
+                  rows={2} placeholder="Ex: Promoção por mérito, reestruturação de equipe…"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-xs text-blue-800 flex items-start gap-2">
+                <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                <span>
+                  O ajuste será registrado no histórico (AuditLog) com antes/depois e atualizado automaticamente no organograma.
+                </span>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button onClick={() => setModalAjuste(null)} disabled={ajustando}
+                className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={handleAjuste} disabled={ajustando || !formAjuste.dataEfetivacao}
+                className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
+                {ajustando ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                {ajustando ? "Salvando…" : "Confirmar Ajuste"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Resultado Importação */}
       {modalImport && importResult && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setModalImport(false)}>
@@ -610,6 +810,47 @@ export default function FuncionariosClient() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function BotaoAcoes({ onNovo, desabilitado }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setAberto(!aberto)}
+        className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2"
+      >
+        <PlusCircle size={16} />
+        Funcionário
+        <ChevronDown size={14} className={`transition-transform ${aberto ? "rotate-180" : ""}`} />
+      </button>
+      {aberto && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setAberto(false)} />
+          <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+            <button
+              onClick={() => { setAberto(false); onNovo(); }}
+              disabled={desabilitado}
+              className="w-full px-3 py-2.5 text-sm text-left text-torg-dark hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
+            >
+              <PlusCircle size={15} className="text-emerald-600" />
+              Novo Funcionário
+            </button>
+            <div className="border-t border-gray-100 my-1" />
+            <p className="px-3 py-1 text-[10px] text-torg-gray uppercase tracking-wider font-bold">Ações por funcionário</p>
+            <div className="px-3 py-2 text-xs text-torg-gray flex items-center gap-2">
+              <ArrowUpDown size={13} className="text-torg-blue" />
+              Ajuste — use o menu <MoreVertical size={11} className="inline" /> na tabela
+            </div>
+            <div className="px-3 py-2 text-xs text-torg-gray flex items-center gap-2">
+              <UserMinus size={13} className="text-red-500" />
+              Desligamento — use o menu <MoreVertical size={11} className="inline" /> na tabela
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
