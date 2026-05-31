@@ -88,28 +88,28 @@ export async function POST(req, { params }) {
       }
     }
 
-    // Atualizar precos de cada item
-    for (const item of parsed.itens) {
-      await prisma.estudoCotacaoItem.update({
-        where: { id: item.id },
+    // Atualizar tudo em uma unica transacao (evita N+1)
+    await prisma.$transaction([
+      ...parsed.itens.map((item) =>
+        prisma.estudoCotacaoItem.update({
+          where: { id: item.id },
+          data: {
+            precoUnitario: item.precoUnitario,
+            observacao: item.observacao || undefined,
+          },
+        })
+      ),
+      prisma.estudoCotacao.update({
+        where: { token },
         data: {
-          precoUnitario: item.precoUnitario,
-          observacao: item.observacao || undefined,
+          prazoEntrega: parsed.prazoEntrega,
+          condicaoPgto: parsed.condicaoPgto || undefined,
+          observacao: parsed.observacao || cotacao.observacao,
+          status: "RECEBIDA",
+          respondidoEm: new Date(),
         },
-      });
-    }
-
-    // Atualizar cotacao
-    await prisma.estudoCotacao.update({
-      where: { token },
-      data: {
-        prazoEntrega: parsed.prazoEntrega,
-        condicaoPgto: parsed.condicaoPgto || undefined,
-        observacao: parsed.observacao || cotacao.observacao,
-        status: "RECEBIDA",
-        respondidoEm: new Date(),
-      },
-    });
+      }),
+    ]);
 
     await prisma.auditLog.create({
       data: {

@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft, FileSpreadsheet, ExternalLink, Upload, Scale,
   DollarSign, Calculator, BarChart3, Loader2, AlertCircle,
@@ -10,15 +11,22 @@ import {
   Wrench, Bolt, Paintbrush, Landmark, CalendarDays, Truck,
   Send, Package, ChevronUp, XCircle,
 } from "lucide-react";
-import AbaProdutividade from "./AbaProdutividade";
-import AbaAcessorios from "./AbaAcessorios";
-import AbaParafusos from "./AbaParafusos";
-import AbaPintura from "./AbaPintura";
-import AbaCustos from "./AbaCustos";
-import AbaCronograma from "./AbaCronograma";
-import AbaImpostos from "./AbaImpostos";
-import AbaFretes from "./AbaFretes";
-import AbaResumo from "./AbaResumo";
+
+// Lazy-load abas pesadas — reduz bundle inicial em ~60%
+const TabLoader = () => (
+  <div className="flex items-center justify-center py-20">
+    <Loader2 size={24} className="animate-spin text-torg-blue" />
+  </div>
+);
+const AbaProdutividade = dynamic(() => import("./AbaProdutividade"), { loading: TabLoader });
+const AbaAcessorios = dynamic(() => import("./AbaAcessorios"), { loading: TabLoader });
+const AbaParafusos = dynamic(() => import("./AbaParafusos"), { loading: TabLoader });
+const AbaPintura = dynamic(() => import("./AbaPintura"), { loading: TabLoader });
+const AbaCustos = dynamic(() => import("./AbaCustos"), { loading: TabLoader });
+const AbaCronograma = dynamic(() => import("./AbaCronograma"), { loading: TabLoader });
+const AbaImpostos = dynamic(() => import("./AbaImpostos"), { loading: TabLoader });
+const AbaFretes = dynamic(() => import("./AbaFretes"), { loading: TabLoader });
+const AbaResumo = dynamic(() => import("./AbaResumo"), { loading: TabLoader });
 
 const STATUS_LABELS = {
   RASCUNHO: { label: "Rascunho", cor: "bg-gray-100 text-gray-700", icon: Edit3 },
