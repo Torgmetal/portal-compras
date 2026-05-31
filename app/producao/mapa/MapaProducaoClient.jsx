@@ -5,13 +5,13 @@ import {
 } from "lucide-react";
 
 const AREAS = [
-  { id: "PENDENTE", label: "Estoque", rects: [{ x: 30, y: 395, w: 230, h: 125 }], stroke: "#64748b", fill: "#f1f5f9", statusKey: "PENDENTE" },
-  { id: "CORTE", label: "Preparação", rects: [{ x: 30, y: 25, w: 810, h: 120 }], stroke: "#2563eb", fill: "#eff6ff", statusKey: "CORTE" },
-  { id: "MONTAGEM", label: "Montagem", rects: [{ x: 30, y: 165, w: 395, h: 185 }], stroke: "#059669", fill: "#ecfdf5", statusKey: "MONTAGEM" },
-  { id: "SOLDA", label: "Solda", rects: [{ x: 440, y: 165, w: 400, h: 185 }], stroke: "#d97706", fill: "#fffbeb", statusKey: "SOLDA" },
-  { id: "JATO", label: "Jato", rects: [{ x: 280, y: 395, w: 230, h: 125 }], stroke: "#4f46e5", fill: "#eef2ff", statusKey: "JATO" },
-  { id: "PINTURA", label: "Pintura", rects: [{ x: 890, y: 25, w: 280, h: 330 }], stroke: "#7c3aed", fill: "#f5f3ff", statusKey: "PINTURA" },
-  { id: "EXPEDIDO", label: "Expedição", rects: [{ x: 530, y: 395, w: 310, h: 125 }], stroke: "#0d9488", fill: "#f0fdfa", statusKey: "EXPEDIDO" },
+  { id: "PENDENTE", label: "Estoque", rects: [{ x: 30, y: 15, w: 810, h: 80 }], stroke: "#64748b", fill: "#f1f5f9", statusKey: "PENDENTE" },
+  { id: "CORTE", label: "Preparação", rects: [{ x: 30, y: 115, w: 810, h: 120 }], stroke: "#2563eb", fill: "#eff6ff", statusKey: "CORTE" },
+  { id: "MONTAGEM", label: "Montagem", rects: [{ x: 30, y: 255, w: 395, h: 185 }], stroke: "#059669", fill: "#ecfdf5", statusKey: "MONTAGEM" },
+  { id: "SOLDA", label: "Solda", rects: [{ x: 440, y: 255, w: 400, h: 185 }], stroke: "#d97706", fill: "#fffbeb", statusKey: "SOLDA" },
+  { id: "JATO", label: "Jato", rects: [{ x: 30, y: 470, w: 250, h: 110 }], stroke: "#4f46e5", fill: "#eef2ff", statusKey: "JATO" },
+  { id: "PINTURA", label: "Pintura", rects: [{ x: 890, y: 15, w: 280, h: 425 }], stroke: "#7c3aed", fill: "#f5f3ff", statusKey: "PINTURA" },
+  { id: "EXPEDIDO", label: "Expedição", rects: [{ x: 300, y: 470, w: 310, h: 110 }], stroke: "#0d9488", fill: "#f0fdfa", statusKey: "EXPEDIDO" },
 ];
 
 const FLOW_ORDER = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "JATO", "PINTURA", "EXPEDIDO"];
@@ -161,7 +161,7 @@ export default function MapaProducaoClient() {
         </div>
 
         <div className="p-4 bg-slate-50">
-          <svg viewBox="0 0 1200 540" className="w-full h-auto" style={{ minHeight: 240 }}>
+          <svg viewBox="0 0 1200 600" className="w-full h-auto" style={{ minHeight: 260 }}>
             <defs>
               <pattern id="gridMap" width="40" height="40" patternUnits="userSpaceOnUse">
                 <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="0.5" />
@@ -170,16 +170,16 @@ export default function MapaProducaoClient() {
                 <path d="M0,0 L8,4 L0,8 Z" fill="#94a3b8" />
               </marker>
             </defs>
-            <rect width="1200" height="540" fill="url(#gridMap)" />
+            <rect width="1200" height="600" fill="url(#gridMap)" />
 
             {/* Galpão 01 — Produção */}
-            <rect x={15} y={10} width={850} height={365} fill="white" stroke="#cbd5e1" strokeWidth={1.5} rx={6} />
-            <text x={435} y={160} textAnchor="middle" fill="rgba(0,0,0,0.05)" fontSize={16} fontWeight="bold" letterSpacing={3}>
+            <rect x={15} y={5} width={850} height={450} fill="white" stroke="#cbd5e1" strokeWidth={1.5} rx={6} />
+            <text x={435} y={230} textAnchor="middle" fill="rgba(0,0,0,0.05)" fontSize={16} fontWeight="bold" letterSpacing={3}>
               GALPÃO 01 — PRODUÇÃO
             </text>
 
             {/* Galpão 02 — Pintura */}
-            <rect x={880} y={10} width={300} height={365} fill="white" stroke="#cbd5e1" strokeWidth={1.5} rx={6} />
+            <rect x={880} y={5} width={300} height={450} fill="white" stroke="#cbd5e1" strokeWidth={1.5} rx={6} />
             <text x={1030} y={200} textAnchor="middle" fill="rgba(0,0,0,0.05)" fontSize={13} fontWeight="bold" letterSpacing={3}>
               GALPÃO 02
             </text>
@@ -259,29 +259,29 @@ export default function MapaProducaoClient() {
 
             {/* Flow arrows: Estoque → Prep → Mont → Solda → Jato → Pintura → Exp */}
 
-            {/* 1. Estoque → Preparação (bottom-left up to top) */}
-            <path d="M145,393 L145,147" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={155} y={270} fill="#94a3b8" fontSize={8} fontWeight="600">①</text>
+            {/* 1. Estoque → Preparação (top down) */}
+            <path d="M435,97 L435,113" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={445} y={108} fill="#94a3b8" fontSize={8} fontWeight="600">①</text>
 
-            {/* 2. Preparação → Montagem (top to bottom-left) */}
-            <path d="M300,147 L300,163" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={310} y={158} fill="#94a3b8" fontSize={8} fontWeight="600">②</text>
+            {/* 2. Preparação → Montagem (down to left) */}
+            <path d="M300,237 L300,253" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={310} y={248} fill="#94a3b8" fontSize={8} fontWeight="600">②</text>
 
             {/* 3. Montagem → Solda (left to right) */}
-            <path d="M427,260 L438,260" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={433} y={252} fill="#94a3b8" fontSize={8} fontWeight="600">③</text>
+            <path d="M427,350 L438,350" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={433} y={342} fill="#94a3b8" fontSize={8} fontWeight="600">③</text>
 
-            {/* 4. Solda → Jato (Solda bottom to Jato) */}
-            <path d="M580,352 L450,393" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={520} y={368} fill="#94a3b8" fontSize={8} fontWeight="600">④</text>
+            {/* 4. Solda → Jato (down to bottom) */}
+            <path d="M400,442 L280,468" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={345} y={453} fill="#94a3b8" fontSize={8} fontWeight="600">④</text>
 
             {/* 5. Jato → Pintura (bottom to Galpão 02) */}
-            <path d="M512,450 Q750,420 888,200" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={710} y={400} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
+            <path d="M282,520 Q700,560 888,300" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={600} y={530} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
 
             {/* 6. Pintura → Expedição (Galpão 02 back to bottom) */}
-            <path d="M888,320 Q800,460 842,457" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={850} y={420} fill="#94a3b8" fontSize={8} fontWeight="600">⑥</text>
+            <path d="M888,380 Q750,520 612,478" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={760} y={470} fill="#94a3b8" fontSize={8} fontWeight="600">⑥</text>
           </svg>
         </div>
 
