@@ -9,7 +9,7 @@ const AREAS = [
   { id: "CORTE", label: "Preparação", rects: [{ x: 30, y: 115, w: 810, h: 120 }], stroke: "#2563eb", fill: "#eff6ff", statusKey: "CORTE" },
   { id: "MONTAGEM", label: "Montagem", rects: [{ x: 30, y: 255, w: 395, h: 185 }], stroke: "#059669", fill: "#ecfdf5", statusKey: "MONTAGEM" },
   { id: "SOLDA", label: "Solda", rects: [{ x: 440, y: 255, w: 400, h: 185 }], stroke: "#d97706", fill: "#fffbeb", statusKey: "SOLDA" },
-  { id: "JATO", label: "Jato", rects: [{ x: 30, y: 470, w: 250, h: 110 }], stroke: "#4f46e5", fill: "#eef2ff", statusKey: "JATO" },
+  { id: "JATO", label: "Jato", rects: [{ x: 440, y: 470, w: 400, h: 110 }], stroke: "#4f46e5", fill: "#eef2ff", statusKey: "JATO" },
   { id: "EXPEDIDO", label: "Expedição", rects: [{ x: 890, y: 15, w: 280, h: 200 }], stroke: "#0d9488", fill: "#f0fdfa", statusKey: "EXPEDIDO" },
   { id: "PINTURA", label: "Pintura", rects: [{ x: 890, y: 235, w: 280, h: 210 }], stroke: "#7c3aed", fill: "#f5f3ff", statusKey: "PINTURA" },
 ];
@@ -272,12 +272,16 @@ export default function MapaProducaoClient() {
             <text x={433} y={342} fill="#94a3b8" fontSize={8} fontWeight="600">③</text>
 
             {/* 4. Solda → Jato */}
-            <path d="M400,442 L280,468" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={345} y={453} fill="#94a3b8" fontSize={8} fontWeight="600">④</text>
+            <path d="M640,442 L640,468" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={650} y={458} fill="#94a3b8" fontSize={8} fontWeight="600">④</text>
 
-            {/* 5. Pintura → Expedição (up in Galpão 02) */}
+            {/* 5. Jato → Pintura */}
+            <path d="M842,525 L888,525 L888,400" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
+            <text x={860} y={518} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
+
+            {/* 6. Pintura → Expedição (up in Galpão 02) */}
             <path d="M1030,233 L1030,217" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={1040} y={228} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
+            <text x={1040} y={228} fill="#94a3b8" fontSize={8} fontWeight="600">⑥</text>
           </svg>
         </div>
 
