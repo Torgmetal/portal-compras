@@ -27,6 +27,7 @@ enum Modulo {
   FINANCEIRO
   EXPEDICAO
   RH
+  PLANEJAMENTO
 }
 
 model User {
@@ -56,6 +57,8 @@ model User {
   notificacoes            Notificacao[]
   sharepointSyncs         SharepointSync[]
   producaoDiarias         ProducaoDiaria[]     @relation("ProducaoDiariaCreatedBy")
+  tarefasPlanejamento     TarefaPlanejamento[] @relation("TarefaPlanejamentoCreatedBy")
+  necessidadesSemanais    NecessidadeSemanal[] @relation("NecessidadeSemanalCreatedBy")
   passwordResetTokens     PasswordResetToken[]
   orcamentosCriados       Orcamento[]          @relation("OrcamentoCriadoPor")
   estudosCriados          PropostaEstudo[]     @relation("EstudoCriadoPor")
@@ -183,6 +186,8 @@ model OP {
   pecasConjunto   PecaConjunto[]
   orcamentos      Orcamento[]    @relation("OrcamentoOP")
   mesApontamentos MesApontamento[] @relation("MesApontamentosOP")
+  tarefasPlanejamento TarefaPlanejamento[]
+  necessidadesSemanais NecessidadeSemanal[]
 
   @@index([numero])
   @@index([status])
@@ -2407,6 +2412,61 @@ model Recebimento {
 enum RecebimentoOrigem {
   MANUAL    // usuario registrou manualmente
   OMIE_SYNC // detectado automaticamente pelo sync
+}
+
+// ─── PLANEJAMENTO (PCP) ──────────────────────────────────────
+// Tarefas de acompanhamento por setor, criadas nas reuniões semanais de PCP.
+
+model TarefaPlanejamento {
+  id            String   @id @default(cuid())
+  titulo        String
+  descricao     String?
+  opNumero      String?
+  opId          String?
+  op            OP?      @relation(fields: [opId], references: [id])
+  setor         String   // PRODUCAO, PINTURA, EXPEDICAO
+  semanaIso     Int
+  ano           Int
+  status        String   @default("PENDENTE") // PENDENTE, EM_ANDAMENTO, CONCLUIDA, CANCELADA
+  prioridade    String   @default("MEDIA") // ALTA, MEDIA, BAIXA
+  responsavel   String?
+  dataPrevista  DateTime?
+  dataConcluida DateTime?
+  observacao    String?
+  createdById   String?
+  createdBy     User?    @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([semanaIso, ano])
+  @@index([setor])
+  @@index([opId])
+  @@index([status])
+}
+
+// Necessidade semanal de produção por OP/setor — preenchido na reunião de PCP.
+model NecessidadeSemanal {
+  id            String   @id @default(cuid())
+  semanaIso     Int
+  ano           Int
+  opNumero      String
+  opId          String?
+  op            OP?      @relation(fields: [opId], references: [id])
+  setor         String   // PRODUCAO, PINTURA, EXPEDICAO
+  descricao     String?
+  pesoKg        Float    @default(0)
+  prioridade    String   @default("MEDIA") // ALTA, MEDIA, BAIXA
+  status        String   @default("PENDENTE") // PENDENTE, EM_ANDAMENTO, CONCLUIDO
+  observacao    String?
+  createdById   String?
+  createdBy     User?    @relation("NecessidadeSemanalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([semanaIso, ano])
+  @@index([setor])
+  @@index([opNumero])
+  @@index([status])
 }
 
 // ─── CONFIGURAÇÃO DO ASSISTENTE IA (Torguinho) ──────────────────────────────

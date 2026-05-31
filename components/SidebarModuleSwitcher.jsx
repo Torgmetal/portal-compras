@@ -15,6 +15,7 @@ import {
   LayoutGrid,
   Users,
   Activity,
+  ClipboardList,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -84,6 +85,14 @@ const MODULOS = [
     icon: Users,
     cor: "bg-rose-100 text-rose-700",
     modulos: ["RH"],
+  },
+  {
+    href: "/planejamento",
+    label: "Planejamento",
+    desc: "PCP e programação semanal",
+    icon: ClipboardList,
+    cor: "bg-amber-100 text-amber-700",
+    modulos: ["PLANEJAMENTO", "PRODUCAO"],
   },
   {
     href: "/admin/usuarios",
