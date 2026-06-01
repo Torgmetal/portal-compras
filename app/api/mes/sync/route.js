@@ -58,6 +58,8 @@ function parseData(s) {
   return new Date(s);
 }
 
+export const maxDuration = 60; // Vercel: aumenta limite de 10s (padrão) para 60s
+
 export async function POST(req) {
   await waitMesTables();
   const apiKey = process.env.MES_SYNC_API_KEY;
@@ -104,7 +106,9 @@ export async function POST(req) {
   });
 
   try {
-    const LOTE = 200;
+    // LOTE menor (10) para respeitar pool de conexões do Neon (limit=5)
+    // 10 paralelos / 5 conexões × ~40ms = ~80ms por lote → 500 reg = ~4s total
+    const LOTE = 10;
     for (let i = 0; i < body.apontamentos.length; i += LOTE) {
       const lote = body.apontamentos.slice(i, i + LOTE);
       await Promise.all(
