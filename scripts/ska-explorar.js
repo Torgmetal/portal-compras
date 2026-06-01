@@ -1,19 +1,22 @@
 /**
- * ska-explorar.js — Descobre datasets/relatórios disponíveis no SKA Syneco
+ * ska-explorar.js — Explora datasets/relatórios do SKA Syneco
  *
- * Objetivo: achar o dataset que contém as ORDENS PLANEJADAS (com ITEM PAI =
- * relação conjunto→marca), que é diferente do 242 (apontamentos de produção).
+ * O endpoint /v1/dataset retorna TODOS os datasets com { sql, parameters, columns, data }.
+ * Este script baixa essa lista e permite buscar/inspecionar localmente.
  *
  * USO (na pasta C:\MesSync, com o mesmo .env do agente):
  *
- *   node ska-explorar.js                    → lista todos os datasets/relatórios
- *   node ska-explorar.js --run 242          → roda o dataset 242 e mostra colunas + 3 linhas
- *   node ska-explorar.js --run 263 --obra T87  → roda filtrando uma obra
+ *   node ska-explorar.js                      → lista todos (id + colunas de saída)
+ *   node ska-explorar.js --find Pai           → só datasets cujas colunas/SQL contêm "Pai"
+ *   node ska-explorar.js --find Peso          → procura "Peso"
+ *   node ska-explorar.js --sql 123            → imprime SQL completo + colunas do dataset 123
+ *   node ska-explorar.js --run 123 --obra T87 → roda o dataset 123 e mostra amostra real
  *
- * Depois que achar o dataset das ordens planejadas, me passe:
- *   - o número do dataset
- *   - as colunas que ele retorna (o script imprime)
- *   - 2-3 linhas de exemplo
+ * Para achar as ORDENS PLANEJADAS (conjunto→marca), procure por:
+ *   --find Pai     (coluna "Item Pai")
+ *   --find Parent
+ *   --find Peso
+ *   --find Estrutura
  */
 
 const path = require("path");
@@ -31,8 +34,10 @@ function getArg(name) {
   if (argv[idx].includes("=")) return argv[idx].split("=").slice(1).join("=");
   return argv[idx + 1] || null;
 }
-const RUN_ID  = getArg("run");
-const OBRA    = getArg("obra");
+const FIND   = getArg("find");
+const SQL_ID = getArg("sql");
+const RUN_ID = getArg("run");
+const OBRA   = getArg("obra");
 
 async function login() {
   const resp = await fetch(`${SKA_API_URL}/v1/auth/login`, {
@@ -45,65 +50,69 @@ async function login() {
   const data = await resp.json();
   const token = data.data?.[0]?.token || data.token || data.accessToken || data.jwt;
   if (!token) throw new Error("Token não encontrado: " + JSON.stringify(data).slice(0,200));
-  console.log(`✓ Login OK — token ${token.length} chars\n`);
+  console.log(`✓ Login OK\n`);
   return token;
 }
 
-// Tenta vários endpoints possíveis para listar datasets/relatórios
-async function listarDatasets(token) {
-  const endpoints = [
-    "/v1/dataset",
-    "/v1/datasets",
-    "/v1/dataset/list",
-    "/v1/report",
-    "/v1/reports",
-    "/v1/report/list",
-    "/v1/datasource",
-    "/v1/datasources",
-  ];
-
-  for (const ep of endpoints) {
-    try {
-      const resp = await fetch(`${SKA_API_URL}${ep}`, {
-        method: "GET",
-        headers: { token },
-        timeout: 30000,
-      });
-      if (!resp.ok) {
-        console.log(`  ${ep} → HTTP ${resp.status}`);
-        continue;
-      }
-      const data = await resp.json();
-      const lista = Array.isArray(data) ? data : (data.data || data.rows || data.result || data.datasets || data.reports || []);
-      if (Array.isArray(lista) && lista.length > 0) {
-        console.log(`\n✓✓ ENCONTRADO em ${ep} — ${lista.length} itens:\n`);
-        console.log("Campos de cada item:", Object.keys(lista[0]).join(", "), "\n");
-        lista.forEach(item => {
-          // Tenta extrair id + nome de forma flexível
-          const id   = item.id ?? item.datasetId ?? item.reportId ?? item.code ?? item.codigo ?? "?";
-          const nome = item.name ?? item.nome ?? item.description ?? item.descricao ?? item.title ?? JSON.stringify(item).slice(0,80);
-          console.log(`  [${id}] ${nome}`);
-        });
-        return true;
-      } else {
-        console.log(`  ${ep} → OK mas vazio/formato inesperado: ${JSON.stringify(data).slice(0,150)}`);
-      }
-    } catch (e) {
-      console.log(`  ${ep} → erro: ${e.message}`);
-    }
-  }
-  console.log("\n⚠ Nenhum endpoint de listagem respondeu com dados.");
-  console.log("Abra o SKA Reports manualmente e veja o número do relatório das ordens planejadas.");
-  return false;
+// Baixa a lista completa de datasets
+async function baixarDatasets(token) {
+  const resp = await fetch(`${SKA_API_URL}/v1/dataset`, {
+    method: "GET", headers: { token }, timeout: 60000,
+  });
+  if (!resp.ok) throw new Error(`/v1/dataset → HTTP ${resp.status}`);
+  const data = await resp.json();
+  const lista = Array.isArray(data) ? data : (data.data || data.rows || data.result || []);
+  return lista;
 }
 
-// Roda um dataset e mostra colunas + amostra
-async function rodarDataset(token, id) {
-  console.log(`\n── Rodando dataset ${id}${OBRA ? ` (obra=${OBRA})` : ""} ──\n`);
+// Extrai id, nome, sql e colunas de um item (estrutura flexível)
+function parseItem(item) {
+  const sqlObj  = item.sql || {};
+  const id      = sqlObj.dataSetId ?? item.dataSetId ?? item.id ?? "?";
+  const nome    = sqlObj.name ?? item.name ?? "";
+  const sqlText = (typeof sqlObj === "string" ? sqlObj : sqlObj.sql) || item.sqlText || "";
+  // columns pode ser array de strings ou de objetos
+  let cols = item.columns || sqlObj.columns || [];
+  if (Array.isArray(cols)) {
+    cols = cols.map(c => (typeof c === "string" ? c : (c.name || c.caption || c.title || c.field || JSON.stringify(c))));
+  } else {
+    cols = [];
+  }
+  return { id, nome, sqlText: String(sqlText), cols };
+}
+
+function listar(lista) {
+  const termo = (FIND || "").toLowerCase();
+  let mostrados = 0;
+  for (const item of lista) {
+    const { id, nome, sqlText, cols } = parseItem(item);
+    const haystack = (cols.join(" ") + " " + sqlText + " " + nome).toLowerCase();
+    if (termo && !haystack.includes(termo)) continue;
+    mostrados++;
+    console.log(`[${id}] ${nome || "(sem nome)"}`);
+    if (cols.length > 0) console.log(`     colunas: ${cols.join(", ")}`);
+  }
+  console.log(`\n${mostrados} dataset(s)${termo ? ` contendo "${FIND}"` : ""}.`);
+  if (termo && mostrados === 0) {
+    console.log(`Nenhum com "${FIND}". Tente: --find Parent | --find Peso | --find Qtd | --find Estrutura`);
+  }
+}
+
+function mostrarSql(lista, id) {
+  const item = lista.find(it => String(parseItem(it).id) === String(id));
+  if (!item) { console.log(`Dataset ${id} não encontrado.`); return; }
+  const { nome, sqlText, cols } = parseItem(item);
+  console.log(`=== Dataset ${id} — ${nome} ===\n`);
+  console.log("COLUNAS DE SAÍDA:", cols.join(", ") || "(não informadas)", "\n");
+  console.log("SQL COMPLETO:\n");
+  console.log(sqlText);
+}
+
+async function rodar(token, id) {
+  console.log(`── Rodando dataset ${id}${OBRA ? ` (obra=${OBRA})` : ""} ──\n`);
   const hoje = new Date();
   const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T00:00:00`;
   const ini = new Date(hoje); ini.setFullYear(ini.getFullYear() - 2);
-
   const qs = [
     "interval=0",
     `%23StartDate=${encodeURIComponent(fmt(ini))}`,
@@ -114,36 +123,26 @@ async function rodarDataset(token, id) {
     "%23Resource=Todos", "%23Resource_concat=Todos",
     "page=1", "pageSize=10",
   ].join("&");
-
   const resp = await fetch(`${SKA_API_URL}/v1/dataset/${id}/run?${qs}`, {
     method: "GET", headers: { token }, timeout: 120000,
   });
-  if (!resp.ok) {
-    console.log(`Dataset ${id} → HTTP ${resp.status}: ${(await resp.text()).slice(0,300)}`);
-    return;
-  }
+  if (!resp.ok) { console.log(`HTTP ${resp.status}: ${(await resp.text()).slice(0,300)}`); return; }
   const data = await resp.json();
   const rows = Array.isArray(data) ? data : (data.data || data.rows || data.result || []);
-  if (!Array.isArray(rows) || rows.length === 0) {
-    console.log("Sem linhas. Resposta:", JSON.stringify(data).slice(0,300));
-    return;
-  }
-  console.log(`Total de linhas: ${rows.length}\n`);
-  console.log("COLUNAS:", Object.keys(rows[0]).join(", "), "\n");
-  console.log("AMOSTRA (3 primeiras linhas):");
-  rows.slice(0, 3).forEach((r, i) => console.log(`\n[${i}]`, JSON.stringify(r, null, 2)));
+  if (!Array.isArray(rows) || rows.length === 0) { console.log("Sem linhas:", JSON.stringify(data).slice(0,300)); return; }
+  console.log(`${rows.length} linhas.\nCOLUNAS:`, Object.keys(rows[0]).join(", "), "\n");
+  rows.slice(0, 3).forEach((r, i) => console.log(`[${i}]`, JSON.stringify(r, null, 2)));
 }
 
 async function main() {
   if (!SKA_USER || !SKA_PASS) { console.error("SKA_USER/SKA_PASS não configurados no .env"); process.exit(1); }
   try {
     const token = await login();
-    if (RUN_ID) {
-      await rodarDataset(token, RUN_ID);
-    } else {
-      console.log("Procurando datasets/relatórios disponíveis...\n");
-      await listarDatasets(token);
-    }
+    if (RUN_ID) { await rodar(token, RUN_ID); return; }
+    const lista = await baixarDatasets(token);
+    console.log(`Total: ${lista.length} datasets\n`);
+    if (SQL_ID) mostrarSql(lista, SQL_ID);
+    else        listar(lista);
   } catch (e) {
     console.error("ERRO:", e.message);
     process.exit(1);
