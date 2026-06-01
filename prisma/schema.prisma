@@ -1419,6 +1419,7 @@ model PropostaEstudo {
   itensAcessorio          AcessorioItem[]
   itensCronograma         CronogramaItem[]
   itensCusto              CustoItem[]
+  itensMontagem           MontagemItem[]
   cotacoesEstudo          EstudoCotacao[]
   itensFaturamento        FaturamentoEvento[]
   cotacoesFretes          FreteCotacao[]
@@ -1451,6 +1452,26 @@ model CronogramaItem {
   estudo         PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
 
   @@index([estudoId])
+}
+
+model MontagemItem {
+  id            String         @id @default(cuid())
+  estudoId      String
+  secao         String
+  descricao     String
+  quantidade    Int            @default(1)
+  dias          Float          @default(0)
+  custoDiario   Float          @default(0)
+  custoFixo     Float          @default(0)
+  custoTotal    Float          @default(0)
+  observacao    String?
+  ordem         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  estudo        PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+  @@index([estudoId, secao])
 }
 
 model FreteItem {

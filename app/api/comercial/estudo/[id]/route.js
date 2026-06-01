@@ -29,6 +29,7 @@ export async function GET(req, { params }) {
           include: { tintaProduto: { select: { id: true, nome: true, svPct: true, resinaTipo: true, diluentePct: true, fabricante: true, norma: true } } },
         },
         itensCusto: { orderBy: [{ categoria: "asc" }, { ordem: "asc" }] },
+        itensMontagem: { orderBy: [{ secao: "asc" }, { ordem: "asc" }] },
         itensFaturamento: { orderBy: { ordem: "asc" } },
         itensCronograma: { orderBy: { ordem: "asc" } },
         itensFretes: { orderBy: { ordem: "asc" } },
