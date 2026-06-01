@@ -839,11 +839,15 @@ function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
               <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between flex-wrap gap-2">
                 <span className="text-sm font-medium text-torg-dark">
                   {filtradosRast.length} de {rastData.total} peças — <strong>{obraFiltro}</strong>
-                  {rastData.modoFallback && <span className="text-amber-600 text-xs ml-2">(Syneco only)</span>}
+                  {rastData.pesoTotalPlanejado > 0 && (
+                    <span className="text-torg-gray font-normal ml-2">
+                      · {fmtNum(rastData.pesoTotalProduzido, 0)}/{fmtNum(rastData.pesoTotalPlanejado, 0)} kg
+                    </span>
+                  )}
                   {filtroStatusPeca && <span className="text-torg-blue"> · {filtroStatusPeca}</span>}
                 </span>
                 <div className="flex gap-3 text-xs text-torg-gray">
-                  {!rastData.modoFallback && <span className="text-gray-500 font-medium">{rastData.contagens?.naoIniciada || 0} não iniciadas</span>}
+                  <span className="text-gray-500 font-medium">{rastData.contagens?.naoIniciada || 0} não iniciadas</span>
                   <span className="text-blue-600 font-medium">{rastData.contagens?.produzindo || 0} produzindo</span>
                   <span className="text-green-600 font-medium">{rastData.contagens?.finalizado || 0} finalizadas</span>
                 </div>

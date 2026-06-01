@@ -22,27 +22,26 @@ export default async function MesPage() {
   const de  = new Date(de30Str + "T00:00:00.000Z");
   const ate = new Date(hojeStr + "T23:59:59.999Z");
 
-  const [grupos, totaisPorObra, statusGrupos, opsDb, ultimoSync, totalGeral] = await Promise.all([
-    prisma.mesApontamento.groupBy({
+  const [grupos0, totais0, statusGrupos, opsDb, ultimoSync, totalGeral] = await Promise.all([
+    prisma.mesOrdem.groupBy({
       by: ["obra", "setor"],
       where: { dataInicio: { gte: de, lte: ate } },
-      _sum:   { produzidoKg: true, produzidoUn: true, rejeitado: true, retrabalhado: true },
-      _count: { productionId: true },
+      _sum:   { pesoProduzido: true, produzidoUn: true, rejeitadoUn: true, pesoPlanejado: true },
+      _count: { id: true },
       _max:   { dataFim: true, updatedAt: true },
       orderBy: [{ obra: "asc" }],
     }),
-    prisma.mesApontamento.groupBy({
+    prisma.mesOrdem.groupBy({
       by: ["obra"],
       where: { dataInicio: { gte: de, lte: ate } },
-      _sum:   { produzidoKg: true, produzidoUn: true },
-      _count: { productionId: true },
+      _sum:   { pesoProduzido: true, produzidoUn: true },
+      _count: { id: true },
       _max:   { updatedAt: true },
     }),
-    // Status dominante por obra (Produzindo > Finalizado Total > Finalizado Parcial > Finalizado)
-    prisma.mesApontamento.groupBy({
+    prisma.mesOrdem.groupBy({
       by: ["obra", "status"],
       where: { dataInicio: { gte: de, lte: ate } },
-      _count: { productionId: true },
+      _count: { id: true },
     }),
     prisma.oP.findMany({
       where: { status: { in: ["ABERTA", "EM_EXECUCAO", "ATRASADA"] } },
@@ -50,8 +49,28 @@ export default async function MesPage() {
       orderBy: { numero: "asc" },
     }),
     prisma.mesSyncLog.findFirst({ orderBy: { criadoEm: "desc" } }),
-    prisma.mesApontamento.count(),
+    prisma.mesOrdem.count(),
   ]);
+
+  // Remapeia para o formato que o MesClient consome (produzidoKg, productionId…)
+  const grupos = grupos0.map(g => ({
+    obra: g.obra, setor: g.setor,
+    _sum: {
+      produzidoKg:   g._sum.pesoProduzido || 0,
+      produzidoUn:   g._sum.produzidoUn || 0,
+      rejeitado:     g._sum.rejeitadoUn || 0,
+      retrabalhado:  0,
+      pesoPlanejado: g._sum.pesoPlanejado || 0,
+    },
+    _count: { productionId: g._count.id || 0 },
+    _max:   { dataFim: g._max.dataFim, updatedAt: g._max.updatedAt },
+  }));
+  const totaisPorObra = totais0.map(t => ({
+    obra: t.obra,
+    _sum: { produzidoKg: t._sum.pesoProduzido || 0, produzidoUn: t._sum.produzidoUn || 0 },
+    _count: { productionId: t._count.id || 0 },
+    _max: { updatedAt: t._max.updatedAt },
+  }));
 
   // Converte T64 → 064 para encontrar a OP no portal
   function obraParaNumeroOP(obra) {
@@ -80,11 +99,13 @@ export default async function MesPage() {
     }
   }
 
-  // Não Iniciadas: OPs ativas do portal sem nenhum apontamento no período
+  // Não Iniciadas: OPs ativas do portal sem nenhuma produção (produzido = 0)
   const normObraNum = (obra) => { const m = (obra || "").match(/^T(\d+)/i); return m ? String(parseInt(m[1])) : ""; };
-  const skaNormSet  = new Set(obrasUnicas.map(normObraNum).filter(Boolean));
+  const obrasComProducao = new Set(
+    grupos.filter(g => (g._sum.produzidoUn || 0) > 0).map(g => normObraNum(g.obra)).filter(Boolean)
+  );
   const naoIniciadas = opsDb
-    .filter(op => !skaNormSet.has(String(parseInt(op.numero || "0"))))
+    .filter(op => !obrasComProducao.has(String(parseInt(op.numero || "0"))))
     .map(op => ({
       obra:   `T${parseInt(op.numero)}`,
       opInfo: { id: op.id, cliente: op.cliente, obra: op.obra, numero: op.numero },

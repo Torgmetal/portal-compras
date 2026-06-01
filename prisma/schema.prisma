@@ -2356,6 +2356,48 @@ model MesApontamento {
   @@index([status])
 }
 
+// Ordem planejada do Syneco (dataset 150 — TORG_Production_Traceability_Detalhado).
+// Diferente de MesApontamento (eventos): aqui é UMA linha por peça/operação/obra,
+// com Planejado vs Produzido. Inclui peças NÃO INICIADAS (planejado>0, produzido=0).
+model MesOrdem {
+  id            String   @id @default(cuid())
+
+  obra          String   // T87 (campo Obra do SKA = número da OP no portal)
+  op            String   // P11 (OrderNum)
+  operacao      String   // "10", "30", "40"... (Operation)
+  item          String   // P11 (PartCode)
+  setor         String?  // Corte, Montagem, Solda...
+  descItem      String?  // CH22, W150X13...
+  maquina       String?
+  operador      String?
+
+  planejadoUn   Float    @default(0) // PlanQty
+  produzidoUn   Float    @default(0) // PartCount
+  rejeitadoUn   Float    @default(0) // ScrapCount
+  saldoUn       Float    @default(0) // LeftOver (planejado - produzido)
+  pesoPlanejado Float    @default(0) // PesoPlanejado (kg)
+  pesoProduzido Float    @default(0) // Peso (kg produzido)
+  saldoRestante Float    @default(0) // SaldoRestante (kg)
+
+  status        String?  // Finalizado | Finalizado Parcial | Produzindo | (null = não iniciada)
+  productionId  Int?     // ProductionID do SKA (null quando não iniciada)
+  dataInicio    DateTime?
+  dataFim       DateTime?
+
+  // Vínculo opcional com OP do portal
+  opId          String?
+
+  syncRunId     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([obra, op, operacao, item]) // chave de upsert (uma linha por peça/operação)
+  @@index([obra])
+  @@index([setor])
+  @@index([status])
+  @@index([opId])
+}
+
 // Log de cada execução do sync com o MES SKA.
 model MesSyncLog {
   id               String   @id @default(cuid())
