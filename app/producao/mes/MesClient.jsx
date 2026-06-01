@@ -866,13 +866,25 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
 
           {obraFiltro && rastData && !loadRast && (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              {/* Aviso modo fallback — LE não importada */}
+              {rastData.modoFallback && (
+                <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 flex items-start gap-2 text-xs text-amber-800">
+                  <Info size={13} className="mt-0.5 shrink-0" />
+                  <span>
+                    <strong>Lista de Estrutura (LE) não importada</strong> para esta OP —
+                    mostrando apenas peças com apontamentos no Syneco.
+                    Para ver peças "Não Iniciadas", importe a LE na aba <strong>Produção → Peças</strong>.
+                  </span>
+                </div>
+              )}
               <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between flex-wrap gap-2">
                 <span className="text-sm font-medium text-torg-dark">
                   {filtradosRast.length} de {rastData.total} peças — <strong>{obraFiltro}</strong>
+                  {rastData.modoFallback && <span className="text-amber-600 text-xs ml-2">(Syneco only)</span>}
                   {filtroRast && <span className="text-torg-blue"> · {filtroRast}</span>}
                 </span>
                 <div className="flex gap-3 text-xs text-torg-gray">
-                  <span className="text-gray-500 font-medium">{rastData.contagens?.naoIniciada || 0} não iniciadas</span>
+                  {!rastData.modoFallback && <span className="text-gray-500 font-medium">{rastData.contagens?.naoIniciada || 0} não iniciadas</span>}
                   <span className="text-blue-600 font-medium">{rastData.contagens?.produzindo || 0} produzindo</span>
                   <span className="text-green-600 font-medium">{rastData.contagens?.finalizado || 0} finalizadas</span>
                 </div>
@@ -1167,6 +1179,34 @@ export default function MesClient({
           </div>
         )}
       </div>
+
+      {/* Banner: histórico limitado */}
+      {ultimoSync && (() => {
+        const primeiroSync = new Date(totalGeralBanco > 0
+          ? "2026-05-27" // data aproximada do primeiro sync — poderia ser dinâmica
+          : new Date().toISOString());
+        const diasDesde = Math.round((Date.now() - new Date(ultimoSync.criadoEm).getTime()) / 86400000);
+        // Mostra aviso se existir sync recente mas os dados começam depois de jan/2026
+        return null; // removido do render, instrução fica no painel de diagnóstico
+      })()}
+
+      {/* Instrução de backfill — só aparece para ADMIN */}
+      {totalGeralBanco > 0 && totalGeralBanco < 500 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3 text-sm text-amber-800">
+          <Info size={16} className="shrink-0 mt-0.5" />
+          <div>
+            <strong>Histórico limitado</strong> — apenas {totalGeralBanco} apontamentos no banco.
+            Para importar dados históricos do Syneco, execute no servidor onde o agente está instalado:
+            <code className="block mt-1 bg-amber-100 rounded px-2 py-1 text-xs font-mono text-amber-900">
+              node mes-sync-agent.js --start 2026-01-01
+            </code>
+            <span className="text-xs opacity-80 mt-0.5 block">
+              Isso importa todos os apontamentos de 01/01/2026 até hoje.
+              Ajuste a data conforme necessário.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

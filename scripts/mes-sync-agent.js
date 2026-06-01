@@ -27,13 +27,30 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 const fetch  = require("node-fetch");
 const fs     = require("fs");
 
+// ─── Argumentos de linha de comando ────────────────────────────
+// Exemplos de uso:
+//   node mes-sync-agent.js                 → sincroniza SYNC_DIAS_ATRAS dias atrás (padrão: 1)
+//   node mes-sync-agent.js --dias 180       → sincroniza últimos 180 dias (backfill)
+//   node mes-sync-agent.js --start 2026-01-01               → de 01/01/2026 até hoje
+//   node mes-sync-agent.js --start 2026-01-01 --end 2026-05-26  → intervalo específico
+function getArg(name) {
+  const argv = process.argv.slice(2);
+  const idx  = argv.findIndex(a => a === `--${name}` || a.startsWith(`--${name}=`));
+  if (idx === -1) return null;
+  if (argv[idx].includes("=")) return argv[idx].split("=").slice(1).join("=");
+  return argv[idx + 1] || null;
+}
+const ARG_DIAS  = getArg("dias");
+const ARG_START = getArg("start");
+const ARG_END   = getArg("end");
+
 // ─── Configuração ──────────────────────────────────────────────
 const SKA_API_URL    = (process.env.SKA_API_URL || "http://192.168.0.190:1000").replace(/\/$/, "");
 const SKA_USER       = process.env.SKA_USER;
 const SKA_PASS       = process.env.SKA_PASS;
 const PORTAL_API_URL = (process.env.PORTAL_API_URL || "https://workspace.torg.com.br").replace(/\/$/, "");
 const PORTAL_API_KEY = process.env.PORTAL_API_KEY;
-const SYNC_DIAS_ATRAS = parseInt(process.env.SYNC_DIAS_ATRAS || "1", 10);
+const SYNC_DIAS_ATRAS = ARG_DIAS ? parseInt(ARG_DIAS, 10) : parseInt(process.env.SYNC_DIAS_ATRAS || "1", 10);
 const LOG_FILE        = process.env.LOG_FILE || path.join(__dirname, "mes-sync.log");
 
 // Dataset 242 = "04.4 Rastreabilidade de OP e Item [TORG] - Produção"
@@ -215,12 +232,23 @@ async function main() {
     const hoje = new Date();
     hoje.setHours(23); hoje.setMinutes(59); hoje.setSeconds(59);
 
-    const fimGeral = new Date(hoje);
-    const inicioGeral = new Date(hoje);
-    inicioGeral.setDate(inicioGeral.getDate() - SYNC_DIAS_ATRAS);
-    inicioGeral.setHours(0); inicioGeral.setMinutes(0); inicioGeral.setSeconds(0);
+    let inicioGeral, fimGeral;
 
-    log(`Período total: ${inicioGeral.toISOString().split("T")[0]} → ${fimGeral.toISOString().split("T")[0]} (${SYNC_DIAS_ATRAS} dias)`);
+    if (ARG_START) {
+      // Modo backfill com data explícita: --start 2026-01-01 [--end 2026-05-26]
+      inicioGeral = new Date(ARG_START + "T00:00:00");
+      fimGeral    = ARG_END ? new Date(ARG_END + "T23:59:59") : new Date(hoje);
+      if (isNaN(inicioGeral.getTime())) throw new Error(`--start inválido: ${ARG_START}. Use YYYY-MM-DD`);
+      log(`Modo backfill: ${ARG_START} → ${ARG_END || "hoje"}`);
+    } else {
+      // Modo normal: SYNC_DIAS_ATRAS dias atrás
+      fimGeral    = new Date(hoje);
+      inicioGeral = new Date(hoje);
+      inicioGeral.setDate(inicioGeral.getDate() - SYNC_DIAS_ATRAS);
+      inicioGeral.setHours(0); inicioGeral.setMinutes(0); inicioGeral.setSeconds(0);
+    }
+
+    log(`Período: ${inicioGeral.toISOString().split("T")[0]} → ${fimGeral.toISOString().split("T")[0]} (${SYNC_DIAS_ATRAS} dias)`);
 
     // 1. Login
     const token = await skaLogin();
