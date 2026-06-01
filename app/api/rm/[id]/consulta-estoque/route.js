@@ -10,6 +10,11 @@ const postSchema = z.object({
   email: z.string().email("Email inválido").optional(),
 });
 
+const patchSchema = z.object({
+  consultaId: z.string(),
+  acao: z.enum(["CANCELAR"]),
+});
+
 // GET — busca consultas de estoque dessa RM
 export async function GET(req, { params }) {
   try {
@@ -215,4 +220,50 @@ export async function POST(req, { params }) {
   });
 
   return NextResponse.json({ success: true, consulta }, { status: 201 });
+}
+
+// PATCH — cancelar consulta pendente
+export async function PATCH(req, { params }) {
+  let user;
+  try {
+    user = await requireRole(["ADMIN", "COMPRAS"]);
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
+  }
+
+  let body;
+  try {
+    body = patchSchema.parse(await req.json());
+  } catch (e) {
+    return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
+  }
+
+  const consulta = await prisma.consultaEstoque.findUnique({
+    where: { id: body.consultaId },
+    select: { id: true, rmId: true, status: true },
+  });
+  if (!consulta || consulta.rmId !== params.id) {
+    return NextResponse.json({ success: false, error: "Consulta não encontrada" }, { status: 404 });
+  }
+  if (consulta.status !== "ENVIADA") {
+    return NextResponse.json({ success: false, error: "Só é possível cancelar consultas pendentes" }, { status: 400 });
+  }
+
+  await prisma.consultaEstoque.update({
+    where: { id: body.consultaId },
+    data: { status: "CANCELADA" },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      userId: user.id,
+      action: "CONSULTA_ESTOQUE_CANCELADA",
+      entity: "ConsultaEstoque",
+      entityId: body.consultaId,
+      details: { rmId: params.id },
+    },
+  });
+
+  return NextResponse.json({ success: true });
 }

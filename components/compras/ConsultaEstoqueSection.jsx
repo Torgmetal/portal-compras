@@ -159,24 +159,53 @@ export default function ConsultaEstoqueSection({ rmId }) {
 
         {/* Lista de consultas */}
         {!loading && !erro && consultas.map((c) => (
-          <ConsultaCard key={c.id} consulta={c} />
+          <ConsultaCard key={c.id} consulta={c} rmId={rmId} onCancelado={carregar} />
         ))}
       </div>
     </div>
   );
 }
 
-function ConsultaCard({ consulta }) {
+function ConsultaCard({ consulta, rmId, onCancelado }) {
   const [aberto, setAberto] = useState(consulta.status === "ENVIADA");
+  const [cancelando, setCancelando] = useState(false);
   const isRespondida = consulta.status === "RESPONDIDA";
+  const isCancelada = consulta.status === "CANCELADA";
+  const isPendente = consulta.status === "ENVIADA";
 
   const resumo = (consulta.itens || []).reduce((acc, it) => {
     if (it.resposta) acc[it.resposta] = (acc[it.resposta] || 0) + 1;
     return acc;
   }, {});
 
+  const cancelar = async (e) => {
+    e.stopPropagation();
+    if (!window.confirm("Cancelar esta consulta de estoque?")) return;
+    setCancelando(true);
+    try {
+      const res = await fetch(`/api/rm/${rmId}/consulta-estoque`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consultaId: consulta.id, acao: "CANCELAR" }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      onCancelado();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setCancelando(false);
+    }
+  };
+
+  const borderClass = isRespondida
+    ? "border-emerald-200 bg-emerald-50/20"
+    : isCancelada
+    ? "border-gray-200 bg-gray-50/20"
+    : "border-amber-200 bg-amber-50/20";
+
   return (
-    <div className={`border rounded-lg ${isRespondida ? "border-emerald-200 bg-emerald-50/20" : "border-amber-200 bg-amber-50/20"}`}>
+    <div className={`border rounded-lg ${borderClass}`}>
       <button
         onClick={() => setAberto(!aberto)}
         className="w-full flex items-center justify-between px-4 py-3 text-left"
@@ -184,17 +213,29 @@ function ConsultaCard({ consulta }) {
         <div className="flex items-center gap-2">
           {isRespondida ? (
             <CheckCircle2 size={16} className="text-emerald-600" />
+          ) : isCancelada ? (
+            <XCircle size={16} className="text-gray-400" />
           ) : (
             <Clock size={16} className="text-amber-600" />
           )}
-          <span className="text-sm font-medium text-torg-dark">
-            {isRespondida ? "Respondida" : "Aguardando resposta"}
+          <span className={`text-sm font-medium ${isCancelada ? "text-gray-400 line-through" : "text-torg-dark"}`}>
+            {isRespondida ? "Respondida" : isCancelada ? "Cancelada" : "Aguardando resposta"}
           </span>
           <span className="text-xs text-torg-gray">
             — {new Date(consulta.createdAt).toLocaleDateString("pt-BR")} por {consulta.createdBy?.name}
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {isPendente && (
+            <button
+              onClick={cancelar}
+              disabled={cancelando}
+              className="px-2 py-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+              title="Cancelar consulta"
+            >
+              {cancelando ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={14} />}
+            </button>
+          )}
           {isRespondida && (
             <div className="flex gap-1">
               {resumo.DISPONIVEL > 0 && (
