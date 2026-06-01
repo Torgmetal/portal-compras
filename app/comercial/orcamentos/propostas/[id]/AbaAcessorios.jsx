@@ -4,6 +4,7 @@ import {
   Plus, Trash2, Loader2, X, Sparkles, Upload, Edit3, Check,
   Send, Search, ChevronDown, ChevronUp, Clock, CheckCircle2,
   XCircle, ExternalLink, Package, FileSpreadsheet, CheckSquare, Square,
+  Download,
 } from "lucide-react";
 
 const CATEGORIAS = [
@@ -1059,6 +1060,17 @@ export default function AbaAcessorios({ estudo, estudoId }) {
             )}
             {analisandoIA ? "Analisando..." : "Analisar com IA"}
           </button>
+
+          {/* Baixar template */}
+          <a
+            href="/api/comercial/template-acessorios"
+            download
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-torg-dark hover:bg-gray-50 transition-colors"
+            title="Baixar planilha Composicao de Areas para preencher"
+          >
+            <Download size={14} />
+            Template
+          </a>
 
           {/* Importar planilha */}
           <button
