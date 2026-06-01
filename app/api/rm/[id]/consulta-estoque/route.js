@@ -129,21 +129,71 @@ export async function POST(req, { params }) {
   }
 
   if (emails.length > 0) {
-    const itensHtml = rm.itens.map((it) => {
-      const qtdLabel = (it.peso || 0) > 0 ? `${it.peso} KG` : `${it.qtd} ${it.unidade}`;
-      return `<li>${it.descricao} — ${qtdLabel}</li>`;
+    const baseUrl = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+    const linkResponder = `${baseUrl}/producao/consulta-estoque/${consulta.id}`;
+    const clienteLabel = rm.op?.cliente ? ` — ${rm.op.cliente}` : "";
+
+    const itensRows = rm.itens.map((it, i) => {
+      const qtdLabel = (it.peso || 0) > 0 ? `${Number(it.peso).toLocaleString("pt-BR")} KG` : `${Number(it.qtd).toLocaleString("pt-BR")} ${it.unidade}`;
+      const bg = i % 2 === 0 ? "#ffffff" : "#f7fafc";
+      return `<tr style="background:${bg};">
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#2d3748;font-size:13px;">${it.descricao}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#4a5568;font-size:13px;text-align:right;white-space:nowrap;">${qtdLabel}</td>
+      </tr>`;
     }).join("");
 
     await sendEmail({
       to: emails,
-      subject: `Consulta de estoque — RM ${rm.numero} (${opLabel})`,
+      subject: `Consulta de Estoque — RM ${rm.numero} (${opLabel})`,
       html: `
-        <h2>Consulta de Estoque</h2>
-        <p><strong>${user.name}</strong> solicitou verificação de disponibilidade para a <strong>RM ${rm.numero}</strong> (${opLabel}).</p>
-        ${body.mensagem ? `<p><em>"${body.mensagem}"</em></p>` : ""}
-        <p><strong>Itens para avaliar:</strong></p>
-        <ul>${itensHtml}</ul>
-        <p><a href="${process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}/producao/consulta-estoque/${consulta.id}">Responder no sistema</a></p>
+        <div style="font-family:-apple-system,system-ui,sans-serif;max-width:640px;margin:0 auto;color:#2d3748;">
+          <h2 style="color:#006EAB;margin-top:0;">Consulta de Estoque</h2>
+
+          <p style="color:#4a5568;line-height:1.6;">
+            <strong>${user.name}</strong> (Compras) solicitou uma verificacao de disponibilidade em estoque
+            para a <strong>RM ${rm.numero}</strong> (${opLabel}${clienteLabel}).
+          </p>
+
+          ${body.mensagem ? `
+          <div style="background:#f7fafc;border-left:4px solid #006EAB;padding:12px 16px;border-radius:0 6px 6px 0;margin:16px 0;">
+            <p style="color:#718096;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 4px 0;">Mensagem</p>
+            <p style="color:#2d3748;font-size:14px;line-height:1.5;margin:0;">${body.mensagem}</p>
+          </div>` : ""}
+
+          <table style="width:100%;border-collapse:collapse;margin:24px 0;font-size:14px;">
+            <tr><td style="padding:6px 0;color:#718096;width:160px;">Requisicao</td><td style="padding:6px 0;"><strong>RM ${rm.numero}</strong></td></tr>
+            <tr><td style="padding:6px 0;color:#718096;">Referencia</td><td style="padding:6px 0;">${opLabel}${clienteLabel}</td></tr>
+            <tr><td style="padding:6px 0;color:#718096;">Total de itens</td><td style="padding:6px 0;"><strong>${rm.itens.length}</strong></td></tr>
+            <tr><td style="padding:6px 0;color:#718096;">Solicitado por</td><td style="padding:6px 0;">${user.name}</td></tr>
+          </table>
+
+          <p style="color:#2d3748;font-weight:700;font-size:14px;margin-bottom:8px;">Itens para avaliar:</p>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+            <tr style="background:#002945;">
+              <th style="padding:10px 12px;text-align:left;color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Descricao</th>
+              <th style="padding:10px 12px;text-align:right;color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Quantidade</th>
+            </tr>
+            ${itensRows}
+          </table>
+
+          <div style="text-align:center;margin:32px 0;">
+            <a href="${linkResponder}"
+               style="display:inline-block;background:#006EAB;color:#ffffff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;">
+              Responder consulta
+            </a>
+          </div>
+
+          <p style="color:#718096;font-size:12px;line-height:1.5;">
+            Ou copie e cole esse endereco no navegador:<br>
+            <a href="${linkResponder}" style="color:#006EAB;word-break:break-all;">${linkResponder}</a>
+          </p>
+
+          <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;">
+          <p style="color:#a0aec0;font-size:12px;line-height:1.4;">
+            Atenciosamente,<br>
+            <strong>Equipe de Compras — Torg Metal</strong>
+          </p>
+        </div>
       `,
     });
   }

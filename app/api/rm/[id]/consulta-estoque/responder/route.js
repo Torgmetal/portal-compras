@@ -103,16 +103,93 @@ export async function POST(req, { params }) {
     origemUserId: user.id,
   });
 
-  // Email para quem criou
+  // Email para quem criou — busca itens com rmItem para montar tabela
   if (consulta.createdBy.email) {
+    const consultaCompleta = await prisma.consultaEstoque.findUnique({
+      where: { id: body.consultaId },
+      include: {
+        itens: {
+          include: { rmItem: { select: { descricao: true, unidade: true, qtd: true, peso: true } } },
+        },
+      },
+    });
+
+    const baseUrl = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+    const linkRM = `${baseUrl}/compras/rm/${consulta.rm.id}`;
+
+    const corStatus = { DISPONIVEL: "#38a169", PARCIAL: "#d69e2e", INDISPONIVEL: "#c53030" };
+    const labelStatus = { DISPONIVEL: "Disponivel", PARCIAL: "Parcial", INDISPONIVEL: "Indisponivel" };
+
+    const itensRows = (consultaCompleta?.itens || []).map((it, i) => {
+      const resp = body.itens.find((r) => r.consultaItemId === it.id);
+      const qtdLabel = (it.rmItem?.peso || 0) > 0
+        ? `${Number(it.rmItem.peso).toLocaleString("pt-BR")} KG`
+        : `${Number(it.rmItem?.qtd).toLocaleString("pt-BR")} ${it.rmItem?.unidade}`;
+      const bg = i % 2 === 0 ? "#ffffff" : "#f7fafc";
+      const statusCor = resp ? corStatus[resp.resposta] || "#718096" : "#718096";
+      const statusLabel = resp ? labelStatus[resp.resposta] || "—" : "—";
+      const qtdDisp = resp?.resposta === "PARCIAL" && resp.qtdDisponivel != null ? resp.qtdDisponivel : "";
+      const obs = resp?.observacao || "";
+      return `<tr style="background:${bg};">
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#2d3748;font-size:13px;">${it.rmItem?.descricao || "—"}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#4a5568;font-size:13px;text-align:right;white-space:nowrap;">${qtdLabel}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;">
+          <span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;color:#ffffff;background:${statusCor};">${statusLabel}</span>
+        </td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#4a5568;font-size:13px;text-align:right;">${qtdDisp}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#718096;font-size:12px;">${obs}</td>
+      </tr>`;
+    }).join("");
+
     await sendEmail({
       to: consulta.createdBy.email,
       subject: `Estoque respondido — RM ${consulta.rm.numero} (${opLabel})`,
       html: `
-        <h2>Resposta da Consulta de Estoque</h2>
-        <p><strong>${user.name}</strong> respondeu à sua consulta de estoque para a <strong>RM ${consulta.rm.numero}</strong> (${opLabel}).</p>
-        <p><strong>Resumo:</strong> ${resumoText}</p>
-        <p><a href="${process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}/compras/rm/${consulta.rm.id}">Ver detalhes no sistema</a></p>
+        <div style="font-family:-apple-system,system-ui,sans-serif;max-width:700px;margin:0 auto;color:#2d3748;">
+          <h2 style="color:#006EAB;margin-top:0;">Resposta da Consulta de Estoque</h2>
+
+          <p style="color:#4a5568;line-height:1.6;">
+            <strong>${user.name}</strong> (Producao) respondeu a sua consulta de estoque para a
+            <strong>RM ${consulta.rm.numero}</strong> (${opLabel}).
+          </p>
+
+          <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
+            <tr><td style="padding:6px 0;color:#718096;width:160px;">Requisicao</td><td style="padding:6px 0;"><strong>RM ${consulta.rm.numero}</strong></td></tr>
+            <tr><td style="padding:6px 0;color:#718096;">Referencia</td><td style="padding:6px 0;">${opLabel}</td></tr>
+            <tr><td style="padding:6px 0;color:#718096;">Respondido por</td><td style="padding:6px 0;">${user.name}</td></tr>
+            <tr><td style="padding:6px 0;color:#718096;">Resumo</td><td style="padding:6px 0;"><strong>${resumoText}</strong></td></tr>
+          </table>
+
+          <p style="color:#2d3748;font-weight:700;font-size:14px;margin-bottom:8px;">Detalhamento por item:</p>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+            <tr style="background:#002945;">
+              <th style="padding:10px 12px;text-align:left;color:#ffffff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Descricao</th>
+              <th style="padding:10px 12px;text-align:right;color:#ffffff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Qtd</th>
+              <th style="padding:10px 12px;text-align:center;color:#ffffff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Status</th>
+              <th style="padding:10px 12px;text-align:right;color:#ffffff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Disp.</th>
+              <th style="padding:10px 12px;text-align:left;color:#ffffff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Obs.</th>
+            </tr>
+            ${itensRows}
+          </table>
+
+          <div style="text-align:center;margin:32px 0;">
+            <a href="${linkRM}"
+               style="display:inline-block;background:#006EAB;color:#ffffff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;">
+              Ver RM no sistema
+            </a>
+          </div>
+
+          <p style="color:#718096;font-size:12px;line-height:1.5;">
+            Ou copie e cole esse endereco no navegador:<br>
+            <a href="${linkRM}" style="color:#006EAB;word-break:break-all;">${linkRM}</a>
+          </p>
+
+          <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;">
+          <p style="color:#a0aec0;font-size:12px;line-height:1.4;">
+            Atenciosamente,<br>
+            <strong>Equipe de Producao — Torg Metal</strong>
+          </p>
+        </div>
       `,
     });
   }
