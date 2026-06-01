@@ -26,7 +26,14 @@ export async function GET(req) {
 
   // Filtro base
   const where = {};
-  if (obra)   where.obra   = obra;
+  if (obra) {
+    // Se a obra for código base (T64), inclui sub-OPs (T64A, T64B, T64C) via startsWith
+    // Se vier com letra de sub-OP (T64A), faz match exato
+    const ehBase = /^T\d+$/i.test(obra.trim());
+    where.obra = ehBase
+      ? { startsWith: obra.trim(), mode: "insensitive" }
+      : obra.trim();
+  }
   if (setor)  where.setor  = { contains: setor, mode: "insensitive" };
   if (status) where.status = status;
   if (de || ate) {

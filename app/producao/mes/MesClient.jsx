@@ -586,10 +586,22 @@ function ViewPorSetor({ grupos }) {
 }
 
 // ─── View: Por Peça ───────────────────────────────────────────────────────────
+// Extrai o código base de uma obra: "T64A" → "T64", "T100B" → "T100"
+function obraBaseCode(obra) {
+  const m = (obra || "").match(/^(T\d+)/i);
+  return m ? m[1].toUpperCase() : obra;
+}
+
 function ViewPorPeca({ de, ate, obrasDisponiveis }) {
   const [busca,      setBusca]     = useState("");
-  const [obraFiltro, setObraFiltro]= useState(""); // "T64" | ""
+  const [obraFiltro, setObraFiltro]= useState(""); // "T64" | "" (sempre código base)
   const [abaPeca,    setAbaPeca]   = useState("apontamentos"); // "apontamentos" | "rastreabilidade"
+
+  // Normaliza para código base único: [T64, T64A, T64B] → [T64]
+  const obrasBase = useMemo(() =>
+    [...new Set(obrasDisponiveis.map(obraBaseCode))].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    ), [obrasDisponiveis]);
 
   // ── Tab Apontamentos ────────────────────────────────────────────────────────
   const [todos,   setTodos]   = useState([]);
@@ -602,9 +614,15 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
     setErroAp(null);
     setBusca("");
     const qs = new URLSearchParams({ detalhe: "1" });
-    if (de)         qs.set("de",   de);
-    if (ate)        qs.set("ate",  ate);
-    if (obraFiltro) qs.set("obra", obraFiltro);
+    // Quando uma OP específica está selecionada: busca histórico COMPLETO (sem filtro de data)
+    // Quando "Todas as OPs": usa filtro de data do período selecionado
+    if (!obraFiltro && de)  qs.set("de",  de);
+    if (!obraFiltro && ate) qs.set("ate", ate);
+    if (obraFiltro) {
+      // Passa o código base para capturar sub-OPs (T64A, T64B, T64C)
+      // O backend aceita obra como prefixo (startsWith)
+      qs.set("obra", obraFiltro);
+    }
     fetch(`/api/mes/apontamentos?${qs}`)
       .then(r => r.json())
       .then(d => { if (ativo) { setTodos(d.rows || []); setLoadAp(false); } })
@@ -675,7 +693,7 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
               className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-torg-blue bg-white min-w-[160px]"
             >
               <option value="">Todas as OPs</option>
-              {obrasDisponiveis.map(o => <option key={o} value={o}>{o}</option>)}
+              {obrasBase.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
@@ -870,50 +888,76 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50/60 sticky top-0">
                       <tr>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Marca</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Marca</th>
                         <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">Qtd</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">Peso</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Status Syneco</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Setores visitados</th>
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Último apontamento</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">Apont.</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">UN Total</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">UN Produzida</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Peso</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Status Syneco</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Setores</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Último apont.</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {filtradosRast.map(p => {
                         const naoIniciada = p.statusSyneco === "Não Iniciada";
+                        const pct = p.qte > 0 ? Math.min(100, Math.round((p.produzidoUn / p.qte) * 100)) : 0;
                         const corStatus =
-                          naoIniciada                          ? "text-gray-500 bg-gray-50 border-gray-200"
+                          naoIniciada                          ? "text-gray-400 bg-gray-50 border-gray-200"
                           : p.statusSyneco === "Produzindo"    ? "text-blue-700 bg-blue-50 border-blue-200"
                           : p.statusSyneco.includes("Total")   ? "text-green-800 bg-green-100 border-green-300"
                           : p.statusSyneco.includes("Parcial") ? "text-yellow-700 bg-yellow-50 border-yellow-200"
                           :                                      "text-green-700 bg-green-50 border-green-200";
+                        const corBarra =
+                          naoIniciada          ? "bg-gray-200"
+                          : pct >= 100         ? "bg-green-500"
+                          : pct > 0            ? "bg-yellow-400"
+                          :                     "bg-gray-200";
                         return (
-                          <tr key={p.id} className={`hover:bg-gray-50/50 ${naoIniciada ? "opacity-60" : ""}`}>
-                            <td className="px-4 py-2.5 font-mono text-xs font-semibold text-torg-blue">{p.marca}</td>
-                            <td className="px-4 py-2.5 text-gray-700 max-w-[200px] truncate" title={p.descricao}>{p.descricao || "—"}</td>
-                            <td className="px-4 py-2.5 text-right text-gray-700">{p.qte}</td>
-                            <td className="px-4 py-2.5 text-right text-gray-600 text-xs">{fmtNum(p.pesoTotalKg)} kg</td>
-                            <td className="px-4 py-2.5">
+                          <tr key={p.id} className={`hover:bg-gray-50/50 transition-colors ${naoIniciada ? "opacity-55" : ""}`}>
+                            {/* Marca */}
+                            <td className="px-4 py-2.5 font-mono text-xs font-bold text-torg-blue whitespace-nowrap">{p.marca}</td>
+                            {/* Descrição */}
+                            <td className="px-4 py-2.5 text-gray-700 max-w-[180px] truncate" title={p.descricao}>{p.descricao || "—"}</td>
+                            {/* UN Total */}
+                            <td className="px-4 py-2.5 text-right font-semibold text-torg-dark">{p.qte} un</td>
+                            {/* UN Produzida + barra */}
+                            <td className="px-4 py-2.5 text-right min-w-[110px]">
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className={`font-semibold text-sm ${naoIniciada ? "text-gray-400" : pct >= 100 ? "text-green-700" : pct > 0 ? "text-yellow-700" : "text-gray-500"}`}>
+                                  {naoIniciada ? "0" : fmtNum(p.produzidoUn, 0)} <span className="text-xs font-normal text-gray-400">/ {p.qte} un</span>
+                                </span>
+                                <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full ${corBarra}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            </td>
+                            {/* Peso */}
+                            <td className="px-4 py-2.5 text-right text-gray-500 text-xs whitespace-nowrap">{fmtNum(p.pesoTotalKg)} kg</td>
+                            {/* Status Syneco */}
+                            <td className="px-4 py-2.5 whitespace-nowrap">
                               <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${corStatus}`}>
-                                {naoIniciada ? "— Não Iniciada" : p.statusSyneco}
+                                {naoIniciada ? "Não Iniciada" : p.statusSyneco}
                               </span>
                             </td>
+                            {/* Setores visitados */}
                             <td className="px-4 py-2.5">
-                              <div className="flex flex-wrap gap-1">
+                              <div className="flex flex-wrap gap-1 max-w-[160px]">
                                 {p.setoresVisitados.map(s => (
                                   <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${corSetor(s)}`}>{s}</span>
                                 ))}
                                 {p.setoresVisitados.length === 0 && <span className="text-gray-300 text-xs">—</span>}
                               </div>
                             </td>
+                            {/* Último apontamento */}
                             <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                               {p.ultimaData ? (
-                                <>{fmtDataCurta(p.ultimaData)}{p.ultimoSetor && <span className={`ml-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${corSetor(p.ultimoSetor)}`}>{p.ultimoSetor}</span>}</>
+                                <div className="flex flex-col gap-0.5">
+                                  <span>{fmtDataCurta(p.ultimaData)}</span>
+                                  {p.ultimoSetor && <span className={`px-1.5 py-0.5 rounded border text-[10px] font-medium w-fit ${corSetor(p.ultimoSetor)}`}>{p.ultimoSetor}</span>}
+                                </div>
                               ) : "—"}
                             </td>
-                            <td className="px-4 py-2.5 text-right text-xs text-gray-500">{p.totalApontamentos || "—"}</td>
                           </tr>
                         );
                       })}
