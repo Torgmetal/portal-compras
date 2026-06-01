@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email";
 
 const postSchema = z.object({
   mensagem: z.string().max(500).optional(),
+  email: z.string().email("Email inválido").optional(),
 });
 
 // GET — busca consultas de estoque dessa RM
@@ -109,18 +110,23 @@ export async function POST(req, { params }) {
     origemUserId: user.id,
   });
 
-  // Email para usuários de Produção
-  const producaoUsers = await prisma.user.findMany({
-    where: {
-      ativo: true,
-      OR: [
-        { tipo: "ADMIN" },
-        { modulos: { some: { modulo: "PRODUCAO" } } },
-      ],
-    },
-    select: { email: true },
-  });
-  const emails = producaoUsers.map((u) => u.email).filter(Boolean);
+  // Email: usa o email informado manualmente, ou busca usuários de Produção
+  let emails = [];
+  if (body.email) {
+    emails = [body.email];
+  } else {
+    const producaoUsers = await prisma.user.findMany({
+      where: {
+        ativo: true,
+        OR: [
+          { tipo: "ADMIN" },
+          { modulos: { some: { modulo: "PRODUCAO" } } },
+        ],
+      },
+      select: { email: true },
+    });
+    emails = producaoUsers.map((u) => u.email).filter(Boolean);
+  }
 
   if (emails.length > 0) {
     const itensHtml = rm.itens.map((it) => {

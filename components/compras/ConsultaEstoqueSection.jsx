@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { PackageSearch, Send, CheckCircle2, AlertTriangle, XCircle, Clock, Loader2, RefreshCw, MessageSquare } from "lucide-react";
+import { PackageSearch, Send, CheckCircle2, AlertTriangle, XCircle, Clock, Loader2, RefreshCw, MessageSquare, Mail } from "lucide-react";
 
 const RESPOSTA_CONFIG = {
   DISPONIVEL: { label: "Disponível", cor: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
@@ -14,6 +14,7 @@ export default function ConsultaEstoqueSection({ rmId }) {
   const [erro, setErro] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [mensagem, setMensagem] = useState("");
+  const [email, setEmail] = useState("");
   const [showForm, setShowForm] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -39,12 +40,16 @@ export default function ConsultaEstoqueSection({ rmId }) {
       const res = await fetch(`/api/rm/${rmId}/consulta-estoque`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mensagem: mensagem.trim() || undefined }),
+        body: JSON.stringify({
+          mensagem: mensagem.trim() || undefined,
+          email: email.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       setConsultas((prev) => [data.consulta, ...prev]);
       setMensagem("");
+      setEmail("");
       setShowForm(false);
     } catch (e) {
       alert(e.message);
@@ -87,6 +92,19 @@ export default function ConsultaEstoqueSection({ rmId }) {
               Enviar os itens desta RM para a Produção verificar disponibilidade em estoque.
             </p>
             <div>
+              <label className="text-xs text-torg-gray block mb-1 flex items-center gap-1">
+                <Mail size={12} /> Email do destinatário
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="producao@torg.com.br"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
+              />
+              <p className="text-[11px] text-torg-gray mt-0.5">Se vazio, envia para todos os usuários cadastrados com módulo Produção.</p>
+            </div>
+            <div>
               <label className="text-xs text-torg-gray block mb-1">Mensagem (opcional)</label>
               <textarea
                 value={mensagem}
@@ -107,7 +125,7 @@ export default function ConsultaEstoqueSection({ rmId }) {
                 {enviando ? "Enviando..." : "Enviar Consulta"}
               </button>
               <button
-                onClick={() => { setShowForm(false); setMensagem(""); }}
+                onClick={() => { setShowForm(false); setMensagem(""); setEmail(""); }}
                 className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark transition-colors"
               >
                 Cancelar
