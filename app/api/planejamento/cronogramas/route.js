@@ -14,6 +14,20 @@ export async function GET() {
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
+  // Auto-link unlinked cronogramas to OPs
+  const unlinked = await prisma.cronograma.findMany({ where: { ativo: true, opId: null } });
+  if (unlinked.length > 0) {
+    const opNums = unlinked.map((c) => c.opNumero.replace(/^T0*/, "").padStart(3, "0"));
+    const ops = await prisma.oP.findMany({ where: { numero: { in: opNums } }, select: { id: true, numero: true } });
+    const opMap = Object.fromEntries(ops.map((o) => [o.numero, o.id]));
+    for (const c of unlinked) {
+      const num = c.opNumero.replace(/^T0*/, "").padStart(3, "0");
+      if (opMap[num]) {
+        await prisma.cronograma.update({ where: { id: c.id }, data: { opId: opMap[num] } });
+      }
+    }
+  }
+
   const cronogramas = await prisma.cronograma.findMany({
     where: { ativo: true },
     include: {
@@ -78,7 +92,8 @@ export async function POST(req) {
       const parsed = await parseMpp(buffer);
 
       const opNumFormatted = `T${opNum}`;
-      const op = await prisma.oP.findUnique({ where: { numero: opNumFormatted } });
+      const op = await prisma.oP.findUnique({ where: { numero: opNum } })
+        || await prisma.oP.findFirst({ where: { numero: { endsWith: opNum } } });
 
       const existing = await prisma.cronograma.findUnique({ where: { sharepointPath: fullPath } });
 
