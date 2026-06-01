@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import {
-  Plus, Trash2, Loader2, Save, HardHat, Home, Container,
+  Plus, Trash2, Loader2, Save, HardHat, Home, Building2,
   Wrench, MoreHorizontal, X, ChevronDown, ChevronUp,
 } from "lucide-react";
 
@@ -14,9 +14,9 @@ const SECOES = [
     colunas: { quantidade: "Qtd", dias: "Dias", custoDiario: "Custo/Dia" },
     sugestoes: ["Hotel", "Alojamento em container", "Casa alugada", "Pousada", "Alimentacao (VR)", "Transporte local"],
   },
-  { id: "CONTAINER", label: "Containers", icon: Container, cor: "text-cyan-600", bg: "bg-cyan-50", border: "border-cyan-200",
+  { id: "CONTAINER", label: "Canteiro de Obras", icon: Building2, cor: "text-cyan-600", bg: "bg-cyan-50", border: "border-cyan-200",
     colunas: { quantidade: "Qtd", dias: "Dias", custoDiario: "Custo/Dia" },
-    sugestoes: ["Escritorio", "Ferramental", "Almoxarifado", "Vestiario", "Refeitorio", "Banheiro quimico"],
+    sugestoes: ["Container Escritorio", "Container Ferramental", "Container Almoxarifado", "Container Vestiario", "Container Refeitorio", "Banheiro quimico", "Tapume/Cercamento", "Portaria"],
   },
   { id: "EQUIPAMENTO", label: "Equipamentos", icon: Wrench, cor: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200",
     colunas: { quantidade: "Qtd", dias: "Dias Aluguel", custoDiario: "Custo/Dia" },
@@ -118,7 +118,7 @@ export default function AbaMontagem({ estudo, estudoId }) {
             <HardHat size={20} className="text-torg-blue" /> Montagem em Obra
           </h3>
           <p className="text-xs text-torg-gray mt-0.5">
-            Custos de equipe, alojamento, containers, equipamentos e demais despesas de campo.
+            Custos de equipe, alojamento, canteiro de obras, equipamentos e demais despesas de campo.
           </p>
         </div>
         <div className="text-right">
