@@ -166,13 +166,16 @@ export default function AbaImpostos({ estudo, estudoId, onEstudoUpdate }) {
   };
 
   // ══════════════════════════════════════════════════════════
-  // CALCULOS IMPOSTOS / BDI
+  // CALCULOS IMPOSTOS / BDI — Formula TCU (Acordao 2622/2013)
+  // BDI = [(1+AC+S+R) × (1+DF) × (1+L)] / (1−I−C) − 1
   // ══════════════════════════════════════════════════════════
   const somaImpostos = aliqPIS + aliqCOFINS + aliqCSLL + aliqIRPJ + aliqICMS + aliqISS;
-  const somaBdiComponentes = bdiAdmin + bdiSeguro + bdiRisco + bdiFactoring + bdiLucro + bdiComissao;
+  const custosIndiretos = bdiAdmin + bdiSeguro + bdiRisco; // aditivos no numerador
+  const somaBdiComponentes = bdiAdmin + bdiSeguro + bdiRisco + bdiFactoring + bdiLucro + bdiComissao; // total para exibicao
 
-  const fatorBDI = somaImpostos < 100
-    ? (1 + somaBdiComponentes / 100) / (1 - somaImpostos / 100) - 1
+  const denominadorBDI = 1 - (somaImpostos + bdiComissao) / 100;
+  const fatorBDI = denominadorBDI > 0
+    ? ((1 + custosIndiretos / 100) * (1 + bdiFactoring / 100) * (1 + bdiLucro / 100)) / denominadorBDI - 1
     : 0;
   const percBDI = fatorBDI * 100;
 
@@ -516,10 +519,10 @@ export default function AbaImpostos({ estudo, estudoId, onEstudoUpdate }) {
           </table>
         </div>
 
-        {somaImpostos >= 100 && (
+        {(somaImpostos + bdiComissao) >= 100 && (
           <div className="flex items-center gap-2 mt-2 px-4 py-2 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
             <AlertTriangle size={14} />
-            Soma de impostos igual ou superior a 100% torna o BDI inviavel.
+            Soma de impostos + comissao ({fmtNum(somaImpostos + bdiComissao)}%) igual ou superior a 100% torna o BDI inviavel.
           </div>
         )}
       </div>
@@ -532,7 +535,7 @@ export default function AbaImpostos({ estudo, estudoId, onEstudoUpdate }) {
           </div>
           <div>
             <h3 className="text-sm font-bold text-torg-dark">BDI — Beneficios e Despesas Indiretas</h3>
-            <p className="text-xs text-torg-gray">Percentuais que compoem o markup sobre o custo direto</p>
+            <p className="text-xs text-torg-gray">Formula TCU (Acordao 2622/2013) — custos indiretos aditivos, DF e lucro multiplicativos, comissao no denominador</p>
           </div>
         </div>
 
@@ -607,18 +610,19 @@ export default function AbaImpostos({ estudo, estudoId, onEstudoUpdate }) {
                   <Users size={14} className="text-gray-400" />
                   Comissao
                 </td>
-                <td className="py-3 px-4 text-xs text-torg-gray">Comissao de vendas</td>
+                <td className="py-3 px-4 text-xs text-torg-gray">Incide sobre venda (vai no denominador com impostos)</td>
                 <td className="py-2 px-4">
                   <div className="flex justify-end"><InputPerc valor={bdiComissao} onChange={setBdiComissao} /></div>
                 </td>
                 {custoBase > 0 && <td className="py-3 px-4 text-right text-sm text-torg-gray tabular-nums">{fmtMoeda(custoBase * bdiComissao / 100)}</td>}
               </tr>
-              {/* Subtotal componentes */}
+              {/* Info sobre composicao */}
               <tr className="bg-amber-50/50">
-                <td className="py-3 px-4 text-sm font-bold text-torg-dark">Subtotal BDI (s/ impostos)</td>
-                <td className="py-3 px-4"></td>
-                <td className="py-3 px-4 text-right text-sm font-bold text-amber-600 tabular-nums">{fmtNum(somaBdiComponentes)}%</td>
-                {custoBase > 0 && <td className="py-3 px-4 text-right text-sm font-bold text-amber-600 tabular-nums">{fmtMoeda(custoBase * somaBdiComponentes / 100)}</td>}
+                <td colSpan={custoBase > 0 ? 4 : 3} className="py-3 px-4 text-xs text-amber-700">
+                  <span className="font-semibold">Numerador:</span> (1 + {fmtNum(custosIndiretos)}%) x (1 + {fmtNum(bdiFactoring)}%) x (1 + {fmtNum(bdiLucro)}%)
+                  &nbsp;&nbsp;|&nbsp;&nbsp;
+                  <span className="font-semibold">Denominador:</span> 1 - {fmtNum(somaImpostos)}% - {fmtNum(bdiComissao)}%
+                </td>
               </tr>
             </tbody>
           </table>
@@ -634,12 +638,15 @@ export default function AbaImpostos({ estudo, estudoId, onEstudoUpdate }) {
 
         {/* Formula */}
         <div className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 mb-4">
-          <p className="text-xs text-gray-400 mb-1">Formula:</p>
+          <p className="text-xs text-gray-400 mb-1">Formula TCU (Acordao 2622/2013):</p>
           <p className="text-sm text-gray-200 font-mono">
-            BDI = (1 + {fmtNum(somaBdiComponentes)}%) / (1 - {fmtNum(somaImpostos)}%) - 1
+            BDI = [(1+AC+S+R) x (1+DF) x (1+L)] / (1-I-C) - 1
           </p>
           <p className="text-sm text-gray-200 font-mono mt-1">
-            BDI = {fmtNum(1 + somaBdiComponentes / 100, 4)} / {somaImpostos < 100 ? fmtNum(1 - somaImpostos / 100, 4) : "0"} - 1
+            BDI = [(1+{fmtNum(custosIndiretos)}%) x (1+{fmtNum(bdiFactoring)}%) x (1+{fmtNum(bdiLucro)}%)] / (1-{fmtNum(somaImpostos)}%-{fmtNum(bdiComissao)}%) - 1
+          </p>
+          <p className="text-sm text-gray-200 font-mono mt-1">
+            BDI = [{fmtNum(1 + custosIndiretos / 100, 4)} x {fmtNum(1 + bdiFactoring / 100, 4)} x {fmtNum(1 + bdiLucro / 100, 4)}] / {denominadorBDI > 0 ? fmtNum(denominadorBDI, 4) : "0"} - 1
           </p>
         </div>
 
