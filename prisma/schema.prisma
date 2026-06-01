@@ -1063,12 +1063,12 @@ model Notificacao {
 model ConfigEstoque {
   id              String   @id @default(cuid())
   categoriasOmie  String[] @default(["3.1"])
-  // Palavras-chave que identificam um produto como "Estoque Torg" (matéria-prima
-  // central). Match case-insensitive na descricao. Ex: ["AÇO", "CHAPA", "TUBO"]
-  // Usado quando o Omie nao tem familias estruturadas pra classificar via codigo.
   palavrasChave   String[] @default([])
   ultimaSincProd  DateTime?
   ultimaSincMov   DateTime?
+  // Locais de estoque do Omie — populado automaticamente durante a sync.
+  // Formato: [{"cod": 1, "nome": "01 - Fábrica"}, ...]
+  locaisOmie      Json?
   updatedAt       DateTime @updatedAt
 }
 
@@ -1088,6 +1088,9 @@ model EstoqueItem {
   unidade         String
   cmc             Float    @default(0)
   qtdAtual        Float    @default(0)
+  // Quantidade por local de estoque — populado durante a sync.
+  // Formato: {"1": 10.5, "2": 3} onde a chave é o nCodLocal do Omie.
+  locaisQtd       Json?
   ativo           Boolean  @default(true)
   ultimaSincOmie  DateTime?
   createdAt       DateTime @default(now())

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Package, Search, RefreshCw, Loader2, AlertCircle, ExternalLink,
-  Microscope, ChevronDown, X,
+  Microscope, ChevronDown, X, Warehouse,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -19,17 +19,15 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
   const [itens, setItens] = useState(itensIniciais || []);
   const [config, setConfig] = useState(configInicial);
 
-  // Sincroniza estado local quando o server re-renderiza após router.refresh()
-  // (useState só usa o valor inicial uma vez; precisamos de useEffect para receber
-  //  os novos itensIniciais vindos do server após sync)
   useEffect(() => { setItens(itensIniciais || []); }, [itensIniciais]);
   useEffect(() => { setConfig(configInicial); }, [configInicial]);
 
   // ── Filtros ────────────────────────────────────────────────────────────────
   const [busca, setBusca] = useState("");
-  const [filtroFamilia, setFiltroFamilia] = useState("");  // codigo da familia
-  const [filtroEstoque, setFiltroEstoque] = useState("");  // "" | "com" | "sem"
-  const [filtroTipo, setFiltroTipo] = useState("");        // "" | "materia" | "outros"
+  const [filtroFamilia, setFiltroFamilia] = useState("");   // codigo da familia
+  const [filtroEstoque, setFiltroEstoque] = useState("");   // "" | "com" | "sem"
+  const [filtroTipo, setFiltroTipo] = useState("");         // "" | "materia" | "outros"
+  const [filtroLocal, setFiltroLocal] = useState("");       // cod do local ("" = todos)
 
   // ── Estados de UI ──────────────────────────────────────────────────────────
   const [sincronizando, setSincronizando] = useState(false);
@@ -40,11 +38,14 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
 
   // ── Dados derivados ────────────────────────────────────────────────────────
 
-  // Famílias únicas presentes nos itens (código → label)
+  // Locais de estoque disponíveis (da config, populados após sync)
+  const locaisOmie = useMemo(() => Array.isArray(config?.locaisOmie) ? config.locaisOmie : [], [config]);
+
+  // Famílias únicas presentes nos itens
   const familias = useMemo(() => {
     const map = new Map();
     for (const i of itens) {
-      if (i.categoriaOmie) {
+      if (i.categoriaOmie && i.categoriaOmie !== "N/A") {
         map.set(i.categoriaOmie, i.categoriaLabel || i.categoriaOmie);
       }
     }
@@ -53,15 +54,26 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
       .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [itens]);
 
+  // Progresso de enriquecimento de famílias
+  const semFamilia  = useMemo(() => itens.filter(i => !i.categoriaOmie || i.categoriaOmie === "").length, [itens]);
+  const pctFamilia  = itens.length > 0 ? Math.round(((itens.length - semFamilia) / itens.length) * 100) : 0;
+
   const isMateriaPrima = (i) => /mat[eé]ria[\s_-]*prima/i.test(i.categoriaLabel || "");
-  const totalMateria = useMemo(() => itens.filter(isMateriaPrima).length, [itens]);
-  const totalComEst  = useMemo(() => itens.filter((i) => i.qtdAtual > 0).length, [itens]);
+  const totalMateria   = useMemo(() => itens.filter(isMateriaPrima).length, [itens]);
+  const totalComEst    = useMemo(() => itens.filter((i) => i.qtdAtual > 0).length, [itens]);
+
+  // Qtd para display: se filtro de local ativo, usa locaisQtd[local], senão qtdAtual
+  const qtdDisplay = (item) => {
+    if (!filtroLocal) return item.qtdAtual;
+    const locQtd = item.locaisQtd || {};
+    return Number(locQtd[filtroLocal] ?? 0);
+  };
 
   const filtrados = useMemo(() => {
     return itens.filter((i) => {
       if (filtroFamilia && i.categoriaOmie !== filtroFamilia) return false;
-      if (filtroEstoque === "com"    && !(i.qtdAtual > 0))  return false;
-      if (filtroEstoque === "sem"    &&   i.qtdAtual > 0)   return false;
+      if (filtroEstoque === "com" && !(filtroLocal ? (i.locaisQtd || {})[filtroLocal] > 0 : i.qtdAtual > 0)) return false;
+      if (filtroEstoque === "sem" && (filtroLocal ? (i.locaisQtd || {})[filtroLocal] > 0 : i.qtdAtual > 0)) return false;
       if (filtroTipo    === "materia" && !isMateriaPrima(i)) return false;
       if (filtroTipo    === "outros"  &&  isMateriaPrima(i)) return false;
       if (busca) {
@@ -71,14 +83,13 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
       }
       return true;
     });
-  }, [itens, busca, filtroFamilia, filtroEstoque, filtroTipo]);
+  }, [itens, busca, filtroFamilia, filtroEstoque, filtroTipo, filtroLocal]);
 
-  const temFiltroAtivo = busca || filtroFamilia || filtroEstoque || filtroTipo;
+  const temFiltroAtivo = busca || filtroFamilia || filtroEstoque || filtroTipo || filtroLocal;
 
-  // KPIs dos itens filtrados
-  const valorTotal       = useMemo(() => filtrados.reduce((s, i) => s + (Number(i.cmc) || 0) * (Number(i.qtdAtual) || 0), 0), [filtrados]);
-  const filtComEstoque   = useMemo(() => filtrados.filter((i) => i.qtdAtual > 0).length, [filtrados]);
-  const filtSemEstoque   = useMemo(() => filtrados.filter((i) => !(i.qtdAtual > 0)).length, [filtrados]);
+  const valorTotal     = useMemo(() => filtrados.reduce((s, i) => s + (Number(i.cmc) || 0) * (Number(i.qtdAtual) || 0), 0), [filtrados]);
+  const filtComEstoque = useMemo(() => filtrados.filter((i) => qtdDisplay(i) > 0).length, [filtrados, filtroLocal]);
+  const filtSemEstoque = useMemo(() => filtrados.filter((i) => !(qtdDisplay(i) > 0)).length, [filtrados, filtroLocal]);
 
   // ── Ações ──────────────────────────────────────────────────────────────────
   const limparFiltros = () => {
@@ -86,6 +97,7 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
     setFiltroFamilia("");
     setFiltroEstoque("");
     setFiltroTipo("");
+    setFiltroLocal("");
   };
 
   const rodarDiagnostico = async () => {
@@ -95,7 +107,6 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
       const res = await fetch("/api/estoque/diagnostico");
       const data = await res.json();
       if (!res.ok) {
-        // Vercel pode retornar { error: { message: "..." } } em vez de { error: "string" }
         const errMsg = typeof data.error === "string"
           ? data.error
           : (data.error?.message || JSON.stringify(data.error) || "Erro");
@@ -128,12 +139,11 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
           partes.push(`Produtos: ${data.produtos.error}`);
         } else {
           let txt = `${data.produtos.total ?? "?"} produtos`;
-          if (data.produtos.fonteUsada)   txt += ` via ${data.produtos.fonteUsada}`;
-          if (data.produtos.criados)      txt += `, ${data.produtos.criados} novos`;
-          if (data.produtos.reativados)   txt += `, ${data.produtos.reativados} reativados`;
-          if (data.produtos.zerados)      txt += `, ${data.produtos.zerados} zerados`;
-          if (data.produtos.enriquecidos) txt += `, ${data.produtos.enriquecidos} famílias`;
-          if (data.produtos.erros?.length) txt += ` ⚠ ${data.produtos.erros[0]}`;
+          if (data.produtos.fonteUsada)    txt += ` via ${data.produtos.fonteUsada}`;
+          if (data.produtos.criados)       txt += `, ${data.produtos.criados} novos`;
+          if (data.produtos.zerados)       txt += `, ${data.produtos.zerados} zerados`;
+          if (data.produtos.enriquecidos)  txt += `, ${data.produtos.enriquecidos} famílias`;
+          if (data.produtos.locais)        txt += `, ${data.produtos.locais} locais`;
           partes.push(txt);
         }
       }
@@ -173,7 +183,6 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
           <button
             onClick={rodarDiagnostico}
             disabled={carregandoDiag}
-            title="Testa endpoints do Omie para diagnóstico"
             className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50"
           >
             {carregandoDiag ? <Loader2 size={14} className="animate-spin" /> : <Microscope size={14} />}
@@ -202,6 +211,22 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
         </div>
       )}
 
+      {/* Progresso de enriquecimento */}
+      {semFamilia > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-3">
+          <div className="flex-1">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-amber-800 font-medium">Enriquecendo famílias…</span>
+              <span className="text-amber-700">{pctFamilia}% ({itens.length - semFamilia} de {itens.length})</span>
+            </div>
+            <div className="w-full bg-amber-200 rounded-full h-1.5">
+              <div className="bg-amber-500 h-1.5 rounded-full transition-all" style={{ width: `${pctFamilia}%` }} />
+            </div>
+          </div>
+          <span className="text-xs text-amber-600 whitespace-nowrap">+100/sync</span>
+        </div>
+      )}
+
       {/* Diagnóstico */}
       {diagnostico && (
         <DiagnosticoPanel diagnostico={diagnostico} onClose={() => setDiagnostico(null)} />
@@ -217,12 +242,12 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
         <div className="bg-white rounded-xl shadow-sm border border-emerald-100 p-4">
           <p className="text-xs text-torg-gray">Com estoque</p>
           <p className="text-xl font-extrabold text-emerald-700 tabular-nums mt-1">{filtComEstoque}</p>
-          <p className="text-[10px] text-torg-gray mt-0.5">de {filtrados.length} filtrados</p>
+          <p className="text-[10px] text-torg-gray mt-0.5">de {filtrados.length} filtrados{filtroLocal ? " (neste local)" : ""}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-amber-100 p-4">
           <p className="text-xs text-torg-gray">Sem estoque</p>
           <p className="text-xl font-extrabold text-amber-700 tabular-nums mt-1">{filtSemEstoque}</p>
-          <p className="text-[10px] text-torg-gray mt-0.5">qtd = 0</p>
+          <p className="text-[10px] text-torg-gray mt-0.5">qtd = 0{filtroLocal ? " (neste local)" : ""}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-xs text-torg-gray">Total no catálogo</p>
@@ -245,6 +270,24 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue"
             />
           </div>
+
+          {/* Local de estoque */}
+          {locaisOmie.length > 0 && (
+            <div className="relative">
+              <Warehouse size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
+              <select
+                value={filtroLocal}
+                onChange={(e) => setFiltroLocal(e.target.value)}
+                className="appearance-none pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue bg-white"
+              >
+                <option value="">Todos os locais</option>
+                {locaisOmie.map((l) => (
+                  <option key={l.cod} value={String(l.cod)}>{l.nome}</option>
+                ))}
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
+            </div>
+          )}
 
           {/* Família */}
           <div className="relative">
@@ -278,9 +321,9 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
           {/* Tipo */}
           <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs">
             {[
-              { val: "",         label: `Todos (${itens.length})` },
-              { val: "materia",  label: `Matéria Prima (${totalMateria})` },
-              { val: "outros",   label: `Outros (${itens.length - totalMateria})` },
+              { val: "",        label: `Todos (${itens.length})` },
+              { val: "materia", label: `Matéria Prima (${totalMateria})` },
+              { val: "outros",  label: `Outros (${itens.length - totalMateria})` },
             ].map(({ val, label }) => (
               <button
                 key={val}
@@ -314,6 +357,11 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
             <strong className="text-torg-dark">{filtrados.length}</strong> produto{filtrados.length !== 1 ? "s" : ""} encontrado{filtrados.length !== 1 ? "s" : ""}
             {temFiltroAtivo && <span className="text-torg-blue"> (de {itens.length} no catálogo)</span>}
           </p>
+          {filtroLocal && (
+            <p className="text-xs text-torg-blue font-medium">
+              📍 {locaisOmie.find(l => String(l.cod) === filtroLocal)?.nome || filtroLocal}
+            </p>
+          )}
         </div>
       </div>
 
@@ -350,8 +398,13 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
                     Família
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
-                    Qtd
+                    {filtroLocal ? locaisOmie.find(l => String(l.cod) === filtroLocal)?.nome?.split(" ")[0] || "Qtd" : "Qtd total"}
                   </th>
+                  {locaisOmie.length > 0 && !filtroLocal && (
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                      Por local
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                     CMC
                   </th>
@@ -365,8 +418,11 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtrados.map((i) => {
+                  const qtd = qtdDisplay(i);
+                  const semEstoque = !(qtd > 0);
                   const valorLinha = (Number(i.cmc) || 0) * (Number(i.qtdAtual) || 0);
-                  const semEstoque = !(i.qtdAtual > 0);
+                  const locQtd = i.locaisQtd || {};
+                  const locaisComQtd = locaisOmie.filter(l => (locQtd[String(l.cod)] || 0) > 0);
                   return (
                     <tr key={i.id} className={`hover:bg-gray-50 transition-colors ${semEstoque ? "opacity-60" : ""}`}>
                       {/* Código */}
@@ -385,7 +441,9 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
                       {/* Família */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         {i.categoriaLabel ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-torg-blue-50 text-torg-blue font-medium">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            isMateriaPrima(i) ? "bg-emerald-50 text-emerald-700" : "bg-torg-blue-50 text-torg-blue"
+                          }`}>
                             {i.categoriaLabel}
                           </span>
                         ) : (
@@ -394,8 +452,26 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
                       </td>
                       {/* Qtd */}
                       <td className={`px-4 py-3 text-right tabular-nums whitespace-nowrap font-medium ${semEstoque ? "text-gray-400" : "text-torg-dark"}`}>
-                        {fmtQtd(i.qtdAtual, i.unidade)}
+                        {fmtQtd(qtd, i.unidade)}
                       </td>
+                      {/* Por local (só quando sem filtro de local) */}
+                      {locaisOmie.length > 0 && !filtroLocal && (
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {locaisComQtd.map(l => (
+                              <button
+                                key={l.cod}
+                                onClick={() => setFiltroLocal(String(l.cod))}
+                                title={`${l.nome}: ${fmtQtd(locQtd[String(l.cod)], i.unidade)}`}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-torg-blue-50 text-torg-blue hover:bg-torg-blue hover:text-white transition-colors"
+                              >
+                                <Warehouse size={9} />
+                                {l.nome.split(" ")[0]}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      )}
                       {/* CMC */}
                       <td className="px-4 py-3 text-right text-torg-gray text-xs tabular-nums whitespace-nowrap">
                         {fmtMoeda(i.cmc)}
@@ -421,12 +497,14 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
       <div className="text-xs text-torg-gray flex items-center gap-4 flex-wrap">
         <span>Última sync produtos: <strong>{fmtDataHora(config?.ultimaSincProd)}</strong></span>
         <span>Última sync movimentações: <strong>{fmtDataHora(config?.ultimaSincMov)}</strong></span>
+        {locaisOmie.length > 0 && (
+          <span className="text-torg-blue">{locaisOmie.length} locais: {locaisOmie.map(l => l.nome).join(", ")}</span>
+        )}
         <span className="text-[10px] text-gray-400">Cron automático: diariamente às 06:00 (produtos) e 06:30 (movimentações)</span>
       </div>
     </div>
   );
 }
-
 
 // ── Painel de diagnóstico ──────────────────────────────────────────────────────
 function DiagnosticoPanel({ diagnostico, onClose }) {
@@ -441,7 +519,6 @@ function DiagnosticoPanel({ diagnostico, onClose }) {
         </button>
       </div>
 
-      {/* Famílias */}
       {diagnostico.familiasErro ? (
         <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700">
           ✗ <strong>ListarFamilias:</strong> {diagnostico.familiasErro}
@@ -470,43 +547,18 @@ function DiagnosticoPanel({ diagnostico, onClose }) {
             </table>
           </div>
         </div>
-      ) : (
-        <div className="bg-amber-100 border border-amber-300 rounded p-2 text-xs text-amber-800 space-y-1">
-          <p>⚠️ ListarFamilias retornou vazio.</p>
-          {diagnostico.familiasCamposResposta && (
-            <p className="text-[10px]">Campos da resposta: <span className="font-mono">{diagnostico.familiasCamposResposta.join(", ")}</span></p>
-          )}
-          {diagnostico.familiasTotalRegistros !== undefined && (
-            <p className="text-[10px]">total_de_registros: <strong>{String(diagnostico.familiasTotalRegistros)}</strong></p>
-          )}
-          {diagnostico.familiasRespostaBruta && (
-            <details>
-              <summary className="cursor-pointer text-amber-800 text-[10px]">Ver resposta bruta completa</summary>
-              <pre className="text-[10px] bg-white border border-amber-200 rounded p-2 mt-1 overflow-x-auto max-h-48">{JSON.stringify(diagnostico.familiasRespostaBruta, null, 2)}</pre>
-            </details>
-          )}
-          {diagnostico.familiaExemplo && (
-            <details>
-              <summary className="cursor-pointer text-amber-800 text-[10px]">Ver 1ª família (campos reais)</summary>
-              <pre className="text-[10px] bg-white border border-amber-200 rounded p-2 mt-1 overflow-x-auto">{JSON.stringify(diagnostico.familiaExemplo, null, 2)}</pre>
-            </details>
-          )}
-        </div>
-      )}
+      ) : null}
 
-      {/* Testes com filtro */}
       {diagnostico.testesComFiltro?.map((t, i) => (
         <div key={i} className={`rounded p-2 text-xs ${t.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
           {t.ok ? (
             t.descricao_produto != null ? (
-              // Resultado de ConsultarProduto
               <>
                 <p>✓ <strong>ConsultarProduto ({t.categoria}):</strong> {t.descricao_produto || "?"}</p>
                 <p className="mt-1">família: <strong>{t.descricao_familia || "—"}</strong> (código: <code>{t.codigo_familia || "—"}</code>)</p>
-                {t.inativo !== undefined && <p className="mt-0.5">inativo: {String(t.inativo)}</p>}
               </>
             ) : (
-              <>✓ <strong>ListarProdutos ({t.descricao || t.categoria}):</strong> {t.totalRegistros ?? "?"} produtos em {t.totalPaginas ?? "?"} páginas{t.totalNaPagina != null ? ` (${t.totalNaPagina} na pg1)` : ""}</>
+              <>✓ <strong>ListarProdutos ({t.descricao || t.categoria}):</strong> {t.totalRegistros ?? "?"} produtos</>
             )
           ) : (
             <>✗ <strong>{t.descricao || t.categoria}:</strong> {t.erro}</>
@@ -514,7 +566,6 @@ function DiagnosticoPanel({ diagnostico, onClose }) {
         </div>
       ))}
 
-      {/* ListarPosEstoque */}
       {diagnostico.posEstoque && (
         <div className={`rounded p-2 text-xs ${diagnostico.posEstoque.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
           {diagnostico.posEstoque.ok
@@ -523,84 +574,11 @@ function DiagnosticoPanel({ diagnostico, onClose }) {
         </div>
       )}
 
-      {/* ListarProdutosResumido — campos reais */}
-      {diagnostico.produtosResumido && (
-        <div className={`rounded p-2 text-xs ${diagnostico.produtosResumido.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
-          {diagnostico.produtosResumido.ok ? (
-            <>
-              <p>✓ <strong>ListarProdutosResumido (sem filtro):</strong> {diagnostico.produtosResumido.totalNaPagina ?? "?"} produtos na pg1, {diagnostico.produtosResumido.totalRegistros ?? "?"} total</p>
-              {diagnostico.produtosResumido.camposResposta && (
-                <p className="mt-1 text-amber-700">Campos da resposta: <span className="font-mono">{diagnostico.produtosResumido.camposResposta.join(", ")}</span></p>
-              )}
-              {diagnostico.produtosResumido.exemplo && (
-                <details className="mt-1">
-                  <summary className="cursor-pointer text-emerald-700">Ver exemplo</summary>
-                  <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto">{JSON.stringify(diagnostico.produtosResumido.exemplo, null, 2)}</pre>
-                </details>
-              )}
-            </>
-          ) : <>✗ <strong>ListarProdutosResumido:</strong> {diagnostico.produtosResumido.erro}</>}
-        </div>
-      )}
-
-      {/* ListarProdutos completo — campos reais */}
-      {diagnostico.produtosCompleto && (
-        <div className={`rounded p-2 text-xs ${diagnostico.produtosCompleto.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
-          {diagnostico.produtosCompleto.ok ? (
-            <>
-              <p>✓ <strong>ListarProdutos (sem filtro):</strong> {diagnostico.produtosCompleto.totalNaPagina ?? "?"} na pg1, {diagnostico.produtosCompleto.totalRegistros ?? "?"} total, {diagnostico.produtosCompleto.totalPaginas ?? "?"} páginas</p>
-              {diagnostico.produtosCompleto.camposResposta && (
-                <p className="mt-1 text-amber-700">Campos: <span className="font-mono">{diagnostico.produtosCompleto.camposResposta.join(", ")}</span></p>
-              )}
-              {diagnostico.produtosCompleto.exemplo && (
-                <details className="mt-1">
-                  <summary className="cursor-pointer text-emerald-700">Ver 1º produto retornado</summary>
-                  <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto">{JSON.stringify(diagnostico.produtosCompleto.exemplo, null, 2)}</pre>
-                </details>
-              )}
-            </>
-          ) : <>✗ <strong>ListarProdutos (sem filtro):</strong> {diagnostico.produtosCompleto.erro}</>}
-        </div>
-      )}
-
-      {/* ConsultarProduto — teste com 1º produto do ListarPosEstoque */}
-      {diagnostico.consultarProdutoTeste && (
-        <div className={`rounded p-2 text-xs ${diagnostico.consultarProdutoTeste.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
-          {diagnostico.consultarProdutoTeste.ok ? (
-            <>
-              <p>✓ <strong>ConsultarProduto</strong> (código <code>{diagnostico.consultarProdutoTeste.codigoTestado}</code>, nCodProd={diagnostico.consultarProdutoTeste.nCodProd})</p>
-              <p className="mt-1">familia: <strong>{diagnostico.consultarProdutoTeste.descricao_familia || "—"}</strong> (código: {diagnostico.consultarProdutoTeste.codigo_familia || "—"})</p>
-              {diagnostico.consultarProdutoTeste.camposResposta && (
-                <p className="mt-1 text-amber-700">Campos: <span className="font-mono">{diagnostico.consultarProdutoTeste.camposResposta.join(", ")}</span></p>
-              )}
-              <details className="mt-1">
-                <summary className="cursor-pointer text-emerald-700">Variantes de campo família</summary>
-                <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto">{JSON.stringify(diagnostico.consultarProdutoTeste.familiaVariantes, null, 2)}</pre>
-              </details>
-            </>
-          ) : <>✗ <strong>ConsultarProduto:</strong> {diagnostico.consultarProdutoTeste.erro}</>}
-        </div>
-      )}
-
-      {/* ListarMovEstoque */}
       {diagnostico.movEstoque && (
         <div className={`rounded p-2 text-xs ${diagnostico.movEstoque.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
-          {diagnostico.movEstoque.ok ? (
-            <>
-              <p>✓ <strong>ListarMovEstoque (365 dias):</strong> {diagnostico.movEstoque.totalNaPagina ?? "?"} movs na pg1, {diagnostico.movEstoque.totalPaginas ?? "?"} págs, {diagnostico.movEstoque.totalRegistros ?? "?"} total</p>
-              {diagnostico.movEstoque.camposResposta && (
-                <p className="mt-1 text-amber-700">Campos: <span className="font-mono">{diagnostico.movEstoque.camposResposta.join(", ")}</span></p>
-              )}
-              {diagnostico.movEstoque.exemplo && (
-                <details className="mt-1">
-                  <summary className="cursor-pointer">Ver exemplo de movimento</summary>
-                  <pre className="text-[10px] bg-white border border-emerald-200 rounded p-2 mt-1 overflow-x-auto max-h-40">{JSON.stringify(diagnostico.movEstoque.exemplo, null, 2)}</pre>
-                </details>
-              )}
-            </>
-          ) : (
-            <>✗ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.erro}</>
-          )}
+          {diagnostico.movEstoque.ok
+            ? <p>✓ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.totalNaPagina ?? "?"} movs na pg1</p>
+            : <>✗ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.erro}</>}
         </div>
       )}
     </div>

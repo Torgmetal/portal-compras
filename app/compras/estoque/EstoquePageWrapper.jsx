@@ -49,7 +49,7 @@ export default function EstoquePageWrapper({ itensIniciais, configInicial, isAdm
       {/* Conteúdo */}
       {aba === "fisico" && <EstoqueFisicoClient />}
       {aba === "omie" && (
-        <EstoqueClient itensIniciais={itensIniciais} configInicial={configInicial} isAdmin={isAdmin} />
+        <EstoqueClient itensIniciais={itensIniciais} configInicial={configInicial} />
       )}
     </div>
   );
