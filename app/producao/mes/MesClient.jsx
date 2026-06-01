@@ -150,10 +150,11 @@ function FluxoBar({ setoresOp }) {
 
 // ─── Modal de detalhe de OP ───────────────────────────────────────────────────
 function ModalDetalhe({ obra, opInfo, onClose, de, ate }) {
-  const [rows, setRows]   = useState([]);
-  const [loading, setLoad] = useState(true);
-  const [erro, setErro]   = useState(null);
-  const [busca, setBusca] = useState("");
+  const [rows, setRows]       = useState([]);
+  const [loading, setLoad]    = useState(true);
+  const [erro, setErro]       = useState(null);
+  const [busca, setBusca]     = useState("");
+  const [statusModal, setStatusModal] = useState(""); // "" | "Produzindo" | "Finalizado" | "Finalizado Parcial"
 
   useState(() => {
     let ativo = true;
@@ -168,9 +169,17 @@ function ModalDetalhe({ obra, opInfo, onClose, de, ate }) {
   }, [obra, de, ate]);
 
   const filtrados = useMemo(() => {
-    if (!busca.trim()) return rows;
+    let base = rows;
+    // Filtro por status
+    if (statusModal) {
+      base = base.filter(r => {
+        if (statusModal === "Finalizado") return r.status === "Finalizado" || r.status === "Finalizado Total";
+        return r.status === statusModal;
+      });
+    }
+    if (!busca.trim()) return base;
     const b = busca.toLowerCase();
-    return rows.filter(r =>
+    return base.filter(r =>
       (r.opSka        || "").toLowerCase().includes(b) ||
       (r.setor        || "").toLowerCase().includes(b) ||
       (r.maquina      || "").toLowerCase().includes(b) ||
@@ -178,7 +187,7 @@ function ModalDetalhe({ obra, opInfo, onClose, de, ate }) {
       (r.descricaoItem|| "").toLowerCase().includes(b) ||
       (r.status       || "").toLowerCase().includes(b)
     );
-  }, [rows, busca]);
+  }, [rows, busca, statusModal]);
 
   // Agrupa por setor para mostrar referência no header
   const porSetorHeader = useMemo(() => {
@@ -246,8 +255,8 @@ function ModalDetalhe({ obra, opInfo, onClose, de, ate }) {
           </button>
         </div>
 
-        {/* Busca */}
-        <div className="px-6 py-3 border-b border-gray-50">
+        {/* Busca + filtro de status */}
+        <div className="px-6 py-3 border-b border-gray-50 space-y-2">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -256,6 +265,28 @@ function ModalDetalhe({ obra, opInfo, onClose, de, ate }) {
               placeholder="Buscar por peça, setor, máquina, operador..."
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-torg-blue"
             />
+          </div>
+          {/* Chips de status */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { val: "",                   label: "Todos",      cor: "bg-gray-100 text-gray-600", corAt: "bg-torg-dark text-white" },
+              { val: "Produzindo",         label: "▶ Produzindo",   cor: "bg-blue-50 text-blue-700",    corAt: "bg-blue-600 text-white"   },
+              { val: "Finalizado",         label: "✓ Finalizado",   cor: "bg-green-50 text-green-700",  corAt: "bg-green-600 text-white"  },
+              { val: "Finalizado Parcial", label: "◑ Parcial",      cor: "bg-yellow-50 text-yellow-700",corAt: "bg-yellow-500 text-white" },
+            ].map(({ val, label, cor, corAt }) => (
+              <button
+                key={val}
+                onClick={() => setStatusModal(val)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${statusModal === val ? corAt : cor + " hover:opacity-80"}`}
+              >
+                {label}
+                {val && (
+                  <span className="ml-1 opacity-70">
+                    ({rows.filter(r => val === "Finalizado" ? (r.status === "Finalizado" || r.status === "Finalizado Total") : r.status === val).length})
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -329,8 +360,24 @@ function ModalDetalhe({ obra, opInfo, onClose, de, ate }) {
   );
 }
 
+// Badge de status para o CardOP
+function BadgeStatus({ status }) {
+  const cfg = STATUS_CONFIG[status];
+  if (!cfg) return null;
+  const cor = status === "Produzindo"          ? "bg-blue-50 text-blue-700 border-blue-200"
+            : status === "Finalizado Total"    ? "bg-green-100 text-green-800 border-green-300"
+            : status === "Finalizado"          ? "bg-green-50 text-green-700 border-green-200"
+            : status === "Finalizado Parcial"  ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+            : "bg-gray-50 text-gray-500 border-gray-200";
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-semibold ${cor}`}>
+      {cfg.icone} {status}
+    </span>
+  );
+}
+
 // ─── Card de OP ───────────────────────────────────────────────────────────────
-function CardOP({ obra, opInfo, setores, onVerDetalhe }) {
+function CardOP({ obra, opInfo, setores, statusDominante, onVerDetalhe }) {
   const [expandido, setExpandido] = useState(false);
 
   const ref        = setorRef(setores);
@@ -369,6 +416,7 @@ function CardOP({ obra, opInfo, setores, onVerDetalhe }) {
                 OP não encontrada no portal
               </span>
             )}
+            {statusDominante && <BadgeStatus status={statusDominante} />}
           </div>
 
           {/* Peso + contadores */}
@@ -689,30 +737,55 @@ function ViewPorPeca({ de, ate }) {
   );
 }
 
+// ─── Card de OP Não Iniciada ──────────────────────────────────────────────────
+function CardNaoIniciada({ obra, opInfo }) {
+  return (
+    <div className="bg-white rounded-xl border border-dashed border-gray-200 shadow-sm px-4 py-3 flex items-center gap-3 opacity-70 hover:opacity-90 transition-opacity">
+      <div className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-torg-dark text-sm">{opInfo?.numero ? opInfo.numero : obra}</span>
+          {opInfo?.cliente && <span className="text-sm text-torg-gray truncate">{opInfo.cliente}</span>}
+          {opInfo?.obra    && <span className="text-sm text-gray-400 truncate">· {opInfo.obra}</span>}
+        </div>
+        <span className="text-xs text-gray-400 mt-0.5 block">Nenhum apontamento no período</span>
+      </div>
+      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap shrink-0">
+        Não iniciada
+      </span>
+    </div>
+  );
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function MesClient({
   grupos: gruposIniciais,
   opMap:     opMapInicial,
-  totaisMap: totaisMapInicial, // mantido por compatibilidade, não usado nos cálculos
+  totaisMap: totaisMapInicial,
+  statusMapInicial,
+  naoInicidasIniciais,
   setoresDisponiveis: setoresIniciais,
   ultimoSync: ultimoSyncInicial,
   totalGeralBanco,
   deInicial,
   ateInicial,
 }) {
-  const [grupos,      setGrupos]     = useState(gruposIniciais);
-  const [opMap,       setOpMap]      = useState(opMapInicial);
-  const [ultimoSync,  setUltimoSync] = useState(ultimoSyncInicial);
-  const [setoresDisp, setSetoresDisp]= useState(setoresIniciais);
+  const [grupos,        setGrupos]       = useState(gruposIniciais);
+  const [opMap,         setOpMap]        = useState(opMapInicial);
+  const [ultimoSync,    setUltimoSync]   = useState(ultimoSyncInicial);
+  const [setoresDisp,   setSetoresDisp]  = useState(setoresIniciais);
+  const [statusMap,     setStatusMap]    = useState(statusMapInicial || {});
+  const [naoIniciadas,  setNaoIniciadas] = useState(naoInicidasIniciais || []);
 
   const [loading, setLoading] = useState(false);
   const [erro,    setErro]    = useState(null);
 
   // Filtros
-  const [de,          setDe]         = useState(deInicial);
-  const [ate,         setAte]        = useState(ateInicial);
-  const [buscaOP,     setBuscaOP]    = useState("");
-  const [setorFiltro, setSetorFiltro]= useState("");
+  const [de,           setDe]          = useState(deInicial);
+  const [ate,          setAte]         = useState(ateInicial);
+  const [buscaOP,      setBuscaOP]     = useState("");
+  const [setorFiltro,  setSetorFiltro] = useState("");
+  const [statusFiltro, setStatusFiltro]= useState(""); // "" | "Produzindo" | "Finalizado" | "Finalizado Parcial" | "naoIniciada"
 
   // Modo de visualização
   const [modoView, setModoView] = useState("op"); // "op" | "setor" | "peca"
@@ -735,6 +808,8 @@ export default function MesClient({
       setGrupos(data.grupos || []);
       setOpMap(data.opMap || {});
       setUltimoSync(data.ultimoSync || null);
+      setStatusMap(data.statusMap || {});
+      setNaoIniciadas(data.naoIniciadas || []);
       const novos = [...new Set((data.grupos || []).map(g => g.setor).filter(Boolean))].sort();
       setSetoresDisp(novos);
     } catch (e) {
@@ -772,11 +847,32 @@ export default function MesClient({
     return { kg, un, apont, ops: Object.keys(obraGroups).length, etapasCount };
   }, [obraGroups]);
 
-  // Filtra OPs por texto
+  // Contagens por status (para badges nos filtros)
+  const contagensStatus = useMemo(() => {
+    const cnt = { Produzindo: 0, Finalizado: 0, "Finalizado Parcial": 0, naoIniciada: naoIniciadas.length };
+    for (const st of Object.values(statusMap)) {
+      if (st === "Produzindo")       cnt.Produzindo++;
+      else if (st === "Finalizado Total" || st === "Finalizado") cnt.Finalizado++;
+      else if (st === "Finalizado Parcial") cnt["Finalizado Parcial"]++;
+    }
+    return cnt;
+  }, [statusMap, naoIniciadas]);
+
+  // Filtra OPs por texto + status
   const obras = useMemo(() => {
-    const todas = Object.keys(obraGroups).sort((a, b) =>
+    let todas = Object.keys(obraGroups).sort((a, b) =>
       a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
     );
+    // Filtro por status
+    if (statusFiltro && statusFiltro !== "naoIniciada") {
+      todas = todas.filter(obra => {
+        const st = statusMap[obra] || "";
+        if (statusFiltro === "Produzindo")          return st === "Produzindo";
+        if (statusFiltro === "Finalizado")          return st === "Finalizado" || st === "Finalizado Total";
+        if (statusFiltro === "Finalizado Parcial")  return st === "Finalizado Parcial";
+        return true;
+      });
+    }
     if (!buscaOP.trim()) return todas;
     const b = buscaOP.toLowerCase();
     return todas.filter(obra => {
@@ -787,7 +883,7 @@ export default function MesClient({
         (op?.obra    || "").toLowerCase().includes(b)
       );
     });
-  }, [obraGroups, opMap, buscaOP]);
+  }, [obraGroups, opMap, buscaOP, statusFiltro, statusMap]);
 
   function handleFiltrar() {
     buscar(de, ate, setorFiltro);
@@ -948,6 +1044,32 @@ export default function MesClient({
         </div>
       </div>
 
+      {/* Filtro por status — exibido acima das tabs */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          { val: "",                   label: "Todas as OPs",   cor: "bg-gray-100 text-gray-600 border-gray-200",         corAtivo: "bg-torg-dark text-white border-torg-dark",   cnt: Object.keys(obraGroups).length + naoIniciadas.length },
+          { val: "Produzindo",         label: "Produzindo",     cor: "bg-blue-50 text-blue-700 border-blue-200",          corAtivo: "bg-blue-600 text-white border-blue-600",      cnt: contagensStatus.Produzindo },
+          { val: "Finalizado",         label: "Finalizado",     cor: "bg-green-50 text-green-700 border-green-200",       corAtivo: "bg-green-600 text-white border-green-600",    cnt: contagensStatus.Finalizado },
+          { val: "Finalizado Parcial", label: "Parcial",        cor: "bg-yellow-50 text-yellow-700 border-yellow-200",    corAtivo: "bg-yellow-500 text-white border-yellow-500",  cnt: contagensStatus["Finalizado Parcial"] },
+          { val: "naoIniciada",        label: "Não Iniciada",   cor: "bg-gray-50 text-gray-500 border-gray-200",          corAtivo: "bg-gray-500 text-white border-gray-500",      cnt: contagensStatus.naoIniciada },
+        ].map(({ val, label, cor, corAtivo, cnt }) => (
+          <button
+            key={val}
+            onClick={() => setStatusFiltro(val)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+              statusFiltro === val ? corAtivo : cor + " hover:opacity-80"
+            }`}
+          >
+            {label}
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              statusFiltro === val ? "bg-white/20" : "bg-black/8"
+            }`}>
+              {cnt}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* Tabs de visualização */}
       <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
         {[
@@ -992,7 +1114,38 @@ export default function MesClient({
           {/* ── Por OP ── */}
           {modoView === "op" && (
             <>
-              {obras.length === 0 ? (
+              {/* Lista de Não Iniciadas */}
+              {statusFiltro === "naoIniciada" ? (
+                naoIniciadas.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-torg-gray gap-3">
+                    <CheckCircle2 size={40} className="opacity-30 text-green-500" />
+                    <div className="text-center">
+                      <div className="font-medium text-green-700">Todas as OPs têm apontamentos!</div>
+                      <div className="text-sm mt-1 text-gray-400">Nenhuma OP sem produção no período.</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xs text-torg-gray px-1">
+                      {naoIniciadas.length} OP{naoIniciadas.length !== 1 ? "s" : ""} sem apontamentos no período
+                    </div>
+                    {naoIniciadas
+                      .filter(ni => {
+                        if (!buscaOP.trim()) return true;
+                        const b = buscaOP.toLowerCase();
+                        return (
+                          (ni.opInfo?.numero  || "").toLowerCase().includes(b) ||
+                          (ni.opInfo?.cliente || "").toLowerCase().includes(b) ||
+                          (ni.opInfo?.obra    || "").toLowerCase().includes(b)
+                        );
+                      })
+                      .map(ni => (
+                        <CardNaoIniciada key={ni.obra} obra={ni.obra} opInfo={ni.opInfo} />
+                      ))
+                    }
+                  </div>
+                )
+              ) : obras.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-torg-gray gap-3">
                   <Activity size={40} className="opacity-30" />
                   <div className="text-center">
@@ -1009,7 +1162,8 @@ export default function MesClient({
                 <div className="space-y-3">
                   <div className="text-xs text-torg-gray px-1">
                     {obras.length} OP{obras.length !== 1 ? "s" : ""} com apontamentos no período
-                    {buscaOP && <span> · filtrando por &ldquo;{buscaOP}&rdquo;</span>}
+                    {statusFiltro && <span className="text-torg-blue"> · filtro: {statusFiltro}</span>}
+                    {buscaOP && <span> · buscando &ldquo;{buscaOP}&rdquo;</span>}
                   </div>
                   {obras.map(obra => (
                     <CardOP
@@ -1017,6 +1171,7 @@ export default function MesClient({
                       obra={obra}
                       opInfo={opMap[obra]}
                       setores={obraGroups[obra] || []}
+                      statusDominante={statusMap[obra]}
                       onVerDetalhe={setDetalheObra}
                     />
                   ))}

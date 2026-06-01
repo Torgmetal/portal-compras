@@ -88,7 +88,7 @@ export async function GET(req) {
     obrasUnicas.map(obra => [obra, opMapPorNumero[obraParaNumeroOP(obra)] || null])
   );
 
-  // Contagem total de apontamentos (sem groupBy) para cada obra
+  // Contagem total de apontamentos para cada obra
   const totaisPorObra = await prisma.mesApontamento.groupBy({
     by: ["obra"],
     where,
@@ -98,5 +98,35 @@ export async function GET(req) {
   });
   const totaisMap = Object.fromEntries(totaisPorObra.map(t => [t.obra, t]));
 
-  return NextResponse.json({ grupos, opMap, totaisMap, ultimoSync });
+  // Status dominante por obra: Produzindo > Finalizado Total > Finalizado Parcial > Finalizado
+  const statusGrupos = await prisma.mesApontamento.groupBy({
+    by: ["obra", "status"],
+    where,
+    _count: { productionId: true },
+  });
+  const PRIO = { "Produzindo": 4, "Finalizado Total": 3, "Finalizado Parcial": 2, "Finalizado": 1 };
+  const statusMap = {};
+  for (const row of statusGrupos) {
+    const cur = statusMap[row.obra];
+    if (!cur || (PRIO[row.status] || 0) > (PRIO[cur] || 0)) {
+      statusMap[row.obra] = row.status;
+    }
+  }
+
+  // Não Iniciadas: OPs ativas do portal sem apontamentos no período
+  const normNum = (obra) => { const m = (obra || "").match(/^T(\d+)/i); return m ? String(parseInt(m[1])) : ""; };
+  const skaNormSet = new Set(obrasUnicas.map(normNum).filter(Boolean));
+  const opsAtivas = await prisma.oP.findMany({
+    where: { ativo: true },
+    select: { id: true, numero: true, cliente: true, obra: true },
+    orderBy: { numero: "asc" },
+  });
+  const naoIniciadas = opsAtivas
+    .filter(op => !skaNormSet.has(String(parseInt(op.numero || "0"))))
+    .map(op => ({
+      obra:   `T${parseInt(op.numero)}`,
+      opInfo: { id: op.id, cliente: op.cliente, obra: op.obra, numero: op.numero },
+    }));
+
+  return NextResponse.json({ grupos, opMap, totaisMap, statusMap, naoIniciadas, ultimoSync });
 }

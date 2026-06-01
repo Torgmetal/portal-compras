@@ -20,7 +20,7 @@ export default async function MesPage() {
   const de  = new Date(hojeStr + "T00:00:00.000Z");
   const ate = new Date(hojeStr + "T23:59:59.999Z");
 
-  const [grupos, totaisPorObra, opsDb, ultimoSync, totalGeral] = await Promise.all([
+  const [grupos, totaisPorObra, statusGrupos, opsDb, ultimoSync, totalGeral] = await Promise.all([
     prisma.mesApontamento.groupBy({
       by: ["obra", "setor"],
       where: { dataInicio: { gte: de, lte: ate } },
@@ -36,8 +36,16 @@ export default async function MesPage() {
       _count: { productionId: true },
       _max:   { updatedAt: true },
     }),
+    // Status dominante por obra (Produzindo > Finalizado Total > Finalizado Parcial > Finalizado)
+    prisma.mesApontamento.groupBy({
+      by: ["obra", "status"],
+      where: { dataInicio: { gte: de, lte: ate } },
+      _count: { productionId: true },
+    }),
     prisma.oP.findMany({
+      where: { ativo: true },
       select: { id: true, numero: true, cliente: true, obra: true },
+      orderBy: { numero: "asc" },
     }),
     prisma.mesSyncLog.findFirst({ orderBy: { criadoEm: "desc" } }),
     prisma.mesApontamento.count(),
@@ -60,6 +68,26 @@ export default async function MesPage() {
   );
   const totaisMap = Object.fromEntries(totaisPorObra.map(t => [t.obra, t]));
 
+  // Status dominante por obra: Produzindo > Finalizado Total > Finalizado Parcial > Finalizado
+  const PRIO = { "Produzindo": 4, "Finalizado Total": 3, "Finalizado Parcial": 2, "Finalizado": 1 };
+  const statusMap = {};
+  for (const row of statusGrupos) {
+    const cur = statusMap[row.obra];
+    if (!cur || (PRIO[row.status] || 0) > (PRIO[cur] || 0)) {
+      statusMap[row.obra] = row.status;
+    }
+  }
+
+  // Não Iniciadas: OPs ativas do portal sem nenhum apontamento no período
+  const normObraNum = (obra) => { const m = (obra || "").match(/^T(\d+)/i); return m ? String(parseInt(m[1])) : ""; };
+  const skaNormSet  = new Set(obrasUnicas.map(normObraNum).filter(Boolean));
+  const naoIniciadas = opsDb
+    .filter(op => !skaNormSet.has(String(parseInt(op.numero || "0"))))
+    .map(op => ({
+      obra:   `T${parseInt(op.numero)}`,
+      opInfo: { id: op.id, cliente: op.cliente, obra: op.obra, numero: op.numero },
+    }));
+
   // Setores únicos para os filtros (vindos dos dados reais)
   const setoresUnicos = [...new Set(grupos.map(g => g.setor).filter(Boolean))].sort();
 
@@ -68,6 +96,8 @@ export default async function MesPage() {
       grupos={JSON.parse(JSON.stringify(grupos))}
       opMap={JSON.parse(JSON.stringify(opMap))}
       totaisMap={JSON.parse(JSON.stringify(totaisMap))}
+      statusMapInicial={statusMap}
+      naoInicidasIniciais={naoIniciadas}
       setoresDisponiveis={setoresUnicos}
       ultimoSync={JSON.parse(JSON.stringify(ultimoSync))}
       totalGeralBanco={totalGeral}
