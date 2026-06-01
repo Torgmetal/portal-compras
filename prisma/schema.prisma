@@ -1764,6 +1764,23 @@ model BDMPerfil {
   @@index([codigo])
 }
 
+model CatalogoProdutoAcessorio {
+  id                   String   @id @default(cuid())
+  categoria            String   // TELHAS, GRADES_DE_PISO, STEEL_DECK, PAINEIS_ISO
+  nome                 String
+  pesoM2               Float
+  espessuraMm          Float?
+  fatorDesenvolvimento Float?
+  observacao           String?
+  ativo                Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([categoria, nome])
+  @@index([categoria])
+  @@index([ativo])
+}
+
 model MesApontamento {
   id            String    @id @default(cuid())
   productionId  Int       @unique

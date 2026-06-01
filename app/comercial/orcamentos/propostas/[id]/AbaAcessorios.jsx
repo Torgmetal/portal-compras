@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Plus, Trash2, Loader2, X, Sparkles, Upload, Edit3, Check,
   Send, Search, ChevronDown, ChevronUp, Clock, CheckCircle2,
-  XCircle, ExternalLink, Package,
+  XCircle, ExternalLink, Package, FileSpreadsheet, CheckSquare, Square,
 } from "lucide-react";
 
 const CATEGORIAS = [
@@ -28,6 +28,147 @@ function fmtNum(v, dec = 2) {
 function fmtMoeda(v) {
   if (!v && v !== 0) return "—";
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// ── Modal de preview de importacao ──
+function ImportPreviewModal({ itens, formato, onClose, onConfirmar, confirmando }) {
+  const [selecionados, setSelecionados] = useState(() => new Set(itens.map((_, i) => i)));
+
+  const toggleItem = (idx) => {
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      next.has(idx) ? next.delete(idx) : next.add(idx);
+      return next;
+    });
+  };
+
+  const toggleTodos = () => {
+    if (selecionados.size === itens.length) {
+      setSelecionados(new Set());
+    } else {
+      setSelecionados(new Set(itens.map((_, i) => i)));
+    }
+  };
+
+  const itensSelecionados = itens.filter((_, i) => selecionados.has(i));
+  const porCategoria = {};
+  for (const item of itensSelecionados) {
+    porCategoria[item.categoria] = (porCategoria[item.categoria] || 0) + 1;
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <FileSpreadsheet size={20} className="text-emerald-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-torg-dark">
+                {itens.length} {itens.length === 1 ? "item encontrado" : "itens encontrados"}
+              </h2>
+              <p className="text-xs text-torg-gray">
+                Formato: {formato === "composicao-areas" ? "Composicao de Areas TORG" : "Planilha generica"}
+                {" — "}Selecione os itens para importar
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <X size={18} className="text-gray-400" />
+          </button>
+        </div>
+
+        {/* Tabela */}
+        <div className="flex-1 overflow-auto px-6 py-3">
+          <table className="w-full">
+            <thead className="sticky top-0 bg-white z-10">
+              <tr className="text-left text-xs text-torg-gray border-b border-gray-100">
+                <th className="py-2 px-2 w-8">
+                  <button onClick={toggleTodos} className="hover:text-torg-blue transition-colors">
+                    {selecionados.size === itens.length
+                      ? <CheckSquare size={16} className="text-torg-blue" />
+                      : <Square size={16} />
+                    }
+                  </button>
+                </th>
+                <th className="py-2 px-2 font-medium">Categoria</th>
+                <th className="py-2 px-2 font-medium">Produto</th>
+                <th className="py-2 px-2 font-medium text-right">Area (m2)</th>
+                <th className="py-2 px-2 font-medium text-right">Peso (kg/m2)</th>
+                <th className="py-2 px-2 font-medium text-right">Valor Unit.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itens.map((item, idx) => (
+                <tr
+                  key={idx}
+                  onClick={() => toggleItem(idx)}
+                  className={`border-b border-gray-50 cursor-pointer transition-colors ${
+                    selecionados.has(idx) ? "bg-torg-blue/5 hover:bg-torg-blue/10" : "opacity-40 hover:opacity-60"
+                  }`}
+                >
+                  <td className="py-2 px-2">
+                    {selecionados.has(idx)
+                      ? <CheckSquare size={16} className="text-torg-blue" />
+                      : <Square size={16} className="text-gray-300" />
+                    }
+                  </td>
+                  <td className="py-2 px-2">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
+                      {CAT_LABEL[item.categoria] || item.categoria}
+                    </span>
+                  </td>
+                  <td className="py-2 px-2 text-sm text-torg-dark">{item.descricao}</td>
+                  <td className="py-2 px-2 text-sm text-right tabular-nums text-torg-gray">
+                    {item.quantidade > 0 ? fmtNum(item.quantidade) : "—"}
+                  </td>
+                  <td className="py-2 px-2 text-sm text-right tabular-nums text-torg-gray">
+                    {item.especificacao && item.especificacao.includes("kg/m2")
+                      ? item.especificacao.split("|")[0].trim()
+                      : "—"
+                    }
+                  </td>
+                  <td className="py-2 px-2 text-sm text-right tabular-nums text-torg-gray">
+                    {item.custoUnitario ? fmtMoeda(item.custoUnitario) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
+          <div className="text-sm text-torg-gray">
+            <span className="font-semibold text-torg-dark">{selecionados.size}</span> de {itens.length} selecionados
+            {Object.keys(porCategoria).length > 0 && (
+              <span className="ml-2 text-xs">
+                ({Object.entries(porCategoria).map(([c, n]) => `${CAT_LABEL[c] || c}: ${n}`).join(", ")})
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-torg-gray hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => onConfirmar(itensSelecionados)}
+              disabled={selecionados.size === 0 || confirmando}
+              className="flex items-center gap-1.5 px-4 py-2 bg-torg-blue text-white rounded-lg text-sm font-semibold hover:bg-torg-dark transition-colors disabled:opacity-50"
+            >
+              {confirmando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              {confirmando ? "Importando..." : `Importar ${selecionados.size} ${selecionados.size === 1 ? "item" : "itens"}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Modal para adicionar item manualmente ──
@@ -685,6 +826,8 @@ export default function AbaAcessorios({ estudo, estudoId }) {
   const [salvandoIA, setSalvandoIA] = useState(false);
   const fileRef = useRef(null);
   const [importando, setImportando] = useState(false);
+  const [previewImport, setPreviewImport] = useState(null); // { itens, formato }
+  const [confirmandoImport, setConfirmandoImport] = useState(false);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -812,7 +955,7 @@ export default function AbaAcessorios({ estudo, estudoId }) {
     }
   };
 
-  // ── Importar planilha ──
+  // ── Importar planilha (preview → confirmar) ──
   const handleImportarPlanilha = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -820,6 +963,29 @@ export default function AbaAcessorios({ estudo, estudoId }) {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      // Primeiro: preview
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/importar-acessorios?preview=true`, {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      if (json.data.length === 0) throw new Error("Nenhum item encontrado na planilha");
+      setPreviewImport({ itens: json.data, formato: json.formato, file });
+    } catch (e) {
+      showToast(`Erro: ${e.message}`);
+    } finally {
+      setImportando(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const handleConfirmarImport = async (itensSelecionados) => {
+    setConfirmandoImport(true);
+    try {
+      // Reenviar o arquivo original com preview=false, junto com indices selecionados
+      const formData = new FormData();
+      formData.append("file", previewImport.file);
       const res = await fetch(`/api/comercial/estudo/${estudoId}/importar-acessorios`, {
         method: "POST",
         body: formData,
@@ -828,11 +994,11 @@ export default function AbaAcessorios({ estudo, estudoId }) {
       if (!json.success) throw new Error(json.error);
       setItens(json.data);
       showToast(`${json.importados} itens importados da planilha`);
+      setPreviewImport(null);
     } catch (e) {
       showToast(`Erro: ${e.message}`);
     } finally {
-      setImportando(false);
-      if (fileRef.current) fileRef.current.value = "";
+      setConfirmandoImport(false);
     }
   };
 
@@ -1138,6 +1304,16 @@ export default function AbaAcessorios({ estudo, estudoId }) {
           onClose={() => setResultadoIA(null)}
           onConfirmar={handleConfirmarIA}
           salvando={salvandoIA}
+        />
+      )}
+
+      {previewImport && (
+        <ImportPreviewModal
+          itens={previewImport.itens}
+          formato={previewImport.formato}
+          onClose={() => setPreviewImport(null)}
+          onConfirmar={handleConfirmarImport}
+          confirmando={confirmandoImport}
         />
       )}
     </div>
