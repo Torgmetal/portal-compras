@@ -4,7 +4,7 @@ import {
   Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronRight,
   Clock, CheckCircle2, AlertTriangle, Download, MessageSquarePlus,
   Send, X, Briefcase, Wrench, ShoppingCart, Factory, Truck, HardHat,
-  GanttChart, Package, FileText, CircleDot,
+  GanttChart, Package, FileText, CircleDot, Mail,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -252,10 +252,29 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
 
 function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId }) {
   const [tab, setTab] = useState("cronograma");
+  const [notificando, setNotificando] = useState(false);
+  const [notifResult, setNotifResult] = useState(null);
+
+  const notificarAtrasos = async () => {
+    if (!confirm("Enviar e-mail para os departamentos atrasados?")) return;
+    setNotificando(true);
+    setNotifResult(null);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/notificar-atrasos`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao notificar");
+      setNotifResult(data);
+    } catch (e) {
+      setNotifResult({ error: e.message });
+    } finally {
+      setNotificando(false);
+    }
+  };
 
   return (
     <div className="border-t border-gray-100">
-      <div className="flex border-b border-gray-100">
+      <div className="flex items-center justify-between border-b border-gray-100">
+        <div className="flex">
         <button
           onClick={() => setTab("cronograma")}
           className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
@@ -276,7 +295,35 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
         >
           <Package size={13} /> RMs / Pedidos / NFs
         </button>
+        </div>
+        <button
+          onClick={notificarAtrasos}
+          disabled={notificando}
+          className="mr-3 px-3 py-1.5 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1 disabled:opacity-50"
+          title="Enviar e-mail para departamentos atrasados"
+        >
+          {notificando ? <Loader2 size={11} className="animate-spin" /> : <Mail size={11} />}
+          Notificar atrasos
+        </button>
       </div>
+
+      {notifResult && (
+        <div className={`mx-4 mt-2 px-3 py-2 rounded-lg text-xs ${notifResult.error ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
+          {notifResult.error ? (
+            <span>{notifResult.error}</span>
+          ) : notifResult.motivo ? (
+            <span>{notifResult.motivo}</span>
+          ) : (
+            <div>
+              {notifResult.resultados?.map((r, i) => (
+                <p key={i}>
+                  <strong>{r.dept}</strong>: {r.enviado ? `✓ enviado para ${r.destinatarios} pessoa(s)` : r.motivo || "não enviado"}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {tab === "cronograma" && (
         loadingDetail ? (
