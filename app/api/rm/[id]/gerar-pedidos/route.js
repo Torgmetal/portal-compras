@@ -71,7 +71,7 @@ export async function POST(req, { params }) {
 
       // RMs internas sem OP não têm opItem/aditivoItem, então FD = false
       const isFD = false;
-      const codigoOmieItem = rmItem.codigo || rmItem.codigoOmieEstoque || null;
+      const codigoOmieItem = rmItem.codigoOmieEstoque || null;
       const chave = `${cot.id}|NORMAL`;
 
       if (!grupos.has(chave)) {
@@ -104,7 +104,7 @@ export async function POST(req, { params }) {
       return {
         codigo: l.codigoOmieItem || null,
         descricao: l.rmItem.descricao,
-        unidade: "KG",
+        unidade: l.rmItem.unidade || "KG",
         qtd: qtdKg,
         precoUnit: precoComIPI,
       };
