@@ -1420,6 +1420,7 @@ model PropostaEstudo {
   itensCronograma         CronogramaItem[]
   itensCusto              CustoItem[]
   itensMontagem           MontagemItem[]
+  itensTerceirizado       TerceirizadoItem[]
   cotacoesEstudo          EstudoCotacao[]
   itensFaturamento        FaturamentoEvento[]
   cotacoesFretes          FreteCotacao[]
@@ -1472,6 +1473,27 @@ model MontagemItem {
 
   @@index([estudoId])
   @@index([estudoId, secao])
+}
+
+model TerceirizadoItem {
+  id            String         @id @default(cuid())
+  estudoId      String
+  servico       String
+  descricao     String
+  unidade       String         @default("VB")
+  quantidade    Float          @default(1)
+  pesoKg        Float          @default(0)
+  custoUnitario Float          @default(0)
+  custoTotal    Float          @default(0)
+  fornecedor    String?
+  observacao    String?
+  ordem         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  estudo        PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+  @@index([estudoId, servico])
 }
 
 model FreteItem {

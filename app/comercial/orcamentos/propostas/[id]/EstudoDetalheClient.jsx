@@ -8,7 +8,7 @@ import {
   Save, CheckCircle2, Clock, Edit3, Link2, Paperclip, Trash2,
   Plus, X, Search, FileText, Download, ChevronDown, Sparkles,
   Check, Info, FolderDown, FolderOpen, RefreshCw,
-  Wrench, Bolt, Paintbrush, Landmark, CalendarDays, Truck, HardHat,
+  Wrench, Bolt, Paintbrush, Landmark, CalendarDays, Truck, HardHat, Factory,
   Send, Package, ChevronUp, XCircle,
 } from "lucide-react";
 
@@ -28,6 +28,7 @@ const AbaImpostos = dynamic(() => import("./AbaImpostos"), { loading: TabLoader 
 const AbaFretes = dynamic(() => import("./AbaFretes"), { loading: TabLoader });
 const AbaResumo = dynamic(() => import("./AbaResumo"), { loading: TabLoader });
 const AbaMontagem = dynamic(() => import("./AbaMontagem"), { loading: TabLoader });
+const AbaTerceirizados = dynamic(() => import("./AbaTerceirizados"), { loading: TabLoader });
 
 const STATUS_LABELS = {
   RASCUNHO: { label: "Rascunho", cor: "bg-gray-100 text-gray-700", icon: Edit3 },
@@ -45,6 +46,7 @@ const ABAS = [
   { id: "pintura", label: "Pintura", icon: Paintbrush },
   { id: "custos", label: "Custos", icon: DollarSign },
   { id: "montagem", label: "Montagem", icon: HardHat },
+  { id: "terceirizados", label: "Terceirizados", icon: Factory },
   { id: "fretes", label: "Fretes", icon: Truck },
   { id: "impostos", label: "Impostos", icon: Landmark },
   { id: "resumo", label: "Resumo", icon: BarChart3 },
@@ -2689,6 +2691,12 @@ export default function EstudoDetalheClient({ estudoId }) {
         )}
         {abaAtiva === "montagem" && (
           <AbaMontagem
+            estudo={estudo}
+            estudoId={estudoId}
+          />
+        )}
+        {abaAtiva === "terceirizados" && (
+          <AbaTerceirizados
             estudo={estudo}
             estudoId={estudoId}
           />

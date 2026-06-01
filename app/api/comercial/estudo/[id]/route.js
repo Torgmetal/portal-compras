@@ -30,6 +30,7 @@ export async function GET(req, { params }) {
         },
         itensCusto: { orderBy: [{ categoria: "asc" }, { ordem: "asc" }] },
         itensMontagem: { orderBy: [{ secao: "asc" }, { ordem: "asc" }] },
+        itensTerceirizado: { orderBy: [{ servico: "asc" }, { ordem: "asc" }] },
         itensFaturamento: { orderBy: { ordem: "asc" } },
         itensCronograma: { orderBy: { ordem: "asc" } },
         itensFretes: { orderBy: { ordem: "asc" } },
