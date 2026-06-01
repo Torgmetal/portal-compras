@@ -190,8 +190,8 @@ export default async function RMComprasDetail({ params }) {
   }));
 
   const dadosMapa = {
-    id: rm.opId,
-    numero: rm.op?.numero || "",
+    id: rm.opId || rm.id, // sem OP, usa id da RM como referência
+    numero: rm.op?.numero || rm.numero,
     rms: [{
       id: rm.id,
       numero: rm.numero,
@@ -231,9 +231,10 @@ export default async function RMComprasDetail({ params }) {
 
   const data = JSON.parse(JSON.stringify(rm));
   const outrasRMs = JSON.parse(JSON.stringify(outrasRMsAtivas));
-  const dadosMapaSerial = rm.opId
-    ? JSON.parse(JSON.stringify(dadosMapa))
-    : null;
+  // Sempre montar dadosMapa — RMs sem OP usam /api/rm/{id} como apiBase
+  const dadosMapaSerial = JSON.parse(JSON.stringify(dadosMapa));
+  // API base: RM sem OP chama /api/rm/{id}, com OP chama /api/op/{opId}
+  const apiBaseMapa = rm.opId ? `/api/op/${rm.opId}` : `/api/rm/${rm.id}`;
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -245,6 +246,7 @@ export default async function RMComprasDetail({ params }) {
         outrasRMs={outrasRMs}
         userRole={user.role}
         dadosMapa={dadosMapaSerial}
+        apiBaseMapa={apiBaseMapa}
         categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
         pedidos={JSON.parse(JSON.stringify(pedidosVinculados))}
       />

@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { requireUser } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -15,9 +16,53 @@ export const maxDuration = 30;
 // DWG/DXF de projetos estruturais podem passar de 20MB.
 const MAX_SIZE = 50 * 1024 * 1024;
 
+// Extensoes permitidas por categoria
+const EXTENSOES_PERMITIDAS = [
+  // Documentos
+  "pdf", "xlsx", "xls", "csv", "doc", "docx", "txt",
+  // Imagens
+  "png", "jpg", "jpeg", "gif", "webp", "svg",
+  // CAD
+  "dwg", "dxf", "step", "stp", "iges", "igs",
+  // Compactados
+  "zip", "rar", "7z",
+];
+
+// MIME types permitidos (CAD frequentemente vem como octet-stream, tratado a parte)
+const MIME_TYPES_PERMITIDOS = new Set([
+  // Documentos
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+  // Imagens
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  // CAD (quando o browser identifica corretamente)
+  "application/acad",
+  "application/x-acad",
+  "application/x-autocad",
+  "image/vnd.dxf",
+  "model/step",
+  "model/iges",
+  // Compactados
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.rar",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+]);
+
 export async function POST(req) {
+  let user;
   try {
-    await requireUser();
+    user = await requireUser();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -50,6 +95,28 @@ export async function POST(req) {
     );
   }
 
+  // Validacao de tipo de arquivo
+  const nomeOriginal = String(file.name || "");
+  const extensao = nomeOriginal.split(".").pop()?.toLowerCase() || "";
+  const mimeType = (file.type || "application/octet-stream").toLowerCase();
+
+  const extensaoPermitida = EXTENSOES_PERMITIDAS.includes(extensao);
+  const mimePermitido = MIME_TYPES_PERMITIDOS.has(mimeType);
+  // CAD files frequentemente chegam como octet-stream — aceitar se a extensao bater
+  const fallbackOctetStream =
+    mimeType === "application/octet-stream" && extensaoPermitida;
+
+  if (!extensaoPermitida || (!mimePermitido && !fallbackOctetStream)) {
+    return NextResponse.json(
+      {
+        error:
+          `Tipo de arquivo nao permitido (.${extensao}, ${mimeType}). ` +
+          `Extensoes aceitas: ${EXTENSOES_PERMITIDAS.join(", ")}.`,
+      },
+      { status: 400 }
+    );
+  }
+
   // Prefixa com timestamp pra evitar conflito de nome
   const stamp = Date.now();
   const safeName = String(file.name || "arquivo")
@@ -62,6 +129,17 @@ export async function POST(req) {
       access: "public",
       addRandomSuffix: false,
       contentType: file.type || "application/octet-stream",
+    });
+
+    // Registro de auditoria
+    await prisma.auditLog.create({
+      data: {
+        user: { connect: { id: user.id } },
+        action: "UPLOAD_ARQUIVO",
+        entity: "Blob",
+        entityId: blob.url,
+        diff: { nome: file.name, tipo: file.type, tamanho: file.size },
+      },
     });
 
     return NextResponse.json({

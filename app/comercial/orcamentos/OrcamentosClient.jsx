@@ -633,6 +633,7 @@ function FormOrcamentoModal({ orcamento, onSalvar, onClose }) {
     valor: orcamento?.valor ?? "",
     porte: orcamento?.porte || "",
     dataSolicitada: orcamento?.dataSolicitada ? orcamento.dataSolicitada.slice(0, 10) : "",
+    prazoEntrega: orcamento?.prazoEntrega ? orcamento.prazoEntrega.slice(0, 10) : "",
     dataEnvio: orcamento?.dataEnvio ? orcamento.dataEnvio.slice(0, 10) : "",
     dataFechamento: orcamento?.dataFechamento ? orcamento.dataFechamento.slice(0, 10) : "",
     status: orcamento?.status || "ORCAMENTO",
@@ -656,6 +657,7 @@ function FormOrcamentoModal({ orcamento, onSalvar, onClose }) {
         tipoVenda: form.tipoVenda || null,
         porte: form.porte || null,
         dataSolicitada: form.dataSolicitada || null,
+        prazoEntrega: form.prazoEntrega || null,
         dataEnvio: form.dataEnvio || null,
         dataFechamento: form.dataFechamento || null,
         obra: form.obra || null,
@@ -836,13 +838,22 @@ function FormOrcamentoModal({ orcamento, onSalvar, onClose }) {
           </div>
 
           {/* Linha 6: Datas */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Data solicitada</label>
               <input
                 type="date"
                 value={form.dataSolicitada}
                 onChange={set("dataSolicitada")}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-amber-600 mb-1">Prazo de entrega</label>
+              <input
+                type="date"
+                value={form.prazoEntrega}
+                onChange={set("prazoEntrega")}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30"
               />
             </div>
@@ -934,6 +945,7 @@ function VerOrcamentoModal({ orcamento, onClose, onEditar }) {
     { label: "Porte", value: orcamento.porte ? PORTE_LABELS[orcamento.porte] : "—" },
     { label: "Valor", value: fmtMoeda(orcamento.valor) },
     { label: "Data solicitada", value: fmtData(orcamento.dataSolicitada) },
+    { label: "Prazo de entrega", value: fmtData(orcamento.prazoEntrega) },
     { label: "Data envio", value: fmtData(orcamento.dataEnvio) },
     { label: "Data fechamento", value: fmtData(orcamento.dataFechamento) },
   ];

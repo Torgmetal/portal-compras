@@ -41,7 +41,7 @@ const criarSchema = z.union([
 
 export async function POST(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMERCIAL"]);
+    const user = await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const body = await req.json();
     const data = criarSchema.parse(body);
@@ -55,9 +55,10 @@ export async function POST(req, { params }) {
     let proximaOrdem = (ultimo?.ordem ?? -1) + 1;
 
     const itensParaCriar = Array.isArray(data) ? data : [data];
+    const idsCriados = [];
 
     for (const item of itensParaCriar) {
-      await prisma.faturamentoEvento.create({
+      const criado = await prisma.faturamentoEvento.create({
         data: {
           estudoId: id,
           descricao: item.descricao,
@@ -68,12 +69,27 @@ export async function POST(req, { params }) {
           ordem: proximaOrdem++,
         },
       });
+      idsCriados.push(criado.id);
     }
 
     const itens = await prisma.faturamentoEvento.findMany({
       where: { estudoId: id },
       orderBy: { ordem: "asc" },
     });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          user: { connect: { id: user.id } },
+          action: "CRIAR_FATURAMENTO",
+          entity: "FaturamentoEvento",
+          entityId: id,
+          diff: { depois: { estudoId: id, idsCriados, itens: itensParaCriar } },
+        },
+      });
+    } catch (e) {
+      console.error("AuditLog error:", e);
+    }
 
     return NextResponse.json({ success: true, data: itens });
   } catch (e) {
@@ -98,10 +114,12 @@ const atualizarSchema = z.object({
 
 export async function PATCH(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMERCIAL"]);
+    const user = await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const body = await req.json();
     const { itemId, ...data } = atualizarSchema.parse(body);
+
+    const antes = await prisma.faturamentoEvento.findUnique({ where: { id: itemId } });
 
     await prisma.faturamentoEvento.update({
       where: { id: itemId, estudoId: id },
@@ -112,6 +130,20 @@ export async function PATCH(req, { params }) {
       where: { estudoId: id },
       orderBy: { ordem: "asc" },
     });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          user: { connect: { id: user.id } },
+          action: "ATUALIZAR_FATURAMENTO",
+          entity: "FaturamentoEvento",
+          entityId: itemId,
+          diff: { antes, depois: data },
+        },
+      });
+    } catch (e) {
+      console.error("AuditLog error:", e);
+    }
 
     return NextResponse.json({ success: true, data: itens });
   } catch (e) {
@@ -126,7 +158,7 @@ export async function PATCH(req, { params }) {
 // ── DELETE — excluir evento ──
 export async function DELETE(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMERCIAL"]);
+    const user = await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const { searchParams } = new URL(req.url);
     const itemId = searchParams.get("itemId");
@@ -135,9 +167,25 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ success: false, error: "itemId obrigatorio" }, { status: 400 });
     }
 
+    const antes = await prisma.faturamentoEvento.findUnique({ where: { id: itemId } });
+
     await prisma.faturamentoEvento.delete({
       where: { id: itemId, estudoId: id },
     });
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          user: { connect: { id: user.id } },
+          action: "EXCLUIR_FATURAMENTO",
+          entity: "FaturamentoEvento",
+          entityId: itemId,
+          diff: { antes },
+        },
+      });
+    } catch (e) {
+      console.error("AuditLog error:", e);
+    }
 
     const itens = await prisma.faturamentoEvento.findMany({
       where: { estudoId: id },

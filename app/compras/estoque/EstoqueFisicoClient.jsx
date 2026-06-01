@@ -1,14 +1,13 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
 import {
-  Warehouse, Search, RefreshCw, Loader2, AlertCircle,
+  Warehouse, Search, Truck, Loader2, AlertCircle,
   ChevronDown, ChevronRight, X, Layers, Weight,
 } from "lucide-react";
 
 const fmtPeso = (kg) => {
   if (!kg && kg !== 0) return "—";
-  if (kg >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ton`;
-  return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
+  return `${Number(kg).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
 };
 const fmtQtd = (v) => (v != null ? Number(v).toLocaleString("pt-BR") : "—");
 const fmtDataHora = (d) =>
@@ -161,7 +160,7 @@ export default function EstoqueFisicoClient() {
           disabled={sincronizando}
           className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50"
         >
-          {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
           {sincronizando ? "Importando…" : "Sincronizar SharePoint"}
         </button>
       </div>

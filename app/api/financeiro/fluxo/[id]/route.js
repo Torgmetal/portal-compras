@@ -16,8 +16,9 @@ const schema = z.object({
 });
 
 export async function PATCH(req, { params }) {
+  let user;
   try {
-    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
+    user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
@@ -27,20 +28,53 @@ export async function PATCH(req, { params }) {
   } catch {
     return NextResponse.json({ error: "Dados invalidos" }, { status: 400 });
   }
+  const antes = await prisma.fluxoCaixa.findUnique({ where: { id: params.id } });
   const data = { ...body };
   if (data.data) data.data = new Date(data.data);
   if (data.dataRealizado) data.dataRealizado = new Date(data.dataRealizado);
   if (data.dataRealizado === "") data.dataRealizado = null;
   await prisma.fluxoCaixa.update({ where: { id: params.id }, data });
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        user: { connect: { id: user.id } },
+        action: "ATUALIZAR_FLUXO_CAIXA",
+        entity: "FluxoCaixa",
+        entityId: params.id,
+        diff: { antes, depois: data },
+      },
+    });
+  } catch (e) {
+    console.error("AuditLog error:", e);
+  }
+
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(_req, { params }) {
+  let user;
   try {
-    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
+    user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
+  const antes = await prisma.fluxoCaixa.findUnique({ where: { id: params.id } });
   await prisma.fluxoCaixa.delete({ where: { id: params.id } });
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        user: { connect: { id: user.id } },
+        action: "EXCLUIR_FLUXO_CAIXA",
+        entity: "FluxoCaixa",
+        entityId: params.id,
+        diff: { antes },
+      },
+    });
+  } catch (e) {
+    console.error("AuditLog error:", e);
+  }
+
   return NextResponse.json({ ok: true });
 }

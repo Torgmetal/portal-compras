@@ -38,6 +38,8 @@ export default async function CotacaoPorToken({ params }) {
               peso: true, codigo: true,
               rmId: true,
               rm: { select: { numero: true } },
+              opItem: { select: { faturamentoDireto: true } },
+              aditivoItem: { select: { faturamentoDireto: true } },
             },
           },
         },
@@ -118,26 +120,36 @@ export default async function CotacaoPorToken({ params }) {
   const anexosRMData = JSON.parse(JSON.stringify(anexosRM));
   const anexosCotacaoData = JSON.parse(JSON.stringify(anexosCotacao));
 
-  // Monta dados de faturamento. Se cotacao.faturamento === "Cliente" e a OP
-  // vinculada tem dados fiscais preenchidos, mostra o cliente. Senao, Torg.
+  // Deriva faturamento: campo da Cotacao OU fallback pelos itens (cotações antigas
+  // criadas antes do fix podem ter faturamento="Torg" mas itens FD).
+  const isFD =
+    cotacao.faturamento === "Cliente" ||
+    (cotacao.itens || []).some(
+      (ci) =>
+        ci.rmItem?.opItem?.faturamentoDireto ||
+        ci.rmItem?.aditivoItem?.faturamentoDireto
+    );
+
+  // Monta dados de faturamento. Se faturamento direto,
+  // mostra dados do cliente da OP (mesmo que incompletos — o painel avisa).
   let faturamento;
-  if (cotacao.faturamento === "Cliente" && cotacao.rm?.op?.clienteRazaoSocial) {
-    const op = cotacao.rm.op;
+  if (isFD) {
+    const op = cotacao.rm?.op;
     faturamento = {
       tipo: "Cliente",
-      razaoSocial: op.clienteRazaoSocial,
-      cnpj: op.clienteCnpj,
-      inscricaoEstadual: op.clienteIE,
-      endereco: op.clienteEndereco,
-      cidade: op.clienteCidade,
-      uf: op.clienteUF,
-      cep: op.clienteCep,
-      contato: op.clienteContato,
-      email: op.clienteEmail,
-      telefone: op.clienteTelefone,
-      opNumero: op.numero,
-      opCliente: op.cliente,
-      opObra: op.obra,
+      razaoSocial: op?.clienteRazaoSocial || null,
+      cnpj: op?.clienteCnpj || null,
+      inscricaoEstadual: op?.clienteIE || null,
+      endereco: op?.clienteEndereco || null,
+      cidade: op?.clienteCidade || null,
+      uf: op?.clienteUF || null,
+      cep: op?.clienteCep || null,
+      contato: op?.clienteContato || null,
+      email: op?.clienteEmail || null,
+      telefone: op?.clienteTelefone || null,
+      opNumero: op?.numero || null,
+      opCliente: op?.cliente || null,
+      opObra: op?.obra || null,
     };
   } else {
     faturamento = {

@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import {
   Activity, Plus, Loader2, AlertCircle, X, Upload,
   Package, Pencil, Trash2, FileSpreadsheet, CheckCircle2, FileText,
-  Cloud, RefreshCw, XCircle, Calendar, ChevronDown, ChevronUp, TrendingUp,
+  Cloud, RefreshCw, XCircle, Calendar, ChevronDown, ChevronUp, TrendingUp, MapPin,
 } from "lucide-react";
 import { fmtSemana, isoWeekString } from "@/lib/semana";
 
@@ -62,6 +62,12 @@ const fmtPesoCompacto = (v) => {
   if (Math.abs(kg) >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
   return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 };
+const fmtMoedaCurto = (v) => {
+  if (v == null || v === 0) return "R$ 0";
+  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
+  if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(1).replace(".", ",")}k`;
+  return `R$ ${v.toFixed(0)}`;
+};
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const diaSemana = (d) => {
   const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -79,6 +85,46 @@ const SETOR_LABEL = {
   Expedicao: "Expedição",
   __manual__: "Lançamentos manuais",
 };
+
+const PROD_AREAS = [
+  { id: "corte", label: "Corte", prodSetor: "Corte", rects: [{ x: 30, y: 30, w: 398, h: 180 }], stroke: "#3b82f6", fill: "rgba(59,130,246,0.15)" },
+  { id: "acabamento", label: "Acabamento", prodSetor: "Acabamento", rects: [{ x: 432, y: 30, w: 398, h: 180 }], stroke: "#ea580c", fill: "rgba(234,88,12,0.15)" },
+  { id: "montagem", label: "Montagem", prodSetor: "Montagem", rects: [{ x: 30, y: 230, w: 400, h: 240 }], stroke: "#10b981", fill: "rgba(16,185,129,0.15)" },
+  { id: "solda", label: "Solda", prodSetor: "Solda", rects: [{ x: 450, y: 230, w: 380, h: 240 }], stroke: "#f59e0b", fill: "rgba(245,158,11,0.15)" },
+  { id: "pintura", label: "Pintura", prodSetor: "Pintura", rects: [{ x: 870, y: 20, w: 310, h: 340 }], stroke: "#a855f7", fill: "rgba(168,85,247,0.15)" },
+  { id: "jato", label: "Jato", prodSetor: "Jato", rects: [{ x: 20, y: 500, w: 180, h: 130 }], stroke: "#6366f1", fill: "rgba(99,102,241,0.15)" },
+  { id: "almoxarifado", label: "Almoxarifado", rects: [{ x: 220, y: 500, w: 220, h: 130 }], stroke: "#14b8a6", fill: "rgba(20,184,166,0.15)" },
+  { id: "expedicao", label: "Expedição", prodSetor: "Expedicao", rects: [{ x: 460, y: 500, w: 220, h: 130 }], stroke: "#f43f5e", fill: "rgba(244,63,94,0.15)" },
+  { id: "qualidade", label: "Qualidade", rects: [{ x: 700, y: 500, w: 160, h: 130 }], stroke: "#22c55e", fill: "rgba(34,197,94,0.15)" },
+  { id: "manutencao", label: "Manutenção", rects: [{ x: 880, y: 380, w: 150, h: 100 }], stroke: "#fb923c", fill: "rgba(251,146,60,0.15)" },
+  { id: "pcp", label: "PCP / SESMT", rects: [{ x: 1050, y: 380, w: 130, h: 100 }], stroke: "#94a3b8", fill: "rgba(148,163,184,0.15)" },
+];
+
+const PROD_RH_MAP = {
+  "Preparação": "corte",
+  "Acabamento": "acabamento",
+  "Montagem Interna": "montagem",
+  "Solda": "solda",
+  "Pintura": "pintura",
+  "Jato": "jato",
+  "Expedição": "expedicao",
+  "Almoxarifado": "almoxarifado",
+  "Almoxarife": "almoxarifado",
+  "Qualidade": "qualidade",
+  "PCP": "pcp",
+  "SESMT": "pcp",
+  "Manutenção": "manutencao",
+};
+
+function mapProdRhSetor(nome) {
+  if (!nome) return null;
+  if (PROD_RH_MAP[nome]) return PROD_RH_MAP[nome];
+  const lower = nome.toLowerCase();
+  for (const [key, value] of Object.entries(PROD_RH_MAP)) {
+    if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) return value;
+  }
+  return null;
+}
 
 export default function ProducaoClient({ ops, semanas, semanaAtual, producoes }) {
   const router = useRouter();
@@ -232,6 +278,13 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
 
       {/* Hero KPI: 1 card grande com tudo o que importa */}
       <HeroKpi kpi={kpiPeriodo} setor={setorFiltro} kpiSemana={kpiSemana} />
+
+      {/* Mapa da fábrica com produtividade */}
+      <MapaProducao
+        comparacaoSetores={comparacaoSetores}
+        setorFiltro={setorFiltro}
+        onChangeSetor={setSetorFiltro}
+      />
 
       {/* Funil dos setores (compacto) */}
       <FunilSetores
@@ -1127,6 +1180,219 @@ function Stat({ label, value, valueColor = "text-torg-dark", sub, accent }) {
       </p>
       <p className={`text-2xl font-extrabold tabular-nums leading-tight ${valueColor}`}>{value}</p>
       {sub && <p className="text-[10px] text-torg-gray mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// Mapa da fábrica com métricas de produtividade + custo por setor.
+function MapaProducao({ comparacaoSetores, setorFiltro, onChangeSetor }) {
+  const [funcionarios, setFuncionarios] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/rh/funcionarios?ativo=todos")
+      .then((r) => r.json())
+      .then((d) => setFuncionarios(d.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const rhPorArea = useMemo(() => {
+    const map = {};
+    PROD_AREAS.forEach((a) => (map[a.id] = { count: 0, custo: 0 }));
+    funcionarios
+      .filter((f) => f.ativo && f.status !== "DEMITIDO")
+      .forEach((f) => {
+        const areaId = mapProdRhSetor(f.setor?.nome);
+        if (areaId && map[areaId]) {
+          map[areaId].count++;
+          map[areaId].custo += f.salario ? Number(f.salario) : 0;
+        }
+      });
+    return map;
+  }, [funcionarios]);
+
+  const prodPorArea = useMemo(() => {
+    const map = {};
+    PROD_AREAS.forEach((a) => {
+      if (!a.prodSetor) return;
+      const c = comparacaoSetores.find((c) => c.setor === a.prodSetor);
+      if (c) map[a.id] = c;
+    });
+    return map;
+  }, [comparacaoSetores]);
+
+  const custoTotal = Object.values(rhPorArea).reduce((s, v) => s + v.custo, 0);
+  const totalFuncs = Object.values(rhPorArea).reduce((s, v) => s + v.count, 0);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <MapPin size={14} className="text-torg-blue" />
+          <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">
+            Mapa da Fábrica — Produtividade
+          </h3>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-torg-gray">
+          {!loading && (
+            <>
+              <span className="font-medium text-torg-dark">{totalFuncs}</span> funcionários
+              <span className="mx-1">·</span>
+              <span className="font-medium text-torg-dark">{fmtMoedaCurto(custoTotal)}</span>/mês
+            </>
+          )}
+        </div>
+      </div>
+      <div className="bg-[#0a1628] p-3 sm:p-4">
+        <svg viewBox="0 0 1200 650" className="w-full h-auto" style={{ minHeight: 280 }}>
+          <defs>
+            <pattern id="gridProd" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(59,130,246,0.06)" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="1200" height="650" fill="url(#gridProd)" />
+
+          <rect x={20} y={20} width={820} height={460} fill="#0f2240" stroke="#3b82f6" strokeWidth={2} rx={3} />
+          <rect x={870} y={20} width={310} height={340} fill="#0f2240" stroke="#3b82f6" strokeWidth={2} rx={3} />
+
+          <text x={430} y={225} textAnchor="middle" fill="rgba(59,130,246,0.2)" fontSize={14} fontWeight="bold" letterSpacing={2}>
+            GALPÃO 01 — PRODUÇÃO
+          </text>
+          <text x={1025} y={200} textAnchor="middle" fill="rgba(168,85,247,0.2)" fontSize={12} fontWeight="bold" letterSpacing={2}>
+            GALPÃO 02
+          </text>
+
+          {PROD_AREAS.map((area) => {
+            const rect = area.rects[0];
+            const prod = prodPorArea[area.id];
+            const rh = rhPorArea[area.id] || { count: 0, custo: 0 };
+            const isProd = !!area.prodSetor;
+            const isSelected = isProd && setorFiltro === area.prodSetor;
+            const ader = prod?.prev > 0 ? (prod.real / prod.prev) * 100 : 0;
+            const corAder = ader >= 90 ? "#3b82f6" : ader >= 70 ? "#f59e0b" : ader > 0 ? "#ef4444" : area.stroke;
+            const opacity = isProd ? 1 : 0.5;
+            const cx = rect.x + rect.w / 2;
+            const cy = rect.y + rect.h / 2;
+            const isSmall = rect.w < 200;
+            const barW = isSmall ? 70 : rect.w > 300 ? 140 : 100;
+
+            let fillOpacity = isProd ? 0.15 : 0.07;
+            if (isSelected) fillOpacity = 0.35;
+            const computedFill = area.fill.replace(/[\d.]+\)$/, `${fillOpacity})`);
+
+            return (
+              <g key={area.id}>
+                <rect
+                  x={rect.x} y={rect.y} width={rect.w} height={rect.h}
+                  fill={computedFill}
+                  stroke={isProd && prod ? corAder : area.stroke}
+                  strokeWidth={isSelected ? 2.5 : 1}
+                  strokeDasharray={isSelected ? "none" : isProd ? "6 3" : "4 2"}
+                  rx={2}
+                  className={isProd ? "cursor-pointer transition-all duration-200" : ""}
+                  onClick={() => isProd && onChangeSetor(area.prodSetor)}
+                />
+
+                {/* Name */}
+                <text
+                  x={rect.x + 10} y={rect.y + 16}
+                  fill="white" fontSize={isSmall ? 9 : 10} fontWeight="bold"
+                  letterSpacing={1} opacity={opacity * 0.9}
+                  className="pointer-events-none uppercase"
+                >
+                  {area.label}
+                </text>
+
+                {/* Headcount badge */}
+                {rh.count > 0 && (
+                  <g className="pointer-events-none">
+                    <rect x={rect.x + rect.w - 32} y={rect.y + 5} width={24} height={16} rx={8} fill={area.stroke} opacity={0.85} />
+                    <text x={rect.x + rect.w - 20} y={rect.y + 16} textAnchor="middle" fill="white" fontSize={9} fontWeight="bold">
+                      {rh.count}
+                    </text>
+                  </g>
+                )}
+
+                {/* Production metrics */}
+                {isProd && prod && (prod.real > 0 || prod.prev > 0) ? (
+                  <g className="pointer-events-none">
+                    <text x={cx} y={cy - (isSmall ? 8 : 14)} textAnchor="middle" fill="white" fontSize={isSmall ? 16 : 22} fontWeight="800" opacity={0.95}>
+                      {fmtPesoCompacto(prod.real)}
+                    </text>
+                    <text x={cx} y={cy + (isSmall ? 4 : 4)} textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize={isSmall ? 8 : 10}>
+                      de {fmtPesoCompacto(prod.prev)} previsto
+                    </text>
+
+                    {/* Progress bar */}
+                    <rect x={cx - barW / 2} y={cy + (isSmall ? 10 : 12)} width={barW} height={4} rx={2} fill="rgba(255,255,255,0.12)" />
+                    <rect
+                      x={cx - barW / 2} y={cy + (isSmall ? 10 : 12)}
+                      width={Math.min(ader / 100, 1) * barW} height={4} rx={2}
+                      fill={corAder}
+                    />
+
+                    {/* Aderência % */}
+                    <text x={cx} y={cy + (isSmall ? 26 : 30)} textAnchor="middle" fill={corAder} fontSize={isSmall ? 11 : 14} fontWeight="800">
+                      {ader.toFixed(0)}%
+                    </text>
+                  </g>
+                ) : isProd ? (
+                  <text x={cx} y={cy + 4} textAnchor="middle" fill="rgba(255,255,255,0.2)" fontSize={10} className="pointer-events-none">
+                    sem dados
+                  </text>
+                ) : null}
+
+                {/* Cost */}
+                {rh.custo > 0 && (
+                  <text
+                    x={cx} y={rect.y + rect.h - (isSmall ? 8 : 10)}
+                    textAnchor="middle" fill="rgba(255,255,255,0.55)"
+                    fontSize={isSmall ? 9 : 11} fontWeight="600"
+                    className="pointer-events-none"
+                  >
+                    {fmtMoedaCurto(rh.custo)}/mês
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* Flow arrows between production areas */}
+          <defs>
+            <marker id="arrowProd" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="rgba(255,255,255,0.15)" />
+            </marker>
+          </defs>
+          {/* Corte → Montagem */}
+          <line x1={229} y1={210} x2={229} y2={228} stroke="rgba(255,255,255,0.12)" strokeWidth={1.5} markerEnd="url(#arrowProd)" />
+          {/* Montagem → Solda */}
+          <line x1={430} y1={350} x2={448} y2={350} stroke="rgba(255,255,255,0.12)" strokeWidth={1.5} markerEnd="url(#arrowProd)" />
+          {/* Solda → Acabamento */}
+          <line x1={640} y1={228} x2={640} y2={210} stroke="rgba(255,255,255,0.12)" strokeWidth={1.5} markerEnd="url(#arrowProd)" />
+          {/* Acabamento → Jato */}
+          <path d="M432,180 Q10,400 110,498" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={1.5} markerEnd="url(#arrowProd)" />
+          {/* Jato → Pintura */}
+          <path d="M200,565 Q540,640 870,200" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={1.5} markerEnd="url(#arrowProd)" />
+          {/* Pintura → Expedição */}
+          <path d="M870,340 Q700,480 570,498" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={1.5} markerEnd="url(#arrowProd)" />
+        </svg>
+      </div>
+
+      {/* Legend */}
+      <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center gap-4 flex-wrap text-[11px] text-torg-gray">
+        <span className="font-semibold text-torg-dark uppercase text-[10px] tracking-wide">Legenda:</span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-1.5 rounded bg-blue-500 inline-block" /> ≥ 90% aderência
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-1.5 rounded bg-amber-500 inline-block" /> 70–89%
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-1.5 rounded bg-red-500 inline-block" /> &lt; 70%
+        </span>
+        <span className="ml-auto">Clique no setor para filtrar</span>
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { downloadFileByPath, getAccessToken } from "@/lib/sharepoint";
-import XLSX from "xlsx";
+import * as XLSX from "xlsx";
 
 export const maxDuration = 60;
 
@@ -63,6 +63,12 @@ function parseSheet(ws, sheetTag) {
       opReserva = String(r[12] || "").trim() || null;
     }
 
+    // Perfis W, H e HP sao sempre A572-Gr 50 na Torg
+    const PERFIS_A572 = ["W", "H", "HP"];
+    if (PERFIS_A572.includes(perfil) && (!aco || aco.toUpperCase().includes("A36") || aco.toUpperCase() === "A-36")) {
+      aco = "A572-Gr 50";
+    }
+
     items.push({
       perfil,
       bitola,
@@ -89,16 +95,23 @@ export async function GET() {
   try {
     await requireRole(["ADMIN", "COMPRAS", "PRODUCAO", "ALMOXARIFADO"]);
 
-    const [itens, syncInfo] = await Promise.all([
-      prisma.estoqueFisico.findMany({ orderBy: [{ perfil: "asc" }, { bitola: "asc" }] }),
+    const [itensEstoque, itensSaida, syncInfo] = await Promise.all([
+      prisma.estoqueFisico.findMany({
+        where: { sheet: "ESTOQUE_01" },
+        orderBy: [{ perfil: "asc" }, { bitola: "asc" }],
+      }),
+      prisma.estoqueFisico.findMany({
+        where: { sheet: "SAIDA_ESTOQUE" },
+        orderBy: [{ perfil: "asc" }, { bitola: "asc" }],
+      }),
       prisma.estoqueFisicoSync.findFirst({ where: { id: "singleton" } }),
     ]);
 
-    // Agrega por perfil+bitola+aco
+    // ── Agrega ESTOQUE 01 (saldo real em patio) ──
     const agrupado = {};
     let pesoTotal = 0;
     let qtdTotal = 0;
-    for (const item of itens) {
+    for (const item of itensEstoque) {
       const key = `${item.perfil}|${item.bitola}|${item.aco || ""}`;
       if (!agrupado[key]) {
         agrupado[key] = {
@@ -137,7 +150,7 @@ export async function GET() {
       return a.bitola.localeCompare(b.bitola);
     });
 
-    // Resumo por perfil
+    // Resumo por perfil (somente estoque)
     const porPerfil = {};
     for (const m of materiais) {
       if (!porPerfil[m.perfil]) porPerfil[m.perfil] = { qtd: 0, peso: 0, itens: 0 };
@@ -146,15 +159,25 @@ export async function GET() {
       porPerfil[m.perfil].itens++;
     }
 
+    // ── Resumo de saidas (referencia) ──
+    let pesoSaida = 0;
+    let qtdSaida = 0;
+    for (const item of itensSaida) {
+      pesoSaida += item.peso;
+      qtdSaida += item.qtd;
+    }
+
     return NextResponse.json({
       success: true,
       materiais,
       resumo: {
-        totalItens: itens.length,
+        totalItens: itensEstoque.length,
         totalMateriais: materiais.length,
         pesoTotal,
         qtdTotal,
         porPerfil,
+        // Saidas como referencia separada
+        saida: { totalItens: itensSaida.length, pesoTotal: pesoSaida, qtdTotal: qtdSaida },
       },
       ultimaSync: syncInfo?.ultimaSync || null,
     });

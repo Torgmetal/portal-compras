@@ -129,7 +129,7 @@ export async function GET(req) {
         descricao: item.rmItem.descricao,
         material: item.rmItem.material,
         qtd: item.rmItem.peso > 0 ? Number(item.rmItem.peso) : item.rmItem.qtd,
-        unidade: item.rmItem.peso > 0 ? "KG" : item.rmItem.unidade,
+        unidade: "KG",
         precoUnit: item.precoUnit,
         valorBruto,
         prazoEntrega: item.prazoEntrega,

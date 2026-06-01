@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import TorgLogo from "@/components/TorgLogo";
-import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity, DollarSign, FileText } from "lucide-react";
+import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity, DollarSign, FileText, Users } from "lucide-react";
 
 const FOOTER_LOGO_W = 180;
 const FOOTER_LOGO_H = Math.round((FOOTER_LOGO_W * 1080) / 1920);
@@ -48,6 +48,13 @@ const portais = [
     desc: "Fluxo de caixa, receita gerada por produção e validação.",
     Icon: DollarSign,
     bg: "bg-torg-blue-700",
+  },
+  {
+    href: "/rh",
+    label: "Recursos Humanos",
+    desc: "Gestão de pessoas, ponto, férias, benefícios e competências.",
+    Icon: Users,
+    bg: "bg-rose-600",
   },
   {
     href: "/fornecedores",

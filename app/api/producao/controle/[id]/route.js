@@ -9,8 +9,9 @@ import { z } from "zod";
 export const runtime = "nodejs";
 
 export async function PATCH(req, { params }) {
+  let user;
   try {
-    await requireRole(["ADMIN"]);
+    user = await requireRole(["ADMIN"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
@@ -21,6 +22,8 @@ export async function PATCH(req, { params }) {
   } catch {
     return NextResponse.json({ error: "Body invalido" }, { status: 400 });
   }
+
+  const antes = await prisma.producaoDiaria.findUnique({ where: { id: params.id } });
 
   const data = {};
   if (body.pesoMetaKg !== undefined) data.pesoMetaKg = Number(body.pesoMetaKg);
@@ -37,16 +40,47 @@ export async function PATCH(req, { params }) {
     data,
   });
 
+  try {
+    await prisma.auditLog.create({
+      data: {
+        user: { connect: { id: user.id } },
+        action: "ATUALIZAR_PRODUCAO_DIARIA",
+        entity: "ProducaoDiaria",
+        entityId: params.id,
+        diff: { antes, depois: data },
+      },
+    });
+  } catch (e) {
+    console.error("AuditLog error:", e);
+  }
+
   return NextResponse.json({ ok: true, registro });
 }
 
 export async function DELETE(req, { params }) {
+  let user;
   try {
-    await requireRole(["ADMIN"]);
+    user = await requireRole(["ADMIN"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
 
+  const antes = await prisma.producaoDiaria.findUnique({ where: { id: params.id } });
   await prisma.producaoDiaria.delete({ where: { id: params.id } });
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        user: { connect: { id: user.id } },
+        action: "EXCLUIR_PRODUCAO_DIARIA",
+        entity: "ProducaoDiaria",
+        entityId: params.id,
+        diff: { antes },
+      },
+    });
+  } catch (e) {
+    console.error("AuditLog error:", e);
+  }
+
   return NextResponse.json({ ok: true });
 }

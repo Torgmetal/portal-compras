@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   Upload, Loader2, AlertCircle, X, CheckCircle2, Search,
-  Package, FileSpreadsheet, ChevronDown, ChevronUp, Filter, Plus,
+  Package, FileSpreadsheet, ChevronDown, ChevronUp, Filter, Plus, Trash2,
 } from "lucide-react";
+import ConfirmModal from "@/components/admin/ConfirmModal";
 
 const STATUS_PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 const STATUS_LABEL = {
@@ -44,6 +45,8 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
   const [filtroOp, setFiltroOp] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [busca, setBusca] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Lista de OPs que tem pecas (pra mostrar so as relevantes no filtro)
   const opsComPecas = useMemo(() => {
@@ -95,6 +98,38 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
       alert("Erro ao atualizar: " + e.message);
     }
   }
+
+  async function deletarPeca(id) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/producao/pecas/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setPecas((prev) => prev.filter((p) => p.id !== id));
+    } catch (e) {
+      alert("Erro ao excluir: " + e.message);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(null);
+    }
+  }
+
+  async function deletarLoteOp(opNumero) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/producao/pecas?op=${encodeURIComponent(opNumero)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setPecas((prev) => prev.filter((p) => p.opNumero !== opNumero));
+    } catch (e) {
+      alert("Erro ao excluir lote: " + e.message);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(null);
+    }
+  }
+
+  const isAdmin = userRole === "ADMIN";
 
   return (
     <div className="space-y-4 max-w-7xl">
@@ -163,6 +198,14 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
             limpar
           </button>
         )}
+        {isAdmin && filtroOp && (
+          <button
+            onClick={() => setConfirmDelete({ tipo: "lote", opNumero: filtroOp })}
+            className="ml-auto px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg hover:bg-red-100 font-medium flex items-center gap-1.5 border border-red-200"
+          >
+            <Trash2 size={13} /> Excluir OP {filtroOp}
+          </button>
+        )}
       </div>
 
       {/* Tabela */}
@@ -189,6 +232,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso unit.</th>
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso total</th>
                   <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Status</th>
+                  {isAdmin && <th className="px-3 py-2 w-8"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -214,6 +258,17 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                           ))}
                         </select>
                       </td>
+                      {isAdmin && (
+                        <td className="px-2 py-1.5">
+                          <button
+                            onClick={() => setConfirmDelete({ tipo: "peca", id: p.id, marca: p.marca, opNumero: p.opNumero })}
+                            className="p-1 text-gray-300 hover:text-red-500 rounded transition-colors"
+                            title="Excluir peça"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -230,6 +285,24 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
           onImportado={() => { setModalImport(false); router.refresh(); }}
         />
       )}
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => {
+          if (confirmDelete?.tipo === "lote") deletarLoteOp(confirmDelete.opNumero);
+          else if (confirmDelete?.tipo === "peca") deletarPeca(confirmDelete.id);
+        }}
+        titulo={confirmDelete?.tipo === "lote" ? "Excluir todas as peças da OP?" : "Excluir peça?"}
+        mensagem={
+          confirmDelete?.tipo === "lote"
+            ? `Todas as peças da OP ${confirmDelete?.opNumero} serão removidas permanentemente. Esta ação não pode ser desfeita.`
+            : `A peça "${confirmDelete?.marca}" da OP ${confirmDelete?.opNumero} será removida permanentemente.`
+        }
+        labelConfirmar="Excluir"
+        variant="destrutivo"
+        loading={deleting}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { sendEmail } from "@/lib/email";
 
 const fornecedorSchema = z.object({
   fornecedorId: z.string().optional().nullable(), // ID do cadastro unificado
@@ -46,10 +47,17 @@ export async function POST(req) {
     return NextResponse.json({ error: "Informe ao menos uma RM (rmId ou rmIds)." }, { status: 400 });
   }
 
-  // Busca todas as RMs envolvidas
+  // Busca todas as RMs envolvidas (com vinculo OPItem/AditivoItem pra derivar faturamento)
   const rms = await prisma.rM.findMany({
     where: { id: { in: rmIds } },
-    include: { itens: true },
+    include: {
+      itens: {
+        include: {
+          opItem: { select: { faturamentoDireto: true } },
+          aditivoItem: { select: { faturamentoDireto: true } },
+        },
+      },
+    },
   });
   if (rms.length === 0) return NextResponse.json({ error: "RM(s) não encontrada(s)." }, { status: 404 });
   if (rms.length !== rmIds.length) {
@@ -78,6 +86,12 @@ export async function POST(req) {
   // as demais ficam vinculadas via os CotacaoItens que apontam pra rmItemId delas).
   const rmPrincipal = rms.find((r) => r.id === rmIds[0]) || rms[0];
 
+  // Deriva faturamento: se ALGUM item cotável é faturamento direto, marca "Cliente".
+  const algumFD = itensCotaveis.some(
+    (it) => it.opItem?.faturamentoDireto || it.aditivoItem?.faturamentoDireto
+  );
+  const faturamento = algumFD ? "Cliente" : "Torg";
+
   let cotacoesCriadas = [];
   await prisma.$transaction(async (tx) => {
     // Cria todas as cotações (uma por fornecedor) em paralelo
@@ -87,10 +101,11 @@ export async function POST(req) {
         data: {
           rmId: rmPrincipal.id,
           fornecedorId: f.fornecedorId || null,
-          fornecedorNome: f.nome,
+          fornecedorNome: f.nome.trim().toUpperCase(),
           fornecedorEmail: f.email,
           cnpj: f.cnpj || null,
           nCodOmie: f.nCodOmie || null,
+          faturamento,
           prazoResposta: prazo,
           observacao: body.observacaoExtra || null,
           token,
@@ -110,13 +125,13 @@ export async function POST(req) {
       // Registra envio em todas as RMs envolvidas (paralelo por RM)
       await Promise.all(rms.map((rm) =>
         tx.envio.create({
-          data: { rmId: rm.id, fornecedorNome: f.nome, fornecedorEmail: f.email },
+          data: { rmId: rm.id, fornecedorNome: f.nome.trim().toUpperCase(), fornecedorEmail: f.email },
         })
       ));
       return {
         id: cot.id,
         token: cot.token,
-        fornecedorNome: f.nome,
+        fornecedorNome: f.nome.trim().toUpperCase(),
         fornecedorEmail: f.email,
         rmsVinculadas: rms.map((r) => r.numero),
       };
@@ -156,5 +171,99 @@ export async function POST(req) {
     });
   });
 
-  return NextResponse.json({ ok: true, cotacoes: cotacoesCriadas });
+  // --- Envio automático de emails via Resend (best-effort, não bloqueia) ---
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL || "workspace.torg.com.br"}`;
+  const numerosRMs = rms.map((r) => r.numero).filter(Boolean);
+  const rotuloRMs = numerosRMs.length === 1
+    ? `RM ${numerosRMs[0]}`
+    : `RMs ${numerosRMs.join(", ")}`;
+  const totalItens = itensCotaveis.length;
+  const prazoTxt = prazo ? prazo.toLocaleDateString("pt-BR") : null;
+  const obsTexto = body.observacaoExtra?.trim() || null;
+  const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  const emailResults = [];
+  await Promise.all(cotacoesCriadas.map(async (cot) => {
+    if (!cot.fornecedorEmail) return;
+    const link = `${baseUrl}/fornecedores/c/${cot.token}`;
+    const subject = `Solicitacao de Cotacao — ${rotuloRMs} (Torg Metal)`;
+
+    const html = `
+      <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 620px; margin: 0 auto; color: #2d3748;">
+        <h2 style="color: #006EAB; margin-top: 0;">Solicitação de Cotação</h2>
+        <p style="color: #4a5568; line-height: 1.6;">
+          Prezado(a) <strong>${esc(cot.fornecedorNome)}</strong>,
+        </p>
+        <p style="color: #4a5568; line-height: 1.6;">
+          Estamos solicitando sua cotação para o material listado na <strong>${esc(rotuloRMs)}</strong>.
+          Acesse o link abaixo para ver os itens e enviar sua proposta. O link é <strong>único e privado</strong> —
+          não precisa de login.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${link}"
+             style="background: #006EAB; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">
+            Abrir cotação
+          </a>
+        </div>
+        <p style="color: #718096; font-size: 13px; line-height: 1.5;">
+          Ou copie e cole esse endereço no navegador:<br>
+          <span style="color: #006EAB; word-break: break-all;">${link}</span>
+        </p>
+        <table style="width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 14px;">
+          <tr><td style="padding: 6px 0; color: #718096;">Total de itens</td><td style="padding: 6px 0;"><strong>${totalItens}</strong></td></tr>
+          ${prazoTxt ? `<tr><td style="padding: 6px 0; color: #718096;">Prazo de resposta</td><td style="padding: 6px 0;"><strong>${prazoTxt}</strong></td></tr>` : ""}
+          ${obsTexto ? `<tr><td style="padding: 6px 0; color: #718096; vertical-align: top;">Observação</td><td style="padding: 6px 0;">${esc(obsTexto)}</td></tr>` : ""}
+        </table>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+        <p style="color: #a0aec0; font-size: 12px; line-height: 1.4;">
+          Atenciosamente,<br>
+          <strong>Equipe de Compras — Torg Metal</strong>
+        </p>
+      </div>
+    `;
+
+    const text = [
+      `Prezado(a) ${cot.fornecedorNome},`,
+      "",
+      `Solicitamos cotação para o material da ${rotuloRMs}.`,
+      "Acesse o link abaixo (único e privado) para enviar sua proposta:",
+      "",
+      link,
+      "",
+      `Itens: ${totalItens}`,
+      prazoTxt ? `Prazo: ${prazoTxt}` : null,
+      obsTexto ? `Observação: ${obsTexto}` : null,
+      "",
+      "Atenciosamente,",
+      "Equipe de Compras — Torg Metal",
+    ].filter(Boolean).join("\n");
+
+    try {
+      const result = await sendEmail({
+        to: cot.fornecedorEmail,
+        cc: user.email,
+        subject,
+        html,
+        text,
+        replyTo: user.email,
+      });
+      emailResults.push({ fornecedor: cot.fornecedorNome, email: cot.fornecedorEmail, ok: result.ok, error: result.error || null });
+
+      if (result.ok) {
+        await prisma.auditLog.create({
+          data: {
+            userId: user.id,
+            action: "email_cotacao_automatico",
+            entity: "Cotacao",
+            entityId: cot.id,
+            diff: { email: cot.fornecedorEmail, cc: user.email, resendId: result.id },
+          },
+        });
+      }
+    } catch (e) {
+      emailResults.push({ fornecedor: cot.fornecedorNome, email: cot.fornecedorEmail, ok: false, error: e.message });
+    }
+  }));
+
+  return NextResponse.json({ ok: true, cotacoes: cotacoesCriadas, emails: emailResults });
 }

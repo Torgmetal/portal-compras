@@ -3,7 +3,7 @@ import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles, CalendarDays } from "lucide-react";
+import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles, CalendarDays, PackageX } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
 const fmtMoeda = (v) =>
@@ -56,6 +56,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         icmsPct: it.icmsPct != null ? String(it.icmsPct) : "",
         ipiPct: it.ipiPct != null ? String(it.ipiPct) : "",
         observacao: it.observacao || "",
+        semEstoque: it.semEstoque || false,
         prazoEntrega: it.prazoEntrega ? new Date(it.prazoEntrega).toISOString().slice(0, 10) : "",
       };
     })
@@ -288,10 +289,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     }
   }
 
-  // Total bruto: soma de preço × qtd de cada linha
+  // Total bruto: soma de preço × qtd de cada linha (exclui semEstoque)
   const total = useMemo(
     () =>
       linhas.reduce((s, l) => {
+        if (l.semEstoque) return s;
         const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
         const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
         return s + p * q;
@@ -303,6 +305,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   const totalComIPI = useMemo(
     () =>
       linhas.reduce((s, l) => {
+        if (l.semEstoque) return s;
         const p = parseFloat(String(l.precoUnit).replace(",", ".")) || 0;
         const q = parseFloat(String(l.qtdCotada).replace(",", ".")) || 0;
         const ipi = parseFloat(String(l.ipiPct).replace(",", ".")) || 0;
@@ -318,15 +321,17 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     const itens = linhas
       .map((l) => ({
         cotacaoItemId: l.id,
-        precoUnit: parseFloat(String(l.precoUnit).replace(",", ".")) || 0,
-        qtdCotada: parseFloat(String(l.qtdCotada).replace(",", ".")) || 0,
-        icmsPct: parseFloat(String(l.icmsPct).replace(",", ".")) || 0,
-        ipiPct: parseFloat(String(l.ipiPct).replace(",", ".")) || 0,
+        precoUnit: l.semEstoque ? 0 : (parseFloat(String(l.precoUnit).replace(",", ".")) || 0),
+        qtdCotada: l.semEstoque ? 0 : (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0),
+        icmsPct: l.semEstoque ? 0 : (parseFloat(String(l.icmsPct).replace(",", ".")) || 0),
+        ipiPct: l.semEstoque ? 0 : (parseFloat(String(l.ipiPct).replace(",", ".")) || 0),
         observacao: l.observacao || null,
-        prazoEntrega: l.prazoEntrega || null,
+        semEstoque: l.semEstoque || false,
+        prazoEntrega: l.semEstoque ? null : (l.prazoEntrega || null),
       }))
-      .filter((l) => l.precoUnit > 0);
-    if (itens.length === 0) {
+      .filter((l) => l.precoUnit > 0 || l.semEstoque);
+    const itensComPreco = itens.filter((l) => l.precoUnit > 0);
+    if (itensComPreco.length === 0) {
       return setErro("Preencha pelo menos um preco unitario maior que zero.");
     }
     const cnpjLimpo = cnpj.replace(/\D/g, "");
@@ -551,7 +556,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
           </div>
         )}
 
-        <form onSubmit={submit} className="space-y-6">
+        <form onSubmit={submit} noValidate className="space-y-6">
           {/* Anexar proposta (PDF) */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-start justify-between flex-wrap gap-3">
@@ -665,7 +670,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             <div className="px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-torg-dark">Itens solicitados</h2>
               <p className="text-xs text-torg-gray mt-1">
-                Preencha o preço unitário e ajuste a quantidade se necessário. Itens sem preço serão ignorados.
+                Preencha o preço unitário e ajuste a quantidade se necessário. Itens sem preço serão ignorados. Se não tiver algum item, marque <strong>&quot;Sem estoque&quot;</strong>.
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -674,6 +679,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                   <tr>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[80px]">Sem estoque</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd RM</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd cotada *</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. *</th>
@@ -694,10 +700,10 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                       ? "border-torg-blue-200 bg-torg-blue-50/30"
                       : "border-gray-300";
                     return (
-                      <tr key={l.id} className={isAuto ? "bg-torg-orange-50/20" : ""}>
+                      <tr key={l.id} className={`${isAuto ? "bg-torg-orange-50/20" : ""} ${l.semEstoque ? "opacity-50" : ""}`}>
                         <td className="px-2 py-2 text-gray-400 align-top">{i + 1}</td>
                         <td className="px-2 py-2 align-top">
-                          <p className="text-torg-dark font-medium text-xs">{l.descricao}</p>
+                          <p className={`font-medium text-xs ${l.semEstoque ? "line-through text-gray-400" : "text-torg-dark"}`}>{l.descricao}</p>
                           {/* Detalhes técnicos — material, dimensões, peso, qtd em peças.
                               Importante pra chapas/perfis: fornecedor precisa entregar
                               QTD de peças com as dimensões especificadas */}
@@ -740,54 +746,78 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                             <p className="mt-1 text-[10px] text-torg-blue font-medium">✓ conferido</p>
                           )}
                         </td>
+                        {/* Toggle "Sem estoque" */}
+                        <td className="px-2 py-2 text-center align-top pt-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setLinha(l.id, "semEstoque", !l.semEstoque)}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                              l.semEstoque
+                                ? "bg-red-100 text-red-700 border border-red-200 hover:bg-red-50"
+                                : "bg-gray-100 text-gray-400 border border-gray-200 hover:bg-gray-200 hover:text-gray-600"
+                            }`}
+                            title={l.semEstoque ? "Clique pra desmarcar" : "Marcar como sem estoque"}
+                          >
+                            <PackageX size={11} />
+                            {l.semEstoque ? "Sem" : "—"}
+                          </button>
+                        </td>
                         <td className="px-2 py-2 text-right text-torg-gray text-xs tabular-nums whitespace-nowrap align-top pt-3">
                           {l.qtdRm} {l.unidade}
                         </td>
                         <td className="px-2 py-2 text-right align-top">
                           <input
                             type="number" step="0.01" min="0"
-                            value={l.qtdCotada}
+                            value={l.semEstoque ? "" : l.qtdCotada}
                             onChange={(e) => setLinha(l.id, "qtdCotada", e.target.value)}
-                            className={`w-20 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
+                            disabled={l.semEstoque}
+                            className={`w-20 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-right align-top">
                           <input
                             type="number" step="0.01" min="0"
-                            value={l.precoUnit}
+                            value={l.semEstoque ? "" : l.precoUnit}
                             onChange={(e) => setLinha(l.id, "precoUnit", e.target.value)}
                             placeholder="0,00"
-                            className={`w-24 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
+                            disabled={l.semEstoque}
+                            className={`w-24 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-right align-top">
                           <input
                             type="number" step="0.01" min="0" max="100"
-                            value={l.icmsPct}
+                            value={l.semEstoque ? "" : l.icmsPct}
                             onChange={(e) => setLinha(l.id, "icmsPct", e.target.value)}
                             placeholder="0"
-                            className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
+                            disabled={l.semEstoque}
+                            className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-right align-top">
                           <input
                             type="number" step="0.01" min="0" max="100"
-                            value={l.ipiPct}
+                            value={l.semEstoque ? "" : l.ipiPct}
                             onChange={(e) => setLinha(l.id, "ipiPct", e.target.value)}
                             placeholder="0"
-                            className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
+                            disabled={l.semEstoque}
+                            className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-center align-top">
                           <input
                             type="date"
-                            value={l.prazoEntrega}
+                            value={l.semEstoque ? "" : l.prazoEntrega}
                             onChange={(e) => setLinha(l.id, "prazoEntrega", e.target.value)}
-                            className={`w-[130px] border rounded px-1.5 py-1 text-xs tabular-nums focus:ring-1 focus:ring-torg-blue ${inputCls}`}
+                            disabled={l.semEstoque}
+                            className={`w-[130px] border rounded px-1.5 py-1 text-xs tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
-                        <td className="px-2 py-2 text-right text-torg-dark font-medium tabular-nums text-xs align-top pt-3">
-                          {totalBruto > 0 ? fmtMoeda(totalBruto) : "—"}
+                        <td className="px-2 py-2 text-right font-medium tabular-nums text-xs align-top pt-3">
+                          {l.semEstoque
+                            ? <span className="text-red-400 text-[10px]">s/ estoque</span>
+                            : totalBruto > 0 ? fmtMoeda(totalBruto) : "—"
+                          }
                         </td>
                       </tr>
                     );
@@ -795,13 +825,20 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={8} className="px-3 py-2 text-right text-xs text-torg-gray">Subtotal (preco x qtd):</td>
+                    <td colSpan={9} className="px-3 py-2 text-right text-xs text-torg-gray">Subtotal (preco x qtd):</td>
                     <td className="px-3 py-2 text-right font-medium text-torg-dark tabular-nums text-sm">{fmtMoeda(total)}</td>
                   </tr>
                   {totalComIPI !== total && (
                     <tr>
-                      <td colSpan={8} className="px-3 py-2 text-right text-xs text-torg-gray">Total com IPI:</td>
+                      <td colSpan={9} className="px-3 py-2 text-right text-xs text-torg-gray">Total com IPI:</td>
                       <td className="px-3 py-2 text-right font-medium text-torg-dark tabular-nums text-sm">{fmtMoeda(totalComIPI)}</td>
+                    </tr>
+                  )}
+                  {linhas.some((l) => l.semEstoque) && (
+                    <tr>
+                      <td colSpan={10} className="px-3 py-2 text-right text-xs text-red-500">
+                        {linhas.filter((l) => l.semEstoque).length} item(s) marcado(s) como &quot;sem estoque&quot;
+                      </td>
                     </tr>
                   )}
                 </tfoot>

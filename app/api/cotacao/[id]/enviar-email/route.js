@@ -135,6 +135,7 @@ export async function POST(req, { params }) {
 
   const result = await sendEmail({
     to: cot.fornecedorEmail,
+    cc: user.email,
     subject,
     html,
     text,

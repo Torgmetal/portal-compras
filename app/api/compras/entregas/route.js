@@ -22,10 +22,12 @@ export async function GET(req) {
         faturamentoDireto: true,
         criadoManualmente: true,
         prazoEntregaPrevisto: true,
+        prazoOriginal: true,
         dataEntregaReal: true,
         statusEntrega: true,
         createdAt: true,
         observacao: true,
+        itensOmie: true,
         opId: true,
         op: {
           select: { id: true, numero: true, cliente: true, obra: true },
@@ -35,10 +37,11 @@ export async function GET(req) {
           select: {
             id: true,
             fornecedorNome: true,
-            fornecedor: { select: { razaoSocial: true } },
+            fornecedorEmail: true,
+            fornecedor: { select: { razaoSocial: true, email: true } },
             rm: {
               select: {
-                id: true, numero: true,
+                id: true, numero: true, tipoRM: true,
                 opId: true,
                 op: { select: { id: true, numero: true, cliente: true, obra: true } },
               },
@@ -63,6 +66,10 @@ export async function GET(req) {
             },
           },
         },
+        // RM atendida (FD avulsos) — precisa do tipoRM pra separar consumíveis
+        rmAtendida: {
+          select: { id: true, numero: true, tipoRM: true },
+        },
         // Itens de RM vinculados diretamente ao pedido (FD avulsos)
         rmItens: {
           select: {
@@ -85,6 +92,18 @@ export async function GET(req) {
           },
           orderBy: { dataRecebimento: "desc" },
         },
+        // Historico de postergacoes de prazo
+        prazoHistorico: {
+          select: {
+            id: true,
+            prazoAnterior: true,
+            prazoNovo: true,
+            motivo: true,
+            criadoEm: true,
+            alteradoPor: { select: { name: true } },
+          },
+          orderBy: { criadoEm: "asc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -93,12 +112,24 @@ export async function GET(req) {
     const em7dias = new Date(agora.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const data = pedidos.map((p) => {
-      // Itens do pedido — vem da cotação (vencedores) ou dos rmItens diretos
+      // Itens do pedido — prioriza itensOmie (sincronizados do Omie, reflete
+      // edições manuais), fallback pra cotação vencedores, depois rmItens diretos
+      const itensOmieSynced = Array.isArray(p.itensOmie) && p.itensOmie.length > 0
+        ? p.itensOmie.map((it) => ({
+            descricao: it.descricao || "—",
+            material: null,
+            qtd: it.qtd,
+            unidade: it.unidade || "KG",
+            precoUnit: it.valorUnit || null,
+            prazoEntrega: null,
+          }))
+        : null;
+
       const itensCotacao = p.cotacao?.itens?.map((ci) => ({
         descricao: ci.rmItem?.descricao || "—",
         material: ci.rmItem?.material,
         qtd: ci.rmItem?.peso > 0 ? Number(ci.rmItem.peso) : ci.rmItem?.qtd,
-        unidade: ci.rmItem?.peso > 0 ? "KG" : ci.rmItem?.unidade,
+        unidade: "KG",
         precoUnit: ci.precoUnit,
         prazoEntrega: ci.prazoEntrega,
       })) || [];
@@ -107,12 +138,12 @@ export async function GET(req) {
         descricao: ri.descricao || "—",
         material: ri.material,
         qtd: ri.peso > 0 ? Number(ri.peso) : ri.qtd,
-        unidade: ri.peso > 0 ? "KG" : ri.unidade,
+        unidade: "KG",
         precoUnit: null,
         prazoEntrega: null,
       })) || [];
 
-      const itens = itensCotacao.length > 0 ? itensCotacao : itensDiretos;
+      const itens = itensOmieSynced || (itensCotacao.length > 0 ? itensCotacao : itensDiretos);
 
       // Prazo: usa PedidoOmie.prazoEntregaPrevisto; se null, calcula
       // o prazo mais tardio dos CotacaoItems vencedores (fallback)
@@ -153,15 +184,24 @@ export async function GET(req) {
       const opViaCotacao = p.cotacao?.rm?.op;
       const op = opDireta || opViaCotacao || null;
 
+      // Tipo de RM: ENGENHARIA ou INTERNA (consumíveis)
+      const tipoRM = p.cotacao?.rm?.tipoRM || p.rmAtendida?.tipoRM || "ENGENHARIA";
+
+      // Email do fornecedor (pra cobrança de entrega)
+      const fornecedorEmail = p.cotacao?.fornecedor?.email || p.cotacao?.fornecedorEmail || null;
+
       return {
         id: p.id,
         numero: p.numeroPedido || p.codigoPedido || "s/n",
+        codigoPedido: p.codigoPedido || null,
         fornecedor,
+        fornecedorEmail,
         total: p.total,
         status: p.status,
         statusEntrega: statusCalc,
         faturamentoDireto: p.faturamentoDireto,
         criadoManualmente: p.criadoManualmente,
+        tipoRM,
         prazoEntregaPrevisto: prazoFinal || p.prazoEntregaPrevisto,
         dataEntregaReal: p.dataEntregaReal,
         createdAt: p.createdAt,
@@ -170,13 +210,16 @@ export async function GET(req) {
         opNumero: op?.numero || null,
         opCliente: op?.cliente || null,
         opObra: op?.obra || null,
-        rmId: p.cotacao?.rm?.id || null,
-        rmNumero: p.cotacao?.rm?.numero || null,
+        rmId: p.cotacao?.rm?.id || p.rmAtendida?.id || null,
+        rmNumero: p.cotacao?.rm?.numero || p.rmAtendida?.numero || null,
         cotacaoId: p.cotacaoId,
         qtdItens: itens.length,
         itens,
         recebimentos: p.recebimentos,
         temRecebimento: p.recebimentos.length > 0,
+        prazoOriginal: p.prazoOriginal || null,
+        prazoHistorico: p.prazoHistorico || [],
+        foiPostergado: (p.prazoHistorico?.length || 0) > 0,
       };
     });
 

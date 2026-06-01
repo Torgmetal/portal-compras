@@ -1,21 +1,32 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft, FileSpreadsheet, ExternalLink, Upload, Scale,
   DollarSign, Calculator, BarChart3, Loader2, AlertCircle,
   Save, CheckCircle2, Clock, Edit3, Link2, Paperclip, Trash2,
   Plus, X, Search, FileText, Download, ChevronDown, Sparkles,
   Check, Info, FolderDown, FolderOpen, RefreshCw,
-  Wrench, Bolt, Paintbrush, Landmark, CalendarDays,
+  Wrench, Bolt, Paintbrush, Landmark, CalendarDays, Truck,
+  Send, Package, ChevronUp, XCircle,
 } from "lucide-react";
-import AbaProdutividade from "./AbaProdutividade";
-import AbaAcessorios from "./AbaAcessorios";
-import AbaParafusos from "./AbaParafusos";
-import AbaPintura from "./AbaPintura";
-import AbaCustos from "./AbaCustos";
-import AbaCronograma from "./AbaCronograma";
-import AbaImpostos from "./AbaImpostos";
+
+// Lazy-load abas pesadas — reduz bundle inicial em ~60%
+const TabLoader = () => (
+  <div className="flex items-center justify-center py-20">
+    <Loader2 size={24} className="animate-spin text-torg-blue" />
+  </div>
+);
+const AbaProdutividade = dynamic(() => import("./AbaProdutividade"), { loading: TabLoader });
+const AbaAcessorios = dynamic(() => import("./AbaAcessorios"), { loading: TabLoader });
+const AbaParafusos = dynamic(() => import("./AbaParafusos"), { loading: TabLoader });
+const AbaPintura = dynamic(() => import("./AbaPintura"), { loading: TabLoader });
+const AbaCustos = dynamic(() => import("./AbaCustos"), { loading: TabLoader });
+const AbaCronograma = dynamic(() => import("./AbaCronograma"), { loading: TabLoader });
+const AbaImpostos = dynamic(() => import("./AbaImpostos"), { loading: TabLoader });
+const AbaFretes = dynamic(() => import("./AbaFretes"), { loading: TabLoader });
+const AbaResumo = dynamic(() => import("./AbaResumo"), { loading: TabLoader });
 
 const STATUS_LABELS = {
   RASCUNHO: { label: "Rascunho", cor: "bg-gray-100 text-gray-700", icon: Edit3 },
@@ -32,6 +43,7 @@ const ABAS = [
   { id: "parafusos", label: "Parafusos", icon: Bolt },
   { id: "pintura", label: "Pintura", icon: Paintbrush },
   { id: "custos", label: "Custos", icon: DollarSign },
+  { id: "fretes", label: "Fretes", icon: Truck },
   { id: "impostos", label: "Impostos", icon: Landmark },
   { id: "resumo", label: "Resumo", icon: BarChart3 },
   { id: "cronograma", label: "Cronograma", icon: CalendarDays },
@@ -1292,7 +1304,11 @@ function ModalRevisaoIA({ resultado, onClose, onConfirmar, salvando }) {
 
 function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const [itens, setItens] = useState(estudo.itensPerso || []);
+  const [cotacoes, setCotacoes] = useState(
+    (estudo.cotacoesEstudo || []).filter((c) => c.tipo === "MATERIAIS")
+  );
   const [showModal, setShowModal] = useState(false);
+  const [showCotacaoModal, setShowCotacaoModal] = useState(false);
   const [excluindoId, setExcluindoId] = useState(null);
   const [editandoId, setEditandoId] = useState(null);
   const [editValores, setEditValores] = useState({});
@@ -1575,6 +1591,48 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
     }
   };
 
+  // ── Enviar cotacao para fornecedores ──
+  const handleEnviarCotacao = async (dados) => {
+    const res = await fetch(`/api/comercial/estudo/${estudoId}/cotacao-materiais`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: "MATERIAIS", ...dados }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    setCotacoes(json.data);
+    const enviados = (json.resultados || []).filter((r) => r.emailOk).length;
+    showToast(`Cotacao enviada para ${enviados} fornecedor${enviados !== 1 ? "es" : ""}`);
+  };
+
+  const handleExcluirCotacao = async (cotacaoId) => {
+    try {
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/cotacao-materiais?cotacaoId=${cotacaoId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setCotacoes((prev) => prev.filter((c) => c.id !== cotacaoId));
+      showToast("Cotacao removida");
+    } catch (e) {
+      showToast(`Erro: ${e.message}`);
+    }
+  };
+
+  const handleStatusCotacao = async (cotacaoId, status) => {
+    try {
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/cotacao-materiais`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cotacaoId, status }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setCotacoes((prev) => prev.map((c) => (c.id === cotacaoId ? json.data : c)));
+      showToast(`Status alterado`);
+    } catch (e) {
+      showToast(`Erro: ${e.message}`);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header com totais e acoes */}
@@ -1640,6 +1698,15 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
+          )}
+          {itens.length > 0 && (
+            <button
+              onClick={() => setShowCotacaoModal(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-torg-blue text-torg-blue rounded-xl text-sm font-medium hover:bg-torg-blue/5 transition-colors"
+            >
+              <Send size={15} />
+              Enviar para Cotacao
+            </button>
           )}
           {(estudo.documentos?.length || 0) > 0 && (
             <button
@@ -2070,6 +2137,23 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
         />
       )}
 
+      {/* Modal cotacao materiais */}
+      {showCotacaoModal && (
+        <SolicitarCotacaoMateriaisModal
+          onClose={() => setShowCotacaoModal(false)}
+          onEnviar={handleEnviarCotacao}
+        />
+      )}
+
+      {/* Cotacoes enviadas */}
+      {cotacoes.length > 0 && (
+        <CotacoesMateriaisSection
+          cotacoes={cotacoes}
+          onExcluir={handleExcluirCotacao}
+          onStatus={handleStatusCotacao}
+        />
+      )}
+
       {/* Toast inline */}
       {toast && (
         <div
@@ -2080,6 +2164,283 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Modal Cotacao Materiais ─────────────────────────────────
+
+function SolicitarCotacaoMateriaisModal({ onClose, onEnviar }) {
+  const [busca, setBusca] = useState("");
+  const [fornecedores, setFornecedores] = useState([]);
+  const [carregando, setCarregando] = useState(false);
+  const [selecionados, setSelecionados] = useState([]);
+  const [observacao, setObservacao] = useState("");
+  const [prazoResposta, setPrazoResposta] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  const timeoutRef = useRef(null);
+
+  const buscarFornecedores = async (termo) => {
+    setCarregando(true);
+    try {
+      const params = new URLSearchParams({ busca: termo });
+      const res = await fetch(`/api/fornecedores?${params}`);
+      const json = await res.json();
+      setFornecedores(json.fornecedores || []);
+    } catch {} finally {
+      setCarregando(false);
+    }
+  };
+
+  useEffect(() => { buscarFornecedores(""); }, []);
+
+  const handleBusca = (valor) => {
+    setBusca(valor);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => buscarFornecedores(valor), 300);
+  };
+
+  const toggleFornecedor = (f) => {
+    setSelecionados((prev) => {
+      const existe = prev.find((s) => s.id === f.id);
+      if (existe) return prev.filter((s) => s.id !== f.id);
+      return [...prev, { id: f.id, nome: f.nomeFantasia || f.razaoSocial, email: f.email }];
+    });
+  };
+
+  const handleEnviar = async () => {
+    if (selecionados.length === 0) return setErro("Selecione ao menos um fornecedor");
+    setEnviando(true);
+    setErro("");
+    try {
+      await onEnviar({ fornecedores: selecionados, observacao: observacao.trim() || undefined, prazoResposta: prazoResposta.trim() || undefined });
+      onClose();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-lg font-bold text-torg-dark">Solicitar Cotacao de Materiais</h2>
+            <p className="text-sm text-torg-gray mt-0.5">Selecione fornecedores para enviar</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={20} className="text-gray-400" /></button>
+        </div>
+
+        <div className="px-6 py-3 border-b border-gray-100 shrink-0">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" value={busca} onChange={(e) => handleBusca(e.target.value)} placeholder="Buscar fornecedor por nome, CNPJ, cidade..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" autoFocus />
+          </div>
+          {selecionados.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {selecionados.map((s) => (
+                <span key={s.id} className="inline-flex items-center gap-1 px-2 py-1 bg-torg-blue/10 text-torg-blue rounded-lg text-xs font-medium">
+                  {s.nome}
+                  <button onClick={() => toggleFornecedor(s)} className="hover:text-red-500"><X size={12} /></button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-2">
+          {carregando ? (
+            <div className="flex items-center justify-center py-8"><Loader2 size={20} className="animate-spin text-torg-blue" /></div>
+          ) : fornecedores.length === 0 ? (
+            <p className="text-sm text-torg-gray text-center py-8">Nenhum fornecedor encontrado</p>
+          ) : (
+            <div className="space-y-1">
+              {fornecedores.map((f) => {
+                const marcado = selecionados.some((s) => s.id === f.id);
+                return (
+                  <button key={f.id} onClick={() => f.email ? toggleFornecedor(f) : null} disabled={!f.email}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${marcado ? "bg-torg-blue/10 border border-torg-blue/30" : "hover:bg-gray-50 border border-transparent"} ${!f.email ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${marcado ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>
+                      {marcado && <Check size={12} className="text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-torg-dark truncate block">{f.nomeFantasia || f.razaoSocial}</span>
+                      <span className="text-xs text-torg-gray">{f.email || "sem email"}{f.cidade ? ` — ${f.cidade}/${f.uf}` : ""}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 shrink-0 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-torg-dark mb-1">Prazo para resposta</label>
+              <input type="text" value={prazoResposta} onChange={(e) => setPrazoResposta(e.target.value)} placeholder="Ex: 3 dias uteis" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-torg-blue/30 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-torg-dark mb-1">Observacao</label>
+              <input type="text" value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Opcional..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-torg-blue/30 outline-none" />
+            </div>
+          </div>
+          {erro && <p className="text-sm text-red-600">{erro}</p>}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-torg-gray"><strong className="text-torg-dark">{selecionados.length}</strong> fornecedor{selecionados.length !== 1 ? "es" : ""} selecionado{selecionados.length !== 1 ? "s" : ""}</span>
+            <div className="flex items-center gap-3">
+              <button onClick={onClose} className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark transition-colors">Cancelar</button>
+              <button onClick={handleEnviar} disabled={enviando || selecionados.length === 0}
+                className="flex items-center gap-2 px-5 py-2.5 bg-torg-blue text-white rounded-xl text-sm font-semibold hover:bg-torg-dark transition-colors disabled:opacity-50"
+              >
+                {enviando ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                {enviando ? "Enviando..." : "Enviar Cotacao"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Secao Cotacoes Materiais (inline em AbaPesoProjeto) ────
+
+const STATUS_COTACAO = {
+  PENDENTE:    { label: "Pendente",    icon: Clock,         color: "text-amber-600 bg-amber-50 border-amber-200" },
+  RECEBIDA:    { label: "Recebida",    icon: CheckCircle2,  color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
+  SELECIONADA: { label: "Selecionada", icon: CheckCircle2,  color: "text-torg-blue bg-torg-blue/10 border-torg-blue/30" },
+  RECUSADA:    { label: "Recusada",    icon: XCircle,       color: "text-red-600 bg-red-50 border-red-200" },
+};
+
+function CotacoesMateriaisSection({ cotacoes, onExcluir, onStatus }) {
+  const [expandido, setExpandido] = useState(null);
+  const [excluindoId, setExcluindoId] = useState(null);
+
+  const handleExcluir = async (id) => {
+    setExcluindoId(id);
+    await onExcluir(id);
+    setExcluindoId(null);
+  };
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2">
+        <Package size={16} className="text-torg-blue" />
+        Cotacoes de Materiais ({cotacoes.length})
+      </h3>
+      <div className="space-y-2">
+        {cotacoes.map((cot) => {
+          const cfg = STATUS_COTACAO[cot.status] || STATUS_COTACAO.PENDENTE;
+          const Icon = cfg.icon;
+          const aberto = expandido === cot.id;
+          const totalCotado = (cot.itens || []).reduce((s, i) => s + (i.precoUnitario || 0) * (i.quantidade || 0), 0);
+          const itensCotados = (cot.itens || []).filter((i) => i.precoUnitario != null).length;
+
+          return (
+            <div key={cot.id} className="border border-gray-100 rounded-xl overflow-hidden">
+              <button onClick={() => setExpandido(aberto ? null : cot.id)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors text-left">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${cfg.color}`}>
+                  <Icon size={12} /> {cfg.label}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-torg-dark">{cot.fornecedorNome}</span>
+                  <span className="text-xs text-torg-gray ml-2">{cot.fornecedorEmail}</span>
+                </div>
+                {cot.status === "RECEBIDA" && totalCotado > 0 && (
+                  <span className="text-sm font-bold text-emerald-700 whitespace-nowrap">{fmtMoeda(totalCotado)}</span>
+                )}
+                {cot.prazoEntrega && <span className="text-xs text-torg-gray whitespace-nowrap">Prazo: {cot.prazoEntrega}</span>}
+                {aberto ? <ChevronUp size={16} className="text-gray-400 shrink-0" /> : <ChevronDown size={16} className="text-gray-400 shrink-0" />}
+              </button>
+
+              {aberto && (
+                <div className="px-4 pb-4 border-t border-gray-100">
+                  {cot.itens?.length > 0 && (
+                    <div className="overflow-x-auto mt-3">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs text-torg-gray border-b border-gray-100">
+                            <th className="pb-2 pr-2">#</th>
+                            <th className="pb-2 px-2">Descricao</th>
+                            <th className="pb-2 px-2 text-center">Unid.</th>
+                            <th className="pb-2 px-2 text-right">Qtd</th>
+                            <th className="pb-2 px-2 text-right">Preco Unit.</th>
+                            <th className="pb-2 px-2 text-right">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {cot.itens.map((item, idx) => {
+                            const sub = (item.precoUnitario || 0) * (item.quantidade || 0);
+                            return (
+                              <tr key={item.id}>
+                                <td className="py-2 pr-2 text-xs text-gray-400">{idx + 1}</td>
+                                <td className="py-2 px-2 text-torg-dark">{item.descricao}</td>
+                                <td className="py-2 px-2 text-center text-torg-gray">{item.unidade}</td>
+                                <td className="py-2 px-2 text-right">{fmtNum(item.quantidade, item.quantidade % 1 === 0 ? 0 : 2)}</td>
+                                <td className="py-2 px-2 text-right font-medium">
+                                  {item.precoUnitario != null ? fmtMoeda(item.precoUnitario) : <span className="text-gray-300">—</span>}
+                                </td>
+                                <td className="py-2 px-2 text-right font-medium whitespace-nowrap">
+                                  {item.precoUnitario != null ? fmtMoeda(sub) : <span className="text-gray-300">—</span>}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        {totalCotado > 0 && (
+                          <tfoot>
+                            <tr className="border-t border-gray-200">
+                              <td colSpan={4}></td>
+                              <td className="py-2 px-2 text-right text-xs font-bold text-torg-dark uppercase">Total</td>
+                              <td className="py-2 px-2 text-right font-bold text-torg-dark whitespace-nowrap">{fmtMoeda(totalCotado)}</td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4 mt-3 text-xs text-torg-gray">
+                    {cot.condicaoPgto && <span>Pgto: <strong className="text-torg-dark">{cot.condicaoPgto}</strong></span>}
+                    {cot.observacao && <span>Obs: {cot.observacao}</span>}
+                    {cot.enviadoEm && <span>Enviado: {new Date(cot.enviadoEm).toLocaleDateString("pt-BR")}</span>}
+                    {cot.respondidoEm && <span>Respondido: {new Date(cot.respondidoEm).toLocaleDateString("pt-BR")}</span>}
+                    <span>{itensCotados}/{(cot.itens || []).length} itens cotados</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                    {cot.status === "RECEBIDA" && (
+                      <>
+                        <button onClick={() => onStatus(cot.id, "SELECIONADA")} className="flex items-center gap-1.5 px-3 py-1.5 bg-torg-blue text-white rounded-lg text-xs font-medium hover:bg-torg-dark transition-colors">
+                          <CheckCircle2 size={12} /> Selecionar
+                        </button>
+                        <button onClick={() => onStatus(cot.id, "RECUSADA")} className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-torg-gray rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
+                          <XCircle size={12} /> Recusar
+                        </button>
+                      </>
+                    )}
+                    {cot.status === "PENDENTE" && (
+                      <span className="text-xs text-amber-600 flex items-center gap-1"><Clock size={12} /> Aguardando resposta do fornecedor</span>
+                    )}
+                    <div className="flex-1" />
+                    <button onClick={() => handleExcluir(cot.id)} disabled={excluindoId === cot.id}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {excluindoId === cot.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2259,23 +2620,25 @@ export default function EstudoDetalheClient({ estudoId }) {
       </div>
 
       {/* Abas */}
-      <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-100 p-1 shadow-sm">
-        {ABAS.map((aba) => {
-          const ativo = abaAtiva === aba.id;
-          return (
-            <button
-              key={aba.id}
-              onClick={() => setAbaAtiva(aba.id)}
-              className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                ativo
-                  ? "bg-torg-blue text-white shadow-sm"
-                  : "text-torg-gray hover:bg-gray-50 hover:text-torg-dark"
-              }`}
-            >
-              {aba.label}
-            </button>
-          );
-        })}
+      <div className="overflow-x-auto bg-white rounded-xl border border-gray-100 p-1 shadow-sm">
+        <div className="flex items-center gap-1 min-w-max">
+          {ABAS.map((aba) => {
+            const ativo = abaAtiva === aba.id;
+            return (
+              <button
+                key={aba.id}
+                onClick={() => setAbaAtiva(aba.id)}
+                className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                  ativo
+                    ? "bg-torg-blue text-white shadow-sm"
+                    : "text-torg-gray hover:bg-gray-50 hover:text-torg-dark"
+                }`}
+              >
+                {aba.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Conteudo da aba */}
@@ -2322,6 +2685,12 @@ export default function EstudoDetalheClient({ estudoId }) {
             onEstudoUpdate={handleEstudoUpdate}
           />
         )}
+        {abaAtiva === "fretes" && (
+          <AbaFretes
+            estudo={estudo}
+            estudoId={estudoId}
+          />
+        )}
         {abaAtiva === "cronograma" && (
           <AbaCronograma
             estudo={estudo}
@@ -2336,11 +2705,7 @@ export default function EstudoDetalheClient({ estudoId }) {
           />
         )}
         {abaAtiva === "resumo" && (
-          <AbaEmConstrucao
-            titulo="Resumo Comercial"
-            descricao="Visao consolidada do estudo com exportacao para Excel e geracao da proposta tecnica comercial (PTC)."
-            icon={BarChart3}
-          />
+          <AbaResumo estudo={estudo} />
         )}
       </div>
 

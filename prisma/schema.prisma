@@ -26,6 +26,8 @@ enum Modulo {
   ALMOXARIFADO
   FINANCEIRO
   EXPEDICAO
+  RH
+  PLANEJAMENTO
 }
 
 model User {
@@ -55,10 +57,14 @@ model User {
   notificacoes            Notificacao[]
   sharepointSyncs         SharepointSync[]
   producaoDiarias         ProducaoDiaria[]     @relation("ProducaoDiariaCreatedBy")
+  tarefasPlanejamento     TarefaPlanejamento[] @relation("TarefaPlanejamentoCreatedBy")
+  necessidadesSemanais    NecessidadeSemanal[] @relation("NecessidadeSemanalCreatedBy")
+  cronogramaRegistros     CronogramaRegistro[] @relation("CronogramaRegistroCreatedBy")
   passwordResetTokens     PasswordResetToken[]
   orcamentosCriados       Orcamento[]          @relation("OrcamentoCriadoPor")
   estudosCriados          PropostaEstudo[]     @relation("EstudoCriadoPor")
   recebimentos            Recebimento[]
+  prazoHistoricos         PrazoHistorico[]
 }
 
 model PasswordResetToken {
@@ -181,6 +187,9 @@ model OP {
   pecasConjunto   PecaConjunto[]
   orcamentos      Orcamento[]    @relation("OrcamentoOP")
   mesApontamentos MesApontamento[] @relation("MesApontamentosOP")
+  tarefasPlanejamento TarefaPlanejamento[]
+  necessidadesSemanais NecessidadeSemanal[]
+  cronogramas          Cronograma[]
 
   @@index([numero])
   @@index([status])
@@ -747,20 +756,49 @@ model PedidoOmie {
   rmAtendidaId      String?
   rmAtendida        RM?      @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
 
+  // Itens reais do pedido no Omie (sincronizados via ConsultarPedCompra).
+  // Quando alguem edita o pedido direto no Omie (adiciona/remove itens),
+  // esse campo reflete o estado real. Array de objetos:
+  // [{ descricao, qtd, unidade, valorUnit, qtdRecebida }]
+  itensOmie         Json?
+
   createdById       String?
   createdAt         DateTime @default(now())
 
   // Rastreamento de entrega — preenchido a partir do prazo do fornecedor vencedor
   prazoEntregaPrevisto DateTime? // data mais tarde entre prazos dos itens vencedores
+  prazoOriginal        DateTime? // primeiro prazo acordado (set uma vez, nunca muda)
   dataEntregaReal      DateTime? // quando de fato chegou
   statusEntrega        String?   // NO_PRAZO | PROXIMO | ATRASADO | ENTREGUE
+  // Token publico p/ fornecedor informar nova data de entrega (gerado ao
+  // enviar email de acompanhamento). Acessivel em /fornecedores/entrega/[token]
+  tokenEntrega         String?   @unique
 
   rmItens           RMItem[]
   recebimentos      Recebimento[]
+  prazoHistorico    PrazoHistorico[]
 
   @@index([cotacaoId])
   @@index([opId])
   @@index([status])
+}
+
+// Historico de alteracoes de prazo de entrega de um pedido.
+// Cada registro = uma postergacao (ou antecipacao) informada pelo fornecedor.
+model PrazoHistorico {
+  id             String   @id @default(cuid())
+  pedidoId       String
+  pedido         PedidoOmie @relation(fields: [pedidoId], references: [id])
+
+  prazoAnterior  DateTime?  // prazo que estava antes (null = primeira vez definido)
+  prazoNovo      DateTime   // novo prazo informado pelo fornecedor
+  motivo         String?    // observacao livre (ex: "Fornecedor informou atraso na siderurgica")
+
+  alteradoPorId  String?    // null = fornecedor informou via portal publico
+  alteradoPor    User?      @relation(fields: [alteradoPorId], references: [id])
+  criadoEm       DateTime   @default(now())
+
+  @@index([pedidoId])
 }
 
 model RMItem {
@@ -894,6 +932,7 @@ model CotacaoItem {
   icmsPct        Float?
   ipiPct         Float?
   observacao     String?
+  semEstoque     Boolean   @default(false) // fornecedor marcou que não tem esse item
   vencedor       Boolean   @default(false) // marcado quando o compras escolhe
   prazoEntrega   DateTime? // data prevista de entrega informada pelo fornecedor
 
@@ -1054,6 +1093,377 @@ model Notificacao {
   @@index([lida])
   @@index([createdAt])
   @@index([tipo])
+}
+
+// ─── RH — RECURSOS HUMANOS ──────────────────────────────────
+
+model Setor {
+  id            String   @id @default(cuid())
+  nome          String   @unique
+  sigla         String?
+  cor           String?  // pra organograma
+  gestorId      String?
+  gestor        Funcionario? @relation("GestorSetor", fields: [gestorId], references: [id])
+  funcionarios  Funcionario[] @relation("FuncionarioSetor")
+  vagas         Vaga[]
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Cargo {
+  id            String   @id @default(cuid())
+  nome          String
+  nivel         String?  // OPERACIONAL, TECNICO, SUPERVISAO, GERENCIA, DIRETORIA
+  categoria     String?  // agrupamento (ex: Produção, Administrativo, Engenharia)
+  salarioBase   Float?
+  cbo           String?  // Classificação Brasileira de Ocupações
+  funcionarios  Funcionario[]
+  competencias  CargoCompetencia[]
+  vagas         Vaga[]
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([nivel])
+  @@index([categoria])
+}
+
+model Funcionario {
+  id              String    @id @default(cuid())
+  nome            String
+  cpf             String?   @unique
+  rg              String?
+  dataNascimento  DateTime?
+  email           String?
+  telefone        String?
+  endereco        String?
+  cidadeUF        String?
+  // Vínculo empregatício
+  matricula       String?   @unique
+  dataAdmissao    DateTime
+  dataDemissao    DateTime?
+  setorId         String
+  setor           Setor     @relation("FuncionarioSetor", fields: [setorId], references: [id])
+  cargoId         String
+  cargo           Cargo     @relation(fields: [cargoId], references: [id])
+  salario         Float?
+  tipoContrato    String    @default("CLT") // CLT, PJ, ESTAGIO, JOVEM_APRENDIZ, TEMPORARIO
+  jornadaHoras    Int       @default(44)    // horas semanais
+  turno           String?   // ADMINISTRATIVO, PRODUCAO_1, PRODUCAO_2, NOTURNO
+  // Status
+  status          String    @default("ATIVO") // ATIVO, AFASTADO, FERIAS, DEMITIDO
+  ativo           Boolean   @default(true)
+  foto            String?
+  observacao      String?
+  // Desligamento
+  tipoDesligamento    String?   // VOLUNTARIO, INVOLUNTARIO, JUSTA_CAUSA, TERMINO_CONTRATO
+  motivoDesligamento  String?   // texto livre: motivo informado
+  categoriaDesligamento String? // OUTRO_EMPREGO, INSATISFACAO, CORTE, DESEMPENHO, DISCIPLINAR, ACORDO, OUTROS
+
+  setoresGeridos  Setor[]   @relation("GestorSetor")
+  pontos          Ponto[]
+  ferias          Ferias[]
+  beneficios      FuncionarioBeneficio[]
+  competencias    FuncionarioCompetencia[]
+  dependentes     Dependente[]
+  documentos      Documento[]
+  afastamentos    Afastamento[]
+  treinamentos    TreinamentoParticipante[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([setorId])
+  @@index([cargoId])
+  @@index([status])
+  @@index([ativo])
+  @@index([dataDemissao])
+}
+
+model Dependente {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  nome            String
+  parentesco      String    // CONJUGE, FILHO, FILHA, OUTROS
+  dataNascimento  DateTime?
+  cpf             String?
+  createdAt       DateTime  @default(now())
+
+  @@index([funcionarioId])
+}
+
+model Ponto {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  data            DateTime  @db.Date
+  entrada1        String?   // HH:mm
+  saida1          String?
+  entrada2        String?
+  saida2          String?
+  horasTrabalhadas Float?
+  horasExtras     Float     @default(0)
+  bancoHoras      Float     @default(0) // acumulado positivo/negativo
+  tipo            String    @default("NORMAL") // NORMAL, FALTA, ATESTADO, COMPENSACAO, FERIADO
+  observacao      String?
+  createdAt       DateTime  @default(now())
+
+  @@unique([funcionarioId, data])
+  @@index([data])
+}
+
+model Ferias {
+  id                  String    @id @default(cuid())
+  funcionarioId       String
+  funcionario         Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  periodoAquisInicio  DateTime  // inicio do periodo aquisitivo
+  periodoAquisFim     DateTime  // fim do periodo aquisitivo
+  dataInicio          DateTime? // inicio do gozo
+  dataFim             DateTime? // fim do gozo
+  diasGozo            Int?
+  diasVendidos        Int       @default(0) // abono pecuniario
+  status              String    @default("PENDENTE") // PENDENTE, AGENDADO, EM_GOZO, CONCLUIDO, VENCIDO
+  observacao          String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([funcionarioId])
+  @@index([status])
+}
+
+model Beneficio {
+  id            String   @id @default(cuid())
+  nome          String   @unique // VT, VR, VA, PLANO_SAUDE, PLANO_ODONTO, SEGURO_VIDA, etc.
+  tipo          String   // VALE, SAUDE, SEGURO, OUTRO
+  valorPadrao   Float?
+  ativo         Boolean  @default(true)
+  funcionarios  FuncionarioBeneficio[]
+  createdAt     DateTime @default(now())
+}
+
+model FuncionarioBeneficio {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  beneficioId     String
+  beneficio       Beneficio @relation(fields: [beneficioId], references: [id])
+  valorMensal     Float
+  ativo           Boolean   @default(true)
+  dataInicio      DateTime  @default(now())
+  dataFim         DateTime?
+
+  @@unique([funcionarioId, beneficioId])
+}
+
+model Competencia {
+  id          String   @id @default(cuid())
+  nome        String   @unique
+  categoria   String?  // TECNICA, COMPORTAMENTAL, GESTAO, SEGURANCA
+  descricao   String?
+  cargos      CargoCompetencia[]
+  funcionarios FuncionarioCompetencia[]
+  createdAt   DateTime @default(now())
+}
+
+model CargoCompetencia {
+  id              String    @id @default(cuid())
+  cargoId         String
+  cargo           Cargo     @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  competenciaId   String
+  competencia     Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  nivelEsperado   Int       @default(3) // 1-5
+
+  @@unique([cargoId, competenciaId])
+}
+
+model FuncionarioCompetencia {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  competenciaId   String
+  competencia     Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  nivelAtual      Int       @default(1) // 1-5
+  avaliadoEm      DateTime?
+  avaliadoPor     String?
+
+  @@unique([funcionarioId, competenciaId])
+}
+
+// ─── DOCUMENTOS (RH) ───────────────────────────────────────
+
+model Documento {
+  id              String    @id @default(cuid())
+  nome            String    // Ex: "ASO Periódico", "NR-35 Trabalho em Altura"
+  tipo            String    // ASO, NR_10, NR_12, NR_33, NR_35, PPRA, PCMSO, CNH, PASSAPORTE, CERTIDAO, CERTIFICADO, ALVARA, LICENCA_AMBIENTAL, AVCB, ISO, OUTRO
+  categoria       String    // SAUDE_SEGURANCA, PESSOAL, TREINAMENTO, EMPRESA
+  descricao       String?
+  // Vínculo — null = documento da empresa
+  funcionarioId   String?
+  funcionario     Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  // Datas
+  dataEmissao     DateTime?
+  dataValidade    DateTime?
+  // Detalhes
+  orgaoEmissor    String?   // Clínica, órgão, certificadora
+  numeroDocumento String?   // Número / protocolo
+  observacao      String?
+  ativo           Boolean   @default(true)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([funcionarioId])
+  @@index([categoria])
+  @@index([dataValidade])
+  @@index([tipo])
+}
+
+// ─── RH: VAGAS / RECRUTAMENTO ─────────────────────────────
+
+model Vaga {
+  id              String    @id @default(cuid())
+  titulo          String    // Ex: "Soldador MIG/MAG", "Engenheiro de Produção"
+  setorId         String
+  setor           Setor     @relation(fields: [setorId], references: [id])
+  cargoId         String?
+  cargo           Cargo?    @relation(fields: [cargoId], references: [id])
+  quantidade      Int       @default(1)
+  prioridade      String    @default("NORMAL") // URGENTE, ALTA, NORMAL, BAIXA
+  tipo            String    @default("CLT")    // CLT, PJ, ESTAGIO, TEMPORARIO
+  nivelCargo      String?   // OPERACIONAL, TECNICO, SUPERVISAO, GERENCIA
+  justificativa   String?   // por que precisa da vaga
+  requisitos      String?   // requisitos da vaga (texto)
+  salarioFaixa    String?   // faixa salarial prevista
+  // Solicitação
+  solicitanteId   String?   // quem solicitou (userId do sistema)
+  dataAbertura    DateTime  @default(now())
+  // Recrutamento
+  status          String    @default("SOLICITADA") // SOLICITADA, APROVADA, EM_RECRUTAMENTO, PREENCHIDA, CANCELADA
+  dataAprovacao   DateTime?
+  dataFechamento  DateTime? // quando preenchida
+  custoRecrutamento Float?  // total gasto (anúncios, agência, exames)
+  observacaoRH    String?
+  // Resultado
+  funcionarioContratadoNome String? // nome da pessoa contratada (referência)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([setorId])
+  @@index([status])
+  @@index([dataAbertura])
+}
+
+// ─── RH: AFASTAMENTOS ────────────────────────────────────────
+
+model Afastamento {
+  id              String    @id @default(cuid())
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  dataInicio      DateTime
+  dataFim         DateTime?
+  diasAfastado    Int?      // calculado ou informado manualmente
+  // Natureza (LGPD: nunca expor CID individual)
+  natureza        String    // FISICO, MENTAL, ACIDENTE_TRABALHO, ACIDENTE_TRAJETO, MATERNIDADE, PATERNIDADE
+  categoriaCID    String?   // grupo CID (ex: "M" = musculoesquelético, "F" = transtorno mental) — NUNCA CID completo
+  // Status
+  status          String    @default("EM_ANDAMENTO") // EM_ANDAMENTO, ENCERRADO
+  inss            Boolean   @default(false) // se virou benefício INSS (> 15 dias)
+  observacao      String?   // notas internas RH (sem dados médicos identificáveis)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([funcionarioId])
+  @@index([natureza])
+  @@index([dataInicio])
+  @@index([status])
+}
+
+// ─── RH: ACIDENTES DE TRABALHO (SST) ─────────────────────────
+
+model AcidenteTrabalho {
+  id              String    @id @default(cuid())
+  data            DateTime
+  hora            String?   // HH:mm
+  setorId         String?
+  obra            String?   // nome da obra/local
+  // Classificação
+  tipo            String    // COM_AFASTAMENTO, SEM_AFASTAMENTO, TRAJETO, QUASE_ACIDENTE
+  gravidade       String    @default("LEVE") // LEVE, MODERADO, GRAVE, FATAL
+  diasPerdidos    Int       @default(0)
+  // Envolvido (sem expor dados médicos individuais no dashboard)
+  funcionarioNome String?   // pode ser anônimo no indicador
+  funcionarioId   String?   // referência opcional
+  // Detalhes
+  descricao       String    // o que aconteceu
+  causaRaiz       String?   // análise de causa
+  parteCorpo      String?   // MAOS, OLHOS, PES, COLUNA, CABECA, MEMBROS_SUPERIORES, MEMBROS_INFERIORES, OUTROS
+  agenteRisco     String?   // QUIMICO, FISICO, MECANICO, ERGONOMICO, BIOLOGICO
+  // CAT
+  catEmitida      Boolean   @default(false)
+  catNumero       String?
+  // Ações corretivas
+  acaoCorretiva   String?
+  responsavelAcao String?
+  prazoAcao       DateTime?
+  acaoConcluida   Boolean   @default(false)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([data])
+  @@index([tipo])
+  @@index([setorId])
+}
+
+// ─── RH: TREINAMENTOS / CAPACITAÇÃO ──────────────────────────
+
+model Treinamento {
+  id              String    @id @default(cuid())
+  titulo          String    // Ex: "NR-35 Trabalho em Altura", "Ponte Rolante"
+  tipo            String    // NR_OBRIGATORIO, TECNICO, COMPORTAMENTAL, INTEGRACAO, SST
+  nrRelacionada   String?   // NR-10, NR-12, NR-18, NR-33, NR-35 etc.
+  descricao       String?
+  instrutor       String?   // nome do instrutor/empresa
+  local           String?
+  // Datas
+  dataInicio      DateTime
+  dataFim         DateTime?
+  cargaHoraria    Float     // horas totais
+  // Validade (para NRs com reciclagem)
+  validadeMeses   Int?      // meses até vencer (ex: NR-35 = 24 meses)
+  // Custos
+  custo           Float?    // investimento total
+  certificadoUrl  String?   // URL do certificado geral
+
+  participantes   TreinamentoParticipante[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tipo])
+  @@index([dataInicio])
+}
+
+model TreinamentoParticipante {
+  id              String    @id @default(cuid())
+  treinamentoId   String
+  treinamento     Treinamento @relation(fields: [treinamentoId], references: [id], onDelete: Cascade)
+  funcionarioId   String
+  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  presente        Boolean   @default(true)
+  nota            Float?    // nota de avaliação (0-10) se aplicável
+  certificadoUrl  String?   // certificado individual
+  dataVencimento  DateTime? // data em que este treinamento vence pra este funcionário
+
+  createdAt       DateTime  @default(now())
+
+  @@unique([treinamentoId, funcionarioId])
+  @@index([funcionarioId])
+  @@index([dataVencimento])
 }
 
 // ─── ESTOQUE TORG ──────────────────────────────────────────
@@ -1339,6 +1749,7 @@ model Orcamento {
   valor           Float?            // valor total do orçamento
   porte           PorteOrcamento?
   dataSolicitada  DateTime?         // data em que o cliente pediu
+  prazoEntrega    DateTime?         // prazo para entregar a proposta ao cliente
   dataEnvio       DateTime?         // data em que enviamos a proposta
   dataFechamento  DateTime?         // data do aceite / perda
   status          StatusOrcamento   @default(ORCAMENTO)
@@ -1517,6 +1928,9 @@ model PropostaEstudo {
   itensCusto        CustoItem[]
   itensFaturamento  FaturamentoEvento[]
   itensCronograma   CronogramaItem[]
+  itensFretes       FreteItem[]
+  cotacoesFretes    FreteCotacao[]
+  cotacoesEstudo    EstudoCotacao[]
   documentos        PropostaDocumento[]
 
   @@index([orcamentoId])
@@ -1543,6 +1957,117 @@ model CronogramaItem {
   updatedAt       DateTime        @updatedAt
 
   @@index([estudoId])
+}
+
+// Frete — custos de transporte calculados por distancia da obra
+model FreteItem {
+  id              String          @id @default(cuid())
+  estudoId        String
+  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  descricao       String          // "Frete estruturas metalicas", "Frete montagem", etc.
+  origem          String?         // Cidade/UF de origem (ex: "Contagem/MG")
+  destino         String?         // Cidade/UF da obra (ex: "Macae/RJ")
+  distanciaKm     Float           @default(0)   // km entre origem e destino
+  pesoTon         Float           @default(0)   // peso total em toneladas a transportar
+  pesoPorCarga    Float?                        // peso medio por carga/viagem em toneladas
+  tipoVeiculo     String?         // TRUCK, CARRETA, BITREM, RODOTREM, etc.
+  quantidadeViagens Int           @default(1)   // numero de viagens necessarias
+  custoPorViagem  Float           @default(0)   // R$ custo por viagem
+  custoTotal      Float           @default(0)   // R$ total = quantidadeViagens × custoPorViagem
+  observacao      String?
+  ordem           Int             @default(0)
+
+  createdAt       DateTime        @default(now())
+
+  @@index([estudoId])
+}
+
+// Cotação de Frete — solicitação de orçamento enviada a transportadoras
+model FreteCotacao {
+  id              String          @id @default(cuid())
+  estudoId        String
+  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  token           String          @unique @default(cuid()) // acesso publico sem login
+  fornecedorId    String?         // ref ao fornecedor (pode ser removido do vendor list)
+  fornecedorNome  String          // nome da transportadora (snapshot)
+  fornecedorEmail String          // email para onde foi enviado
+
+  status          String          @default("PENDENTE") // PENDENTE, RECEBIDA, SELECIONADA, RECUSADA
+  valorCotado     Float?          // R$ valor total cotado pela transportadora
+  prazoEntrega    String?         // "3 dias uteis", "1 semana", etc.
+  observacao      String?
+
+  // Anexo da cotacao recebida (PDF, imagem, etc.)
+  anexoUrl        String?         // URL no Vercel Blob
+  anexoNome       String?         // nome do arquivo
+
+  enviadoEm       DateTime?       // quando o email foi disparado
+  respondidoEm    DateTime?       // quando a cotacao foi registrada
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([estudoId])
+  @@index([fornecedorId])
+}
+
+// Cotação de Materiais/Acessórios — solicitação de preço unitário por item
+// enviada a fornecedores. Diferente de FreteCotacao (valor unico total),
+// aqui cada item tem precoUnitario individual preenchido pelo fornecedor.
+model EstudoCotacao {
+  id              String          @id @default(cuid())
+  estudoId        String
+  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  token           String          @unique @default(cuid()) // acesso publico sem login
+  tipo            String          // "MATERIAIS" ou "ACESSORIOS"
+  fornecedorId    String?         // ref ao fornecedor (pode ser removido do vendor list)
+  fornecedorNome  String          // nome do fornecedor (snapshot)
+  fornecedorEmail String          // email para onde foi enviado
+
+  status          String          @default("PENDENTE") // PENDENTE, RECEBIDA, SELECIONADA, RECUSADA
+  prazoEntrega    String?         // "15 dias uteis", "30 dias", etc.
+  condicaoPgto    String?         // "30/60/90 DDL", "28 DDL", etc.
+  observacao      String?         // obs do fornecedor ao responder
+  observacaoInterna String?       // obs interna da equipe Torg
+
+  // Anexo da cotacao recebida (PDF, imagem, etc.)
+  anexoUrl        String?
+  anexoNome       String?
+
+  enviadoEm       DateTime?       // quando o email foi disparado
+  respondidoEm    DateTime?       // quando a cotacao foi registrada
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  itens           EstudoCotacaoItem[]
+
+  @@index([estudoId])
+  @@index([fornecedorId])
+  @@index([tipo])
+}
+
+// Item de cotação — snapshot do item + preço preenchido pelo fornecedor
+model EstudoCotacaoItem {
+  id              String          @id @default(cuid())
+  cotacaoId       String
+  cotacao         EstudoCotacao   @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+
+  descricao       String          // "Telha TP40 0,50mm Galvalume", "W200x15 A572 Gr50"
+  especificacao   String?         // detalhes tecnicos
+  unidade         String          @default("un")
+  quantidade      Float           @default(0)
+
+  // Preenchido pelo fornecedor
+  precoUnitario   Float?          // R$ por unidade
+  observacao      String?         // obs do fornecedor sobre este item
+
+  ordem           Int             @default(0)
+
+  @@index([cotacaoId])
 }
 
 // Cenário de Faturamento — eventos de pagamento com classificação fiscal
@@ -1648,6 +2173,29 @@ model ParafusoItem {
   @@index([tipo])
 }
 
+// ── Catálogo de Tintas ─────────────────────────────────────
+// Banco de dados de produtos de tinta com SV% (Sólidos por Volume).
+// Usado no cálculo de rendimento: Rt = (SV% × 10) / Espessura_µm.
+// Populado via seed com ~60 produtos das normas Petrobras e fabricantes.
+
+model TintaProduto {
+  id                String   @id @default(cuid())
+  nome              String   // "Tinta de Fundo Epóxi-Zinco Poliamida"
+  fabricante        String?  // "Akzo Nobel", "Jotun", "Weg", "Sumaré SW", etc.
+  norma             String?  // "N-1277", "N-2677", etc.
+  resinaTipo        String   // EPOXI, PU, ETIL_SILICATO, ACRILICA, ESMALTE, VERNIZ, SILICONE, ANTIFOULING, ALQUIDICA, EPOXI_MASTIC, EPOXI_AMIDA
+  svPct             Float    // Sólidos por Volume (%) — dado-chave para cálculo de rendimento
+  diluentePct       Float    @default(10)  // % de diluente recomendado (varia por resina)
+  ativo             Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  pinturaItens      PinturaItem[]
+
+  @@index([resinaTipo])
+  @@index([ativo])
+}
+
 // ── Pintura ────────────────────────────────────────────────
 
 enum TipoPintura {
@@ -1680,10 +2228,27 @@ model PinturaItem {
   observacao      String?
   ordem           Int             @default(0)
 
+  // ── Campos de cálculo de engenharia (v2) ──────────────────
+  // Vinculo ao catálogo de tintas (opcional — pode preencher SV% manualmente)
+  tintaProdutoId    String?
+  tintaProduto      TintaProduto?  @relation(fields: [tintaProdutoId], references: [id])
+  // Snapshot dos dados do produto no momento da seleção
+  svPct             Float?         // Sólidos por Volume (%) — snapshot ou manual
+  resinaTipo        String?        // tipo de resina (EPOXI, PU, etc.)
+  // Configuração de aplicação
+  etapa             String?        // PRIMER, INTERMEDIARIO, ACABAMENTO
+  metodoAplicacao   String?        // PINCEL, ROLO, PISTOLA_CONV, AIRLESS
+  percPerdas        Float?         // % de perda (depende do método: Airless 15%, Pistola 40%, etc.)
+  // Quantidades calculadas (snapshot para cotação)
+  litrosNecessarios Float?         // = Área / Rp (rendimento prático)
+  galoesNecessarios Int?           // = ceil(litros / 3.6) — galão padrão 3,6L
+  diluenteLitros    Float?         // = litros × diluentePct do produto
+
   createdAt       DateTime        @default(now())
 
   @@index([estudoId])
   @@index([tipoPintura])
+  @@index([tintaProdutoId])
 }
 
 model CustoItem {
@@ -1852,6 +2417,136 @@ model Recebimento {
 enum RecebimentoOrigem {
   MANUAL    // usuario registrou manualmente
   OMIE_SYNC // detectado automaticamente pelo sync
+}
+
+// ─── CRONOGRAMAS (importados do MS Project via SharePoint) ──────────────
+// Cada Cronograma = 1 arquivo .mpp importado. Contém tarefas agrupadas por
+// departamento (Comercial, Engenharia, Suprimentos, Fabricação, Expedição, Montagem).
+
+enum DepartamentoCronograma {
+  COMERCIAL
+  ENGENHARIA
+  SUPRIMENTOS
+  FABRICACAO
+  EXPEDICAO
+  MONTAGEM
+}
+
+model Cronograma {
+  id              String   @id @default(cuid())
+  opNumero        String
+  opId            String?
+  op              OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
+  nomeArquivo     String
+  titulo          String
+  sharepointPath  String
+  dataInicio      DateTime?
+  dataFim         DateTime?
+  ultimoSync      DateTime @default(now())
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tarefas         CronogramaTarefa[]
+
+  @@unique([sharepointPath])
+  @@index([opNumero])
+  @@index([ativo])
+}
+
+model CronogramaTarefa {
+  id                  String   @id @default(cuid())
+  cronogramaId        String
+  cronograma          Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+  uidMpp              Int
+  nome                String
+  departamento        DepartamentoCronograma?
+  dataInicioPrevista  DateTime?
+  dataFimPrevista     DateTime?
+  percentualPrevisto  Float    @default(0)
+  percentualRealizado Float    @default(0)
+  qtdePlanejada       Float    @default(0)
+  qtdeRealizada       Float    @default(0)
+  isSummary           Boolean  @default(false)
+  outlineLevel        Int      @default(0)
+  parentUid           Int?
+  observacao          String?
+  dataRealizacao      DateTime?
+
+  registros           CronogramaRegistro[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([cronogramaId])
+  @@index([departamento])
+}
+
+model CronogramaRegistro {
+  id          String   @id @default(cuid())
+  tarefaId    String
+  tarefa      CronogramaTarefa @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  descricao   String
+  createdById String
+  createdBy   User     @relation("CronogramaRegistroCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([tarefaId])
+}
+
+// ─── PLANEJAMENTO (PCP) ──────────────────────────────────────
+// Tarefas de acompanhamento por setor, criadas nas reuniões semanais de PCP.
+
+model TarefaPlanejamento {
+  id            String   @id @default(cuid())
+  titulo        String
+  descricao     String?
+  opNumero      String?
+  opId          String?
+  op            OP?      @relation(fields: [opId], references: [id])
+  setor         String   // PRODUCAO, PINTURA, EXPEDICAO
+  semanaIso     Int
+  ano           Int
+  status        String   @default("PENDENTE") // PENDENTE, EM_ANDAMENTO, CONCLUIDA, CANCELADA
+  prioridade    String   @default("MEDIA") // ALTA, MEDIA, BAIXA
+  responsavel   String?
+  dataPrevista  DateTime?
+  dataConcluida DateTime?
+  observacao    String?
+  createdById   String?
+  createdBy     User?    @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([semanaIso, ano])
+  @@index([setor])
+  @@index([opId])
+  @@index([status])
+}
+
+// Necessidade semanal de produção por OP/setor — preenchido na reunião de PCP.
+model NecessidadeSemanal {
+  id            String   @id @default(cuid())
+  semanaIso     Int
+  ano           Int
+  opNumero      String
+  opId          String?
+  op            OP?      @relation(fields: [opId], references: [id])
+  setor         String   // PRODUCAO, PINTURA, EXPEDICAO
+  descricao     String?
+  pesoKg        Float    @default(0)
+  prioridade    String   @default("MEDIA") // ALTA, MEDIA, BAIXA
+  status        String   @default("PENDENTE") // PENDENTE, EM_ANDAMENTO, CONCLUIDO
+  observacao    String?
+  createdById   String?
+  createdBy     User?    @relation("NecessidadeSemanalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([semanaIso, ano])
+  @@index([setor])
+  @@index([opNumero])
+  @@index([status])
 }
 
 // ─── CONFIGURAÇÃO DO ASSISTENTE IA (Torguinho) ──────────────────────────────

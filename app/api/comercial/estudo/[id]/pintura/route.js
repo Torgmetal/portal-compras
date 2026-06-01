@@ -8,6 +8,12 @@ const TIPOS_PINTURA = [
   "GALVANIZACAO_FRIO", "INTUMESCENTE", "ZARCAO", "ALQUIDICA", "OUTRO",
 ];
 
+const includeRelation = {
+  tintaProduto: {
+    select: { id: true, nome: true, svPct: true, resinaTipo: true, diluentePct: true, fabricante: true, norma: true },
+  },
+};
+
 // ── GET ── Lista itens de pintura do estudo
 export async function GET(req, { params }) {
   try {
@@ -16,6 +22,7 @@ export async function GET(req, { params }) {
     const itens = await prisma.pinturaItem.findMany({
       where: { estudoId: id },
       orderBy: { ordem: "asc" },
+      include: includeRelation,
     });
     return NextResponse.json({ success: true, data: itens });
   } catch (e) {
@@ -38,6 +45,16 @@ const criarSchema = z.object({
   norma: z.string().nullish(),
   observacao: z.string().nullish(),
   ordem: z.number().int().nullish(),
+  // Campos v2 (cálculo engenharia)
+  tintaProdutoId: z.string().nullish(),
+  svPct: z.number().min(0).max(100).nullish(),
+  resinaTipo: z.string().nullish(),
+  etapa: z.enum(["PRIMER", "INTERMEDIARIO", "ACABAMENTO"]).nullish(),
+  metodoAplicacao: z.enum(["PINCEL", "ROLO", "PISTOLA_CONV", "AIRLESS"]).nullish(),
+  percPerdas: z.number().min(0).max(100).nullish(),
+  litrosNecessarios: z.number().min(0).nullish(),
+  galoesNecessarios: z.number().int().min(0).nullish(),
+  diluenteLitros: z.number().min(0).nullish(),
 });
 
 export async function POST(req, { params }) {
@@ -81,6 +98,7 @@ export async function POST(req, { params }) {
     const todos = await prisma.pinturaItem.findMany({
       where: { estudoId: id },
       orderBy: { ordem: "asc" },
+      include: includeRelation,
     });
     return NextResponse.json({ success: true, data: todos }, { status: 201 });
   } catch (e) {
@@ -107,6 +125,16 @@ const updateSchema = z.object({
   norma: z.string().optional(),
   observacao: z.string().optional(),
   ordem: z.number().int().optional(),
+  // Campos v2
+  tintaProdutoId: z.string().nullable().optional(),
+  svPct: z.number().min(0).max(100).nullable().optional(),
+  resinaTipo: z.string().nullable().optional(),
+  etapa: z.enum(["PRIMER", "INTERMEDIARIO", "ACABAMENTO"]).nullable().optional(),
+  metodoAplicacao: z.enum(["PINCEL", "ROLO", "PISTOLA_CONV", "AIRLESS"]).nullable().optional(),
+  percPerdas: z.number().min(0).max(100).nullable().optional(),
+  litrosNecessarios: z.number().min(0).nullable().optional(),
+  galoesNecessarios: z.number().int().min(0).nullable().optional(),
+  diluenteLitros: z.number().min(0).nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -126,6 +154,7 @@ export async function PATCH(req, { params }) {
     const atualizado = await prisma.pinturaItem.update({
       where: { id: itemId },
       data: campos,
+      include: includeRelation,
     });
     return NextResponse.json({ success: true, data: atualizado });
   } catch (e) {

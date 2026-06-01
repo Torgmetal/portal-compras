@@ -51,9 +51,9 @@ export async function POST(req) {
       );
     }
 
-    // Qtd efetiva (peso ou qtd)
+    // Qtd efetiva sempre em KG — peso tem prioridade; fallback pra qtd
     const qtdEfetiva = rmItem.peso > 0 ? Number(rmItem.peso) : rmItem.qtd;
-    const unidade = rmItem.peso > 0 ? "KG" : rmItem.unidade;
+    const unidade = "KG";
 
     // Calcula total ja recebido desse item
     const recebimentosExistentes = await prisma.recebimento.aggregate({

@@ -45,5 +45,19 @@ export async function POST(req) {
     },
   });
 
+  try {
+    await prisma.auditLog.create({
+      data: {
+        user: { connect: { id: user.id } },
+        action: "CRIAR_FLUXO_CAIXA",
+        entity: "FluxoCaixa",
+        entityId: created.id,
+        diff: { depois: { ...body, id: created.id } },
+      },
+    });
+  } catch (e) {
+    console.error("AuditLog error:", e);
+  }
+
   return NextResponse.json({ id: created.id });
 }

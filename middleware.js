@@ -37,6 +37,9 @@ export default withAuth(
           path === "/api/parse-cotacao-ai" ||
           path.startsWith("/api/cotacao/submeter/") ||
           path.startsWith("/api/cotacao/anexar/") ||
+          path.startsWith("/api/fornecedores/entrega/") ||
+          path.startsWith("/api/frete-cotacao/") ||
+          path.startsWith("/api/estudo-cotacao/") ||
           // Sync MES — autenticado por Bearer API key própria (não NextAuth)
           path.startsWith("/api/mes/")
         ) {
@@ -55,10 +58,13 @@ export default withAuth(
 
         if (path.startsWith("/comercial")  && !temModulo("COMERCIAL"))  return false;
         if (path.startsWith("/compras")    && !temModulo("COMPRAS"))     return false;
+        if (path.startsWith("/indicadores") && !temModulo("COMPRAS", "COMERCIAL", "RH"))    return false;
         if (path.startsWith("/financeiro") && !temModulo("FINANCEIRO"))  return false;
         if (path.startsWith("/expedicao")  && !temModulo("EXPEDICAO"))   return false;
         if (path.startsWith("/producao")   && !temModulo("PRODUCAO"))    return false;
         if (path.startsWith("/rm")         && !temModulo("ENGENHARIA", "ALMOXARIFADO"))  return false;
+        if (path.startsWith("/rh")         && !temModulo("RH"))            return false;
+        if (path.startsWith("/planejamento") && !temModulo("PLANEJAMENTO", "PRODUCAO")) return false;
         if (path.startsWith("/admin")      && !isAdmin)                  return false;
 
         return true;

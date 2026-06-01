@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { FolderKanban, Inbox, History, FileSpreadsheet, GitBranchPlus, ChevronDown, BarChart3, FilePlus2 } from "lucide-react";
+import { FolderKanban, Inbox, History, FileSpreadsheet, GitBranchPlus, ChevronDown, BarChart3, FilePlus2, CalendarClock } from "lucide-react";
 import { useState } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -14,9 +14,10 @@ const menu = [
     label: "Central de Orçamentos",
     icon: FileSpreadsheet,
     sub: [
+      { href: "/comercial/orcamentos/acompanhamento", label: "Acompanhamento", icon: CalendarClock },
       { href: "/comercial/orcamentos/propostas", label: "Propostas", icon: FilePlus2 },
       { href: "/comercial/orcamentos/pipeline", label: "Pipeline", icon: GitBranchPlus },
-      { href: "/comercial/orcamentos/kpis", label: "KPIs", icon: BarChart3 },
+      { href: "/comercial/orcamentos/kpis", label: "Indicadores", icon: BarChart3 },
     ],
   },
   { href: "/comercial/aprovacoes", label: "Aprovações", icon: Inbox, masterOnly: true },

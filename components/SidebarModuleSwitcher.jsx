@@ -13,6 +13,9 @@ import {
   Settings,
   ChevronDown,
   LayoutGrid,
+  Users,
+  Activity,
+  ClipboardList,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -66,6 +69,30 @@ const MODULOS = [
     icon: Truck,
     cor: "bg-teal-100 text-teal-700",
     modulos: ["EXPEDICAO"],
+  },
+  {
+    href: "/indicadores",
+    label: "Indicadores",
+    desc: "Scorecard, Savings e OTIF",
+    icon: Activity,
+    cor: "bg-indigo-100 text-indigo-700",
+    modulos: ["COMPRAS"],
+  },
+  {
+    href: "/rh",
+    label: "RH",
+    desc: "Funcionários e gestão de pessoas",
+    icon: Users,
+    cor: "bg-rose-100 text-rose-700",
+    modulos: ["RH"],
+  },
+  {
+    href: "/planejamento",
+    label: "Planejamento",
+    desc: "PCP e programação semanal",
+    icon: ClipboardList,
+    cor: "bg-amber-100 text-amber-700",
+    modulos: ["PLANEJAMENTO", "PRODUCAO"],
   },
   {
     href: "/admin/usuarios",

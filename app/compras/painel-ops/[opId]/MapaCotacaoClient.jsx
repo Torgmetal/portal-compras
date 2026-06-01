@@ -60,7 +60,19 @@ function abrirOutlookMailto(to, subject) {
   document.body.removeChild(a);
 }
 
-export default function MapaCotacaoClient({ op }) {
+// Extrai mensagem de erro de qualquer formato (string, Error, Zod, objeto)
+function extractError(e) {
+  if (!e) return "Erro desconhecido";
+  if (typeof e === "string") return e;
+  if (typeof e.message === "string") return e.message;
+  if (Array.isArray(e)) return e.map((x) => x?.message || String(x)).join("; ");
+  try { return JSON.stringify(e); } catch { return String(e); }
+}
+
+export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
+  // apiBase: prefixo para endpoints gerar-pedidos e sugerir-vencedores.
+  // Default: /api/op/{op.id} (fluxo OP). Para RMs sem OP: /api/rm/{rmId}.
+  const apiBase = apiBaseProp || `/api/op/${op.id}`;
   const router = useRouter();
   const [loading, setLoading] = useState(null);
   const [erro, setErro] = useState("");
@@ -85,7 +97,7 @@ export default function MapaCotacaoClient({ op }) {
       const res2 = await fetch(`/api/cotacao/${cotacaoId}/preview-email?format=json`);
       if (!res2.ok) {
         const d = await res2.json().catch(() => ({}));
-        throw new Error(d.error || "Falha ao montar email");
+        throw new Error(extractError(d.error) || "Falha ao montar email");
       }
       const emailData = await res2.json();
       setEmailRevisaoCache((prev) => ({ ...prev, [cotacaoId]: emailData }));
@@ -163,7 +175,7 @@ export default function MapaCotacaoClient({ op }) {
         body: JSON.stringify({ vencedor: !jaVencedor }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) throw new Error(extractError(data.error) || "Erro");
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -179,13 +191,13 @@ export default function MapaCotacaoClient({ op }) {
   // O modal chama com cotacoesIds=[id] pra gerar 1 por vez.
   const gerarPedidos = async ({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds }) => {
     setErro("");
-    const res = await fetch(`/api/op/${op.id}/gerar-pedidos`, {
+    const res = await fetch(`${apiBase}/gerar-pedidos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ categoria, localEstoque, cnpjsPorCotacao, cotacoesIds }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Erro");
+    if (!res.ok) throw new Error(extractError(data.error) || "Erro");
     return data.resultados || [];
   };
 
@@ -193,9 +205,9 @@ export default function MapaCotacaoClient({ op }) {
     setLoading("sugerir");
     setErro("");
     try {
-      const res = await fetch(`/api/op/${op.id}/sugerir-vencedores`, { method: "POST" });
+      const res = await fetch(`${apiBase}/sugerir-vencedores`, { method: "POST" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) throw new Error(extractError(data.error) || "Erro");
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -227,7 +239,7 @@ export default function MapaCotacaoClient({ op }) {
         body: JSON.stringify({ totalProposta: valor }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) throw new Error(extractError(data.error) || "Erro");
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -246,7 +258,7 @@ export default function MapaCotacaoClient({ op }) {
         body: JSON.stringify({ vencedor: !todosJaVencedores }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      if (!res.ok) throw new Error(extractError(data.error) || "Erro");
       router.refresh();
     } catch (e) {
       setErro(e.message);
@@ -538,8 +550,14 @@ export default function MapaCotacaoClient({ op }) {
                     const cell = it.celulas.find((c) => c?.cotacaoId === f.cotacaoId);
                     if (!cell || cell.precoUnit <= 0) {
                       return (
-                        <td key={f.cotacaoId} className="px-3 py-2 text-center text-torg-gray text-xs">
-                          —
+                        <td key={f.cotacaoId} className="px-3 py-2 text-center text-xs">
+                          {cell?.semEstoque ? (
+                            <span className="text-red-400 font-medium" title="Fornecedor informou que não tem este item">
+                              s/ estoque
+                            </span>
+                          ) : (
+                            <span className="text-torg-gray">—</span>
+                          )}
                         </td>
                       );
                     }
@@ -1315,6 +1333,7 @@ function buildMatriz(op) {
           qtdCotada: ci.qtdCotada,
           vencedor: ci.vencedor,
           prazoEntrega: ci.prazoEntrega || null,
+          semEstoque: ci.semEstoque || false,
         });
       }
     }

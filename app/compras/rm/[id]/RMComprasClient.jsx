@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   XCircle, AlertTriangle, Lock, Loader2, AlertCircle, X, FileText,
-  CheckCircle2, Check, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
+  CheckCircle2, CheckCircle, Check, Mail, Edit2, Settings, Edit3, Trash2, Unlink, Plus,
   Upload, Sparkles, RotateCcw, Package,
 } from "lucide-react";
 import {
@@ -43,7 +43,7 @@ const STATUS_ITEM_LABELS = {
 // mostra como "Sem proposta" pro usuario perceber que precisa re-cotar.
 const STATUS_SEM_PROPOSTA = { label: "Sem proposta", className: "bg-amber-50 text-amber-700" };
 
-export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null, categoriasCustom = [], pedidos = [] }) {
+export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMapa = null, apiBaseMapa = null, categoriasCustom = [], pedidos = [] }) {
   const router = useRouter();
   const isAdmin = userRole === "ADMIN";
   // Lista mesclada (built-in + custom do banco)
@@ -448,10 +448,13 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
           <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg px-4 py-2 mb-2 text-xs text-torg-dark flex items-start gap-2">
             <span>💡</span>
             <span>
-              Mapa filtrado pra esta RM. Clique nas células pra escolher vencedores e gerar os pedidos. O botão "Gerar Pedidos Omie" abaixo cria pedidos pra <strong>todos os itens vencedores dessa OP</strong> (não só desta RM).
+              {rm.opId
+                ? <>Mapa filtrado pra esta RM. Clique nas células pra escolher vencedores e gerar os pedidos. O botão &quot;Gerar Pedidos Omie&quot; abaixo cria pedidos pra <strong>todos os itens vencedores dessa OP</strong> (não só desta RM).</>
+                : <>Mapa de cotações desta RM. Clique nas células pra escolher vencedores e gerar pedidos no Omie.</>
+              }
             </span>
           </div>
-          <MapaCotacaoClient op={dadosMapa} />
+          <MapaCotacaoClient op={dadosMapa} apiBase={apiBaseMapa || undefined} />
         </div>
       )}
 
@@ -480,7 +483,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
           outrasRMs={outrasRMs}
           categoriasFornecedor={todasCategoriasFornecedor}
           onClose={() => setModalEnviarCot(false)}
-          onSent={(links) => { setModalEnviarCot(false); setLinksParaEnvio(links); router.refresh(); }}
+          onSent={(result) => { setModalEnviarCot(false); setLinksParaEnvio(result); router.refresh(); }}
         />
       )}
       {linksParaEnvio && (
@@ -2048,7 +2051,7 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
-      onSent(data.cotacoes);
+      onSent({ cotacoes: data.cotacoes, emails: data.emails || [] });
     } catch (e) {
       setErro(e.message);
       setSalvando(false);
@@ -2235,41 +2238,20 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
 }
 
 function ModalLinksEnvio({ rm, links, onClose }) {
+  // links agora é { cotacoes: [...], emails: [...] }
+  const cotacoes = links?.cotacoes || links || [];
+  const emailResults = links?.emails || [];
   const [copiado, setCopiado] = useState(null);
-  const [emailToast, setEmailToast] = useState(null);
-  const [emailsCache, setEmailsCache] = useState({});
+  const [reenvioStatus, setReenvioStatus] = useState({});
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  // Pre-fetch dos emails de cada cotacao
-  useEffect(() => {
-    links.forEach((cot) => {
-      if (emailsCache[cot.id]) return;
-      fetch(`/api/cotacao/${cot.id}/preview-email?format=json`)
-        .then((r) => r.ok ? r.json() : null)
-        .then((d) => d && setEmailsCache((prev) => ({ ...prev, [cot.id]: d })))
-        .catch(() => {});
-    });
-  }, [links]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Mapa email -> resultado do envio automático
+  const emailPorFornecedor = {};
+  emailResults.forEach((e) => { emailPorFornecedor[e.email] = e; });
 
-  const handleEnviarEmail = (cot) => {
-    setEmailToast(null);
-    const cached = emailsCache[cot.id];
-    if (!cached) {
-      setEmailToast({ id: cot.id, ok: false, msg: "Aguarde o email carregar e tente de novo." });
-      return;
-    }
-    try {
-      const r = enviarEmailComCache(cached);
-      setEmailToast({
-        id: cot.id,
-        ok: true,
-        msg: r.copiouHtml ? "Email copiado. Cole no Outlook (Ctrl+V) e envie." : "Outlook aberto. Cole manualmente.",
-      });
-      setTimeout(() => setEmailToast(null), 8000);
-    } catch (e) {
-      setEmailToast({ id: cot.id, ok: false, msg: e.message });
-    }
-  };
+  const todosEnviados = emailResults.length > 0 && emailResults.every((e) => e.ok);
+  const algumFalhou = emailResults.some((e) => !e.ok);
+  const nenhumEnviado = emailResults.length === 0;
 
   const copiarLink = async (cot) => {
     const link = `${baseUrl}/fornecedores/c/${cot.token}`;
@@ -2278,82 +2260,104 @@ function ModalLinksEnvio({ rm, links, onClose }) {
     setTimeout(() => setCopiado(null), 2000);
   };
 
+  const reenviarEmail = async (cot) => {
+    setReenvioStatus((prev) => ({ ...prev, [cot.id]: "enviando" }));
+    try {
+      const res = await fetch(`/api/cotacao/${cot.id}/enviar-email`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setReenvioStatus((prev) => ({ ...prev, [cot.id]: "ok" }));
+    } catch (e) {
+      setReenvioStatus((prev) => ({ ...prev, [cot.id]: "erro" }));
+    }
+  };
+
   return (
-    <Modal titulo={`Cotações criadas (${links.length})`} onClose={onClose}>
+    <Modal titulo={`Cotações criadas (${cotacoes.length})`} onClose={onClose}>
       <div className="px-6 py-5 space-y-3 max-h-[70vh] overflow-y-auto">
-        <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg p-3 text-sm text-torg-dark">
-          <p className="font-medium">✓ Cotações criadas com sucesso</p>
-          <p className="text-xs text-torg-gray mt-1">
-            Clique em "Enviar email" pra abrir o template formatado, copiar e colar no Outlook.
-            O link vai como hiperlink clicável. Também pode copiar o link e enviar por WhatsApp.
-          </p>
-        </div>
+        {/* Status geral */}
+        {todosEnviados && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-800">
+            <p className="font-medium flex items-center gap-1.5">
+              <CheckCircle size={15} /> Emails enviados automaticamente
+            </p>
+            <p className="text-xs text-emerald-700 mt-1">
+              Você recebeu cópia em CC de cada email. O fornecedor já pode acessar o link e enviar a proposta.
+            </p>
+          </div>
+        )}
+        {algumFalhou && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+            <p className="font-medium flex items-center gap-1.5">
+              <AlertCircle size={15} /> Alguns emails falharam
+            </p>
+            <p className="text-xs text-amber-700 mt-1">
+              As cotações foram criadas, mas nem todos os emails puderam ser enviados. Use "Reenviar" ou "Copiar link" e envie manualmente.
+            </p>
+          </div>
+        )}
+        {nenhumEnviado && (
+          <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg p-3 text-sm text-torg-dark">
+            <p className="font-medium">✓ Cotações criadas com sucesso</p>
+            <p className="text-xs text-torg-gray mt-1">
+              O serviço de email não está configurado. Copie o link e envie manualmente por email ou WhatsApp.
+            </p>
+          </div>
+        )}
 
         <ul className="space-y-2">
-          {links.map((cot) => (
-            <li key={cot.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-torg-dark">{cot.fornecedorNome}</p>
-                  <p className="text-xs text-torg-gray truncate">{cot.fornecedorEmail}</p>
-                  <p className="text-[10px] text-torg-gray font-mono mt-0.5 truncate">
-                    /fornecedores/c/{cot.token.slice(0, 8)}...
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => copiarLink(cot)}
-                    className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 font-medium"
-                  >
-                    {copiado === cot.id ? "✓ copiado" : "Copiar link"}
-                  </button>
-                  <button
-                    onClick={() => handleEnviarEmail(cot)}
-                    className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
-                    title="Copia o email e abre o Outlook — Ctrl+V e enviar"
-                  >
-                    <Mail size={12} /> Enviar email
-                  </button>
-                </div>
-              </div>
-              {emailToast?.id === cot.id && (
-                <div className={`text-xs rounded px-2 py-2 ${
-                  emailToast.ok
-                    ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
-                    : "bg-red-50 border border-red-200 text-red-700"
-                }`}>
-                  <div>{emailToast.ok ? "✓ " : "✗ "}{emailToast.msg}</div>
-                  {emailToast.ok && (
-                    <div className="flex gap-2 mt-2 flex-wrap">
+          {cotacoes.map((cot) => {
+            const emailStatus = emailPorFornecedor[cot.fornecedorEmail];
+            const enviado = emailStatus?.ok;
+            const reenvio = reenvioStatus[cot.id];
+
+            return (
+              <li key={cot.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-torg-dark flex items-center gap-2">
+                      {cot.fornecedorNome}
+                      {(enviado || reenvio === "ok") && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-medium">
+                          ✓ email enviado
+                        </span>
+                      )}
+                      {emailStatus && !enviado && reenvio !== "ok" && (
+                        <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-medium">
+                          ✗ falhou
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-torg-gray truncate">{cot.fornecedorEmail}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => copiarLink(cot)}
+                      className="px-3 py-1.5 text-xs bg-white border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 font-medium"
+                    >
+                      {copiado === cot.id ? "✓ copiado" : "Copiar link"}
+                    </button>
+                    {/* Reenviar — mostra quando falhou ou como opção sempre */}
+                    {(!enviado || reenvio === "erro") && (
                       <button
-                        onClick={() => {
-                          const cached = emailsCache[cot.id];
-                          const ok = reCopiarEmail(cached);
-                          setEmailToast({
-                            id: cot.id,
-                            ok,
-                            msg: ok ? "Email recopiado. Cole no Outlook (Ctrl+V)." : "Falha ao recopiar.",
-                          });
-                        }}
-                        className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
+                        onClick={() => reenviarEmail(cot)}
+                        disabled={reenvio === "enviando"}
+                        className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1 disabled:opacity-50"
                       >
-                        Copiar de novo
+                        <Mail size={12} />
+                        {reenvio === "enviando" ? "Enviando..." : "Enviar email"}
                       </button>
-                      <button
-                        onClick={() => {
-                          const cached = emailsCache[cot.id];
-                          if (cached) abrirOutlookMailto(cached.to, cached.subject);
-                        }}
-                        className="px-2 py-1 rounded font-medium bg-torg-blue text-white hover:bg-torg-blue-700 whitespace-nowrap"
-                      >
-                        Abrir Outlook
-                      </button>
-                    </div>
-                  )}
+                    )}
+                    {reenvio === "ok" && (
+                      <span className="px-3 py-1.5 text-xs bg-emerald-100 text-emerald-700 rounded-lg font-medium inline-flex items-center gap-1">
+                        <CheckCircle size={12} /> Enviado
+                      </span>
+                    )}
+                  </div>
                 </div>
-              )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </div>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">

@@ -24,10 +24,19 @@ export async function GET(req, { params }) {
         itensPerso: { orderBy: { ordem: "asc" } },
         itensAcessorio: { orderBy: { ordem: "asc" } },
         itensParafuso: { orderBy: { ordem: "asc" } },
-        itensPintura: { orderBy: { ordem: "asc" } },
+        itensPintura: {
+          orderBy: { ordem: "asc" },
+          include: { tintaProduto: { select: { id: true, nome: true, svPct: true, resinaTipo: true, diluentePct: true, fabricante: true, norma: true } } },
+        },
         itensCusto: { orderBy: [{ categoria: "asc" }, { ordem: "asc" }] },
         itensFaturamento: { orderBy: { ordem: "asc" } },
         itensCronograma: { orderBy: { ordem: "asc" } },
+        itensFretes: { orderBy: { ordem: "asc" } },
+        cotacoesFretes: { orderBy: { createdAt: "desc" } },
+        cotacoesEstudo: {
+          orderBy: { createdAt: "desc" },
+          include: { itens: { orderBy: { ordem: "asc" } } },
+        },
         documentos: { orderBy: { criadoEm: "desc" } },
       },
     });

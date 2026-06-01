@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CATEGORIAS_FORNECEDOR_BUILTIN } from "@/lib/fornecedor-categorias";
+import { titleCaseNome, chaveNormalizacao } from "@/lib/normalizar-nome";
 
 const CODIGOS_BUILTIN = new Set(CATEGORIAS_FORNECEDOR_BUILTIN.map((c) => c.codigo));
 
@@ -48,8 +49,9 @@ const schema = z.object({
 export async function GET(req) {
   try {
     await requireRole(["ADMIN", "COMPRAS"]);
-  } catch {
-    return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   const { searchParams } = new URL(req.url);
@@ -81,8 +83,9 @@ export async function POST(req) {
   let user;
   try {
     user = await requireRole(["ADMIN", "COMPRAS"]);
-  } catch {
-    return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
   let body;
@@ -98,16 +101,38 @@ export async function POST(req) {
     return NextResponse.json({ error: validacao.erro }, { status: 400 });
   }
 
+  // Normaliza nomes pra MAIÚSCULO
+  const razaoNormalizada = body.razaoSocial.trim().toUpperCase();
+  const fantasiaNormalizada = body.nomeFantasia ? body.nomeFantasia.trim().toUpperCase() : null;
+
+  // Verifica duplicata (nome similar já existente)
+  const chave = chaveNormalizacao(razaoNormalizada);
+  if (chave) {
+    const existentes = await prisma.fornecedor.findMany({
+      where: { ativo: true },
+      select: { id: true, razaoSocial: true },
+    });
+    const duplicata = existentes.find(
+      (f) => chaveNormalizacao(f.razaoSocial) === chave
+    );
+    if (duplicata) {
+      return NextResponse.json(
+        { error: `Já existe um fornecedor com nome similar: "${duplicata.razaoSocial}". Se quiser cadastrar mesmo assim, edite o nome para diferenciá-lo.` },
+        { status: 409 }
+      );
+    }
+  }
+
   const fornecedor = await prisma.fornecedor.create({
     data: {
-      razaoSocial: body.razaoSocial.trim(),
-      nomeFantasia: body.nomeFantasia?.trim() || null,
+      razaoSocial: razaoNormalizada,
+      nomeFantasia: fantasiaNormalizada,
       cnpj: body.cnpj?.replace(/\D/g, "") || null,
       email: body.email.trim().toLowerCase(),
       emailsAdicionais: body.emailsAdicionais.map((e) => e.trim().toLowerCase()),
       telefone: body.telefone?.trim() || null,
-      contato: body.contato?.trim() || null,
-      cidade: body.cidade?.trim() || null,
+      contato: body.contato ? titleCaseNome(body.contato) : null,
+      cidade: body.cidade ? titleCaseNome(body.cidade) : null,
       uf: body.uf?.trim().toUpperCase() || null,
       categorias: body.categorias,
       observacao: body.observacao?.trim() || null,
