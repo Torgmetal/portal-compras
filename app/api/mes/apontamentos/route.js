@@ -117,7 +117,7 @@ export async function GET(req) {
   const normNum = (obra) => { const m = (obra || "").match(/^T(\d+)/i); return m ? String(parseInt(m[1])) : ""; };
   const skaNormSet = new Set(obrasUnicas.map(normNum).filter(Boolean));
   const opsAtivas = await prisma.oP.findMany({
-    where: { ativo: true },
+    where: { status: { in: ["ABERTA", "EM_EXECUCAO", "ATRASADA"] } },
     select: { id: true, numero: true, cliente: true, obra: true },
     orderBy: { numero: "asc" },
   });

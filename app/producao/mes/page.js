@@ -43,7 +43,7 @@ export default async function MesPage() {
       _count: { productionId: true },
     }),
     prisma.oP.findMany({
-      where: { ativo: true },
+      where: { status: { in: ["ABERTA", "EM_EXECUCAO", "ATRASADA"] } },
       select: { id: true, numero: true, cliente: true, obra: true },
       orderBy: { numero: "asc" },
     }),
