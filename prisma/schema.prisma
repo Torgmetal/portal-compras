@@ -1764,6 +1764,20 @@ model BDMPerfil {
   @@index([codigo])
 }
 
+model CatalogoPerfilEstrutura {
+  id        String   @id @default(cuid())
+  categoria String   // VIGAS_W, PERFIL_HP, TUBO_REDONDO, etc.
+  perfil    String   // nome do perfil (ex: "W 200 x 26,6")
+  pesoKgM   Float    // peso kg/m
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([categoria, perfil])
+  @@index([categoria])
+  @@index([ativo])
+}
+
 model CatalogoProdutoAcessorio {
   id                   String   @id @default(cuid())
   categoria            String   // TELHAS, GRADES_DE_PISO, STEEL_DECK, PAINEIS_ISO

@@ -1326,6 +1326,10 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const [progressoIA, setProgressoIA] = useState(null); // { loteAtual, totalLotes, itensAcumulados }
   const [resultadoIA, setResultadoIA] = useState(null);
   const [salvandoIA, setSalvandoIA] = useState(false);
+  const [importandoPlanilha, setImportandoPlanilha] = useState(false);
+  const [previewImport, setPreviewImport] = useState(null);
+  const [confirmandoImport, setConfirmandoImport] = useState(false);
+  const importFileRef = useRef(null);
   // Filtro de docs padrao: analisar apenas docs de estrutura metalica (-MET-)
   const filtroDocsIA = "MET";
 
@@ -1637,6 +1641,63 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
     }
   };
 
+  // ── Importar planilha de materiais ──
+  const handleImportarPlanilha = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setImportandoPlanilha(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/importar-materiais?preview=true`, {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setPreviewImport({
+        itens: json.data.map((item, i) => ({ ...item, _selecionado: true, _idx: i })),
+        formato: json.formato,
+        avisos: json.avisos || [],
+      });
+    } catch (err) {
+      showToast(`Erro: ${err.message}`);
+    } finally {
+      setImportandoPlanilha(false);
+    }
+  };
+
+  const handleConfirmarImport = async (itensSelecionados) => {
+    setConfirmandoImport(true);
+    try {
+      const payload = itensSelecionados.map(({ _selecionado, _idx, ...item }) => ({
+        tipoMaterial: item.tipoMaterial || "OUTRO",
+        descricao: item.descricao,
+        norma: item.norma || null,
+        quantidade: item.quantidade || 1,
+        comprimento: item.comprimento || null,
+        pesoUnitario: item.pesoUnitario || 0,
+        pesoTotal: item.pesoTotal || 0,
+      }));
+      const res = await fetch(`/api/comercial/estudo/${estudoId}/itens`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      setItens(json.data);
+      onEstudoUpdate?.({ pesoTotal: json.data.reduce((s, i) => s + (i.pesoTotal || 0), 0) });
+      setPreviewImport(null);
+      showToast(`${payload.length} itens importados da planilha`);
+    } catch (err) {
+      showToast(`Erro: ${err.message}`);
+    } finally {
+      setConfirmandoImport(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header com totais e acoes */}
@@ -1712,6 +1773,30 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
               Enviar para Cotacao
             </button>
           )}
+          <a
+            href="/api/comercial/template-materiais"
+            download
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-torg-dark rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+            title="Baixar planilha modelo"
+          >
+            <Download size={15} className="text-torg-gray" />
+            Template
+          </a>
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleImportarPlanilha}
+          />
+          <button
+            onClick={() => importFileRef.current?.click()}
+            disabled={importandoPlanilha}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-torg-dark rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {importandoPlanilha ? <Loader2 size={15} className="animate-spin text-torg-gray" /> : <Upload size={15} className="text-torg-gray" />}
+            {importandoPlanilha ? "Importando..." : "Importar"}
+          </button>
           {(estudo.documentos?.length || 0) > 0 && (
             <button
               onClick={handleAnalisarIA}
@@ -2141,6 +2226,16 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
         />
       )}
 
+      {/* Modal preview importacao materiais */}
+      {previewImport && (
+        <ImportPreviewMateriaisModal
+          dados={previewImport}
+          onClose={() => setPreviewImport(null)}
+          onConfirmar={handleConfirmarImport}
+          salvando={confirmandoImport}
+        />
+      )}
+
       {/* Modal cotacao materiais */}
       {showCotacaoModal && (
         <SolicitarCotacaoMateriaisModal
@@ -2168,6 +2263,120 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Modal Preview Importacao Materiais ─────────────────────
+
+function ImportPreviewMateriaisModal({ dados, onClose, onConfirmar, salvando }) {
+  const [itens, setItens] = useState(dados.itens);
+  const todosSelecionados = itens.every((i) => i._selecionado);
+  const qtdSelecionados = itens.filter((i) => i._selecionado).length;
+
+  const toggleAll = () => {
+    const novoValor = !todosSelecionados;
+    setItens((prev) => prev.map((i) => ({ ...i, _selecionado: novoValor })));
+  };
+
+  const toggleItem = (idx) => {
+    setItens((prev) => prev.map((i) => i._idx === idx ? { ...i, _selecionado: !i._selecionado } : i));
+  };
+
+  const pesoTotal = itens.filter((i) => i._selecionado).reduce((s, i) => s + (i.pesoTotal || 0), 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-lg font-bold text-torg-dark">Importar Materiais da Planilha</h2>
+            <p className="text-sm text-torg-gray mt-0.5">
+              {dados.formato === "levantamento-estrutura" ? "Formato: Levantamento de Estrutura" : "Formato generico"} · {itens.length} itens encontrados
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={20} className="text-gray-400" /></button>
+        </div>
+
+        {dados.avisos?.length > 0 && (
+          <div className="px-6 py-2 bg-amber-50 border-b border-amber-100">
+            <p className="text-xs text-amber-700 flex items-center gap-1.5">
+              <AlertCircle size={13} />
+              {dados.avisos.join(" · ")}
+            </p>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50/60 sticky top-0">
+              <tr className="text-left text-xs font-semibold text-torg-gray uppercase tracking-wider whitespace-nowrap">
+                <th className="pl-4 pr-2 py-2.5 w-8">
+                  <button onClick={toggleAll} className="p-0.5">
+                    {todosSelecionados
+                      ? <CheckCircle2 size={16} className="text-torg-blue" />
+                      : <div className="w-4 h-4 rounded border-2 border-gray-300" />}
+                  </button>
+                </th>
+                <th className="px-2 py-2.5">Perfil/Bitola</th>
+                <th className="px-2 py-2.5">Tipo</th>
+                <th className="px-2 py-2.5">Norma</th>
+                <th className="px-2 py-2.5 text-right">Qtde</th>
+                <th className="px-2 py-2.5 text-right">Comp. (m)</th>
+                <th className="px-2 py-2.5 text-right">kg/m</th>
+                <th className="px-2 py-2.5 text-right">Peso Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {itens.map((item) => (
+                <tr
+                  key={item._idx}
+                  onClick={() => toggleItem(item._idx)}
+                  className={`cursor-pointer transition-colors ${item._selecionado ? "bg-torg-blue/5 hover:bg-torg-blue/10" : "hover:bg-gray-50 opacity-50"}`}
+                >
+                  <td className="pl-4 pr-2 py-2">
+                    {item._selecionado
+                      ? <CheckCircle2 size={16} className="text-torg-blue" />
+                      : <div className="w-4 h-4 rounded border-2 border-gray-300" />}
+                  </td>
+                  <td className="px-2 py-2 font-medium text-torg-dark text-xs">{item.descricao}</td>
+                  <td className="px-2 py-2 text-xs text-torg-gray whitespace-nowrap">
+                    <span className="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-[10px] font-medium">
+                      {TIPO_MATERIAL_LABELS[item.tipoMaterial] || item.tipoMaterial}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2 text-xs text-torg-gray">{item.norma || "—"}</td>
+                  <td className="px-2 py-2 text-xs text-right text-torg-dark">{item.quantidade}</td>
+                  <td className="px-2 py-2 text-xs text-right text-torg-dark">{item.comprimento ? fmtNum(item.comprimento, 3) : "—"}</td>
+                  <td className="px-2 py-2 text-xs text-right text-torg-dark">{item.pesoUnitario ? fmtNum(item.pesoUnitario) : "—"}</td>
+                  <td className="px-2 py-2 text-xs text-right font-semibold text-torg-dark">{fmtNum(item.pesoTotal, 1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 shrink-0">
+          <div className="text-sm text-torg-gray">
+            <span className="font-semibold text-torg-dark">{qtdSelecionados}</span> de {itens.length} itens selecionados
+            <span className="mx-2">·</span>
+            <span className="font-semibold text-torg-dark">{fmtNum(pesoTotal, 0)} kg</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={() => onConfirmar(itens.filter((i) => i._selecionado))}
+              disabled={qtdSelecionados === 0 || salvando}
+              className="flex items-center gap-2 px-5 py-2 bg-torg-blue text-white rounded-xl text-sm font-medium hover:bg-torg-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {salvando ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              {salvando ? "Importando..." : `Importar ${qtdSelecionados} itens`}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
