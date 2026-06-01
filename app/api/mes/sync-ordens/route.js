@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, waitMesTables } from "@/lib/prisma";
 
-// Recebe ordens planejadas do SKA dataset 150 (TORG_Production_Traceability_Detalhado).
-// Cada linha = uma peça/operação/obra com Planejado vs Produzido.
-// Auth: Bearer MES_SYNC_API_KEY (mesma do /api/mes/sync).
+// Recebe ordens planejadas do SKA dataset 150 (snapshot planejado vs produzido).
+// Upsert EM MASSA via INSERT ... ON CONFLICT (1 SQL por lote) — rápido.
+// Auth: Bearer MES_SYNC_API_KEY.
 
 export const maxDuration = 60;
 
@@ -31,30 +31,35 @@ const ordemSchema = z.object({
 });
 
 const bodySchema = z.object({
-  ordens:     z.array(ordemSchema).min(1).max(10000),
+  ordens:     z.array(ordemSchema).min(1).max(20000),
   dataInicio: z.string().optional(),
   dataFim:    z.string().optional(),
   duracaoMs:  z.number().int().optional(),
 });
 
-// Converte código Obra do SKA → número de OP do portal (T87 → 087)
 function obraParaNumeroOP(obra) {
   if (!obra) return obra;
   const m = obra.match(/^T(\d+)/i);
-  if (!m) return obra;
-  return String(parseInt(m[1])).padStart(3, "0");
+  return m ? String(parseInt(m[1])).padStart(3, "0") : obra;
 }
 
 function parseData(s) {
   if (!s) return null;
   if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
-    const [datePart, timePart] = s.split(" ");
-    const [dd, mm, yyyy] = datePart.split("/");
-    return new Date(`${yyyy}-${mm}-${dd}T${timePart || "00:00:00"}.000Z`);
+    const [d, t] = s.split(" ");
+    const [dd, mm, yyyy] = d.split("/");
+    const dt = new Date(`${yyyy}-${mm}-${dd}T${t || "00:00:00"}.000Z`);
+    return isNaN(dt.getTime()) ? null : dt;
   }
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
+  const dt = new Date(s);
+  return isNaN(dt.getTime()) ? null : dt;
 }
+
+// Escaping seguro para SQL
+const q   = (s) => s == null ? "NULL" : `'${String(s).replace(/'/g, "''")}'`;
+const ts  = (d) => d ? `'${d.toISOString()}'::timestamp` : "NULL";
+const n   = (v) => Number.isFinite(v) ? String(v) : "0";
+const ni  = (v) => (v == null || !Number.isFinite(v)) ? "NULL" : String(Math.trunc(v));
 
 export async function POST(req) {
   await waitMesTables();
@@ -65,21 +70,15 @@ export async function POST(req) {
   }
 
   let body;
-  try {
-    body = bodySchema.parse(await req.json());
-  } catch (e) {
-    return NextResponse.json({ error: "Dados inválidos: " + (e.issues?.[0]?.message || e.message) }, { status: 400 });
-  }
+  try { body = bodySchema.parse(await req.json()); }
+  catch (e) { return NextResponse.json({ error: "Dados inválidos: " + (e.issues?.[0]?.message || e.message) }, { status: 400 }); }
 
   const inicio = Date.now();
 
   // Mapa obra → opId do portal
   const obrasUnicas = [...new Set(body.ordens.map(o => o.obra).filter(Boolean))];
   const numerosPortal = [...new Set(obrasUnicas.map(obraParaNumeroOP))];
-  const ops = await prisma.oP.findMany({
-    where: { numero: { in: numerosPortal } },
-    select: { id: true, numero: true },
-  });
+  const ops = await prisma.oP.findMany({ where: { numero: { in: numerosPortal } }, select: { id: true, numero: true } });
   const opMapPorNumero = Object.fromEntries(ops.map(o => [o.numero, o.id]));
   const opIdDaObra = (obra) => opMapPorNumero[obraParaNumeroOP(obra)] || null;
 
@@ -94,30 +93,57 @@ export async function POST(req) {
 
   let criados = 0, atualizados = 0;
   try {
-    const LOTE = 10; // respeita pool de conexões Neon (limit=5)
-    for (let i = 0; i < body.ordens.length; i += LOTE) {
-      const lote = body.ordens.slice(i, i + LOTE);
-      await Promise.all(lote.map(async (o) => {
-        const data = {
-          obra: o.obra, op: o.op, operacao: o.operacao, item: o.item,
-          setor: o.setor || null, descItem: o.descItem || null,
-          maquina: o.maquina || null, operador: o.operador || null,
-          planejadoUn: o.planejadoUn ?? 0, produzidoUn: o.produzidoUn ?? 0,
-          rejeitadoUn: o.rejeitadoUn ?? 0, saldoUn: o.saldoUn ?? 0,
-          pesoPlanejado: o.pesoPlanejado ?? 0, pesoProduzido: o.pesoProduzido ?? 0,
-          saldoRestante: o.saldoRestante ?? 0,
-          status: o.status || null, productionId: o.productionId ?? null,
-          dataInicio: parseData(o.dataInicio), dataFim: parseData(o.dataFim),
-          opId: opIdDaObra(o.obra), syncRunId: syncLog.id,
-        };
-        const res = await prisma.mesOrdem.upsert({
-          where: { obra_op_operacao_item: { obra: o.obra, op: o.op, operacao: o.operacao, item: o.item } },
-          create: data,
-          update: data,
-        });
-        if (res.createdAt.getTime() === res.updatedAt.getTime()) criados++;
-        else atualizados++;
-      }));
+    // Sub-lotes de 1000 para o INSERT em massa (cabe num SQL sem estourar)
+    const SUB = 1000;
+    for (let i = 0; i < body.ordens.length; i += SUB) {
+      // Dedup dentro do lote pela chave (evita "ON CONFLICT afetar linha 2x no mesmo comando")
+      const vistos = new Set();
+      const lote = [];
+      for (const o of body.ordens.slice(i, i + SUB)) {
+        const k = `${o.obra}|${o.op}|${o.operacao}|${o.item}`;
+        if (vistos.has(k)) continue;
+        vistos.add(k);
+        lote.push(o);
+      }
+
+      const valores = lote.map(o => {
+        const di = parseData(o.dataInicio), df = parseData(o.dataFim);
+        return `(gen_random_uuid()::text, ${q(o.obra)}, ${q(o.op)}, ${q(o.operacao)}, ${q(o.item)}, ` +
+          `${q(o.setor)}, ${q(o.descItem)}, ${q(o.maquina)}, ${q(o.operador)}, ` +
+          `${n(o.planejadoUn)}, ${n(o.produzidoUn)}, ${n(o.rejeitadoUn)}, ${n(o.saldoUn)}, ` +
+          `${n(o.pesoPlanejado)}, ${n(o.pesoProduzido)}, ${n(o.saldoRestante)}, ` +
+          `${q(o.status)}, ${ni(o.productionId)}, ${ts(di)}, ${ts(df)}, ${q(opIdDaObra(o.obra))}, ${q(syncLog.id)}, NOW(), NOW())`;
+      }).join(",");
+
+      const res = await prisma.$queryRawUnsafe(`
+        INSERT INTO "MesOrdem" (
+          "id","obra","op","operacao","item","setor","descItem","maquina","operador",
+          "planejadoUn","produzidoUn","rejeitadoUn","saldoUn","pesoPlanejado","pesoProduzido","saldoRestante",
+          "status","productionId","dataInicio","dataFim","opId","syncRunId","createdAt","updatedAt"
+        )
+        VALUES ${valores}
+        ON CONFLICT ("obra","op","operacao","item") DO UPDATE SET
+          "setor"         = EXCLUDED."setor",
+          "descItem"      = EXCLUDED."descItem",
+          "maquina"       = EXCLUDED."maquina",
+          "operador"      = EXCLUDED."operador",
+          "planejadoUn"   = EXCLUDED."planejadoUn",
+          "produzidoUn"   = EXCLUDED."produzidoUn",
+          "rejeitadoUn"   = EXCLUDED."rejeitadoUn",
+          "saldoUn"       = EXCLUDED."saldoUn",
+          "pesoPlanejado" = EXCLUDED."pesoPlanejado",
+          "pesoProduzido" = EXCLUDED."pesoProduzido",
+          "saldoRestante" = EXCLUDED."saldoRestante",
+          "status"        = EXCLUDED."status",
+          "productionId"  = EXCLUDED."productionId",
+          "dataInicio"    = EXCLUDED."dataInicio",
+          "dataFim"       = EXCLUDED."dataFim",
+          "opId"          = EXCLUDED."opId",
+          "syncRunId"     = EXCLUDED."syncRunId",
+          "updatedAt"     = NOW()
+        RETURNING (xmax = 0) AS inserted
+      `);
+      for (const r of res) { if (r.inserted) criados++; else atualizados++; }
     }
 
     await prisma.mesSyncLog.update({
