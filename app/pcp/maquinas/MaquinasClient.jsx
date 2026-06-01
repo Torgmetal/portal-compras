@@ -1,0 +1,238 @@
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import {
+  Loader2, AlertCircle, RefreshCw, Cpu, Weight,
+  Search, Package, Users,
+} from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell,
+} from "recharts";
+import { FLUXO_VISUAL, corSetor, normSetor } from "@/lib/setores";
+
+const fmtKg = (v) =>
+  v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg` : "—";
+const fmtData = (d) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+};
+
+/**
+ * Página especial de Máquinas — mostra TODAS as máquinas de todos os setores,
+ * agrupadas por setor, com visão kanban/grid.
+ */
+export default function MaquinasClient() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [filtro, setFiltro] = useState("");
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    setErro("");
+    try {
+      const res = await fetch("/api/pcp/dashboard");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao carregar");
+      setData(json);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 size={28} className="animate-spin text-torg-blue" />
+        <span className="ml-3 text-sm text-torg-gray">Carregando máquinas...</span>
+      </div>
+    );
+  }
+
+  if (erro) {
+    return (
+      <div className="max-w-xl mx-auto mt-12 bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+        <AlertCircle size={24} className="mx-auto text-red-500 mb-2" />
+        <p className="text-sm text-red-600">{erro}</p>
+        <button onClick={carregar} className="mt-3 px-4 py-2 text-sm bg-white border border-red-200 rounded-lg text-red-600 hover:bg-red-50">
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { maquinasAtivas, kgPorSetor } = data;
+
+  // Agrupa máquinas por setor
+  const porSetor = {};
+  for (const m of maquinasAtivas) {
+    const s = m.setor || "Outros";
+    if (!porSetor[s]) porSetor[s] = [];
+    porSetor[s].push(m);
+  }
+
+  // Ordena setores pelo fluxo visual
+  const setoresOrdenados = Object.keys(porSetor).sort((a, b) => {
+    const ia = FLUXO_VISUAL.findIndex((f) => normSetor(f) === normSetor(a));
+    const ib = FLUXO_VISUAL.findIndex((f) => normSetor(f) === normSetor(b));
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+
+  // Filtra
+  const filtroLower = filtro.toLowerCase();
+  const filtrar = (m) => {
+    if (!filtro) return true;
+    return (
+      (m.maquina || "").toLowerCase().includes(filtroLower) ||
+      (m.obra || "").toLowerCase().includes(filtroLower) ||
+      (m.operador || "").toLowerCase().includes(filtroLower) ||
+      (m.setor || "").toLowerCase().includes(filtroLower)
+    );
+  };
+
+  // KG por setor pra gráfico
+  const setorBarData = FLUXO_VISUAL.map((setor) => {
+    const norm = normSetor(setor);
+    const item = kgPorSetor.hoje.find((r) => normSetor(r.setor) === norm);
+    return { setor, kg: item?._sum.produzidoKg || 0, fill: corSetor(setor).hex };
+  }).filter((s) => s.kg > 0);
+
+  return (
+    <div className="space-y-6 max-w-7xl">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
+            <Cpu size={28} className="text-torg-blue" />
+            Programação de Máquinas
+          </h2>
+          <p className="text-sm text-torg-gray mt-1">
+            Visão de todas as máquinas por setor — dados em tempo real do Syneco.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative max-w-xs">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+              placeholder="Buscar máquina, OP, operador..."
+              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue"
+            />
+          </div>
+          <button
+            onClick={carregar}
+            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+          >
+            <RefreshCw size={14} /> Atualizar
+          </button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+          <div className="bg-torg-blue p-2.5 rounded-lg"><Cpu size={20} className="text-white" /></div>
+          <div>
+            <p className="text-xs text-torg-gray">Máquinas ativas</p>
+            <p className="text-xl font-extrabold text-torg-dark">{maquinasAtivas.length}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+          <div className="bg-emerald-600 p-2.5 rounded-lg"><Package size={20} className="text-white" /></div>
+          <div>
+            <p className="text-xs text-torg-gray">Setores ativos</p>
+            <p className="text-xl font-extrabold text-torg-dark">{setoresOrdenados.length}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+          <div className="bg-torg-orange p-2.5 rounded-lg"><Users size={20} className="text-white" /></div>
+          <div>
+            <p className="text-xs text-torg-gray">Operadores</p>
+            <p className="text-xl font-extrabold text-torg-dark">
+              {new Set(maquinasAtivas.map((m) => m.operador).filter(Boolean)).size}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Gráfico KG por setor hoje */}
+      {setorBarData.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-sm font-semibold text-torg-dark mb-4">KG produzido hoje por setor</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={setorBarData} margin={{ left: 10, right: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey="setor" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(1)}t`} />
+              <Tooltip formatter={(v) => [fmtKg(v), "Produzido"]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+              <Bar dataKey="kg" radius={[4, 4, 0, 0]}>
+                {setorBarData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Máquinas agrupadas por setor */}
+      {maquinasAtivas.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+          <Cpu size={36} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-sm text-torg-gray">Nenhuma máquina produzindo no momento.</p>
+          <p className="text-xs text-torg-gray mt-1">Os dados atualizam automaticamente com o sync do Syneco.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {setoresOrdenados.map((setor) => {
+            const maquinas = porSetor[setor].filter(filtrar);
+            if (maquinas.length === 0) return null;
+            const c = corSetor(setor);
+            return (
+              <div key={setor} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className={`px-6 py-3 border-b border-gray-100 flex items-center gap-2`}>
+                  <span className={`w-3 h-3 rounded-full`} style={{ background: c.hex }} />
+                  <h3 className="text-base font-semibold text-torg-dark">{setor}</h3>
+                  <span className="text-xs text-torg-gray ml-1">({maquinas.length} máquinas)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                  {maquinas.map((m, i) => (
+                    <div key={i} className="border rounded-lg p-3 hover:shadow-sm transition-shadow" style={{ borderColor: c.hex + "40" }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-mono text-sm font-bold" style={{ color: c.hex }}>
+                          {m.maquina || m.codigoMaquina || "Máquina"}
+                        </span>
+                        <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">
+                          ● Ativa
+                        </span>
+                      </div>
+                      <div className="space-y-0.5 text-xs text-torg-gray">
+                        <p>OP: <span className="font-medium text-torg-blue">{m.obra || "—"}</span></p>
+                        <p>Peça: <span className="text-torg-dark">{m.descricaoItem || m.opSka || "—"}</span></p>
+                        <p>Operador: <span className="text-torg-dark">{m.operador || "—"}</span></p>
+                        <p>Início: <span className="text-torg-dark">{fmtData(m.dataInicio)}</span></p>
+                        <p className="pt-1">
+                          <span className="font-medium text-torg-dark text-sm">{fmtKg(m.produzidoKg)}</span>
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

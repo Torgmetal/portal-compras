@@ -16,6 +16,7 @@ import {
   Users,
   Activity,
   ClipboardList,
+  Cog,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -89,9 +90,17 @@ const MODULOS = [
   {
     href: "/planejamento",
     label: "Planejamento",
-    desc: "PCP e programação semanal",
+    desc: "Cronogramas e programação semanal",
     icon: ClipboardList,
     cor: "bg-amber-100 text-amber-700",
+    modulos: ["PLANEJAMENTO", "PRODUCAO"],
+  },
+  {
+    href: "/pcp",
+    label: "PCP",
+    desc: "Máquinas, setores e aproveitamento",
+    icon: Cog,
+    cor: "bg-emerald-100 text-emerald-700",
     modulos: ["PLANEJAMENTO", "PRODUCAO"],
   },
   {
