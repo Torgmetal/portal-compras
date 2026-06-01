@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { isoWeekString, parseSemana, semanaInicio, semanaFim, fmtSemana } from "@/lib/semana";
 import { ExternalLink, FileText, Package } from "lucide-react";
+import RomaneiosSharepoint from "@/components/RomaneiosSharepoint";
 
 
 export const metadata = {
@@ -23,7 +24,7 @@ export default async function RomaneiosProducao() {
   const inicioJanela = new Date(hoje);
   inicioJanela.setDate(inicioJanela.getDate() - 12 * 7);
 
-  const [romaneios, producoes] = await Promise.all([
+  const [romaneios, producoes, opsRaw] = await Promise.all([
     prisma.romaneio.findMany({
       where: { data: { gte: inicioJanela } },
       orderBy: { data: "desc" },
@@ -33,7 +34,14 @@ export default async function RomaneiosProducao() {
       where: { dataInicio: { gte: inicioJanela } },
       orderBy: { dataInicio: "asc" },
     }),
+    prisma.oP.findMany({
+      where: { status: { notIn: ["ENCERRADA", "CANCELADA"] } },
+      select: { id: true, numero: true, cliente: true, obra: true },
+    }),
   ]);
+  const ops = opsRaw.sort((a, b) =>
+    (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
+  );
 
   // Agrega: peso previsto/realizado e romaneios por semana
   const semanas = {};
@@ -224,6 +232,15 @@ export default async function RomaneiosProducao() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Romaneios do SharePoint (marcas e pesos) */}
+      <div>
+        <h3 className="text-lg font-semibold text-torg-dark mb-3">Romaneios SharePoint (por OP)</h3>
+        <p className="text-xs text-torg-gray mb-4">
+          Selecione uma OP para visualizar os romaneios do SharePoint com marcas e pesos detalhados.
+        </p>
+        <RomaneiosSharepoint ops={ops} />
       </div>
     </div>
   );
