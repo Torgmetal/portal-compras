@@ -11,13 +11,15 @@ export default async function MesPage() {
   await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL", "COMPRAS"]);
 
   // Data de hoje no fuso Brasil/São Paulo (UTC-3, sem horário de verão desde 2019)
-  // Vercel roda em UTC, então usamos Intl para pegar a data correta em SP
   const hojeStr = new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Sao_Paulo" })
     .format(new Date()); // retorna "YYYY-MM-DD"
 
-  // Dados armazenados como UTC naïve (hora BRT salva sem offset).
-  // Comparamos com meia-noite UTC para preservar o dia exato do Brasil.
-  const de  = new Date(hojeStr + "T00:00:00.000Z");
+  // Default: últimos 30 dias (melhor visão geral de produção)
+  const hoje30 = new Date();
+  hoje30.setDate(hoje30.getDate() - 30);
+  const de30Str = new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Sao_Paulo" }).format(hoje30);
+
+  const de  = new Date(de30Str + "T00:00:00.000Z");
   const ate = new Date(hojeStr + "T23:59:59.999Z");
 
   const [grupos, totaisPorObra, statusGrupos, opsDb, ultimoSync, totalGeral] = await Promise.all([
@@ -101,7 +103,7 @@ export default async function MesPage() {
       setoresDisponiveis={setoresUnicos}
       ultimoSync={JSON.parse(JSON.stringify(ultimoSync))}
       totalGeralBanco={totalGeral}
-      deInicial={hojeStr}
+      deInicial={de30Str}
       ateInicial={hojeStr}
     />
   );

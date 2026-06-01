@@ -586,152 +586,344 @@ function ViewPorSetor({ grupos }) {
 }
 
 // ─── View: Por Peça ───────────────────────────────────────────────────────────
-function ViewPorPeca({ de, ate }) {
-  const [busca,   setBusca]   = useState("");
-  const [todos,   setTodos]   = useState([]); // todos os rows do período
-  const [loading, setLoading] = useState(false);
-  const [erro,    setErro]    = useState(null);
+function ViewPorPeca({ de, ate, obrasDisponiveis }) {
+  const [busca,      setBusca]     = useState("");
+  const [obraFiltro, setObraFiltro]= useState(""); // "T64" | ""
+  const [abaPeca,    setAbaPeca]   = useState("apontamentos"); // "apontamentos" | "rastreabilidade"
 
-  // Carrega todos os apontamentos do período ao montar ou quando a data muda
+  // ── Tab Apontamentos ────────────────────────────────────────────────────────
+  const [todos,   setTodos]   = useState([]);
+  const [loadAp,  setLoadAp]  = useState(false);
+  const [erroAp,  setErroAp]  = useState(null);
+
   useEffect(() => {
     let ativo = true;
-    setLoading(true);
-    setErro(null);
+    setLoadAp(true);
+    setErroAp(null);
     setBusca("");
     const qs = new URLSearchParams({ detalhe: "1" });
-    if (de)  qs.set("de",  de);
-    if (ate) qs.set("ate", ate);
+    if (de)         qs.set("de",   de);
+    if (ate)        qs.set("ate",  ate);
+    if (obraFiltro) qs.set("obra", obraFiltro);
     fetch(`/api/mes/apontamentos?${qs}`)
       .then(r => r.json())
-      .then(d => { if (ativo) { setTodos(d.rows || []); setLoading(false); } })
-      .catch(e => { if (ativo) { setErro(e.message); setLoading(false); } });
+      .then(d => { if (ativo) { setTodos(d.rows || []); setLoadAp(false); } })
+      .catch(e => { if (ativo) { setErroAp(e.message); setLoadAp(false); } });
     return () => { ativo = false; };
-  }, [de, ate]);
+  }, [de, ate, obraFiltro]);
 
-  // Filtra client-side conforme o usuário digita
-  const filtrados = useMemo(() => {
+  // ── Tab Rastreabilidade ─────────────────────────────────────────────────────
+  const [rastData, setRastData] = useState(null); // { pecas, contagens, total }
+  const [loadRast, setLoadRast] = useState(false);
+  const [erroRast, setErroRast] = useState(null);
+  const [filtroRast, setFiltroRast] = useState(""); // "" | "Não Iniciada" | "Produzindo" | "Finalizado" | "Finalizado Parcial"
+
+  useEffect(() => {
+    if (abaPeca !== "rastreabilidade" || !obraFiltro) { setRastData(null); return; }
+    let ativo = true;
+    setLoadRast(true);
+    setErroRast(null);
+    fetch(`/api/mes/rastreabilidade-op?obra=${encodeURIComponent(obraFiltro)}`)
+      .then(r => r.json())
+      .then(d => { if (ativo) { setRastData(d); setLoadRast(false); } })
+      .catch(e => { if (ativo) { setErroRast(e.message); setLoadRast(false); } });
+    return () => { ativo = false; };
+  }, [abaPeca, obraFiltro]);
+
+  // ── Filtros client-side ─────────────────────────────────────────────────────
+  const filtradosAp = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     if (!termo) return todos;
     return todos.filter(r =>
-      (r.opSka         || "").toLowerCase().includes(termo) ||
+      (r.opSka || "").toLowerCase().includes(termo) ||
       (r.descricaoItem || "").toLowerCase().includes(termo) ||
-      (r.obra          || "").toLowerCase().includes(termo) ||
-      (r.setor         || "").toLowerCase().includes(termo) ||
-      (r.maquina       || "").toLowerCase().includes(termo)
+      (r.obra || "").toLowerCase().includes(termo) ||
+      (r.setor || "").toLowerCase().includes(termo) ||
+      (r.maquina || "").toLowerCase().includes(termo)
     );
   }, [todos, busca]);
 
-  const tabela = (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50/60 sticky top-0">
-          <tr>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Peça (SKA)</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">OP</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Setor</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Máquina</th>
-            <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">KG</th>
-            <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">UN</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Status</th>
-            <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Data</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {filtrados.map(r => {
-            const st = STATUS_CONFIG[r.status] || { cor: "text-gray-500 bg-gray-50", icone: "·" };
-            return (
-              <tr key={r.id} className="hover:bg-gray-50/50">
-                <td className="px-4 py-2 font-mono text-xs text-gray-700">{r.opSka || "—"}</td>
-                <td className="px-4 py-2 text-gray-700 max-w-[160px] truncate" title={r.descricaoItem}>
-                  {r.descricaoItem || "—"}
-                </td>
-                <td className="px-4 py-2 font-bold text-torg-blue text-xs">{r.obra}</td>
-                <td className="px-4 py-2">
-                  {r.setor && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${corSetor(r.setor)}`}>
-                      {r.setor}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-2 text-gray-600">{r.maquina || "—"}</td>
-                <td className="px-4 py-2 text-right font-medium">{fmtNum(r.produzidoKg)}</td>
-                <td className="px-4 py-2 text-right font-medium">{fmtNum(r.produzidoUn, 0)}</td>
-                <td className="px-4 py-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cor}`}>
-                    {st.icone} {r.status || "—"}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
-                  {fmtDataCurta(r.dataInicio)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
+  const filtradosRast = useMemo(() => {
+    if (!rastData?.pecas) return [];
+    let base = rastData.pecas;
+    if (filtroRast) base = base.filter(p => {
+      if (filtroRast === "Finalizado") return p.statusSyneco === "Finalizado" || p.statusSyneco === "Finalizado Total";
+      return p.statusSyneco === filtroRast;
+    });
+    if (busca.trim()) {
+      const b = busca.toLowerCase();
+      base = base.filter(p =>
+        (p.marca || "").toLowerCase().includes(b) ||
+        (p.descricao || "").toLowerCase().includes(b) ||
+        (p.ultimoSetor || "").toLowerCase().includes(b)
+      );
+    }
+    return base;
+  }, [rastData, filtroRast, busca]);
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Campo de filtro */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            placeholder="Filtrar por peça, código SKA, OP, setor, máquina..."
-            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-torg-blue"
-            disabled={loading}
-          />
-          {busca && (
-            <button
-              onClick={() => setBusca("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+      {/* Barra de filtros */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Filtro por OP */}
+          <div className="relative">
+            <select
+              value={obraFiltro}
+              onChange={e => { setObraFiltro(e.target.value); setBusca(""); setFiltroRast(""); }}
+              className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-torg-blue bg-white min-w-[160px]"
             >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {erro && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-          <AlertCircle size={15} /> {erro}
-          <button onClick={() => setErro(null)} className="ml-auto"><X size={14} /></button>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex items-center justify-center gap-2 py-12 text-torg-gray">
-          <Loader2 size={20} className="animate-spin" />
-          <span>Carregando peças do período...</span>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
-            <span className="text-sm font-medium text-torg-dark">
-              {busca.trim()
-                ? `${filtrados.length} de ${todos.length} apontamentos`
-                : `${todos.length} apontamentos no período`
-              }
-            </span>
-            {todos.length >= 1000 && (
-              <span className="text-xs text-gray-400 flex items-center gap-1">
-                <Info size={11} /> Limite de 1.000 registros — refine o período se necessário
-              </span>
-            )}
+              <option value="">Todas as OPs</option>
+              {obrasDisponiveis.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
 
-          {filtrados.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-2">
-              <Search size={32} className="opacity-30" />
-              <span className="text-sm">Nenhuma peça encontrada para &ldquo;{busca}&rdquo;</span>
-            </div>
-          ) : tabela}
+          {/* Busca texto */}
+          <div className="flex-1 min-w-[200px] relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Filtrar por peça, SKA, setor, máquina..."
+              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-torg-blue"
+            />
+            {busca && (
+              <button onClick={() => setBusca("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Tabs: Apontamentos | Rastreabilidade */}
+        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+          {[
+            { id: "apontamentos",    label: "Apontamentos Syneco" },
+            { id: "rastreabilidade", label: "Rastreabilidade por Peça" },
+          ].map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => { setAbaPeca(id); setBusca(""); setFiltroRast(""); }}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                abaPeca === id ? "bg-white text-torg-dark shadow-sm" : "text-torg-gray hover:text-torg-dark"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Chips de status — só na tab Rastreabilidade */}
+        {abaPeca === "rastreabilidade" && rastData && (
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { val: "",                   label: "Todas",         cnt: rastData.total },
+              { val: "Não Iniciada",       label: "Não Iniciada",  cnt: rastData.contagens?.naoIniciada  || 0, cor: "bg-gray-50 text-gray-600 border-gray-200",        corAt: "bg-gray-600 text-white" },
+              { val: "Produzindo",         label: "Produzindo",    cnt: rastData.contagens?.produzindo   || 0, cor: "bg-blue-50 text-blue-700 border-blue-200",         corAt: "bg-blue-600 text-white" },
+              { val: "Finalizado",         label: "Finalizado",    cnt: rastData.contagens?.finalizado   || 0, cor: "bg-green-50 text-green-700 border-green-200",      corAt: "bg-green-600 text-white" },
+              { val: "Finalizado Parcial", label: "Parcial",       cnt: rastData.contagens?.parcial      || 0, cor: "bg-yellow-50 text-yellow-700 border-yellow-200",   corAt: "bg-yellow-500 text-white" },
+            ].map(({ val, label, cnt, cor = "bg-torg-blue text-white", corAt = "bg-torg-dark text-white" }) => (
+              <button
+                key={val}
+                onClick={() => setFiltroRast(val)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                  filtroRast === val
+                    ? corAt + " border-transparent"
+                    : (cor || "bg-gray-100 text-gray-600 border-gray-200") + " hover:opacity-80"
+                }`}
+              >
+                {label}
+                <span className="text-[10px] font-bold opacity-70">{cnt}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── TAB: APONTAMENTOS ── */}
+      {abaPeca === "apontamentos" && (
+        <>
+          {erroAp && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              <AlertCircle size={15} /> {erroAp}
+            </div>
+          )}
+          {loadAp ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-torg-gray">
+              <Loader2 size={20} className="animate-spin" />
+              <span>Carregando apontamentos...</span>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+                <span className="text-sm font-medium text-torg-dark">
+                  {busca.trim()
+                    ? `${filtradosAp.length} de ${todos.length} apontamentos`
+                    : `${todos.length} apontamentos${obraFiltro ? ` — ${obraFiltro}` : " no período"}`}
+                </span>
+                {todos.length >= 1000 && (
+                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                    <Info size={11} /> Limite 1.000 — refine o período
+                  </span>
+                )}
+              </div>
+              {filtradosAp.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-2">
+                  <Activity size={32} className="opacity-30" />
+                  <span className="text-sm">Nenhum apontamento encontrado</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50/60 sticky top-0">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Peça (SKA)</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">OP</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Setor</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Máquina</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">KG</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">UN</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Status</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Data</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filtradosAp.map(r => {
+                        const st = STATUS_CONFIG[r.status] || { cor: "text-gray-500 bg-gray-50", icone: "·" };
+                        return (
+                          <tr key={r.id} className="hover:bg-gray-50/50">
+                            <td className="px-4 py-2 font-mono text-xs text-gray-700">{r.opSka || "—"}</td>
+                            <td className="px-4 py-2 text-gray-700 max-w-[160px] truncate" title={r.descricaoItem}>{r.descricaoItem || "—"}</td>
+                            <td className="px-4 py-2 font-bold text-torg-blue text-xs">{r.obra}</td>
+                            <td className="px-4 py-2">
+                              {r.setor && <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${corSetor(r.setor)}`}>{r.setor}</span>}
+                            </td>
+                            <td className="px-4 py-2 text-gray-600">{r.maquina || "—"}</td>
+                            <td className="px-4 py-2 text-right font-medium">{fmtNum(r.produzidoKg)}</td>
+                            <td className="px-4 py-2 text-right font-medium">{fmtNum(r.produzidoUn, 0)}</td>
+                            <td className="px-4 py-2"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cor}`}>{st.icone} {r.status || "—"}</span></td>
+                            <td className="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{fmtDataCurta(r.dataInicio)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── TAB: RASTREABILIDADE ── */}
+      {abaPeca === "rastreabilidade" && (
+        <>
+          {!obraFiltro && (
+            <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-3 bg-white rounded-xl border border-dashed border-gray-200">
+              <Package size={36} className="opacity-30" />
+              <div className="text-center">
+                <div className="font-medium">Selecione uma OP acima</div>
+                <div className="text-sm text-gray-400 mt-1">
+                  Ex: T64 → ver todas as peças com status de produção no Syneco
+                </div>
+              </div>
+            </div>
+          )}
+
+          {obraFiltro && erroRast && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              <AlertCircle size={15} /> {erroRast}
+            </div>
+          )}
+
+          {obraFiltro && loadRast && (
+            <div className="flex items-center justify-center gap-2 py-12 text-torg-gray">
+              <Loader2 size={20} className="animate-spin" />
+              <span>Carregando rastreabilidade de {obraFiltro}...</span>
+            </div>
+          )}
+
+          {obraFiltro && rastData && !loadRast && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between flex-wrap gap-2">
+                <span className="text-sm font-medium text-torg-dark">
+                  {filtradosRast.length} de {rastData.total} peças — <strong>{obraFiltro}</strong>
+                  {filtroRast && <span className="text-torg-blue"> · {filtroRast}</span>}
+                </span>
+                <div className="flex gap-3 text-xs text-torg-gray">
+                  <span className="text-gray-500 font-medium">{rastData.contagens?.naoIniciada || 0} não iniciadas</span>
+                  <span className="text-blue-600 font-medium">{rastData.contagens?.produzindo || 0} produzindo</span>
+                  <span className="text-green-600 font-medium">{rastData.contagens?.finalizado || 0} finalizadas</span>
+                </div>
+              </div>
+
+              {filtradosRast.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-2">
+                  <Activity size={32} className="opacity-30" />
+                  <span className="text-sm">Nenhuma peça neste filtro</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50/60 sticky top-0">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Marca</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">Qtd</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">Peso</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Status Syneco</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Setores visitados</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Último apontamento</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark">Apont.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filtradosRast.map(p => {
+                        const naoIniciada = p.statusSyneco === "Não Iniciada";
+                        const corStatus =
+                          naoIniciada                          ? "text-gray-500 bg-gray-50 border-gray-200"
+                          : p.statusSyneco === "Produzindo"    ? "text-blue-700 bg-blue-50 border-blue-200"
+                          : p.statusSyneco.includes("Total")   ? "text-green-800 bg-green-100 border-green-300"
+                          : p.statusSyneco.includes("Parcial") ? "text-yellow-700 bg-yellow-50 border-yellow-200"
+                          :                                      "text-green-700 bg-green-50 border-green-200";
+                        return (
+                          <tr key={p.id} className={`hover:bg-gray-50/50 ${naoIniciada ? "opacity-60" : ""}`}>
+                            <td className="px-4 py-2.5 font-mono text-xs font-semibold text-torg-blue">{p.marca}</td>
+                            <td className="px-4 py-2.5 text-gray-700 max-w-[200px] truncate" title={p.descricao}>{p.descricao || "—"}</td>
+                            <td className="px-4 py-2.5 text-right text-gray-700">{p.qte}</td>
+                            <td className="px-4 py-2.5 text-right text-gray-600 text-xs">{fmtNum(p.pesoTotalKg)} kg</td>
+                            <td className="px-4 py-2.5">
+                              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${corStatus}`}>
+                                {naoIniciada ? "— Não Iniciada" : p.statusSyneco}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex flex-wrap gap-1">
+                                {p.setoresVisitados.map(s => (
+                                  <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${corSetor(s)}`}>{s}</span>
+                                ))}
+                                {p.setoresVisitados.length === 0 && <span className="text-gray-300 text-xs">—</span>}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                              {p.ultimaData ? (
+                                <>{fmtDataCurta(p.ultimaData)}{p.ultimoSetor && <span className={`ml-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${corSetor(p.ultimoSetor)}`}>{p.ultimoSetor}</span>}</>
+                              ) : "—"}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-xs text-gray-500">{p.totalApontamentos || "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -1187,7 +1379,13 @@ export default function MesClient({
 
           {/* ── Por Peça ── */}
           {modoView === "peca" && (
-            <ViewPorPeca de={de} ate={ate} />
+            <ViewPorPeca
+              de={de}
+              ate={ate}
+              obrasDisponiveis={Object.keys(obraGroups).sort((a, b) =>
+                a.localeCompare(b, undefined, { numeric: true })
+              )}
+            />
           )}
         </>
       )}
