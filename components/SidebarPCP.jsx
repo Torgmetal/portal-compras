@@ -1,26 +1,29 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ClipboardList, FileText, Package, Factory, Map, PackageSearch } from "lucide-react";
+import {
+  LayoutDashboard, Cpu, Wrench, Flame,
+  Wind, Paintbrush, Scissors,
+} from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
-  { href: "/producao", label: "Painel de Produção", icon: Activity, exact: true },
-  { href: "/producao/mapa", label: "Mapa da Produção", icon: Map },
-  { href: "/producao/controle", label: "Controle de Produção", icon: ClipboardList },
-  { href: "/producao/pecas", label: "Controle de Peças", icon: Package },
-  { href: "/producao/consulta-estoque", label: "Consulta de Estoque", icon: PackageSearch },
-  { href: "/producao/romaneios", label: "Romaneios", icon: FileText },
-  { href: "/producao/mes", label: "Rastreabilidade Syneco", icon: Factory },
+  { href: "/pcp",              label: "Dashboard",        icon: LayoutDashboard, exact: true },
+  { href: "/pcp/maquinas",     label: "Máquinas",         icon: Cpu },
+  { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
+  { href: "/pcp/solda",        label: "Solda",            icon: Flame },
+  { href: "/pcp/jato",         label: "Jato",             icon: Wind },
+  { href: "/pcp/pintura",      label: "Pintura",          icon: Paintbrush },
+  { href: "/pcp/aproveitamento", label: "Aproveitamento", icon: Scissors },
 ];
 
-export default function SidebarProducao() {
+export default function SidebarPCP() {
   const pathname = usePathname();
 
   return (
     <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col min-h-screen fixed left-0 top-0">
-      <SidebarModuleSwitcher moduloAtual="Portal de Produção" />
+      <SidebarModuleSwitcher moduloAtual="PCP" />
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {menu.map((m) => {
