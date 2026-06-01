@@ -91,10 +91,10 @@ export async function POST(req, { params }) {
 
       const isFD =
         rmItem.opItem?.faturamentoDireto || rmItem.aditivoItem?.faturamentoDireto || false;
-      // Prioridade: codigo do RMItem (vem do xlsx do Tekla, mais especifico) >
-      // codigo do OPItem/AditivoItem (cadastrado pelo Comercial) > produto generico
+      // Prioridade: codigoOmieEstoque do RMItem (vem do cadastro de estoque) >
+      // codigoOmie do OPItem/AditivoItem (cadastrado pelo Comercial) > busca por descricao
       const codigoOmieItem =
-        rmItem.codigo || rmItem.opItem?.codigoOmie || rmItem.aditivoItem?.codigoOmie || null;
+        rmItem.codigoOmieEstoque || rmItem.opItem?.codigoOmie || rmItem.aditivoItem?.codigoOmie || null;
       const chave = `${cot.id}|${isFD ? "FD" : "NORMAL"}`;
 
       if (!grupos.has(chave)) {
@@ -144,7 +144,7 @@ export async function POST(req, { params }) {
       return {
         codigo: l.codigoOmieItem || null,
         descricao: l.rmItem.descricao,
-        unidade: "KG",
+        unidade: l.rmItem.unidade || "KG",
         qtd: qtdKg,
         precoUnit: precoComIPI,
       };
