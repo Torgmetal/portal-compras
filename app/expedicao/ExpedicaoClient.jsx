@@ -5,6 +5,7 @@ import {
   FileText, Plus, Loader2, AlertCircle, X, Pencil, Trash2,
   Truck, Package, Activity,
 } from "lucide-react";
+import RomaneiosSharepoint from "@/components/RomaneiosSharepoint";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -160,6 +161,15 @@ export default function ExpedicaoClient({ ops, romaneios }) {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Romaneios do SharePoint (marcas e pesos) */}
+      <div>
+        <h3 className="text-lg font-semibold text-torg-dark mb-3">Romaneios SharePoint (por OP)</h3>
+        <p className="text-xs text-torg-gray mb-4">
+          Selecione uma OP para visualizar os romaneios com marcas e pesos detalhados.
+        </p>
+        <RomaneiosSharepoint ops={ops} />
       </div>
 
       {modal && (

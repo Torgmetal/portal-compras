@@ -279,13 +279,6 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
       {/* Hero KPI: 1 card grande com tudo o que importa */}
       <HeroKpi kpi={kpiPeriodo} setor={setorFiltro} kpiSemana={kpiSemana} />
 
-      {/* Mapa da fábrica com produtividade */}
-      <MapaProducao
-        comparacaoSetores={comparacaoSetores}
-        setorFiltro={setorFiltro}
-        onChangeSetor={setSetorFiltro}
-      />
-
       {/* Funil dos setores (compacto) */}
       <FunilSetores
         comparacao={comparacaoSetores}

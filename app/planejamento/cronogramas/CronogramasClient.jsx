@@ -252,24 +252,6 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
 
 function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId }) {
   const [tab, setTab] = useState("cronograma");
-  const [notificando, setNotificando] = useState(false);
-  const [notifResult, setNotifResult] = useState(null);
-
-  const notificarAtrasos = async () => {
-    if (!confirm("Enviar e-mail para os departamentos atrasados?")) return;
-    setNotificando(true);
-    setNotifResult(null);
-    try {
-      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/notificar-atrasos`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao notificar");
-      setNotifResult(data);
-    } catch (e) {
-      setNotifResult({ error: e.message });
-    } finally {
-      setNotificando(false);
-    }
-  };
 
   return (
     <div className="border-t border-gray-100">
@@ -296,34 +278,7 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
           <Package size={13} /> RMs / Pedidos / NFs
         </button>
         </div>
-        <button
-          onClick={notificarAtrasos}
-          disabled={notificando}
-          className="mr-3 px-3 py-1.5 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1 disabled:opacity-50"
-          title="Enviar e-mail para departamentos atrasados"
-        >
-          {notificando ? <Loader2 size={11} className="animate-spin" /> : <Mail size={11} />}
-          Notificar atrasos
-        </button>
       </div>
-
-      {notifResult && (
-        <div className={`mx-4 mt-2 px-3 py-2 rounded-lg text-xs ${notifResult.error ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
-          {notifResult.error ? (
-            <span>{notifResult.error}</span>
-          ) : notifResult.motivo ? (
-            <span>{notifResult.motivo}</span>
-          ) : (
-            <div>
-              {notifResult.resultados?.map((r, i) => (
-                <p key={i}>
-                  <strong>{r.dept}</strong>: {r.enviado ? `✓ enviado para ${r.destinatarios} pessoa(s)` : r.motivo || "não enviado"}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {tab === "cronograma" && (
         loadingDetail ? (
@@ -332,7 +287,7 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
             <span className="ml-2 text-sm text-torg-gray">Carregando tarefas...</span>
           </div>
         ) : detail ? (
-          <CronogramaDetail detail={detail} onRefresh={onRefreshDetail} />
+          <CronogramaDetail detail={detail} onRefresh={onRefreshDetail} cronogramaId={cronogramaId} />
         ) : (
           <div className="py-6 text-center text-sm text-torg-gray">Erro ao carregar detalhe.</div>
         )
@@ -345,7 +300,7 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
   );
 }
 
-function CronogramaDetail({ detail, onRefresh }) {
+function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
   const now = new Date();
   const tarefas = detail.tarefas || [];
 
@@ -364,22 +319,46 @@ function CronogramaDetail({ detail, onRefresh }) {
   return (
     <div className="divide-y divide-gray-50">
       {Object.entries(byDept).map(([dept, { summary, tasks }]) => (
-        <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} />
+        <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} />
       ))}
     </div>
   );
 }
 
-function DeptSection({ dept, summary, tasks, now, onRefresh }) {
+function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [cobrando, setCobrando] = useState(false);
+  const [cobrResult, setCobrResult] = useState(null);
   const Icon = DEPT_ICONS[dept] || Factory;
   const colors = DEPT_COLORS[dept] || "text-gray-600 bg-gray-50 border-gray-200";
   const atrasadas = tasks.filter((t) => !t.isSummary && t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100);
 
+  const cobrarDept = async (e) => {
+    e.stopPropagation();
+    if (!confirm(`Enviar e-mail de cobrança para ${DEPT_LABEL[dept] || dept}? (${atrasadas.length} tarefa${atrasadas.length > 1 ? "s" : ""} atrasada${atrasadas.length > 1 ? "s" : ""})`)) return;
+    setCobrando(true);
+    setCobrResult(null);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/notificar-atrasos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ departamento: dept }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao notificar");
+      const r = data.resultados?.[0];
+      setCobrResult(r?.enviado ? { ok: true, msg: `Enviado para ${r.destinatarios} pessoa(s)` } : { ok: false, msg: r?.motivo || data.motivo || "Não enviado" });
+    } catch (err) {
+      setCobrResult({ ok: false, msg: err.message });
+    } finally {
+      setCobrando(false);
+    }
+  };
+
   return (
     <div className="px-4 py-3">
-      <button onClick={() => setCollapsed(!collapsed)} className="w-full flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 flex-1 min-w-0">
           {collapsed ? <ChevronRight size={14} className="text-torg-gray" /> : <ChevronDown size={14} className="text-torg-gray" />}
           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border flex items-center gap-1 ${colors}`}>
             <Icon size={12} /> {DEPT_LABEL[dept] || dept}
@@ -392,13 +371,34 @@ function DeptSection({ dept, summary, tasks, now, onRefresh }) {
           {atrasadas.length > 0 && (
             <span className="text-[10px] text-red-600 font-semibold">{atrasadas.length} atrasada{atrasadas.length > 1 ? "s" : ""}</span>
           )}
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {atrasadas.length > 0 && (
+            <button
+              onClick={cobrarDept}
+              disabled={cobrando}
+              className="px-2.5 py-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1 disabled:opacity-50 transition-colors"
+              title={`Cobrar ${DEPT_LABEL[dept] || dept} por e-mail`}
+            >
+              {cobrando ? <Loader2 size={10} className="animate-spin" /> : <Mail size={10} />}
+              Cobrar
+            </button>
+          )}
+          {summary && (
+            <span className={`text-xs font-bold ${summary.percentualRealizado >= 100 ? "text-emerald-600" : summary.percentualRealizado > 0 ? "text-torg-blue" : "text-torg-gray"}`}>
+              {summary.percentualRealizado}%
+            </span>
+          )}
         </div>
-        {summary && (
-          <span className={`text-xs font-bold ${summary.percentualRealizado >= 100 ? "text-emerald-600" : summary.percentualRealizado > 0 ? "text-torg-blue" : "text-torg-gray"}`}>
-            {summary.percentualRealizado}%
-          </span>
-        )}
-      </button>
+      </div>
+
+      {cobrResult && (
+        <div className={`ml-6 mb-2 px-3 py-1.5 rounded-lg text-[10px] flex items-center gap-1.5 ${cobrResult.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+          {cobrResult.ok ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
+          {cobrResult.msg}
+          <button onClick={() => setCobrResult(null)} className="ml-auto p-0.5 hover:opacity-70"><X size={10} /></button>
+        </div>
+      )}
 
       {!collapsed && (
         <div className="ml-6 space-y-1">
