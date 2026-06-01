@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/session";
 import { ArrowLeft } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import RMComprasClient from "./RMComprasClient";
+import ConsultaEstoqueSection from "@/components/compras/ConsultaEstoqueSection";
 
 // Sempre busca dados frescos do banco
 
@@ -250,6 +251,7 @@ export default async function RMComprasDetail({ params }) {
         categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
         pedidos={JSON.parse(JSON.stringify(pedidosVinculados))}
       />
+      <ConsultaEstoqueSection rmId={rm.id} />
     </div>
   );
 }

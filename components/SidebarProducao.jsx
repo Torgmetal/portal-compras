@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ClipboardList, FileText, Package, Factory, Map } from "lucide-react";
+import { Activity, ClipboardList, FileText, Package, Factory, Map, PackageSearch } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -10,6 +10,7 @@ const menu = [
   { href: "/producao/mapa", label: "Mapa da Produção", icon: Map },
   { href: "/producao/controle", label: "Controle de Produção", icon: ClipboardList },
   { href: "/producao/pecas", label: "Controle de Peças", icon: Package },
+  { href: "/producao/consulta-estoque", label: "Consulta de Estoque", icon: PackageSearch },
   { href: "/producao/romaneios", label: "Romaneios", icon: FileText },
   { href: "/producao/mes", label: "Rastreabilidade Syneco", icon: Factory },
 ];

@@ -1,6 +1,3 @@
-// Schema do Portal de Compras Torg Metal
-// Documentação: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,11 +8,1944 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─── USUÁRIOS / AUTENTICAÇÃO ────────────────────────────────
+model User {
+  id                       String                @id @default(cuid())
+  email                    String                @unique
+  name                     String
+  password                 String
+  setor                    String?
+  ativo                    Boolean               @default(true)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  podeAlterarVerba         Boolean               @default(false)
+  tipo                     TipoUsuario
+  aditivos                 Aditivo[]
+  ajustesPrazoCriados      AjustePrazo[]         @relation("AjustePrazoCreatedBy")
+  auditLogs                AuditLog[]
+  consultasEstoqueCriadas  ConsultaEstoque[]     @relation("ConsultaEstoqueCreatedBy")
+  consultaItensRespondidos ConsultaEstoqueItem[] @relation("ConsultaItemRespondidoPor")
+  cronogramaRegistros      CronogramaRegistro[]  @relation("CronogramaRegistroCreatedBy")
+  necessidadesSemanais     NecessidadeSemanal[]  @relation("NecessidadeSemanalCreatedBy")
+  notificacoes             Notificacao[]
+  opsCriadas               OP[]                  @relation("OPCreatedBy")
+  orcamentosCriados        Orcamento[]           @relation("OrcamentoCriadoPor")
+  passwordResetTokens      PasswordResetToken[]
+  prazoHistoricos          PrazoHistorico[]
+  producaoDiarias          ProducaoDiaria[]      @relation("ProducaoDiariaCreatedBy")
+  estudosCriados           PropostaEstudo[]      @relation("EstudoCriadoPor")
+  rmsCriadas               RM[]                  @relation("RMCreatedBy")
+  recebimentos             Recebimento[]
+  revisoesCriadas          Revisao[]             @relation("RevisaoCreatedBy")
+  sharepointSyncs          SharepointSync[]
+  solicitacoesCriadas      SolicitacaoVerba[]    @relation("SolicitacaoCreatedBy")
+  solicitacoesDecididas    SolicitacaoVerba[]    @relation("SolicitacaoDecididoBy")
+  tarefasPlanejamento      TarefaPlanejamento[]  @relation("TarefaPlanejamentoCreatedBy")
+  modulos                  UserModulo[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Meta {
+  id          String   @id @default(cuid())
+  modulo      String
+  tipo        String
+  setor       String   @default("GERAL")
+  ano         Int
+  mes         Int
+  valorMensal Float    @default(0)
+  semana1     Float?
+  semana2     Float?
+  semana3     Float?
+  semana4     Float?
+  semana5     Float?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([modulo, tipo, setor, ano, mes])
+  @@index([modulo, ano])
+  @@index([modulo, tipo, ano])
+}
+
+model UserModulo {
+  id     String @id @default(cuid())
+  userId String
+  modulo Modulo
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, modulo])
+  @@index([userId])
+}
+
+model OP {
+  id                   String               @id @default(cuid())
+  numero               String               @unique
+  cliente              String
+  obra                 String?
+  descricao            String?
+  status               OPStatus             @default(ABERTA)
+  createdById          String
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  dataFimPrevista      DateTime?
+  dataFimReal          DateTime?
+  dataInicio           DateTime?
+  clienteCep           String?
+  clienteCidade        String?
+  clienteCnpj          String?
+  clienteContato       String?
+  clienteEmail         String?
+  clienteEndereco      String?
+  clienteIE            String?
+  clienteRazaoSocial   String?
+  clienteTelefone      String?
+  clienteUF            String?
+  valorTotalContrato   Float?
+  aditivos             Aditivo[]
+  ajustesPrazo         AjustePrazo[]
+  cronogramas          Cronograma[]
+  estoqueAlocacoes     EstoqueAlocacao[]
+  estoqueReservas      EstoqueReserva[]
+  fluxoCaixa           FluxoCaixa[]
+  mesApontamentos      MesApontamento[]     @relation("MesApontamentosOP")
+  necessidadesSemanais NecessidadeSemanal[]
+  createdBy            User                 @relation("OPCreatedBy", fields: [createdById], references: [id])
+  itens                OPItem[]
+  medicoes             OPMedicao[]
+  receitas             OPReceita[]
+  orcamentos           Orcamento[]          @relation("OrcamentoOP")
+  pecasConjunto        PecaConjunto[]
+  pedidosOmieAvulsos   PedidoOmie[]
+  planejamentosCarga   PlanejamentoCarga[]
+  producaoSemanal      ProducaoSemanal[]
+  rms                  RM[]
+  rmItensDestino       RMItem[]             @relation("RMItemOpDestino")
+  revisoes             Revisao[]
+  romaneios            Romaneio[]
+  tarefasPlanejamento  TarefaPlanejamento[]
+
+  @@index([numero])
+  @@index([status])
+  @@index([status, createdAt])
+  @@index([createdById, status])
+}
+
+model ProducaoSemanal {
+  id              String   @id @default(cuid())
+  semana          String
+  dataInicio      DateTime
+  dataFim         DateTime
+  pesoPrevistoKg  Float    @default(0)
+  pesoRealizadoKg Float    @default(0)
+  valorPrevisto   Float    @default(0)
+  valorRealizado  Float    @default(0)
+  opId            String?
+  observacao      String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  data            DateTime
+  fonte           String?
+  setor           String?
+  op              OP?      @relation(fields: [opId], references: [id])
+
+  @@unique([data, opId, setor])
+  @@index([data])
+  @@index([semana])
+  @@index([opId])
+  @@index([setor])
+}
+
+model Romaneio {
+  id                String             @id @default(cuid())
+  numero            String
+  opId              String?
+  data              DateTime
+  pesoRealKg        Float
+  descricao         String?
+  observacao        String?
+  valorPorKg        Float?
+  valorTotal        Float?
+  createdById       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  planejamentoCarga PlanejamentoCarga?
+  op                OP?                @relation(fields: [opId], references: [id])
+  itens             RomaneioItem[]
+
+  @@index([opId])
+  @@index([data])
+}
+
+model RomaneioItem {
+  id             String        @id @default(cuid())
+  romaneioId     String
+  tipo           String
+  descricao      String
+  pecaConjuntoId String?
+  rmItemId       String?
+  qtd            Float         @default(1)
+  pesoKg         Float?
+  observacao     String?
+  createdAt      DateTime      @default(now())
+  pecaConjunto   PecaConjunto? @relation(fields: [pecaConjuntoId], references: [id])
+  rmItem         RMItem?       @relation(fields: [rmItemId], references: [id])
+  romaneio       Romaneio      @relation(fields: [romaneioId], references: [id], onDelete: Cascade)
+
+  @@index([romaneioId])
+  @@index([pecaConjuntoId])
+  @@index([rmItemId])
+}
+
+model PlanejamentoCarga {
+  id           String                  @id @default(cuid())
+  opId         String
+  dataPrevista DateTime
+  descricao    String?
+  status       String                  @default("PLANEJADO")
+  romaneioId   String?                 @unique
+  createdById  String?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  op           OP                      @relation(fields: [opId], references: [id])
+  romaneio     Romaneio?               @relation(fields: [romaneioId], references: [id])
+  itens        PlanejamentoCargaItem[]
+
+  @@index([opId])
+  @@index([status])
+  @@index([dataPrevista])
+}
+
+model PlanejamentoCargaItem {
+  id                 String            @id @default(cuid())
+  planejamentoId     String
+  tipo               String
+  descricao          String
+  pecaConjuntoId     String?
+  rmItemId           String?
+  qtdPlanejada       Float             @default(1)
+  qtdCarregada       Float             @default(0)
+  pesoEstimadoKg     Float?
+  status             String            @default("PLANEJADO")
+  motivoNaoEnvio     String?
+  reprogramadoParaId String?
+  createdAt          DateTime          @default(now())
+  pecaConjunto       PecaConjunto?     @relation(fields: [pecaConjuntoId], references: [id])
+  planejamento       PlanejamentoCarga @relation(fields: [planejamentoId], references: [id], onDelete: Cascade)
+  rmItem             RMItem?           @relation(fields: [rmItemId], references: [id])
+
+  @@index([planejamentoId])
+  @@index([pecaConjuntoId])
+  @@index([rmItemId])
+  @@index([status])
+}
+
+model FluxoCaixa {
+  id            String    @id @default(cuid())
+  data          DateTime
+  tipo          String
+  categoria     String
+  descricao     String
+  valor         Float
+  realizado     Boolean   @default(false)
+  dataRealizado DateTime?
+  opId          String?
+  observacao    String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  op            OP?       @relation(fields: [opId], references: [id])
+
+  @@index([data])
+  @@index([tipo])
+  @@index([categoria])
+  @@index([opId])
+}
+
+model OPMedicao {
+  id                String    @id @default(cuid())
+  opId              String
+  numeroPedidoOmie  String
+  codigoPedidoOmie  String?
+  descricao         String?
+  data              DateTime?
+  valorBruto        Float     @default(0)
+  valorLiquido      Float?
+  status            String?
+  etapa             String?
+  qtdItens          Int       @default(0)
+  ultimoSync        DateTime?
+  syncErro          String?
+  payload           Json?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  tipoDocumento     String    @default("VENDA")
+  valorContratado   Float?
+  valorFaturadoAuto Float?
+  op                OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@unique([opId, numeroPedidoOmie])
+  @@index([opId])
+}
+
+model OPReceita {
+  id            String   @id @default(cuid())
+  opId          String
+  ordem         Int      @default(0)
+  categoria     String
+  descricao     String
+  cfop          String?
+  codigoServico String?
+  valor         Float
+  icmsPct       Float?
+  ipiPct        Float?
+  pisPct        Float?
+  cofinsPct     Float?
+  issPct        Float?
+  irrfPct       Float?
+  csllPct       Float?
+  observacao    String?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  op            OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@index([opId])
+  @@index([categoria])
+}
+
+model OPItem {
+  id                String             @id @default(cuid())
+  opId              String
+  ordem             Int                @default(0)
+  descricao         String
+  codigoOmie        String?
+  unidade           String?
+  qtdContratada     Float?
+  valorVerba        Float
+  faturamentoDireto Boolean            @default(false)
+  observacao        String?
+  capacidade        String?
+  categoria         String
+  meses             Int?
+  tipo              ItemTipo           @default(VERBA)
+  valorPorMes       Float?
+  cmcMedio          Float?
+  localEstoque      String?
+  op                OP                 @relation(fields: [opId], references: [id], onDelete: Cascade)
+  rmItens           RMItem[]
+  solicitacoesVerba SolicitacaoVerba[]
+
+  @@index([opId])
+  @@index([categoria])
+}
+
+model Revisao {
+  id          String   @id @default(cuid())
+  opId        String
+  numero      Int
+  motivo      String
+  createdById String
+  createdAt   DateTime @default(now())
+  createdBy   User     @relation("RevisaoCreatedBy", fields: [createdById], references: [id])
+  op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@unique([opId, numero])
+  @@index([opId])
+}
+
+model Aditivo {
+  id          String        @id @default(cuid())
+  opId        String
+  numero      Int
+  descricao   String
+  createdById String
+  createdAt   DateTime      @default(now())
+  createdBy   User          @relation(fields: [createdById], references: [id])
+  op          OP            @relation(fields: [opId], references: [id], onDelete: Cascade)
+  itens       AditivoItem[]
+
+  @@unique([opId, numero])
+  @@index([opId])
+}
+
+model AditivoItem {
+  id                String             @id @default(cuid())
+  aditivoId         String
+  ordem             Int                @default(0)
+  descricao         String
+  codigoOmie        String?
+  unidade           String?
+  qtdContratada     Float?
+  valorVerba        Float
+  faturamentoDireto Boolean            @default(false)
+  observacao        String?
+  capacidade        String?
+  categoria         String
+  meses             Int?
+  tipo              ItemTipo           @default(VERBA)
+  valorPorMes       Float?
+  cmcMedio          Float?
+  localEstoque      String?
+  aditivo           Aditivo            @relation(fields: [aditivoId], references: [id], onDelete: Cascade)
+  rmItens           RMItem[]
+  solicitacoesVerba SolicitacaoVerba[]
+
+  @@index([aditivoId])
+  @@index([categoria])
+}
+
+model AjustePrazo {
+  id              String   @id @default(cuid())
+  opId            String
+  dataFimAnterior DateTime
+  dataFimNova     DateTime
+  motivo          String
+  createdById     String
+  createdAt       DateTime @default(now())
+  createdBy       User     @relation("AjustePrazoCreatedBy", fields: [createdById], references: [id])
+  op              OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@index([opId])
+}
+
+model SolicitacaoVerba {
+  id               String                 @id @default(cuid())
+  opItemId         String?
+  aditivoItemId    String?
+  valorAtual       Float
+  valorProposto    Float
+  justificativa    String
+  status           SolicitacaoVerbaStatus @default(PENDENTE)
+  observacaoMaster String?
+  decididoEm       DateTime?
+  decididoById     String?
+  createdById      String
+  createdAt        DateTime               @default(now())
+  aditivoItem      AditivoItem?           @relation(fields: [aditivoItemId], references: [id], onDelete: Cascade)
+  createdBy        User                   @relation("SolicitacaoCreatedBy", fields: [createdById], references: [id])
+  decididoBy       User?                  @relation("SolicitacaoDecididoBy", fields: [decididoById], references: [id])
+  opItem           OPItem?                @relation(fields: [opItemId], references: [id], onDelete: Cascade)
+
+  @@index([opItemId])
+  @@index([aditivoItemId])
+  @@index([status])
+}
+
+model RM {
+  id                 String            @id @default(cuid())
+  numero             String            @unique
+  opId               String?
+  tipo               String            @default("Material")
+  descricao          String
+  observacao         String?
+  status             RMStatus          @default(ABERTA)
+  categoriaCompra    String?
+  localEstoque       String?
+  createdById        String
+  setor              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  categoriasOP       String[]          @default([])
+  tipoRM             TipoRM            @default(ENGENHARIA)
+  anexos             Anexo[]
+  consultasEstoque   ConsultaEstoque[]
+  cotacoes           Cotacao[]
+  envios             Envio[]
+  pedidosFDAtendidos PedidoOmie[]      @relation("PedidoOmieRMAtendida")
+  createdBy          User              @relation("RMCreatedBy", fields: [createdById], references: [id])
+  op                 OP?               @relation(fields: [opId], references: [id])
+  itens              RMItem[]
+
+  @@index([opId])
+  @@index([status])
+  @@index([createdById])
+  @@index([status, createdAt])
+  @@index([opId, status])
+}
+
+model PedidoOmie {
+  id                   String           @id @default(cuid())
+  cotacaoId            String?
+  fornecedorNome       String
+  nCodFor              String?
+  cnpj                 String?
+  codigoPedido         String?
+  numeroPedido         String?
+  total                Float            @default(0)
+  faturamentoDireto    Boolean          @default(false)
+  status               String           @default("CRIADO")
+  observacao           String?
+  erroOmie             String?
+  payload              Json?
+  resposta             Json?
+  createdById          String?
+  createdAt            DateTime         @default(now())
+  anexoNome            String?
+  anexoUrl             String?
+  criadoManualmente    Boolean          @default(false)
+  opId                 String?
+  categoriaItem        String?
+  itensDetalhes        Json?
+  rmAtendidaId         String?
+  dataEntregaReal      DateTime?
+  prazoEntregaPrevisto DateTime?
+  statusEntrega        String?
+  prazoOriginal        DateTime?
+  tokenEntrega         String?          @unique
+  itensOmie            Json?
+  cotacao              Cotacao?         @relation(fields: [cotacaoId], references: [id])
+  op                   OP?              @relation(fields: [opId], references: [id])
+  rmAtendida           RM?              @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
+  prazoHistorico       PrazoHistorico[]
+  rmItens              RMItem[]
+  recebimentos         Recebimento[]
+
+  @@index([cotacaoId])
+  @@index([opId])
+  @@index([status])
+}
+
+model PrazoHistorico {
+  id            String     @id @default(cuid())
+  pedidoId      String
+  prazoAnterior DateTime?
+  prazoNovo     DateTime
+  motivo        String?
+  alteradoPorId String?
+  criadoEm      DateTime   @default(now())
+  alteradoPor   User?      @relation(fields: [alteradoPorId], references: [id])
+  pedido        PedidoOmie @relation(fields: [pedidoId], references: [id])
+
+  @@index([pedidoId])
+}
+
+model RMItem {
+  id                     String                  @id @default(cuid())
+  rmId                   String
+  opItemId               String?
+  ordem                  Int                     @default(0)
+  descricao              String
+  unidade                String
+  qtd                    Float
+  material               String?
+  comprimento            String?
+  largura                String?
+  peso                   Float?
+  pesoLinear             Float?
+  codigo                 String?
+  tratamento             String?
+  aditivoItemId          String?
+  canceladoEm            DateTime?
+  canceladoMotivo        String?
+  status                 RMItemStatus            @default(PENDENTE)
+  pedidoOmieId           String?
+  codigoOmieEstoque      String?
+  destinoEstoque         Boolean                 @default(false)
+  opDestinoId            String?
+  consultaEstoqueItens   ConsultaEstoqueItem[]
+  cotacaoItens           CotacaoItem[]
+  planejamentoCargaItens PlanejamentoCargaItem[]
+  aditivoItem            AditivoItem?            @relation(fields: [aditivoItemId], references: [id])
+  opDestino              OP?                     @relation("RMItemOpDestino", fields: [opDestinoId], references: [id])
+  opItem                 OPItem?                 @relation(fields: [opItemId], references: [id])
+  pedidoOmie             PedidoOmie?             @relation(fields: [pedidoOmieId], references: [id])
+  rm                     RM                      @relation(fields: [rmId], references: [id], onDelete: Cascade)
+  recebimentos           Recebimento[]
+  romaneioItens          RomaneioItem[]
+
+  @@index([rmId])
+  @@index([opItemId])
+  @@index([aditivoItemId])
+  @@index([status])
+  @@index([pedidoOmieId])
+  @@index([status, opDestinoId])
+  @@index([rmId, status])
+}
+
+model Cotacao {
+  id                     String        @id @default(cuid())
+  rmId                   String
+  fornecedorNome         String
+  fornecedorEmail        String?
+  nCodOmie               String?
+  cnpj                   String?
+  faturamento            String        @default("Torg")
+  prazoPagamento         String?
+  observacao             String?
+  total                  Float         @default(0)
+  prazoResposta          DateTime?
+  recebidaEm             DateTime?
+  status                 CotacaoStatus @default(PENDENTE)
+  token                  String?       @unique
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  numeroRevisao          Int           @default(0)
+  totalProposta          Float?
+  solicitadaRevisaoFinal DateTime?
+  fornecedorId           String?
+  numeroProposta         String?
+  anexos                 Anexo[]
+  fornecedor             Fornecedor?   @relation(fields: [fornecedorId], references: [id])
+  rm                     RM            @relation(fields: [rmId], references: [id], onDelete: Cascade)
+  itens                  CotacaoItem[]
+  pedidosOmie            PedidoOmie[]
+
+  @@index([rmId])
+  @@index([fornecedorId])
+  @@index([status])
+  @@index([token])
+  @@index([status, createdAt])
+  @@index([rmId, status])
+}
+
+model CotacaoItem {
+  id           String    @id @default(cuid())
+  cotacaoId    String
+  rmItemId     String
+  precoUnit    Float
+  qtdCotada    Float
+  qtdProposta  Float?
+  icmsPct      Float?
+  ipiPct       Float?
+  observacao   String?
+  vencedor     Boolean   @default(false)
+  prazoEntrega DateTime?
+  semEstoque   Boolean   @default(false)
+  cotacao      Cotacao   @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+  rmItem       RMItem    @relation(fields: [rmItemId], references: [id])
+
+  @@index([cotacaoId])
+  @@index([rmItemId])
+  @@index([cotacaoId, vencedor])
+  @@index([rmItemId, vencedor])
+}
+
+model Envio {
+  id              String   @id @default(cuid())
+  rmId            String
+  fornecedorNome  String
+  fornecedorEmail String
+  data            DateTime @default(now())
+  status          String   @default("Enviado")
+  rm              RM       @relation(fields: [rmId], references: [id], onDelete: Cascade)
+
+  @@index([rmId])
+}
+
+model Anexo {
+  id          String   @id @default(cuid())
+  cotacaoId   String?
+  rmId        String?
+  nomeArquivo String
+  blobUrl     String
+  tamanho     Int
+  tipo        String
+  uploadedAt  DateTime @default(now())
+  cotacao     Cotacao? @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+  rm          RM?      @relation(fields: [rmId], references: [id], onDelete: Cascade)
+
+  @@index([cotacaoId])
+  @@index([rmId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  diff      Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+model Fornecedor {
+  id               String    @id @default(cuid())
+  razaoSocial      String
+  nomeFantasia     String?
+  cnpj             String?
+  email            String
+  emailsAdicionais String[]
+  telefone         String?
+  contato          String?
+  cidade           String?
+  uf               String?
+  categorias       String[]
+  observacao       String?
+  nCodOmie         String?
+  ativo            Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  cotacoes         Cotacao[]
+
+  @@index([ativo])
+}
+
+model EmailNotificacao {
+  id        String   @id @default(cuid())
+  email     String
+  nome      String?
+  eventos   String[]
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ativo])
+}
+
+model CategoriaFornecedor {
+  id        String   @id @default(cuid())
+  codigo    String   @unique
+  label     String
+  color     String   @default("slate")
+  ordem     Int      @default(100)
+  ativa     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notificacao {
+  id           String          @id @default(cuid())
+  tipo         NotificacaoTipo
+  titulo       String
+  mensagem     String
+  link         String?
+  dados        Json?
+  origemUserId String?
+  lida         Boolean         @default(false)
+  lidaEm       DateTime?
+  createdAt    DateTime        @default(now())
+  origemUser   User?           @relation(fields: [origemUserId], references: [id])
+
+  @@index([lida])
+  @@index([createdAt])
+  @@index([tipo])
+}
+
+model ConsultaEstoque {
+  id           String                @id @default(cuid())
+  rmId         String
+  status       String                @default("ENVIADA")
+  mensagem     String?
+  createdById  String
+  respondidoEm DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  createdBy    User                  @relation("ConsultaEstoqueCreatedBy", fields: [createdById], references: [id])
+  rm           RM                    @relation(fields: [rmId], references: [id], onDelete: Cascade)
+  itens        ConsultaEstoqueItem[]
+
+  @@index([rmId])
+  @@index([status])
+}
+
+model ConsultaEstoqueItem {
+  id              String          @id @default(cuid())
+  consultaId      String
+  rmItemId        String
+  resposta        String?
+  qtdDisponivel   Float?
+  observacao      String?
+  respondidoPorId String?
+  respondidoEm    DateTime?
+  consulta        ConsultaEstoque @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  respondidoPor   User?           @relation("ConsultaItemRespondidoPor", fields: [respondidoPorId], references: [id])
+  rmItem          RMItem          @relation(fields: [rmItemId], references: [id])
+
+  @@unique([consultaId, rmItemId])
+  @@index([rmItemId])
+}
+
+model Setor {
+  id           String        @id @default(cuid())
+  nome         String        @unique
+  sigla        String?
+  cor          String?
+  gestorId     String?
+  ativo        Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  funcionarios Funcionario[] @relation("FuncionarioSetor")
+  gestor       Funcionario?  @relation("GestorSetor", fields: [gestorId], references: [id])
+  vagas        Vaga[]
+}
+
+model Cargo {
+  id           String             @id @default(cuid())
+  nome         String
+  nivel        String?
+  categoria    String?
+  salarioBase  Float?
+  cbo          String?
+  ativo        Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  competencias CargoCompetencia[]
+  funcionarios Funcionario[]
+  vagas        Vaga[]
+
+  @@index([nivel])
+  @@index([categoria])
+}
+
+model Funcionario {
+  id                    String                    @id @default(cuid())
+  nome                  String
+  cpf                   String?                   @unique
+  rg                    String?
+  dataNascimento        DateTime?
+  email                 String?
+  telefone              String?
+  endereco              String?
+  cidadeUF              String?
+  matricula             String?                   @unique
+  dataAdmissao          DateTime
+  dataDemissao          DateTime?
+  setorId               String
+  cargoId               String
+  salario               Float?
+  tipoContrato          String                    @default("CLT")
+  jornadaHoras          Int                       @default(44)
+  turno                 String?
+  status                String                    @default("ATIVO")
+  ativo                 Boolean                   @default(true)
+  foto                  String?
+  observacao            String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  categoriaDesligamento String?
+  motivoDesligamento    String?
+  tipoDesligamento      String?
+  afastamentos          Afastamento[]
+  dependentes           Dependente[]
+  documentos            Documento[]
+  ferias                Ferias[]
+  cargo                 Cargo                     @relation(fields: [cargoId], references: [id])
+  setor                 Setor                     @relation("FuncionarioSetor", fields: [setorId], references: [id])
+  beneficios            FuncionarioBeneficio[]
+  competencias          FuncionarioCompetencia[]
+  pontos                Ponto[]
+  setoresGeridos        Setor[]                   @relation("GestorSetor")
+  treinamentos          TreinamentoParticipante[]
+
+  @@index([setorId])
+  @@index([cargoId])
+  @@index([status])
+  @@index([ativo])
+  @@index([dataDemissao])
+}
+
+model Dependente {
+  id             String      @id @default(cuid())
+  funcionarioId  String
+  nome           String
+  parentesco     String
+  dataNascimento DateTime?
+  cpf            String?
+  createdAt      DateTime    @default(now())
+  funcionario    Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@index([funcionarioId])
+}
+
+model Ponto {
+  id               String      @id @default(cuid())
+  funcionarioId    String
+  data             DateTime    @db.Date
+  entrada1         String?
+  saida1           String?
+  entrada2         String?
+  saida2           String?
+  horasTrabalhadas Float?
+  horasExtras      Float       @default(0)
+  bancoHoras       Float       @default(0)
+  tipo             String      @default("NORMAL")
+  observacao       String?
+  createdAt        DateTime    @default(now())
+  funcionario      Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@unique([funcionarioId, data])
+  @@index([data])
+}
+
+model Ferias {
+  id                 String      @id @default(cuid())
+  funcionarioId      String
+  periodoAquisInicio DateTime
+  periodoAquisFim    DateTime
+  dataInicio         DateTime?
+  dataFim            DateTime?
+  diasGozo           Int?
+  diasVendidos       Int         @default(0)
+  status             String      @default("PENDENTE")
+  observacao         String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  funcionario        Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@index([funcionarioId])
+  @@index([status])
+}
+
+model Beneficio {
+  id           String                 @id @default(cuid())
+  nome         String                 @unique
+  tipo         String
+  valorPadrao  Float?
+  ativo        Boolean                @default(true)
+  createdAt    DateTime               @default(now())
+  funcionarios FuncionarioBeneficio[]
+}
+
+model FuncionarioBeneficio {
+  id            String      @id @default(cuid())
+  funcionarioId String
+  beneficioId   String
+  valorMensal   Float
+  ativo         Boolean     @default(true)
+  dataInicio    DateTime    @default(now())
+  dataFim       DateTime?
+  beneficio     Beneficio   @relation(fields: [beneficioId], references: [id])
+  funcionario   Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@unique([funcionarioId, beneficioId])
+}
+
+model Competencia {
+  id           String                   @id @default(cuid())
+  nome         String                   @unique
+  categoria    String?
+  descricao    String?
+  createdAt    DateTime                 @default(now())
+  cargos       CargoCompetencia[]
+  funcionarios FuncionarioCompetencia[]
+}
+
+model CargoCompetencia {
+  id            String      @id @default(cuid())
+  cargoId       String
+  competenciaId String
+  nivelEsperado Int         @default(3)
+  cargo         Cargo       @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  competencia   Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+
+  @@unique([cargoId, competenciaId])
+}
+
+model FuncionarioCompetencia {
+  id            String      @id @default(cuid())
+  funcionarioId String
+  competenciaId String
+  nivelAtual    Int         @default(1)
+  avaliadoEm    DateTime?
+  avaliadoPor   String?
+  competencia   Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  funcionario   Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@unique([funcionarioId, competenciaId])
+}
+
+model Documento {
+  id              String       @id @default(cuid())
+  nome            String
+  tipo            String
+  categoria       String
+  descricao       String?
+  funcionarioId   String?
+  dataEmissao     DateTime?
+  dataValidade    DateTime?
+  orgaoEmissor    String?
+  numeroDocumento String?
+  observacao      String?
+  ativo           Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  funcionario     Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@index([funcionarioId])
+  @@index([categoria])
+  @@index([dataValidade])
+  @@index([tipo])
+}
+
+model Vaga {
+  id                        String    @id @default(cuid())
+  titulo                    String
+  setorId                   String
+  cargoId                   String?
+  quantidade                Int       @default(1)
+  prioridade                String    @default("NORMAL")
+  tipo                      String    @default("CLT")
+  nivelCargo                String?
+  justificativa             String?
+  requisitos                String?
+  salarioFaixa              String?
+  solicitanteId             String?
+  dataAbertura              DateTime  @default(now())
+  status                    String    @default("SOLICITADA")
+  dataAprovacao             DateTime?
+  dataFechamento            DateTime?
+  custoRecrutamento         Float?
+  observacaoRH              String?
+  funcionarioContratadoNome String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  cargo                     Cargo?    @relation(fields: [cargoId], references: [id])
+  setor                     Setor     @relation(fields: [setorId], references: [id])
+
+  @@index([setorId])
+  @@index([status])
+  @@index([dataAbertura])
+}
+
+model Afastamento {
+  id            String      @id @default(cuid())
+  funcionarioId String
+  dataInicio    DateTime
+  dataFim       DateTime?
+  diasAfastado  Int?
+  natureza      String
+  categoriaCID  String?
+  status        String      @default("EM_ANDAMENTO")
+  inss          Boolean     @default(false)
+  observacao    String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  funcionario   Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  @@index([funcionarioId])
+  @@index([natureza])
+  @@index([dataInicio])
+  @@index([status])
+}
+
+model AcidenteTrabalho {
+  id              String    @id @default(cuid())
+  data            DateTime
+  hora            String?
+  setorId         String?
+  obra            String?
+  tipo            String
+  gravidade       String    @default("LEVE")
+  diasPerdidos    Int       @default(0)
+  funcionarioNome String?
+  funcionarioId   String?
+  descricao       String
+  causaRaiz       String?
+  parteCorpo      String?
+  agenteRisco     String?
+  catEmitida      Boolean   @default(false)
+  catNumero       String?
+  acaoCorretiva   String?
+  responsavelAcao String?
+  prazoAcao       DateTime?
+  acaoConcluida   Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([data])
+  @@index([tipo])
+  @@index([setorId])
+}
+
+model Treinamento {
+  id             String                    @id @default(cuid())
+  titulo         String
+  tipo           String
+  nrRelacionada  String?
+  descricao      String?
+  instrutor      String?
+  local          String?
+  dataInicio     DateTime
+  dataFim        DateTime?
+  cargaHoraria   Float
+  validadeMeses  Int?
+  custo          Float?
+  certificadoUrl String?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  participantes  TreinamentoParticipante[]
+
+  @@index([tipo])
+  @@index([dataInicio])
+}
+
+model TreinamentoParticipante {
+  id             String      @id @default(cuid())
+  treinamentoId  String
+  funcionarioId  String
+  presente       Boolean     @default(true)
+  nota           Float?
+  certificadoUrl String?
+  dataVencimento DateTime?
+  createdAt      DateTime    @default(now())
+  funcionario    Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  treinamento    Treinamento @relation(fields: [treinamentoId], references: [id], onDelete: Cascade)
+
+  @@unique([treinamentoId, funcionarioId])
+  @@index([funcionarioId])
+  @@index([dataVencimento])
+}
+
+model ConfigEstoque {
+  id             String    @id @default(cuid())
+  categoriasOmie String[]  @default(["3.1"])
+  ultimaSincProd DateTime?
+  ultimaSincMov  DateTime?
+  updatedAt      DateTime  @updatedAt
+  palavrasChave  String[]  @default([])
+  locaisOmie     Json?
+}
+
+model EstoqueItem {
+  id               String                @id @default(cuid())
+  codigoOmie       String                @unique
+  codigoIntegracao String?               @unique
+  descricao        String
+  categoriaOmie    String
+  categoriaLabel   String?
+  unidade          String
+  cmc              Float                 @default(0)
+  qtdAtual         Float                 @default(0)
+  ativo            Boolean               @default(true)
+  ultimaSincOmie   DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  estoqueTorg      Boolean               @default(false)
+  locaisQtd        Json?
+  movimentacoes    EstoqueMovimentacao[]
+  reservas         EstoqueReserva[]
+
+  @@index([categoriaOmie])
+  @@index([estoqueTorg])
+  @@index([ativo])
+  @@index([estoqueTorg, ativo])
+  @@index([descricao])
+}
+
+model EstoqueReserva {
+  id            String      @id @default(cuid())
+  itemEstoqueId String
+  opId          String
+  rmItemId      String?
+  qtdReservada  Float
+  qtdConsumida  Float       @default(0)
+  status        String      @default("ATIVA")
+  cancelMotivo  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  itemEstoque   EstoqueItem @relation(fields: [itemEstoqueId], references: [id], onDelete: Cascade)
+  op            OP          @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@index([opId])
+  @@index([itemEstoqueId, status])
+}
+
+model EstoqueMovimentacao {
+  id             String            @id @default(cuid())
+  itemEstoqueId  String
+  tipo           String
+  origem         String
+  quantidade     Float
+  cmcMomento     Float?
+  observacao     String?
+  syncCodigoOmie String?           @unique
+  createdAt      DateTime          @default(now())
+  createdById    String?
+  alocacoes      EstoqueAlocacao[]
+  itemEstoque    EstoqueItem       @relation(fields: [itemEstoqueId], references: [id], onDelete: Cascade)
+
+  @@index([itemEstoqueId])
+  @@index([tipo, createdAt])
+}
+
+model EstoqueAlocacao {
+  id             String              @id @default(cuid())
+  movimentacaoId String
+  opId           String
+  reservaId      String?
+  quantidade     Float
+  valorCMC       Float
+  ajustadoManual Boolean             @default(false)
+  ajustadoById   String?
+  createdAt      DateTime            @default(now())
+  movimentacao   EstoqueMovimentacao @relation(fields: [movimentacaoId], references: [id], onDelete: Cascade)
+  op             OP                  @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@index([opId])
+  @@index([movimentacaoId])
+}
+
+model EstoqueFisico {
+  id          String    @id @default(cuid())
+  perfil      String
+  bitola      String
+  qtd         Int       @default(1)
+  comprimento Float?
+  largura     Float?
+  area        Float?
+  peso        Float     @default(0)
+  origem      String?
+  destino     String?
+  obra        String?
+  aco         String?
+  dataLanc    DateTime?
+  inspCorr    String?
+  opReserva   String?
+  sheet       String
+  createdAt   DateTime  @default(now())
+
+  @@index([perfil])
+  @@index([aco])
+  @@index([obra])
+  @@index([sheet])
+}
+
+model EstoqueFisicoSync {
+  id          String   @id @default("singleton")
+  ultimaSync  DateTime
+  totalItens  Int      @default(0)
+  pesoTotalKg Float    @default(0)
+  sheets      String[]
+  updatedAt   DateTime @updatedAt
+}
+
+model PecaConjunto {
+  id                     String                  @id @default(cuid())
+  opId                   String?
+  opNumero               String
+  item                   Int?
+  marca                  String
+  descricao              String?
+  qte                    Int                     @default(1)
+  pesoUnitKg             Float                   @default(0)
+  pesoTotalKg            Float                   @default(0)
+  status                 String                  @default("PENDENTE")
+  fluxoEspecial          Boolean                 @default(false)
+  ultimoSetor            String?
+  dataConcluida          DateTime?
+  dataPrevista           DateTime?
+  fonte                  String?
+  observacao             String?
+  criadoEm               DateTime                @default(now())
+  atualizadoEm           DateTime                @updatedAt
+  precoTotal             Float                   @default(0)
+  precoUnitario          Float                   @default(0)
+  op                     OP?                     @relation(fields: [opId], references: [id])
+  planejamentos          PecaPlanejamento[]
+  planejamentoCargaItens PlanejamentoCargaItem[]
+  romaneioItens          RomaneioItem[]
+
+  @@unique([opNumero, marca])
+  @@index([opId])
+  @@index([status])
+  @@index([marca])
+}
+
+model ProducaoDiaria {
+  id                    String             @id @default(cuid())
+  data                  DateTime           @db.Date
+  setor                 String
+  pesoMetaKg            Float              @default(0)
+  pesoRealizadoKg       Float              @default(0)
+  produtividadeEstimada Float?
+  qtdPessoas            Int                @default(0)
+  horasNormais          Float              @default(8.8)
+  horasExtrasProjetadas Float              @default(0)
+  horasExtrasRealizadas Float?
+  observacao            String?
+  createdById           String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  pecasPlanejadas       PecaPlanejamento[]
+  createdBy             User?              @relation("ProducaoDiariaCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([data, setor])
+  @@index([data])
+  @@index([setor])
+}
+
+model PecaPlanejamento {
+  id               String         @id @default(cuid())
+  producaoDiariaId String
+  pecaConjuntoId   String
+  qtdPlanejada     Int            @default(1)
+  concluida        Boolean        @default(false)
+  observacao       String?
+  createdAt        DateTime       @default(now())
+  pecaConjunto     PecaConjunto   @relation(fields: [pecaConjuntoId], references: [id], onDelete: Cascade)
+  producaoDiaria   ProducaoDiaria @relation(fields: [producaoDiariaId], references: [id], onDelete: Cascade)
+
+  @@unique([producaoDiariaId, pecaConjuntoId])
+  @@index([pecaConjuntoId])
+}
+
+model SharepointSync {
+  id               String   @id @default(cuid())
+  tipo             String
+  sucesso          Boolean
+  itensProcessados Int      @default(0)
+  criados          Int      @default(0)
+  atualizados      Int      @default(0)
+  mensagem         String?
+  erro             String?
+  duracaoMs        Int      @default(0)
+  executadoPorId   String?
+  criadoEm         DateTime @default(now())
+  executadoPor     User?    @relation(fields: [executadoPorId], references: [id])
+
+  @@index([tipo, criadoEm])
+}
+
+model Orcamento {
+  id             String             @id @default(cuid())
+  numero         String             @unique
+  cliente        String
+  obra           String?
+  responsavel    String?
+  contato        String?
+  orcamentista   String?
+  tipoVenda      TipoVenda?
+  valor          Float?
+  porte          PorteOrcamento?
+  dataSolicitada DateTime?
+  dataEnvio      DateTime?
+  dataFechamento DateTime?
+  status         StatusOrcamento    @default(ORCAMENTO)
+  vendedor       String?
+  motivoPerda    String?
+  observacoes    String?
+  opId           String?
+  criadoPorId    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  prazoEntrega   DateTime?
+  criadoPor      User?              @relation("OrcamentoCriadoPor", fields: [criadoPorId], references: [id])
+  op             OP?                @relation("OrcamentoOP", fields: [opId], references: [id])
+  revisoes       OrcamentoRevisao[]
+  estudos        PropostaEstudo[]
+
+  @@index([status])
+  @@index([vendedor])
+  @@index([createdAt])
+}
+
+model OrcamentoRevisao {
+  id          String    @id @default(cuid())
+  orcamentoId String
+  numero      Int
+  dataEnvio   DateTime?
+  observacao  String?
+  createdAt   DateTime  @default(now())
+  orcamento   Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  @@index([orcamentoId])
+}
+
+model PropostaEstudo {
+  id                      String              @id @default(cuid())
+  orcamentoId             String
+  revisao                 Int                 @default(0)
+  status                  StatusEstudo        @default(RASCUNHO)
+  referencia              String?
+  sharepointUrl           String?
+  pesoTotal               Float?
+  areaTotal               Float?
+  custoMaterial           Float?
+  custoFabricacao         Float?
+  custoMontagem           Float?
+  custoTerceiros          Float?
+  bdiValor                Float?
+  valorTotal              Float?
+  percPerda               Float               @default(12)
+  percParafusos           Float               @default(0.60)
+  cfopPrincipal           String?
+  bdiAdmin                Float               @default(0)
+  bdiSeguro               Float               @default(0)
+  bdiRisco                Float               @default(0)
+  bdiFactoring            Float               @default(1.6)
+  bdiLucro                Float               @default(6.0)
+  bdiComissao             Float               @default(0)
+  aliqPIS                 Float               @default(1.65)
+  aliqCOFINS              Float               @default(7.60)
+  aliqCSLL                Float               @default(1.08)
+  aliqIRPJ                Float               @default(3.00)
+  aliqICMS                Float               @default(18.00)
+  aliqISS                 Float               @default(0)
+  observacoes             String?
+  criadoPorId             String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  creditoConfirmado       Boolean             @default(false)
+  custoAuxiliarKg         Float               @default(0)
+  custoDemaisKg           Float               @default(0)
+  custoFinanceiroKg       Float               @default(0)
+  custoMoKg               Float?
+  custoPinturaKg          Float               @default(0)
+  hhPorTon                Float?
+  percCreditoCOFINS       Float               @default(7.60)
+  percCreditoICMS         Float               @default(12)
+  percCreditoPIS          Float               @default(1.65)
+  tipoObra                String?
+  percPesoParafusos       Float?
+  esquemaPintura          String?
+  esquemaPinturaDesc      String?
+  esquemaPinturaEspessura Float?
+  pinturaCustoLitro       Float?
+  pinturaCustoM2          Float?
+  pinturaMetodo           String              @default("M2")
+  pinturaPercPerda        Float               @default(25)
+  pinturaRendimento       Float?
+  produtividadeMix        Json?
+  itensAcessorio          AcessorioItem[]
+  itensCronograma         CronogramaItem[]
+  itensCusto              CustoItem[]
+  cotacoesEstudo          EstudoCotacao[]
+  itensFaturamento        FaturamentoEvento[]
+  cotacoesFretes          FreteCotacao[]
+  itensFretes             FreteItem[]
+  itensParafuso           ParafusoItem[]
+  itensPerso              PesoProjetoItem[]
+  itensPintura            PinturaItem[]
+  documentos              PropostaDocumento[]
+  criadoPor               User?               @relation("EstudoCriadoPor", fields: [criadoPorId], references: [id])
+  orcamento               Orcamento           @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+
+  @@index([orcamentoId])
+  @@index([status])
+}
+
+model CronogramaItem {
+  id             String         @id @default(cuid())
+  estudoId       String
+  grupo          String
+  descricao      String?
+  pesoKg         Float          @default(0)
+  diasFabricacao Int            @default(0)
+  diasMontagem   Int?
+  semanaInicio   Int            @default(1)
+  cor            String?
+  observacao     String?
+  ordem          Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  estudo         PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+}
+
+model FreteItem {
+  id                String         @id @default(cuid())
+  estudoId          String
+  descricao         String
+  origem            String?
+  destino           String?
+  distanciaKm       Float          @default(0)
+  pesoTon           Float          @default(0)
+  tipoVeiculo       String?
+  quantidadeViagens Int            @default(1)
+  custoPorViagem    Float          @default(0)
+  custoTotal        Float          @default(0)
+  observacao        String?
+  ordem             Int            @default(0)
+  createdAt         DateTime       @default(now())
+  pesoPorCarga      Float?
+  estudo            PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+}
+
+model FreteCotacao {
+  id              String         @id @default(cuid())
+  estudoId        String
+  fornecedorId    String?
+  fornecedorNome  String
+  fornecedorEmail String
+  status          String         @default("PENDENTE")
+  valorCotado     Float?
+  prazoEntrega    String?
+  observacao      String?
+  anexoUrl        String?
+  anexoNome       String?
+  enviadoEm       DateTime?
+  respondidoEm    DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  token           String         @unique @default(cuid())
+  estudo          PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+  @@index([fornecedorId])
+}
+
+model EstudoCotacao {
+  id                String              @id @default(cuid())
+  estudoId          String
+  token             String              @unique @default(cuid())
+  tipo              String
+  fornecedorId      String?
+  fornecedorNome    String
+  fornecedorEmail   String
+  status            String              @default("PENDENTE")
+  prazoEntrega      String?
+  condicaoPgto      String?
+  observacao        String?
+  observacaoInterna String?
+  anexoUrl          String?
+  anexoNome         String?
+  enviadoEm         DateTime?
+  respondidoEm      DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  estudo            PropostaEstudo      @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+  itens             EstudoCotacaoItem[]
+
+  @@index([estudoId])
+  @@index([fornecedorId])
+  @@index([tipo])
+}
+
+model EstudoCotacaoItem {
+  id            String        @id @default(cuid())
+  cotacaoId     String
+  descricao     String
+  especificacao String?
+  unidade       String        @default("un")
+  quantidade    Float         @default(0)
+  precoUnitario Float?
+  observacao    String?
+  ordem         Int           @default(0)
+  cotacao       EstudoCotacao @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+
+  @@index([cotacaoId])
+}
+
+model FaturamentoEvento {
+  id            String         @id @default(cuid())
+  estudoId      String
+  descricao     String
+  tipoNota      String
+  cfop          String?
+  codigoServico String?
+  percentual    Float
+  ordem         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  estudo        PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+}
+
+model PesoProjetoItem {
+  id            String         @id @default(cuid())
+  estudoId      String
+  setor         String?
+  projeto       String?
+  tipoMaterial  TipoMaterial   @default(OUTRO)
+  descricao     String
+  norma         String?
+  comprimento   Float?
+  pesoUnitario  Float
+  quantidade    Int            @default(1)
+  pesoTotal     Float
+  areaPintura   Float?
+  ordem         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  codigoOmie    String?
+  custoUnitario Float?
+  descricaoOmie String?
+  estudo        PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+}
+
+model AcessorioItem {
+  id                String             @id @default(cuid())
+  estudoId          String
+  categoria         CategoriaAcessorio @default(OUTRO)
+  descricao         String
+  especificacao     String?
+  unidade           String             @default("un")
+  quantidade        Float              @default(0)
+  custoUnitario     Float?
+  margemAdm         Float              @default(15)
+  faturamentoDireto Boolean            @default(false)
+  observacao        String?
+  ordem             Int                @default(0)
+  createdAt         DateTime           @default(now())
+  estudo            PropostaEstudo     @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+  @@index([categoria])
+}
+
+model ParafusoItem {
+  id            String         @id @default(cuid())
+  estudoId      String
+  tipo          TipoParafuso   @default(PARAFUSO)
+  descricao     String
+  especificacao String?
+  diametro      String?
+  comprimento   String?
+  unidade       String         @default("un")
+  quantidade    Float          @default(0)
+  estimativa    Boolean        @default(false)
+  observacao    String?
+  ordem         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  estudo        PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+  @@index([tipo])
+}
+
+model TintaProduto {
+  id           String        @id @default(cuid())
+  nome         String
+  fabricante   String?
+  norma        String?
+  resinaTipo   String
+  svPct        Float
+  diluentePct  Float         @default(10)
+  ativo        Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  pinturaItens PinturaItem[]
+
+  @@index([resinaTipo])
+  @@index([ativo])
+}
+
+model PinturaItem {
+  id                String         @id @default(cuid())
+  estudoId          String
+  tipoPintura       TipoPintura    @default(OUTRO)
+  descricao         String
+  especificacao     String?
+  areaM2            Float          @default(0)
+  demaos            Int            @default(1)
+  espessuraMicra    Float?
+  unidade           String         @default("m2")
+  quantidade        Float          @default(0)
+  cor               String?
+  norma             String?
+  observacao        String?
+  ordem             Int            @default(0)
+  createdAt         DateTime       @default(now())
+  diluenteLitros    Float?
+  etapa             String?
+  galoesNecessarios Int?
+  litrosNecessarios Float?
+  metodoAplicacao   String?
+  percPerdas        Float?
+  resinaTipo        String?
+  svPct             Float?
+  tintaProdutoId    String?
+  estudo            PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+  tintaProduto      TintaProduto?  @relation(fields: [tintaProdutoId], references: [id])
+
+  @@index([estudoId])
+  @@index([tipoPintura])
+  @@index([tintaProdutoId])
+}
+
+model CustoItem {
+  id            String         @id @default(cuid())
+  estudoId      String
+  categoria     CategoriaCusto
+  descricao     String
+  unidade       String?
+  quantidade    Float          @default(0)
+  precoUnitario Float          @default(0)
+  subtotal      Float          @default(0)
+  percImpostos  Float?
+  percInsumos   Float?
+  observacao    String?
+  ordem         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  estudo        PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+  @@index([categoria])
+}
+
+model PropostaDocumento {
+  id         String         @id @default(cuid())
+  estudoId   String
+  nome       String
+  tipo       String
+  tamanho    Int?
+  blobUrl    String
+  categoria  String?
+  observacao String?
+  criadoEm   DateTime       @default(now())
+  estudo     PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+}
+
+model BDMPerfil {
+  id           String       @id @default(cuid())
+  tipo         TipoMaterial
+  codigo       String       @unique
+  descricao    String?
+  pesoUnitario Float
+  secao        Float?
+  precoRef     Float?
+  fontePreco   String?
+  dataPreco    DateTime?
+  ativo        Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([tipo])
+  @@index([codigo])
+}
+
+model MesApontamento {
+  id            String    @id @default(cuid())
+  productionId  Int       @unique
+  dataInicio    DateTime
+  dataFim       DateTime?
+  obra          String
+  opSka         String?
+  setor         String?
+  maquina       String?
+  codigoMaquina String?
+  operacao      String?
+  descricaoItem String?
+  operador      String?
+  status        String?
+  produzidoUn   Float     @default(0)
+  rejeitado     Float     @default(0)
+  retrabalhado  Float     @default(0)
+  produzidoKg   Float     @default(0)
+  opId          String?
+  syncRunId     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  op            OP?       @relation("MesApontamentosOP", fields: [opId], references: [id])
+
+  @@index([opId])
+  @@index([obra])
+  @@index([dataInicio])
+  @@index([setor])
+  @@index([status])
+}
+
+model MesOrdem {
+  id            String    @id @default(cuid())
+  obra          String
+  op            String
+  operacao      String
+  item          String
+  setor         String?
+  descItem      String?
+  maquina       String?
+  operador      String?
+  planejadoUn   Float     @default(0)
+  produzidoUn   Float     @default(0)
+  rejeitadoUn   Float     @default(0)
+  saldoUn       Float     @default(0)
+  pesoPlanejado Float     @default(0)
+  pesoProduzido Float     @default(0)
+  saldoRestante Float     @default(0)
+  status        String?
+  productionId  Int?
+  dataInicio    DateTime?
+  dataFim       DateTime?
+  opId          String?
+  syncRunId     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([obra, op, operacao, item])
+  @@index([obra])
+  @@index([setor])
+  @@index([status])
+  @@index([opId])
+}
+
+model MesSyncLog {
+  id          String   @id @default(cuid())
+  sucesso     Boolean
+  dataInicio  DateTime
+  dataFim     DateTime
+  totalLinhas Int      @default(0)
+  criados     Int      @default(0)
+  atualizados Int      @default(0)
+  ignorados   Int      @default(0)
+  erro        String?
+  duracaoMs   Int      @default(0)
+  criadoEm    DateTime @default(now())
+
+  @@index([criadoEm])
+  @@index([sucesso])
+}
+
+model Recebimento {
+  id              String            @id @default(cuid())
+  pedidoOmieId    String?
+  rmItemId        String?
+  qtdRecebida     Float
+  unidade         String?
+  dataRecebimento DateTime          @default(now())
+  nfNumero        String?
+  nfChave         String?
+  nfSerie         String?
+  origem          RecebimentoOrigem @default(MANUAL)
+  observacao      String?
+  createdById     String?
+  createdAt       DateTime          @default(now())
+  createdBy       User?             @relation(fields: [createdById], references: [id])
+  pedidoOmie      PedidoOmie?       @relation(fields: [pedidoOmieId], references: [id])
+  rmItem          RMItem?           @relation(fields: [rmItemId], references: [id])
+
+  @@index([pedidoOmieId])
+  @@index([rmItemId])
+  @@index([dataRecebimento])
+}
+
+model Cronograma {
+  id             String             @id @default(cuid())
+  opNumero       String
+  opId           String?
+  nomeArquivo    String
+  titulo         String
+  sharepointPath String             @unique
+  dataInicio     DateTime?
+  dataFim        DateTime?
+  ultimoSync     DateTime           @default(now())
+  ativo          Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  op             OP?                @relation(fields: [opId], references: [id])
+  tarefas        CronogramaTarefa[]
+
+  @@index([opNumero])
+  @@index([ativo])
+}
+
+model CronogramaTarefa {
+  id                  String                  @id @default(cuid())
+  cronogramaId        String
+  uidMpp              Int
+  nome                String
+  departamento        DepartamentoCronograma?
+  dataInicioPrevista  DateTime?
+  dataFimPrevista     DateTime?
+  percentualPrevisto  Float                   @default(0)
+  percentualRealizado Float                   @default(0)
+  qtdePlanejada       Float                   @default(0)
+  qtdeRealizada       Float                   @default(0)
+  isSummary           Boolean                 @default(false)
+  outlineLevel        Int                     @default(0)
+  parentUid           Int?
+  observacao          String?
+  dataRealizacao      DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  registros           CronogramaRegistro[]
+  cronograma          Cronograma              @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+
+  @@index([cronogramaId])
+  @@index([departamento])
+}
+
+model CronogramaRegistro {
+  id          String           @id @default(cuid())
+  tarefaId    String
+  descricao   String
+  createdById String
+  createdAt   DateTime         @default(now())
+  createdBy   User             @relation("CronogramaRegistroCreatedBy", fields: [createdById], references: [id])
+  tarefa      CronogramaTarefa @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+
+  @@index([tarefaId])
+}
+
+model TarefaPlanejamento {
+  id            String    @id @default(cuid())
+  titulo        String
+  descricao     String?
+  opNumero      String?
+  opId          String?
+  setor         String
+  semanaIso     Int
+  ano           Int
+  status        String    @default("PENDENTE")
+  prioridade    String    @default("MEDIA")
+  responsavel   String?
+  dataPrevista  DateTime?
+  dataConcluida DateTime?
+  observacao    String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdBy     User?     @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id])
+  op            OP?       @relation(fields: [opId], references: [id])
+
+  @@index([semanaIso, ano])
+  @@index([setor])
+  @@index([opId])
+  @@index([status])
+}
+
+model NecessidadeSemanal {
+  id          String   @id @default(cuid())
+  semanaIso   Int
+  ano         Int
+  opNumero    String
+  opId        String?
+  setor       String
+  descricao   String?
+  pesoKg      Float    @default(0)
+  prioridade  String   @default("MEDIA")
+  status      String   @default("PENDENTE")
+  observacao  String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   User?    @relation("NecessidadeSemanalCreatedBy", fields: [createdById], references: [id])
+  op          OP?      @relation(fields: [opId], references: [id])
+
+  @@index([semanaIso, ano])
+  @@index([setor])
+  @@index([opNumero])
+  @@index([status])
+}
+
+model ConfigAssistente {
+  id                 String   @id @default(cuid())
+  ativo              Boolean  @default(true)
+  modulosHabilitados String[] @default([])
+  modelo             String   @default("claude-haiku-4-5")
+  instrucaoExtra     String?
+  updatedAt          DateTime @updatedAt
+}
 
 enum TipoUsuario {
-  ADMIN    // acesso total ao sistema; não tem módulos específicos
-  USUARIO  // acesso restrito aos módulos liberados em UserModulo
+  ADMIN
+  USUARIO
 }
 
 enum Modulo {
@@ -30,626 +1960,27 @@ enum Modulo {
   PLANEJAMENTO
 }
 
-model User {
-  id        String      @id @default(cuid())
-  email     String      @unique
-  name      String
-  password  String      // bcrypt hash
-  tipo      TipoUsuario
-  setor     String?
-  ativo     Boolean     @default(true)
-  // Permite alterar verba direto, sem passar pelo fluxo de solicitacao
-  // pendente de aprovacao do master. Usado pra usuarios COMERCIAL de
-  // confianca que precisam ajustar valores frequentemente.
-  podeAlterarVerba Boolean @default(false)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-
-  modulos                 UserModulo[]
-  opsCriadas              OP[]                @relation("OPCreatedBy")
-  rmsCriadas              RM[]                @relation("RMCreatedBy")
-  aditivos                Aditivo[]
-  revisoesCriadas         Revisao[]           @relation("RevisaoCreatedBy")
-  ajustesPrazoCriados     AjustePrazo[]       @relation("AjustePrazoCreatedBy")
-  solicitacoesCriadas     SolicitacaoVerba[]  @relation("SolicitacaoCreatedBy")
-  solicitacoesDecididas   SolicitacaoVerba[]  @relation("SolicitacaoDecididoBy")
-  auditLogs               AuditLog[]
-  notificacoes            Notificacao[]
-  sharepointSyncs         SharepointSync[]
-  producaoDiarias         ProducaoDiaria[]     @relation("ProducaoDiariaCreatedBy")
-  tarefasPlanejamento     TarefaPlanejamento[] @relation("TarefaPlanejamentoCreatedBy")
-  necessidadesSemanais    NecessidadeSemanal[] @relation("NecessidadeSemanalCreatedBy")
-  cronogramaRegistros     CronogramaRegistro[] @relation("CronogramaRegistroCreatedBy")
-  passwordResetTokens     PasswordResetToken[]
-  orcamentosCriados       Orcamento[]          @relation("OrcamentoCriadoPor")
-  estudosCriados          PropostaEstudo[]     @relation("EstudoCriadoPor")
-  recebimentos            Recebimento[]
-  prazoHistoricos         PrazoHistorico[]
-}
-
-model PasswordResetToken {
-  id        String   @id @default(cuid())
-  token     String   @unique        // código de 6 dígitos
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  expiresAt DateTime                // expira em 15 minutos
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-// ─── METAS / OBJETIVOS ─────────────────────────────────────
-// Metas mensais por módulo/setor com distribuição semanal.
-// Admin define o valor mensal; distribuição semanal é automática (÷ 4 semanas)
-// ou manual quando os campos semana1-5 são preenchidos.
-
-model Meta {
-  id          String   @id @default(cuid())
-  modulo      String   // PRODUCAO, COMERCIAL, FINANCEIRO, EXPEDICAO, COMPRAS
-  tipo        String   // PESO_KG, FATURAMENTO_BRL, QTD_PEDIDOS, etc.
-  setor       String   @default("GERAL") // CORTE, MONTAGEM, etc. ou GERAL
-  ano         Int
-  mes         Int      // 1-12
-  valorMensal Float    @default(0) // valor total do mês (kg pra peso, R$ pra financeiro)
-  // Distribuição semanal (null = auto ÷ 4 semanas).
-  // Quando preenchido, sobrescreve a distribuição automática.
-  semana1     Float?
-  semana2     Float?
-  semana3     Float?
-  semana4     Float?
-  semana5     Float?   // apenas meses com 5 semanas úteis
-
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([modulo, tipo, setor, ano, mes])
-  @@index([modulo, ano])
-  @@index([modulo, tipo, ano])
-}
-
-model UserModulo {
-  id     String @id @default(cuid())
-  userId String
-  modulo Modulo
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, modulo])
-  @@index([userId])
-}
-
-// ─── OP (ORDEM DE PRODUÇÃO) ─────────────────────────────────
-
 enum OPStatus {
   ABERTA
   EM_EXECUCAO
   ENCERRADA
-  ATRASADA
   CANCELADA
-}
-
-model OP {
-  id          String   @id @default(cuid())
-  numero      String   @unique // T083, T084, etc
-  cliente     String
-  obra        String?
-  descricao   String?
-  status      OPStatus @default(ABERTA)
-
-  // Cronograma
-  dataInicio       DateTime?
-  dataFimPrevista  DateTime?
-  dataFimReal      DateTime?
-
-  // Dados fiscais do cliente (necessario quando OP tem itens em
-  // Faturamento Direto — Omie precisa emitir nota direto pro cliente)
-  clienteRazaoSocial String?
-  clienteCnpj        String?
-  clienteIE          String?  // Inscricao Estadual
-  clienteEndereco    String?
-  clienteCidade      String?
-  clienteUF          String?
-  clienteCep         String?
-  clienteContato     String?
-  clienteEmail       String?
-  clienteTelefone    String?
-
-  // Valor total do contrato com o cliente. Inclui TUDO (receita Torg +
-  // materiais em Faturamento Direto que serao faturados em nome do cliente).
-  // Quando preenchido, vira a fonte de verdade pra calcular margem — sem
-  // ele, o sistema fallback pra soma de receitas (que so reflete o que Torg
-  // fatura, ignora os FDs).
-  valorTotalContrato Float?
-
-  createdById String
-  createdBy   User     @relation("OPCreatedBy", fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  itens          OPItem[]
-  aditivos       Aditivo[]
-  revisoes       Revisao[]
-  ajustesPrazo   AjustePrazo[]
-  rms            RM[]
-  receitas       OPReceita[]
-  medicoes       OPMedicao[]
-  producaoSemanal ProducaoSemanal[]
-  fluxoCaixa     FluxoCaixa[]
-  romaneios      Romaneio[]
-  planejamentosCarga PlanejamentoCarga[]
-  estoqueReservas EstoqueReserva[]
-  estoqueAlocacoes EstoqueAlocacao[]
-  rmItensDestino  RMItem[]   @relation("RMItemOpDestino")
-  pedidosOmieAvulsos PedidoOmie[]   // pedidos cadastrados direto na OP (FD avulsos)
-  pecasConjunto   PecaConjunto[]
-  orcamentos      Orcamento[]    @relation("OrcamentoOP")
-  mesApontamentos MesApontamento[] @relation("MesApontamentosOP")
-  tarefasPlanejamento TarefaPlanejamento[]
-  necessidadesSemanais NecessidadeSemanal[]
-  cronogramas          Cronograma[]
-
-  @@index([numero])
-  @@index([status])
-  @@index([status, createdAt])   // listagem de OPs por status ordenada por data
-  @@index([createdById, status]) // OPs criadas por usuário + filtro de status
-}
-
-// ─── PRODUÇÃO (PCP / FÁBRICA) ─────────────────────────────────
-// Pesos previstos x realizados de estruturas, por semana e por OP.
-// Inputado manualmente pelo time de PCP/Produção (ou via import xlsx).
-
-model ProducaoSemanal {
-  id              String   @id @default(cuid())
-
-  // DIA especifico — chave principal
-  data            DateTime
-  // Cache: semana ISO (ex: "2026-W19") + range pra agrupamento
-  semana          String
-  dataInicio      DateTime // segunda da semana
-  dataFim         DateTime // sabado da semana
-
-  // Producao em estrutura (kg)
-  pesoPrevistoKg  Float    @default(0)
-  pesoRealizadoKg Float    @default(0)
-
-  // Valor associado (R$, opcional — pra fluxo financeiro)
-  valorPrevisto   Float    @default(0)
-  valorRealizado  Float    @default(0)
-
-  // Quebrado por OP (opcional — null = total geral do dia)
-  opId            String?
-  op              OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
-
-  observacao      String?
-
-  // Fonte da informacao: MANUAL (usuario lancou), IMPORT (planilha local), SHAREPOINT (sync auto).
-  fonte           String?
-
-  // Setor da fabrica (Corte, Montagem, Solda, Acabamento, Jato, Pintura, Expedicao).
-  // null = lancamento geral/agregado (lancamentos manuais antigos).
-  setor           String?
-
-  createdById     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([data, opId, setor])
-  @@index([data])
-  @@index([semana])
-  @@index([opId])
-  @@index([setor])
-}
-
-// Romaneio = nota de expedicao com peso REAL produzido/expedido.
-// Usado pra validar peso previsto vs realizado e calcular receita gerada.
-model Romaneio {
-  id          String   @id @default(cuid())
-  numero      String   // numero do romaneio (ex: "R-001/2026")
-
-  opId        String?
-  op          OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
-
-  data        DateTime // data de emissao/expedicao
-  pesoRealKg  Float    // peso real produzido/expedido (kg)
-
-  descricao   String?  // descricao do que foi produzido
-  observacao  String?
-
-  // Snapshot do valor unitario (R$/kg) usado pra calcular receita gerada
-  valorPorKg  Float?
-  valorTotal  Float?   // pesoRealKg * valorPorKg (calculado e armazenado)
-
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  itens       RomaneioItem[]
-  planejamentoCarga PlanejamentoCarga?
-
-  @@index([opId])
-  @@index([data])
-}
-
-// Itens detalhados de um romaneio — vincula peças (PecaConjunto) e
-// acessórios (RMItem) ao romaneio de saída. Permite rastrear QUAIS
-// itens foram expedidos em cada carga.
-model RomaneioItem {
-  id              String        @id @default(cuid())
-  romaneioId      String
-  romaneio        Romaneio      @relation(fields: [romaneioId], references: [id], onDelete: Cascade)
-
-  // Tipo do item: PECA (estrutura/marca) ou ACESSORIO (item de RM expedível)
-  tipo            String        // PECA | ACESSORIO
-  descricao       String        // descrição (ex: "T64K1 - VIGA" ou "Parafusos M16")
-
-  // Vínculo com peça de estrutura (marca da LE/form21)
-  pecaConjuntoId  String?
-  pecaConjunto    PecaConjunto? @relation(fields: [pecaConjuntoId], references: [id])
-
-  // Vínculo com item de RM (acessórios expedíveis)
-  rmItemId        String?
-  rmItem          RMItem?       @relation(fields: [rmItemId], references: [id])
-
-  qtd             Float         @default(1)   // quantidade expedida neste romaneio
-  pesoKg          Float?        // peso deste item (kg)
-  observacao      String?
-
-  createdAt       DateTime      @default(now())
-
-  @@index([romaneioId])
-  @@index([pecaConjuntoId])
-  @@index([rmItemId])
-}
-
-// ─── PLANEJAMENTO DE CARGA ─────────────────────────────────
-// Lista o que DEVERIA ser carregado numa carga (antes do romaneio).
-// Quando a carga acontece, gera um Romaneio. Itens que não foram
-// carregados recebem motivo e podem ser reprogramados pra próxima carga.
-
-model PlanejamentoCarga {
-  id           String   @id @default(cuid())
-  opId         String
-  op           OP       @relation(fields: [opId], references: [id])
-
-  dataPrevista DateTime               // data prevista de carregamento
-  descricao    String?                // ex: "Carga 1 - Mezanino etapa 1"
-  // PLANEJADO: carga planejada, aguardando dia de carregar
-  // EM_CARGA: caminhão chegou, carregamento em andamento
-  // CONCLUIDO: romaneio gerado, carga saiu
-  // CANCELADO: carga cancelada
-  status       String   @default("PLANEJADO")
-
-  // Quando concluído, vincula ao romaneio oficial
-  romaneioId   String?  @unique
-  romaneio     Romaneio? @relation(fields: [romaneioId], references: [id])
-
-  createdById  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  itens        PlanejamentoCargaItem[]
-
-  @@index([opId])
-  @@index([status])
-  @@index([dataPrevista])
-}
-
-// Item do planejamento de carga. Pode ser peça (PecaConjunto) ou
-// acessório (RMItem expedível). Acompanha se foi carregado ou não.
-model PlanejamentoCargaItem {
-  id                  String              @id @default(cuid())
-  planejamentoId      String
-  planejamento        PlanejamentoCarga   @relation(fields: [planejamentoId], references: [id], onDelete: Cascade)
-
-  tipo                String              // PECA | ACESSORIO
-  descricao           String
-
-  pecaConjuntoId      String?
-  pecaConjunto        PecaConjunto?       @relation(fields: [pecaConjuntoId], references: [id])
-  rmItemId            String?
-  rmItem              RMItem?             @relation(fields: [rmItemId], references: [id])
-
-  qtdPlanejada        Float               @default(1)
-  qtdCarregada        Float               @default(0)   // preenchido ao gerar romaneio
-  pesoEstimadoKg      Float?              // peso estimado do item
-
-  // PLANEJADO: item aguardando carregamento
-  // CARREGADO: item foi no romaneio (qtdCarregada = qtdPlanejada)
-  // PARCIAL: carregou menos que o planejado
-  // NAO_ENVIADO: não foi carregado (precisa de motivo)
-  // REPROGRAMADO: reagendado pra próxima carga
-  status              String              @default("PLANEJADO")
-  motivoNaoEnvio      String?             // obrigatório quando NAO_ENVIADO
-  // Referência ao planejamento futuro onde esse item foi reprogramado
-  reprogramadoParaId  String?
-
-  createdAt           DateTime            @default(now())
-
-  @@index([planejamentoId])
-  @@index([pecaConjuntoId])
-  @@index([rmItemId])
-  @@index([status])
-}
-
-// Fluxo de caixa previsto (entradas e saidas)
-model FluxoCaixa {
-  id            String   @id @default(cuid())
-
-  data          DateTime // data prevista de entrada/saida
-  tipo          String   // 'ENTRADA' | 'SAIDA'
-  categoria     String   // FATURAMENTO_MEDICAO | RECEBIMENTO | SALARIO | IMPOSTO | COMPRA | TRIBUTO | OUTROS
-  descricao     String
-  valor         Float    // sempre positivo (tipo define se entra ou sai)
-
-  // Realizado: quando entrou/saiu efetivo
-  realizado     Boolean  @default(false)
-  dataRealizado DateTime?
-
-  // Vinculo opcional com OP
-  opId          String?
-  op            OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
-
-  observacao    String?
-
-  createdById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([data])
-  @@index([tipo])
-  @@index([categoria])
-  @@index([opId])
-}
-
-// ─── MEDIÇÕES (Pedidos de Venda do Omie vinculados à OP) ──────
-// Cada medição = 1 Pedido de Venda no Omie, com vários produtos.
-// Aqui guardamos só o snapshot dos dados pra mostrar no portal.
-
-model OPMedicao {
-  id          String   @id @default(cuid())
-  opId        String
-  op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-
-  // Tipo de documento Omie: "VENDA" (Pedido de Venda — default histórico)
-  // ou "SERVICO" (Ordem de Servico). Define qual API consultar.
-  tipoDocumento    String   @default("VENDA")
-  // Identificadores no Omie
-  numeroPedidoOmie String  // Numero visivel (ex: "1500" ou "233/1" pra OS)
-  codigoPedidoOmie String? // codigo_pedido / codigo_os interno do Omie
-
-  // Snapshot dos dados (sincronizado via API Omie)
-  descricao        String?
-  data             DateTime?
-  // valorBruto = quanto JA FOI MEDIDO/FATURADO desse pedido (default: parcelas
-  // com nFatura ou etapa=60 = total). Pode ser editado manualmente quando a
-  // detecccao automatica nao bate.
-  valorBruto       Float    @default(0)
-  valorLiquido     Float?
-  // valorContratado = valor_total_pedido do Omie (info auxiliar pra
-  // comparar quanto foi medido vs contratado)
-  valorContratado  Float?
-  // valorFaturado bruto detectado das parcelas (mesma logica do valorBruto,
-  // guardado pra auditoria — pode divergir se usuario editou manualmente)
-  valorFaturadoAuto Float?
-  status           String?  // ABERTO | FATURADO | CANCELADO | etc
-  etapa            String?  // codigo da etapa do pedido no Omie
-  qtdItens         Int      @default(0)
-
-  // Sincronizacao
-  ultimoSync       DateTime?
-  syncErro         String?
-  payload          Json?    // Resposta do Omie (auditoria)
-
-  createdById      String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([opId])
-  @@unique([opId, numeroPedidoOmie])
-}
-
-// ─── RECEITAS DA OP ──────────────────────────────────────────
-// Linhas de receita do contrato (projeto, montagem, fabricacao, etc.)
-// com aliquotas de impostos por linha pra controle financeiro.
-
-model OPReceita {
-  id          String   @id @default(cuid())
-  opId        String
-  op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-
-  ordem       Int      @default(0)
-  categoria   String   // PROJETO | MONTAGEM | FABRICACAO | MATERIAL | OUTRO
-  descricao   String
-  cfop        String?  // codigo CFOP (ex: "5101", "5933", "6101")
-  codigoServico String? // codigo de servico ISS quando aplicavel
-
-  valor       Float    // valor bruto da receita
-
-  // Aliquotas tributarias em % (cada linha pode ter regime/CFOP diferente)
-  icmsPct     Float?
-  ipiPct      Float?
-  pisPct      Float?
-  cofinsPct   Float?
-  issPct      Float?
-  irrfPct     Float?
-  csllPct     Float?
-
-  observacao  String?
-
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([opId])
-  @@index([categoria])
+  ATRASADA
 }
 
 enum ItemTipo {
-  VERBA       // só R$ — parafusos, tinta, galvanização
-  ESTRUTURA   // peso (KG/TON) + verba
-  AREA        // m² — telhas, steel deck, placa wall
-  ALUGUEL     // meses × valor/mês + descrição da capacidade
-  GENERICO    // qtd + unidade livre + verba
+  VERBA
+  ESTRUTURA
+  AREA
+  ALUGUEL
+  GENERICO
 }
 
-model OPItem {
-  id              String  @id @default(cuid())
-  opId            String
-  op              OP      @relation(fields: [opId], references: [id], onDelete: Cascade)
-
-  ordem           Int     @default(0)
-  categoria       String  // "MATERIA_PRIMA", "TINTA", "ALUGUEL_PLATAFORMA", "OUTRO", etc
-  tipo            ItemTipo @default(VERBA)
-  descricao       String
-  codigoOmie      String?
-
-  // Local: FABRICA ou TERCEIRO
-  localEstoque    String?
-
-  // Para ESTRUTURA / AREA / GENERICO
-  unidade         String?
-  qtdContratada   Float?
-  cmcMedio        Float?   // R$/unidade (R$/kg, R$/m²) — opcional
-
-  // Para ALUGUEL
-  meses           Int?
-  valorPorMes     Float?
-  capacidade      String?  // texto livre da capacidade do equipamento
-
-  valorVerba      Float    // sempre tem; calculado auto p/ ESTRUTURA/AREA (qtd*cmc) e ALUGUEL (meses*valorMes)
-  faturamentoDireto Boolean @default(false)
-  observacao      String?
-
-  rmItens             RMItem[]
-  solicitacoesVerba   SolicitacaoVerba[]
-
-  @@index([opId])
-  @@index([categoria])
-}
-
-// Revisão: registro de mudanças na OP base (cliente, descrição, qtd dos itens base, etc)
-// Comercial cria a revisão com motivo; alterações são aplicadas direto na OP/OPItem
-model Revisao {
-  id          String   @id @default(cuid())
-  opId        String
-  op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-  numero      Int      // Rev 1, 2, 3...
-  motivo      String
-
-  createdById String
-  createdBy   User     @relation("RevisaoCreatedBy", fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-
-  @@unique([opId, numero])
-  @@index([opId])
-}
-
-// Aditivo: acréscimo ao contrato — TEM SUAS PRÓPRIAS LINHAS DE ITENS (AditivoItem)
-model Aditivo {
-  id          String   @id @default(cuid())
-  opId        String
-  op          OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-  numero      Int      // Aditivo 1, 2, 3...
-  descricao   String   // razão / breve descrição
-
-  createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-
-  itens       AditivoItem[]
-
-  @@unique([opId, numero])
-  @@index([opId])
-}
-
-model AditivoItem {
-  id              String  @id @default(cuid())
-  aditivoId       String
-  aditivo         Aditivo @relation(fields: [aditivoId], references: [id], onDelete: Cascade)
-
-  ordem           Int     @default(0)
-  categoria       String
-  tipo            ItemTipo @default(VERBA)
-  descricao       String
-  codigoOmie      String?
-
-  localEstoque    String?
-
-  unidade         String?
-  qtdContratada   Float?
-  cmcMedio        Float?
-
-  meses           Int?
-  valorPorMes     Float?
-  capacidade      String?
-
-  valorVerba      Float
-  faturamentoDireto Boolean @default(false)
-  observacao      String?
-
-  rmItens             RMItem[]
-  solicitacoesVerba   SolicitacaoVerba[]
-
-  @@index([aditivoId])
-  @@index([categoria])
-}
-
-// Ajuste de Prazo: extensão da data fim prevista da OP. Apenas usuário master.
-model AjustePrazo {
-  id              String   @id @default(cuid())
-  opId            String
-  op              OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-
-  dataFimAnterior DateTime
-  dataFimNova     DateTime
-  motivo          String
-
-  createdById     String
-  createdBy       User     @relation("AjustePrazoCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime @default(now())
-
-  @@index([opId])
-}
-
-// Solicitação de mudança de verba — comercial pede, master aprova/rejeita por item
 enum SolicitacaoVerbaStatus {
   PENDENTE
   APROVADA
   REJEITADA
 }
-
-model SolicitacaoVerba {
-  id              String   @id @default(cuid())
-
-  // Item afetado: pode ser de OP ou de Aditivo
-  opItemId        String?
-  opItem          OPItem?  @relation(fields: [opItemId], references: [id], onDelete: Cascade)
-  aditivoItemId   String?
-  aditivoItem     AditivoItem? @relation(fields: [aditivoItemId], references: [id], onDelete: Cascade)
-
-  valorAtual      Float
-  valorProposto   Float
-  justificativa   String
-
-  status          SolicitacaoVerbaStatus @default(PENDENTE)
-  observacaoMaster String?
-  decididoEm      DateTime?
-  decididoById    String?
-  decididoBy      User?    @relation("SolicitacaoDecididoBy", fields: [decididoById], references: [id])
-
-  createdById     String
-  createdBy       User     @relation("SolicitacaoCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime @default(now())
-
-  @@index([opItemId])
-  @@index([aditivoItemId])
-  @@index([status])
-}
-
-// ─── RM (REQUISIÇÃO DE MATERIAL) ────────────────────────────
 
 enum RMStatus {
   ABERTA
@@ -660,1065 +1991,36 @@ enum RMStatus {
 }
 
 enum TipoRM {
-  ENGENHARIA      // vinculada a OP + categorias (tipo de material) do escopo do comercial
-  INTERNA         // sem vinculo a OP — almoxarifado, coisas internas, etc
-}
-
-model RM {
-  id          String   @id @default(cuid())
-  numero      String   @unique // RM-0001
-  tipoRM      TipoRM   @default(ENGENHARIA)
-  opId        String?
-  op          OP?      @relation(fields: [opId], references: [id])
-  // categorias da OP cobertas por essa RM (so pra ENGENHARIA)
-  categoriasOP String[] @default([])
-  tipo        String   @default("Material") // Material, Consumível
-  descricao   String
-  observacao  String?
-  status      RMStatus @default(ABERTA)
-
-  // Configuração para pedido Omie (escolhida na RM)
-  categoriaCompra String?
-  localEstoque    String?
-
-  // Solicitante
-  createdById String
-  createdBy   User     @relation("RMCreatedBy", fields: [createdById], references: [id])
-  setor       String?  // setor capturado no momento da criação (snapshot)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  itens       RMItem[]
-  cotacoes    Cotacao[]
-  envios      Envio[]
-  anexos      Anexo[]
-  pedidosFDAtendidos PedidoOmie[] @relation("PedidoOmieRMAtendida")
-
-  @@index([opId])
-  @@index([status])
-  @@index([createdById])
-  @@index([status, createdAt])   // listagem de RMs por status ordenada por data
-  @@index([opId, status])        // RMs de uma OP filtradas por status
+  ENGENHARIA
+  INTERNA
 }
 
 enum RMItemStatus {
-  PENDENTE        // ainda nao cotado
-  EM_COTACAO      // enviado pra fornecedor
-  COTADO          // recebeu proposta, aguarda escolha
-  PEDIDO_GERADO   // virou pedido de compra
-  CANCELADO       // decisao de nao comprar (com motivo)
+  PENDENTE
+  EM_COTACAO
+  COTADO
+  PEDIDO_GERADO
+  CANCELADO
 }
-
-// Pedido de compra gerado no Omie. Cada pedido representa 1 fornecedor
-// vencedor de N itens da OP (agrupamento de RMItens por cotacao).
-model PedidoOmie {
-  id                String   @id @default(cuid())
-  cotacaoId         String?
-  cotacao           Cotacao? @relation(fields: [cotacaoId], references: [id])
-
-  fornecedorNome    String
-  nCodFor           String?  // codigo do fornecedor no Omie
-  cnpj              String?
-
-  codigoPedido      String?  // codigo_pedido retornado pelo Omie
-  numeroPedido      String?  // numero_pedido (mais legivel)
-  total             Float    @default(0)
-  faturamentoDireto Boolean  @default(false)
-  status            String   @default("CRIADO")  // CRIADO | ERRO
-
-  observacao        String?
-  erroOmie          String?
-  payload           Json?    // payload enviado (auditoria)
-  resposta          Json?    // resposta do Omie
-
-  // Vinculo direto pra OP — usado em FD avulsos (cadastros manuais
-  // sem RM/Cotacao prévia, pra regularizar compras que ocorreram fora
-  // do fluxo do portal).
-  opId              String?
-  op                OP?      @relation(fields: [opId], references: [id])
-
-  // Pedido cadastrado manualmente (fora do fluxo RM → Cotacao → Pedido).
-  // Quando true, geralmente significa regularizacao de FD existente.
-  criadoManualmente Boolean  @default(false)
-  // PDF anexo da NF/pedido (URL Vercel Blob) — pra cadastros manuais
-  anexoUrl          String?
-  anexoNome         String?
-  // Categoria do material/escopo (ex: STEEL_DECK, TINTA, PARAFUSOS) — pra
-  // cadastros manuais; quando via cotacao a categoria sai pelos rmItens.
-  categoriaItem     String?
-  // Itens detalhados do FD avulso (cadastros manuais). Array de objetos
-  // { descricao, qtd, unidade, valorUnit, ipiPct, icmsPct, codigo? }.
-  // Quando vazio, o "Criar no Omie" usa 1 item generico com o total embutido.
-  itensDetalhes     Json?
-  // RM que esse FD avulso atende. Quando preenchido, ao salvar marca
-  // todos os RMItens dela como PEDIDO_GERADO e a RM tambem — saindo
-  // da lista de RMs ativas do Compras.
-  rmAtendidaId      String?
-  rmAtendida        RM?      @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
-
-  // Itens reais do pedido no Omie (sincronizados via ConsultarPedCompra).
-  // Quando alguem edita o pedido direto no Omie (adiciona/remove itens),
-  // esse campo reflete o estado real. Array de objetos:
-  // [{ descricao, qtd, unidade, valorUnit, qtdRecebida }]
-  itensOmie         Json?
-
-  createdById       String?
-  createdAt         DateTime @default(now())
-
-  // Rastreamento de entrega — preenchido a partir do prazo do fornecedor vencedor
-  prazoEntregaPrevisto DateTime? // data mais tarde entre prazos dos itens vencedores
-  prazoOriginal        DateTime? // primeiro prazo acordado (set uma vez, nunca muda)
-  dataEntregaReal      DateTime? // quando de fato chegou
-  statusEntrega        String?   // NO_PRAZO | PROXIMO | ATRASADO | ENTREGUE
-  // Token publico p/ fornecedor informar nova data de entrega (gerado ao
-  // enviar email de acompanhamento). Acessivel em /fornecedores/entrega/[token]
-  tokenEntrega         String?   @unique
-
-  rmItens           RMItem[]
-  recebimentos      Recebimento[]
-  prazoHistorico    PrazoHistorico[]
-
-  @@index([cotacaoId])
-  @@index([opId])
-  @@index([status])
-}
-
-// Historico de alteracoes de prazo de entrega de um pedido.
-// Cada registro = uma postergacao (ou antecipacao) informada pelo fornecedor.
-model PrazoHistorico {
-  id             String   @id @default(cuid())
-  pedidoId       String
-  pedido         PedidoOmie @relation(fields: [pedidoId], references: [id])
-
-  prazoAnterior  DateTime?  // prazo que estava antes (null = primeira vez definido)
-  prazoNovo      DateTime   // novo prazo informado pelo fornecedor
-  motivo         String?    // observacao livre (ex: "Fornecedor informou atraso na siderurgica")
-
-  alteradoPorId  String?    // null = fornecedor informou via portal publico
-  alteradoPor    User?      @relation(fields: [alteradoPorId], references: [id])
-  criadoEm       DateTime   @default(now())
-
-  @@index([pedidoId])
-}
-
-model RMItem {
-  id          String  @id @default(cuid())
-  rmId        String
-  rm          RM      @relation(fields: [rmId], references: [id], onDelete: Cascade)
-
-  // OP destinataria deste item (multi-OP via RM). Pode ser null quando
-  // a linha eh compra pra estoque livre (sem destino especifico).
-  opDestinoId   String?
-  opDestino     OP?     @relation("RMItemOpDestino", fields: [opDestinoId], references: [id])
-  // Quando true, este item vai pro estoque e e consumido depois via CMC.
-  // Quando false, comportamento atual (sob encomenda / FD direto pra OP).
-  destinoEstoque Boolean @default(false)
-  // Codigo do item no Omie (cCodProduto) — quando o usuario souber,
-  // permite vincular direto ao EstoqueItem. Sem isso, vira "compra avulsa"
-  // sem reserva automatica.
-  codigoOmieEstoque String?
-
-  // Vinculo com item da OP base OU com item de Aditivo (exatamente um dos dois)
-  opItemId      String?
-  opItem        OPItem?      @relation(fields: [opItemId], references: [id])
-  aditivoItemId String?
-  aditivoItem   AditivoItem? @relation(fields: [aditivoItemId], references: [id])
-
-  ordem       Int     @default(0)
-  descricao   String
-  unidade     String
-  qtd         Float
-  status      RMItemStatus @default(PENDENTE)
-  canceladoMotivo String?
-  canceladoEm     DateTime?
-
-  // Quando o item vira pedido, vincula o pedido Omie aqui
-  pedidoOmieId String?
-  pedidoOmie   PedidoOmie? @relation(fields: [pedidoOmieId], references: [id])
-
-  // Detalhe (do Tekla quando importado)
-  material    String?
-  comprimento String?
-  largura     String?
-  peso        Float?
-  pesoLinear  Float?
-  codigo      String?
-  tratamento  String?
-
-  cotacaoItens    CotacaoItem[]
-  romaneioItens   RomaneioItem[]
-  planejamentoCargaItens PlanejamentoCargaItem[]
-  recebimentos    Recebimento[]
-
-  @@index([rmId])
-  @@index([opItemId])
-  @@index([aditivoItemId])
-  @@index([status])
-  @@index([pedidoOmieId])
-  @@index([status, opDestinoId]) // itens pendentes por OP de destino
-  @@index([rmId, status])        // itens de uma RM filtrados por status
-}
-
-// ─── COTAÇÕES ───────────────────────────────────────────────
 
 enum CotacaoStatus {
-  PENDENTE      // aguardando fornecedor responder
-  RECEBIDA      // fornecedor respondeu
-  VENCIDA       // passou do prazo
+  PENDENTE
+  RECEBIDA
+  VENCIDA
   CANCELADA
 }
 
-model Cotacao {
-  id              String        @id @default(cuid())
-  rmId            String
-  rm              RM            @relation(fields: [rmId], references: [id], onDelete: Cascade)
-
-  // Fornecedor — vinculo ao cadastro unificado. Campos denormalizados mantidos pra auditoria.
-  fornecedorId    String?
-  fornecedor      Fornecedor?   @relation(fields: [fornecedorId], references: [id])
-  fornecedorNome  String
-  fornecedorEmail String?
-  nCodOmie        String?       // codigo do fornecedor no Omie
-  cnpj            String?
-
-  faturamento     String        @default("Torg") // Torg | Cliente
-  prazoPagamento  String?
-  observacao      String?
-  total           Float         @default(0)
-  // Total declarado pelo fornecedor (do PDF da proposta). Quando setado, vira
-  // a "fonte da verdade" do valor da NF — usado pra ajustar precos no Omie
-  // proporcionalmente, garantindo que o pedido bata com a proposta.
-  totalProposta   Float?
-  numeroProposta  String?       // numero da proposta informado pelo fornecedor
-
-  prazoResposta   DateTime?     // limite pra fornecedor responder
-  recebidaEm      DateTime?
-  // Marca quando Compras pediu "revisao final" — o fornecedor entra no portal
-  // e ve so os itens em que ele venceu (vencedor=true) pra confirmar os
-  // valores finais antes da geracao do pedido. Quando setado, o portal
-  // entra em modo "revisao final" com aviso destacado.
-  solicitadaRevisaoFinal DateTime?
-  status          CotacaoStatus @default(PENDENTE)
-
-  // Token único para acesso do fornecedor (uploads via /fornecedores/c/[token])
-  token           String?       @unique
-  numeroRevisao   Int           @default(0) // incrementa a cada re-submissao do fornecedor
-
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  itens           CotacaoItem[]
-  anexos          Anexo[]
-  pedidosOmie     PedidoOmie[]
-
-  @@index([rmId])
-  @@index([fornecedorId])
-  @@index([status])
-  @@index([token])
-  @@index([status, createdAt])   // cotações por status ordenadas por data
-  @@index([rmId, status])        // cotações de uma RM filtradas por status
-}
-
-model CotacaoItem {
-  id          String  @id @default(cuid())
-  cotacaoId   String
-  cotacao     Cotacao @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
-  rmItemId    String
-  rmItem      RMItem  @relation(fields: [rmItemId], references: [id])
-
-  precoUnit      Float
-  qtdCotada      Float
-  qtdProposta    Float?
-  icmsPct        Float?
-  ipiPct         Float?
-  observacao     String?
-  semEstoque     Boolean   @default(false) // fornecedor marcou que não tem esse item
-  vencedor       Boolean   @default(false) // marcado quando o compras escolhe
-  prazoEntrega   DateTime? // data prevista de entrega informada pelo fornecedor
-
-  @@index([cotacaoId])
-  @@index([rmItemId])
-  @@index([cotacaoId, vencedor]) // itens vencedores de uma cotação
-  @@index([rmItemId, vencedor])  // item de RM que foi vencedor
-}
-
-// Histórico de e-mails enviados aos fornecedores
-model Envio {
-  id              String   @id @default(cuid())
-  rmId            String
-  rm              RM       @relation(fields: [rmId], references: [id], onDelete: Cascade)
-  fornecedorNome  String
-  fornecedorEmail String
-  data            DateTime @default(now())
-  status          String   @default("Enviado")
-
-  @@index([rmId])
-}
-
-// ─── ANEXOS (Vercel Blob) ───────────────────────────────────
-
-model Anexo {
-  id          String   @id @default(cuid())
-
-  // Polimórfico — pode estar vinculado a RM ou Cotacao
-  cotacaoId   String?
-  cotacao     Cotacao? @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
-  rmId        String?
-  rm          RM?      @relation(fields: [rmId], references: [id], onDelete: Cascade)
-
-  nomeArquivo String
-  blobUrl     String   // URL do Vercel Blob
-  tamanho     Int      // bytes
-  tipo        String   // pdf, image/png, etc
-  uploadedAt  DateTime @default(now())
-
-  @@index([cotacaoId])
-  @@index([rmId])
-}
-
-// ─── AUDITORIA ──────────────────────────────────────────────
-
-// Log de todas as ações pra rastreabilidade
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  action    String   // create_op, update_op_item, delete_rm, etc
-  entity    String   // OP, RM, Cotacao, OPItem, etc
-  entityId  String
-  diff      Json?    // {before, after} se aplicável
-  ip        String?
-  userAgent String?
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([entity, entityId])
-  @@index([createdAt])
-}
-
-// ─── FORNECEDORES (Vendor List) ─────────────────────────────
-
-// Cadastro de fornecedores classificados por categoria de material/servico.
-// Usado pra selecionar destinatarios no envio de cotacao (em vez de digitar
-// nome/email manualmente toda vez).
-model Fornecedor {
-  id              String   @id @default(cuid())
-  razaoSocial     String
-  nomeFantasia    String?
-  cnpj            String?
-  email           String   // email principal
-  emailsAdicionais String[] // emails secundarios (copias)
-  telefone        String?
-  contato         String?  // nome do vendedor/contato
-  cidade          String?
-  uf              String?
-
-  // Categorias que esse fornecedor atende. Codigos do catalogo
-  // lib/fornecedor-categorias.js (MATERIA_PRIMA, TINTA, etc).
-  categorias      String[]
-  observacao      String?
-
-  // Integracao Omie — pra resolver pedido sem precisar buscar de novo
-  nCodOmie        String?
-
-  ativo           Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  cotacoes        Cotacao[]
-
-  @@index([ativo])
-}
-
-// ─── NOTIFICACOES POR EMAIL ─────────────────────────────────
-
-// Lista de emails inscritos em eventos do sistema (RM criada, etc).
-// Mantida pelo admin via /admin/notificacoes. Toda criacao de RM
-// dispara email pros emails inscritos no evento RM_CRIADA.
-model EmailNotificacao {
-  id        String   @id @default(cuid())
-  email     String
-  nome      String?  // nome de exibicao pro tooltip
-  // Eventos que esse email recebe. Strings livres pra futura extensao.
-  // Hoje suportados: "RM_CRIADA", "COTACAO_RESPONDIDA"
-  eventos   String[]
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([ativo])
-}
-
-// ─── CATEGORIAS CUSTOMIZADAS DE FORNECEDORES ────────────────
-// Alem das 7 categorias built-in (MATERIA_PRIMA, TINTA, etc — em
-// lib/fornecedor-categorias.js), admin/compras pode cadastrar mais
-// categorias aqui pelo botao "Gerenciar categorias" do Vendor List.
-model CategoriaFornecedor {
-  id        String   @id @default(cuid())
-  codigo    String   @unique // ex: "PINTURA_AUTOMOTIVA" (auto-gerado do label)
-  label     String   // ex: "Pintura Automotiva"
-  color     String   @default("slate") // blue|purple|slate|amber|red|emerald|orange
-  ordem     Int      @default(100)
-  ativa     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// ─── FEED DE ATIVIDADES (NOTIFICACOES IN-APP) ──────────────
-// Registra eventos do sistema (RM criada, cotacao respondida) pra exibir
-// em /compras/notificacoes como feed cronologico. Independente do envio
-// por email (que e best-effort via Resend).
 enum NotificacaoTipo {
   RM_CRIADA
   COTACAO_RESPONDIDA
+  CONSULTA_ESTOQUE
 }
-
-model Notificacao {
-  id        String          @id @default(cuid())
-  tipo      NotificacaoTipo
-  titulo    String          // ex: "Nova RM 0042 criada por João"
-  mensagem  String          // texto descritivo
-  link      String?         // url interna pra abrir o item (RM, cotacao)
-  // Dados estruturados pra exibicao rica (numeros, fornecedor, total, etc)
-  dados     Json?
-  // Quem disparou o evento (opcional). Null pra eventos de fornecedor externo.
-  origemUserId String?
-  origemUser   User? @relation(fields: [origemUserId], references: [id])
-  // Marcacao de lida — global, todos veem o mesmo estado pra simplicidade
-  // (depois pode evoluir pra UserNotificacao se quiser por-usuario)
-  lida      Boolean         @default(false)
-  lidaEm    DateTime?
-  createdAt DateTime        @default(now())
-
-  @@index([lida])
-  @@index([createdAt])
-  @@index([tipo])
-}
-
-// ─── RH — RECURSOS HUMANOS ──────────────────────────────────
-
-model Setor {
-  id            String   @id @default(cuid())
-  nome          String   @unique
-  sigla         String?
-  cor           String?  // pra organograma
-  gestorId      String?
-  gestor        Funcionario? @relation("GestorSetor", fields: [gestorId], references: [id])
-  funcionarios  Funcionario[] @relation("FuncionarioSetor")
-  vagas         Vaga[]
-  ativo         Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-model Cargo {
-  id            String   @id @default(cuid())
-  nome          String
-  nivel         String?  // OPERACIONAL, TECNICO, SUPERVISAO, GERENCIA, DIRETORIA
-  categoria     String?  // agrupamento (ex: Produção, Administrativo, Engenharia)
-  salarioBase   Float?
-  cbo           String?  // Classificação Brasileira de Ocupações
-  funcionarios  Funcionario[]
-  competencias  CargoCompetencia[]
-  vagas         Vaga[]
-  ativo         Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([nivel])
-  @@index([categoria])
-}
-
-model Funcionario {
-  id              String    @id @default(cuid())
-  nome            String
-  cpf             String?   @unique
-  rg              String?
-  dataNascimento  DateTime?
-  email           String?
-  telefone        String?
-  endereco        String?
-  cidadeUF        String?
-  // Vínculo empregatício
-  matricula       String?   @unique
-  dataAdmissao    DateTime
-  dataDemissao    DateTime?
-  setorId         String
-  setor           Setor     @relation("FuncionarioSetor", fields: [setorId], references: [id])
-  cargoId         String
-  cargo           Cargo     @relation(fields: [cargoId], references: [id])
-  salario         Float?
-  tipoContrato    String    @default("CLT") // CLT, PJ, ESTAGIO, JOVEM_APRENDIZ, TEMPORARIO
-  jornadaHoras    Int       @default(44)    // horas semanais
-  turno           String?   // ADMINISTRATIVO, PRODUCAO_1, PRODUCAO_2, NOTURNO
-  // Status
-  status          String    @default("ATIVO") // ATIVO, AFASTADO, FERIAS, DEMITIDO
-  ativo           Boolean   @default(true)
-  foto            String?
-  observacao      String?
-  // Desligamento
-  tipoDesligamento    String?   // VOLUNTARIO, INVOLUNTARIO, JUSTA_CAUSA, TERMINO_CONTRATO
-  motivoDesligamento  String?   // texto livre: motivo informado
-  categoriaDesligamento String? // OUTRO_EMPREGO, INSATISFACAO, CORTE, DESEMPENHO, DISCIPLINAR, ACORDO, OUTROS
-
-  setoresGeridos  Setor[]   @relation("GestorSetor")
-  pontos          Ponto[]
-  ferias          Ferias[]
-  beneficios      FuncionarioBeneficio[]
-  competencias    FuncionarioCompetencia[]
-  dependentes     Dependente[]
-  documentos      Documento[]
-  afastamentos    Afastamento[]
-  treinamentos    TreinamentoParticipante[]
-
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([setorId])
-  @@index([cargoId])
-  @@index([status])
-  @@index([ativo])
-  @@index([dataDemissao])
-}
-
-model Dependente {
-  id              String    @id @default(cuid())
-  funcionarioId   String
-  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
-  nome            String
-  parentesco      String    // CONJUGE, FILHO, FILHA, OUTROS
-  dataNascimento  DateTime?
-  cpf             String?
-  createdAt       DateTime  @default(now())
-
-  @@index([funcionarioId])
-}
-
-model Ponto {
-  id              String    @id @default(cuid())
-  funcionarioId   String
-  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
-  data            DateTime  @db.Date
-  entrada1        String?   // HH:mm
-  saida1          String?
-  entrada2        String?
-  saida2          String?
-  horasTrabalhadas Float?
-  horasExtras     Float     @default(0)
-  bancoHoras      Float     @default(0) // acumulado positivo/negativo
-  tipo            String    @default("NORMAL") // NORMAL, FALTA, ATESTADO, COMPENSACAO, FERIADO
-  observacao      String?
-  createdAt       DateTime  @default(now())
-
-  @@unique([funcionarioId, data])
-  @@index([data])
-}
-
-model Ferias {
-  id                  String    @id @default(cuid())
-  funcionarioId       String
-  funcionario         Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
-  periodoAquisInicio  DateTime  // inicio do periodo aquisitivo
-  periodoAquisFim     DateTime  // fim do periodo aquisitivo
-  dataInicio          DateTime? // inicio do gozo
-  dataFim             DateTime? // fim do gozo
-  diasGozo            Int?
-  diasVendidos        Int       @default(0) // abono pecuniario
-  status              String    @default("PENDENTE") // PENDENTE, AGENDADO, EM_GOZO, CONCLUIDO, VENCIDO
-  observacao          String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  @@index([funcionarioId])
-  @@index([status])
-}
-
-model Beneficio {
-  id            String   @id @default(cuid())
-  nome          String   @unique // VT, VR, VA, PLANO_SAUDE, PLANO_ODONTO, SEGURO_VIDA, etc.
-  tipo          String   // VALE, SAUDE, SEGURO, OUTRO
-  valorPadrao   Float?
-  ativo         Boolean  @default(true)
-  funcionarios  FuncionarioBeneficio[]
-  createdAt     DateTime @default(now())
-}
-
-model FuncionarioBeneficio {
-  id              String    @id @default(cuid())
-  funcionarioId   String
-  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
-  beneficioId     String
-  beneficio       Beneficio @relation(fields: [beneficioId], references: [id])
-  valorMensal     Float
-  ativo           Boolean   @default(true)
-  dataInicio      DateTime  @default(now())
-  dataFim         DateTime?
-
-  @@unique([funcionarioId, beneficioId])
-}
-
-model Competencia {
-  id          String   @id @default(cuid())
-  nome        String   @unique
-  categoria   String?  // TECNICA, COMPORTAMENTAL, GESTAO, SEGURANCA
-  descricao   String?
-  cargos      CargoCompetencia[]
-  funcionarios FuncionarioCompetencia[]
-  createdAt   DateTime @default(now())
-}
-
-model CargoCompetencia {
-  id              String    @id @default(cuid())
-  cargoId         String
-  cargo           Cargo     @relation(fields: [cargoId], references: [id], onDelete: Cascade)
-  competenciaId   String
-  competencia     Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
-  nivelEsperado   Int       @default(3) // 1-5
-
-  @@unique([cargoId, competenciaId])
-}
-
-model FuncionarioCompetencia {
-  id              String    @id @default(cuid())
-  funcionarioId   String
-  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
-  competenciaId   String
-  competencia     Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
-  nivelAtual      Int       @default(1) // 1-5
-  avaliadoEm      DateTime?
-  avaliadoPor     String?
-
-  @@unique([funcionarioId, competenciaId])
-}
-
-// ─── DOCUMENTOS (RH) ───────────────────────────────────────
-
-model Documento {
-  id              String    @id @default(cuid())
-  nome            String    // Ex: "ASO Periódico", "NR-35 Trabalho em Altura"
-  tipo            String    // ASO, NR_10, NR_12, NR_33, NR_35, PPRA, PCMSO, CNH, PASSAPORTE, CERTIDAO, CERTIFICADO, ALVARA, LICENCA_AMBIENTAL, AVCB, ISO, OUTRO
-  categoria       String    // SAUDE_SEGURANCA, PESSOAL, TREINAMENTO, EMPRESA
-  descricao       String?
-  // Vínculo — null = documento da empresa
-  funcionarioId   String?
-  funcionario     Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
-  // Datas
-  dataEmissao     DateTime?
-  dataValidade    DateTime?
-  // Detalhes
-  orgaoEmissor    String?   // Clínica, órgão, certificadora
-  numeroDocumento String?   // Número / protocolo
-  observacao      String?
-  ativo           Boolean   @default(true)
-
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([funcionarioId])
-  @@index([categoria])
-  @@index([dataValidade])
-  @@index([tipo])
-}
-
-// ─── RH: VAGAS / RECRUTAMENTO ─────────────────────────────
-
-model Vaga {
-  id              String    @id @default(cuid())
-  titulo          String    // Ex: "Soldador MIG/MAG", "Engenheiro de Produção"
-  setorId         String
-  setor           Setor     @relation(fields: [setorId], references: [id])
-  cargoId         String?
-  cargo           Cargo?    @relation(fields: [cargoId], references: [id])
-  quantidade      Int       @default(1)
-  prioridade      String    @default("NORMAL") // URGENTE, ALTA, NORMAL, BAIXA
-  tipo            String    @default("CLT")    // CLT, PJ, ESTAGIO, TEMPORARIO
-  nivelCargo      String?   // OPERACIONAL, TECNICO, SUPERVISAO, GERENCIA
-  justificativa   String?   // por que precisa da vaga
-  requisitos      String?   // requisitos da vaga (texto)
-  salarioFaixa    String?   // faixa salarial prevista
-  // Solicitação
-  solicitanteId   String?   // quem solicitou (userId do sistema)
-  dataAbertura    DateTime  @default(now())
-  // Recrutamento
-  status          String    @default("SOLICITADA") // SOLICITADA, APROVADA, EM_RECRUTAMENTO, PREENCHIDA, CANCELADA
-  dataAprovacao   DateTime?
-  dataFechamento  DateTime? // quando preenchida
-  custoRecrutamento Float?  // total gasto (anúncios, agência, exames)
-  observacaoRH    String?
-  // Resultado
-  funcionarioContratadoNome String? // nome da pessoa contratada (referência)
-
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([setorId])
-  @@index([status])
-  @@index([dataAbertura])
-}
-
-// ─── RH: AFASTAMENTOS ────────────────────────────────────────
-
-model Afastamento {
-  id              String    @id @default(cuid())
-  funcionarioId   String
-  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
-  dataInicio      DateTime
-  dataFim         DateTime?
-  diasAfastado    Int?      // calculado ou informado manualmente
-  // Natureza (LGPD: nunca expor CID individual)
-  natureza        String    // FISICO, MENTAL, ACIDENTE_TRABALHO, ACIDENTE_TRAJETO, MATERNIDADE, PATERNIDADE
-  categoriaCID    String?   // grupo CID (ex: "M" = musculoesquelético, "F" = transtorno mental) — NUNCA CID completo
-  // Status
-  status          String    @default("EM_ANDAMENTO") // EM_ANDAMENTO, ENCERRADO
-  inss            Boolean   @default(false) // se virou benefício INSS (> 15 dias)
-  observacao      String?   // notas internas RH (sem dados médicos identificáveis)
-
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([funcionarioId])
-  @@index([natureza])
-  @@index([dataInicio])
-  @@index([status])
-}
-
-// ─── RH: ACIDENTES DE TRABALHO (SST) ─────────────────────────
-
-model AcidenteTrabalho {
-  id              String    @id @default(cuid())
-  data            DateTime
-  hora            String?   // HH:mm
-  setorId         String?
-  obra            String?   // nome da obra/local
-  // Classificação
-  tipo            String    // COM_AFASTAMENTO, SEM_AFASTAMENTO, TRAJETO, QUASE_ACIDENTE
-  gravidade       String    @default("LEVE") // LEVE, MODERADO, GRAVE, FATAL
-  diasPerdidos    Int       @default(0)
-  // Envolvido (sem expor dados médicos individuais no dashboard)
-  funcionarioNome String?   // pode ser anônimo no indicador
-  funcionarioId   String?   // referência opcional
-  // Detalhes
-  descricao       String    // o que aconteceu
-  causaRaiz       String?   // análise de causa
-  parteCorpo      String?   // MAOS, OLHOS, PES, COLUNA, CABECA, MEMBROS_SUPERIORES, MEMBROS_INFERIORES, OUTROS
-  agenteRisco     String?   // QUIMICO, FISICO, MECANICO, ERGONOMICO, BIOLOGICO
-  // CAT
-  catEmitida      Boolean   @default(false)
-  catNumero       String?
-  // Ações corretivas
-  acaoCorretiva   String?
-  responsavelAcao String?
-  prazoAcao       DateTime?
-  acaoConcluida   Boolean   @default(false)
-
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([data])
-  @@index([tipo])
-  @@index([setorId])
-}
-
-// ─── RH: TREINAMENTOS / CAPACITAÇÃO ──────────────────────────
-
-model Treinamento {
-  id              String    @id @default(cuid())
-  titulo          String    // Ex: "NR-35 Trabalho em Altura", "Ponte Rolante"
-  tipo            String    // NR_OBRIGATORIO, TECNICO, COMPORTAMENTAL, INTEGRACAO, SST
-  nrRelacionada   String?   // NR-10, NR-12, NR-18, NR-33, NR-35 etc.
-  descricao       String?
-  instrutor       String?   // nome do instrutor/empresa
-  local           String?
-  // Datas
-  dataInicio      DateTime
-  dataFim         DateTime?
-  cargaHoraria    Float     // horas totais
-  // Validade (para NRs com reciclagem)
-  validadeMeses   Int?      // meses até vencer (ex: NR-35 = 24 meses)
-  // Custos
-  custo           Float?    // investimento total
-  certificadoUrl  String?   // URL do certificado geral
-
-  participantes   TreinamentoParticipante[]
-
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  @@index([tipo])
-  @@index([dataInicio])
-}
-
-model TreinamentoParticipante {
-  id              String    @id @default(cuid())
-  treinamentoId   String
-  treinamento     Treinamento @relation(fields: [treinamentoId], references: [id], onDelete: Cascade)
-  funcionarioId   String
-  funcionario     Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
-  presente        Boolean   @default(true)
-  nota            Float?    // nota de avaliação (0-10) se aplicável
-  certificadoUrl  String?   // certificado individual
-  dataVencimento  DateTime? // data em que este treinamento vence pra este funcionário
-
-  createdAt       DateTime  @default(now())
-
-  @@unique([treinamentoId, funcionarioId])
-  @@index([funcionarioId])
-  @@index([dataVencimento])
-}
-
-// ─── ESTOQUE TORG ──────────────────────────────────────────
-
-// Configuracao de quais categorias do Omie entram no controle de estoque.
-// Singleton (so 1 registro). Default: categoria "3.1".
-model ConfigEstoque {
-  id              String   @id @default(cuid())
-  categoriasOmie  String[] @default(["3.1"])
-  palavrasChave   String[] @default([])
-  ultimaSincProd  DateTime?
-  ultimaSincMov   DateTime?
-  // Locais de estoque do Omie — populado automaticamente durante a sync.
-  // Formato: [{"cod": 1, "nome": "01 - Fábrica"}, ...]
-  locaisOmie      Json?
-  updatedAt       DateTime @updatedAt
-}
-
-// Item do estoque — espelha produto do Omie via ListarPosEstoque.
-// Sincronizado periodicamente. CMC e quantidade vem do Omie.
-model EstoqueItem {
-  id              String   @id @default(cuid())
-  codigoOmie      String   @unique
-  codigoIntegracao String? @unique
-  descricao       String
-  categoriaOmie   String
-  categoriaLabel  String?
-  // Flag que indica se esse item entra no fluxo "Estoque Torg" (centralizado).
-  // Setado durante a sync via match das palavras-chave do ConfigEstoque,
-  // ou manualmente pelo usuario via UI.
-  estoqueTorg     Boolean  @default(false)
-  unidade         String
-  cmc             Float    @default(0)
-  qtdAtual        Float    @default(0)
-  // Quantidade por local de estoque — populado durante a sync.
-  // Formato: {"1": 10.5, "2": 3} onde a chave é o nCodLocal do Omie.
-  locaisQtd       Json?
-  ativo           Boolean  @default(true)
-  ultimaSincOmie  DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  reservas        EstoqueReserva[]
-  movimentacoes   EstoqueMovimentacao[]
-
-  @@index([categoriaOmie])
-  @@index([estoqueTorg])
-  @@index([ativo])
-  @@index([estoqueTorg, ativo])  // listagem principal do estoque Torg ativo
-  @@index([descricao])           // busca textual por descrição
-}
-
-// Reserva — quanto de cada item foi planejado pra cada OP via linha de RM.
-model EstoqueReserva {
-  id              String   @id @default(cuid())
-  itemEstoqueId   String
-  itemEstoque     EstoqueItem @relation(fields: [itemEstoqueId], references: [id], onDelete: Cascade)
-  opId            String
-  op              OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-  rmItemId        String?
-  qtdReservada    Float
-  qtdConsumida    Float    @default(0)
-  status          String   @default("ATIVA")
-  cancelMotivo    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([opId])
-  @@index([itemEstoqueId, status])
-}
-
-// Movimentacao de estoque — entradas, saidas, ajustes.
-model EstoqueMovimentacao {
-  id              String   @id @default(cuid())
-  itemEstoqueId   String
-  itemEstoque     EstoqueItem @relation(fields: [itemEstoqueId], references: [id], onDelete: Cascade)
-  tipo            String   // ENTRADA | SAIDA | AJUSTE
-  origem          String   // OMIE_NF | OMIE_BAIXA | MANUAL | SYNECO
-  quantidade      Float
-  cmcMomento      Float?
-  observacao      String?
-  syncCodigoOmie  String?  @unique
-  alocacoes       EstoqueAlocacao[]
-  createdAt       DateTime @default(now())
-  createdById     String?
-
-  @@index([itemEstoqueId])
-  @@index([tipo, createdAt])
-}
-
-// Alocacao — quanto de uma SAIDA foi pra cada OP.
-model EstoqueAlocacao {
-  id              String   @id @default(cuid())
-  movimentacaoId  String
-  movimentacao    EstoqueMovimentacao @relation(fields: [movimentacaoId], references: [id], onDelete: Cascade)
-  opId            String
-  op              OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
-  reservaId       String?
-  quantidade      Float
-  valorCMC        Float
-  ajustadoManual  Boolean  @default(false)
-  ajustadoById    String?
-  createdAt       DateTime @default(now())
-
-  @@index([opId])
-  @@index([movimentacaoId])
-}
-
-// ─── ESTOQUE FÍSICO (MATÉRIA-PRIMA) ────────────────────────
-// Dados importados da planilha "Estoque MP.xlsx" no SharePoint.
-// Cada linha representa um lote/peça de material no pátio da fábrica.
-// Recarregado por completo a cada sync (delete + insert).
-model EstoqueFisico {
-  id          String    @id @default(cuid())
-  perfil      String    // Tipo: W, L, Ø, CH, TB, U, C, etc.
-  bitola      String    // Dimensão: 310X79, 4X1/2, 12.7, etc.
-  qtd         Int       @default(1)
-  comprimento Float?    // mm
-  largura     Float?    // mm
-  area        Float?    // m²
-  peso        Float     @default(0) // kg
-  origem      String?   // De onde veio
-  destino     String?   // Para onde vai
-  obra        String?   // Código da obra (T67, T60, etc.)
-  aco         String?   // Grau do aço (A36, A572-Gr 50, etc.)
-  dataLanc    DateTime? // Data de lançamento
-  inspCorr    String?   // Nº inspeção / corrida
-  opReserva   String?   // OP de reserva
-  sheet       String    // Aba de origem: ESTOQUE_01 | SAIDA_ESTOQUE
-  createdAt   DateTime  @default(now())
-
-  @@index([perfil])
-  @@index([aco])
-  @@index([obra])
-  @@index([sheet])
-}
-
-// Metadata da ultima sync do estoque físico SharePoint.
-model EstoqueFisicoSync {
-  id            String   @id @default("singleton")
-  ultimaSync    DateTime
-  totalItens    Int      @default(0)
-  pesoTotalKg   Float    @default(0)
-  sheets        String[] // quais abas foram importadas
-  updatedAt     DateTime @updatedAt
-}
-
-// ─── CONTROLE DE PECAS (CONJUNTOS) ─────────────────────────
-// Lista de Estrutura (LE / FORM 21) importada por OP. Cada conjunto tem
-// marca unica dentro da OP, qte/peso/descricao e status que avanca pelo
-// pipeline de producao (pendente -> corte -> ... -> expedido).
-model PecaConjunto {
-  id            String   @id @default(cuid())
-  opId          String?
-  op            OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
-  opNumero      String   // backup do numero da OP (caso a OP nao esteja cadastrada)
-  item          Int?     // numero do item na LE (1, 2, 3, ...)
-  marca         String   // T64K1, T64K2, etc
-  descricao     String?  // VIGA, COLUNA, LIGACAO, etc
-  qte           Int      @default(1)
-  pesoUnitKg    Float    @default(0)
-  pesoTotalKg   Float    @default(0)
-  precoUnitario Float    @default(0)  // R$ por peça
-  precoTotal    Float    @default(0)  // R$ total (precoUnitario * qte)
-  // Status atual: PENDENTE | CORTE | MONTAGEM | SOLDA | ACABAMENTO | JATO | PINTURA | EXPEDIDO
-  status        String   @default("PENDENTE")
-  // Peca sem letra "P" no inicio da marca pula montagem/solda/acab e vai direto pra jato
-  fluxoEspecial Boolean  @default(false)
-  ultimoSetor   String?  // setor onde foi feito o ultimo apontamento
-  dataConcluida DateTime? // quando foi expedida
-  dataPrevista  DateTime? // data planejada de conclusao (opcional)
-  fonte         String?  // LE_IMPORT | MANUAL
-  observacao    String?
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
-
-  planejamentos          PecaPlanejamento[]
-  romaneioItens          RomaneioItem[]
-  planejamentoCargaItens PlanejamentoCargaItem[]
-
-  @@unique([opNumero, marca])
-  @@index([opId])
-  @@index([status])
-  @@index([marca])
-}
-
-// ─── CONTROLE DIÁRIO DE PRODUÇÃO ────────────────────────────
-// Preenchido pelo admin: metas e parametros de produção por setor/dia.
-model ProducaoDiaria {
-  id                      String   @id @default(cuid())
-  data                    DateTime @db.Date
-  setor                   String   // CORTE, MONTAGEM, SOLDA, ACABAMENTO, JATO, PINTURA, EXPEDICAO
-  pesoMetaKg              Float    @default(0)   // meta de peso do dia (kg)
-  pesoRealizadoKg         Float    @default(0)   // peso efetivamente produzido (kg)
-  produtividadeEstimada   Float?                  // kg/pessoa/hora estimado
-  qtdPessoas              Int      @default(0)    // pessoas no setor naquele dia
-  horasNormais            Float    @default(8.8)  // horas normais de trabalho/dia
-  horasExtrasProjetadas   Float    @default(0)    // horas extras projetadas
-  horasExtrasRealizadas   Float?                  // horas extras realizadas
-  observacao              String?
-  createdById             String?
-  createdBy               User?    @relation("ProducaoDiariaCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-
-  pecasPlanejadas         PecaPlanejamento[]
-
-  @@unique([data, setor])
-  @@index([data])
-  @@index([setor])
-}
-
-// Vínculo peça ↔ dia planejado: quais peças serão fabricadas em qual dia/setor.
-model PecaPlanejamento {
-  id                String          @id @default(cuid())
-  producaoDiariaId  String
-  producaoDiaria    ProducaoDiaria  @relation(fields: [producaoDiariaId], references: [id], onDelete: Cascade)
-  pecaConjuntoId    String
-  pecaConjunto      PecaConjunto    @relation(fields: [pecaConjuntoId], references: [id], onDelete: Cascade)
-  qtdPlanejada      Int             @default(1)   // quantas unidades daquela peça
-  concluida         Boolean         @default(false)
-  observacao        String?
-  createdAt         DateTime        @default(now())
-
-  @@unique([producaoDiariaId, pecaConjuntoId])
-  @@index([pecaConjuntoId])
-}
-
-// ─── SHAREPOINT SYNC ────────────────────────────────────────
-// Log de cada execucao do sync com SharePoint. Cada tipo (PCP_PRODUCAO, etc.)
-// tem o seu fluxo. Permite ver historico, debugar falhas e mostrar "ultima sync".
-model SharepointSync {
-  id               String   @id @default(cuid())
-  tipo             String   // "PCP_PRODUCAO", "COTACOES", etc.
-  sucesso          Boolean
-  itensProcessados Int      @default(0)
-  criados          Int      @default(0)
-  atualizados      Int      @default(0)
-  mensagem         String?  // texto livre com info do que foi sincronizado
-  erro             String?  // mensagem de erro quando sucesso=false
-  duracaoMs        Int      @default(0)
-  executadoPorId   String?
-  executadoPor     User?    @relation(fields: [executadoPorId], references: [id], onDelete: SetNull)
-  criadoEm         DateTime @default(now())
-
-  @@index([tipo, criadoEm])
-}
-
-// ─── CENTRAL DE ORÇAMENTOS (COMERCIAL) ─────────────────────
 
 enum StatusOrcamento {
-  ORCAMENTO       // Proposta em elaboração/enviada
-  EM_NEGOCIACAO   // Cliente está negociando
-  FECHADA         // Proposta aceita / virou OP
-  PERDIDA         // Proposta perdida
+  ORCAMENTO
+  EM_NEGOCIACAO
+  FECHADA
+  PERDIDA
 }
 
 enum TipoVenda {
@@ -1731,68 +2033,17 @@ enum TipoVenda {
 }
 
 enum PorteOrcamento {
-  ATE_1_2M        // Até R$ 1,2M
-  DE_1_2M_A_10M   // De R$ 1,2M até R$ 10,0M
-  DE_10M_A_50M    // De R$ 10M até R$ 50M
-  ACIMA_50M       // Acima de R$ 50M
+  ATE_1_2M
+  DE_1_2M_A_10M
+  DE_10M_A_50M
+  ACIMA_50M
 }
-
-model Orcamento {
-  id              String            @id @default(cuid())
-  numero          String            @unique   // e.g. "001-26"
-  cliente         String
-  obra            String?
-  responsavel     String?           // nome do contato no cliente
-  contato         String?           // e-mail do contato
-  orcamentista    String?           // quem elaborou o orçamento
-  tipoVenda       TipoVenda?
-  valor           Float?            // valor total do orçamento
-  porte           PorteOrcamento?
-  dataSolicitada  DateTime?         // data em que o cliente pediu
-  prazoEntrega    DateTime?         // prazo para entregar a proposta ao cliente
-  dataEnvio       DateTime?         // data em que enviamos a proposta
-  dataFechamento  DateTime?         // data do aceite / perda
-  status          StatusOrcamento   @default(ORCAMENTO)
-  vendedor        String?           // Vitor, Patrícia, Matheus, Airton, etc.
-  motivoPerda     String?           // motivo quando status = PERDIDA
-  observacoes     String?
-
-  opId            String?           // OP gerada (quando status = FECHADA)
-  op              OP?               @relation("OrcamentoOP", fields: [opId], references: [id], onDelete: SetNull)
-
-  criadoPorId     String?
-  criadoPor       User?             @relation("OrcamentoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  revisoes        OrcamentoRevisao[]
-  estudos         PropostaEstudo[]
-
-  @@index([status])
-  @@index([vendedor])
-  @@index([createdAt])
-}
-
-model OrcamentoRevisao {
-  id            String    @id @default(cuid())
-  orcamentoId   String
-  orcamento     Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
-  numero        Int       // revisão 1, 2, 3...
-  dataEnvio     DateTime?
-  observacao    String?
-  createdAt     DateTime  @default(now())
-
-  @@index([orcamentoId])
-}
-
-// ─── ESTUDO DE PRECIFICAÇÃO (EPC) ──────────────────────────
 
 enum StatusEstudo {
-  RASCUNHO        // Em elaboração
-  EM_ANALISE      // Sendo revisado
-  APROVADO        // Aprovado internamente
-  CONCLUIDO       // Proposta gerada
+  RASCUNHO
+  EM_ANALISE
+  APROVADO
+  CONCLUIDO
 }
 
 enum CategoriaCusto {
@@ -1812,9 +2063,9 @@ enum CategoriaCusto {
 }
 
 enum TipoMaterial {
-  PERFIL_W        // W, HP
-  PERFIL_U        // U, UE
-  PERFIL_L        // Cantoneiras
+  PERFIL_W
+  PERFIL_U
+  PERFIL_L
   TUBO_REDONDO
   TUBO_QUADRADO
   TUBO_RETANGULAR
@@ -1841,305 +2092,6 @@ enum CategoriaAcessorio {
   OUTRO
 }
 
-model PropostaEstudo {
-  id                String          @id @default(cuid())
-  orcamentoId       String
-  orcamento         Orcamento       @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
-
-  revisao           Int             @default(0)   // R0, R1, R2...
-  status            StatusEstudo    @default(RASCUNHO)
-  referencia        String?         // ENC-0333, referência do cliente
-  sharepointUrl     String?         // link para pasta no SharePoint
-
-  // Totais calculados (denormalizados para performance)
-  pesoTotal         Float?          // kg
-  areaTotal         Float?          // m² de pintura
-  custoMaterial     Float?          // R$ total materiais
-  custoFabricacao   Float?          // R$ total fabricação
-  custoMontagem     Float?          // R$ total montagem
-  custoTerceiros    Float?          // R$ total terceiros
-  bdiValor          Float?          // R$ valor do BDI
-  valorTotal        Float?          // R$ valor total com BDI
-
-  // Produtividade (mão de obra de fabricação)
-  tipoObra          String?         // PIPE_RACK, ESTRUTURAL_PESADA, ESTRUTURAL_MEDIA, etc.
-  hhPorTon          Float?          // Hh/ton conforme tipo de obra
-  custoMoKg         Float?          // R$/kg mão de obra calculado
-  produtividadeMix  Json?           // [{tipoObraId, label, pesoKg, hhTon}] — breakdown IA
-
-  // Percentuais de perda e configurações
-  percPerda         Float           @default(12)  // % de perda sobre matéria prima
-  percParafusos     Float           @default(0.60) // R$/kg de parafusos
-  percPesoParafusos Float?          // % sobre peso total para estimar peso de parafusos (quando nao tem lista)
-
-  // Esquema de pintura selecionado (TIPO_1..TIPO_5, SEM_PINTURA, CUSTOMIZADO)
-  esquemaPintura    String?         // identificador do esquema selecionado
-  esquemaPinturaDesc String?        // descricao customizada (quando esquema = CUSTOMIZADO)
-  esquemaPinturaEspessura Float?    // espessura total em µm (editavel)
-
-  // Pintura — calculo por area
-  pinturaPercPerda    Float         @default(25)     // % perda de material de pintura
-  pinturaMetodo       String        @default("M2")   // "M2" ou "LITRO"
-  pinturaCustoM2      Float?                         // R$/m² quando metodo = M2
-  pinturaRendimento   Float?                         // m²/L rendimento teorico (metodo = LITRO)
-  pinturaCustoLitro   Float?                         // R$/L custo da tinta (metodo = LITRO)
-
-  // Custos por kg (composição de preço)
-  custoPinturaKg    Float           @default(0)   // R$/kg custo de pintura
-  custoAuxiliarKg   Float           @default(0)   // R$/kg material auxiliar de fabrica
-  custoFinanceiroKg Float           @default(0)   // R$/kg despesas financeiras
-  custoDemaisKg     Float           @default(0)   // R$/kg demais custos
-
-  // Créditos tributários sobre compras (reduz custo efetivo de materiais)
-  // Estimativa inicial = pior cenário (alíquotas padrão). Compras atualiza com valores reais.
-  percCreditoICMS   Float           @default(12)   // % crédito ICMS sobre materiais
-  percCreditoPIS    Float           @default(1.65)  // % crédito PIS sobre materiais
-  percCreditoCOFINS Float           @default(7.60)  // % crédito COFINS sobre materiais
-  creditoConfirmado Boolean         @default(false) // false=estimativa, true=confirmado por Compras
-
-  // BDI
-  cfopPrincipal     String?         // 5101, 6101, etc.
-  bdiAdmin          Float           @default(0)   // %
-  bdiSeguro         Float           @default(0)   // %
-  bdiRisco          Float           @default(0)   // %
-  bdiFactoring      Float           @default(1.6) // % despesas financeiras
-  bdiLucro          Float           @default(6.0) // % margem de lucro
-  bdiComissao       Float           @default(0)   // %
-  // Impostos
-  aliqPIS           Float           @default(1.65)
-  aliqCOFINS        Float           @default(7.60)
-  aliqCSLL          Float           @default(1.08)
-  aliqIRPJ          Float           @default(3.00)
-  aliqICMS          Float           @default(18.00)
-  aliqISS           Float           @default(0)
-
-  observacoes       String?
-
-  criadoPorId       String?
-  criadoPor         User?           @relation("EstudoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-
-  itensPerso        PesoProjetoItem[]
-  itensAcessorio    AcessorioItem[]
-  itensParafuso     ParafusoItem[]
-  itensPintura      PinturaItem[]
-  itensCusto        CustoItem[]
-  itensFaturamento  FaturamentoEvento[]
-  itensCronograma   CronogramaItem[]
-  itensFretes       FreteItem[]
-  cotacoesFretes    FreteCotacao[]
-  cotacoesEstudo    EstudoCotacao[]
-  documentos        PropostaDocumento[]
-
-  @@index([orcamentoId])
-  @@index([status])
-}
-
-// Cronograma de Fabricação — timeline por grupo de material para enviar ao cliente
-model CronogramaItem {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  grupo           String          // "Colunas", "Vigas Principais", "Guarda-corpo", etc.
-  descricao       String?         // detalhes do que inclui
-  pesoKg          Float           @default(0)   // peso total do grupo em kg
-  diasFabricacao  Int             @default(0)   // dias uteis de fabricação
-  diasMontagem    Int?                          // dias uteis de montagem (opcional)
-  semanaInicio    Int             @default(1)   // semana de inicio (base 1)
-  cor             String?                       // cor hex para a barra (#3B82F6)
-  observacao      String?
-  ordem           Int             @default(0)
-
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  @@index([estudoId])
-}
-
-// Frete — custos de transporte calculados por distancia da obra
-model FreteItem {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  descricao       String          // "Frete estruturas metalicas", "Frete montagem", etc.
-  origem          String?         // Cidade/UF de origem (ex: "Contagem/MG")
-  destino         String?         // Cidade/UF da obra (ex: "Macae/RJ")
-  distanciaKm     Float           @default(0)   // km entre origem e destino
-  pesoTon         Float           @default(0)   // peso total em toneladas a transportar
-  pesoPorCarga    Float?                        // peso medio por carga/viagem em toneladas
-  tipoVeiculo     String?         // TRUCK, CARRETA, BITREM, RODOTREM, etc.
-  quantidadeViagens Int           @default(1)   // numero de viagens necessarias
-  custoPorViagem  Float           @default(0)   // R$ custo por viagem
-  custoTotal      Float           @default(0)   // R$ total = quantidadeViagens × custoPorViagem
-  observacao      String?
-  ordem           Int             @default(0)
-
-  createdAt       DateTime        @default(now())
-
-  @@index([estudoId])
-}
-
-// Cotação de Frete — solicitação de orçamento enviada a transportadoras
-model FreteCotacao {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  token           String          @unique @default(cuid()) // acesso publico sem login
-  fornecedorId    String?         // ref ao fornecedor (pode ser removido do vendor list)
-  fornecedorNome  String          // nome da transportadora (snapshot)
-  fornecedorEmail String          // email para onde foi enviado
-
-  status          String          @default("PENDENTE") // PENDENTE, RECEBIDA, SELECIONADA, RECUSADA
-  valorCotado     Float?          // R$ valor total cotado pela transportadora
-  prazoEntrega    String?         // "3 dias uteis", "1 semana", etc.
-  observacao      String?
-
-  // Anexo da cotacao recebida (PDF, imagem, etc.)
-  anexoUrl        String?         // URL no Vercel Blob
-  anexoNome       String?         // nome do arquivo
-
-  enviadoEm       DateTime?       // quando o email foi disparado
-  respondidoEm    DateTime?       // quando a cotacao foi registrada
-
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  @@index([estudoId])
-  @@index([fornecedorId])
-}
-
-// Cotação de Materiais/Acessórios — solicitação de preço unitário por item
-// enviada a fornecedores. Diferente de FreteCotacao (valor unico total),
-// aqui cada item tem precoUnitario individual preenchido pelo fornecedor.
-model EstudoCotacao {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  token           String          @unique @default(cuid()) // acesso publico sem login
-  tipo            String          // "MATERIAIS" ou "ACESSORIOS"
-  fornecedorId    String?         // ref ao fornecedor (pode ser removido do vendor list)
-  fornecedorNome  String          // nome do fornecedor (snapshot)
-  fornecedorEmail String          // email para onde foi enviado
-
-  status          String          @default("PENDENTE") // PENDENTE, RECEBIDA, SELECIONADA, RECUSADA
-  prazoEntrega    String?         // "15 dias uteis", "30 dias", etc.
-  condicaoPgto    String?         // "30/60/90 DDL", "28 DDL", etc.
-  observacao      String?         // obs do fornecedor ao responder
-  observacaoInterna String?       // obs interna da equipe Torg
-
-  // Anexo da cotacao recebida (PDF, imagem, etc.)
-  anexoUrl        String?
-  anexoNome       String?
-
-  enviadoEm       DateTime?       // quando o email foi disparado
-  respondidoEm    DateTime?       // quando a cotacao foi registrada
-
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  itens           EstudoCotacaoItem[]
-
-  @@index([estudoId])
-  @@index([fornecedorId])
-  @@index([tipo])
-}
-
-// Item de cotação — snapshot do item + preço preenchido pelo fornecedor
-model EstudoCotacaoItem {
-  id              String          @id @default(cuid())
-  cotacaoId       String
-  cotacao         EstudoCotacao   @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
-
-  descricao       String          // "Telha TP40 0,50mm Galvalume", "W200x15 A572 Gr50"
-  especificacao   String?         // detalhes tecnicos
-  unidade         String          @default("un")
-  quantidade      Float           @default(0)
-
-  // Preenchido pelo fornecedor
-  precoUnitario   Float?          // R$ por unidade
-  observacao      String?         // obs do fornecedor sobre este item
-
-  ordem           Int             @default(0)
-
-  @@index([cotacaoId])
-}
-
-// Cenário de Faturamento — eventos de pagamento com classificação fiscal
-model FaturamentoEvento {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  descricao       String          // Ex: "Sinal", "Material", "Montagem", "Projeto"
-  tipoNota        String          // "NFE" (produto) ou "NFSE" (servico)
-  cfop            String?         // CFOP para NF-e (5101, 6101, etc.)
-  codigoServico   String?         // Codigo LC 116 para NFS-e (7.02, 14.06, etc.)
-  percentual      Float           // % do valor total da proposta
-  ordem           Int             @default(0)
-
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  @@index([estudoId])
-}
-
-model PesoProjetoItem {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  setor           String?         // TRASEIRA, FRONTAL, DESAERADOR, etc.
-  projeto         String?         // nome do projeto/desenho
-  tipoMaterial    TipoMaterial    @default(OUTRO)
-  descricao       String          // W200X15, CHAPA#9,50, etc.
-  norma           String?         // ASTM A572 Gr. 50, A36, etc.
-  comprimento     Float?          // metros ou m²
-  pesoUnitario    Float           // kg/m ou kg/m²
-  quantidade      Int             @default(1)
-  pesoTotal       Float           // kg (calculado)
-  areaPintura     Float?          // m²
-  ordem           Int             @default(0) // para manter a ordem do levantamento
-
-  // Vinculacao com cadastro Omie
-  codigoOmie      String?         // codigo do produto no Omie (ex: 501000003)
-  descricaoOmie   String?         // descricao completa no Omie
-  custoUnitario   Float?          // CMC (Custo Medio Contabil) em R$/kg
-
-  createdAt       DateTime        @default(now())
-
-  @@index([estudoId])
-}
-
-model AcessorioItem {
-  id              String              @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo      @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  categoria       CategoriaAcessorio  @default(OUTRO)
-  descricao       String              // "Telha TP40 0,50mm Galvalume"
-  especificacao   String?             // detalhes tecnicos extras
-  unidade         String              @default("un") // m2, m, un, kg, vb
-  quantidade      Float               @default(0)
-  custoUnitario   Float?              // R$ por unidade (preenchido na aba Custos)
-  margemAdm       Float               @default(15)  // % margem administrativa sobre revenda
-  faturamentoDireto Boolean           @default(false) // true = fornecedor fatura direto pro cliente (sem crédito tributário)
-  observacao      String?
-  ordem           Int                 @default(0)
-
-  createdAt       DateTime            @default(now())
-
-  @@index([estudoId])
-  @@index([categoria])
-}
-
-// ── Parafusos ──────────────────────────────────────────────
-
 enum TipoParafuso {
   PARAFUSO
   PORCA
@@ -2150,53 +2102,6 @@ enum TipoParafuso {
   INSERTO
   OUTRO
 }
-
-model ParafusoItem {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  tipo            TipoParafuso    @default(PARAFUSO)
-  descricao       String          // "Parafuso sextavado M16x50 A325"
-  especificacao   String?         // "ASTM A325, galvanizado"
-  diametro        String?         // "M16", "5/8"", "3/4""
-  comprimento     String?         // "50mm", "2""
-  unidade         String          @default("un")
-  quantidade      Float           @default(0)
-  estimativa      Boolean         @default(false) // true = qtd estimada pela IA/regra
-  observacao      String?
-  ordem           Int             @default(0)
-
-  createdAt       DateTime        @default(now())
-
-  @@index([estudoId])
-  @@index([tipo])
-}
-
-// ── Catálogo de Tintas ─────────────────────────────────────
-// Banco de dados de produtos de tinta com SV% (Sólidos por Volume).
-// Usado no cálculo de rendimento: Rt = (SV% × 10) / Espessura_µm.
-// Populado via seed com ~60 produtos das normas Petrobras e fabricantes.
-
-model TintaProduto {
-  id                String   @id @default(cuid())
-  nome              String   // "Tinta de Fundo Epóxi-Zinco Poliamida"
-  fabricante        String?  // "Akzo Nobel", "Jotun", "Weg", "Sumaré SW", etc.
-  norma             String?  // "N-1277", "N-2677", etc.
-  resinaTipo        String   // EPOXI, PU, ETIL_SILICATO, ACRILICA, ESMALTE, VERNIZ, SILICONE, ANTIFOULING, ALQUIDICA, EPOXI_MASTIC, EPOXI_AMIDA
-  svPct             Float    // Sólidos por Volume (%) — dado-chave para cálculo de rendimento
-  diluentePct       Float    @default(10)  // % de diluente recomendado (varia por resina)
-  ativo             Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  pinturaItens      PinturaItem[]
-
-  @@index([resinaTipo])
-  @@index([ativo])
-}
-
-// ── Pintura ────────────────────────────────────────────────
 
 enum TipoPintura {
   PRIMER
@@ -2210,260 +2115,10 @@ enum TipoPintura {
   OUTRO
 }
 
-model PinturaItem {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  tipoPintura     TipoPintura     @default(OUTRO)
-  descricao       String          // "Primer epoxi cinza + esmalte branco"
-  especificacao   String?         // "Conforme N-1550 rev E"
-  areaM2          Float           @default(0)    // area de pintura em m²
-  demaos          Int             @default(1)    // 1, 2 ou 3 demaos
-  espessuraMicra  Float?          // espessura seca por demao (µm)
-  unidade         String          @default("m2") // m2, vb
-  quantidade      Float           @default(0)    // area total (area x demaos) ou verba
-  cor             String?         // "RAL 7035", "Cinza N6.5"
-  norma           String?         // "Petrobras N-1550", "SSPC-SP6"
-  observacao      String?
-  ordem           Int             @default(0)
-
-  // ── Campos de cálculo de engenharia (v2) ──────────────────
-  // Vinculo ao catálogo de tintas (opcional — pode preencher SV% manualmente)
-  tintaProdutoId    String?
-  tintaProduto      TintaProduto?  @relation(fields: [tintaProdutoId], references: [id])
-  // Snapshot dos dados do produto no momento da seleção
-  svPct             Float?         // Sólidos por Volume (%) — snapshot ou manual
-  resinaTipo        String?        // tipo de resina (EPOXI, PU, etc.)
-  // Configuração de aplicação
-  etapa             String?        // PRIMER, INTERMEDIARIO, ACABAMENTO
-  metodoAplicacao   String?        // PINCEL, ROLO, PISTOLA_CONV, AIRLESS
-  percPerdas        Float?         // % de perda (depende do método: Airless 15%, Pistola 40%, etc.)
-  // Quantidades calculadas (snapshot para cotação)
-  litrosNecessarios Float?         // = Área / Rp (rendimento prático)
-  galoesNecessarios Int?           // = ceil(litros / 3.6) — galão padrão 3,6L
-  diluenteLitros    Float?         // = litros × diluentePct do produto
-
-  createdAt       DateTime        @default(now())
-
-  @@index([estudoId])
-  @@index([tipoPintura])
-  @@index([tintaProdutoId])
-}
-
-model CustoItem {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  categoria       CategoriaCusto
-  descricao       String
-  unidade         String?         // kg, m², un, vb, L
-  quantidade      Float           @default(0)
-  precoUnitario   Float           @default(0)
-  subtotal        Float           @default(0)  // quantidade × precoUnitario
-  percImpostos    Float?          // % de imposto sobre este item
-  percInsumos     Float?          // % de insumos
-  observacao      String?
-  ordem           Int             @default(0)
-
-  createdAt       DateTime        @default(now())
-
-  @@index([estudoId])
-  @@index([categoria])
-}
-
-model PropostaDocumento {
-  id              String          @id @default(cuid())
-  estudoId        String
-  estudo          PropostaEstudo  @relation(fields: [estudoId], references: [id], onDelete: Cascade)
-
-  nome            String          // nome do arquivo
-  tipo            String          // pdf, xlsx, dxf, eml, docx, etc.
-  tamanho         Int?            // bytes
-  blobUrl         String          // URL no Vercel Blob
-  categoria       String?         // email, projeto, documento, cotacao
-  observacao      String?
-
-  criadoEm        DateTime        @default(now())
-
-  @@index([estudoId])
-}
-
-// Banco de Dados de Materiais — tabela de referência de perfis metálicos
-model BDMPerfil {
-  id              String          @id @default(cuid())
-  tipo            TipoMaterial
-  codigo          String          @unique // W200X15, U150X50X3, CHAPA#9,50
-  descricao       String?         // descrição longa
-  pesoUnitario    Float           // kg/m ou kg/m²
-  secao           Float?          // mm (perímetro para cálculo de pintura)
-  precoRef        Float?          // preço de referência R$/kg (atualizado via CMC)
-  fontePreco      String?         // "CMC", "Cotação Fornecedor", "Manual"
-  dataPreco       DateTime?       // quando o preço foi atualizado
-  ativo           Boolean         @default(true)
-
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  @@index([tipo])
-  @@index([codigo])
-}
-
-// ─── INTEGRAÇÃO MES (SYNECO/SKA) ───────────────────────────
-// Apontamentos de produção importados do sistema MES local (SKA Syneco).
-// Sincronizados pelo agente local (scripts/mes-sync-agent.js) que roda
-// via Task Scheduler na máquina do servidor interno.
-
-model MesApontamento {
-  id           String   @id @default(cuid())
-
-  // Chave única do SKA — ProductionID é inteiro único por apontamento no dataset 242
-  productionId Int      @unique  // ProductionID do SKA (chave de upsert)
-
-  // Dados do apontamento (dataset 242 — Rastreabilidade de OP e Item [TORG] - Produção)
-  dataInicio   DateTime // Data de Início (DD/MM/YYYY HH:mm:ss no SKA)
-  dataFim      DateTime? // Data de Fim
-  obra         String   // campo "Obra" do SKA = número da OP no portal (T70, T78...)
-  opSka        String?  // campo "OP" do SKA = código interno da peça (1SOC-001, T78C3...)
-  setor        String?  // Setor (Corte, Montagem, Solda, Acabamento, etc.)
-  maquina      String?  // Máquina (LASER CHAPA, MONTAGEM 2, SOLDA 4...)
-  codigoMaquina String? // Código da máquina (09, 30B, 40D...)
-  operacao     String?  // Operação (10, 30, 40, 50...)
-  descricaoItem String? // Desc. Item
-  operador     String?  // nome do operador
-  status       String?  // Produzindo | Finalizado | Finalizado Total | Finalizado Parcial
-
-  // Quantidades produzidas
-  produzidoUn  Float    @default(0)  // campo "Produzido" (unidades)
-  rejeitado    Float    @default(0)  // campo "Rejeitado"
-  retrabalhado Float    @default(0)  // campo "Retrabalhado"
-  produzidoKg  Float    @default(0)  // campo "Peso" (kg)
-
-  // Vínculo com OP do portal (resolvido durante sync via campo Obra)
-  opId         String?
-  op           OP?      @relation("MesApontamentosOP", fields: [opId], references: [id], onDelete: SetNull)
-
-  // Controle de sync
-  syncRunId    String?  // ID do MesSyncLog que criou/atualizou este registro
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([opId])
-  @@index([obra])
-  @@index([dataInicio])
-  @@index([setor])
-  @@index([status])
-}
-
-// Ordem planejada do Syneco (dataset 150 — TORG_Production_Traceability_Detalhado).
-// Diferente de MesApontamento (eventos): aqui é UMA linha por peça/operação/obra,
-// com Planejado vs Produzido. Inclui peças NÃO INICIADAS (planejado>0, produzido=0).
-model MesOrdem {
-  id            String   @id @default(cuid())
-
-  obra          String   // T87 (campo Obra do SKA = número da OP no portal)
-  op            String   // P11 (OrderNum)
-  operacao      String   // "10", "30", "40"... (Operation)
-  item          String   // P11 (PartCode)
-  setor         String?  // Corte, Montagem, Solda...
-  descItem      String?  // CH22, W150X13...
-  maquina       String?
-  operador      String?
-
-  planejadoUn   Float    @default(0) // PlanQty
-  produzidoUn   Float    @default(0) // PartCount
-  rejeitadoUn   Float    @default(0) // ScrapCount
-  saldoUn       Float    @default(0) // LeftOver (planejado - produzido)
-  pesoPlanejado Float    @default(0) // PesoPlanejado (kg)
-  pesoProduzido Float    @default(0) // Peso (kg produzido)
-  saldoRestante Float    @default(0) // SaldoRestante (kg)
-
-  status        String?  // Finalizado | Finalizado Parcial | Produzindo | (null = não iniciada)
-  productionId  Int?     // ProductionID do SKA (null quando não iniciada)
-  dataInicio    DateTime?
-  dataFim       DateTime?
-
-  // Vínculo opcional com OP do portal
-  opId          String?
-
-  syncRunId     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@unique([obra, op, operacao, item]) // chave de upsert (uma linha por peça/operação)
-  @@index([obra])
-  @@index([setor])
-  @@index([status])
-  @@index([opId])
-}
-
-// Log de cada execução do sync com o MES SKA.
-model MesSyncLog {
-  id               String   @id @default(cuid())
-  sucesso          Boolean
-  dataInicio       DateTime // período sincronizado (início)
-  dataFim          DateTime // período sincronizado (fim)
-  totalLinhas      Int      @default(0) // linhas retornadas pelo SKA
-  criados          Int      @default(0)
-  atualizados      Int      @default(0)
-  ignorados        Int      @default(0)
-  erro             String?
-  duracaoMs        Int      @default(0)
-  criadoEm         DateTime @default(now())
-
-  @@index([criadoEm])
-  @@index([sucesso])
-}
-
-// ─── RECEBIMENTOS (NF de entrada) ─────────────────────────────────
-// Registra cada recebimento parcial ou total de materiais.
-// Pode ser criado automaticamente pelo sync Omie ou manualmente pelo usuario.
-model Recebimento {
-  id              String   @id @default(cuid())
-
-  // Vinculo ao pedido de compra
-  pedidoOmieId    String?
-  pedidoOmie      PedidoOmie? @relation(fields: [pedidoOmieId], references: [id])
-
-  // Vinculo ao item especifico da RM (granularidade por item)
-  rmItemId        String?
-  rmItem          RMItem?  @relation(fields: [rmItemId], references: [id])
-
-  // Quantidades
-  qtdRecebida     Float    // quantidade efetivamente recebida neste registro
-  unidade         String?  // KG, UN, etc.
-
-  // Data do recebimento
-  dataRecebimento DateTime @default(now())
-
-  // Dados da NF
-  nfNumero        String?  // numero da NF-e
-  nfChave         String?  // chave de acesso 44 digitos
-  nfSerie         String?
-
-  // Origem do registro
-  origem          RecebimentoOrigem @default(MANUAL)
-  observacao      String?
-
-  // Quem registrou (null = sync automatico)
-  createdById     String?
-  createdBy       User?    @relation(fields: [createdById], references: [id])
-  createdAt       DateTime @default(now())
-
-  @@index([pedidoOmieId])
-  @@index([rmItemId])
-  @@index([dataRecebimento])
-}
-
 enum RecebimentoOrigem {
-  MANUAL    // usuario registrou manualmente
-  OMIE_SYNC // detectado automaticamente pelo sync
+  MANUAL
+  OMIE_SYNC
 }
-
-// ─── CRONOGRAMAS (importados do MS Project via SharePoint) ──────────────
-// Cada Cronograma = 1 arquivo .mpp importado. Contém tarefas agrupadas por
-// departamento (Comercial, Engenharia, Suprimentos, Fabricação, Expedição, Montagem).
 
 enum DepartamentoCronograma {
   COMERCIAL
@@ -2472,135 +2127,4 @@ enum DepartamentoCronograma {
   FABRICACAO
   EXPEDICAO
   MONTAGEM
-}
-
-model Cronograma {
-  id              String   @id @default(cuid())
-  opNumero        String
-  opId            String?
-  op              OP?      @relation(fields: [opId], references: [id], onDelete: SetNull)
-  nomeArquivo     String
-  titulo          String
-  sharepointPath  String
-  dataInicio      DateTime?
-  dataFim         DateTime?
-  ultimoSync      DateTime @default(now())
-  ativo           Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  tarefas         CronogramaTarefa[]
-
-  @@unique([sharepointPath])
-  @@index([opNumero])
-  @@index([ativo])
-}
-
-model CronogramaTarefa {
-  id                  String   @id @default(cuid())
-  cronogramaId        String
-  cronograma          Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
-  uidMpp              Int
-  nome                String
-  departamento        DepartamentoCronograma?
-  dataInicioPrevista  DateTime?
-  dataFimPrevista     DateTime?
-  percentualPrevisto  Float    @default(0)
-  percentualRealizado Float    @default(0)
-  qtdePlanejada       Float    @default(0)
-  qtdeRealizada       Float    @default(0)
-  isSummary           Boolean  @default(false)
-  outlineLevel        Int      @default(0)
-  parentUid           Int?
-  observacao          String?
-  dataRealizacao      DateTime?
-
-  registros           CronogramaRegistro[]
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  @@index([cronogramaId])
-  @@index([departamento])
-}
-
-model CronogramaRegistro {
-  id          String   @id @default(cuid())
-  tarefaId    String
-  tarefa      CronogramaTarefa @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
-  descricao   String
-  createdById String
-  createdBy   User     @relation("CronogramaRegistroCreatedBy", fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-
-  @@index([tarefaId])
-}
-
-// ─── PLANEJAMENTO (PCP) ──────────────────────────────────────
-// Tarefas de acompanhamento por setor, criadas nas reuniões semanais de PCP.
-
-model TarefaPlanejamento {
-  id            String   @id @default(cuid())
-  titulo        String
-  descricao     String?
-  opNumero      String?
-  opId          String?
-  op            OP?      @relation(fields: [opId], references: [id])
-  setor         String   // PRODUCAO, PINTURA, EXPEDICAO
-  semanaIso     Int
-  ano           Int
-  status        String   @default("PENDENTE") // PENDENTE, EM_ANDAMENTO, CONCLUIDA, CANCELADA
-  prioridade    String   @default("MEDIA") // ALTA, MEDIA, BAIXA
-  responsavel   String?
-  dataPrevista  DateTime?
-  dataConcluida DateTime?
-  observacao    String?
-  createdById   String?
-  createdBy     User?    @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([semanaIso, ano])
-  @@index([setor])
-  @@index([opId])
-  @@index([status])
-}
-
-// Necessidade semanal de produção por OP/setor — preenchido na reunião de PCP.
-model NecessidadeSemanal {
-  id            String   @id @default(cuid())
-  semanaIso     Int
-  ano           Int
-  opNumero      String
-  opId          String?
-  op            OP?      @relation(fields: [opId], references: [id])
-  setor         String   // PRODUCAO, PINTURA, EXPEDICAO
-  descricao     String?
-  pesoKg        Float    @default(0)
-  prioridade    String   @default("MEDIA") // ALTA, MEDIA, BAIXA
-  status        String   @default("PENDENTE") // PENDENTE, EM_ANDAMENTO, CONCLUIDO
-  observacao    String?
-  createdById   String?
-  createdBy     User?    @relation("NecessidadeSemanalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([semanaIso, ano])
-  @@index([setor])
-  @@index([opNumero])
-  @@index([status])
-}
-
-// ─── CONFIGURAÇÃO DO ASSISTENTE IA (Torguinho) ──────────────────────────────
-
-model ConfigAssistente {
-  id                 String   @id @default(cuid())
-  ativo              Boolean  @default(true)
-  // Módulos que podem usar o chat. Vazio = todos os módulos habilitados.
-  modulosHabilitados String[] @default([])
-  // claude-haiku-4-5 (barato) ou claude-sonnet-4-5 (mais capaz)
-  modelo             String   @default("claude-haiku-4-5")
-  // Instrução extra adicionada ao final do system prompt
-  instrucaoExtra     String?
-  updatedAt          DateTime @updatedAt
 }
