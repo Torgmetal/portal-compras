@@ -592,16 +592,22 @@ function obraBaseCode(obra) {
   return m ? m[1].toUpperCase() : obra;
 }
 
-function ViewPorPeca({ de, ate, obrasDisponiveis }) {
-  const [busca,      setBusca]     = useState("");
+function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
   const [obraFiltro, setObraFiltro]= useState(""); // "T64" | "" (sempre código base)
-  const [abaPeca,    setAbaPeca]   = useState("apontamentos"); // "apontamentos" | "rastreabilidade"
+  const [abaPeca,    setAbaPeca]   = useState("rastreabilidade"); // "rastreabilidade" | "apontamentos"
 
   // Normaliza para código base único: [T64, T64A, T64B] → [T64]
   const obrasBase = useMemo(() =>
     [...new Set(obrasDisponiveis.map(obraBaseCode))].sort((a, b) =>
       a.localeCompare(b, undefined, { numeric: true })
     ), [obrasDisponiveis]);
+
+  // Mapeia o filtro de status global (sidebar) → status de peça
+  const filtroStatusPeca = useMemo(() => {
+    if (!statusFiltro) return "";
+    if (statusFiltro === "naoIniciada") return "Não Iniciada";
+    return statusFiltro; // "Produzindo" | "Finalizado" | "Finalizado Parcial"
+  }, [statusFiltro]);
 
   // ── Tab Apontamentos ────────────────────────────────────────────────────────
   const [todos,   setTodos]   = useState([]);
@@ -612,17 +618,11 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
     let ativo = true;
     setLoadAp(true);
     setErroAp(null);
-    setBusca("");
     const qs = new URLSearchParams({ detalhe: "1" });
-    // Quando uma OP específica está selecionada: busca histórico COMPLETO (sem filtro de data)
-    // Quando "Todas as OPs": usa filtro de data do período selecionado
+    // OP selecionada: histórico COMPLETO (sem data) | "Todas": usa período
     if (!obraFiltro && de)  qs.set("de",  de);
     if (!obraFiltro && ate) qs.set("ate", ate);
-    if (obraFiltro) {
-      // Passa o código base para capturar sub-OPs (T64A, T64B, T64C)
-      // O backend aceita obra como prefixo (startsWith)
-      qs.set("obra", obraFiltro);
-    }
+    if (obraFiltro)         qs.set("obra", obraFiltro); // código base → backend usa startsWith
     fetch(`/api/mes/apontamentos?${qs}`)
       .then(r => r.json())
       .then(d => { if (ativo) { setTodos(d.rows || []); setLoadAp(false); } })
@@ -634,7 +634,6 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
   const [rastData, setRastData] = useState(null); // { pecas, contagens, total }
   const [loadRast, setLoadRast] = useState(false);
   const [erroRast, setErroRast] = useState(null);
-  const [filtroRast, setFiltroRast] = useState(""); // "" | "Não Iniciada" | "Produzindo" | "Finalizado" | "Finalizado Parcial"
 
   useEffect(() => {
     if (abaPeca !== "rastreabilidade" || !obraFiltro) { setRastData(null); return; }
@@ -648,9 +647,9 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
     return () => { ativo = false; };
   }, [abaPeca, obraFiltro]);
 
-  // ── Filtros client-side ─────────────────────────────────────────────────────
+  // ── Filtros client-side (status + busca vêm da sidebar global) ──────────────
   const filtradosAp = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
+    const termo = (busca || "").trim().toLowerCase();
     if (!termo) return todos;
     return todos.filter(r =>
       (r.opSka || "").toLowerCase().includes(termo) ||
@@ -664,66 +663,44 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
   const filtradosRast = useMemo(() => {
     if (!rastData?.pecas) return [];
     let base = rastData.pecas;
-    if (filtroRast) base = base.filter(p => {
-      if (filtroRast === "Finalizado") return p.statusSyneco === "Finalizado" || p.statusSyneco === "Finalizado Total";
-      return p.statusSyneco === filtroRast;
+    if (filtroStatusPeca) base = base.filter(p => {
+      if (filtroStatusPeca === "Finalizado") return p.statusSyneco === "Finalizado" || p.statusSyneco === "Finalizado Total";
+      return p.statusSyneco === filtroStatusPeca;
     });
-    if (busca.trim()) {
-      const b = busca.toLowerCase();
-      base = base.filter(p =>
-        (p.marca || "").toLowerCase().includes(b) ||
-        (p.descricao || "").toLowerCase().includes(b) ||
-        (p.ultimoSetor || "").toLowerCase().includes(b)
-      );
-    }
+    const termo = (busca || "").trim().toLowerCase();
+    if (termo) base = base.filter(p =>
+      (p.marca || "").toLowerCase().includes(termo) ||
+      (p.descricao || "").toLowerCase().includes(termo) ||
+      (p.ultimoSetor || "").toLowerCase().includes(termo)
+    );
     return base;
-  }, [rastData, filtroRast, busca]);
+  }, [rastData, filtroStatusPeca, busca]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Barra de filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Filtro por OP */}
-          <div className="relative">
-            <select
-              value={obraFiltro}
-              onChange={e => { setObraFiltro(e.target.value); setBusca(""); setFiltroRast(""); }}
-              className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-torg-blue bg-white min-w-[160px]"
-            >
-              <option value="">Todas as OPs</option>
-              {obrasBase.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-
-          {/* Busca texto */}
-          <div className="flex-1 min-w-[200px] relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-              placeholder="Filtrar por peça, SKA, setor, máquina..."
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-torg-blue"
-            />
-            {busca && (
-              <button onClick={() => setBusca("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <X size={14} />
-              </button>
-            )}
-          </div>
+      {/* Seletor de OP + sub-abas (sem filtros duplicados — status/busca vêm da sidebar) */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <select
+            value={obraFiltro}
+            onChange={e => setObraFiltro(e.target.value)}
+            className="appearance-none pl-3 pr-9 py-2 text-sm font-medium border border-gray-200 rounded-lg focus:outline-none focus:border-torg-blue bg-white min-w-[180px]"
+          >
+            <option value="">Selecione uma OP…</option>
+            {obrasBase.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         </div>
 
-        {/* Tabs: Apontamentos | Rastreabilidade */}
-        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
           {[
-            { id: "apontamentos",    label: "Apontamentos Syneco" },
-            { id: "rastreabilidade", label: "Rastreabilidade por Peça" },
+            { id: "rastreabilidade", label: "Rastreabilidade" },
+            { id: "apontamentos",    label: "Apontamentos" },
           ].map(({ id, label }) => (
             <button
               key={id}
-              onClick={() => { setAbaPeca(id); setBusca(""); setFiltroRast(""); }}
+              onClick={() => setAbaPeca(id)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                 abaPeca === id ? "bg-white text-torg-dark shadow-sm" : "text-torg-gray hover:text-torg-dark"
               }`}
@@ -733,30 +710,12 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
           ))}
         </div>
 
-        {/* Chips de status — só na tab Rastreabilidade */}
         {abaPeca === "rastreabilidade" && rastData && (
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              { val: "",                   label: "Todas",         cnt: rastData.total },
-              { val: "Não Iniciada",       label: "Não Iniciada",  cnt: rastData.contagens?.naoIniciada  || 0, cor: "bg-gray-50 text-gray-600 border-gray-200",        corAt: "bg-gray-600 text-white" },
-              { val: "Produzindo",         label: "Produzindo",    cnt: rastData.contagens?.produzindo   || 0, cor: "bg-blue-50 text-blue-700 border-blue-200",         corAt: "bg-blue-600 text-white" },
-              { val: "Finalizado",         label: "Finalizado",    cnt: rastData.contagens?.finalizado   || 0, cor: "bg-green-50 text-green-700 border-green-200",      corAt: "bg-green-600 text-white" },
-              { val: "Finalizado Parcial", label: "Parcial",       cnt: rastData.contagens?.parcial      || 0, cor: "bg-yellow-50 text-yellow-700 border-yellow-200",   corAt: "bg-yellow-500 text-white" },
-            ].map(({ val, label, cnt, cor = "bg-torg-blue text-white", corAt = "bg-torg-dark text-white" }) => (
-              <button
-                key={val}
-                onClick={() => setFiltroRast(val)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                  filtroRast === val
-                    ? corAt + " border-transparent"
-                    : (cor || "bg-gray-100 text-gray-600 border-gray-200") + " hover:opacity-80"
-                }`}
-              >
-                {label}
-                <span className="text-[10px] font-bold opacity-70">{cnt}</span>
-              </button>
-            ))}
-          </div>
+          <span className="text-xs text-torg-gray ml-auto">
+            {rastData.contagens?.naoIniciada || 0} não iniciadas ·{" "}
+            {rastData.contagens?.produzindo || 0} produzindo ·{" "}
+            {rastData.contagens?.finalizado || 0} finalizadas
+          </span>
         )}
       </div>
 
@@ -777,7 +736,7 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
                 <span className="text-sm font-medium text-torg-dark">
-                  {busca.trim()
+                  {(busca || "").trim()
                     ? `${filtradosAp.length} de ${todos.length} apontamentos`
                     : `${todos.length} apontamentos${obraFiltro ? ` — ${obraFiltro}` : " no período"}`}
                 </span>
@@ -881,7 +840,7 @@ function ViewPorPeca({ de, ate, obrasDisponiveis }) {
                 <span className="text-sm font-medium text-torg-dark">
                   {filtradosRast.length} de {rastData.total} peças — <strong>{obraFiltro}</strong>
                   {rastData.modoFallback && <span className="text-amber-600 text-xs ml-2">(Syneco only)</span>}
-                  {filtroRast && <span className="text-torg-blue"> · {filtroRast}</span>}
+                  {filtroStatusPeca && <span className="text-torg-blue"> · {filtroStatusPeca}</span>}
                 </span>
                 <div className="flex gap-3 text-xs text-torg-gray">
                   {!rastData.modoFallback && <span className="text-gray-500 font-medium">{rastData.contagens?.naoIniciada || 0} não iniciadas</span>}
@@ -1258,125 +1217,98 @@ export default function MesClient({
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-xs font-medium text-torg-gray mb-1">De</label>
-            <input
-              type="date"
-              value={de}
-              onChange={e => setDe(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-torg-blue"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-torg-gray mb-1">Até</label>
-            <input
-              type="date"
-              value={ate}
-              onChange={e => setAte(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-torg-blue"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-torg-gray mb-1">Setor</label>
-            <select
-              value={setorFiltro}
-              onChange={e => setSetorFiltro(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-torg-blue bg-white"
-            >
-              <option value="">Todos os setores</option>
-              {setoresDisp.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <button
-            onClick={handleFiltrar}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-torg-blue text-white text-sm font-medium hover:bg-torg-blue/90 disabled:opacity-50"
-          >
-            {loading
-              ? <Loader2 size={15} className="animate-spin" />
-              : <Filter  size={15} />
-            }
-            Filtrar
-          </button>
-          {/* Busca rápida por OP (visível só no modo OP) */}
-          {modoView === "op" && (
-            <div className="flex-1 min-w-48">
-              <label className="block text-xs font-medium text-torg-gray mb-1">Buscar OP</label>
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={buscaOP}
-                  onChange={e => setBuscaOP(e.target.value)}
-                  placeholder="Número, cliente..."
-                  className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-torg-blue"
-                />
-              </div>
+      {/* ═══ Layout: sidebar de filtros (esquerda) + conteúdo (direita) ═══ */}
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
+
+        {/* ── SIDEBAR DE FILTROS ── */}
+        <aside className="w-full lg:w-56 shrink-0 space-y-3 lg:sticky lg:top-4">
+          {/* Período + setor */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-2.5">
+            <div className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Período</div>
+            <div>
+              <label className="block text-[11px] text-torg-gray mb-1">De</label>
+              <input type="date" value={de} onChange={e => setDe(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-torg-blue" />
             </div>
-          )}
-        </div>
-      </div>
+            <div>
+              <label className="block text-[11px] text-torg-gray mb-1">Até</label>
+              <input type="date" value={ate} onChange={e => setAte(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-torg-blue" />
+            </div>
+            <div>
+              <label className="block text-[11px] text-torg-gray mb-1">Setor</label>
+              <select value={setorFiltro} onChange={e => setSetorFiltro(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-torg-blue bg-white">
+                <option value="">Todos os setores</option>
+                {setoresDisp.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <button onClick={handleFiltrar} disabled={loading}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-torg-blue text-white text-sm font-medium hover:bg-torg-blue/90 disabled:opacity-50">
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Filter size={14} />}
+              Aplicar
+            </button>
+          </div>
 
-      {/* Filtro por status — exibido acima das tabs */}
-      <div className="flex flex-wrap items-center gap-2">
-        {[
-          { val: "",                   label: "Todas as OPs",   cor: "bg-gray-100 text-gray-600 border-gray-200",         corAtivo: "bg-torg-dark text-white border-torg-dark",   cnt: Object.keys(obraGroups).length + naoIniciadas.length },
-          { val: "Produzindo",         label: "Produzindo",     cor: "bg-blue-50 text-blue-700 border-blue-200",          corAtivo: "bg-blue-600 text-white border-blue-600",      cnt: contagensStatus.Produzindo },
-          { val: "Finalizado",         label: "Finalizado",     cor: "bg-green-50 text-green-700 border-green-200",       corAtivo: "bg-green-600 text-white border-green-600",    cnt: contagensStatus.Finalizado },
-          { val: "Finalizado Parcial", label: "Parcial",        cor: "bg-yellow-50 text-yellow-700 border-yellow-200",    corAtivo: "bg-yellow-500 text-white border-yellow-500",  cnt: contagensStatus["Finalizado Parcial"] },
-          { val: "naoIniciada",        label: "Não Iniciada",   cor: "bg-gray-50 text-gray-500 border-gray-200",          corAtivo: "bg-gray-500 text-white border-gray-500",      cnt: contagensStatus.naoIniciada },
-        ].map(({ val, label, cor, corAtivo, cnt }) => (
-          <button
-            key={val}
-            onClick={() => {
-              setStatusFiltro(val);
-              // O filtro de status só tem efeito na visão "Por OP" — leva o usuário até lá
-              if (val) setModoView("op");
-            }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-              statusFiltro === val ? corAtivo : cor + " hover:opacity-80"
-            }`}
-          >
-            {label}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-              statusFiltro === val ? "bg-white/20" : "bg-black/8"
-            }`}>
-              {cnt}
-            </span>
-          </button>
-        ))}
-      </div>
-      {/* Dica contextual: filtro de status só afeta a visão Por OP */}
-      {statusFiltro && modoView !== "op" && (
-        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 -mt-2 inline-flex items-center gap-1.5 w-fit">
-          <Info size={12} /> O filtro "{statusFiltro === "naoIniciada" ? "Não Iniciada" : statusFiltro}" funciona na aba <strong>Por OP</strong>.
-        </div>
-      )}
+          {/* Status (filtro global — vale para Por OP e Por Peça) */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+            <div className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-2 px-1">Status</div>
+            <div className="space-y-0.5">
+              {[
+                { val: "",                   label: "Todas",        dot: "bg-torg-dark",  cnt: Object.keys(obraGroups).length + naoIniciadas.length },
+                { val: "Produzindo",         label: "Produzindo",   dot: "bg-blue-500",   cnt: contagensStatus.Produzindo },
+                { val: "Finalizado",         label: "Finalizado",   dot: "bg-green-500",  cnt: contagensStatus.Finalizado },
+                { val: "Finalizado Parcial", label: "Parcial",      dot: "bg-yellow-400", cnt: contagensStatus["Finalizado Parcial"] },
+                { val: "naoIniciada",        label: "Não Iniciada", dot: "bg-gray-400",   cnt: contagensStatus.naoIniciada },
+              ].map(({ val, label, dot, cnt }) => (
+                <button key={val} onClick={() => setStatusFiltro(val)}
+                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-colors ${
+                    statusFiltro === val ? "bg-torg-blue/10 text-torg-dark font-semibold" : "text-torg-gray hover:bg-gray-50"
+                  }`}>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                  <span className="flex-1 text-left">{label}</span>
+                  <span className="text-xs text-gray-400 font-medium">{cnt}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {/* Tabs de visualização */}
-      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
-        {[
-          { id: "op",    label: "Por OP",    icon: List      },
-          { id: "setor", label: "Por Setor", icon: BarChart2 },
-          { id: "peca",  label: "Por Peça",  icon: Search    },
-        ].map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setModoView(id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              modoView === id
-                ? "bg-white text-torg-dark shadow-sm"
-                : "text-torg-gray hover:text-torg-dark"
-            }`}
-          >
-            <Icon size={14} />
-            {label}
-          </button>
-        ))}
-      </div>
+          {/* Busca global */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+            <div className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-2 px-1">Buscar</div>
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={buscaOP} onChange={e => setBuscaOP(e.target.value)}
+                placeholder="OP, peça, cliente…"
+                className="w-full pl-8 pr-7 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-torg-blue" />
+              {buscaOP && (
+                <button onClick={() => setBuscaOP("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+        </aside>
+
+        {/* ── COLUNA DE CONTEÚDO ── */}
+        <div className="flex-1 min-w-0 space-y-4">
+
+          {/* Tabs de visualização */}
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+            {[
+              { id: "peca",  label: "Por Peça",  icon: Search    },
+              { id: "op",    label: "Por OP",    icon: List      },
+              { id: "setor", label: "Por Setor", icon: BarChart2 },
+            ].map(({ id, label, icon: Icon }) => (
+              <button key={id} onClick={() => setModoView(id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  modoView === id ? "bg-white text-torg-dark shadow-sm" : "text-torg-gray hover:text-torg-dark"
+                }`}>
+                <Icon size={14} />
+                {label}
+              </button>
+            ))}
+          </div>
 
       {/* Erro */}
       {erro && (
@@ -1476,6 +1408,8 @@ export default function MesClient({
             <ViewPorPeca
               de={de}
               ate={ate}
+              statusFiltro={statusFiltro}
+              busca={buscaOP}
               obrasDisponiveis={Object.keys(obraGroups).sort((a, b) =>
                 a.localeCompare(b, undefined, { numeric: true })
               )}
@@ -1483,6 +1417,8 @@ export default function MesClient({
           )}
         </>
       )}
+        </div>{/* fim coluna de conteúdo */}
+      </div>{/* fim layout 2 colunas */}
 
       {/* Modal detalhe */}
       {detalheObra && (
