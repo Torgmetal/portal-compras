@@ -31,6 +31,20 @@ export async function POST(req, { params }) {
   }
 
   const { id } = await params;
+
+  // Aceita filtro opcional por departamento(s) no body
+  let filtroDepts = null;
+  try {
+    const body = await req.json();
+    if (body.departamentos && Array.isArray(body.departamentos)) {
+      filtroDepts = body.departamentos;
+    } else if (body.departamento && typeof body.departamento === "string") {
+      filtroDepts = [body.departamento];
+    }
+  } catch {
+    // body vazio ou invalido — notifica todos os atrasados
+  }
+
   const cronograma = await prisma.cronograma.findUnique({
     where: { id },
     include: {
@@ -53,6 +67,8 @@ export async function POST(req, { params }) {
     if (!t.departamento || !t.dataFimPrevista) continue;
     if (new Date(t.dataFimPrevista) >= now) continue;
     if (t.isSummary && t.outlineLevel === 0) continue;
+    // Se filtro de departamento foi especificado, ignorar os demais
+    if (filtroDepts && !filtroDepts.includes(t.departamento)) continue;
 
     if (!atrasadosPorDept[t.departamento]) atrasadosPorDept[t.departamento] = [];
     atrasadosPorDept[t.departamento].push(t);
