@@ -1331,7 +1331,11 @@ export default function MesClient({
         ].map(({ val, label, cor, corAtivo, cnt }) => (
           <button
             key={val}
-            onClick={() => setStatusFiltro(val)}
+            onClick={() => {
+              setStatusFiltro(val);
+              // O filtro de status só tem efeito na visão "Por OP" — leva o usuário até lá
+              if (val) setModoView("op");
+            }}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
               statusFiltro === val ? corAtivo : cor + " hover:opacity-80"
             }`}
@@ -1345,6 +1349,12 @@ export default function MesClient({
           </button>
         ))}
       </div>
+      {/* Dica contextual: filtro de status só afeta a visão Por OP */}
+      {statusFiltro && modoView !== "op" && (
+        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 -mt-2 inline-flex items-center gap-1.5 w-fit">
+          <Info size={12} /> O filtro "{statusFiltro === "naoIniciada" ? "Não Iniciada" : statusFiltro}" funciona na aba <strong>Por OP</strong>.
+        </div>
+      )}
 
       {/* Tabs de visualização */}
       <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
