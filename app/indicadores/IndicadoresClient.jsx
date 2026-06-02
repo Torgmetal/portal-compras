@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Trophy, TrendingUp, TrendingDown,
   Package, Truck, Star, ChevronDown, ChevronUp, Info, Target, Clock,
@@ -501,7 +502,7 @@ export function SavingsClient() {
               <tbody className="divide-y divide-gray-50">
                 {porObra.map((op) => (
                   <tr key={op.opId} className="hover:bg-gray-50">
-                    <td className="px-4 py-2.5 font-medium text-torg-dark">{op.opNumero}</td>
+                    <td className="px-4 py-2.5 font-medium text-torg-dark">{fmtOP(op.opNumero)}</td>
                     <td className="px-4 py-2.5 text-gray-600 max-w-[180px] truncate">{op.cliente}</td>
                     <td className="px-4 py-2.5 text-gray-500 max-w-[140px] truncate">{op.obra || "—"}</td>
                     <td className="px-4 py-2.5">
@@ -789,7 +790,7 @@ export function AtendimentoClient() {
                     return (
                       <tr key={d.cotacaoId} className="hover:bg-gray-50">
                         <td className="px-4 py-2 font-medium text-torg-dark">{d.rmNumero}</td>
-                        <td className="px-4 py-2 text-gray-500">{d.opNumero}</td>
+                        <td className="px-4 py-2 text-gray-500">{fmtOP(d.opNumero)}</td>
                         <td className="px-4 py-2 text-gray-600 max-w-[160px] truncate">{d.fornecedor}</td>
                         <td className="px-3 py-2 text-center text-gray-400 text-xs">{fmtData(d.rmCriada)}</td>
                         <td className="px-3 py-2 text-center text-gray-400 text-xs">{fmtData(d.rfqEnviada)}</td>
@@ -840,7 +841,7 @@ export function AtendimentoClient() {
                     return (
                       <tr key={b.cotacaoId} className="hover:bg-gray-50">
                         <td className="px-4 py-2 font-medium text-torg-dark">{b.rmNumero}</td>
-                        <td className="px-4 py-2 text-gray-500">{b.opNumero}</td>
+                        <td className="px-4 py-2 text-gray-500">{fmtOP(b.opNumero)}</td>
                         <td className="px-4 py-2 text-gray-600 max-w-[180px] truncate">{b.fornecedor}</td>
                         <td className="px-3 py-2 text-center text-gray-500 text-xs">{fmtData(b.respostaEm)}</td>
                         <td className={`px-3 py-2 text-center font-bold text-xs ${corDias}`}>

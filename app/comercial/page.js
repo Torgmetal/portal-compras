@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { fmtOP } from "@/lib/utils";
 import { requireRole } from "@/lib/session";
 import { PlusCircle, FolderKanban, Activity, AlertTriangle, DollarSign } from "lucide-react";
 import OPRowActions from "./OPRowActions";
@@ -211,7 +212,7 @@ export default async function ComercialHome({ searchParams }) {
                     <tr key={op.id} className="hover:bg-gray-50">
                       <td className="px-6 py-3">
                         <Link href={`/comercial/${op.id}`} className="font-mono font-semibold text-torg-blue hover:underline">
-                          {op.numero}
+                          {fmtOP(op.numero)}
                         </Link>
                       </td>
                       <td className="px-6 py-3 text-torg-dark">{op.cliente}</td>
@@ -227,7 +228,7 @@ export default async function ComercialHome({ searchParams }) {
                       <td className="px-3 py-3 text-right">
                         <OPRowActions
                           opId={op.id}
-                          numero={op.numero}
+                          numero={fmtOP(op.numero)}
                           status={op.status}
                           qtdRMs={op._count.rms}
                           isAdmin={user.role === "ADMIN"}

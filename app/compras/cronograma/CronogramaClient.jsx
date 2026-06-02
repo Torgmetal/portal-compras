@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
+import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, Package, Clock, AlertTriangle,
@@ -592,7 +593,7 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
       {/* OP + prazo */}
       <div className="flex items-center justify-between mt-2 text-[11px] text-torg-gray">
         <span className="truncate">
-          {p.opNumero ? `OP ${p.opNumero}` : "Sem OP"}
+          {p.opNumero ? fmtOP(p.opNumero) : "Sem OP"}
           {p.opCliente ? ` · ${p.opCliente}` : ""}
         </span>
         {p.qtdItens > 0 && (
@@ -866,7 +867,7 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
         <td className="px-4 py-2.5">
           {p.opNumero ? (
             <div>
-              <span className="text-xs font-mono text-torg-gray bg-gray-100 px-1.5 py-0.5 rounded">{p.opNumero}</span>
+              <span className="text-xs font-mono text-torg-gray bg-gray-100 px-1.5 py-0.5 rounded">{fmtOP(p.opNumero)}</span>
               {p.opCliente && <p className="text-[10px] text-torg-gray mt-0.5 truncate max-w-[100px]">{p.opCliente}</p>}
             </div>
           ) : (
@@ -1096,7 +1097,7 @@ function ModalCobrarFornecedor({ pedido, onClose }) {
             {p.opNumero && (
               <div className="flex justify-between">
                 <span className="text-torg-gray">OP</span>
-                <span className="text-torg-dark">{p.opNumero}{p.opCliente ? ` — ${p.opCliente}` : ""}</span>
+                <span className="text-torg-dark">{fmtOP(p.opNumero)}{p.opCliente ? ` — ${p.opCliente}` : ""}</span>
               </div>
             )}
           </div>

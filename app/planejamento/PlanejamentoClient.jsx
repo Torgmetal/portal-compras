@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Clock, CheckCircle2, AlertTriangle,
   ArrowRight, Factory, Paintbrush, Truck, ListTodo, CalendarRange,
@@ -146,7 +147,7 @@ function OPCard({ op }) {
     <div className={`bg-white rounded-xl border ${op.atrasada ? "border-red-200" : "border-gray-100"} shadow-sm p-4`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-bold text-torg-blue font-mono">OP {op.numero}</span>
+          <span className="text-sm font-bold text-torg-blue font-mono">{fmtOP(op.numero)}</span>
           <span className="text-sm text-torg-dark font-medium">{op.cliente}</span>
           {op.obra && <span className="text-xs text-torg-gray">({op.obra})</span>}
         </div>

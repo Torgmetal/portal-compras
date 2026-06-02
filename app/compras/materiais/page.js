@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { fmtOP } from "@/lib/utils";
 import { Boxes, Search } from "lucide-react";
 
 
@@ -88,7 +89,7 @@ export default async function MateriaisPage() {
               <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <Link href={`/comercial/${op.id}`} className="font-mono font-bold text-torg-blue text-lg hover:underline">
-                    {op.numero}
+                    {fmtOP(op.numero)}
                   </Link>
                   <span className="text-sm text-torg-dark ml-2">{op.cliente}</span>
                   {op.obra && <p className="text-xs text-torg-gray">{op.obra}</p>}

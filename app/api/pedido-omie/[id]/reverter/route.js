@@ -84,7 +84,7 @@ export async function POST(req, { params }) {
           select: { status: true },
         });
         const todosFinalizados = itensRM.every(
-          (i) => i.status === "PEDIDO_GERADO" || i.status === "CANCELADO"
+          (i) => ["PEDIDO_GERADO", "CANCELADO", "ATENDIDO_ESTOQUE"].includes(i.status)
         );
         const algumCotado = itensRM.some((i) => i.status === "COTADO");
         const algumEmCotacao = itensRM.some((i) => i.status === "EM_COTACAO");

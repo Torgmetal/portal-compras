@@ -35,6 +35,7 @@ model User {
   estudosCriados           PropostaEstudo[]      @relation("EstudoCriadoPor")
   rmsCriadas               RM[]                  @relation("RMCreatedBy")
   recebimentos             Recebimento[]
+  pedidosRecebidos         PedidoOmie[]          @relation("PedidoRecebidoPor")
   revisoesCriadas          Revisao[]             @relation("RevisaoCreatedBy")
   sharepointSyncs          SharepointSync[]
   solicitacoesCriadas      SolicitacaoVerba[]    @relation("SolicitacaoCreatedBy")
@@ -506,6 +507,12 @@ model PedidoOmie {
   prazoOriginal        DateTime?
   tokenEntrega         String?          @unique
   itensOmie            Json?
+  nfNumero             String?
+  nfSerie              String?
+  nfChave              String?
+  recebidoPorId        String?
+  recebidoEm           DateTime?
+  recebidoPor          User?            @relation("PedidoRecebidoPor", fields: [recebidoPorId], references: [id])
   cotacao              Cotacao?         @relation(fields: [cotacaoId], references: [id])
   op                   OP?              @relation(fields: [opId], references: [id])
   rmAtendida           RM?              @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
@@ -550,6 +557,9 @@ model RMItem {
   aditivoItemId          String?
   canceladoEm            DateTime?
   canceladoMotivo        String?
+  atendidoEstoqueEm      DateTime?
+  atendidoEstoqueQtd     Float?
+  atendidoEstoqueObs     String?
   status                 RMItemStatus            @default(PENDENTE)
   pedidoOmieId           String?
   codigoOmieEstoque      String?
@@ -2099,6 +2109,7 @@ enum RMItemStatus {
   EM_COTACAO
   COTADO
   PEDIDO_GERADO
+  ATENDIDO_ESTOQUE
   CANCELADO
 }
 

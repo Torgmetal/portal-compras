@@ -6,6 +6,7 @@ import {
   TrendingUp, AlertCircle, Upload, FileSpreadsheet, Download,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { fmtOP } from "@/lib/utils";
 
 const SETORES = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 const SETOR_LABELS = {
@@ -824,7 +825,7 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
                           {pp.concluida && <Check size={14} strokeWidth={3} />}
                         </button>
                       </td>
-                      <td className="px-4 py-2.5 text-xs font-mono text-torg-blue">{peca?.opNumero}</td>
+                      <td className="px-4 py-2.5 text-xs font-mono text-torg-blue">{fmtOP(peca?.opNumero)}</td>
                       <td className={`px-4 py-2.5 text-xs font-mono font-semibold ${pp.concluida ? "text-torg-gray line-through" : "text-torg-dark"}`}>{peca?.marca}</td>
                       <td className={`px-4 py-2.5 text-xs ${pp.concluida ? "text-torg-gray/60 line-through" : "text-torg-gray"}`}>{peca?.descricao || "—"}</td>
                       <td className="px-4 py-2.5 text-right text-xs tabular-nums">{peca?.qte}</td>
@@ -911,7 +912,7 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               >
                 <option value="">Todas OPs</option>
                 {ops.map((op) => (
-                  <option key={op.id} value={op.numero}>{op.numero} — {op.cliente}</option>
+                  <option key={op.id} value={op.numero}>{fmtOP(op.numero)} — {op.cliente}</option>
                 ))}
               </select>
             </div>
@@ -937,7 +938,7 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
                   <tbody className="divide-y divide-gray-100">
                     {pecasFiltradas.slice(0, 100).map((p) => (
                       <tr key={p.id} className="hover:bg-torg-blue-50/30 cursor-pointer" onClick={() => adicionarPecas([p.id])}>
-                        <td className="px-4 py-2 text-xs font-mono text-torg-blue">{p.opNumero}</td>
+                        <td className="px-4 py-2 text-xs font-mono text-torg-blue">{fmtOP(p.opNumero)}</td>
                         <td className="px-4 py-2 text-xs font-mono font-semibold">{p.marca}</td>
                         <td className="px-4 py-2 text-xs text-torg-gray">{p.descricao || "—"}</td>
                         <td className="px-4 py-2 text-right text-xs tabular-nums">{p.pesoTotalKg?.toFixed(1)} kg</td>

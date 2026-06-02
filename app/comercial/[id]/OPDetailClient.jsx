@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
+import { fmtOP } from "@/lib/utils";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -55,9 +56,9 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
   async function executarAcaoStatus(acao) {
     const confirms = {
-      finalizar: `Finalizar a OP ${op.numero}? Ela some das listas ativas mas continua acessivel pelo historico.`,
-      reabrir: `Reabrir a OP ${op.numero}? Ela volta pra lista ativa.`,
-      cancelar: `Cancelar a OP ${op.numero}? Diferente de finalizar — usa quando a obra nao vai acontecer.`,
+      finalizar: `Finalizar a ${fmtOP(op.numero)}? Ela some das listas ativas mas continua acessivel pelo historico.`,
+      reabrir: `Reabrir a ${fmtOP(op.numero)}? Ela volta pra lista ativa.`,
+      cancelar: `Cancelar a ${fmtOP(op.numero)}? Diferente de finalizar — usa quando a obra nao vai acontecer.`,
     };
     if (!window.confirm(confirms[acao])) return;
     setErroAcao("");
@@ -100,7 +101,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
   async function excluirOP() {
     if (!window.confirm(
-      `EXCLUIR DEFINITIVAMENTE a OP ${op.numero}?\n\n` +
+      `EXCLUIR DEFINITIVAMENTE a ${fmtOP(op.numero)}?\n\n` +
       `Apaga itens, aditivos, revisoes e ajustes de prazo.\n` +
       `So funciona se a OP nao tiver RMs vinculadas.\n\n` +
       `Essa acao NAO PODE ser desfeita.`
@@ -140,7 +141,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               <div>
                 <div className="flex items-center gap-3">
                   <h2 className="text-2xl font-extrabold text-torg-dark tracking-tight font-mono">
-                    OP {op.numero}
+                    {fmtOP(op.numero)}
                   </h2>
                   <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${s.className}`}>
                     {s.label}
@@ -1337,7 +1338,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
     if (!form.cliente.trim()) return setErro("Cliente é obrigatório.");
     if (numeroMudou) {
       const ok = window.confirm(
-        `Você está alterando o NÚMERO da OP de ${op.numero} para ${form.numero.trim().toUpperCase()}.\n\n` +
+        `Você está alterando o NÚMERO da OP de ${fmtOP(op.numero)} para ${fmtOP(form.numero.trim().toUpperCase())}.\n\n` +
         `RMs, cotações e pedidos vinculados continuam ligados (são por ID, não por número), ` +
         `mas relatórios e referências em texto que mencionam o número antigo precisarão ser ajustados manualmente.\n\n` +
         `Deseja continuar?`

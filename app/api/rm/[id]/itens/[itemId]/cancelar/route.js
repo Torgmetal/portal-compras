@@ -21,7 +21,7 @@ export async function POST(req, { params }) {
   }
   // Permite cancelar itens ainda nao consumidos em pedido — PENDENTE,
   // EM_COTACAO ou COTADO. Bloqueia apenas PEDIDO_GERADO e CANCELADO.
-  if (item.status === "PEDIDO_GERADO" || item.status === "CANCELADO") {
+  if (item.status === "PEDIDO_GERADO" || item.status === "CANCELADO" || item.status === "ATENDIDO_ESTOQUE") {
     return NextResponse.json({ error: `Item em status "${item.status}" não pode ser cancelado.` }, { status: 409 });
   }
 

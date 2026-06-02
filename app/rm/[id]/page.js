@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { fmtOP } from "@/lib/utils";
 import { ArrowLeft, ClipboardList } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import RMHeaderActions from "@/components/RMHeaderActions";
@@ -63,7 +64,7 @@ export default async function RMDetail({ params }) {
           {rm.op && (
             <div className="text-right text-sm">
               <p className="text-torg-gray">OP de origem</p>
-              <p className="text-lg font-bold text-torg-blue font-mono">{rm.op.numero}</p>
+              <p className="text-lg font-bold text-torg-blue font-mono">{fmtOP(rm.op.numero)}</p>
               <p className="text-xs text-torg-gray">{rm.op.cliente}{rm.op.obra ? ` — ${rm.op.obra}` : ""}</p>
             </div>
           )}

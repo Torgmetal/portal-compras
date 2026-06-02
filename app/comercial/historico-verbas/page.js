@@ -4,6 +4,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { History, ArrowRight, Filter } from "lucide-react";
+import { fmtOP } from "@/lib/utils";
 
 
 const fmtMoeda = (v) =>
@@ -223,10 +224,10 @@ export default async function HistoricoVerbasPage({ searchParams }) {
                             <div className="flex items-center gap-2 text-xs text-torg-gray">
                               {itemInfo.opId ? (
                                 <Link href={`/comercial/${itemInfo.opId}`} className="font-mono text-torg-blue hover:underline">
-                                  {itemInfo.opNumero}
+                                  {fmtOP(itemInfo.opNumero)}
                                 </Link>
                               ) : (
-                                <span className="font-mono">{itemInfo.opNumero || "—"}</span>
+                                <span className="font-mono">{fmtOP(itemInfo.opNumero) || "—"}</span>
                               )}
                               <span>·</span>
                               <span>{itemInfo.tipo}</span>

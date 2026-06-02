@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
   CheckCircle2, Clock, Circle, ListTodo,
@@ -179,7 +180,7 @@ export default function TarefasClient() {
                             {t.titulo}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            {t.opNumero && <span className="text-[10px] text-torg-blue font-mono">OP {t.opNumero}</span>}
+                            {t.opNumero && <span className="text-[10px] text-torg-blue font-mono">{fmtOP(t.opNumero)}</span>}
                             {t.responsavel && <span className="text-[10px] text-torg-gray">{t.responsavel}</span>}
                             {t.observacao && <span className="text-[10px] text-torg-gray italic truncate max-w-[200px]">{t.observacao}</span>}
                           </div>

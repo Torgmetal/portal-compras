@@ -8,6 +8,7 @@ import {
   Percent, PieChart, Activity, Users, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Timer, Zap, ExternalLink,
 } from "lucide-react";
+import { fmtOP } from "@/lib/utils";
 
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -157,7 +158,7 @@ export default function KPIsClient() {
                 <tbody className="divide-y divide-gray-50">
                   {margem.contratos.map((c) => (
                     <tr key={c.opId} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-2.5 font-mono font-semibold text-torg-blue text-xs">{c.opNumero}</td>
+                      <td className="px-4 py-2.5 font-mono font-semibold text-torg-blue text-xs">{fmtOP(c.opNumero)}</td>
                       <td className="px-4 py-2.5 text-torg-dark max-w-[200px] truncate">{c.cliente}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-xs">{fmtMoeda(c.valorContrato)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-xs">{fmtMoeda(c.custoTorg)}</td>
@@ -548,7 +549,7 @@ function WinRateSection({ winRate }) {
                           href={`/comercial/${p.opId}`}
                           className="inline-flex items-center gap-1 text-xs font-semibold text-torg-blue bg-torg-blue-50 hover:bg-torg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
                         >
-                          {p.opNumero}
+                          {fmtOP(p.opNumero)}
                           <ExternalLink size={11} />
                         </Link>
                       ) : (

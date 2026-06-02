@@ -7,6 +7,7 @@ import {
   Package, FileSpreadsheet, ChevronDown, ChevronUp, Filter, Plus, Trash2,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
+import { fmtOP } from "@/lib/utils";
 
 const STATUS_PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 const STATUS_LABEL = {
@@ -261,7 +262,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                   const cor = STATUS_COR[p.status] || STATUS_COR.PENDENTE;
                   return (
                     <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-1.5 text-xs font-mono text-torg-blue">{p.opNumero}</td>
+                      <td className="px-3 py-1.5 text-xs font-mono text-torg-blue">{fmtOP(p.opNumero)}</td>
                       <td className="px-3 py-1.5 text-[10px] text-gray-400 tabular-nums">{p.item || ""}</td>
                       <td className="px-3 py-1.5">
                         <span className="text-xs font-semibold text-torg-dark font-mono">{p.marca}</span>
@@ -332,8 +333,8 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
         titulo={confirmDelete?.tipo === "lote" ? "Excluir todas as peças da OP?" : "Excluir peça?"}
         mensagem={
           confirmDelete?.tipo === "lote"
-            ? `Todas as peças da OP ${confirmDelete?.opNumero} serão removidas permanentemente. Esta ação não pode ser desfeita.`
-            : `A peça "${confirmDelete?.marca}" da OP ${confirmDelete?.opNumero} será removida permanentemente.`
+            ? `Todas as peças da ${fmtOP(confirmDelete?.opNumero)} serão removidas permanentemente. Esta ação não pode ser desfeita.`
+            : `A peça "${confirmDelete?.marca}" da ${fmtOP(confirmDelete?.opNumero)} será removida permanentemente.`
         }
         labelConfirmar="Excluir"
         variant="destrutivo"
@@ -406,14 +407,14 @@ function ModalImportarLE({ ops, onClose, onImportado }) {
           {resultado ? (
             <div className="bg-emerald-50 border border-emerald-200 rounded p-4 text-sm">
               <p className="text-emerald-800 font-semibold flex items-center gap-2 mb-2">
-                <CheckCircle2 size={16} /> OP {resultado.opNumero} importada com sucesso
+                <CheckCircle2 size={16} /> {fmtOP(resultado.opNumero)} importada com sucesso
               </p>
               <ul className="text-xs text-emerald-700 space-y-1">
                 <li>• {resultado.criados} {resultado.criados === 1 ? "peça nova" : "peças novas"}</li>
                 <li>• {resultado.atualizados} {resultado.atualizados === 1 ? "atualizada" : "atualizadas"}</li>
                 {resultado.ignorados > 0 && <li>• {resultado.ignorados} ignoradas (erro)</li>}
                 <li>• Total: {resultado.qteTotal} unidades · {fmtKg(resultado.pesoTotal)}</li>
-                {!resultado.opEncontrada && <li className="text-yellow-700">⚠️ OP "{resultado.opNumero}" não cadastrada no portal — peças ficaram sem vínculo</li>}
+                {!resultado.opEncontrada && <li className="text-yellow-700">⚠️ {fmtOP(resultado.opNumero)} não cadastrada no portal — peças ficaram sem vínculo</li>}
               </ul>
               <button
                 onClick={onImportado}
@@ -540,7 +541,7 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
           {resultado ? (
             <div className="bg-emerald-50 border border-emerald-200 rounded p-4 text-sm">
               <p className="text-emerald-800 font-semibold flex items-center gap-2 mb-2">
-                <CheckCircle2 size={16} /> OP {resultado.opNumero} — LPC importada
+                <CheckCircle2 size={16} /> {fmtOP(resultado.opNumero)} — LPC importada
               </p>
               {resultado.obra && (
                 <p className="text-xs text-emerald-700 mb-2">
@@ -557,7 +558,7 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
                   {resultado.ignorados > 0 && ` · ${resultado.ignorados} ignorada(s)`}
                 </li>
                 <li>• Peso: {Number(resultado.pesoTotal).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg · Pintura: {Number(resultado.areaTotal).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} m²</li>
-                {!resultado.opEncontrada && <li className="text-yellow-700">⚠️ OP "{resultado.opNumero}" não cadastrada — peças ficaram sem vínculo</li>}
+                {!resultado.opEncontrada && <li className="text-yellow-700">⚠️ {fmtOP(resultado.opNumero)} não cadastrada — peças ficaram sem vínculo</li>}
               </ul>
               <button
                 onClick={onImportado}

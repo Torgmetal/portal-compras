@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { fmtOP } from "@/lib/utils";
 import { ArrowLeft, FileText } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import MapaCotacaoClient from "./MapaCotacaoClient";
@@ -260,7 +261,7 @@ export default async function PainelOPDetalhe({ params }) {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight font-mono">{data.numero}</h2>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight font-mono">{fmtOP(data.numero)}</h2>
           <p className="text-torg-dark font-medium mt-1">{data.cliente}</p>
           {data.obra && <p className="text-sm text-torg-gray">{data.obra}</p>}
           {data.descricao && <p className="text-sm text-torg-gray mt-2">{data.descricao}</p>}

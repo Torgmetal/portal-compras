@@ -10,6 +10,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
 import { FLUXO_VISUAL, corSetor, normSetor } from "@/lib/setores";
+import { fmtOP } from "@/lib/utils";
 
 const fmtKg = (v) =>
   v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg` : "—";
@@ -301,7 +302,7 @@ export default function PCPDashboardClient() {
             {ops.filter((o) => o.totalPecas > 0).slice(0, 15).map((op) => (
               <div key={op.numero} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50">
                 <div className="w-20 shrink-0">
-                  <span className="font-mono text-sm font-bold text-torg-blue">OP {op.numero}</span>
+                  <span className="font-mono text-sm font-bold text-torg-blue">{fmtOP(op.numero)}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-torg-dark truncate">{op.cliente}{op.obra ? ` — ${op.obra}` : ""}</p>

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, MapPin,
 } from "lucide-react";
+import { fmtOP } from "@/lib/utils";
 
 const AREAS = [
   { id: "PENDENTE", label: "Estoque", rects: [{ x: 30, y: 15, w: 810, h: 80 }], stroke: "#64748b", fill: "#f1f5f9", statusKey: "PENDENTE" },
@@ -364,7 +365,7 @@ function PecasDetalhe({ area, pecas, loading, data }) {
               {Object.entries(porOp).map(([opNum, { cliente, pecas: pecasOp }]) => (
                 <div key={opNum}>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-bold text-torg-dark bg-gray-100 px-2 py-0.5 rounded">OP {opNum}</span>
+                    <span className="text-xs font-bold text-torg-dark bg-gray-100 px-2 py-0.5 rounded">{fmtOP(opNum)}</span>
                     <span className="text-xs text-torg-gray">{cliente}</span>
                     <span className="text-xs text-torg-gray ml-auto">{pecasOp.reduce((s, p) => s + p.qte, 0)} pç · {fmtPeso(pecasOp.reduce((s, p) => s + p.pesoTotalKg, 0))}</span>
                   </div>

@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/session";
 import { isoWeekString, parseSemana, semanaInicio, semanaFim, fmtSemana } from "@/lib/semana";
 import { ExternalLink, FileText, Package } from "lucide-react";
 import RomaneiosSharepoint from "@/components/RomaneiosSharepoint";
+import { fmtOP } from "@/lib/utils";
 
 
 export const metadata = {
@@ -213,7 +214,7 @@ export default async function RomaneiosProducao() {
                     <td className="px-4 py-2 text-xs">
                       {r.op ? (
                         <>
-                          <span className="font-mono text-torg-blue">{r.op.numero}</span>
+                          <span className="font-mono text-torg-blue">{fmtOP(r.op.numero)}</span>
                           <span className="text-torg-gray block text-[10px]">{r.op.cliente}</span>
                         </>
                       ) : <span className="text-torg-gray">—</span>}

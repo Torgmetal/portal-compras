@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { fmtOP } from "@/lib/utils";
 import { PlusCircle, ClipboardList, AlertTriangle } from "lucide-react";
 import RMRowActions from "@/components/RMRowActions";
 
@@ -176,7 +177,7 @@ export default async function MinhasRMs({ searchParams }) {
                         <td className="px-6 py-3 text-torg-dark">
                           {rm.op ? (
                             <>
-                              <span className="font-mono">{rm.op.numero}</span>
+                              <span className="font-mono">{fmtOP(rm.op.numero)}</span>
                               <span className="text-xs text-torg-gray block">{rm.op.cliente}</span>
                             </>
                           ) : (

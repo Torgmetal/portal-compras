@@ -2,6 +2,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { fmtOP } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
   Trash2, Upload, FileSpreadsheet, X, RailSymbol, Building2, Plus,
@@ -626,7 +627,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                       >
                         <option value="">— sem OP —</option>
                         {(ops || []).map((op) => (
-                          <option key={op.id} value={op.id}>{op.numero}</option>
+                          <option key={op.id} value={op.id}>{fmtOP(op.numero)}</option>
                         ))}
                       </select>
                     </td>
