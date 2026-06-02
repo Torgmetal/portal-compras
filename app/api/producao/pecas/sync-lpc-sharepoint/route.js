@@ -52,7 +52,17 @@ function parseNomeLpc(nome) {
   return { obra: m[1].replace(/[-_ ]+$/, "").toUpperCase(), rev: m[2] ? parseInt(m[2], 10) : 0 };
 }
 
+// GET = sempre dry-run (somente leitura — fácil de abrir no navegador).
+export async function GET(req) {
+  return handle(req, { permitirImport: false });
+}
+
+// POST = pode importar quando ?importar=1.
 export async function POST(req) {
+  return handle(req, { permitirImport: true });
+}
+
+async function handle(req, { permitirImport }) {
   let user;
   try {
     user = await requireRole(["ADMIN", "PRODUCAO"]);
@@ -61,7 +71,7 @@ export async function POST(req) {
   }
 
   const { searchParams } = new URL(req.url);
-  const importar = searchParams.get("importar") === "1";
+  const importar = permitirImport && searchParams.get("importar") === "1";
   const dryRun   = !importar; // padrão seguro: só lista
   const opFiltro = (searchParams.get("op") || "").trim();
 
