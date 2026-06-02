@@ -27,3 +27,5 @@ node_modules/
 .env.production
 .env*
 *.Zone.Identifier
+*Zone.Identifier
+*:Zone.Identifier

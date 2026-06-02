@@ -1,0 +1,19 @@
+# Normaliza fim de linha: tudo vira LF no repositório, evitando que um
+# editor no Windows reconverta o projeto inteiro para CRLF (ruído gigante no diff).
+* text=auto eol=lf
+
+# Binários: nunca aplicar conversão de fim de linha nem diff de texto.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.pdf  binary
+*.xlsx binary
+*.xls  binary
+*.zip  binary
+*.woff  binary
+*.woff2 binary
+*.ttf  binary
+*.eot  binary
