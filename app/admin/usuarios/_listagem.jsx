@@ -31,6 +31,8 @@ const MODULO_LABELS = {
   ALMOXARIFADO: { label: "Almoxarifado", cor: "bg-yellow-100 text-yellow-700" },
   FINANCEIRO:   { label: "Financeiro",   cor: "bg-pink-100 text-pink-700" },
   EXPEDICAO:    { label: "Expedição",    cor: "bg-teal-100 text-teal-700" },
+  RH:           { label: "RH",           cor: "bg-indigo-100 text-indigo-700" },
+  PLANEJAMENTO: { label: "Planejamento", cor: "bg-purple-100 text-purple-700" },
 };
 
 const FILTRO_OPCOES = [

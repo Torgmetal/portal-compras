@@ -15,6 +15,8 @@ const MODULOS_OPCOES = [
   { value: "ALMOXARIFADO", label: "Almoxarifado" },
   { value: "FINANCEIRO",   label: "Financeiro" },
   { value: "EXPEDICAO",    label: "Expedição" },
+  { value: "RH",           label: "RH" },
+  { value: "PLANEJAMENTO", label: "Planejamento" },
 ];
 
 const campoVazio = {
