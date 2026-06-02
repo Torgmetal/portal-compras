@@ -560,6 +560,8 @@ model RMItem {
   atendidoEstoqueEm      DateTime?
   atendidoEstoqueQtd     Float?
   atendidoEstoqueObs     String?
+  atendidoEstoquePreco   Float?
+  atendidoEstoqueTotal   Float?
   status                 RMItemStatus            @default(PENDENTE)
   pedidoOmieId           String?
   codigoOmieEstoque      String?

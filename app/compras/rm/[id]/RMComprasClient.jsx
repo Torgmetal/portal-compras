@@ -2076,9 +2076,30 @@ function ModalCancelarItem({ item, rmId, onClose, onSaved }) {
 function ModalAtenderEstoque({ item, rmId, onClose, onSaved }) {
   const qtdSugerida = item.peso > 0 ? Number(item.peso) : Number(item.qtd) || 0;
   const [quantidade, setQuantidade] = useState(qtdSugerida || "");
+  const [precoUnit, setPrecoUnit] = useState("");
   const [observacao, setObservacao] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [buscandoPreco, setBuscandoPreco] = useState(false);
+  const [infoOmie, setInfoOmie] = useState(null);
+
+  // Busca preco medio do Omie quando tem codigo
+  useEffect(() => {
+    if (!item.codigo) return;
+    setBuscandoPreco(true);
+    fetch(`/api/omie/preco-medio?codigo=${encodeURIComponent(item.codigo)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setInfoOmie(data);
+        // Prioriza ultimo preco de compra; fallback pro CMC
+        const preco = data.precoUltCompra || data.cmc || 0;
+        if (preco > 0) setPrecoUnit(String(preco));
+      })
+      .catch(() => {})
+      .finally(() => setBuscandoPreco(false));
+  }, [item.codigo]);
+
+  const totalEstimado = Number(precoUnit || 0) * Number(quantidade || 0);
 
   const submit = async () => {
     const qtd = Number(quantidade);
@@ -2088,7 +2109,11 @@ function ModalAtenderEstoque({ item, rmId, onClose, onSaved }) {
       const res = await fetch(`/api/rm/${rmId}/itens/${item.id}/atender-estoque`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantidade: qtd, observacao: observacao.trim() || undefined }),
+        body: JSON.stringify({
+          quantidade: qtd,
+          precoUnitario: Number(precoUnit) || undefined,
+          observacao: observacao.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
@@ -2112,6 +2137,7 @@ function ModalAtenderEstoque({ item, rmId, onClose, onSaved }) {
           <p className="text-xs text-emerald-600 mt-1">
             Solicitado: {item.peso > 0 ? `${Number(item.peso).toLocaleString("pt-BR")} KG` : `${Number(item.qtd).toLocaleString("pt-BR")} ${item.unidade}`}
             {item.material && ` · ${item.material}`}
+            {item.codigo && ` · Cod: ${item.codigo}`}
           </p>
         </div>
         <div>
@@ -2128,6 +2154,63 @@ function ModalAtenderEstoque({ item, rmId, onClose, onSaved }) {
             <span className="text-sm text-torg-gray font-medium">{item.peso > 0 ? "KG" : item.unidade}</span>
           </div>
         </div>
+        {/* Preco unitario (CMC do Omie) */}
+        <div>
+          <label className="block text-sm font-medium text-torg-dark mb-1">
+            Preco unitario (R$)
+            <span className="text-xs text-torg-gray font-normal ml-1">
+              {buscandoPreco ? "(buscando no Omie...)" : infoOmie?.cmc ? "(sugerido pelo Omie)" : "(opcional)"}
+            </span>
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-torg-gray">R$</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={precoUnit}
+                onChange={(e) => setPrecoUnit(e.target.value)}
+                placeholder="0,00"
+                className="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            {buscandoPreco && <Loader2 size={16} className="text-emerald-500 animate-spin" />}
+          </div>
+          {infoOmie && (infoOmie.cmc > 0 || infoOmie.precoUltCompra > 0) && (
+            <div className="mt-1.5 flex items-center gap-3 flex-wrap text-[10px] text-torg-gray">
+              {infoOmie.cmc > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPrecoUnit(String(infoOmie.cmc))}
+                  className="hover:text-emerald-700 underline"
+                >
+                  CMC: {fmtMoeda(infoOmie.cmc)}
+                </button>
+              )}
+              {infoOmie.precoUltCompra > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPrecoUnit(String(infoOmie.precoUltCompra))}
+                  className="hover:text-emerald-700 underline"
+                >
+                  Ult. compra: {fmtMoeda(infoOmie.precoUltCompra)}
+                  {infoOmie.dataUltCompra && ` (${infoOmie.dataUltCompra})`}
+                </button>
+              )}
+              {infoOmie.saldo > 0 && (
+                <span>Saldo: {Number(infoOmie.saldo).toLocaleString("pt-BR")} {infoOmie.unidade}</span>
+              )}
+            </div>
+          )}
+        </div>
+        {/* Total estimado */}
+        {totalEstimado > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between">
+            <span className="text-xs text-amber-800 font-medium">Custo estimado (controle interno)</span>
+            <span className="text-sm text-amber-900 font-bold tabular-nums">{fmtMoeda(totalEstimado)}</span>
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium text-torg-dark mb-1">Observacao</label>
           <textarea
@@ -2139,8 +2222,8 @@ function ModalAtenderEstoque({ item, rmId, onClose, onSaved }) {
           />
         </div>
         <p className="text-xs text-torg-gray">
-          O item sera marcado como atendido pelo estoque interno. A quantidade fica vinculada a RM para controle da OP.
-          Nenhum pedido Omie sera gerado para este item.
+          O item sera marcado como atendido pelo estoque interno. O custo estimado sera usado apenas para controle financeiro da OP
+          (nao entra no calculo de FD/contrato). Nenhum pedido Omie sera gerado.
         </p>
       </div>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">

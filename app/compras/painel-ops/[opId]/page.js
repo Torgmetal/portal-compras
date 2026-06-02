@@ -9,6 +9,7 @@ import MapaCotacaoClient from "./MapaCotacaoClient";
 import OPAcoesClient from "./OPAcoesClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
 import FDAvulsosSection from "@/components/FDAvulsosSection";
+import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 
 
 const fmtMoeda = (v) =>
@@ -380,6 +381,9 @@ export default async function PainelOPDetalhe({ params }) {
 
       {/* Pedidos no Omie vinculados a essa OP */}
       <PedidosOmieSection pedidos={pedidosFlat} />
+
+      {/* Controle Financeiro — pedidos + estoque (informativo) */}
+      <ControleFinanceiroOP opId={op.id} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/session";
 const schema = z.object({
   quantidade: z.number().positive("Quantidade deve ser maior que zero"),
   observacao: z.string().max(500).optional(),
+  precoUnitario: z.number().min(0).optional().nullable(),
 });
 
 /**
@@ -58,6 +59,8 @@ export async function POST(req, { params }) {
         atendidoEstoqueEm: new Date(),
         atendidoEstoqueQtd: body.quantidade,
         atendidoEstoqueObs: body.observacao || null,
+        atendidoEstoquePreco: body.precoUnitario ?? null,
+        atendidoEstoqueTotal: body.precoUnitario ? body.precoUnitario * body.quantidade : null,
       },
     }),
     prisma.auditLog.create({
@@ -71,6 +74,8 @@ export async function POST(req, { params }) {
           depois: {
             status: "ATENDIDO_ESTOQUE",
             quantidade: body.quantidade,
+            precoUnitario: body.precoUnitario ?? null,
+            total: body.precoUnitario ? body.precoUnitario * body.quantidade : null,
             observacao: body.observacao || null,
           },
           rmNumero: item.rm.numero,

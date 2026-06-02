@@ -6,6 +6,7 @@ import {
   CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
+import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { fmtOP } from "@/lib/utils";
 
@@ -586,6 +587,9 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           </div>
         </div>
       )}
+
+      {/* Controle Financeiro — pedidos + estoque (informativo) */}
+      <ControleFinanceiroOP opId={op.id} />
 
       {/* Receitas do contrato */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
