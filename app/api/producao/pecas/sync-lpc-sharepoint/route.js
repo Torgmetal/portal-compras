@@ -13,13 +13,37 @@
 
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
-import { listAllFilesRecursive, downloadFileById } from "@/lib/sharepoint";
+import { getAccessToken, listAllFilesRecursive, downloadFileById } from "@/lib/sharepoint";
 import { parseLPC } from "@/lib/parse-lpc";
 import { importarLpcParsed } from "@/lib/importar-lpc-core";
 import * as XLSX from "xlsx";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+// Resolve o drive da biblioteca SERVIDOR. Ordem:
+//   1. SHAREPOINT_SERVIDOR_DRIVE_ID (se setado)
+//   2. resolve pelo nome "SERVIDOR" nos drives do site (SHAREPOINT_SITE_ID)
+//   3. fallback SHAREPOINT_DRIVE_ID
+async function resolveServidorDriveId() {
+  if (process.env.SHAREPOINT_SERVIDOR_DRIVE_ID) return process.env.SHAREPOINT_SERVIDOR_DRIVE_ID;
+
+  const siteId = process.env.SHAREPOINT_SITE_ID;
+  if (siteId) {
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/drives?$select=id,name`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const servidor = (data.value || []).find(d => (d.name || "").toUpperCase() === "SERVIDOR");
+        if (servidor) return servidor.id;
+      }
+    } catch { /* cai pro fallback */ }
+  }
+  return process.env.SHAREPOINT_DRIVE_ID || null;
+}
 
 // Extrai obra e revisão do nome do arquivo: "T78A-LPC_R01.xlsx" → { obra:"T78A", rev:1 }
 function parseNomeLpc(nome) {
@@ -41,9 +65,9 @@ export async function POST(req) {
   const dryRun   = !importar; // padrão seguro: só lista
   const opFiltro = (searchParams.get("op") || "").trim();
 
-  const driveId = process.env.SHAREPOINT_SERVIDOR_DRIVE_ID || process.env.SHAREPOINT_DRIVE_ID;
+  const driveId = await resolveServidorDriveId();
   if (!driveId) {
-    return NextResponse.json({ error: "SHAREPOINT_SERVIDOR_DRIVE_ID não configurado no .env" }, { status: 503 });
+    return NextResponse.json({ error: "Não foi possível resolver o drive SERVIDOR (verifique SHAREPOINT_SITE_ID/credenciais Azure)" }, { status: 503 });
   }
   const baseFolder = process.env.SHAREPOINT_OP_BASE_FOLDER || "/Ordem de Servico/01. OP";
   const folder = opFiltro ? `${baseFolder}/${opFiltro}` : baseFolder;
