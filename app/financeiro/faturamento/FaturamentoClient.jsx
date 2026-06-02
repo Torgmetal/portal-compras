@@ -42,7 +42,7 @@ export default function FaturamentoClient() {
             <FileText size={26} className="text-torg-blue" /> Faturamento por obra
           </h2>
           <p className="text-sm text-torg-gray mt-1">
-            Pedidos de venda (medições) do Omie por projeto/obra: quanto já foi faturado e quanto falta.
+Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado e quanto falta. A tag mostra se a obra tem venda, serviço ou os dois.
             {data?.atualizadoEm && ` Atualizado ${fmtData(data.atualizadoEm)} ${new Date(data.atualizadoEm).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}.`}
           </p>
         </div>
@@ -130,14 +130,22 @@ export default function FaturamentoClient() {
   );
 }
 
+function TagTipo({ tipo }) {
+  const cor = tipo === "Venda+Serviço" ? "bg-teal-100 text-teal-700 border-teal-200"
+    : tipo === "Serviço" ? "bg-purple-100 text-purple-700 border-purple-200"
+    : "bg-blue-100 text-blue-700 border-blue-200";
+  return <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium whitespace-nowrap ${cor}`}>{tipo}</span>;
+}
+
 function FragmentObra({ obra, aberta, onToggle }) {
   return (
     <>
       <tr className={`hover:bg-gray-50 cursor-pointer ${obra.atrasado ? "bg-red-50/20" : ""}`} onClick={onToggle}>
         <td className="px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-gray-400 transition-transform ${aberta ? "rotate-90" : ""}`}>▶</span>
             <span className="text-torg-dark font-medium">{obra.projeto}</span>
+            <TagTipo tipo={obra.tipo} />
             {obra.atrasado && <Clock size={13} className="text-red-500" />}
           </div>
         </td>
@@ -157,8 +165,11 @@ function FragmentObra({ obra, aberta, onToggle }) {
         <tr key={ped.numero} className="bg-gray-50/40">
           <td colSpan={5} className="px-4 py-2">
             <div className="pl-6">
-              <div className="text-xs font-semibold text-torg-gray mb-1">
-                Pedido #{ped.numero} — {ped.parcelas.length} parcela(s) · faturado {fmtMoeda(ped.faturado)} · a faturar {fmtMoeda(ped.aFaturar)}
+              <div className="text-xs font-semibold text-torg-gray mb-1 flex items-center gap-1.5">
+                <span className={`px-1.5 py-0.5 rounded text-[10px] ${ped.origem === "servico" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
+                  {ped.origem === "servico" ? "Serviço (OS)" : "Venda"}
+                </span>
+                #{ped.numero} — {ped.parcelas.length} parcela(s) · faturado {fmtMoeda(ped.faturado)} · a faturar {fmtMoeda(ped.aFaturar)}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {ped.parcelas.map((pc) => {
