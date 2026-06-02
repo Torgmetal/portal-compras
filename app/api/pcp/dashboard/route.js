@@ -22,6 +22,7 @@ export async function GET() {
     return NextResponse.json({ error: e.message }, { status });
   }
 
+  try {
   const agora = new Date();
   const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
   const inicioSemana = new Date(hoje);
@@ -105,7 +106,6 @@ export async function GET() {
         numero: true,
         cliente: true,
         obra: true,
-        pesoTotalKg: true,
         _count: { select: { pecasConjunto: true } },
       },
       orderBy: { numero: "desc" },
@@ -155,12 +155,13 @@ export async function GET() {
     for (const op of opsAtivas) {
       const prog = progressoMap[op.id] || {};
       const totalPecas = Object.values(prog).reduce((s, v) => s + v.count, 0);
+      const pesoTotalKg = Object.values(prog).reduce((s, v) => s + v.kg, 0);
       const pecasExpedidas = prog.EXPEDIDO?.count || 0;
       opsComProgresso.push({
         numero: op.numero,
         cliente: op.cliente,
         obra: op.obra,
-        pesoTotalKg: op.pesoTotalKg,
+        pesoTotalKg,
         totalPecas,
         pecasExpedidas,
         pctConcluido: totalPecas > 0 ? Math.round((pecasExpedidas / totalPecas) * 100) : 0,
@@ -206,4 +207,7 @@ export async function GET() {
     totalPecasAtivas,
     metasSemana,
   });
+  } catch (e) {
+    return NextResponse.json({ error: e.message || "Erro interno no dashboard" }, { status: 500 });
+  }
 }
