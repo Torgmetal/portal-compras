@@ -47,6 +47,8 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
   const [busca, setBusca] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [modalImportLPC, setModalImportLPC] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState("");
 
   // Lista de OPs que tem pecas (pra mostrar so as relevantes no filtro)
   const opsComPecas = useMemo(() => {
@@ -57,6 +59,9 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
   const pecasFiltradas = useMemo(() => {
     return pecas.filter((p) => {
       if (filtroOp && p.opNumero !== filtroOp) return false;
+      if (filtroTipo === "CONJUNTO" && p.tipoPeca !== "CONJUNTO") return false;
+      if (filtroTipo === "CROQUI" && p.tipoPeca !== "CROQUI") return false;
+      if (filtroTipo === "PECA" && p.tipoPeca != null) return false;
       if (filtroStatus && p.status !== filtroStatus) return false;
       if (busca) {
         const q = busca.toLowerCase();
@@ -64,7 +69,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
       }
       return true;
     });
-  }, [pecas, filtroOp, filtroStatus, busca]);
+  }, [pecas, filtroOp, filtroTipo, filtroStatus, busca]);
 
   // Resumo
   const resumo = useMemo(() => {
@@ -140,7 +145,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
             Controle de Peças
           </h2>
           <p className="text-xs text-torg-gray mt-0.5">
-            Lista de estrutura (LE / FORM 21) por OP, com status atual de cada conjunto.
+            Controle de peças e conjuntos por OP — importe LE ou LPC.
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -149,6 +154,12 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
             className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
           >
             <Upload size={14} /> Importar LE
+          </button>
+          <button
+            onClick={() => setModalImportLPC(true)}
+            className="px-3 py-1.5 bg-torg-dark text-white text-xs rounded-lg hover:bg-torg-dark/90 font-medium flex items-center gap-1.5"
+          >
+            <Upload size={14} /> Importar LPC
           </button>
         </div>
       </div>
@@ -180,6 +191,16 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
           <option value="">Todos status</option>
           {STATUS_PIPELINE.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
         </select>
+        <select
+          value={filtroTipo}
+          onChange={(e) => setFiltroTipo(e.target.value)}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Todos tipos</option>
+          <option value="CONJUNTO">Conjuntos</option>
+          <option value="CROQUI">Croquis</option>
+          <option value="PECA">Peças / LE</option>
+        </select>
         <div className="flex items-center gap-1 flex-1 min-w-[200px]">
           <Search size={12} className="text-torg-gray ml-2" />
           <input
@@ -190,9 +211,9 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
             className="flex-1 px-2 py-1.5 text-xs border-0 focus:ring-0 focus:outline-none"
           />
         </div>
-        {(filtroOp || filtroStatus || busca) && (
+        {(filtroOp || filtroStatus || filtroTipo || busca) && (
           <button
-            onClick={() => { setFiltroOp(""); setFiltroStatus(""); setBusca(""); }}
+            onClick={() => { setFiltroOp(""); setFiltroStatus(""); setFiltroTipo(""); setBusca(""); }}
             className="text-xs text-torg-gray hover:text-torg-dark"
           >
             limpar
@@ -242,8 +263,15 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                     <tr key={p.id} className="hover:bg-gray-50">
                       <td className="px-3 py-1.5 text-xs font-mono text-torg-blue">{p.opNumero}</td>
                       <td className="px-3 py-1.5 text-[10px] text-gray-400 tabular-nums">{p.item || ""}</td>
-                      <td className="px-3 py-1.5 text-xs font-semibold text-torg-dark font-mono">{p.marca}</td>
-                      <td className="px-3 py-1.5 text-xs text-torg-gray">{p.descricao || "—"}</td>
+                      <td className="px-3 py-1.5">
+                        <span className="text-xs font-semibold text-torg-dark font-mono">{p.marca}</span>
+                        {p.tipoPeca === "CONJUNTO" && <span className="ml-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-torg-blue/10 text-torg-blue">CJ</span>}
+                        {p.tipoPeca === "CROQUI" && <span className="ml-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">CR</span>}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <span className="text-xs text-torg-gray">{p.descricao || "—"}</span>
+                        {p.material && <span className="block text-[10px] text-torg-gray/60">{p.material}</span>}
+                      </td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark">{p.qte}</td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray">{fmtKg(p.pesoUnitKg)}</td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark font-medium">{fmtKg(p.pesoTotalKg)}</td>
@@ -283,6 +311,14 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
           ops={ops}
           onClose={() => setModalImport(false)}
           onImportado={() => { setModalImport(false); router.refresh(); }}
+        />
+      )}
+
+      {modalImportLPC && (
+        <ModalImportarLPC
+          ops={ops}
+          onClose={() => setModalImportLPC(false)}
+          onImportado={() => { setModalImportLPC(false); router.refresh(); }}
         />
       )}
 
@@ -437,6 +473,151 @@ function ModalImportarLE({ ops, onClose, onImportado }) {
                   className="mt-0.5"
                 />
                 <span>Sobrescrever — apaga peças anteriores dessa OP que foram importadas via LE antes de importar de novo. Útil se a LE foi revisada.</span>
+              </label>
+            </>
+          )}
+        </div>
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">
+            {resultado ? "Fechar" : "Cancelar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalImportarLPC({ ops, onClose, onImportado }) {
+  const fileRef = useRef(null);
+  const [arquivoNome, setArquivoNome] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [erro, setErro] = useState("");
+  const [opForcada, setOpForcada] = useState("");
+  const [sobrescrever, setSobrescrever] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function processar(file) {
+    if (!file) return;
+    setErro("");
+    setParsing(true);
+    setArquivoNome(file.name);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
+
+      const res = await fetch("/api/producao/pecas/importar-lpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows, opNumero: opForcada || null, sobrescrever }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao importar");
+      setResultado(data);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <Upload size={18} className="text-torg-dark" /> Importar LPC
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-6 py-5 space-y-3">
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+            </div>
+          )}
+          {resultado ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded p-4 text-sm">
+              <p className="text-emerald-800 font-semibold flex items-center gap-2 mb-2">
+                <CheckCircle2 size={16} /> OP {resultado.opNumero} — LPC importada
+              </p>
+              {resultado.obra && (
+                <p className="text-xs text-emerald-700 mb-2">
+                  {resultado.obra}{resultado.cliente ? ` — ${resultado.cliente}` : ""}
+                </p>
+              )}
+              <ul className="text-xs text-emerald-700 space-y-1">
+                <li>• {resultado.conjuntos} {resultado.conjuntos === 1 ? "conjunto" : "conjuntos"}</li>
+                <li>• {resultado.croquis} {resultado.croquis === 1 ? "croqui" : "croquis"}</li>
+                {resultado.avulsas > 0 && <li>• {resultado.avulsas} {resultado.avulsas === 1 ? "peça avulsa" : "peças avulsas"}</li>}
+                <li>• {resultado.relacoes} {resultado.relacoes === 1 ? "relação" : "relações"} conjunto↔croqui</li>
+                <li className="pt-1 border-t border-emerald-200 mt-1">
+                  {resultado.criados} {resultado.criados === 1 ? "nova" : "novas"} · {resultado.atualizados} {resultado.atualizados === 1 ? "atualizada" : "atualizadas"}
+                  {resultado.ignorados > 0 && ` · ${resultado.ignorados} ignorada(s)`}
+                </li>
+                <li>• Peso: {Number(resultado.pesoTotal).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg · Pintura: {Number(resultado.areaTotal).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} m²</li>
+                {!resultado.opEncontrada && <li className="text-yellow-700">⚠️ OP "{resultado.opNumero}" não cadastrada — peças ficaram sem vínculo</li>}
+              </ul>
+              <button
+                onClick={onImportado}
+                className="mt-3 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700"
+              >
+                Ver na lista
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="bg-torg-dark/5 border border-torg-dark/10 rounded p-4 text-center">
+                <FileSpreadsheet size={28} className="mx-auto text-torg-dark mb-2" />
+                <p className="text-sm text-torg-dark font-medium mb-1">
+                  Suba o arquivo LPC (Lista de Peças por Conjunto)
+                </p>
+                <p className="text-xs text-torg-gray mb-3">
+                  Identifica conjuntos, croquis e peças avulsas automaticamente.
+                  Croquis com "-P" recebem status de preparação.
+                </p>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={parsing}
+                  className="px-4 py-1.5 bg-torg-dark text-white text-xs rounded-lg hover:bg-torg-dark/90 font-medium inline-flex items-center gap-2 disabled:opacity-50"
+                >
+                  {parsing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {parsing ? "Processando..." : "Selecionar arquivo"}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => { processar(e.target.files?.[0]); e.target.value = ""; }}
+                />
+                {arquivoNome && (
+                  <p className="text-[11px] text-torg-gray mt-2 truncate">{arquivoNome}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-torg-dark mb-1">
+                  Forçar OP (opcional — o parser detecta automaticamente pela marca)
+                </label>
+                <input
+                  type="text"
+                  value={opForcada}
+                  onChange={(e) => setOpForcada(e.target.value.toUpperCase())}
+                  placeholder="Ex: T82A"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+
+              <label className="flex items-start gap-2 text-xs text-torg-gray">
+                <input
+                  type="checkbox"
+                  checked={sobrescrever}
+                  onChange={(e) => setSobrescrever(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>Sobrescrever — apaga peças anteriores dessa OP que foram importadas via LPC antes de importar de novo.</span>
               </label>
             </>
           )}

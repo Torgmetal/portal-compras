@@ -103,7 +103,8 @@ export default function AbaResumo({ estudo }) {
     const custoEstruturaLiquido = custoTotalEstrutura - creditoMateriais;
     const custoEstruturaLiquidoKg = pesoTotal > 0 ? custoEstruturaLiquido / pesoTotal : 0;
 
-    // ══ IMPOSTOS / BDI ══
+    // ══ IMPOSTOS / BDI — Formula TCU (Acordao 2622/2013) ══
+    // BDI = [(1+AC+S+R) × (1+DF) × (1+L)] / (1−I−C) − 1
     const aliqPIS = estudo.aliqPIS ?? 1.65;
     const aliqCOFINS = estudo.aliqCOFINS ?? 7.60;
     const aliqCSLL = estudo.aliqCSLL ?? 1.08;
@@ -118,10 +119,12 @@ export default function AbaResumo({ estudo }) {
     const bdiFactoring = estudo.bdiFactoring ?? 1.6;
     const bdiLucro = estudo.bdiLucro ?? 6.0;
     const bdiComissao = estudo.bdiComissao ?? 0;
+    const custosIndiretos = bdiAdmin + bdiSeguro + bdiRisco;
     const somaBdiComponentes = bdiAdmin + bdiSeguro + bdiRisco + bdiFactoring + bdiLucro + bdiComissao;
 
-    const fatorBDI = somaImpostos < 100
-      ? (1 + somaBdiComponentes / 100) / (1 - somaImpostos / 100) - 1
+    const denominadorBDI = 1 - (somaImpostos + bdiComissao) / 100;
+    const fatorBDI = denominadorBDI > 0
+      ? ((1 + custosIndiretos / 100) * (1 + bdiFactoring / 100) * (1 + bdiLucro / 100)) / denominadorBDI - 1
       : 0;
     const percBDI = fatorBDI * 100;
 

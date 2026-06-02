@@ -1250,15 +1250,40 @@ model PecaConjunto {
   atualizadoEm           DateTime                @updatedAt
   precoTotal             Float                   @default(0)
   precoUnitario          Float                   @default(0)
+  // Campos LPC — conjunto/croqui
+  tipoPeca               String?                 // "CONJUNTO" | "CROQUI" | null (legado LE)
+  material               String?                 // "A36", "A572-GR.50"
+  perfil                 String?                 // "W410X46.1", "CH4.80X70"
+  comprimentoMm          Float?                  // comprimento em mm
+  areaPinturaM2          Float?                  // area de pintura m²
+  statusPrep             String?                 // "PENDENTE" | "PREPARADO" (so croquis)
   op                     OP?                     @relation(fields: [opId], references: [id])
   planejamentos          PecaPlanejamento[]
   planejamentoCargaItens PlanejamentoCargaItem[]
   romaneioItens          RomaneioItem[]
+  // Relacoes conjunto<->croqui (many-to-many via junction)
+  conjuntoCroquis        ConjuntoCroqui[]        @relation("ConjuntoCroquis_conjunto")
+  croquiConjuntos        ConjuntoCroqui[]        @relation("ConjuntoCroquis_croqui")
 
   @@unique([opNumero, marca])
   @@index([opId])
   @@index([status])
   @@index([marca])
+  @@index([tipoPeca])
+}
+
+// Relacao many-to-many: qual croqui pertence a qual conjunto
+model ConjuntoCroqui {
+  id             String       @id @default(cuid())
+  conjuntoId     String
+  croquiId       String
+  qtdNoConjunto  Int          @default(1)
+  conjunto       PecaConjunto @relation("ConjuntoCroquis_conjunto", fields: [conjuntoId], references: [id], onDelete: Cascade)
+  croqui         PecaConjunto @relation("ConjuntoCroquis_croqui", fields: [croquiId], references: [id], onDelete: Cascade)
+
+  @@unique([conjuntoId, croquiId])
+  @@index([conjuntoId])
+  @@index([croquiId])
 }
 
 model ProducaoDiaria {
@@ -1419,6 +1444,8 @@ model PropostaEstudo {
   itensAcessorio          AcessorioItem[]
   itensCronograma         CronogramaItem[]
   itensCusto              CustoItem[]
+  itensMontagem           MontagemItem[]
+  itensTerceirizado       TerceirizadoItem[]
   cotacoesEstudo          EstudoCotacao[]
   itensFaturamento        FaturamentoEvento[]
   cotacoesFretes          FreteCotacao[]
@@ -1451,6 +1478,47 @@ model CronogramaItem {
   estudo         PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
 
   @@index([estudoId])
+}
+
+model MontagemItem {
+  id            String         @id @default(cuid())
+  estudoId      String
+  secao         String
+  descricao     String
+  quantidade    Int            @default(1)
+  dias          Float          @default(0)
+  custoDiario   Float          @default(0)
+  custoFixo     Float          @default(0)
+  custoTotal    Float          @default(0)
+  observacao    String?
+  ordem         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  estudo        PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+  @@index([estudoId, secao])
+}
+
+model TerceirizadoItem {
+  id            String         @id @default(cuid())
+  estudoId      String
+  servico       String
+  descricao     String
+  unidade       String         @default("VB")
+  quantidade    Float          @default(1)
+  pesoKg        Float          @default(0)
+  custoUnitario Float          @default(0)
+  custoTotal    Float          @default(0)
+  fornecedor    String?
+  observacao    String?
+  ordem         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  estudo        PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+
+  @@index([estudoId])
+  @@index([estudoId, servico])
 }
 
 model FreteItem {
@@ -1719,6 +1787,37 @@ model BDMPerfil {
 
   @@index([tipo])
   @@index([codigo])
+}
+
+model CatalogoPerfilEstrutura {
+  id        String   @id @default(cuid())
+  categoria String   // VIGAS_W, PERFIL_HP, TUBO_REDONDO, etc.
+  perfil    String   // nome do perfil (ex: "W 200 x 26,6")
+  pesoKgM   Float    // peso kg/m
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([categoria, perfil])
+  @@index([categoria])
+  @@index([ativo])
+}
+
+model CatalogoProdutoAcessorio {
+  id                   String   @id @default(cuid())
+  categoria            String   // TELHAS, GRADES_DE_PISO, STEEL_DECK, PAINEIS_ISO
+  nome                 String
+  pesoM2               Float
+  espessuraMm          Float?
+  fatorDesenvolvimento Float?
+  observacao           String?
+  ativo                Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([categoria, nome])
+  @@index([categoria])
+  @@index([ativo])
 }
 
 model MesApontamento {
