@@ -1,9 +1,10 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   DollarSign, Plus, Loader2, AlertCircle, X,
   TrendingUp, TrendingDown, Pencil, Trash2, Activity,
+  FileText, RefreshCw, Clock, Search,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -159,6 +160,9 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
           Icon={saldoMes >= 0 ? TrendingUp : TrendingDown}
         />
       </div>
+
+      {/* Pedidos de venda (Medições) em aberto no Omie */}
+      <PedidosVendaSection />
 
       {/* Receita gerada por semana (baseada em Romaneios) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -485,5 +489,123 @@ function ModalFluxo({ ops, item, onClose, onSaved }) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+// ─── Pedidos de Venda (Medições) em aberto no Omie ──────────────────────────────
+function PedidosVendaSection() {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro]       = useState("");
+  const [busca, setBusca]     = useState("");
+  const [soAtrasados, setSoAtrasados] = useState(false);
+
+  const carregar = async (forcar = false) => {
+    setLoading(true); setErro("");
+    try {
+      const res = await fetch(`/api/financeiro/pedidos-venda${forcar ? "?forcar=1" : ""}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Erro");
+      setData(d);
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  };
+
+  useEffect(() => { carregar(false); }, []);
+
+  const filtrados = useMemo(() => {
+    if (!data?.pedidos) return [];
+    let base = data.pedidos;
+    if (soAtrasados) base = base.filter((p) => p.atrasado);
+    const t = busca.trim().toLowerCase();
+    if (t) base = base.filter((p) =>
+      (p.projeto || "").toLowerCase().includes(t) || (p.numero || "").toLowerCase().includes(t)
+    );
+    return base;
+  }, [data, busca, soAtrasados]);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h3 className="text-lg font-bold text-torg-dark flex items-center gap-2">
+            <FileText size={18} className="text-torg-blue" /> Pedidos de venda em aberto (Omie)
+          </h3>
+          <p className="text-xs text-torg-gray mt-0.5">
+            Medições não faturadas, com a obra (Projeto). {data?.atualizadoEm && `Atualizado ${fmtData(data.atualizadoEm)} ${new Date(data.atualizadoEm).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}.`}
+          </p>
+        </div>
+        <button onClick={() => carregar(true)} disabled={loading}
+          className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Atualizar
+        </button>
+      </div>
+
+      {/* KPIs + filtros */}
+      {data && (
+        <div className="px-6 py-3 border-b border-gray-50 flex items-center gap-4 flex-wrap">
+          <span className="text-sm"><strong className="text-torg-dark">{data.total}</strong> <span className="text-torg-gray">em aberto</span></span>
+          <button onClick={() => setSoAtrasados(v => !v)}
+            className={`text-sm px-2.5 py-1 rounded-full border inline-flex items-center gap-1.5 ${soAtrasados ? "bg-red-600 text-white border-red-600" : "bg-red-50 text-red-700 border-red-200 hover:opacity-80"}`}>
+            <Clock size={13} /> {data.totalAtrasados} atrasados
+          </button>
+          <span className="text-sm text-torg-gray">Total: <strong className="text-torg-dark">{fmtMoeda(data.totalValor)}</strong></span>
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por projeto/obra ou nº pedido…"
+              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+          </div>
+        </div>
+      )}
+
+      {erro && (
+        <div className="m-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" /> <span>{erro}</span>
+        </div>
+      )}
+
+      {loading && !data ? (
+        <div className="flex items-center justify-center gap-2 py-12 text-torg-gray">
+          <Loader2 size={20} className="animate-spin" /> <span>Consultando pedidos no Omie… (pode levar ~40s na 1ª vez)</span>
+        </div>
+      ) : data && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50/60 border-b border-gray-100">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Pedido</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projeto (obra)</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Valor</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Previsão</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtrados.map((p) => (
+                <tr key={p.codigoPedido} className={`hover:bg-gray-50 ${p.atrasado ? "bg-red-50/30" : ""}`}>
+                  <td className="px-4 py-3 font-mono text-xs text-torg-gray whitespace-nowrap">#{p.numero}</td>
+                  <td className="px-4 py-3 text-torg-dark font-medium">{p.projeto || <span className="text-gray-400 italic">sem projeto</span>}</td>
+                  <td className="px-4 py-3 text-right tabular-nums font-semibold text-torg-dark whitespace-nowrap">{fmtMoeda(p.valor)}</td>
+                  <td className="px-4 py-3 text-center text-xs whitespace-nowrap">
+                    <span className={p.atrasado ? "text-red-600 font-semibold" : "text-torg-gray"}>{fmtData(p.dataPrevisao)}</span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {p.atrasado ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium inline-flex items-center gap-1">
+                        <Clock size={11} /> Atrasado
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">{p.status}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {filtrados.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-torg-gray text-sm">Nenhum pedido em aberto encontrado.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
