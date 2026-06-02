@@ -79,9 +79,10 @@ async function handle(req, { permitirImport }) {
   }
 
   const { searchParams } = new URL(req.url);
-  const importar = permitirImport && searchParams.get("importar") === "1";
-  const dryRun   = !importar; // padrão seguro: só lista
-  const opFiltro = (searchParams.get("op") || "").trim();
+  const importar  = permitirImport && searchParams.get("importar") === "1";
+  const dryRun    = !importar; // padrão seguro: só lista
+  const opFiltro  = (searchParams.get("op") || "").trim();
+  const obraFiltro = (searchParams.get("obra") || "").trim().toUpperCase(); // importar só esta obra
 
   const driveId = await resolveServidorDriveId();
   if (!driveId) {
@@ -110,10 +111,13 @@ async function handle(req, { permitirImport }) {
     if (!atual || info.rev > atual.rev) porObra.set(info.obra, { file: f, rev: info.rev });
   }
 
-  const lista = [...porObra.entries()].map(([obra, { file, rev }]) => ({
+  let lista = [...porObra.entries()].map(([obra, { file, rev }]) => ({
     obra, rev, nome: file.name, pasta: file.folderPath, id: file.id,
     modificado: file.lastModified, tamanhoKb: Math.round((file.size || 0) / 1024),
   })).sort((a, b) => a.obra.localeCompare(b.obra, undefined, { numeric: true }));
+
+  // Filtro opcional por obra (ex: importar só T78A por vez — evita timeout)
+  if (obraFiltro) lista = lista.filter(x => x.obra === obraFiltro);
 
   // 3. Dry-run: só retorna a lista do que seria importado
   if (dryRun) {
