@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { DollarSign } from "lucide-react";
+import { DollarSign, FileText } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/financeiro", label: "Fluxo de Caixa", icon: DollarSign, exact: true },
+  { href: "/financeiro/faturamento", label: "Faturamento por obra", icon: FileText },
   // Futuro: Receita projetada, Tributos, Conciliação, etc.
 ];
 

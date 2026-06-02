@@ -1,10 +1,9 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   DollarSign, Plus, Loader2, AlertCircle, X,
   TrendingUp, TrendingDown, Pencil, Trash2, Activity,
-  FileText, RefreshCw, Clock, Search,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -273,9 +272,6 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
         )}
       </div>
 
-      {/* Faturamento por obra (Omie) — separado, abaixo do Fluxo de Caixa */}
-      <PedidosVendaSection />
-
       {modalFluxo && (
         <ModalFluxo
           ops={ops}
@@ -489,163 +485,5 @@ function ModalFluxo({ ops, item, onClose, onSaved }) {
         </div>
       </div>
     </Modal>
-  );
-}
-
-// ─── Pedidos de Venda por OBRA: faturado vs a faturar (Omie) ────────────────────
-function PedidosVendaSection() {
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [erro, setErro]       = useState("");
-  const [busca, setBusca]     = useState("");
-  const [soAFaturar, setSoAFaturar] = useState(false);
-  const [expandida, setExpandida] = useState(null);
-
-  const carregar = async (forcar = false) => {
-    setLoading(true); setErro("");
-    try {
-      const res = await fetch(`/api/financeiro/pedidos-venda${forcar ? "?forcar=1" : ""}`);
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Erro");
-      setData(d);
-    } catch (e) { setErro(e.message); } finally { setLoading(false); }
-  };
-  useEffect(() => { carregar(false); }, []);
-
-  const obras = useMemo(() => {
-    if (!data?.obras) return [];
-    let base = data.obras;
-    if (soAFaturar) base = base.filter((o) => o.aFaturar > 0);
-    const t = busca.trim().toLowerCase();
-    if (t) base = base.filter((o) => (o.projeto || "").toLowerCase().includes(t));
-    return base;
-  }, [data, busca, soAFaturar]);
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="text-lg font-bold text-torg-dark flex items-center gap-2">
-            <FileText size={18} className="text-torg-blue" /> Faturamento por obra (Omie)
-          </h3>
-          <p className="text-xs text-torg-gray mt-0.5">
-            Pedidos de venda (medições) por projeto/obra: quanto já foi faturado e quanto falta.
-            {data?.atualizadoEm && ` Atualizado ${fmtData(data.atualizadoEm)} ${new Date(data.atualizadoEm).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}.`}
-          </p>
-        </div>
-        <button onClick={() => carregar(true)} disabled={loading}
-          className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Atualizar
-        </button>
-      </div>
-
-      {data && (
-        <div className="px-6 py-3 border-b border-gray-50 flex items-center gap-4 flex-wrap text-sm">
-          <span className="text-torg-gray">Faturado: <strong className="text-green-700">{fmtMoeda(data.totalFaturado)}</strong></span>
-          <span className="text-torg-gray">A faturar: <strong className="text-amber-700">{fmtMoeda(data.totalAFaturar)}</strong></span>
-          <button onClick={() => setSoAFaturar(v => !v)}
-            className={`px-2.5 py-1 rounded-full border text-xs inline-flex items-center gap-1.5 ${soAFaturar ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 text-amber-700 border-amber-200 hover:opacity-80"}`}>
-            Só com a faturar
-          </button>
-          {data.obrasComAtraso > 0 && (
-            <span className="text-xs px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 inline-flex items-center gap-1.5">
-              <Clock size={12} /> {data.obrasComAtraso} obras com atraso
-            </span>
-          )}
-          <div className="relative flex-1 min-w-[200px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar obra/projeto…"
-              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
-          </div>
-        </div>
-      )}
-
-      {erro && (
-        <div className="m-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
-          <AlertCircle size={14} className="mt-0.5 shrink-0" /> <span>{erro}</span>
-        </div>
-      )}
-
-      {loading && !data ? (
-        <div className="flex items-center justify-center gap-2 py-12 text-torg-gray">
-          <Loader2 size={20} className="animate-spin" /> <span>Consultando pedidos no Omie… (pode levar ~40s na 1ª vez)</span>
-        </div>
-      ) : data && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50/60 border-b border-gray-100">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Obra / Projeto</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Faturado</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">A faturar</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Total</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">% Fat.</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {obras.map((o) => (
-                <FragmentObra key={o.codProj} obra={o} aberta={expandida === o.codProj}
-                  onToggle={() => setExpandida(expandida === o.codProj ? null : o.codProj)} />
-              ))}
-              {obras.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-torg-gray text-sm">Nenhuma obra encontrada.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FragmentObra({ obra, aberta, onToggle }) {
-  return (
-    <>
-      <tr className={`hover:bg-gray-50 cursor-pointer ${obra.atrasado ? "bg-red-50/20" : ""}`} onClick={onToggle}>
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className={`text-gray-400 transition-transform ${aberta ? "rotate-90" : ""}`}>▶</span>
-            <span className="text-torg-dark font-medium">{obra.projeto}</span>
-            {obra.atrasado && <Clock size={13} className="text-red-500" />}
-          </div>
-        </td>
-        <td className="px-4 py-3 text-right tabular-nums text-green-700 font-semibold whitespace-nowrap">{fmtMoeda(obra.faturado)}</td>
-        <td className={`px-4 py-3 text-right tabular-nums font-semibold whitespace-nowrap ${obra.aFaturar > 0 ? "text-amber-700" : "text-gray-400"}`}>{fmtMoeda(obra.aFaturar)}</td>
-        <td className="px-4 py-3 text-right tabular-nums text-torg-dark font-bold whitespace-nowrap">{fmtMoeda(obra.total)}</td>
-        <td className="px-4 py-3">
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-xs font-semibold text-torg-dark">{obra.pctFaturado}%</span>
-            <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-green-500 rounded-full" style={{ width: `${obra.pctFaturado}%` }} />
-            </div>
-          </div>
-        </td>
-      </tr>
-      {aberta && obra.pedidos.map((ped) => (
-        <tr key={ped.numero} className="bg-gray-50/40">
-          <td colSpan={5} className="px-4 py-2">
-            <div className="pl-6">
-              <div className="text-xs font-semibold text-torg-gray mb-1">
-                Pedido #{ped.numero} — {ped.parcelas.length} parcela(s) · faturado {fmtMoeda(ped.faturado)} · a faturar {fmtMoeda(ped.aFaturar)}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {ped.parcelas.map((pc) => {
-                  const cor = pc.situacao === "Cancelado" ? "bg-gray-100 text-gray-400 line-through border-gray-200"
-                    : pc.situacao === "Faturado" ? "bg-green-50 text-green-700 border-green-200"
-                    : pc.atrasado ? "bg-red-50 text-red-700 border-red-200"
-                    : "bg-amber-50 text-amber-700 border-amber-200";
-                  return (
-                    <span key={pc.codigoPedido} className={`text-[11px] px-2 py-0.5 rounded border ${cor}`}
-                      title={`Seq ${pc.sequencial} — ${pc.situacao}`}>
-                      {ped.numero}/{pc.sequencial} · {fmtMoeda(pc.valor)} · {pc.situacao}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </td>
-        </tr>
-      ))}
-    </>
   );
 }
