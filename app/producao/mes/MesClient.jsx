@@ -647,6 +647,37 @@ function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
     return () => { ativo = false; };
   }, [abaPeca, obraFiltro]);
 
+  // ── Tab Conjuntos (montável: LPC × Syneco) ──────────────────────────────────
+  const [conjData, setConjData] = useState(null);
+  const [loadConj, setLoadConj] = useState(false);
+  const [erroConj, setErroConj] = useState(null);
+  const [filtroConj, setFiltroConj] = useState(""); // "" | "montavel" | "parcial" | "semInicio"
+
+  useEffect(() => {
+    if (abaPeca !== "conjuntos" || !obraFiltro) { setConjData(null); return; }
+    let ativo = true;
+    setLoadConj(true);
+    setErroConj(null);
+    fetch(`/api/mes/conjuntos?obra=${encodeURIComponent(obraFiltro)}`)
+      .then(r => r.json())
+      .then(d => { if (ativo) { setConjData(d); setLoadConj(false); } })
+      .catch(e => { if (ativo) { setErroConj(e.message); setLoadConj(false); } });
+    return () => { ativo = false; };
+  }, [abaPeca, obraFiltro]);
+
+  const conjuntosFiltrados = useMemo(() => {
+    if (!conjData?.conjuntos) return [];
+    let base = conjData.conjuntos;
+    if (filtroConj === "montavel")  base = base.filter(c => c.montavel);
+    if (filtroConj === "parcial")   base = base.filter(c => !c.montavel && c.marcasProntas > 0);
+    if (filtroConj === "semInicio") base = base.filter(c => c.marcasProntas === 0);
+    const termo = (busca || "").trim().toLowerCase();
+    if (termo) base = base.filter(c =>
+      (c.marca || "").toLowerCase().includes(termo) || (c.descricao || "").toLowerCase().includes(termo)
+    );
+    return base;
+  }, [conjData, filtroConj, busca]);
+
   // ── Filtros client-side (status + busca vêm da sidebar global) ──────────────
   const filtradosAp = useMemo(() => {
     const termo = (busca || "").trim().toLowerCase();
@@ -696,6 +727,7 @@ function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
         <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
           {[
             { id: "rastreabilidade", label: "Rastreabilidade" },
+            { id: "conjuntos",       label: "Conjuntos" },
             { id: "apontamentos",    label: "Apontamentos" },
           ].map(({ id, label }) => (
             <button
@@ -941,6 +973,124 @@ function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
                 </div>
               )}
             </div>
+          )}
+        </>
+      )}
+
+      {/* ── TAB: CONJUNTOS (montável — LPC × Syneco) ── */}
+      {abaPeca === "conjuntos" && (
+        <>
+          {!obraFiltro && (
+            <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-3 bg-white rounded-xl border border-dashed border-gray-200">
+              <Package size={36} className="opacity-30" />
+              <div className="text-center">
+                <div className="font-medium">Selecione uma OP acima</div>
+                <div className="text-sm text-gray-400 mt-1">Ex: T78 → ver quais conjuntos podem ser montados</div>
+              </div>
+            </div>
+          )}
+          {obraFiltro && erroConj && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              <AlertCircle size={15} /> {erroConj}
+            </div>
+          )}
+          {obraFiltro && loadConj && (
+            <div className="flex items-center justify-center gap-2 py-12 text-torg-gray">
+              <Loader2 size={20} className="animate-spin" /> <span>Calculando conjuntos montáveis…</span>
+            </div>
+          )}
+          {obraFiltro && conjData && !loadConj && (
+            conjData.conjuntos?.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-3 bg-white rounded-xl border border-dashed border-gray-200">
+                <Package size={36} className="opacity-30" />
+                <div className="text-center">
+                  <div className="font-medium">Nenhum conjunto importado para {obraFiltro}</div>
+                  <div className="text-sm text-gray-400 mt-1">Importe a LPC desta obra (Produção → Peças / SharePoint).</div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Chips de status do conjunto */}
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { val: "",          label: "Todos",        cnt: conjData.contagens?.total     || 0, cor: "bg-torg-dark text-white" },
+                    { val: "montavel",  label: "Pode montar",  cnt: conjData.contagens?.montaveis || 0, cor: "bg-green-600 text-white",  off: "bg-green-50 text-green-700 border-green-200" },
+                    { val: "parcial",   label: "Parcial",      cnt: conjData.contagens?.parciais  || 0, cor: "bg-yellow-500 text-white", off: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+                    { val: "semInicio", label: "Sem início",   cnt: conjData.contagens?.semInicio || 0, cor: "bg-gray-500 text-white",   off: "bg-gray-50 text-gray-600 border-gray-200" },
+                  ].map(({ val, label, cnt, cor, off }) => (
+                    <button key={val} onClick={() => setFiltroConj(val)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                        filtroConj === val ? cor + " border-transparent" : (off || "bg-gray-100 text-gray-600 border-gray-200") + " hover:opacity-80"
+                      }`}>
+                      {label} <span className="text-[10px] font-bold opacity-70">{cnt}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-50 text-sm text-torg-dark">
+                    <strong>{conjuntosFiltrados.length}</strong> de {conjData.contagens?.total || 0} conjuntos — <strong>{obraFiltro}</strong>
+                    <span className="text-torg-gray ml-2 text-xs">({conjData.marcasComProducao}/{conjData.totalMarcas} marcas com registro no Syneco)</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50/60 sticky top-0">
+                        <tr>
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Conjunto</th>
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
+                          <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Peso</th>
+                          <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Marcas prontas</th>
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Status</th>
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Faltam</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {conjuntosFiltrados.map(c => {
+                          const pct = c.totalMarcas > 0 ? Math.round((c.marcasProntas / c.totalMarcas) * 100) : 0;
+                          const cor = c.montavel ? "text-green-800 bg-green-100 border-green-300"
+                            : c.marcasProntas > 0 ? "text-yellow-700 bg-yellow-50 border-yellow-200"
+                            : "text-gray-500 bg-gray-50 border-gray-200";
+                          const corBarra = c.montavel ? "bg-green-500" : c.marcasProntas > 0 ? "bg-yellow-400" : "bg-gray-200";
+                          return (
+                            <tr key={c.id} className="hover:bg-gray-50/50">
+                              <td className="px-4 py-2.5 font-mono text-xs font-bold text-torg-blue whitespace-nowrap">{c.marca}</td>
+                              <td className="px-4 py-2.5 text-gray-700 max-w-[160px] truncate" title={c.descricao}>{c.descricao || "—"}</td>
+                              <td className="px-4 py-2.5 text-right text-gray-500 text-xs whitespace-nowrap">{fmtNum(c.pesoTotalKg)} kg</td>
+                              <td className="px-4 py-2.5 text-right min-w-[120px]">
+                                <div className="flex flex-col items-end gap-0.5">
+                                  <span className="font-semibold text-sm text-torg-dark">{c.marcasProntas}/{c.totalMarcas}</span>
+                                  <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${corBarra}`} style={{ width: `${pct}%` }} />
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2.5 whitespace-nowrap">
+                                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cor}`}>
+                                  {c.montavel ? "✓ Pode montar" : c.marcasProntas > 0 ? "◑ Parcial" : "Sem início"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5">
+                                {c.faltam === 0 ? <span className="text-green-600 text-xs">—</span> : (
+                                  <div className="flex flex-wrap gap-1 max-w-[280px]">
+                                    {c.marcasFaltantes.slice(0, 6).map(m => (
+                                      <span key={m.marca} title={`${m.descricao || ""} (${m.qtd}x)${m.noSyneco ? "" : " — não está no Syneco"}`}
+                                        className={`text-[10px] px-1.5 py-0.5 rounded border font-mono ${m.noSyneco ? "bg-red-50 text-red-600 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                                        {m.marca}
+                                      </span>
+                                    ))}
+                                    {c.faltam > 6 && <span className="text-[10px] text-gray-400">+{c.faltam - 6}</span>}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
           )}
         </>
       )}
