@@ -45,11 +45,12 @@ async function resolveServidorDriveId() {
   return process.env.SHAREPOINT_DRIVE_ID || null;
 }
 
-// Extrai obra e revisão do nome do arquivo: "T78A-LPC_R01.xlsx" → { obra:"T78A", rev:1 }
+// Extrai obra (T<num><letra>) e revisão (R<num>) do nome: "T78A-LPC_R01.xlsx" → { obra:"T78A", rev:1 }
 function parseNomeLpc(nome) {
-  const m = nome.match(/^(.+?)[-_ ]*LPC[_ -]*R?(\d+)?/i);
-  if (!m) return null;
-  return { obra: m[1].replace(/[-_ ]+$/, "").toUpperCase(), rev: m[2] ? parseInt(m[2], 10) : 0 };
+  const mObra = nome.match(/(T\d+[A-Z]?)\b/i);
+  if (!mObra) return null;
+  const mRev = nome.match(/[_-]R(\d+)/i);
+  return { obra: mObra[1].toUpperCase(), rev: mRev ? parseInt(mRev[1], 10) : 0 };
 }
 
 // GET = sempre dry-run (somente leitura — fácil de abrir no navegador).
@@ -97,10 +98,12 @@ async function handle(req, { permitirImport }) {
     return NextResponse.json({ error: `Falha ao varrer SharePoint (${folder}): ${e.message}` }, { status: 502 });
   }
 
-  // 2. Filtra LPC e agrupa por obra, escolhendo a revisão mais alta
+  // 2. Filtra LPC na pasta canônica "Lista de Liberação" e agrupa por obra (revisão mais alta)
+  // (ignora cópias em outras pastas como "2.5.5 Cliente/Fabricação/Listas")
   const porObra = new Map(); // obra → { file, rev }
   for (const f of arquivos) {
     if (!/LPC/i.test(f.name)) continue;
+    if (!/Lista de Libera/i.test(f.folderPath || "")) continue; // só a pasta canônica
     const info = parseNomeLpc(f.name);
     if (!info) continue;
     const atual = porObra.get(info.obra);
