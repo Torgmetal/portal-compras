@@ -1,6 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import { FileText, RefreshCw, Clock, Search, Loader2, AlertCircle } from "lucide-react";
+import { FileText, RefreshCw, Clock, Search, Loader2, AlertCircle, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -13,6 +13,19 @@ export default function FaturamentoClient() {
   const [busca, setBusca]     = useState("");
   const [soAFaturar, setSoAFaturar] = useState(false);
   const [expandida, setExpandida] = useState(null);
+  // Ordenação: campo + direção. Default = mais a faturar primeiro (igual ao backend).
+  const [ordenarPor, setOrdenarPor] = useState("aFaturar");
+  const [direcao, setDirecao] = useState("desc");
+
+  const clicarOrdenar = (campo) => {
+    if (ordenarPor === campo) {
+      setDirecao((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setOrdenarPor(campo);
+      // texto começa A→Z; números começam do maior pro menor
+      setDirecao(campo === "projeto" ? "asc" : "desc");
+    }
+  };
 
   const carregar = async (forcar = false) => {
     setLoading(true); setErro("");
@@ -31,8 +44,17 @@ export default function FaturamentoClient() {
     if (soAFaturar) base = base.filter((o) => o.aFaturar > 0);
     const t = busca.trim().toLowerCase();
     if (t) base = base.filter((o) => (o.projeto || "").toLowerCase().includes(t));
-    return base;
-  }, [data, busca, soAFaturar]);
+
+    const fator = direcao === "asc" ? 1 : -1;
+    const ordenada = [...base].sort((a, b) => {
+      if (ordenarPor === "projeto") {
+        return fator * String(a.projeto || "").localeCompare(String(b.projeto || ""), "pt-BR", { numeric: true });
+      }
+      const va = Number(a[ordenarPor] || 0), vb = Number(b[ordenarPor] || 0);
+      return fator * (va - vb);
+    });
+    return ordenada;
+  }, [data, busca, soAFaturar, ordenarPor, direcao]);
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -106,11 +128,11 @@ Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado
             <table className="w-full text-sm">
               <thead className="bg-gray-50/60 border-b border-gray-100">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Obra / Projeto</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Faturado</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">A faturar</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Total</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">% Fat.</th>
+                  <Th campo="projeto"   label="Obra / Projeto" align="left"   {...{ ordenarPor, direcao, clicarOrdenar }} />
+                  <Th campo="faturado"  label="Faturado"       align="right"  {...{ ordenarPor, direcao, clicarOrdenar }} />
+                  <Th campo="aFaturar"  label="A faturar"      align="right"  {...{ ordenarPor, direcao, clicarOrdenar }} />
+                  <Th campo="total"     label="Total"          align="right"  {...{ ordenarPor, direcao, clicarOrdenar }} />
+                  <Th campo="pctFaturado" label="% Fat."       align="center" {...{ ordenarPor, direcao, clicarOrdenar }} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -127,6 +149,22 @@ Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado
         </div>
       )}
     </div>
+  );
+}
+
+function Th({ campo, label, align, ordenarPor, direcao, clicarOrdenar }) {
+  const ativo = ordenarPor === campo;
+  const just = align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
+  const txt = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  const Icon = !ativo ? ChevronsUpDown : direcao === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th className={`px-4 py-3 ${txt} text-xs font-medium uppercase whitespace-nowrap select-none`}>
+      <button onClick={() => clicarOrdenar(campo)}
+        className={`inline-flex items-center gap-1 ${just} w-full hover:text-torg-blue transition-colors ${ativo ? "text-torg-blue" : "text-gray-500"}`}>
+        {label}
+        <Icon size={13} className={ativo ? "opacity-100" : "opacity-40"} />
+      </button>
+    </th>
   );
 }
 
