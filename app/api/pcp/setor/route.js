@@ -21,6 +21,7 @@ export async function GET(req) {
     return NextResponse.json({ error: e.message }, { status });
   }
 
+  try {
   const { searchParams } = new URL(req.url);
   const setor = searchParams.get("setor");
   const dias = Math.min(Number(searchParams.get("dias")) || 7, 30);
@@ -153,4 +154,7 @@ export async function GET(req) {
     produzindoAgora: [...produzindoMap.values()],
     operadores,
   });
+  } catch (e) {
+    return NextResponse.json({ error: e.message || "Erro interno" }, { status: 500 });
+  }
 }
