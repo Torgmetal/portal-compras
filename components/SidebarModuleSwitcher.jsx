@@ -186,7 +186,7 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
 
       {/* Dropdown de módulos */}
       {aberto && (
-        <div className="absolute left-3 right-3 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="absolute left-3 right-3 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-2 animate-in fade-in slide-in-from-top-1 duration-150 max-h-[75vh] overflow-y-auto">
           <div className="px-3 py-1.5 mb-1">
             <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold flex items-center gap-1.5">
               <LayoutGrid size={11} />
