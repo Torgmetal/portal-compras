@@ -348,7 +348,7 @@ export default async function PainelOPDetalhe({ params }) {
                   {(() => {
                     const s = STATUS_RM_BADGE[rm.status] || STATUS_RM_BADGE.ABERTA;
                     return (
-                      <span className={`px-2 py-0.5 rounded-full font-medium ${s.className}`}>
+                      <span className={`px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${s.className}`}>
                         {s.label}
                       </span>
                     );

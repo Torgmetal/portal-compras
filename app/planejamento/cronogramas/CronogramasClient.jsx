@@ -751,7 +751,7 @@ function SuprimentoRow({ item }) {
         ) : "—"}
       </td>
       <td className="px-2 py-1.5">
-        <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${st.color}`}>{st.label}</span>
+        <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap ${st.color}`}>{st.label}</span>
       </td>
       <td className="px-2 py-1.5 truncate max-w-[120px]" title={item.fornecedor}>{item.fornecedor || "—"}</td>
       <td className="px-2 py-1.5 font-mono whitespace-nowrap">{item.numeroPedido || "—"}</td>

@@ -186,7 +186,7 @@ export default async function PainelOPs({ searchParams }) {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-mono font-semibold text-torg-blue text-lg">{fmtOP(op.numero)}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${s.className}`}>
                           {s.label}
                         </span>
                       </div>

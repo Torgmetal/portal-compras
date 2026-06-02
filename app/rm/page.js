@@ -168,7 +168,7 @@ export default async function MinhasRMs({ searchParams }) {
                       </td>
                       {!isAlmoxSemEng && !isEngSemAlmox && (
                         <td className="px-6 py-3">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.className}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${t.className}`}>
                             {t.label}
                           </span>
                         </td>
@@ -196,7 +196,7 @@ export default async function MinhasRMs({ searchParams }) {
                       </td>
                       <td className="px-6 py-3 text-torg-gray">{fmtData(rm.createdAt)}</td>
                       <td className="px-6 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.className}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${s.className}`}>
                           {s.label}
                         </span>
                       </td>
