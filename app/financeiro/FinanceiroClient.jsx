@@ -161,9 +161,6 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
         />
       </div>
 
-      {/* Pedidos de venda (Medições) em aberto no Omie */}
-      <PedidosVendaSection />
-
       {/* Receita gerada por semana (baseada em Romaneios) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
@@ -275,6 +272,9 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
           </div>
         )}
       </div>
+
+      {/* Faturamento por obra (Omie) — separado, abaixo do Fluxo de Caixa */}
+      <PedidosVendaSection />
 
       {modalFluxo && (
         <ModalFluxo
