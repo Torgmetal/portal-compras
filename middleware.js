@@ -41,7 +41,9 @@ export default withAuth(
           path.startsWith("/api/frete-cotacao/") ||
           path.startsWith("/api/estudo-cotacao/") ||
           // Sync MES — autenticado por Bearer API key própria (não NextAuth)
-          path.startsWith("/api/mes/")
+          path.startsWith("/api/mes/") ||
+          // Sync LPC SharePoint — auth própria (Bearer MES_SYNC_API_KEY ou sessão no handler)
+          path.startsWith("/api/producao/pecas/sync-lpc-sharepoint")
         ) {
           return true;
         }
