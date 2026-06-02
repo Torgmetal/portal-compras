@@ -1,0 +1,119 @@
+// POST /api/producao/pecas/sync-lpc-sharepoint
+// Varre as pastas das OPs no SharePoint, acha os arquivos *-LPC_*.xlsx,
+// pega a revisão mais recente por obra, baixa, parseia e importa (conjunto→marca).
+//
+// Query params:
+//   ?dryRun=1   → só LISTA os LPC que importaria (não grava). Padrão = 1 (seguro).
+//   ?importar=1 → executa a importação de fato.
+//   ?op=OP-078  → restringe a uma OP específica (mais rápido).
+//
+// Config (.env):
+//   SHAREPOINT_SERVIDOR_DRIVE_ID  (drive da biblioteca SERVIDOR; cai p/ SHAREPOINT_DRIVE_ID)
+//   SHAREPOINT_OP_BASE_FOLDER     (padrão: "/Ordem de Servico/01. OP")
+
+import { NextResponse } from "next/server";
+import { requireRole } from "@/lib/session";
+import { listAllFilesRecursive, downloadFileById } from "@/lib/sharepoint";
+import { parseLPC } from "@/lib/parse-lpc";
+import { importarLpcParsed } from "@/lib/importar-lpc-core";
+import * as XLSX from "xlsx";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+// Extrai obra e revisão do nome do arquivo: "T78A-LPC_R01.xlsx" → { obra:"T78A", rev:1 }
+function parseNomeLpc(nome) {
+  const m = nome.match(/^(.+?)[-_ ]*LPC[_ -]*R?(\d+)?/i);
+  if (!m) return null;
+  return { obra: m[1].replace(/[-_ ]+$/, "").toUpperCase(), rev: m[2] ? parseInt(m[2], 10) : 0 };
+}
+
+export async function POST(req) {
+  let user;
+  try {
+    user = await requireRole(["ADMIN", "PRODUCAO"]);
+  } catch (e) {
+    return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const importar = searchParams.get("importar") === "1";
+  const dryRun   = !importar; // padrão seguro: só lista
+  const opFiltro = (searchParams.get("op") || "").trim();
+
+  const driveId = process.env.SHAREPOINT_SERVIDOR_DRIVE_ID || process.env.SHAREPOINT_DRIVE_ID;
+  if (!driveId) {
+    return NextResponse.json({ error: "SHAREPOINT_SERVIDOR_DRIVE_ID não configurado no .env" }, { status: 503 });
+  }
+  const baseFolder = process.env.SHAREPOINT_OP_BASE_FOLDER || "/Ordem de Servico/01. OP";
+  const folder = opFiltro ? `${baseFolder}/${opFiltro}` : baseFolder;
+
+  // 1. Varre recursivamente buscando arquivos xlsx
+  let arquivos;
+  try {
+    arquivos = await listAllFilesRecursive(driveId, folder, { maxDepth: 8, supportedTypes: ["xlsx"] });
+  } catch (e) {
+    return NextResponse.json({ error: `Falha ao varrer SharePoint (${folder}): ${e.message}` }, { status: 502 });
+  }
+
+  // 2. Filtra LPC e agrupa por obra, escolhendo a revisão mais alta
+  const porObra = new Map(); // obra → { file, rev }
+  for (const f of arquivos) {
+    if (!/LPC/i.test(f.name)) continue;
+    const info = parseNomeLpc(f.name);
+    if (!info) continue;
+    const atual = porObra.get(info.obra);
+    if (!atual || info.rev > atual.rev) porObra.set(info.obra, { file: f, rev: info.rev });
+  }
+
+  const lista = [...porObra.entries()].map(([obra, { file, rev }]) => ({
+    obra, rev, nome: file.name, pasta: file.folderPath, id: file.id,
+    modificado: file.lastModified, tamanhoKb: Math.round((file.size || 0) / 1024),
+  })).sort((a, b) => a.obra.localeCompare(b.obra, undefined, { numeric: true }));
+
+  // 3. Dry-run: só retorna a lista do que seria importado
+  if (dryRun) {
+    return NextResponse.json({
+      dryRun: true,
+      pastaVarrida: folder,
+      totalXlsx: arquivos.length,
+      lpcEncontrados: lista.length,
+      arquivos: lista,
+      aviso: "Modo dry-run (não gravou nada). Para importar de fato, chame com ?importar=1",
+    });
+  }
+
+  // 4. Importa cada LPC (respeitando orçamento de tempo do Vercel)
+  const budget = Date.now() + 50_000;
+  const resultados = [];
+  let importados = 0, pulados = 0;
+
+  for (const item of lista) {
+    if (Date.now() > budget) {
+      pulados = lista.length - importados;
+      break;
+    }
+    try {
+      const { buffer } = await downloadFileById(driveId, item.id);
+      const wb = XLSX.read(buffer, { type: "buffer" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      const parsed = parseLPC(rows);
+      if (parsed.erro) { resultados.push({ obra: item.obra, nome: item.nome, erro: parsed.erro }); continue; }
+      const res = await importarLpcParsed(parsed, { sobrescrever: true, userId: user.id });
+      resultados.push({ obra: item.obra, nome: item.nome, ...res });
+      importados++;
+    } catch (e) {
+      resultados.push({ obra: item.obra, nome: item.nome, erro: e.message });
+    }
+  }
+
+  return NextResponse.json({
+    dryRun: false,
+    pastaVarrida: folder,
+    lpcEncontrados: lista.length,
+    importados,
+    pulados,
+    resultados,
+  });
+}
