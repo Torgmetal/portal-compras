@@ -63,11 +63,18 @@ export async function POST(req) {
 }
 
 async function handle(req, { permitirImport }) {
+  // Auth: sessão (ADMIN/PRODUCAO) OU Bearer MES_SYNC_API_KEY (automação/testes)
+  const auth = req.headers.get("authorization") || "";
+  const bearerOk = process.env.MES_SYNC_API_KEY && auth.startsWith("Bearer ") && auth.slice(7) === process.env.MES_SYNC_API_KEY;
   let user;
-  try {
-    user = await requireRole(["ADMIN", "PRODUCAO"]);
-  } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
+  if (bearerOk) {
+    user = { id: null };
+  } else {
+    try {
+      user = await requireRole(["ADMIN", "PRODUCAO"]);
+    } catch (e) {
+      return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
+    }
   }
 
   const { searchParams } = new URL(req.url);
