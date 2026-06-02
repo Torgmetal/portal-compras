@@ -93,8 +93,9 @@ export async function POST(req) {
 
   let criados = 0, atualizados = 0;
   try {
-    // Sub-lotes de 1000 para o INSERT em massa (cabe num SQL sem estourar)
-    const SUB = 1000;
+    // Sub-lotes de 200 para o INSERT em massa.
+    // (1000 estourava a memória do Neon — "out of memory" code 53200.)
+    const SUB = 200;
     for (let i = 0; i < body.ordens.length; i += SUB) {
       // Dedup dentro do lote pela chave (evita "ON CONFLICT afetar linha 2x no mesmo comando")
       const vistos = new Set();
