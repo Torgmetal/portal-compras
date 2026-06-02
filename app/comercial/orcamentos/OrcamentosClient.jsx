@@ -8,6 +8,7 @@ import {
   Calendar, BarChart3,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { fmtOP } from "@/lib/utils";
 
 // ─── CONSTANTES ─────────────────────────────────────────────────
 
@@ -955,7 +956,7 @@ function VerOrcamentoModal({ orcamento, onClose, onEditar }) {
   }
 
   if (orcamento.op) {
-    campos.push({ label: "OP vinculada", value: orcamento.op.numero });
+    campos.push({ label: "OP vinculada", value: fmtOP(orcamento.op.numero) });
   }
 
   if (orcamento.observacoes) {

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { fmtOP } from "@/lib/utils";
 import {
   FileText, Plus, Loader2, AlertCircle, X, Pencil, Trash2,
   Truck, Package, Activity,
@@ -140,7 +141,7 @@ export default function ExpedicaoClient({ ops, romaneios }) {
                     <td className="px-4 py-2 text-xs">
                       {r.op ? (
                         <>
-                          <span className="font-mono text-torg-blue">{r.op.numero}</span>
+                          <span className="font-mono text-torg-blue">{fmtOP(r.op.numero)}</span>
                           <span className="text-torg-gray block text-[10px]">{r.op.cliente}</span>
                         </>
                       ) : <span className="text-torg-gray">—</span>}

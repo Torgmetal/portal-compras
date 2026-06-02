@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { PackageSearch, CheckCircle2, Clock, AlertTriangle, XCircle, Inbox } from "lucide-react";
+import { fmtOP } from "@/lib/utils";
 
 export default function ConsultaEstoqueListClient({ consultas }) {
   const [filtro, setFiltro] = useState("TODAS");
@@ -61,7 +62,7 @@ export default function ConsultaEstoqueListClient({ consultas }) {
               if (it.resposta) acc[it.resposta] = (acc[it.resposta] || 0) + 1;
               return acc;
             }, {});
-            const opLabel = c.rm.op ? `OP ${c.rm.op.numero}` : "Sem OP";
+            const opLabel = c.rm.op ? fmtOP(c.rm.op.numero) : "Sem OP";
 
             return (
               <Link

@@ -21,7 +21,7 @@ export async function GET() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        call: "ListarEstoqueLocal",
+        call: "ListarLocaisEstoque",
         app_key: appKey,
         app_secret: appSecret,
         param: [{ nPagina: 1, nRegPorPagina: 100 }],
@@ -33,12 +33,13 @@ export async function GET() {
       return NextResponse.json({ error: data.faultstring }, { status: 400 });
     }
 
-    // Resposta tipica: { cadastros: [{ nCodLocal, cCodLocal, cDescricao, ... }] }
-    const lista = (data.cadastros || data.local || data.locais || []).map((l) => ({
-      nCodLocal: l.nCodLocal || l.codigo_local || 0,
-      cCodLocal: l.cCodLocal || l.codigo || "",
-      cDescricao: l.cDescricao || l.descricao || "",
-      cAtivo: l.cAtivo || l.ativo || "S",
+    // Resposta Omie: { locaisEncontrados: [{ codigo_local_estoque, codigo, descricao, inativo, ... }] }
+    const raw = data.locaisEncontrados || data.cadastros || data.locais || [];
+    const lista = raw.map((l) => ({
+      nCodLocal: l.codigo_local_estoque || l.nCodLocal || 0,
+      cCodLocal: l.codigo || l.cCodLocal || "",
+      cDescricao: l.descricao || l.cDescricao || "",
+      cAtivo: l.inativo === "S" ? "N" : "S",
     })).filter((l) => l.cAtivo !== "N" && l.cDescricao);
 
     return NextResponse.json({ locais: lista, _meta: { count: lista.length } });

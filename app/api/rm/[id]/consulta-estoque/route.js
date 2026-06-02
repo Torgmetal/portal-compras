@@ -256,8 +256,8 @@ export async function PATCH(req, { params }) {
     if (!consulta || consulta.rmId !== id) {
       return NextResponse.json({ success: false, error: "Consulta não encontrada" }, { status: 404 });
     }
-    if (consulta.status !== "ENVIADA") {
-      return NextResponse.json({ success: false, error: "Só é possível cancelar consultas pendentes" }, { status: 400 });
+    if (consulta.status === "CANCELADA") {
+      return NextResponse.json({ success: false, error: "Consulta ja esta cancelada" }, { status: 400 });
     }
 
     await prisma.consultaEstoque.update({

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Check, X, AlertCircle } from "lucide-react";
+import { fmtOP } from "@/lib/utils";
 
 const fmtMoeda = (v) =>
   Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -52,7 +53,7 @@ export default function AprovacoesClient({ items }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-2">
                   <Link href={`/comercial/${it.opId}`} className="text-xs font-mono font-semibold text-torg-blue hover:underline">
-                    OP {it.opNumero}
+                    {fmtOP(it.opNumero)}
                   </Link>
                   <span className="text-xs text-torg-gray">— {it.cliente}</span>
                   {it.aditivoNumero && (

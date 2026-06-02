@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
+import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, AlertCircle, Loader2, Mail, X, FileText, Send, Copy, Check, ExternalLink, CheckCircle2, Truck, Clock, LayoutGrid, List, Plus } from "lucide-react";
@@ -272,7 +273,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
                     <td className="px-6 py-3 text-torg-dark whitespace-nowrap">
                       {rm.op ? (
                         <>
-                          <span className="font-mono text-xs">{rm.op.numero}</span>
+                          <span className="font-mono text-xs">{fmtOP(rm.op.numero)}</span>
                           <span className="text-xs text-torg-gray block">{rm.op.cliente}</span>
                         </>
                       ) : (
@@ -948,7 +949,7 @@ function KanbanView({ rms, isAdmin }) {
                       </div>
                       {rm.op && (
                         <p className="text-xs text-torg-gray mt-1 font-mono">
-                          {rm.op.numero} <span className="text-torg-gray/70">·</span> {rm.op.cliente}
+                          {fmtOP(rm.op.numero)} <span className="text-torg-gray/70">·</span> {rm.op.cliente}
                         </p>
                       )}
                       <p className="text-xs text-torg-dark mt-1 line-clamp-2 leading-tight">{rm.descricao}</p>

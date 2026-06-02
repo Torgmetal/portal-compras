@@ -87,7 +87,7 @@ export async function POST(req, { params }) {
       const entry = itemPorId.get(ci.rmItemId);
       if (!entry) continue; // item de RM fora dessa OP — pula
       const { rmItem, rm } = entry;
-      if (rmItem.status === "PEDIDO_GERADO" || rmItem.status === "CANCELADO") continue;
+      if (rmItem.status === "PEDIDO_GERADO" || rmItem.status === "CANCELADO" || rmItem.status === "ATENDIDO_ESTOQUE") continue;
 
       const isFD =
         rmItem.opItem?.faturamentoDireto || rmItem.aditivoItem?.faturamentoDireto || false;
@@ -358,7 +358,7 @@ export async function POST(req, { params }) {
       select: { status: true },
     });
     const todosFinalizados = rmItens.every(
-      (i) => i.status === "PEDIDO_GERADO" || i.status === "CANCELADO"
+      (i) => ["PEDIDO_GERADO", "CANCELADO", "ATENDIDO_ESTOQUE"].includes(i.status)
     );
     if (todosFinalizados && rmItens.length > 0) {
       await prisma.rM.update({ where: { id: rmId }, data: { status: "PEDIDO_GERADO" } });

@@ -6,6 +6,7 @@ import {
   ArrowLeft, PackageSearch, CheckCircle2, AlertTriangle,
   XCircle, Loader2, MessageSquare, User, Calendar,
 } from "lucide-react";
+import { fmtOP } from "@/lib/utils";
 
 const OPCOES_RESPOSTA = [
   { valor: "DISPONIVEL", label: "Disponível", cor: "border-emerald-400 bg-emerald-50 text-emerald-700", icon: CheckCircle2 },
@@ -63,7 +64,7 @@ export default function ConsultaEstoqueResponder({ consulta, userName }) {
     }
   };
 
-  const opLabel = consulta.rm.op ? `OP ${consulta.rm.op.numero} — ${consulta.rm.op.cliente}` : "Sem OP vinculada";
+  const opLabel = consulta.rm.op ? `${fmtOP(consulta.rm.op.numero)} — ${consulta.rm.op.cliente}` : "Sem OP vinculada";
 
   return (
     <div className="space-y-6 max-w-5xl">

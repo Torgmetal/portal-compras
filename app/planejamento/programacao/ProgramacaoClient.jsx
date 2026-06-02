@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
   CalendarRange, ChevronLeft, ChevronRight,
@@ -202,7 +203,7 @@ export default function ProgramacaoClient() {
                         {SETOR_LABEL[item.setor]}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-xs font-mono text-torg-blue font-semibold">{item.opNumero}</td>
+                    <td className="px-3 py-2 text-xs font-mono text-torg-blue font-semibold">{fmtOP(item.opNumero)}</td>
                     <td className="px-3 py-2 text-xs text-torg-dark">{item.descricao || "—"}</td>
                     <td className="px-3 py-2 text-right text-xs font-medium tabular-nums text-torg-dark">{fmtKg(item.pesoKg)}</td>
                     <td className="px-3 py-2 text-center">
@@ -242,7 +243,7 @@ export default function ProgramacaoClient() {
         onClose={() => setConfirmDelete(null)}
         onConfirm={() => deletar(confirmDelete?.id)}
         titulo="Excluir item?"
-        mensagem={`O item da OP ${confirmDelete?.opNumero} sera removido da programacao.`}
+        mensagem={`O item da ${fmtOP(confirmDelete?.opNumero)} sera removido da programacao.`}
         labelConfirmar="Excluir"
         variant="destrutivo"
         loading={deleting}

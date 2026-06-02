@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { fmtOP } from "@/lib/utils";
 import { ArrowLeft, Package, ArrowDownToLine, ArrowUpFromLine, Settings } from "lucide-react";
 
 
@@ -113,7 +114,7 @@ export default async function EstoqueItemDetalhe({ params }) {
                 return (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2.5">
-                      <p className="font-mono text-torg-blue font-semibold">{r.op.numero}</p>
+                      <p className="font-mono text-torg-blue font-semibold">{fmtOP(r.op.numero)}</p>
                       <p className="text-xs text-torg-gray">{r.op.cliente}</p>
                     </td>
                     <td className="px-4 py-2.5 text-right text-torg-gray tabular-nums">{fmtQtd(r.qtdReservada, item.unidade)}</td>
@@ -181,7 +182,7 @@ export default async function EstoqueItemDetalhe({ params }) {
                         <div className="flex flex-wrap gap-1">
                           {m.alocacoes.map((a) => (
                             <span key={a.id} className="text-[10px] bg-torg-blue-50 text-torg-blue px-1.5 py-0.5 rounded font-mono">
-                              {a.op.numero} · {fmtQtd(a.quantidade, item.unidade)}
+                              {fmtOP(a.op.numero)} · {fmtQtd(a.quantidade, item.unidade)}
                             </span>
                           ))}
                         </div>

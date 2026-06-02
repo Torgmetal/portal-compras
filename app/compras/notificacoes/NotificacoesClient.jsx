@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -448,7 +449,7 @@ function NotifMetadados({ tipo, dados }) {
         )}
         {dados.opNumero && (
           <span className="text-[10px] bg-torg-blue-50 text-torg-blue px-1.5 py-0.5 rounded font-medium">
-            OP {dados.opNumero}{dados.opCliente ? ` · ${dados.opCliente}` : ""}
+            {fmtOP(dados.opNumero)}{dados.opCliente ? ` · ${dados.opCliente}` : ""}
           </span>
         )}
         {dados.itensCount != null && (

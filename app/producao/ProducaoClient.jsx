@@ -8,6 +8,7 @@ import {
   Cloud, RefreshCw, XCircle, Calendar, ChevronDown, ChevronUp, TrendingUp, MapPin,
 } from "lucide-react";
 import { fmtSemana, isoWeekString } from "@/lib/semana";
+import { fmtOP } from "@/lib/utils";
 
 // Periodos pre-definidos para o seletor (em dias relativos a hoje)
 const PERIODOS = [
@@ -531,12 +532,12 @@ function ModalImportarPCP({ ops, onClose, onSaved }) {
                               className={`border rounded px-1.5 py-1 text-xs bg-white ${opNotFound ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
                               <option value="">— Geral —</option>
                               {ops.map((o) => (
-                                <option key={o.id} value={o.id}>{o.numero}</option>
+                                <option key={o.id} value={o.id}>{fmtOP(o.numero)}</option>
                               ))}
                             </select>
                             {opNotFound && (
-                              <p className="text-[10px] text-red-600 mt-0.5" title={`OP ${it.opNumero} não cadastrada`}>
-                                {it.opNumero}?
+                              <p className="text-[10px] text-red-600 mt-0.5" title={`${fmtOP(it.opNumero)} não cadastrada`}>
+                                {fmtOP(it.opNumero)}?
                               </p>
                             )}
                           </td>

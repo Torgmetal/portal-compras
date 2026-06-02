@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { fmtOP } from "@/lib/utils";
 import {
   ClipboardCheck, Loader2, AlertCircle, Search, ChevronDown, ChevronRight,
   Package, Truck, CheckCircle2, Clock, AlertTriangle, ArrowLeft, Box,
@@ -130,7 +131,7 @@ export default function ChecklistClient({ ops }) {
                   className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-left hover:border-torg-blue hover:shadow-md transition-all group"
                 >
                   <p className="font-mono text-lg font-bold text-torg-blue group-hover:text-torg-blue-700">
-                    {op.numero}
+                    {fmtOP(op.numero)}
                   </p>
                   <p className="text-sm text-torg-dark mt-1 truncate">{op.cliente}</p>
                   {op.obra && (
@@ -194,7 +195,7 @@ function ChecklistOP({ dados, secaoAberta, setSecaoAberta, onVoltar }) {
             <ArrowLeft size={14} /> Voltar às OPs
           </button>
           <h3 className="text-2xl font-extrabold text-torg-dark tracking-tight">
-            <span className="font-mono text-torg-blue">{op.numero}</span>
+            <span className="font-mono text-torg-blue">{fmtOP(op.numero)}</span>
             <span className="text-lg font-normal text-torg-gray ml-2">— {op.cliente}</span>
           </h3>
           {op.obra && <p className="text-sm text-torg-gray">{op.obra}</p>}

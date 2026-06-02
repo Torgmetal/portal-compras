@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, BarChart3, DollarSign, TrendingUp,
   FileCheck2, XCircle, ChevronDown, ChevronUp, Calendar, Clock, Target,
@@ -446,7 +447,7 @@ function PropostasTable({ tipo, propostas }) {
                   <td className="px-4 py-2.5">
                     {p.opNumero ? (
                       <Link href={`/comercial/${p.opId}`} className="inline-flex items-center gap-1 text-xs font-semibold text-torg-blue bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors">
-                        {p.opNumero} <ExternalLink size={11} />
+                        {fmtOP(p.opNumero)} <ExternalLink size={11} />
                       </Link>
                     ) : (
                       <span className="text-xs text-amber-600 flex items-center gap-1"><AlertTriangle size={11} /> Sem OP</span>
@@ -528,7 +529,7 @@ export function MargemClient() {
                 <tbody className="divide-y divide-gray-50">
                   {margem.contratos.map((c) => (
                     <tr key={c.opId} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-2.5 font-mono font-semibold text-torg-blue text-xs">{c.opNumero}</td>
+                      <td className="px-4 py-2.5 font-mono font-semibold text-torg-blue text-xs">{fmtOP(c.opNumero)}</td>
                       <td className="px-4 py-2.5 text-torg-dark max-w-[200px] truncate">{c.cliente}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-xs">{fmtMoeda(c.valorContrato)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-xs">{fmtMoeda(c.custoTorg)}</td>

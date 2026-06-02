@@ -216,6 +216,12 @@ export default async function RMComprasDetail({ params }) {
       status: true,
       faturamentoDireto: true,
       createdAt: true,
+      statusEntrega: true,
+      dataEntregaReal: true,
+      nfNumero: true,
+      nfSerie: true,
+      recebidoEm: true,
+      recebidoPor: { select: { name: true } },
       rmItens: {
         where: { rmId: rm.id },
         select: { id: true, descricao: true },

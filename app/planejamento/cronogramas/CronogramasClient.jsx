@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronRight,
   Clock, CheckCircle2, AlertTriangle, Download, MessageSquarePlus,
@@ -191,7 +192,7 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
       <button onClick={onToggle} className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/50 transition-colors">
         <div className="flex items-center gap-3">
           {expanded ? <ChevronDown size={16} className="text-torg-gray" /> : <ChevronRight size={16} className="text-torg-gray" />}
-          <span className="text-sm font-bold text-torg-blue font-mono">{c.opNumero}</span>
+          <span className="text-sm font-bold text-torg-blue font-mono">{fmtOP(c.opNumero)}</span>
           <span className="text-sm text-torg-dark font-medium truncate max-w-xs">{c.titulo}</span>
           {c.op && <span className="text-xs text-torg-gray">({c.op.cliente})</span>}
         </div>

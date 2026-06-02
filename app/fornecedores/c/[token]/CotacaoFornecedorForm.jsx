@@ -3,6 +3,7 @@ import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { fmtOP } from "@/lib/utils";
 import { Loader2, AlertCircle, Send, AlertTriangle, Truck, RotateCcw, CheckCircle2, Upload, FileText, X, Sparkles, CalendarDays, PackageX } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -1030,7 +1031,7 @@ function PainelFaturamento({ faturamento }) {
 
       {isCliente && faturamento.opNumero && (
         <p className="text-xs text-amber-700 bg-amber-100/70 border border-amber-200 rounded px-3 py-2 mb-3">
-          Referente à <strong>OP {faturamento.opNumero}</strong>
+          Referente à <strong>{fmtOP(faturamento.opNumero)}</strong>
           {faturamento.opObra ? ` — obra "${faturamento.opObra}"` : ""}
         </p>
       )}

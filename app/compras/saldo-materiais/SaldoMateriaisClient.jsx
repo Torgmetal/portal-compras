@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
+import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, Package, CheckCircle2, Clock,
   AlertTriangle, ChevronDown, ChevronRight, Filter,
@@ -416,7 +417,7 @@ function MaterialRow({ mat, isExpanded, onToggle, onRegistrar }) {
                       <td className="px-2 py-1.5">
                         {d.opNumero ? (
                           <>
-                            <span className="font-medium text-torg-dark">OP {d.opNumero}</span>
+                            <span className="font-medium text-torg-dark">{fmtOP(d.opNumero)}</span>
                             <span className="text-torg-gray ml-1">— {d.opCliente}</span>
                           </>
                         ) : (
@@ -577,7 +578,7 @@ function ModalRecebimento({ item, onClose, onSuccess }) {
               <ClipboardCheck size={18} className="text-emerald-600" />
               Registrar Recebimento
             </h3>
-            <p className="text-xs text-torg-gray mt-0.5">RM {item.rmNumero} &bull; OP {item.opNumero}</p>
+            <p className="text-xs text-torg-gray mt-0.5">RM {item.rmNumero} &bull; {fmtOP(item.opNumero)}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
             <X size={18} />

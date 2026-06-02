@@ -144,7 +144,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
   // no que ainda precisa de decisao. Toggle no header pra ver os ja resolvidos.
   const itens = useMemo(() => {
     if (mostrarPedidos) return itensTodos;
-    return itensTodos.filter((it) => !it.jaPedido && !it.cancelado);
+    return itensTodos.filter((it) => !it.jaPedido && !it.cancelado && !it.atendidoEstoque);
   }, [itensTodos, mostrarPedidos]);
 
   // Filtra fornecedores pra mostrar somente os que tem celula nos itens visiveis.
@@ -161,9 +161,10 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
   }, [itens, fornecedoresTodos]);
 
   const qtdPedido = itensTodos.filter((it) => it.jaPedido).length;
+  const qtdEstoque = itensTodos.filter((it) => it.atendidoEstoque).length;
   const qtdCancelado = itensTodos.filter((it) => it.cancelado).length;
-  const qtdSemCotacao = itensTodos.filter((it) => it.semCotacao && !it.jaPedido && !it.cancelado).length;
-  const qtdAtivo = itensTodos.length - qtdPedido - qtdCancelado;
+  const qtdSemCotacao = itensTodos.filter((it) => it.semCotacao && !it.jaPedido && !it.cancelado && !it.atendidoEstoque).length;
+  const qtdAtivo = itensTodos.length - qtdPedido - qtdCancelado - qtdEstoque;
 
   const marcarVencedor = async (cotacaoItemId, jaVencedor) => {
     setLoading(cotacaoItemId);
@@ -311,9 +312,9 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
         totaisPorFornecedor[cell.cotacaoId] += valorNota;
         totaisLiquidoPorFornecedor[cell.cotacaoId] += custoEfetivo;
         if (it.jaPedido) totalEmPedidos += valorNota;
-        else if (!it.cancelado) totalAGerar += valorNota;
+        else if (!it.cancelado && !it.atendidoEstoque) totalAGerar += valorNota;
         totalLiquidoGeral += custoEfetivo;
-        if (!it.jaPedido && !it.cancelado) {
+        if (!it.jaPedido && !it.cancelado && !it.atendidoEstoque) {
           itensPorFornecedor[cell.cotacaoId].push({
             descricao: it.descricao,
             qtd: cell.qtdCotada,
@@ -360,7 +361,8 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
             <BarChart3 size={20} className="text-torg-blue" /> Mapa Comparativo
             <span className="text-xs text-torg-gray font-normal ml-1">
               ({qtdAtivo} {qtdAtivo === 1 ? "item ativo" : "itens ativos"}
-              {qtdPedido > 0 && <span> · {qtdPedido} já em pedido</span>}
+              {qtdPedido > 0 && <span> · {qtdPedido} em pedido</span>}
+              {qtdEstoque > 0 && <span> · {qtdEstoque} via estoque</span>}
               {qtdCancelado > 0 && <span> · {qtdCancelado} cancelado(s)</span>})
             </span>
           </h3>
@@ -1305,6 +1307,7 @@ function buildMatriz(op) {
             // Status do RMItem — se ja virou pedido, podemos esconder/destacar
             itemStatus: rmItem.status,
             jaPedido: rmItem.status === "PEDIDO_GERADO",
+            atendidoEstoque: rmItem.status === "ATENDIDO_ESTOQUE",
             cancelado: rmItem.status === "CANCELADO",
             celulas: [],
           });
@@ -1361,6 +1364,7 @@ function buildMatriz(op) {
         faturamentoDireto: fatDiretoItem,
         itemStatus: rmItem.status,
         jaPedido: rmItem.status === "PEDIDO_GERADO",
+        atendidoEstoque: rmItem.status === "ATENDIDO_ESTOQUE",
         cancelado: rmItem.status === "CANCELADO",
         semCotacao: true,
         celulas: [],

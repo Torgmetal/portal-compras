@@ -67,7 +67,7 @@ export async function POST(req, { params }) {
       const entry = itemPorId.get(ci.rmItemId);
       if (!entry) continue;
       const { rmItem } = entry;
-      if (rmItem.status === "PEDIDO_GERADO" || rmItem.status === "CANCELADO") continue;
+      if (rmItem.status === "PEDIDO_GERADO" || rmItem.status === "CANCELADO" || rmItem.status === "ATENDIDO_ESTOQUE") continue;
 
       // RMs internas sem OP não têm opItem/aditivoItem, então FD = false
       const isFD = false;
@@ -267,7 +267,7 @@ export async function POST(req, { params }) {
     select: { status: true },
   });
   const todosFinalizados = rmItens.every(
-    (i) => i.status === "PEDIDO_GERADO" || i.status === "CANCELADO"
+    (i) => ["PEDIDO_GERADO", "CANCELADO", "ATENDIDO_ESTOQUE"].includes(i.status)
   );
   if (todosFinalizados && rmItens.length > 0) {
     await prisma.rM.update({ where: { id: rm.id }, data: { status: "PEDIDO_GERADO" } });
