@@ -482,6 +482,8 @@ function TarefaRow({ tarefa, now, onRefresh }) {
   const [editing, setEditing] = useState(false);
   const [pct, setPct] = useState(tarefa.percentualRealizado);
   const [obs, setObs] = useState(tarefa.observacao || "");
+  const [dataExec, setDataExec] = useState(tarefa.dataRealizacao ? new Date(tarefa.dataRealizacao).toISOString().split("T")[0] : "");
+  const [justificativa, setJustificativa] = useState("");
   const [saving, setSaving] = useState(false);
   const [showReg, setShowReg] = useState(false);
   const [regText, setRegText] = useState("");
@@ -495,17 +497,20 @@ function TarefaRow({ tarefa, now, onRefresh }) {
   const salvar = async () => {
     setSaving(true);
     try {
+      const body = {
+        percentualRealizado: pct,
+        observacao: obs || null,
+        dataRealizacao: dataExec ? new Date(dataExec + "T12:00:00Z").toISOString() : null,
+      };
+      if (justificativa.trim()) body.justificativa = justificativa.trim();
       const res = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          percentualRealizado: pct,
-          observacao: obs || null,
-          dataRealizacao: pct >= 100 ? new Date().toISOString() : null,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Erro");
       setEditing(false);
+      setJustificativa("");
       onRefresh();
     } catch {
       // keep editing
@@ -534,6 +539,14 @@ function TarefaRow({ tarefa, now, onRefresh }) {
     }
   };
 
+  const cancelarEdicao = () => {
+    setEditing(false);
+    setPct(t.percentualRealizado);
+    setObs(t.observacao || "");
+    setDataExec(t.dataRealizacao ? new Date(t.dataRealizacao).toISOString().split("T")[0] : "");
+    setJustificativa("");
+  };
+
   return (
     <div className={`rounded-lg border ${atrasada ? "border-red-200 bg-red-50/30" : "border-gray-100 bg-white"} p-2.5`} style={{ marginLeft: `${indent * 16}px` }}>
       <div className="flex items-center justify-between gap-2">
@@ -549,6 +562,11 @@ function TarefaRow({ tarefa, now, onRefresh }) {
             {t.nome}
           </span>
           {t.isSummary && <span className="text-[9px] text-torg-gray bg-gray-100 px-1 rounded">grupo</span>}
+          {t.dataRealizacao && !editing && (
+            <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+              <CheckCircle2 size={9} /> {new Date(t.dataRealizacao).toLocaleDateString("pt-BR")}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -598,19 +616,47 @@ function TarefaRow({ tarefa, now, onRefresh }) {
       </div>
 
       {editing && (
-        <div className="mt-2 flex items-center gap-2">
-          <input
-            value={obs}
-            onChange={(e) => setObs(e.target.value)}
-            placeholder="Observacao..."
-            className="flex-1 text-[10px] px-2 py-1 border border-gray-200 rounded"
-          />
-          <button onClick={salvar} disabled={saving} className="px-2 py-1 bg-torg-blue text-white text-[10px] rounded hover:bg-torg-blue-700 disabled:opacity-50">
-            {saving ? "..." : "Salvar"}
-          </button>
-          <button onClick={() => { setEditing(false); setPct(t.percentualRealizado); setObs(t.observacao || ""); }} className="px-2 py-1 text-[10px] text-torg-gray hover:text-torg-dark">
-            Cancelar
-          </button>
+        <div className="mt-2 space-y-2 bg-gray-50/50 rounded-lg p-2.5 border border-gray-100">
+          <div className="flex items-center gap-2">
+            <input
+              value={obs}
+              onChange={(e) => setObs(e.target.value)}
+              placeholder="Observação..."
+              className="flex-1 text-[10px] px-2 py-1 border border-gray-200 rounded bg-white"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <Calendar size={11} className="text-torg-gray" />
+              <span className="text-[10px] text-torg-gray whitespace-nowrap">Data executado:</span>
+              <input
+                type="date"
+                value={dataExec}
+                onChange={(e) => setDataExec(e.target.value)}
+                className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
+              />
+            </div>
+            {dataExec && (
+              <button onClick={() => setDataExec("")} className="text-[9px] text-red-400 hover:text-red-600">limpar</button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              value={justificativa}
+              onChange={(e) => setJustificativa(e.target.value)}
+              placeholder="Justificativa / motivo da alteração..."
+              className="flex-1 text-[10px] px-2 py-1 border border-gray-200 rounded bg-white"
+              onKeyDown={(e) => e.key === "Enter" && salvar()}
+            />
+          </div>
+          <div className="flex items-center gap-2 justify-end">
+            <button onClick={cancelarEdicao} className="px-2 py-1 text-[10px] text-torg-gray hover:text-torg-dark">
+              Cancelar
+            </button>
+            <button onClick={salvar} disabled={saving} className="px-3 py-1 bg-torg-blue text-white text-[10px] rounded hover:bg-torg-blue-700 disabled:opacity-50 font-medium">
+              {saving ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -891,28 +937,33 @@ function exportarGanttPDF(detail) {
   }
   if (!isFinite(minDate) || !isFinite(maxDate)) return alert("Tarefas sem datas definidas.");
 
-  // Padding 7 dias
-  minDate -= 7 * 86400000;
-  maxDate += 7 * 86400000;
+  // Padding 10 dias
+  minDate -= 10 * 86400000;
+  maxDate += 10 * 86400000;
   const totalDays = Math.ceil((maxDate - minDate) / 86400000);
 
+  const deptColors = {
+    COMERCIAL: { bar: "#2563eb", bg: "#dbeafe", text: "#1e40af", label: "Comercial" },
+    ENGENHARIA: { bar: "#7c3aed", bg: "#ede9fe", text: "#5b21b6", label: "Engenharia" },
+    SUPRIMENTOS: { bar: "#d97706", bg: "#fef3c7", text: "#92400e", label: "Suprimentos" },
+    FABRICACAO: { bar: "#059669", bg: "#d1fae5", text: "#065f46", label: "Fabricação" },
+    EXPEDICAO: { bar: "#0d9488", bg: "#ccfbf1", text: "#134e4a", label: "Expedição" },
+    MONTAGEM: { bar: "#ea580c", bg: "#ffedd5", text: "#9a3412", label: "Montagem" },
+  };
+
   // Config
-  const rowHeight = 22;
-  const headerHeight = 80;
-  const labelWidth = 280;
-  const dayWidth = Math.max(3, Math.min(12, 900 / totalDays));
+  const rowHeight = 28;
+  const labelWidth = 320;
+  const pctWidth = 40;
+  const datesWidth = 110;
+  const tableLeft = labelWidth + pctWidth + datesWidth;
+  const dayWidth = Math.max(3, Math.min(14, 960 / totalDays));
   const chartWidth = totalDays * dayWidth;
-  const totalWidth = labelWidth + chartWidth + 40;
-  const totalHeight = headerHeight + tarefas.length * rowHeight + 60;
+  const totalWidth = tableLeft + chartWidth + 20;
 
   // Abre janela de impressao
-  const win = window.open("", "_blank", `width=${Math.min(totalWidth + 40, 1400)},height=${Math.min(totalHeight + 100, 900)}`);
+  const win = window.open("", "_blank", `width=${Math.min(totalWidth + 60, 1500)},height=900`);
   if (!win) return alert("Popup bloqueado — permita popups para gerar o PDF.");
-
-  const deptColors = {
-    COMERCIAL: "#2563eb", ENGENHARIA: "#7c3aed", SUPRIMENTOS: "#d97706",
-    FABRICACAO: "#059669", EXPEDICAO: "#0d9488", MONTAGEM: "#ea580c",
-  };
 
   // Gera meses
   const months = [];
@@ -923,103 +974,290 @@ function exportarGanttPDF(detail) {
     const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
     const end = Math.min(totalDays, (next.getTime() - minDate) / 86400000);
     months.push({
-      label: cur.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }),
+      label: cur.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(".", ""),
       left: start * dayWidth,
       width: (end - start) * dayWidth,
     });
     cur = next;
   }
 
+  // Hoje line
+  const todayPos = ((Date.now() - minDate) / 86400000) * dayWidth;
   // Data base line
   const dataBaseLine = detail.dataBase ? ((new Date(detail.dataBase).getTime() - minDate) / 86400000) * dayWidth : null;
 
-  // HTML
-  let rowsHtml = "";
-  for (let i = 0; i < tarefas.length; i++) {
-    const t = tarefas[i];
-    const indent = Math.max(0, t.outlineLevel - 1) * 12;
-    const isSummary = t.isSummary;
-    const pct = t.percentualRealizado;
-    const bg = i % 2 === 0 ? "#fff" : "#f8fafc";
-
-    // Barra baseline
-    let baselineBar = "";
-    if (t.dataInicioBase && t.dataFimBase) {
-      const bStart = ((new Date(t.dataInicioBase).getTime() - minDate) / 86400000) * dayWidth;
-      const bWidth = Math.max(2, ((new Date(t.dataFimBase).getTime() - new Date(t.dataInicioBase).getTime()) / 86400000) * dayWidth);
-      baselineBar = `<div style="position:absolute;top:3px;left:${bStart}px;width:${bWidth}px;height:6px;background:#cbd5e1;border-radius:2px;"></div>`;
-    }
-
-    // Barra atual
-    let currentBar = "";
-    if (t.dataInicioPrevista && t.dataFimPrevista) {
-      const cStart = ((new Date(t.dataInicioPrevista).getTime() - minDate) / 86400000) * dayWidth;
-      const cWidth = Math.max(2, ((new Date(t.dataFimPrevista).getTime() - new Date(t.dataInicioPrevista).getTime()) / 86400000) * dayWidth);
-      const color = deptColors[t.departamento] || "#6b7280";
-      const fillWidth = Math.round(cWidth * pct / 100);
-      currentBar = `<div style="position:absolute;top:${t.dataInicioBase ? 11 : 5}px;left:${cStart}px;width:${cWidth}px;height:${isSummary ? 8 : 10}px;background:${color}22;border:1px solid ${color};border-radius:3px;overflow:hidden;">` +
-        `<div style="width:${fillWidth}px;height:100%;background:${color};"></div></div>`;
-    }
-
-    const nome = isSummary ? `<b>${t.nome}</b>` : t.nome;
-    rowsHtml += `<div style="display:flex;height:${rowHeight}px;border-bottom:1px solid #f1f5f9;background:${bg};">` +
-      `<div style="width:${labelWidth}px;padding:3px 8px 3px ${8 + indent}px;display:flex;align-items:center;gap:6px;flex-shrink:0;overflow:hidden;">` +
-        `<span style="font-size:10px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nome}</span>` +
-        `<span style="font-size:9px;color:${pct >= 100 ? '#059669' : pct > 0 ? '#006EAB' : '#94a3b8'};font-weight:bold;flex-shrink:0;">${pct}%</span>` +
-      `</div>` +
-      `<div style="flex:1;position:relative;min-width:${chartWidth}px;">${baselineBar}${currentBar}</div>` +
-    `</div>`;
+  // Agrupa tarefas por departamento
+  const byDept = {};
+  for (const t of tarefas) {
+    if (!byDept[t.departamento]) byDept[t.departamento] = [];
+    byDept[t.departamento].push(t);
   }
 
-  // Monta meses header
-  let monthsHtml = months.map((m) => `<div style="position:absolute;left:${m.left}px;width:${m.width}px;text-align:center;font-size:9px;color:#64748b;border-left:1px solid #e2e8f0;padding:2px 0;">${m.label}</div>`).join("");
+  // HTML dos rows com separadores de departamento
+  let rowsHtml = "";
+  let rowIdx = 0;
+  for (const [dept, tasks] of Object.entries(byDept)) {
+    const dc = deptColors[dept] || { bar: "#6b7280", bg: "#f3f4f6", text: "#374151", label: dept };
+    // Header do departamento
+    rowsHtml += `<div style="display:flex;height:32px;background:${dc.bg};border-bottom:2px solid ${dc.bar};">` +
+      `<div style="width:${tableLeft}px;padding:6px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;">` +
+        `<div style="width:4px;height:18px;background:${dc.bar};border-radius:2px;"></div>` +
+        `<span style="font-size:11px;font-weight:700;color:${dc.text};letter-spacing:0.3px;text-transform:uppercase;">${dc.label}</span>` +
+      `</div>` +
+      `<div style="flex:1;min-width:${chartWidth}px;"></div>` +
+    `</div>`;
+
+    for (const t of tasks) {
+      if (t.isSummary && t.outlineLevel === 1) continue; // Skip dept summary, we have header
+      const indent = Math.max(0, t.outlineLevel - 2) * 16;
+      const isSummary = t.isSummary;
+      const pct = t.percentualRealizado;
+      const bg = rowIdx % 2 === 0 ? "#ffffff" : "#f8fafc";
+      const isLate = t.dataFimPrevista && new Date(t.dataFimPrevista) < new Date() && pct < 100;
+
+      // Datas formatadas
+      const fmtD = (d) => d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "";
+      const dateStr = `${fmtD(t.dataInicioPrevista)} - ${fmtD(t.dataFimPrevista)}`;
+
+      // Barra baseline
+      let baselineBar = "";
+      if (t.dataInicioBase && t.dataFimBase) {
+        const bStart = ((new Date(t.dataInicioBase).getTime() - minDate) / 86400000) * dayWidth;
+        const bWidth = Math.max(4, ((new Date(t.dataFimBase).getTime() - new Date(t.dataInicioBase).getTime()) / 86400000) * dayWidth);
+        baselineBar = `<div style="position:absolute;top:4px;left:${bStart}px;width:${bWidth}px;height:7px;background:#94a3b8;border-radius:3px;opacity:0.35;"></div>`;
+      }
+
+      // Barra atual
+      let currentBar = "";
+      if (t.dataInicioPrevista && t.dataFimPrevista) {
+        const cStart = ((new Date(t.dataInicioPrevista).getTime() - minDate) / 86400000) * dayWidth;
+        const cWidth = Math.max(4, ((new Date(t.dataFimPrevista).getTime() - new Date(t.dataInicioPrevista).getTime()) / 86400000) * dayWidth);
+        const fillWidth = Math.round(cWidth * pct / 100);
+        const barColor = isLate ? "#dc2626" : dc.bar;
+        const barBg = isLate ? "#fecaca" : `${dc.bar}20`;
+        const yPos = t.dataInicioBase ? 13 : 7;
+        const barH = isSummary ? 6 : 12;
+
+        if (isSummary) {
+          // Diamante summary
+          currentBar = `<div style="position:absolute;top:${yPos}px;left:${cStart}px;width:${cWidth}px;height:${barH}px;">` +
+            `<div style="position:absolute;left:0;top:0;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid ${barColor};"></div>` +
+            `<div style="position:absolute;left:5px;right:5px;top:0;height:3px;background:${barColor};"></div>` +
+            `<div style="position:absolute;right:0;top:0;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid ${barColor};"></div>` +
+          `</div>`;
+        } else {
+          currentBar = `<div style="position:absolute;top:${yPos}px;left:${cStart}px;width:${cWidth}px;height:${barH}px;background:${barBg};border:1.5px solid ${barColor};border-radius:4px;overflow:hidden;">` +
+            `<div style="width:${fillWidth}px;height:100%;background:${barColor};opacity:0.85;border-radius:2px 0 0 2px;"></div>` +
+          `</div>`;
+          // Pct label ao lado da barra
+          if (pct > 0) {
+            currentBar += `<div style="position:absolute;top:${yPos + 1}px;left:${cStart + cWidth + 4}px;font-size:8px;font-weight:700;color:${barColor};white-space:nowrap;">${pct}%</div>`;
+          }
+        }
+      }
+
+      // Realização badge
+      const realBadge = t.dataRealizacao ? `<span style="color:#059669;font-weight:600;"> ✓</span>` : "";
+
+      const nome = isSummary ? `<b style="color:${dc.text};">${t.nome}</b>` : t.nome;
+      rowsHtml += `<div style="display:flex;height:${rowHeight}px;border-bottom:1px solid #f1f5f9;background:${bg};align-items:center;">` +
+        // Nome
+        `<div style="width:${labelWidth}px;padding:0 8px 0 ${12 + indent}px;display:flex;align-items:center;gap:4px;flex-shrink:0;overflow:hidden;">` +
+          `<span style="font-size:10.5px;color:${isLate ? '#dc2626' : '#334155'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${isSummary ? '' : 'font-weight:400;'}">${nome}${realBadge}</span>` +
+        `</div>` +
+        // Percentual
+        `<div style="width:${pctWidth}px;text-align:center;flex-shrink:0;">` +
+          `<span style="font-size:9px;font-weight:700;color:${pct >= 100 ? '#059669' : isLate ? '#dc2626' : pct > 0 ? '#006EAB' : '#94a3b8'};padding:1px 4px;background:${pct >= 100 ? '#d1fae5' : isLate ? '#fee2e2' : pct > 0 ? '#dbeafe' : '#f3f4f6'};border-radius:3px;">${pct}%</span>` +
+        `</div>` +
+        // Datas
+        `<div style="width:${datesWidth}px;text-align:center;flex-shrink:0;">` +
+          `<span style="font-size:8.5px;color:#64748b;font-family:monospace;">${dateStr}</span>` +
+        `</div>` +
+        // Chart area
+        `<div style="flex:1;position:relative;min-width:${chartWidth}px;height:${rowHeight}px;">${baselineBar}${currentBar}</div>` +
+      `</div>`;
+      rowIdx++;
+    }
+  }
+
+  // Meses header
+  let monthsHtml = months.map((m) =>
+    `<div style="position:absolute;left:${m.left}px;width:${m.width}px;text-align:center;font-size:9px;font-weight:600;color:#475569;border-left:1px solid #cbd5e1;height:100%;display:flex;align-items:center;justify-content:center;text-transform:capitalize;">${m.label}</div>`
+  ).join("");
+
+  // Month grid lines (nas rows)
+  let gridLines = months.map((m) =>
+    `<div style="position:absolute;left:${m.left}px;top:0;bottom:0;width:1px;background:#f1f5f9;"></div>`
+  ).join("");
+
+  // Today line
+  const todayLine = (todayPos > 0 && todayPos < chartWidth)
+    ? `<div style="position:absolute;left:${todayPos}px;top:0;bottom:0;width:2px;background:#f97316;z-index:6;opacity:0.7;"></div>` +
+      `<div style="position:absolute;left:${todayPos - 14}px;top:-16px;font-size:7px;color:#f97316;font-weight:700;width:30px;text-align:center;">HOJE</div>`
+    : "";
 
   // Data base indicator
   let dataBaseIndicator = "";
   if (dataBaseLine !== null) {
     dataBaseIndicator = `<div style="position:absolute;left:${dataBaseLine}px;top:0;bottom:0;width:2px;background:#006EAB;z-index:5;"></div>` +
-      `<div style="position:absolute;left:${dataBaseLine - 20}px;top:-18px;font-size:8px;color:#006EAB;font-weight:bold;width:42px;text-align:center;">DB</div>`;
+      `<div style="position:absolute;left:${dataBaseLine - 8}px;top:-16px;font-size:7px;color:#006EAB;font-weight:700;width:18px;text-align:center;">DB</div>`;
   }
 
-  const html = `<!DOCTYPE html><html><head><title>Gantt — ${detail.titulo || detail.opNumero}</title>
+  // Legenda departamentos
+  const deptLegend = Object.entries(deptColors).filter(([d]) => byDept[d]).map(([, dc]) =>
+    `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:14px;font-size:9px;color:#475569;"><span style="width:10px;height:10px;background:${dc.bar};border-radius:2px;display:inline-block;"></span>${dc.label}</span>`
+  ).join("");
+
+  // Progresso geral
+  const totalTarefas = tarefas.filter(t => !t.isSummary).length;
+  const concluidas = tarefas.filter(t => !t.isSummary && t.percentualRealizado >= 100).length;
+  const atrasadas = tarefas.filter(t => !t.isSummary && t.dataFimPrevista && new Date(t.dataFimPrevista) < new Date() && t.percentualRealizado < 100).length;
+  const mediaProgresso = totalTarefas > 0 ? Math.round(tarefas.filter(t => !t.isSummary).reduce((s, t) => s + t.percentualRealizado, 0) / totalTarefas) : 0;
+
+  // Dados da OP
+  const op = detail.op || {};
+  const fmtCNPJ = (c) => {
+    if (!c) return "";
+    const d = c.replace(/\D/g, "");
+    if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
+    return c;
+  };
+  const localObra = [op.clienteCidade, op.clienteUF].filter(Boolean).join("/");
+  const enderecoCompleto = [op.clienteEndereco, localObra, op.clienteCep].filter(Boolean).join(" — ");
+
+  const html = `<!DOCTYPE html><html><head><title>Cronograma Gantt — ${detail.opNumero || detail.titulo}</title>
 <style>
-  @page { size: landscape; margin: 10mm; }
-  body { font-family: Arial, sans-serif; margin: 0; padding: 16px; }
+  @page { size: landscape; margin: 8mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; margin: 0; padding: 20px; background: #fff; color: #1e293b; }
   @media print { body { padding: 0; } .no-print { display: none !important; } }
+  .info-label { font-size:10px; color:#64748b; font-weight:400; }
+  .info-value { font-size:10px; color:#002945; font-weight:600; }
 </style></head><body>
-<div class="no-print" style="text-align:right;margin-bottom:12px;">
-  <button onclick="window.print()" style="padding:8px 20px;background:#006EAB;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;">🖨 Imprimir / Salvar PDF</button>
+
+<!-- Print button -->
+<div class="no-print" style="position:fixed;top:16px;right:16px;z-index:100;display:flex;gap:8px;">
+  <button onclick="window.print()" style="padding:10px 24px;background:#006EAB;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,110,171,0.3);">Imprimir / Salvar PDF</button>
 </div>
-<div style="margin-bottom:12px;">
-  <div style="display:flex;align-items:center;gap:12px;">
-    <h1 style="font-size:18px;color:#002945;margin:0;">${detail.opNumero} — ${detail.titulo || ""}</h1>
-  </div>
-  <div style="display:flex;gap:16px;margin-top:4px;">
-    <span style="font-size:11px;color:#576D7E;">Período: ${detail.dataInicio ? new Date(detail.dataInicio).toLocaleDateString("pt-BR") : "—"} a ${detail.dataFim ? new Date(detail.dataFim).toLocaleDateString("pt-BR") : "—"}</span>
-    ${detail.dataBase ? `<span style="font-size:11px;color:#006EAB;font-weight:bold;">Data Base: ${new Date(detail.dataBase).toLocaleDateString("pt-BR")}</span>` : ""}
-    ${detail.op?.cliente ? `<span style="font-size:11px;color:#576D7E;">Cliente: ${detail.op.cliente}</span>` : ""}
-  </div>
-  <div style="display:flex;gap:12px;margin-top:6px;">
-    <span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#64748b;"><span style="width:16px;height:6px;background:#cbd5e1;border-radius:2px;display:inline-block;"></span> Baseline</span>
-    <span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#64748b;"><span style="width:16px;height:8px;background:#006EAB44;border:1px solid #006EAB;border-radius:2px;display:inline-block;"></span> Atual</span>
-    ${dataBaseLine !== null ? '<span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#006EAB;"><span style="width:2px;height:12px;background:#006EAB;display:inline-block;"></span> Data Base</span>' : ""}
-  </div>
-</div>
-<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;">
-  <div style="min-width:${totalWidth}px;">
-    <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
-      <div style="width:${labelWidth}px;padding:6px 8px;font-size:10px;font-weight:bold;color:#334155;flex-shrink:0;">Tarefa</div>
-      <div style="flex:1;position:relative;min-width:${chartWidth}px;height:24px;">${monthsHtml}</div>
+
+<!-- Header -->
+<div style="margin-bottom:16px;">
+  <!-- Top bar: logo + title + KPIs -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:3px solid #002945;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <img src="/torg-logo.png" alt="Torg Metal" style="height:48px;object-fit:contain;" onerror="this.style.display='none'" />
+      <div>
+        <h1 style="font-size:20px;color:#002945;font-weight:800;letter-spacing:-0.3px;">Cronograma de Produção</h1>
+        <div style="font-size:10px;color:#64748b;margin-top:1px;">Acompanhamento de progresso por departamento</div>
+      </div>
     </div>
+    <div style="display:flex;gap:10px;">
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:6px 14px;border-radius:6px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:#059669;line-height:1;">${concluidas}<span style="font-size:10px;color:#6b7280;font-weight:400;">/${totalTarefas}</span></div>
+        <div style="font-size:7px;color:#065f46;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;">Concluídas</div>
+      </div>
+      ${atrasadas > 0 ? `<div style="background:#fef2f2;border:1px solid #fecaca;padding:6px 14px;border-radius:6px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:#dc2626;line-height:1;">${atrasadas}</div>
+        <div style="font-size:7px;color:#991b1b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;">Atrasadas</div>
+      </div>` : ""}
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:6px 14px;border-radius:6px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:#006EAB;line-height:1;">${mediaProgresso}%</div>
+        <div style="font-size:7px;color:#1e40af;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;">Progresso</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info grid: dados da obra -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;margin-top:10px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+    <!-- Linha 1 -->
+    <div style="padding:6px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:#f8fafc;">
+      <span class="info-label">Ordem de Produção</span><br/>
+      <span class="info-value" style="font-size:13px;font-weight:800;color:#006EAB;">${detail.opNumero || "—"}</span>
+    </div>
+    <div style="padding:6px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:#f8fafc;">
+      <span class="info-label">Obra / Descrição</span><br/>
+      <span class="info-value">${detail.titulo || op.obra || "—"}</span>
+      ${op.descricao ? `<span style="font-size:9px;color:#94a3b8;margin-left:6px;">${op.descricao}</span>` : ""}
+    </div>
+    <div style="padding:6px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+      <span class="info-label">Status OP</span><br/>
+      <span class="info-value">${op.status === "ABERTA" ? "Em andamento" : op.status === "CONCLUIDA" ? "Concluída" : op.status || "—"}</span>
+    </div>
+    <!-- Linha 2 -->
+    <div style="padding:6px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+      <span class="info-label">Cliente</span><br/>
+      <span class="info-value">${op.cliente || "—"}</span>
+      ${op.clienteRazaoSocial && op.clienteRazaoSocial !== op.cliente ? `<br/><span style="font-size:9px;color:#94a3b8;">${op.clienteRazaoSocial}</span>` : ""}
+    </div>
+    <div style="padding:6px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+      <span class="info-label">CNPJ</span><br/>
+      <span class="info-value" style="font-family:monospace;">${fmtCNPJ(op.clienteCnpj) || "—"}</span>
+    </div>
+    <div style="padding:6px 12px;border-bottom:1px solid #e2e8f0;">
+      <span class="info-label">Contato</span><br/>
+      <span class="info-value">${op.clienteContato || "—"}</span>
+      ${op.clienteTelefone ? `<span style="font-size:9px;color:#64748b;margin-left:4px;">(${op.clienteTelefone})</span>` : ""}
+    </div>
+    <!-- Linha 3 -->
+    <div style="padding:6px 12px;border-right:1px solid #e2e8f0;">
+      <span class="info-label">Período do Cronograma</span><br/>
+      <span class="info-value">${detail.dataInicio ? new Date(detail.dataInicio).toLocaleDateString("pt-BR") : "—"} a ${detail.dataFim ? new Date(detail.dataFim).toLocaleDateString("pt-BR") : "—"}</span>
+    </div>
+    <div style="padding:6px 12px;border-right:1px solid #e2e8f0;">
+      <span class="info-label">Data Base (Baseline)</span><br/>
+      <span class="info-value" style="color:#006EAB;">${detail.dataBase ? new Date(detail.dataBase).toLocaleDateString("pt-BR") : "Não definida"}</span>
+    </div>
+    <div style="padding:6px 12px;">
+      <span class="info-label">Local da Obra</span><br/>
+      <span class="info-value">${enderecoCompleto || localObra || "—"}</span>
+    </div>
+  </div>
+</div>
+
+<!-- Legenda -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+  <div>${deptLegend}</div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:#64748b;"><span style="width:14px;height:5px;background:#94a3b8;border-radius:2px;display:inline-block;opacity:0.5;"></span> Baseline</span>
+    <span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:#f97316;"><span style="width:2px;height:10px;background:#f97316;display:inline-block;opacity:0.7;"></span> Hoje</span>
+    ${dataBaseLine !== null ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:#006EAB;"><span style="width:2px;height:10px;background:#006EAB;display:inline-block;"></span> Data Base</span>` : ""}
+  </div>
+</div>
+
+<!-- Gantt Chart -->
+<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+  <div style="min-width:${totalWidth}px;">
+    <!-- Table header -->
+    <div style="display:flex;background:#002945;color:#fff;height:30px;align-items:center;">
+      <div style="width:${labelWidth}px;padding:0 12px;font-size:10px;font-weight:600;flex-shrink:0;letter-spacing:0.3px;">TAREFA</div>
+      <div style="width:${pctWidth}px;text-align:center;font-size:10px;font-weight:600;flex-shrink:0;">%</div>
+      <div style="width:${datesWidth}px;text-align:center;font-size:10px;font-weight:600;flex-shrink:0;">PERÍODO</div>
+      <div style="flex:1;position:relative;min-width:${chartWidth}px;height:30px;">${monthsHtml}</div>
+    </div>
+    <!-- Rows -->
     <div style="position:relative;">
       ${rowsHtml}
-      <div style="position:absolute;left:${labelWidth}px;top:0;bottom:0;right:0;">${dataBaseIndicator}</div>
+      <!-- Grid lines overlay -->
+      <div style="position:absolute;left:${tableLeft}px;top:0;bottom:0;right:0;pointer-events:none;">
+        ${gridLines}
+        ${todayLine}
+        ${dataBaseIndicator}
+      </div>
     </div>
   </div>
 </div>
-<div style="margin-top:12px;text-align:right;font-size:9px;color:#94a3b8;">
-  Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — Torg Metal
+
+<!-- Footer -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:2px solid #002945;">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <img src="/torg-logo.png" alt="Torg" style="height:22px;object-fit:contain;opacity:0.5;" onerror="this.style.display='none'" />
+    <span style="font-size:8px;color:#94a3b8;">Torg Metal — Soluções em Estruturas Metálicas</span>
+  </div>
+  <div style="font-size:8px;color:#94a3b8;">
+    Documento gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · ${detail.opNumero || ""}
+  </div>
 </div>
+
 </body></html>`;
 
   win.document.write(html);

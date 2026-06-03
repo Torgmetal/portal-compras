@@ -9,6 +9,7 @@ const patchSchema = z.object({
   dataRealizacao: z.string().datetime().nullable().optional(),
   dataInicioPrevista: z.string().datetime().nullable().optional(),
   dataFimPrevista: z.string().datetime().nullable().optional(),
+  justificativa: z.string().max(500).optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -78,6 +79,19 @@ export async function PATCH(req, { params }) {
       },
     }),
   ];
+
+  // Se tem justificativa, cria registro permanente
+  if (parsed.data.justificativa) {
+    ops.push(
+      prisma.cronogramaRegistro.create({
+        data: {
+          tarefaId: id,
+          descricao: parsed.data.justificativa,
+          createdById: user.id,
+        },
+      })
+    );
+  }
 
   // Se cronograma tem baseline e houve alteracao de datas/progresso, gera revisao
   if (tarefa.cronograma.dataBase && Object.keys(diffDepois).length > 0) {

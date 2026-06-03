@@ -15,7 +15,14 @@ export async function GET(req, { params }) {
   const cronograma = await prisma.cronograma.findUnique({
     where: { id },
     include: {
-      op: { select: { id: true, numero: true, cliente: true, obra: true, status: true } },
+      op: { select: {
+        id: true, numero: true, cliente: true, obra: true, status: true,
+        descricao: true, clienteRazaoSocial: true, clienteCnpj: true,
+        clienteCidade: true, clienteUF: true, clienteContato: true,
+        clienteEmail: true, clienteTelefone: true, clienteEndereco: true,
+        clienteCep: true, dataInicio: true, dataFimPrevista: true,
+        valorTotalContrato: true,
+      } },
       tarefas: {
         orderBy: { uidMpp: "asc" },
         include: {
