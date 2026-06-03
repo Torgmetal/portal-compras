@@ -88,6 +88,10 @@ export default function CronogramasClient() {
       return;
     }
     setExpandedId(id);
+    await recarregarDetail(id);
+  };
+
+  const recarregarDetail = async (id) => {
     setLoadingDetail(true);
     try {
       const res = await fetch(`/api/planejamento/cronogramas/${id}`);
@@ -187,7 +191,7 @@ export default function CronogramasClient() {
               onToggle={() => expandir(c.id)}
               detail={expandedId === c.id ? detail : null}
               loadingDetail={expandedId === c.id && loadingDetail}
-              onRefreshDetail={() => expandir(c.id)}
+              onRefreshDetail={() => recarregarDetail(c.id)}
               onDeleted={() => { setExpandedId(null); setDetail(null); carregar(); }}
             />
           ))}
