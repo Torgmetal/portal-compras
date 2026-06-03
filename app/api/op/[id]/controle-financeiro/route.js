@@ -18,7 +18,7 @@ export async function GET(req, { params }) {
       select: {
         id: true,
         numero: true,
-        valorContrato: true,
+        valorTotalContrato: true,
         rms: {
           select: {
             id: true,
@@ -43,27 +43,38 @@ export async function GET(req, { params }) {
             },
           },
         },
-        pedidosOmie: {
-          where: { status: { not: "REVERTIDO" } },
-          select: {
-            id: true,
-            fornecedorNome: true,
-            numeroPedido: true,
-            total: true,
-            status: true,
-            statusEntrega: true,
-            nfNumero: true,
-            createdAt: true,
-            faturamentoDireto: true,
-          },
-          orderBy: { createdAt: "desc" },
-        },
       },
     });
 
     if (!op) {
       return NextResponse.json({ error: "OP nao encontrada" }, { status: 404 });
     }
+
+    // Busca TODOS os pedidos vinculados a esta OP:
+    // - via opId direto (FD avulsos)
+    // - via cotacao de uma RM desta OP
+    const rmIds = op.rms.map((r) => r.id);
+    const allPedidos = await prisma.pedidoOmie.findMany({
+      where: {
+        OR: [
+          { opId: id },
+          ...(rmIds.length > 0 ? [{ cotacao: { rmId: { in: rmIds } } }] : []),
+        ],
+        status: { not: "REVERTIDO" },
+      },
+      select: {
+        id: true,
+        fornecedorNome: true,
+        numeroPedido: true,
+        total: true,
+        status: true,
+        statusEntrega: true,
+        nfNumero: true,
+        createdAt: true,
+        faturamentoDireto: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
     // Itens atendidos por estoque (flatten de todas as RMs)
     const itensEstoque = op.rms.flatMap((rm) =>
@@ -84,8 +95,8 @@ export async function GET(req, { params }) {
 
     // Totais
     const totalEstoque = itensEstoque.reduce((s, i) => s + (i.total || 0), 0);
-    const pedidosTorg = op.pedidosOmie.filter((p) => !p.faturamentoDireto);
-    const pedidosFD = op.pedidosOmie.filter((p) => p.faturamentoDireto);
+    const pedidosTorg = allPedidos.filter((p) => !p.faturamentoDireto);
+    const pedidosFD = allPedidos.filter((p) => p.faturamentoDireto);
     const totalPedidosTorg = pedidosTorg.reduce((s, p) => s + (p.total || 0), 0);
     const totalPedidosFD = pedidosFD.reduce((s, p) => s + (p.total || 0), 0);
     const totalPedidos = totalPedidosTorg + totalPedidosFD;
@@ -93,7 +104,7 @@ export async function GET(req, { params }) {
     return NextResponse.json({
       success: true,
       data: {
-        valorContrato: op.valorContrato || 0,
+        valorContrato: op.valorTotalContrato || 0,
         pedidos: {
           torg: { lista: pedidosTorg, total: totalPedidosTorg },
           fd: { lista: pedidosFD, total: totalPedidosFD },

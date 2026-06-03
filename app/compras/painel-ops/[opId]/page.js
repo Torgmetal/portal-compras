@@ -148,6 +148,7 @@ export default async function PainelOPDetalhe({ params }) {
   for (const rm of op.rms) {
     for (const cot of rm.cotacoes) {
       for (const ped of cot.pedidosOmie || []) {
+        if (ped.status === "REVERTIDO") continue; // pedidos revertidos somem do historico
         if (ped.status === "CRIADO") totalEmPedidos += ped.total || 0;
         pedidosFlat.push({
           id: ped.id,
@@ -192,6 +193,7 @@ export default async function PainelOPDetalhe({ params }) {
   // o valor da NF/proposta ja foi comprometido, mesmo se o pedido ainda
   // nao foi criado no Omie. So nao conta CANCELADO.
   for (const p of pedidosFdAvulsos) {
+    if (p.status === "REVERTIDO") continue; // pedidos revertidos somem do historico
     if (p.status !== "CANCELADO") totalEmPedidos += p.total || 0;
     pedidosFlat.push({
       ...p,

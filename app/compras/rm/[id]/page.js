@@ -57,6 +57,7 @@ export default async function RMComprasDetail({ params }) {
         select: {
           id: true, rmItemId: true, precoUnit: true, qtdCotada: true,
           icmsPct: true, ipiPct: true, observacao: true, vencedor: true,
+          semEstoque: true, prazoEntrega: true,
           rmItem: {
             select: {
               id: true, descricao: true, unidade: true, qtd: true,

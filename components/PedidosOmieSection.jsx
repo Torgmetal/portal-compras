@@ -53,9 +53,11 @@ export default function PedidosOmieSection({ pedidos }) {
 
   const totalCriados = pedidos.filter((p) => p.status === "CRIADO").reduce((s, p) => s + (p.total || 0), 0);
   const qtdCriados = pedidos.filter((p) => p.status === "CRIADO").length;
-  // Conta erros REAIS — FDs avulsos pendentes nao sao "erro", sao FD valido
-  const qtdErros = pedidos.filter((p) => p.status !== "CRIADO" && !p.criadoManualmente).length;
-  const qtdFD = pedidos.filter((p) => p.status !== "CRIADO" && p.criadoManualmente).length;
+  // Conta erros REAIS — FDs avulsos pendentes nao sao "erro", sao FD valido.
+  // REVERTIDO nao e erro — nao deveria chegar aqui (filtrado no server),
+  // mas se chegar, ignora pra nao poluir contagem.
+  const qtdErros = pedidos.filter((p) => p.status !== "CRIADO" && p.status !== "REVERTIDO" && !p.criadoManualmente).length;
+  const qtdFD = pedidos.filter((p) => p.status !== "CRIADO" && p.status !== "REVERTIDO" && p.criadoManualmente).length;
 
   return (
     <div id="pedidos-omie" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden scroll-mt-4">
@@ -112,7 +114,7 @@ export default function PedidosOmieSection({ pedidos }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {pedidos.map((p) => (
+            {pedidos.filter((p) => p.status !== "REVERTIDO").map((p) => (
               <tr key={p.id} className="hover:bg-gray-50">
                 <td className="px-4 py-2.5">
                   <PedidoNumeroCell pedido={p} />
