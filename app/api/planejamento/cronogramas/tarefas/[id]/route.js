@@ -11,6 +11,8 @@ const patchSchema = z.object({
   dataInicioPrevista: z.string().datetime().nullable().optional(),
   dataFimPrevista: z.string().datetime().nullable().optional(),
   justificativa: z.string().max(500).optional(),
+  qtdePlanejada: z.number().min(0).optional(),
+  qtdeRealizada: z.number().min(0).optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -51,6 +53,16 @@ export async function PATCH(req, { params }) {
     diffAntes.percentualRealizado = tarefa.percentualRealizado;
     diffDepois.percentualRealizado = parsed.data.percentualRealizado;
     data.percentualRealizado = parsed.data.percentualRealizado;
+  }
+  if (parsed.data.qtdePlanejada !== undefined && parsed.data.qtdePlanejada !== tarefa.qtdePlanejada) {
+    diffAntes.qtdePlanejada = tarefa.qtdePlanejada;
+    diffDepois.qtdePlanejada = parsed.data.qtdePlanejada;
+    data.qtdePlanejada = parsed.data.qtdePlanejada;
+  }
+  if (parsed.data.qtdeRealizada !== undefined && parsed.data.qtdeRealizada !== tarefa.qtdeRealizada) {
+    diffAntes.qtdeRealizada = tarefa.qtdeRealizada;
+    diffDepois.qtdeRealizada = parsed.data.qtdeRealizada;
+    data.qtdeRealizada = parsed.data.qtdeRealizada;
   }
   if (parsed.data.observacao !== undefined) data.observacao = parsed.data.observacao;
   if (parsed.data.dataRealizacao !== undefined) {
