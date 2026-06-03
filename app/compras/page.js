@@ -55,90 +55,74 @@ export default async function PainelCompras({ searchParams }) {
     }),
   ]);
 
-  // Conta cotacoes por RM considerando consolidadas: uma cotacao consolidada
-  // que tem itens de varias RMs conta pra cada RM envolvida (nao so a primaria).
-  // Wrap em try/catch defensivo — se a query falhar por algum motivo, cai pro
-  // _count.cotacoes original (pode ficar errado pra consolidadas mas pelo
-  // menos a pagina nao crasha).
+  // Conta cotacoes por RM e agrega status (RECEBIDA/PENDENTE/atrasada).
+  // Usa CotacaoItem como ponte leve pra identificar cotacaoIds, evitando
+  // OR com subquery aninhada que causa OOM no Neon.
   try {
     const rmIdsListados = rms.map((r) => r.id);
     if (rmIdsListados.length > 0) {
+      // 1) CotacaoItem -> mapa rmId -> Set<cotacaoId>
       const cotItensRelacionados = await prisma.cotacaoItem.findMany({
         where: { rmItem: { rmId: { in: rmIdsListados } } },
         select: { cotacaoId: true, rmItem: { select: { rmId: true } } },
       });
       const cotacoesPorRm = new Map();
+      const todosCotsIds = new Set();
       for (const ci of cotItensRelacionados) {
         const rid = ci.rmItem?.rmId;
         if (!rid) continue;
         if (!cotacoesPorRm.has(rid)) cotacoesPorRm.set(rid, new Set());
         cotacoesPorRm.get(rid).add(ci.cotacaoId);
+        todosCotsIds.add(ci.cotacaoId);
       }
       for (const rm of rms) {
         if (rm._count) {
           rm._count.cotacoes = cotacoesPorRm.get(rm.id)?.size ?? rm._count.cotacoes;
         }
       }
-    }
-  } catch (e) {
-    console.error("[/compras] Falha contando cotacoes multi-RM:", e?.message);
-  }
 
-  // Pra cada RM: quantas cotacoes RECEBIDA / quantas PENDENTE / atraso
-  // (cotacao pendente com prazoResposta < hoje). Usado nos KPI cards e
-  // na coluna "Ação" da tabela.
-  try {
-    const rmIdsListados = rms.map((r) => r.id);
-    if (rmIdsListados.length > 0) {
-      // Busca todas cotacoes que tocam essas RMs (primaria ou consolidada)
-      const cotsRelacionadas = await prisma.cotacao.findMany({
-        where: {
-          OR: [
-            { rmId: { in: rmIdsListados } },
-            { itens: { some: { rmItem: { rmId: { in: rmIdsListados } } } } },
-          ],
-        },
-        select: {
-          id: true, rmId: true, status: true, prazoResposta: true,
-          itens: { select: { rmItem: { select: { rmId: true } } } },
-        },
-      });
-      const agora = Date.now();
-      // Mapa rmId -> { recebidas: Set<cotId>, pendentes: Set<cotId>, atrasadas: Set<cotId> }
-      const infoPorRm = new Map();
-      const upsert = (rmId) => {
-        if (!infoPorRm.has(rmId)) {
-          infoPorRm.set(rmId, { recebidas: new Set(), pendentes: new Set(), atrasadas: new Set() });
-        }
-        return infoPorRm.get(rmId);
-      };
-      for (const cot of cotsRelacionadas) {
-        const rmIdsDestaCot = new Set();
-        if (cot.rmId) rmIdsDestaCot.add(cot.rmId);
-        for (const it of cot.itens || []) {
-          if (it.rmItem?.rmId) rmIdsDestaCot.add(it.rmItem.rmId);
-        }
-        for (const rid of rmIdsDestaCot) {
-          if (!rmIdsListados.includes(rid)) continue;
-          const info = upsert(rid);
-          if (cot.status === "RECEBIDA") info.recebidas.add(cot.id);
-          else if (cot.status === "PENDENTE") {
-            info.pendentes.add(cot.id);
-            if (cot.prazoResposta && new Date(cot.prazoResposta).getTime() < agora) {
-              info.atrasadas.add(cot.id);
+      // 2) Busca status/prazo das cotacoes por ID direto (sem OR+subquery)
+      if (todosCotsIds.size > 0) {
+        const cotsRelacionadas = await prisma.cotacao.findMany({
+          where: { id: { in: [...todosCotsIds] } },
+          select: { id: true, status: true, prazoResposta: true },
+        });
+        const cotsMap = new Map();
+        for (const c of cotsRelacionadas) cotsMap.set(c.id, c);
+
+        const agora = Date.now();
+        const infoPorRm = new Map();
+        const upsert = (rmId) => {
+          if (!infoPorRm.has(rmId)) {
+            infoPorRm.set(rmId, { recebidas: new Set(), pendentes: new Set(), atrasadas: new Set() });
+          }
+          return infoPorRm.get(rmId);
+        };
+        for (const [rmId, cotIds] of cotacoesPorRm) {
+          if (!rmIdsListados.includes(rmId)) continue;
+          for (const cotId of cotIds) {
+            const cot = cotsMap.get(cotId);
+            if (!cot) continue;
+            const info = upsert(rmId);
+            if (cot.status === "RECEBIDA") info.recebidas.add(cot.id);
+            else if (cot.status === "PENDENTE") {
+              info.pendentes.add(cot.id);
+              if (cot.prazoResposta && new Date(cot.prazoResposta).getTime() < agora) {
+                info.atrasadas.add(cot.id);
+              }
             }
           }
         }
-      }
-      for (const rm of rms) {
-        const info = infoPorRm.get(rm.id);
-        rm.recebidas = info ? info.recebidas.size : 0;
-        rm.pendentes = info ? info.pendentes.size : 0;
-        rm.atrasadas = info ? info.atrasadas.size : 0;
+        for (const rm of rms) {
+          const info = infoPorRm.get(rm.id);
+          rm.recebidas = info ? info.recebidas.size : 0;
+          rm.pendentes = info ? info.pendentes.size : 0;
+          rm.atrasadas = info ? info.atrasadas.size : 0;
+        }
       }
     }
   } catch (e) {
-    console.error("[/compras] Falha agregando status de cotacoes:", e?.message);
+    console.error("[/compras] Falha agregando cotacoes:", e?.message);
     for (const rm of rms) {
       rm.recebidas = 0; rm.pendentes = 0; rm.atrasadas = 0;
     }

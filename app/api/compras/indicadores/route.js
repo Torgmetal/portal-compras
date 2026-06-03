@@ -442,9 +442,10 @@ async function calcularOTIF(dataInicio, dataFim) {
 // Foco: tempo entre resposta do fornecedor e geração do pedido.
 async function calcularAtendimento(dataInicio, dataFim) {
   // 1) Cotações respondidas que geraram pedido — mede lead time de compra
+  // Limita ao periodo pra evitar query sem escopo que causa OOM no Neon
   const cotacoesComPedido = await prisma.cotacao.findMany({
     where: {
-      recebidaEm: { not: null },
+      recebidaEm: { not: null, gte: dataInicio, lte: dataFim },
       pedidosOmie: { some: { status: { not: "ERRO" } } },
     },
     select: {
@@ -471,9 +472,12 @@ async function calcularAtendimento(dataInicio, dataFim) {
   });
 
   // 2) Cotações respondidas PENDENTES — backlog (respondeu, mas não gerou pedido)
+  // Filtra cotacoes recebidas nos ultimos 6 meses pra evitar query sem escopo
+  const sesMesesAtras = new Date(dataFim);
+  sesMesesAtras.setMonth(sesMesesAtras.getMonth() - 6);
   const cotacoesPendentes = await prisma.cotacao.findMany({
     where: {
-      recebidaEm: { not: null },
+      recebidaEm: { not: null, gte: sesMesesAtras },
       status: "RECEBIDA",
       pedidosOmie: { none: {} },
       rm: { status: { notIn: ["CANCELADA", "PEDIDO_GERADO"] } },

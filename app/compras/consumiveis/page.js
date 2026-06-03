@@ -52,6 +52,9 @@ export default async function PainelConsumiveis({ searchParams }) {
   ]);
 
   // Conta cotacoes por RM considerando consolidadas
+  // Conta cotacoes por RM e agrega status (RECEBIDA/PENDENTE/atrasada).
+  // Usa CotacaoItem como ponte leve pra identificar cotacaoIds, evitando
+  // OR com subquery aninhada que causa OOM no Neon.
   try {
     const rmIdsListados = rms.map((r) => r.id);
     if (rmIdsListados.length > 0) {
@@ -60,73 +63,61 @@ export default async function PainelConsumiveis({ searchParams }) {
         select: { cotacaoId: true, rmItem: { select: { rmId: true } } },
       });
       const cotacoesPorRm = new Map();
+      const todosCotsIds = new Set();
       for (const ci of cotItensRelacionados) {
         const rid = ci.rmItem?.rmId;
         if (!rid) continue;
         if (!cotacoesPorRm.has(rid)) cotacoesPorRm.set(rid, new Set());
         cotacoesPorRm.get(rid).add(ci.cotacaoId);
+        todosCotsIds.add(ci.cotacaoId);
       }
       for (const rm of rms) {
         if (rm._count) {
           rm._count.cotacoes = cotacoesPorRm.get(rm.id)?.size ?? rm._count.cotacoes;
         }
       }
-    }
-  } catch (e) {
-    console.error("[/compras/consumiveis] Falha contando cotacoes multi-RM:", e?.message);
-  }
 
-  // Cotacoes recebidas / pendentes / atrasadas por RM
-  try {
-    const rmIdsListados = rms.map((r) => r.id);
-    if (rmIdsListados.length > 0) {
-      const cotsRelacionadas = await prisma.cotacao.findMany({
-        where: {
-          OR: [
-            { rmId: { in: rmIdsListados } },
-            { itens: { some: { rmItem: { rmId: { in: rmIdsListados } } } } },
-          ],
-        },
-        select: {
-          id: true, rmId: true, status: true, prazoResposta: true,
-          itens: { select: { rmItem: { select: { rmId: true } } } },
-        },
-      });
-      const agora = Date.now();
-      const infoPorRm = new Map();
-      const upsert = (rmId) => {
-        if (!infoPorRm.has(rmId)) {
-          infoPorRm.set(rmId, { recebidas: new Set(), pendentes: new Set(), atrasadas: new Set() });
-        }
-        return infoPorRm.get(rmId);
-      };
-      for (const cot of cotsRelacionadas) {
-        const rmIdsDestaCot = new Set();
-        if (cot.rmId) rmIdsDestaCot.add(cot.rmId);
-        for (const it of cot.itens || []) {
-          if (it.rmItem?.rmId) rmIdsDestaCot.add(it.rmItem.rmId);
-        }
-        for (const rid of rmIdsDestaCot) {
-          if (!rmIdsListados.includes(rid)) continue;
-          const info = upsert(rid);
-          if (cot.status === "RECEBIDA") info.recebidas.add(cot.id);
-          else if (cot.status === "PENDENTE") {
-            info.pendentes.add(cot.id);
-            if (cot.prazoResposta && new Date(cot.prazoResposta).getTime() < agora) {
-              info.atrasadas.add(cot.id);
+      if (todosCotsIds.size > 0) {
+        const cotsRelacionadas = await prisma.cotacao.findMany({
+          where: { id: { in: [...todosCotsIds] } },
+          select: { id: true, status: true, prazoResposta: true },
+        });
+        const cotsMap = new Map();
+        for (const c of cotsRelacionadas) cotsMap.set(c.id, c);
+
+        const agora = Date.now();
+        const infoPorRm = new Map();
+        const upsert = (rmId) => {
+          if (!infoPorRm.has(rmId)) {
+            infoPorRm.set(rmId, { recebidas: new Set(), pendentes: new Set(), atrasadas: new Set() });
+          }
+          return infoPorRm.get(rmId);
+        };
+        for (const [rmId, cotIds] of cotacoesPorRm) {
+          if (!rmIdsListados.includes(rmId)) continue;
+          for (const cotId of cotIds) {
+            const cot = cotsMap.get(cotId);
+            if (!cot) continue;
+            const info = upsert(rmId);
+            if (cot.status === "RECEBIDA") info.recebidas.add(cot.id);
+            else if (cot.status === "PENDENTE") {
+              info.pendentes.add(cot.id);
+              if (cot.prazoResposta && new Date(cot.prazoResposta).getTime() < agora) {
+                info.atrasadas.add(cot.id);
+              }
             }
           }
         }
-      }
-      for (const rm of rms) {
-        const info = infoPorRm.get(rm.id);
-        rm.recebidas = info ? info.recebidas.size : 0;
-        rm.pendentes = info ? info.pendentes.size : 0;
-        rm.atrasadas = info ? info.atrasadas.size : 0;
+        for (const rm of rms) {
+          const info = infoPorRm.get(rm.id);
+          rm.recebidas = info ? info.recebidas.size : 0;
+          rm.pendentes = info ? info.pendentes.size : 0;
+          rm.atrasadas = info ? info.atrasadas.size : 0;
+        }
       }
     }
   } catch (e) {
-    console.error("[/compras/consumiveis] Falha agregando status de cotacoes:", e?.message);
+    console.error("[/compras/consumiveis] Falha agregando cotacoes:", e?.message);
     for (const rm of rms) {
       rm.recebidas = 0; rm.pendentes = 0; rm.atrasadas = 0;
     }

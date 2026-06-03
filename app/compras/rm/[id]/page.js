@@ -36,14 +36,16 @@ export default async function RMComprasDetail({ params }) {
   if (!rm) notFound();
 
   // Cotacoes: tanto as primarias (rmId = essa RM) quanto consolidadas que
-  // incluem itens dessa RM via CotacaoItem.rmItem.rmId
+  // incluem itens dessa RM via CotacaoItem.rmItem.rmId.
+  // Busca cotacaoIds via CotacaoItem primeiro (query leve) pra evitar
+  // OR com subquery aninhada que causa OOM no Neon.
+  const cotItemsDestaRM = await prisma.cotacaoItem.findMany({
+    where: { rmItem: { rmId: rm.id } },
+    select: { cotacaoId: true },
+  });
+  const cotIdsDestaRM = [...new Set(cotItemsDestaRM.map((ci) => ci.cotacaoId))];
   const cotacoesRelacionadas = await prisma.cotacao.findMany({
-    where: {
-      OR: [
-        { rmId: rm.id },
-        { itens: { some: { rmItem: { rmId: rm.id } } } },
-      ],
-    },
+    where: { id: { in: cotIdsDestaRM } },
     select: {
       id: true, rmId: true, fornecedorNome: true, fornecedorEmail: true, token: true,
       status: true, total: true, totalProposta: true, numeroRevisao: true,
