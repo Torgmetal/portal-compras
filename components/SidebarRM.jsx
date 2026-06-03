@@ -14,10 +14,10 @@ export default function SidebarRM() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col min-h-screen fixed left-0 top-0">
+    <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col h-screen fixed left-0 top-0">
       <SidebarModuleSwitcher moduloAtual="Portal de RMs" />
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {menu.map((m) => {
           const Icon = m.icon;
           const active = m.exact ? pathname === m.href : pathname.startsWith(m.href);

@@ -38,10 +38,10 @@ export default function SidebarComercial() {
   const toggleSub = (href) => setOpenSub((prev) => (prev === href ? null : href));
 
   return (
-    <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col min-h-screen fixed left-0 top-0">
+    <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col h-screen fixed left-0 top-0">
       <SidebarModuleSwitcher moduloAtual="Portal Comercial" />
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {menu
           .filter((m) => !m.masterOnly || isMaster)
           .map((m) => {
