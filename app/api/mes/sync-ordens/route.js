@@ -92,10 +92,76 @@ export async function POST(req) {
   });
 
   let criados = 0, atualizados = 0;
+
+  // Monta o INSERT ... ON CONFLICT para um lote já deduplicado.
+  const montarSQL = (lote) => {
+    const valores = lote.map(o => {
+      const di = parseData(o.dataInicio), df = parseData(o.dataFim);
+      return `(gen_random_uuid()::text, ${q(o.obra)}, ${q(o.op)}, ${q(o.operacao)}, ${q(o.item)}, ` +
+        `${q(o.setor)}, ${q(o.descItem)}, ${q(o.maquina)}, ${q(o.operador)}, ` +
+        `${n(o.planejadoUn)}, ${n(o.produzidoUn)}, ${n(o.rejeitadoUn)}, ${n(o.saldoUn)}, ` +
+        `${n(o.pesoPlanejado)}, ${n(o.pesoProduzido)}, ${n(o.saldoRestante)}, ` +
+        `${q(o.status)}, ${ni(o.productionId)}, ${ts(di)}, ${ts(df)}, ${q(opIdDaObra(o.obra))}, ${q(syncLog.id)}, NOW(), NOW())`;
+    }).join(",");
+    return `
+      INSERT INTO "MesOrdem" (
+        "id","obra","op","operacao","item","setor","descItem","maquina","operador",
+        "planejadoUn","produzidoUn","rejeitadoUn","saldoUn","pesoPlanejado","pesoProduzido","saldoRestante",
+        "status","productionId","dataInicio","dataFim","opId","syncRunId","createdAt","updatedAt"
+      )
+      VALUES ${valores}
+      ON CONFLICT ("obra","op","operacao","item") DO UPDATE SET
+        "setor"         = EXCLUDED."setor",
+        "descItem"      = EXCLUDED."descItem",
+        "maquina"       = EXCLUDED."maquina",
+        "operador"      = EXCLUDED."operador",
+        "planejadoUn"   = EXCLUDED."planejadoUn",
+        "produzidoUn"   = EXCLUDED."produzidoUn",
+        "rejeitadoUn"   = EXCLUDED."rejeitadoUn",
+        "saldoUn"       = EXCLUDED."saldoUn",
+        "pesoPlanejado" = EXCLUDED."pesoPlanejado",
+        "pesoProduzido" = EXCLUDED."pesoProduzido",
+        "saldoRestante" = EXCLUDED."saldoRestante",
+        "status"        = EXCLUDED."status",
+        "productionId"  = EXCLUDED."productionId",
+        "dataInicio"    = EXCLUDED."dataInicio",
+        "dataFim"       = EXCLUDED."dataFim",
+        "opId"          = EXCLUDED."opId",
+        "syncRunId"     = EXCLUDED."syncRunId",
+        "updatedAt"     = NOW()
+      RETURNING (xmax = 0) AS inserted
+    `;
+  };
+
+  const ehOOM = (e) => /53200|out of memory/i.test(e?.message || "");
+
+  // Upsert resiliente: se o Neon estourar memória (OOM), divide o lote pela
+  // metade e tenta de novo recursivamente — degrada em vez de abortar.
+  async function upsertResiliente(lote, tentativa = 0) {
+    if (lote.length === 0) return;
+    try {
+      const res = await prisma.$queryRawUnsafe(montarSQL(lote));
+      for (const r of res) { if (r.inserted) criados++; else atualizados++; }
+    } catch (e) {
+      if (ehOOM(e) && lote.length > 1) {
+        const meio = Math.ceil(lote.length / 2);
+        // pequena pausa para o Neon liberar memória antes de reprocessar
+        await new Promise(r => setTimeout(r, 250));
+        await upsertResiliente(lote.slice(0, meio), tentativa + 1);
+        await upsertResiliente(lote.slice(meio), tentativa + 1);
+      } else if (ehOOM(e) && tentativa < 4) {
+        // lote já unitário mas ainda OOM → espera e repete (pressão momentânea)
+        await new Promise(r => setTimeout(r, 500 * (tentativa + 1)));
+        await upsertResiliente(lote, tentativa + 1);
+      } else {
+        throw e;
+      }
+    }
+  }
+
   try {
-    // Sub-lotes de 200 para o INSERT em massa.
-    // (1000 estourava a memória do Neon — "out of memory" code 53200.)
-    const SUB = 200;
+    // Sub-lotes de 100 para o INSERT em massa (com auto-split em OOM).
+    const SUB = 100;
     for (let i = 0; i < body.ordens.length; i += SUB) {
       // Dedup dentro do lote pela chave (evita "ON CONFLICT afetar linha 2x no mesmo comando")
       const vistos = new Set();
@@ -106,45 +172,7 @@ export async function POST(req) {
         vistos.add(k);
         lote.push(o);
       }
-
-      const valores = lote.map(o => {
-        const di = parseData(o.dataInicio), df = parseData(o.dataFim);
-        return `(gen_random_uuid()::text, ${q(o.obra)}, ${q(o.op)}, ${q(o.operacao)}, ${q(o.item)}, ` +
-          `${q(o.setor)}, ${q(o.descItem)}, ${q(o.maquina)}, ${q(o.operador)}, ` +
-          `${n(o.planejadoUn)}, ${n(o.produzidoUn)}, ${n(o.rejeitadoUn)}, ${n(o.saldoUn)}, ` +
-          `${n(o.pesoPlanejado)}, ${n(o.pesoProduzido)}, ${n(o.saldoRestante)}, ` +
-          `${q(o.status)}, ${ni(o.productionId)}, ${ts(di)}, ${ts(df)}, ${q(opIdDaObra(o.obra))}, ${q(syncLog.id)}, NOW(), NOW())`;
-      }).join(",");
-
-      const res = await prisma.$queryRawUnsafe(`
-        INSERT INTO "MesOrdem" (
-          "id","obra","op","operacao","item","setor","descItem","maquina","operador",
-          "planejadoUn","produzidoUn","rejeitadoUn","saldoUn","pesoPlanejado","pesoProduzido","saldoRestante",
-          "status","productionId","dataInicio","dataFim","opId","syncRunId","createdAt","updatedAt"
-        )
-        VALUES ${valores}
-        ON CONFLICT ("obra","op","operacao","item") DO UPDATE SET
-          "setor"         = EXCLUDED."setor",
-          "descItem"      = EXCLUDED."descItem",
-          "maquina"       = EXCLUDED."maquina",
-          "operador"      = EXCLUDED."operador",
-          "planejadoUn"   = EXCLUDED."planejadoUn",
-          "produzidoUn"   = EXCLUDED."produzidoUn",
-          "rejeitadoUn"   = EXCLUDED."rejeitadoUn",
-          "saldoUn"       = EXCLUDED."saldoUn",
-          "pesoPlanejado" = EXCLUDED."pesoPlanejado",
-          "pesoProduzido" = EXCLUDED."pesoProduzido",
-          "saldoRestante" = EXCLUDED."saldoRestante",
-          "status"        = EXCLUDED."status",
-          "productionId"  = EXCLUDED."productionId",
-          "dataInicio"    = EXCLUDED."dataInicio",
-          "dataFim"       = EXCLUDED."dataFim",
-          "opId"          = EXCLUDED."opId",
-          "syncRunId"     = EXCLUDED."syncRunId",
-          "updatedAt"     = NOW()
-        RETURNING (xmax = 0) AS inserted
-      `);
-      for (const r of res) { if (r.inserted) criados++; else atualizados++; }
+      await upsertResiliente(lote);
     }
 
     await prisma.mesSyncLog.update({
