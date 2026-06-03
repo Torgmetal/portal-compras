@@ -75,21 +75,31 @@ export async function POST(req) {
 
   const inicio = Date.now();
 
+  // Todo o endpoint usa a conexão DIRETA (sem pooler) — o pooler do Neon
+  // (PgBouncer) estoura "out of memory" sob carga repetida.
   // Mapa obra → opId do portal
   const obrasUnicas = [...new Set(body.ordens.map(o => o.obra).filter(Boolean))];
   const numerosPortal = [...new Set(obrasUnicas.map(obraParaNumeroOP))];
-  const ops = await prisma.oP.findMany({ where: { numero: { in: numerosPortal } }, select: { id: true, numero: true } });
+  const ops = await prismaDirect.oP.findMany({ where: { numero: { in: numerosPortal } }, select: { id: true, numero: true } });
   const opMapPorNumero = Object.fromEntries(ops.map(o => [o.numero, o.id]));
   const opIdDaObra = (obra) => opMapPorNumero[obraParaNumeroOP(obra)] || null;
 
-  const syncLog = await prisma.mesSyncLog.create({
-    data: {
-      sucesso: false,
-      dataInicio: parseData(body.dataInicio) || new Date(),
-      dataFim:    parseData(body.dataFim) || new Date(),
-      totalLinhas: body.ordens.length,
-    },
-  });
+  // Registro de auditoria do sync — NÃO-FATAL: se falhar, o sync dos dados
+  // continua normalmente (o syncLog é só bookkeeping, não pode derrubar o upsert).
+  let syncLog = null;
+  try {
+    syncLog = await prismaDirect.mesSyncLog.create({
+      data: {
+        sucesso: false,
+        dataInicio: parseData(body.dataInicio) || new Date(),
+        dataFim:    parseData(body.dataFim) || new Date(),
+        totalLinhas: body.ordens.length,
+      },
+    });
+  } catch (e) {
+    console.error("[sync-ordens] falha ao criar MesSyncLog (não-fatal):", e?.message);
+  }
+  const syncLogId = syncLog?.id || null;
 
   let processados = 0;
 
@@ -147,7 +157,7 @@ export async function POST(req) {
     pgArray(lote.map(o => { const d = parseData(o.dataInicio); return d ? d.toISOString() : null; })),
     pgArray(lote.map(o => { const d = parseData(o.dataFim);    return d ? d.toISOString() : null; })),
     pgArray(lote.map(o => opIdDaObra(o.obra))),
-    pgArray(lote.map(() => syncLog.id)),
+    pgArray(lote.map(() => syncLogId)),
   ];
 
   const ehOOM = (e) => /53200|out of memory/i.test(e?.message || "");
@@ -195,16 +205,22 @@ export async function POST(req) {
       await new Promise(r => setTimeout(r, 40));
     }
 
-    await prisma.mesSyncLog.update({
-      where: { id: syncLog.id },
-      data: { sucesso: true, atualizados: processados, duracaoMs: body.duracaoMs ?? (Date.now() - inicio) },
-    });
-    return NextResponse.json({ ok: true, processados, syncId: syncLog.id });
+    // Atualização do log é NÃO-FATAL: os dados já foram gravados; não pode
+    // derrubar a resposta (senão o agente re-tenta o lote inteiro à toa).
+    if (syncLogId) {
+      await prismaDirect.mesSyncLog.update({
+        where: { id: syncLogId },
+        data: { sucesso: true, atualizados: processados, duracaoMs: body.duracaoMs ?? (Date.now() - inicio) },
+      }).catch(e => console.error("[sync-ordens] falha ao atualizar MesSyncLog (não-fatal):", e?.message));
+    }
+    return NextResponse.json({ ok: true, processados, syncId: syncLogId });
   } catch (e) {
-    await prisma.mesSyncLog.update({
-      where: { id: syncLog.id },
-      data: { sucesso: false, erro: e?.message || "erro", duracaoMs: Date.now() - inicio },
-    }).catch(() => {});
+    if (syncLogId) {
+      await prismaDirect.mesSyncLog.update({
+        where: { id: syncLogId },
+        data: { sucesso: false, erro: e?.message || "erro", duracaoMs: Date.now() - inicio },
+      }).catch(() => {});
+    }
     return NextResponse.json({ error: "Erro interno: " + e?.message }, { status: 500 });
   }
 }
