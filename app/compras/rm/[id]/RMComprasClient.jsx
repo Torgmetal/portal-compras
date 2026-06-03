@@ -563,6 +563,7 @@ function PedidosGerados({ pedidos, rmId, onRevertido, isAdmin, userRole }) {
   const [confirmando, setConfirmando] = useState(null);
   const [toast, setToast] = useState(null);
   const [modalReceber, setModalReceber] = useState(null);
+  const [modalEditar, setModalEditar] = useState(null);
 
   const handleReverter = async (pedido) => {
     setRevertendo(pedido.id);
@@ -671,6 +672,15 @@ function PedidosGerados({ pedidos, rmId, onRevertido, isAdmin, userRole }) {
                 </span>
                 {/* Botoes de acao */}
                 <div className="flex items-center gap-2 flex-wrap">
+                  {podeReverter && (
+                    <button
+                      onClick={() => setModalEditar(p)}
+                      className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-torg-dark rounded-lg hover:bg-gray-50 font-medium inline-flex items-center gap-1"
+                      title="Editar valor, fornecedor ou observação do pedido"
+                    >
+                      <Edit2 size={12} /> Editar
+                    </button>
+                  )}
                   {podeReceber && !recebido && (
                     <button
                       onClick={() => setModalReceber(p)}
@@ -746,9 +756,154 @@ function PedidosGerados({ pedidos, rmId, onRevertido, isAdmin, userRole }) {
         <ModalReceberPedido
           pedido={modalReceber}
           onClose={() => setModalReceber(null)}
-          onSaved={() => { setModalReceber(null); onRevertido(); /* reusa refresh */ }}
+          onSaved={() => { setModalReceber(null); onRevertido(); }}
         />
       )}
+
+      {/* Modal de Edição do Pedido */}
+      {modalEditar && (
+        <ModalEditarPedido
+          pedido={modalEditar}
+          onClose={() => setModalEditar(null)}
+          onSaved={() => { setModalEditar(null); onRevertido(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── MODAL EDITAR PEDIDO ──
+
+function ModalEditarPedido({ pedido, onClose, onSaved }) {
+  const [total, setTotal] = useState(String(pedido.total || 0));
+  const [fornecedor, setFornecedor] = useState(pedido.fornecedorNome || "");
+  const [numeroPed, setNumeroPed] = useState(pedido.numeroPedido || "");
+  const [obs, setObs] = useState(pedido.observacao || "");
+  const [saving, setSaving] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const parseTotal = (v) => {
+    // Aceita "39.804,33" (BR) ou "39804.33" (EN)
+    const limpo = String(v).replace(/\s/g, "");
+    if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(limpo)) {
+      return Number(limpo.replace(/\./g, "").replace(",", "."));
+    }
+    return Number(limpo.replace(",", "."));
+  };
+
+  const handleSalvar = async () => {
+    const totalNum = parseTotal(total);
+    if (isNaN(totalNum) || totalNum < 0) {
+      setErro("Valor invalido");
+      return;
+    }
+    if (!fornecedor.trim()) {
+      setErro("Nome do fornecedor obrigatorio");
+      return;
+    }
+    setSaving(true);
+    setErro("");
+    try {
+      const res = await fetch(`/api/pedido-omie/${pedido.id}/editar`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          total: totalNum,
+          fornecedorNome: fornecedor.trim(),
+          numeroPedido: numeroPed.trim() || null,
+          observacao: obs.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || "Erro ao salvar");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-torg-dark inline-flex items-center gap-2">
+            <Edit2 size={16} className="text-torg-blue" />
+            Editar Pedido
+          </h3>
+          <button onClick={onClose} className="text-torg-gray hover:text-torg-dark"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-4 space-y-4">
+          <p className="text-xs text-torg-gray">
+            Ajuste os dados do pedido no portal para refletir alterações feitas diretamente no Omie.
+          </p>
+
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Valor total (R$) *</label>
+            <input
+              type="text"
+              value={total}
+              onChange={(e) => setTotal(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-torg-blue focus:border-torg-blue"
+              placeholder="39.804,33"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Fornecedor *</label>
+            <input
+              type="text"
+              value={fornecedor}
+              onChange={(e) => setFornecedor(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-torg-blue focus:border-torg-blue"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Nº Pedido Omie</label>
+            <input
+              type="text"
+              value={numeroPed}
+              onChange={(e) => setNumeroPed(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-torg-blue focus:border-torg-blue"
+              placeholder="1461"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Observação</label>
+            <textarea
+              value={obs}
+              onChange={(e) => setObs(e.target.value)}
+              rows={2}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-torg-blue focus:border-torg-blue resize-none"
+              placeholder="Motivo da alteração..."
+            />
+          </div>
+
+          {erro && (
+            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-1.5">
+              <AlertCircle size={12} className="mt-0.5 shrink-0" /> {erro}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark">
+            Cancelar
+          </button>
+          <button
+            onClick={handleSalvar}
+            disabled={saving}
+            className="px-4 py-2 text-sm bg-torg-blue text-white rounded-lg hover:bg-torg-blue/90 font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            Salvar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
