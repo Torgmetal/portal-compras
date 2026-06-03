@@ -91,9 +91,10 @@ export async function POST(req) {
     },
   });
 
-  let criados = 0, atualizados = 0;
+  let processados = 0;
 
   // Monta o INSERT ... ON CONFLICT para um lote já deduplicado.
+  // Sem RETURNING: $executeRaw é mais leve no executor (não materializa resultado).
   const montarSQL = (lote) => {
     const valores = lote.map(o => {
       const di = parseData(o.dataInicio), df = parseData(o.dataFim);
@@ -129,7 +130,6 @@ export async function POST(req) {
         "opId"          = EXCLUDED."opId",
         "syncRunId"     = EXCLUDED."syncRunId",
         "updatedAt"     = NOW()
-      RETURNING (xmax = 0) AS inserted
     `;
   };
 
@@ -141,18 +141,18 @@ export async function POST(req) {
     if (lote.length === 0) return;
     try {
       // Conexão DIRETA (sem pooler) — evita o OOM do PgBouncer do Neon.
-      const res = await prismaDirect.$queryRawUnsafe(montarSQL(lote));
-      for (const r of res) { if (r.inserted) criados++; else atualizados++; }
+      await prismaDirect.$executeRawUnsafe(montarSQL(lote));
+      processados += lote.length;
     } catch (e) {
       if (ehOOM(e) && lote.length > 1) {
         const meio = Math.ceil(lote.length / 2);
-        // pequena pausa para o Neon liberar memória antes de reprocessar
-        await new Promise(r => setTimeout(r, 250));
+        // pausa para o Neon liberar memória antes de reprocessar (cresce com a profundidade)
+        await new Promise(r => setTimeout(r, 400 + 200 * tentativa));
         await upsertResiliente(lote.slice(0, meio), tentativa + 1);
         await upsertResiliente(lote.slice(meio), tentativa + 1);
-      } else if (ehOOM(e) && tentativa < 4) {
-        // lote já unitário mas ainda OOM → espera e repete (pressão momentânea)
-        await new Promise(r => setTimeout(r, 500 * (tentativa + 1)));
+      } else if (ehOOM(e) && tentativa < 8) {
+        // lote já unitário mas ainda OOM → espera (crescente) e repete
+        await new Promise(r => setTimeout(r, 700 * (tentativa + 1)));
         await upsertResiliente(lote, tentativa + 1);
       } else {
         throw e;
@@ -161,8 +161,8 @@ export async function POST(req) {
   }
 
   try {
-    // Sub-lotes de 100 para o INSERT em massa (com auto-split em OOM).
-    const SUB = 100;
+    // Sub-lotes pequenos para o INSERT em massa (com auto-split em OOM).
+    const SUB = 50;
     for (let i = 0; i < body.ordens.length; i += SUB) {
       // Dedup dentro do lote pela chave (evita "ON CONFLICT afetar linha 2x no mesmo comando")
       const vistos = new Set();
@@ -180,9 +180,9 @@ export async function POST(req) {
 
     await prisma.mesSyncLog.update({
       where: { id: syncLog.id },
-      data: { sucesso: true, criados, atualizados, duracaoMs: body.duracaoMs ?? (Date.now() - inicio) },
+      data: { sucesso: true, atualizados: processados, duracaoMs: body.duracaoMs ?? (Date.now() - inicio) },
     });
-    return NextResponse.json({ ok: true, criados, atualizados, syncId: syncLog.id });
+    return NextResponse.json({ ok: true, processados, syncId: syncLog.id });
   } catch (e) {
     await prisma.mesSyncLog.update({
       where: { id: syncLog.id },

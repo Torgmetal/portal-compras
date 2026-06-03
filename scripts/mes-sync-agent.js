@@ -119,11 +119,14 @@ function transformarLinha(row) {
   };
 }
 
-// Envia em lotes de 1000 (upsert em massa no portal) com retry
+// Envia em lotes PEQUENOS com pausa entre eles (a compute do Neon é pequena e
+// precisa de tempo para liberar memória entre escritas, senão estoura OOM).
 async function enviarPortal(ordens, dataInicio, dataFim) {
   if (!PORTAL_API_KEY) throw new Error("PORTAL_API_KEY não configurada no .env");
-  const LOTE = 1000, MAX_TENT = 3;
-  let criados = 0, atualizados = 0;
+  const LOTE      = Number(process.env.LOTE      || 250);  // linhas por requisição
+  const PAUSA_MS  = Number(process.env.PAUSA_MS  || 2000); // respiro entre lotes
+  const MAX_TENT  = Number(process.env.MAX_TENT  || 6);
+  let processados = 0;
 
   for (let i = 0; i < ordens.length; i += LOTE) {
     const lote = ordens.slice(i, i + LOTE);
@@ -134,20 +137,26 @@ async function enviarPortal(ordens, dataInicio, dataFim) {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${PORTAL_API_KEY}` },
           body: JSON.stringify({ ordens: lote, dataInicio: fmtData(dataInicio), dataFim: fmtData(dataFim) }),
-          timeout: 90000,
+          timeout: 120000,
         });
         if (!resp.ok) throw new Error(`Portal ${resp.status}: ${(await resp.text().catch(()=>"")).slice(0,200)}`);
         const r = await resp.json();
-        criados += r.criados || 0; atualizados += r.atualizados || 0;
-        log(`  Lote ${nLote}/${total} (${lote.length}): ↑${r.criados} novos, ↻${r.atualizados} atualizados`);
+        processados += r.processados || r.atualizados || 0;
+        log(`  Lote ${nLote}/${total} (${lote.length}): ✓ ${r.processados ?? "?"} processados`);
         break;
       } catch (e) {
-        if (t < MAX_TENT) { log(`  Lote ${nLote}/${total} tent.${t}/${MAX_TENT} falhou: ${e.message}. Aguardando 5s...`); await sleep(5000); }
-        else throw new Error(`Lote ${nLote}/${total} falhou após ${MAX_TENT} tentativas: ${e.message}`);
+        if (t < MAX_TENT) {
+          // backoff crescente — dá tempo da compute recuperar memória
+          const espera = 5000 * t;
+          log(`  Lote ${nLote}/${total} tent.${t}/${MAX_TENT} falhou: ${e.message}. Aguardando ${espera/1000}s...`);
+          await sleep(espera);
+        } else throw new Error(`Lote ${nLote}/${total} falhou após ${MAX_TENT} tentativas: ${e.message}`);
       }
     }
+    // pausa entre lotes bem-sucedidos: respiro para o Neon
+    if (i + LOTE < ordens.length) await sleep(PAUSA_MS);
   }
-  return { criados, atualizados };
+  return { processados };
 }
 
 async function main() {
@@ -183,8 +192,7 @@ async function main() {
     log(`\n${"─".repeat(60)}`);
     log(`Sync concluído em ${((Date.now()-t0)/1000).toFixed(1)}s`);
     log(`Linhas SKA  : ${linhas.length}`);
-    log(`Criados     : ${res.criados}`);
-    log(`Atualizados : ${res.atualizados}`);
+    log(`Processados : ${res.processados}`);
   } catch (err) {
     log(`\nERRO FATAL: ${err.message}`);
     process.exit(1);
