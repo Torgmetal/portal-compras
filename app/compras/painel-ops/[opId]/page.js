@@ -10,6 +10,7 @@ import OPAcoesClient from "./OPAcoesClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
 import FDAvulsosSection from "@/components/FDAvulsosSection";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
+import MateriaisOPSection from "@/components/MateriaisOPSection";
 
 
 const fmtMoeda = (v) =>
@@ -361,6 +362,9 @@ export default async function PainelOPDetalhe({ params }) {
           </ul>
         </div>
       )}
+
+      {/* Materiais da OP — todos os itens com status */}
+      <MateriaisOPSection opId={op.id} />
 
       {/* Mapa de Cotação */}
       <MapaCotacaoClient op={data} />

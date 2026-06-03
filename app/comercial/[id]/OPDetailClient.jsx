@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
+import MateriaisOPSection from "@/components/MateriaisOPSection";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { fmtOP } from "@/lib/utils";
 
@@ -587,6 +588,9 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           </div>
         </div>
       )}
+
+      {/* Materiais da OP — todos os itens com status */}
+      <MateriaisOPSection opId={op.id} />
 
       {/* Controle Financeiro — pedidos + estoque (informativo) */}
       <ControleFinanceiroOP opId={op.id} />
