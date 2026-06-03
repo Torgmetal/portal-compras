@@ -58,6 +58,12 @@ Time atual: Vitor (diretor) e Matheus.
 
 > **Warning — no staging environment.** Local development runs against the **production Neon database** and **real integrations** (Omie ERP, Resend, Anthropic). Any test that creates data — purchase orders, vendor quote emails, OP mutations — affects real production records and may trigger real emails to suppliers.
 
+> **Warning — Neon compute pequena → "out of memory" (code 53200).** A compute do Neon satura de RAM sob carga (escritas em massa, builds que pré-renderizam páginas). O erro aparece como `PostgresError 53200 "out of memory"` em vários contextos (`MessageContext`, `ExecutorState`, `CachedPlanQuery`). **Causa estrutural: o mínimo de autoscaling da compute está baixo** — a correção definitiva é aumentá-lo no painel do Neon (decisão de infra do time). Mitigações já aplicadas no código para escritas em massa (ver `/api/mes/sync-ordens`), que **devem ser o padrão para qualquer bulk write futuro**:
+> - **Usar `prismaDirect`** (conexão direta, sem pooler) de `lib/prisma.js` — o pooler (PgBouncer) estoura `MessageContext` com statements grandes.
+> - **Statement SQL constante** (ex: `INSERT ... SELECT FROM UNNEST($1::text[], ...)`) com os dados passados como **arrays-literais de texto** (`'{"a","b",NULL}'`) e cast `::tipo[]` no SQL. Nunca gerar SQL com valores inline (cada SQL diferente vira um plano cacheado → `CachedPlanQuery` OOM). Não passar arrays JS direto (Prisma manda em binário → erro `22P03 improper binary format`).
+> - **Bookkeeping não-fatal**: tabelas de auditoria/log (ex: `MesSyncLog`) em `try/catch` — uma falha de log nunca deve abortar a escrita dos dados de verdade.
+> - **Não rodar sync pesado enquanto há deploy/build da Vercel em andamento** (o build pré-renderiza páginas que batem na produção e somam pressão de memória).
+
 **Fullstack SaaS** — Next.js 14 App Router (JavaScript, no TypeScript), PostgreSQL via Neon + Prisma 6, deployed on Vercel. It is an internal ERP workflow tool for Torg Metal (steel fabrication), orchestrating the flow: **Comercial → Engenharia → Compras → Produção/Almoxarifado → Expedição**.
 
 ### App Router structure
