@@ -96,9 +96,12 @@ export default function PlanejamentoClient() {
       </div>
 
       {/* Atalhos */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Link href="/planejamento/programacao" className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5">
           <CalendarRange size={14} /> Programacao Semanal
+        </Link>
+        <Link href="/planejamento/expedicao-semanal" className="px-4 py-2 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5">
+          <Truck size={14} /> Expedição Semanal
         </Link>
         <Link href="/planejamento/tarefas" className="px-4 py-2 bg-white text-torg-dark text-xs rounded-lg border border-gray-200 hover:bg-gray-50 font-medium flex items-center gap-1.5">
           <ListTodo size={14} /> Gerenciar Tarefas
