@@ -1,66 +1,107 @@
-// Aba "Materiais" — visao por OP do consumo de estoque (categoria 3.1).
-// Mostra: peso planejado vs consumido, custo estimado (CMC) por OP,
-// reservas ativas + alocacoes ja realizadas.
+// Aba "Materiais por OP" — visao consolidada de TODOS os materiais solicitados
+// por OP, com status derivado de cada item (comprado, aguardando, estoque, etc).
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { fmtOP } from "@/lib/utils";
-import { Boxes, Search } from "lucide-react";
-
-
-const fmtMoeda = (v) =>
-  v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
-const fmtQtd = (v, u = "") =>
-  v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${u}`.trim() : "—";
+import { Boxes } from "lucide-react";
+import MateriaisOPPageClient from "./MateriaisOPPageClient";
 
 export default async function MateriaisPage() {
   await requireRole(["ADMIN", "COMPRAS"]);
 
-  // OPs ativas com reservas/alocacoes
   const ops = await prisma.oP.findMany({
     where: { status: { in: ["ABERTA", "EM_EXECUCAO"] } },
     select: {
-      id: true, numero: true, cliente: true, obra: true, dataInicio: true, dataFimPrevista: true,
-      estoqueReservas: {
-        where: { status: { in: ["ATIVA", "CONCLUIDA"] } },
-        include: { itemEstoque: true },
-      },
-      estoqueAlocacoes: {
-        include: {
-          movimentacao: { select: { id: true, createdAt: true, cmcMomento: true } },
-          // Para mostrar qual item foi consumido
+      id: true,
+      numero: true,
+      cliente: true,
+      obra: true,
+      rms: {
+        orderBy: { numero: "asc" },
+        select: {
+          id: true,
+          numero: true,
+          itens: {
+            orderBy: { ordem: "asc" },
+            select: {
+              id: true,
+              descricao: true,
+              unidade: true,
+              qtd: true,
+              peso: true,
+              material: true,
+              status: true,
+              canceladoEm: true,
+              atendidoEstoqueEm: true,
+              atendidoEstoquePreco: true,
+              pedidoOmie: {
+                select: {
+                  id: true,
+                  numeroPedido: true,
+                  fornecedorNome: true,
+                  statusEntrega: true,
+                  nfNumero: true,
+                  recebidoEm: true,
+                  status: true,
+                },
+              },
+            },
+          },
         },
       },
     },
-    orderBy: { dataInicio: "asc" },
+    orderBy: { numero: "desc" },
   });
 
-  // Pra cada OP, agrega por item de estoque
-  const opsComMaterial = ops.map((op) => {
-    const porItem = new Map();
-    for (const r of op.estoqueReservas) {
-      const k = r.itemEstoqueId;
-      if (!porItem.has(k)) {
-        porItem.set(k, {
-          itemId: r.itemEstoqueId,
-          descricao: r.itemEstoque.descricao,
-          codigoOmie: r.itemEstoque.codigoOmie,
-          unidade: r.itemEstoque.unidade,
-          cmc: r.itemEstoque.cmc,
-          reservado: 0,
-          consumido: 0,
-        });
+  // Processa cada OP e seus itens
+  const opsData = ops
+    .map((op) => {
+      const itens = [];
+      const resumo = { RECEBIDO: 0, COMPRADO: 0, ESTOQUE: 0, EM_COTACAO: 0, NAO_COMPRADO: 0, CANCELADO: 0 };
+
+      for (const rm of op.rms) {
+        for (const it of rm.itens) {
+          const ped = it.pedidoOmie;
+          const pedidoRecebido = ped?.statusEntrega === "RECEBIDO" || !!ped?.recebidoEm;
+          const pedidoRevertido = ped?.status === "REVERTIDO";
+
+          let st;
+          if (it.status === "CANCELADO") st = "CANCELADO";
+          else if (it.status === "ATENDIDO_ESTOQUE") st = "ESTOQUE";
+          else if (it.status === "PEDIDO_GERADO" && !pedidoRevertido) st = pedidoRecebido ? "RECEBIDO" : "COMPRADO";
+          else if (it.status === "EM_COTACAO" || it.status === "COTADO") st = "EM_COTACAO";
+          else st = "NAO_COMPRADO";
+
+          resumo[st]++;
+
+          itens.push({
+            id: it.id,
+            rmNumero: rm.numero,
+            descricao: it.descricao,
+            material: it.material,
+            unidade: it.peso > 0 ? "KG" : it.unidade,
+            quantidade: it.peso > 0 ? it.peso : it.qtd,
+            statusDerivado: st,
+            fornecedor: ped?.fornecedorNome || null,
+            pedidoNumero: ped?.numeroPedido || null,
+            nfNumero: ped?.nfNumero || null,
+          });
+        }
       }
-      const acc = porItem.get(k);
-      acc.reservado += r.qtdReservada;
-      acc.consumido += r.qtdConsumida;
-    }
-    const itens = Array.from(porItem.values());
-    const totalReservado = itens.reduce((s, i) => s + i.reservado, 0);
-    const totalConsumido = itens.reduce((s, i) => s + i.consumido, 0);
-    const valorConsumido = op.estoqueAlocacoes.reduce((s, a) => s + (a.valorCMC || 0), 0);
-    return { ...op, itens, totalReservado, totalConsumido, valorConsumido };
-  }).filter((op) => op.itens.length > 0);
+
+      const totalItens = itens.length;
+      return {
+        id: op.id,
+        numero: op.numero,
+        cliente: op.cliente,
+        obra: op.obra,
+        itens,
+        resumo,
+        totalItens,
+      };
+    })
+    .filter((op) => op.totalItens > 0);
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -69,84 +110,17 @@ export default async function MateriaisPage() {
           <Boxes size={26} className="text-torg-blue" /> Materiais por OP
         </h2>
         <p className="text-sm text-torg-gray mt-1">
-          Consumo de estoque (matéria prima 3.1) por OP. Reservas vêm das RMs com itens marcados como "Estoque",
-          consumo é abatido automaticamente conforme o Syneco baixa no Omie.
+          Todos os materiais solicitados por OP — status atualizado automaticamente conforme cotações, pedidos e recebimentos.
         </p>
       </div>
 
-      {opsComMaterial.length === 0 ? (
+      {opsData.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <Boxes size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-torg-gray text-lg">Nenhuma OP com reserva de estoque</p>
-          <p className="text-xs text-torg-gray mt-2">
-            Crie RMs com itens marcados como "Estoque" e a OP destino — as reservas aparecem aqui.
-          </p>
+          <p className="text-torg-gray text-lg">Nenhuma OP com materiais solicitados</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {opsComMaterial.map((op) => (
-            <div key={op.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <Link href={`/comercial/${op.id}`} className="font-mono font-bold text-torg-blue text-lg hover:underline">
-                    {fmtOP(op.numero)}
-                  </Link>
-                  <span className="text-sm text-torg-dark ml-2">{op.cliente}</span>
-                  {op.obra && <p className="text-xs text-torg-gray">{op.obra}</p>}
-                </div>
-                <div className="text-right text-xs">
-                  <p className="text-torg-gray">Reservado total</p>
-                  <p className="text-torg-dark font-semibold text-base tabular-nums">
-                    {fmtQtd(op.totalReservado, op.itens[0]?.unidade || "")}
-                  </p>
-                  <p className="text-[10px] text-torg-gray mt-1">
-                    Consumido: <strong>{fmtQtd(op.totalConsumido, op.itens[0]?.unidade || "")}</strong>
-                    {" · "}Valor: <strong>{fmtMoeda(op.valorConsumido)}</strong>
-                  </p>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">CMC</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Reservado</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Consumido</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Saldo</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor estimado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {op.itens.map((it) => {
-                      const saldo = it.reservado - it.consumido;
-                      const valorReservado = it.reservado * it.cmc;
-                      return (
-                        <tr key={it.itemId} className="hover:bg-gray-50">
-                          <td className="px-4 py-2">
-                            <Link href={`/compras/estoque/${it.itemId}`} className="text-torg-blue hover:underline text-xs">
-                              <span className="font-mono mr-1">{it.codigoOmie}</span>
-                              <span className="text-torg-dark">{it.descricao}</span>
-                            </Link>
-                          </td>
-                          <td className="px-4 py-2 text-right text-torg-gray text-xs tabular-nums">{fmtMoeda(it.cmc)}</td>
-                          <td className="px-4 py-2 text-right text-torg-dark tabular-nums whitespace-nowrap">{fmtQtd(it.reservado, it.unidade)}</td>
-                          <td className="px-4 py-2 text-right text-amber-700 tabular-nums whitespace-nowrap">{fmtQtd(it.consumido, it.unidade)}</td>
-                          <td className={`px-4 py-2 text-right tabular-nums whitespace-nowrap font-semibold ${saldo > 0 ? "text-emerald-700" : "text-torg-gray"}`}>
-                            {fmtQtd(saldo, it.unidade)}
-                          </td>
-                          <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums whitespace-nowrap">
-                            {fmtMoeda(valorReservado)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
-        </div>
+        <MateriaisOPPageClient ops={JSON.parse(JSON.stringify(opsData))} />
       )}
     </div>
   );
