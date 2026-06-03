@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
 const patchSchema = z.object({
+  nome: z.string().min(1).max(200).optional(),
   percentualRealizado: z.number().min(0).max(100).optional(),
   observacao: z.string().max(500).optional(),
   dataRealizacao: z.string().datetime().nullable().optional(),
@@ -41,6 +42,11 @@ export async function PATCH(req, { params }) {
   const diffAntes = {};
   const diffDepois = {};
 
+  if (parsed.data.nome !== undefined && parsed.data.nome !== tarefa.nome) {
+    diffAntes.nome = tarefa.nome;
+    diffDepois.nome = parsed.data.nome;
+    data.nome = parsed.data.nome;
+  }
   if (parsed.data.percentualRealizado !== undefined && parsed.data.percentualRealizado !== tarefa.percentualRealizado) {
     diffAntes.percentualRealizado = tarefa.percentualRealizado;
     diffDepois.percentualRealizado = parsed.data.percentualRealizado;

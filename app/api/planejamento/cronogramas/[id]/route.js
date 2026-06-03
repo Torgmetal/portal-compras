@@ -123,8 +123,16 @@ export async function PATCH(req, { params }) {
     });
   }
 
-  // Alterar datas do cronograma
+  // Alterar datas do cronograma — bloqueado se baseline já definida
   const cronData = {};
+  if (parsed.data.dataInicio || parsed.data.dataFim) {
+    if (cronograma.dataBase) {
+      return NextResponse.json(
+        { success: false, error: "Datas do cronograma não podem ser alteradas após definir a linha de base" },
+        { status: 400 }
+      );
+    }
+  }
   if (parsed.data.dataInicio) {
     const d = new Date(parsed.data.dataInicio);
     revisoes.push({
@@ -158,6 +166,41 @@ export async function PATCH(req, { params }) {
   if (ops.length > 0) {
     await prisma.$transaction(ops);
   }
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(req, { params }) {
+  let user;
+  try {
+    user = await requireRole(["ADMIN", "PLANEJAMENTO"]);
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
+  }
+
+  const { id } = await params;
+
+  const cronograma = await prisma.cronograma.findUnique({
+    where: { id },
+    select: { id: true, opNumero: true, titulo: true },
+  });
+  if (!cronograma) {
+    return NextResponse.json({ success: false, error: "Cronograma não encontrado" }, { status: 404 });
+  }
+
+  await prisma.$transaction([
+    prisma.cronograma.delete({ where: { id } }),
+    prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "DELETE_CRONOGRAMA",
+        entity: "Cronograma",
+        entityId: id,
+        diff: { opNumero: cronograma.opNumero, titulo: cronograma.titulo },
+      },
+    }),
+  ]);
 
   return NextResponse.json({ success: true });
 }

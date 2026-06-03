@@ -188,6 +188,7 @@ export default function CronogramasClient() {
               detail={expandedId === c.id ? detail : null}
               loadingDetail={expandedId === c.id && loadingDetail}
               onRefreshDetail={() => expandir(c.id)}
+              onDeleted={() => { setExpandedId(null); setDetail(null); carregar(); }}
             />
           ))}
         </div>
@@ -400,7 +401,7 @@ function NovoCronogramaModal({ onClose, onCreated }) {
   );
 }
 
-function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail, onRefreshDetail }) {
+function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail, onRefreshDetail, onDeleted }) {
   const c = cronograma;
   const now = new Date();
   const diasRestantes = c.dataFim
@@ -465,15 +466,17 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
           loadingDetail={loadingDetail}
           onRefreshDetail={onRefreshDetail}
           cronogramaId={c.id}
+          onDeleted={onDeleted}
         />
       )}
     </div>
   );
 }
 
-function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId }) {
+function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId, onDeleted }) {
   const [tab, setTab] = useState("cronograma");
   const [settingBase, setSettingBase] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const definirDataBase = async () => {
     const hoje = new Date().toISOString().split("T")[0];
@@ -497,6 +500,23 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
     }
   };
 
+  const excluirCronograma = async () => {
+    if (!confirm("Tem certeza que deseja excluir este cronograma? Todas as tarefas e registros serão perdidos.")) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Erro ao excluir");
+      }
+      onDeleted();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const tabs = [
     { key: "cronograma", label: "Cronograma", icon: GanttChart },
     { key: "suprimentos", label: "RMs / Pedidos / NFs", icon: Package },
@@ -505,7 +525,7 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
 
   return (
     <div className="border-t border-gray-100">
-      {/* Data Base badge */}
+      {/* Data Base badge + ações */}
       {detail && (
         <div className="px-4 py-2 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
@@ -525,13 +545,28 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
             >
               {settingBase ? "..." : detail.dataBase ? "Redefinir" : "Definir"}
             </button>
+            {detail.dataBase && (
+              <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
+                Datas do cronograma travadas
+              </span>
+            )}
           </div>
-          <button
-            onClick={() => exportarGanttPDF(detail)}
-            className="px-3 py-1 text-[10px] font-medium text-white bg-torg-blue rounded-lg hover:bg-torg-blue-700 flex items-center gap-1.5"
-          >
-            <FileDown size={12} /> Exportar Gantt (PDF)
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportarGanttPDF(detail)}
+              className="px-3 py-1 text-[10px] font-medium text-white bg-torg-blue rounded-lg hover:bg-torg-blue-700 flex items-center gap-1.5"
+            >
+              <FileDown size={12} /> Exportar Gantt (PDF)
+            </button>
+            <button
+              onClick={excluirCronograma}
+              disabled={deleting}
+              className="px-3 py-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              Excluir
+            </button>
+          </div>
         </div>
       )}
 
@@ -890,6 +925,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId }) {
 
 function TarefaRow({ tarefa, now, onRefresh }) {
   const [editing, setEditing] = useState(false);
+  const [editNome, setEditNome] = useState(tarefa.nome);
   const [pct, setPct] = useState(tarefa.percentualRealizado);
   const [obs, setObs] = useState(tarefa.observacao || "");
   const [dataExec, setDataExec] = useState(tarefa.dataRealizacao ? new Date(tarefa.dataRealizacao).toISOString().split("T")[0] : "");
@@ -913,6 +949,7 @@ function TarefaRow({ tarefa, now, onRefresh }) {
         observacao: obs || null,
         dataRealizacao: dataExec ? new Date(dataExec + "T12:00:00Z").toISOString() : null,
       };
+      if (editNome !== t.nome) body.nome = editNome;
       if (justificativa.trim()) body.justificativa = justificativa.trim();
       const res = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
         method: "PATCH",
@@ -966,6 +1003,7 @@ function TarefaRow({ tarefa, now, onRefresh }) {
 
   const cancelarEdicao = () => {
     setEditing(false);
+    setEditNome(t.nome);
     setPct(t.percentualRealizado);
     setObs(t.observacao || "");
     setDataExec(t.dataRealizacao ? new Date(t.dataRealizacao).toISOString().split("T")[0] : "");
@@ -983,9 +1021,17 @@ function TarefaRow({ tarefa, now, onRefresh }) {
           ) : (
             <Clock size={14} className="text-torg-gray shrink-0" />
           )}
-          <span className={`text-xs font-medium truncate ${concluida ? "text-torg-gray line-through" : "text-torg-dark"}`}>
-            {t.nome}
-          </span>
+          {editing ? (
+            <input
+              value={editNome}
+              onChange={(e) => setEditNome(e.target.value)}
+              className="text-xs font-medium px-1.5 py-0.5 border border-torg-blue/30 rounded bg-white flex-1 min-w-0 outline-none focus:border-torg-blue"
+            />
+          ) : (
+            <span className={`text-xs font-medium truncate ${concluida ? "text-torg-gray line-through" : "text-torg-dark"}`}>
+              {t.nome}
+            </span>
+          )}
           {t.isSummary && <span className="text-[9px] text-torg-gray bg-gray-100 px-1 rounded">grupo</span>}
           {t.dataRealizacao && !editing && (
             <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
