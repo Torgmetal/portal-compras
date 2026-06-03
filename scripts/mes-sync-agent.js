@@ -123,8 +123,8 @@ function transformarLinha(row) {
 // precisa de tempo para liberar memória entre escritas, senão estoura OOM).
 async function enviarPortal(ordens, dataInicio, dataFim) {
   if (!PORTAL_API_KEY) throw new Error("PORTAL_API_KEY não configurada no .env");
-  const LOTE      = Number(process.env.LOTE      || 250);  // linhas por requisição
-  const PAUSA_MS  = Number(process.env.PAUSA_MS  || 2000); // respiro entre lotes
+  const LOTE      = Number(process.env.LOTE      || 1000); // linhas por requisição
+  const PAUSA_MS  = Number(process.env.PAUSA_MS  || 300);  // respiro entre lotes
   const MAX_TENT  = Number(process.env.MAX_TENT  || 6);
   let processados = 0;
 
