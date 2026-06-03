@@ -6,7 +6,7 @@ import {
   Clock, CheckCircle2, AlertTriangle, Download, MessageSquarePlus,
   Send, X, Briefcase, Wrench, ShoppingCart, Factory, Truck, HardHat,
   GanttChart, Package, FileText, CircleDot, Mail, Calendar,
-  History, FileDown, Milestone,
+  History, FileDown, Milestone, Plus, Trash2,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -49,6 +49,7 @@ export default function CronogramasClient() {
   const [expandedId, setExpandedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [showNovoModal, setShowNovoModal] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -126,10 +127,16 @@ export default function CronogramasClient() {
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">Cronogramas</h2>
           <p className="text-xs text-torg-gray mt-0.5">
-            Acompanhamento de cronogramas do MS Project por OP e departamento
+            Acompanhamento de cronogramas por OP e departamento
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowNovoModal(true)}
+            className="px-4 py-2 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5"
+          >
+            <Plus size={14} /> Novo Cronograma
+          </button>
           <button
             onClick={sincronizar}
             disabled={syncing}
@@ -153,14 +160,22 @@ export default function CronogramasClient() {
       {cronogramas.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
           <GanttChart size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-torg-gray mb-4">Nenhum cronograma importado ainda.</p>
-          <button
-            onClick={sincronizar}
-            disabled={syncing}
-            className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5"
-          >
-            <Download size={14} /> Importar do SharePoint
-          </button>
+          <p className="text-sm text-torg-gray mb-4">Nenhum cronograma criado ainda.</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => setShowNovoModal(true)}
+              className="px-4 py-2 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium inline-flex items-center gap-1.5"
+            >
+              <Plus size={14} /> Criar Cronograma
+            </button>
+            <button
+              onClick={sincronizar}
+              disabled={syncing}
+              className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5"
+            >
+              <Download size={14} /> Importar do SharePoint
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -177,6 +192,210 @@ export default function CronogramasClient() {
           ))}
         </div>
       )}
+
+      {showNovoModal && (
+        <NovoCronogramaModal
+          onClose={() => setShowNovoModal(false)}
+          onCreated={(id) => {
+            setShowNovoModal(false);
+            carregar().then(() => expandir(id));
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function NovoCronogramaModal({ onClose, onCreated }) {
+  const [ops, setOps] = useState([]);
+  const [loadingOps, setLoadingOps] = useState(true);
+  const [opSelecionada, setOpSelecionada] = useState("");
+  const [titulo, setTitulo] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+  const [usarTemplate, setUsarTemplate] = useState(true);
+  const [opManual, setOpManual] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [erro, setErro] = useState("");
+
+  useEffect(() => {
+    fetch("/api/planejamento/cronogramas/manual")
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Erro ao carregar OPs");
+        return r.json();
+      })
+      .then((d) => setOps(d.ops || []))
+      .catch(() => setOps([]))
+      .finally(() => setLoadingOps(false));
+  }, []);
+
+  const opNum = opSelecionada || opManual.trim().toUpperCase();
+
+  const criar = async () => {
+    if (!opNum) return setErro("Selecione ou digite o número da OP");
+    if (!titulo.trim()) return setErro("Informe o título / nome da obra");
+    setSaving(true);
+    setErro("");
+    try {
+      const body = {
+        opNumero: opNum.startsWith("T") ? opNum : `T${opNum}`,
+        titulo: titulo.trim(),
+        usarTemplate,
+      };
+      if (dataInicio) body.dataInicio = new Date(dataInicio + "T12:00:00Z").toISOString();
+      if (dataFim) body.dataFim = new Date(dataFim + "T12:00:00Z").toISOString();
+
+      const res = await fetch("/api/planejamento/cronogramas/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao criar");
+      onCreated(data.cronograma.id);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Auto-preencher título quando seleciona OP
+  const handleSelectOP = (val) => {
+    setOpSelecionada(val);
+    setOpManual("");
+    if (val) {
+      const op = ops.find((o) => o.numero === val);
+      if (op && !titulo) setTitulo(op.obra || op.cliente || "");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <GanttChart size={18} className="text-torg-blue" />
+            <h3 className="text-sm font-bold text-torg-dark">Novo Cronograma</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-torg-gray hover:text-torg-dark rounded">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {/* OP */}
+          <div>
+            <label className="text-xs font-medium text-torg-dark mb-1 block">Ordem de Produção *</label>
+            {loadingOps ? (
+              <div className="flex items-center gap-2 text-xs text-torg-gray py-2">
+                <Loader2 size={12} className="animate-spin" /> Carregando OPs...
+              </div>
+            ) : ops.length > 0 ? (
+              <div className="space-y-2">
+                <select
+                  value={opSelecionada}
+                  onChange={(e) => handleSelectOP(e.target.value)}
+                  className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg bg-white focus:border-torg-blue focus:ring-1 focus:ring-torg-blue outline-none"
+                >
+                  <option value="">Selecione uma OP...</option>
+                  {ops.map((op) => (
+                    <option key={op.id} value={op.numero}>
+                      {op.numero} — {op.cliente} {op.obra ? `(${op.obra})` : ""}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-torg-gray">ou digite:</span>
+                  <input
+                    value={opManual}
+                    onChange={(e) => { setOpManual(e.target.value); setOpSelecionada(""); }}
+                    placeholder="Ex: T001 ou 001"
+                    className="flex-1 text-xs px-2 py-1 border border-gray-200 rounded"
+                  />
+                </div>
+              </div>
+            ) : (
+              <input
+                value={opManual}
+                onChange={(e) => setOpManual(e.target.value)}
+                placeholder="Número da OP (ex: T001 ou 001)"
+                className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg"
+              />
+            )}
+          </div>
+
+          {/* Título */}
+          <div>
+            <label className="text-xs font-medium text-torg-dark mb-1 block">Título / Nome da Obra *</label>
+            <input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ex: Galpão Industrial ABC Ltda"
+              className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue outline-none"
+            />
+          </div>
+
+          {/* Datas */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-torg-dark mb-1 block">Data Início</label>
+              <input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+                className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-torg-dark mb-1 block">Data Fim Prevista</label>
+              <input
+                type="date"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg"
+              />
+            </div>
+          </div>
+
+          {/* Template */}
+          <div className="flex items-start gap-3 bg-gray-50 rounded-lg p-3">
+            <input
+              type="checkbox"
+              checked={usarTemplate}
+              onChange={(e) => setUsarTemplate(e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+              id="usar-template"
+            />
+            <label htmlFor="usar-template" className="cursor-pointer">
+              <span className="text-xs font-medium text-torg-dark">Usar template padrão Torg</span>
+              <p className="text-[10px] text-torg-gray mt-0.5">
+                Cria automaticamente os departamentos (Comercial, Engenharia, Suprimentos, Fabricação, Expedição, Montagem) com tarefas padrão. Você pode editar, adicionar ou remover depois.
+              </p>
+            </label>
+          </div>
+
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 rounded-lg flex items-center gap-1.5">
+              <AlertCircle size={12} /> {erro}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
+          <button onClick={onClose} className="px-4 py-2 text-xs text-torg-gray hover:text-torg-dark font-medium">
+            Cancelar
+          </button>
+          <button
+            onClick={criar}
+            disabled={saving}
+            className="px-5 py-2 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+            {saving ? "Criando..." : "Criar Cronograma"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -393,6 +612,11 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId }) {
   const [collapsed, setCollapsed] = useState(false);
   const [cobrando, setCobrando] = useState(false);
   const [cobrResult, setCobrResult] = useState(null);
+  const [addingTask, setAddingTask] = useState(false);
+  const [newTaskName, setNewTaskName] = useState("");
+  const [newTaskInicio, setNewTaskInicio] = useState("");
+  const [newTaskFim, setNewTaskFim] = useState("");
+  const [savingTask, setSavingTask] = useState(false);
   const Icon = DEPT_ICONS[dept] || Factory;
   const colors = DEPT_COLORS[dept] || "text-gray-600 bg-gray-50 border-gray-200";
   const atrasadas = tasks.filter((t) => !t.isSummary && t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100);
@@ -472,10 +696,90 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId }) {
           {tasks.length === 0 && (
             <p className="text-xs text-torg-gray italic py-2">Nenhuma tarefa neste departamento.</p>
           )}
+
+          {/* Adicionar tarefa */}
+          {!addingTask ? (
+            <button
+              onClick={() => setAddingTask(true)}
+              className="flex items-center gap-1 text-[10px] text-torg-gray hover:text-torg-blue py-1 px-2 rounded hover:bg-gray-50 transition-colors"
+            >
+              <Plus size={10} /> Adicionar tarefa
+            </button>
+          ) : (
+            <div className="rounded-lg border border-torg-blue/30 bg-torg-blue-50/30 p-2.5 space-y-2">
+              <input
+                value={newTaskName}
+                onChange={(e) => setNewTaskName(e.target.value)}
+                placeholder="Nome da tarefa..."
+                className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded bg-white"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newTaskName.trim()) adicionarTarefa();
+                  if (e.key === "Escape") { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); }
+                }}
+              />
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-torg-gray">Início:</span>
+                  <input type="date" value={newTaskInicio} onChange={(e) => setNewTaskInicio(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-torg-gray">Fim:</span>
+                  <input type="date" value={newTaskFim} onChange={(e) => setNewTaskFim(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
+                </div>
+                <div className="flex items-center gap-1 ml-auto">
+                  <button
+                    onClick={() => { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); }}
+                    className="px-2 py-1 text-[10px] text-torg-gray hover:text-torg-dark"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={adicionarTarefa}
+                    disabled={savingTask || !newTaskName.trim()}
+                    className="px-3 py-1 bg-torg-blue text-white text-[10px] rounded hover:bg-torg-blue-700 disabled:opacity-50 font-medium"
+                  >
+                    {savingTask ? "..." : "Adicionar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
+
+  async function adicionarTarefa() {
+    if (!newTaskName.trim()) return;
+    setSavingTask(true);
+    try {
+      const body = {
+        nome: newTaskName.trim(),
+        departamento: dept,
+        outlineLevel: 2,
+        isSummary: false,
+      };
+      if (newTaskInicio) body.dataInicioPrevista = new Date(newTaskInicio + "T12:00:00Z").toISOString();
+      if (newTaskFim) body.dataFimPrevista = new Date(newTaskFim + "T12:00:00Z").toISOString();
+
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/tarefas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Erro ao adicionar");
+      setAddingTask(false);
+      setNewTaskName("");
+      setNewTaskInicio("");
+      setNewTaskFim("");
+      onRefresh();
+    } catch {
+      // keep form open
+    } finally {
+      setSavingTask(false);
+    }
+  }
 }
 
 function TarefaRow({ tarefa, now, onRefresh }) {
@@ -488,6 +792,7 @@ function TarefaRow({ tarefa, now, onRefresh }) {
   const [showReg, setShowReg] = useState(false);
   const [regText, setRegText] = useState("");
   const [sendingReg, setSendingReg] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const t = tarefa;
   const atrasada = t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100;
@@ -539,6 +844,20 @@ function TarefaRow({ tarefa, now, onRefresh }) {
     }
   };
 
+  const excluirTarefa = async () => {
+    if (!confirm(`Excluir a tarefa "${t.nome}"?`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Erro ao excluir");
+      onRefresh();
+    } catch {
+      // keep row
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const cancelarEdicao = () => {
     setEditing(false);
     setPct(t.percentualRealizado);
@@ -548,7 +867,7 @@ function TarefaRow({ tarefa, now, onRefresh }) {
   };
 
   return (
-    <div className={`rounded-lg border ${atrasada ? "border-red-200 bg-red-50/30" : "border-gray-100 bg-white"} p-2.5`} style={{ marginLeft: `${indent * 16}px` }}>
+    <div className={`group rounded-lg border ${atrasada ? "border-red-200 bg-red-50/30" : "border-gray-100 bg-white"} p-2.5`} style={{ marginLeft: `${indent * 16}px` }}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {concluida ? (
@@ -611,6 +930,14 @@ function TarefaRow({ tarefa, now, onRefresh }) {
             title="Adicionar registro"
           >
             <MessageSquarePlus size={12} />
+          </button>
+          <button
+            onClick={excluirTarefa}
+            disabled={deleting}
+            className="p-0.5 text-torg-gray hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Excluir tarefa"
+          >
+            {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
           </button>
         </div>
       </div>

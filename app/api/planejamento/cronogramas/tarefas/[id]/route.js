@@ -124,3 +124,38 @@ export async function PATCH(req, { params }) {
   const updated = await prisma.cronogramaTarefa.findUnique({ where: { id } });
   return NextResponse.json({ success: true, tarefa: updated });
 }
+
+export async function DELETE(req, { params }) {
+  let user;
+  try {
+    user = await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ success: false, error: e.message }, { status });
+  }
+
+  const { id } = await params;
+
+  const tarefa = await prisma.cronogramaTarefa.findUnique({
+    where: { id },
+    select: { id: true, nome: true, cronogramaId: true },
+  });
+  if (!tarefa) {
+    return NextResponse.json({ success: false, error: "Tarefa não encontrada" }, { status: 404 });
+  }
+
+  await prisma.$transaction([
+    prisma.cronogramaTarefa.delete({ where: { id } }),
+    prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "DELETE_CRONOGRAMA_TAREFA",
+        entity: "CronogramaTarefa",
+        entityId: id,
+        diff: { nome: tarefa.nome, cronogramaId: tarefa.cronogramaId },
+      },
+    }),
+  ]);
+
+  return NextResponse.json({ success: true });
+}
