@@ -376,6 +376,106 @@ function BadgeStatus({ status }) {
   );
 }
 
+// ─── Etapas (visão Conjuntos por etapa) ───────────────────────────────────────
+function corEtapa(etapa) {
+  if (etapa === "Não iniciada") return "bg-gray-100 text-gray-500 border-gray-200";
+  if (etapa === "Concluído")    return "bg-green-100 text-green-800 border-green-300";
+  return corSetor(etapa);
+}
+
+function BadgeEtapa({ etapa }) {
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium whitespace-nowrap ${corEtapa(etapa)}`}>
+      {etapa === "Concluído" ? "✓ Concluído" : etapa}
+    </span>
+  );
+}
+
+function TipoConjBadge({ tipo }) {
+  const cor = tipo === "CONJUNTO" ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+    : tipo === "PEÇA ÚNICA" ? "bg-sky-50 text-sky-700 border-sky-200"
+    : "bg-gray-50 text-gray-500 border-gray-200";
+  const label = tipo === "CONJUNTO" ? "Conjunto" : tipo === "PEÇA ÚNICA" ? "Peça única" : "Marca";
+  return <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium whitespace-nowrap ${cor}`}>{label}</span>;
+}
+
+// Painel lateral com as etapas da linha (filtro por etapa)
+function PainelEtapas({ etapas, contagens, pesoTotalPlanejado, pesoTotalProduzido, selecionada, onSelecionar }) {
+  const pctPeso = pesoTotalPlanejado > 0 ? Math.round((pesoTotalProduzido / pesoTotalPlanejado) * 100) : 0;
+  return (
+    <div className="w-56 shrink-0 space-y-2">
+      {/* Peso total da obra */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+        <div className="text-xs text-torg-gray flex items-center gap-1 mb-1">
+          <Weight size={12} className="text-torg-blue" /> Peso total da obra
+        </div>
+        <div className="text-lg font-bold text-torg-dark leading-tight">{fmtNum(pesoTotalProduzido, 0)} kg</div>
+        <div className="text-xs text-gray-400">de {fmtNum(pesoTotalPlanejado, 0)} kg planejados</div>
+        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1.5">
+          <div className="h-full bg-torg-blue rounded-full" style={{ width: `${pctPeso}%` }} />
+        </div>
+      </div>
+
+      {/* Lista de etapas */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-3 py-2 text-xs font-semibold text-torg-dark border-b border-gray-50 flex items-center gap-1.5">
+          <Filter size={12} className="text-torg-gray" /> Etapa na linha
+        </div>
+        <button onClick={() => onSelecionar("")}
+          className={`w-full flex items-center justify-between px-3 py-2 text-sm transition-colors ${!selecionada ? "bg-torg-blue/10 text-torg-blue font-semibold" : "hover:bg-gray-50 text-torg-dark"}`}>
+          <span>Todas</span>
+          <span className="text-xs font-bold opacity-70">{contagens?.total || 0}</span>
+        </button>
+        {(etapas || []).map(e => (
+          <button key={e.etapa} onClick={() => onSelecionar(selecionada === e.etapa ? "" : e.etapa)}
+            className={`w-full flex items-center justify-between px-3 py-2 text-sm border-t border-gray-50 transition-colors ${selecionada === e.etapa ? "bg-torg-blue/10 font-semibold" : "hover:bg-gray-50"}`}>
+            <span className="flex items-center gap-2 min-w-0">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${corEtapa(e.etapa).split(" ")[0]}`} />
+              <span className="truncate text-torg-dark">{e.etapa}</span>
+            </span>
+            <span className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] text-gray-400">{fmtNum(e.peso, 0)}kg</span>
+              <span className="text-xs font-bold text-torg-gray">{e.count}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Linha de um conjunto/peça na lista principal
+function LinhaConjunto({ c }) {
+  const corBarra = c.concluido ? "bg-green-500" : c.pct >= 100 ? "bg-green-500" : c.pct > 0 ? "bg-yellow-400" : "bg-gray-200";
+  return (
+    <tr className="hover:bg-gray-50/50">
+      <td className="px-4 py-2.5 font-mono text-xs font-bold text-torg-blue whitespace-nowrap">{c.marca}</td>
+      <td className="px-4 py-2.5 text-gray-700 max-w-[180px] truncate" title={c.descricao}>{c.descricao || "—"}</td>
+      <td className="px-4 py-2.5"><TipoConjBadge tipo={c.tipo} /></td>
+      <td className="px-4 py-2.5 text-right min-w-[110px]">
+        <div className="flex flex-col items-end gap-0.5">
+          <span className={`font-semibold text-sm ${c.pct >= 100 ? "text-green-700" : c.pct > 0 ? "text-yellow-700" : "text-gray-400"}`}>
+            {fmtNum(c.produzidoUn, 0)} <span className="text-xs font-normal text-gray-400">/ {c.planejadoUn} un</span>
+          </span>
+          <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full ${corBarra}`} style={{ width: `${c.pct}%` }} />
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-2.5 text-right text-gray-500 text-xs whitespace-nowrap">{fmtNum(c.pesoTotalKg)} kg</td>
+      <td className="px-4 py-2.5"><BadgeEtapa etapa={c.etapaAtual} /></td>
+      <td className="px-4 py-2.5">
+        <div className="flex flex-wrap gap-1 max-w-[180px]">
+          {c.setoresVisitados.map(s => (
+            <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${corSetor(s)}`}>{s}</span>
+          ))}
+          {c.setoresVisitados.length === 0 && <span className="text-gray-300 text-xs">—</span>}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ─── Card de OP ───────────────────────────────────────────────────────────────
 function CardOP({ obra, opInfo, setores, statusDominante, onVerDetalhe }) {
   const [expandido, setExpandido] = useState(false);
@@ -651,7 +751,8 @@ function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
   const [conjData, setConjData] = useState(null);
   const [loadConj, setLoadConj] = useState(false);
   const [erroConj, setErroConj] = useState(null);
-  const [filtroConj, setFiltroConj] = useState(""); // "" | "montavel" | "parcial" | "semInicio"
+  const [filtroConj, setFiltroConj] = useState(""); // "" | nome da etapa selecionada
+  const [verMarcas, setVerMarcas]   = useState(false); // grupo de marcas cortadas colapsável
 
   useEffect(() => {
     if (abaPeca !== "conjuntos" || !obraFiltro) { setConjData(null); return; }
@@ -665,12 +766,11 @@ function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
     return () => { ativo = false; };
   }, [abaPeca, obraFiltro]);
 
+  // filtroConj agora é o nome da ETAPA selecionada no painel lateral ("" = todas)
   const conjuntosFiltrados = useMemo(() => {
-    if (!conjData?.conjuntos) return [];
-    let base = conjData.conjuntos;
-    if (filtroConj === "montavel")  base = base.filter(c => c.montavel);
-    if (filtroConj === "parcial")   base = base.filter(c => !c.montavel && c.marcasProntas > 0);
-    if (filtroConj === "semInicio") base = base.filter(c => c.marcasProntas === 0);
+    if (!conjData?.principais) return [];
+    let base = conjData.principais;
+    if (filtroConj) base = base.filter(c => c.etapaAtual === filtroConj);
     const termo = (busca || "").trim().toLowerCase();
     if (termo) base = base.filter(c =>
       (c.marca || "").toLowerCase().includes(termo) || (c.descricao || "").toLowerCase().includes(termo)
@@ -977,7 +1077,7 @@ function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
         </>
       )}
 
-      {/* ── TAB: CONJUNTOS (montável — LPC × Syneco) ── */}
+      {/* ── TAB: CONJUNTOS (por etapa — direto do Syneco) ── */}
       {abaPeca === "conjuntos" && (
         <>
           {!obraFiltro && (
@@ -985,7 +1085,7 @@ function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
               <Package size={36} className="opacity-30" />
               <div className="text-center">
                 <div className="font-medium">Selecione uma OP acima</div>
-                <div className="text-sm text-gray-400 mt-1">Ex: T78 → ver quais conjuntos podem ser montados</div>
+                <div className="text-sm text-gray-400 mt-1">Ex: T78 → ver conjuntos e peças com a etapa atual na linha</div>
               </div>
             </div>
           )}
@@ -996,98 +1096,110 @@ function ViewPorPeca({ de, ate, obrasDisponiveis, statusFiltro, busca }) {
           )}
           {obraFiltro && loadConj && (
             <div className="flex items-center justify-center gap-2 py-12 text-torg-gray">
-              <Loader2 size={20} className="animate-spin" /> <span>Calculando conjuntos montáveis…</span>
+              <Loader2 size={20} className="animate-spin" /> <span>Carregando conjuntos de {obraFiltro}…</span>
             </div>
           )}
           {obraFiltro && conjData && !loadConj && (
-            conjData.conjuntos?.length === 0 ? (
+            (conjData.contagens?.total || 0) === 0 && (conjData.contagens?.marcas || 0) === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-3 bg-white rounded-xl border border-dashed border-gray-200">
                 <Package size={36} className="opacity-30" />
                 <div className="text-center">
-                  <div className="font-medium">Nenhum conjunto importado para {obraFiltro}</div>
-                  <div className="text-sm text-gray-400 mt-1">Importe a LPC desta obra (Produção → Peças / SharePoint).</div>
+                  <div className="font-medium">Nenhum conjunto/peça no Syneco para {obraFiltro}</div>
+                  <div className="text-sm text-gray-400 mt-1">Rode o sync do Syneco para esta obra.</div>
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                {/* Chips de status do conjunto */}
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { val: "",          label: "Todos",        cnt: conjData.contagens?.total     || 0, cor: "bg-torg-dark text-white" },
-                    { val: "montavel",  label: "Pode montar",  cnt: conjData.contagens?.montaveis || 0, cor: "bg-green-600 text-white",  off: "bg-green-50 text-green-700 border-green-200" },
-                    { val: "parcial",   label: "Parcial",      cnt: conjData.contagens?.parciais  || 0, cor: "bg-yellow-500 text-white", off: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-                    { val: "semInicio", label: "Sem início",   cnt: conjData.contagens?.semInicio || 0, cor: "bg-gray-500 text-white",   off: "bg-gray-50 text-gray-600 border-gray-200" },
-                  ].map(({ val, label, cnt, cor, off }) => (
-                    <button key={val} onClick={() => setFiltroConj(val)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                        filtroConj === val ? cor + " border-transparent" : (off || "bg-gray-100 text-gray-600 border-gray-200") + " hover:opacity-80"
-                      }`}>
-                      {label} <span className="text-[10px] font-bold opacity-70">{cnt}</span>
-                    </button>
-                  ))}
-                </div>
+              <div className="flex gap-4 items-start">
+                {/* ── Painel lateral: etapas ── */}
+                <PainelEtapas
+                  etapas={conjData.etapas}
+                  contagens={conjData.contagens}
+                  pesoTotalPlanejado={conjData.pesoTotalPlanejado}
+                  pesoTotalProduzido={conjData.pesoTotalProduzido}
+                  selecionada={filtroConj}
+                  onSelecionar={setFiltroConj}
+                />
 
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-50 text-sm text-torg-dark">
-                    <strong>{conjuntosFiltrados.length}</strong> de {conjData.contagens?.total || 0} conjuntos — <strong>{obraFiltro}</strong>
-                    <span className="text-torg-gray ml-2 text-xs">({conjData.marcasComProducao}/{conjData.totalMarcas} marcas com registro no Syneco)</span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50/60 sticky top-0">
-                        <tr>
-                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Conjunto</th>
-                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
-                          <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Peso</th>
-                          <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Marcas prontas</th>
-                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Status</th>
-                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Faltam</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {conjuntosFiltrados.map(c => {
-                          const pct = c.totalMarcas > 0 ? Math.round((c.marcasProntas / c.totalMarcas) * 100) : 0;
-                          const cor = c.montavel ? "text-green-800 bg-green-100 border-green-300"
-                            : c.marcasProntas > 0 ? "text-yellow-700 bg-yellow-50 border-yellow-200"
-                            : "text-gray-500 bg-gray-50 border-gray-200";
-                          const corBarra = c.montavel ? "bg-green-500" : c.marcasProntas > 0 ? "bg-yellow-400" : "bg-gray-200";
-                          return (
-                            <tr key={c.id} className="hover:bg-gray-50/50">
-                              <td className="px-4 py-2.5 font-mono text-xs font-bold text-torg-blue whitespace-nowrap">{c.marca}</td>
-                              <td className="px-4 py-2.5 text-gray-700 max-w-[160px] truncate" title={c.descricao}>{c.descricao || "—"}</td>
-                              <td className="px-4 py-2.5 text-right text-gray-500 text-xs whitespace-nowrap">{fmtNum(c.pesoTotalKg)} kg</td>
-                              <td className="px-4 py-2.5 text-right min-w-[120px]">
-                                <div className="flex flex-col items-end gap-0.5">
-                                  <span className="font-semibold text-sm text-torg-dark">{c.marcasProntas}/{c.totalMarcas}</span>
-                                  <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full ${corBarra}`} style={{ width: `${pct}%` }} />
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-4 py-2.5 whitespace-nowrap">
-                                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cor}`}>
-                                  {c.montavel ? "✓ Pode montar" : c.marcasProntas > 0 ? "◑ Parcial" : "Sem início"}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2.5">
-                                {c.faltam === 0 ? <span className="text-green-600 text-xs">—</span> : (
-                                  <div className="flex flex-wrap gap-1 max-w-[280px]">
-                                    {c.marcasFaltantes.slice(0, 6).map(m => (
-                                      <span key={m.marca} title={`${m.descricao || ""} (${m.qtd}x)${m.noSyneco ? "" : " — não está no Syneco"}`}
-                                        className={`text-[10px] px-1.5 py-0.5 rounded border font-mono ${m.noSyneco ? "bg-red-50 text-red-600 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                                        {m.marca}
-                                      </span>
-                                    ))}
-                                    {c.faltam > 6 && <span className="text-[10px] text-gray-400">+{c.faltam - 6}</span>}
-                                  </div>
-                                )}
-                              </td>
+                {/* ── Lista principal ── */}
+                <div className="flex-1 min-w-0 space-y-3">
+                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-50 text-sm text-torg-dark flex items-center justify-between flex-wrap gap-2">
+                      <span>
+                        <strong>{conjuntosFiltrados.length}</strong> de {conjData.contagens?.total || 0} conjuntos/peças — <strong>{obraFiltro}</strong>
+                        {filtroConj && <span className="text-torg-blue ml-1">· {filtroConj}</span>}
+                      </span>
+                      <span className="text-xs text-torg-gray">
+                        {conjData.contagens?.conjuntos || 0} conjuntos · {conjData.contagens?.pecasUnicas || 0} peças únicas
+                      </span>
+                    </div>
+                    {conjuntosFiltrados.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-torg-gray gap-2">
+                        <Activity size={32} className="opacity-30" />
+                        <span className="text-sm">Nenhum item neste filtro</span>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50/60 sticky top-0">
+                            <tr>
+                              <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Conjunto / Peça</th>
+                              <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
+                              <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Tipo</th>
+                              <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Produzido</th>
+                              <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Peso</th>
+                              <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Etapa atual</th>
+                              <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Por onde passou</th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {conjuntosFiltrados.map(c => (
+                              <LinhaConjunto key={c.id} c={c} />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
+
+                  {/* ── Grupo: Marcas cortadas (colapsável) ── */}
+                  {(conjData.contagens?.marcas || 0) > 0 && (
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                      <button onClick={() => setVerMarcas(v => !v)}
+                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
+                        <span className="text-sm font-medium text-torg-dark flex items-center gap-2">
+                          {verMarcas ? <ChevronDown size={15} className="text-gray-400" /> : <ChevronRight size={15} className="text-gray-400" />}
+                          Marcas cortadas (componentes) <span className="text-xs text-gray-400">{conjData.contagens?.marcas} marcas</span>
+                        </span>
+                        <span className="text-xs text-gray-400">peças individuais apontadas no Corte</span>
+                      </button>
+                      {verMarcas && (
+                        <div className="overflow-x-auto border-t border-gray-50">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gray-50/60">
+                              <tr>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Marca</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark">Descrição</th>
+                                <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Produzido</th>
+                                <th className="text-right px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Peso</th>
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-torg-dark whitespace-nowrap">Etapa atual</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {conjData.marcas.map(c => (
+                                <tr key={c.id} className="hover:bg-gray-50/50">
+                                  <td className="px-4 py-2 font-mono text-xs font-bold text-torg-blue whitespace-nowrap">{c.marca}</td>
+                                  <td className="px-4 py-2 text-gray-700 max-w-[200px] truncate" title={c.descricao}>{c.descricao || "—"}</td>
+                                  <td className="px-4 py-2 text-right text-gray-700">{fmtNum(c.produzidoUn, 0)}<span className="text-xs text-gray-400">/{c.planejadoUn}</span></td>
+                                  <td className="px-4 py-2 text-right text-gray-500 text-xs whitespace-nowrap">{fmtNum(c.pesoTotalKg)} kg</td>
+                                  <td className="px-4 py-2 whitespace-nowrap"><BadgeEtapa etapa={c.etapaAtual} /></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )
