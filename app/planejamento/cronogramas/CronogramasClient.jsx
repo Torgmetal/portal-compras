@@ -213,7 +213,7 @@ function NovoCronogramaModal({ onClose, onCreated }) {
   const [titulo, setTitulo] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
-  const [usarTemplate, setUsarTemplate] = useState(true);
+  const [usarTemplate, setUsarTemplate] = useState(false);
   const [opManual, setOpManual] = useState("");
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState("");
@@ -584,6 +584,13 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
 }
 
 function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
+  const [addingGlobal, setAddingGlobal] = useState(false);
+  const [newDept, setNewDept] = useState("FABRICACAO");
+  const [newName, setNewName] = useState("");
+  const [newInicio, setNewInicio] = useState("");
+  const [newFim, setNewFim] = useState("");
+  const [savingGlobal, setSavingGlobal] = useState(false);
+
   const now = new Date();
   const tarefas = detail.tarefas || [];
 
@@ -599,11 +606,110 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
     }
   }
 
+  const hasTarefas = Object.keys(byDept).length > 0;
+
+  const adicionarTarefaGlobal = async () => {
+    if (!newName.trim()) return;
+    setSavingGlobal(true);
+    try {
+      const body = { nome: newName.trim(), departamento: newDept, outlineLevel: 2, isSummary: false };
+      if (newInicio) body.dataInicioPrevista = new Date(newInicio + "T12:00:00Z").toISOString();
+      if (newFim) body.dataFimPrevista = new Date(newFim + "T12:00:00Z").toISOString();
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/tarefas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Erro ao adicionar");
+      setNewName("");
+      setNewInicio("");
+      setNewFim("");
+      onRefresh();
+    } catch {
+      // keep form open
+    } finally {
+      setSavingGlobal(false);
+    }
+  };
+
   return (
     <div className="divide-y divide-gray-50">
       {Object.entries(byDept).map(([dept, { summary, tasks }]) => (
         <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} />
       ))}
+
+      {!hasTarefas && !addingGlobal && (
+        <div className="py-8 text-center">
+          <GanttChart size={28} className="mx-auto text-gray-300 mb-2" />
+          <p className="text-sm text-torg-gray mb-1">Cronograma vazio.</p>
+          <p className="text-xs text-torg-gray mb-4">Adicione as tarefas de cada departamento.</p>
+          <button
+            onClick={() => setAddingGlobal(true)}
+            className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5"
+          >
+            <Plus size={14} /> Adicionar Tarefa
+          </button>
+        </div>
+      )}
+
+      {/* Botão global de adicionar tarefa (sempre visível quando já tem tarefas) */}
+      <div className="px-4 py-3">
+        {!addingGlobal ? (
+          <button
+            onClick={() => setAddingGlobal(true)}
+            className="flex items-center gap-1.5 text-xs text-torg-blue hover:text-torg-blue-700 font-medium py-1"
+          >
+            <Plus size={13} /> Adicionar tarefa
+          </button>
+        ) : (
+          <div className="rounded-lg border border-torg-blue/20 bg-torg-blue-50/20 p-3 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <select
+                value={newDept}
+                onChange={(e) => setNewDept(e.target.value)}
+                className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg bg-white"
+              >
+                {Object.entries(DEPT_LABEL).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Nome da tarefa..."
+                className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded bg-white"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newName.trim()) adicionarTarefaGlobal();
+                  if (e.key === "Escape") setAddingGlobal(false);
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-torg-gray">Início:</span>
+                <input type="date" value={newInicio} onChange={(e) => setNewInicio(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-torg-gray">Fim:</span>
+                <input type="date" value={newFim} onChange={(e) => setNewFim(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
+              </div>
+              <div className="flex items-center gap-1 ml-auto">
+                <button onClick={() => setAddingGlobal(false)} className="px-2 py-1 text-[10px] text-torg-gray hover:text-torg-dark">
+                  Cancelar
+                </button>
+                <button
+                  onClick={adicionarTarefaGlobal}
+                  disabled={savingGlobal || !newName.trim()}
+                  className="px-3 py-1 bg-torg-blue text-white text-[10px] rounded hover:bg-torg-blue-700 disabled:opacity-50 font-medium"
+                >
+                  {savingGlobal ? "..." : "Adicionar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
