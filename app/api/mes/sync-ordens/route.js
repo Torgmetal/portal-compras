@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma, waitMesTables } from "@/lib/prisma";
+import { prisma, prismaDirect, waitMesTables } from "@/lib/prisma";
 
 // Recebe ordens planejadas do SKA dataset 150 (snapshot planejado vs produzido).
 // Upsert EM MASSA via INSERT ... ON CONFLICT (1 SQL por lote) — rápido.
@@ -140,7 +140,8 @@ export async function POST(req) {
   async function upsertResiliente(lote, tentativa = 0) {
     if (lote.length === 0) return;
     try {
-      const res = await prisma.$queryRawUnsafe(montarSQL(lote));
+      // Conexão DIRETA (sem pooler) — evita o OOM do PgBouncer do Neon.
+      const res = await prismaDirect.$queryRawUnsafe(montarSQL(lote));
       for (const r of res) { if (r.inserted) criados++; else atualizados++; }
     } catch (e) {
       if (ehOOM(e) && lote.length > 1) {
@@ -173,6 +174,8 @@ export async function POST(req) {
         lote.push(o);
       }
       await upsertResiliente(lote);
+      // pausa curta entre chunks: alivia a pressão de memória da compute do Neon
+      await new Promise(r => setTimeout(r, 40));
     }
 
     await prisma.mesSyncLog.update({
