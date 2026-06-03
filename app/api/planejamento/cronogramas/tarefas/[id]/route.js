@@ -7,6 +7,8 @@ const patchSchema = z.object({
   percentualRealizado: z.number().min(0).max(100).optional(),
   observacao: z.string().max(500).optional(),
   dataRealizacao: z.string().datetime().nullable().optional(),
+  dataInicioPrevista: z.string().datetime().nullable().optional(),
+  dataFimPrevista: z.string().datetime().nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -26,29 +28,85 @@ export async function PATCH(req, { params }) {
     return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const tarefa = await prisma.cronogramaTarefa.findUnique({ where: { id } });
+  const tarefa = await prisma.cronogramaTarefa.findUnique({
+    where: { id },
+    include: { cronograma: { select: { id: true, dataBase: true } } },
+  });
   if (!tarefa) {
     return NextResponse.json({ success: false, error: "Tarefa nao encontrada" }, { status: 404 });
   }
 
   const data = {};
-  if (parsed.data.percentualRealizado !== undefined) data.percentualRealizado = parsed.data.percentualRealizado;
+  const diffAntes = {};
+  const diffDepois = {};
+
+  if (parsed.data.percentualRealizado !== undefined && parsed.data.percentualRealizado !== tarefa.percentualRealizado) {
+    diffAntes.percentualRealizado = tarefa.percentualRealizado;
+    diffDepois.percentualRealizado = parsed.data.percentualRealizado;
+    data.percentualRealizado = parsed.data.percentualRealizado;
+  }
   if (parsed.data.observacao !== undefined) data.observacao = parsed.data.observacao;
   if (parsed.data.dataRealizacao !== undefined) {
     data.dataRealizacao = parsed.data.dataRealizacao ? new Date(parsed.data.dataRealizacao) : null;
   }
+  if (parsed.data.dataInicioPrevista !== undefined) {
+    const novo = parsed.data.dataInicioPrevista ? new Date(parsed.data.dataInicioPrevista) : null;
+    if (tarefa.dataInicioPrevista?.toISOString() !== novo?.toISOString()) {
+      diffAntes.dataInicioPrevista = tarefa.dataInicioPrevista?.toISOString() || null;
+      diffDepois.dataInicioPrevista = novo?.toISOString() || null;
+      data.dataInicioPrevista = novo;
+    }
+  }
+  if (parsed.data.dataFimPrevista !== undefined) {
+    const novo = parsed.data.dataFimPrevista ? new Date(parsed.data.dataFimPrevista) : null;
+    if (tarefa.dataFimPrevista?.toISOString() !== novo?.toISOString()) {
+      diffAntes.dataFimPrevista = tarefa.dataFimPrevista?.toISOString() || null;
+      diffDepois.dataFimPrevista = novo?.toISOString() || null;
+      data.dataFimPrevista = novo;
+    }
+  }
 
-  const updated = await prisma.cronogramaTarefa.update({ where: { id }, data });
+  const ops = [
+    prisma.cronogramaTarefa.update({ where: { id }, data }),
+    prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "UPDATE_CRONOGRAMA_TAREFA",
+        entity: "CronogramaTarefa",
+        entityId: id,
+        diff: { antes: { percentualRealizado: tarefa.percentualRealizado, observacao: tarefa.observacao }, depois: data },
+      },
+    }),
+  ];
 
-  await prisma.auditLog.create({
-    data: {
-      userId: user.id,
-      action: "UPDATE_CRONOGRAMA_TAREFA",
-      entity: "CronogramaTarefa",
-      entityId: id,
-      diff: { antes: { percentualRealizado: tarefa.percentualRealizado, observacao: tarefa.observacao }, depois: data },
-    },
-  });
+  // Se cronograma tem baseline e houve alteracao de datas/progresso, gera revisao
+  if (tarefa.cronograma.dataBase && Object.keys(diffDepois).length > 0) {
+    const partes = [];
+    if (diffDepois.percentualRealizado !== undefined) {
+      partes.push(`progresso ${diffAntes.percentualRealizado}% → ${diffDepois.percentualRealizado}%`);
+    }
+    if (diffDepois.dataInicioPrevista !== undefined) {
+      partes.push(`início alterado`);
+    }
+    if (diffDepois.dataFimPrevista !== undefined) {
+      partes.push(`fim alterado`);
+    }
 
+    ops.push(
+      prisma.cronogramaRevisao.create({
+        data: {
+          cronogramaId: tarefa.cronograma.id,
+          tipo: "TAREFA_ALTERADA",
+          descricao: `${tarefa.nome}: ${partes.join(", ")}`,
+          diff: { tarefa: tarefa.nome, antes: diffAntes, depois: diffDepois },
+          createdById: user.id,
+        },
+      })
+    );
+  }
+
+  await prisma.$transaction(ops);
+
+  const updated = await prisma.cronogramaTarefa.findUnique({ where: { id } });
   return NextResponse.json({ success: true, tarefa: updated });
 }

@@ -25,6 +25,7 @@ model User {
   consultasEstoqueCriadas  ConsultaEstoque[]     @relation("ConsultaEstoqueCreatedBy")
   consultaItensRespondidos ConsultaEstoqueItem[] @relation("ConsultaItemRespondidoPor")
   cronogramaRegistros      CronogramaRegistro[]  @relation("CronogramaRegistroCreatedBy")
+  cronogramaRevisoes       CronogramaRevisao[]   @relation("CronogramaRevisaoCreatedBy")
   necessidadesSemanais     NecessidadeSemanal[]  @relation("NecessidadeSemanalCreatedBy")
   notificacoes             Notificacao[]
   opsCriadas               OP[]                  @relation("OPCreatedBy")
@@ -1937,20 +1938,22 @@ model Recebimento {
 }
 
 model Cronograma {
-  id             String             @id @default(cuid())
+  id             String               @id @default(cuid())
   opNumero       String
   opId           String?
   nomeArquivo    String
   titulo         String
-  sharepointPath String             @unique
+  sharepointPath String               @unique
   dataInicio     DateTime?
   dataFim        DateTime?
-  ultimoSync     DateTime           @default(now())
-  ativo          Boolean            @default(true)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  op             OP?                @relation(fields: [opId], references: [id])
+  dataBase       DateTime?            // Data base (baseline) — referencia do cronograma
+  ultimoSync     DateTime             @default(now())
+  ativo          Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  op             OP?                  @relation(fields: [opId], references: [id])
   tarefas        CronogramaTarefa[]
+  revisoes       CronogramaRevisao[]
 
   @@index([opNumero])
   @@index([ativo])
@@ -1964,6 +1967,8 @@ model CronogramaTarefa {
   departamento        DepartamentoCronograma?
   dataInicioPrevista  DateTime?
   dataFimPrevista     DateTime?
+  dataInicioBase      DateTime?               // Baseline start (snapshot na data base)
+  dataFimBase         DateTime?               // Baseline end (snapshot na data base)
   percentualPrevisto  Float                   @default(0)
   percentualRealizado Float                   @default(0)
   qtdePlanejada       Float                   @default(0)
@@ -1992,6 +1997,22 @@ model CronogramaRegistro {
   tarefa      CronogramaTarefa @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
 
   @@index([tarefaId])
+}
+
+// Linha de controle — cada alteracao no cronograma gera uma revisao
+model CronogramaRevisao {
+  id            String     @id @default(cuid())
+  cronogramaId  String
+  tipo          String     // BASELINE_DEFINIDA, TAREFA_ALTERADA, SYNC_SHAREPOINT, DATA_ALTERADA
+  descricao     String     // Descricao legivel da alteracao
+  diff          Json?      // { campo, antes, depois } ou snapshot
+  createdById   String
+  createdAt     DateTime   @default(now())
+  cronograma    Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+  createdBy     User       @relation("CronogramaRevisaoCreatedBy", fields: [createdById], references: [id])
+
+  @@index([cronogramaId])
+  @@index([createdAt])
 }
 
 model TarefaPlanejamento {

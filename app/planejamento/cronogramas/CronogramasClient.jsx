@@ -5,7 +5,8 @@ import {
   Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronRight,
   Clock, CheckCircle2, AlertTriangle, Download, MessageSquarePlus,
   Send, X, Briefcase, Wrench, ShoppingCart, Factory, Truck, HardHat,
-  GanttChart, Package, FileText, CircleDot, Mail,
+  GanttChart, Package, FileText, CircleDot, Mail, Calendar,
+  History, FileDown, Milestone,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -253,31 +254,89 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
 
 function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId }) {
   const [tab, setTab] = useState("cronograma");
+  const [settingBase, setSettingBase] = useState(false);
+
+  const definirDataBase = async () => {
+    const hoje = new Date().toISOString().split("T")[0];
+    const input = prompt("Data base do cronograma (AAAA-MM-DD):", hoje);
+    if (!input) return;
+    const d = new Date(input + "T12:00:00Z");
+    if (isNaN(d.getTime())) return alert("Data inválida");
+    setSettingBase(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataBase: d.toISOString() }),
+      });
+      if (!res.ok) throw new Error("Erro ao definir data base");
+      onRefreshDetail();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSettingBase(false);
+    }
+  };
+
+  const tabs = [
+    { key: "cronograma", label: "Cronograma", icon: GanttChart },
+    { key: "suprimentos", label: "RMs / Pedidos / NFs", icon: Package },
+    { key: "historico", label: "Linha de Controle", icon: History },
+  ];
 
   return (
     <div className="border-t border-gray-100">
+      {/* Data Base badge */}
+      {detail && (
+        <div className="px-4 py-2 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Milestone size={13} className="text-torg-blue" />
+              <span className="text-xs font-medium text-torg-dark">Data Base:</span>
+              {detail.dataBase ? (
+                <span className="text-xs font-bold text-torg-blue">{new Date(detail.dataBase).toLocaleDateString("pt-BR")}</span>
+              ) : (
+                <span className="text-xs text-torg-gray italic">Não definida</span>
+              )}
+            </div>
+            <button
+              onClick={definirDataBase}
+              disabled={settingBase}
+              className="px-2 py-0.5 text-[10px] font-medium text-torg-blue bg-torg-blue-50 border border-torg-blue/20 rounded hover:bg-torg-blue-100 disabled:opacity-50"
+            >
+              {settingBase ? "..." : detail.dataBase ? "Redefinir" : "Definir"}
+            </button>
+          </div>
+          <button
+            onClick={() => exportarGanttPDF(detail)}
+            className="px-3 py-1 text-[10px] font-medium text-white bg-torg-blue rounded-lg hover:bg-torg-blue-700 flex items-center gap-1.5"
+          >
+            <FileDown size={12} /> Exportar Gantt (PDF)
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between border-b border-gray-100">
         <div className="flex">
-        <button
-          onClick={() => setTab("cronograma")}
-          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
-            tab === "cronograma"
-              ? "border-torg-blue text-torg-blue"
-              : "border-transparent text-torg-gray hover:text-torg-dark"
-          }`}
-        >
-          <GanttChart size={13} /> Cronograma
-        </button>
-        <button
-          onClick={() => setTab("suprimentos")}
-          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
-            tab === "suprimentos"
-              ? "border-torg-blue text-torg-blue"
-              : "border-transparent text-torg-gray hover:text-torg-dark"
-          }`}
-        >
-          <Package size={13} /> RMs / Pedidos / NFs
-        </button>
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+                  tab === t.key
+                    ? "border-torg-blue text-torg-blue"
+                    : "border-transparent text-torg-gray hover:text-torg-dark"
+                }`}
+              >
+                <Icon size={13} /> {t.label}
+                {t.key === "historico" && detail?.revisoes?.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-gray-100 text-torg-gray text-[9px] rounded-full font-bold">{detail.revisoes.length}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -296,6 +355,10 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
 
       {tab === "suprimentos" && (
         <SuprimentosTab cronogramaId={cronogramaId} />
+      )}
+
+      {tab === "historico" && detail && (
+        <HistoricoTab revisoes={detail.revisoes || []} />
       )}
     </div>
   );
@@ -491,6 +554,11 @@ function TarefaRow({ tarefa, now, onRefresh }) {
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[10px] text-torg-gray whitespace-nowrap">
             {fmtData(t.dataInicioPrevista)} — {fmtData(t.dataFimPrevista)}
+            {t.dataFimBase && t.dataFimPrevista && new Date(t.dataFimPrevista) > new Date(t.dataFimBase) && (
+              <span className="ml-1 text-red-500 font-semibold" title={`Baseline: ${fmtData(t.dataFimBase)}`}>
+                ▲{Math.ceil((new Date(t.dataFimPrevista) - new Date(t.dataFimBase)) / 86400000)}d
+              </span>
+            )}
           </span>
 
           {!editing ? (
@@ -765,6 +833,197 @@ function SuprimentoRow({ item }) {
       </td>
     </tr>
   );
+}
+
+function HistoricoTab({ revisoes }) {
+  if (revisoes.length === 0) {
+    return (
+      <div className="py-8 text-center">
+        <History size={28} className="mx-auto text-gray-300 mb-2" />
+        <p className="text-sm text-torg-gray">Nenhuma alteração registrada.</p>
+        <p className="text-xs text-torg-gray mt-1">Defina a data base para iniciar o controle de revisões.</p>
+      </div>
+    );
+  }
+
+  const TIPO_BADGE = {
+    BASELINE_DEFINIDA: { label: "Baseline", color: "bg-torg-blue-50 text-torg-blue" },
+    TAREFA_ALTERADA: { label: "Tarefa", color: "bg-amber-50 text-amber-700" },
+    SYNC_SHAREPOINT: { label: "Sync", color: "bg-purple-50 text-purple-700" },
+    DATA_ALTERADA: { label: "Data", color: "bg-emerald-50 text-emerald-700" },
+  };
+
+  return (
+    <div className="p-4 space-y-2 max-h-[400px] overflow-y-auto">
+      {revisoes.map((r) => {
+        const badge = TIPO_BADGE[r.tipo] || TIPO_BADGE.TAREFA_ALTERADA;
+        return (
+          <div key={r.id} className="flex items-start gap-3 px-3 py-2 rounded-lg border border-gray-100 bg-white hover:bg-gray-50/50">
+            <div className="mt-0.5">
+              <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded ${badge.color}`}>{badge.label}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-torg-dark">{r.descricao}</p>
+              <p className="text-[10px] text-torg-gray mt-0.5">
+                {r.createdBy?.name} · {new Date(r.createdAt).toLocaleDateString("pt-BR")} às{" "}
+                {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Exportar Gantt como PDF ──────────────────────────────────
+function exportarGanttPDF(detail) {
+  const tarefas = (detail.tarefas || []).filter((t) => t.outlineLevel > 0 && t.departamento);
+  if (tarefas.length === 0) return alert("Nenhuma tarefa para exportar.");
+
+  // Calcula range de datas
+  let minDate = Infinity, maxDate = -Infinity;
+  for (const t of tarefas) {
+    if (t.dataInicioPrevista) minDate = Math.min(minDate, new Date(t.dataInicioPrevista).getTime());
+    if (t.dataFimPrevista) maxDate = Math.max(maxDate, new Date(t.dataFimPrevista).getTime());
+    if (t.dataInicioBase) minDate = Math.min(minDate, new Date(t.dataInicioBase).getTime());
+    if (t.dataFimBase) maxDate = Math.max(maxDate, new Date(t.dataFimBase).getTime());
+  }
+  if (!isFinite(minDate) || !isFinite(maxDate)) return alert("Tarefas sem datas definidas.");
+
+  // Padding 7 dias
+  minDate -= 7 * 86400000;
+  maxDate += 7 * 86400000;
+  const totalDays = Math.ceil((maxDate - minDate) / 86400000);
+
+  // Config
+  const rowHeight = 22;
+  const headerHeight = 80;
+  const labelWidth = 280;
+  const dayWidth = Math.max(3, Math.min(12, 900 / totalDays));
+  const chartWidth = totalDays * dayWidth;
+  const totalWidth = labelWidth + chartWidth + 40;
+  const totalHeight = headerHeight + tarefas.length * rowHeight + 60;
+
+  // Abre janela de impressao
+  const win = window.open("", "_blank", `width=${Math.min(totalWidth + 40, 1400)},height=${Math.min(totalHeight + 100, 900)}`);
+  if (!win) return alert("Popup bloqueado — permita popups para gerar o PDF.");
+
+  const deptColors = {
+    COMERCIAL: "#2563eb", ENGENHARIA: "#7c3aed", SUPRIMENTOS: "#d97706",
+    FABRICACAO: "#059669", EXPEDICAO: "#0d9488", MONTAGEM: "#ea580c",
+  };
+
+  // Gera meses
+  const months = [];
+  const d0 = new Date(minDate);
+  let cur = new Date(d0.getFullYear(), d0.getMonth(), 1);
+  while (cur.getTime() < maxDate) {
+    const start = Math.max(0, (cur.getTime() - minDate) / 86400000);
+    const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    const end = Math.min(totalDays, (next.getTime() - minDate) / 86400000);
+    months.push({
+      label: cur.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }),
+      left: start * dayWidth,
+      width: (end - start) * dayWidth,
+    });
+    cur = next;
+  }
+
+  // Data base line
+  const dataBaseLine = detail.dataBase ? ((new Date(detail.dataBase).getTime() - minDate) / 86400000) * dayWidth : null;
+
+  // HTML
+  let rowsHtml = "";
+  for (let i = 0; i < tarefas.length; i++) {
+    const t = tarefas[i];
+    const indent = Math.max(0, t.outlineLevel - 1) * 12;
+    const isSummary = t.isSummary;
+    const pct = t.percentualRealizado;
+    const bg = i % 2 === 0 ? "#fff" : "#f8fafc";
+
+    // Barra baseline
+    let baselineBar = "";
+    if (t.dataInicioBase && t.dataFimBase) {
+      const bStart = ((new Date(t.dataInicioBase).getTime() - minDate) / 86400000) * dayWidth;
+      const bWidth = Math.max(2, ((new Date(t.dataFimBase).getTime() - new Date(t.dataInicioBase).getTime()) / 86400000) * dayWidth);
+      baselineBar = `<div style="position:absolute;top:3px;left:${bStart}px;width:${bWidth}px;height:6px;background:#cbd5e1;border-radius:2px;"></div>`;
+    }
+
+    // Barra atual
+    let currentBar = "";
+    if (t.dataInicioPrevista && t.dataFimPrevista) {
+      const cStart = ((new Date(t.dataInicioPrevista).getTime() - minDate) / 86400000) * dayWidth;
+      const cWidth = Math.max(2, ((new Date(t.dataFimPrevista).getTime() - new Date(t.dataInicioPrevista).getTime()) / 86400000) * dayWidth);
+      const color = deptColors[t.departamento] || "#6b7280";
+      const fillWidth = Math.round(cWidth * pct / 100);
+      currentBar = `<div style="position:absolute;top:${t.dataInicioBase ? 11 : 5}px;left:${cStart}px;width:${cWidth}px;height:${isSummary ? 8 : 10}px;background:${color}22;border:1px solid ${color};border-radius:3px;overflow:hidden;">` +
+        `<div style="width:${fillWidth}px;height:100%;background:${color};"></div></div>`;
+    }
+
+    const nome = isSummary ? `<b>${t.nome}</b>` : t.nome;
+    rowsHtml += `<div style="display:flex;height:${rowHeight}px;border-bottom:1px solid #f1f5f9;background:${bg};">` +
+      `<div style="width:${labelWidth}px;padding:3px 8px 3px ${8 + indent}px;display:flex;align-items:center;gap:6px;flex-shrink:0;overflow:hidden;">` +
+        `<span style="font-size:10px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nome}</span>` +
+        `<span style="font-size:9px;color:${pct >= 100 ? '#059669' : pct > 0 ? '#006EAB' : '#94a3b8'};font-weight:bold;flex-shrink:0;">${pct}%</span>` +
+      `</div>` +
+      `<div style="flex:1;position:relative;min-width:${chartWidth}px;">${baselineBar}${currentBar}</div>` +
+    `</div>`;
+  }
+
+  // Monta meses header
+  let monthsHtml = months.map((m) => `<div style="position:absolute;left:${m.left}px;width:${m.width}px;text-align:center;font-size:9px;color:#64748b;border-left:1px solid #e2e8f0;padding:2px 0;">${m.label}</div>`).join("");
+
+  // Data base indicator
+  let dataBaseIndicator = "";
+  if (dataBaseLine !== null) {
+    dataBaseIndicator = `<div style="position:absolute;left:${dataBaseLine}px;top:0;bottom:0;width:2px;background:#006EAB;z-index:5;"></div>` +
+      `<div style="position:absolute;left:${dataBaseLine - 20}px;top:-18px;font-size:8px;color:#006EAB;font-weight:bold;width:42px;text-align:center;">DB</div>`;
+  }
+
+  const html = `<!DOCTYPE html><html><head><title>Gantt — ${detail.titulo || detail.opNumero}</title>
+<style>
+  @page { size: landscape; margin: 10mm; }
+  body { font-family: Arial, sans-serif; margin: 0; padding: 16px; }
+  @media print { body { padding: 0; } .no-print { display: none !important; } }
+</style></head><body>
+<div class="no-print" style="text-align:right;margin-bottom:12px;">
+  <button onclick="window.print()" style="padding:8px 20px;background:#006EAB;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;">🖨 Imprimir / Salvar PDF</button>
+</div>
+<div style="margin-bottom:12px;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1 style="font-size:18px;color:#002945;margin:0;">${detail.opNumero} — ${detail.titulo || ""}</h1>
+  </div>
+  <div style="display:flex;gap:16px;margin-top:4px;">
+    <span style="font-size:11px;color:#576D7E;">Período: ${detail.dataInicio ? new Date(detail.dataInicio).toLocaleDateString("pt-BR") : "—"} a ${detail.dataFim ? new Date(detail.dataFim).toLocaleDateString("pt-BR") : "—"}</span>
+    ${detail.dataBase ? `<span style="font-size:11px;color:#006EAB;font-weight:bold;">Data Base: ${new Date(detail.dataBase).toLocaleDateString("pt-BR")}</span>` : ""}
+    ${detail.op?.cliente ? `<span style="font-size:11px;color:#576D7E;">Cliente: ${detail.op.cliente}</span>` : ""}
+  </div>
+  <div style="display:flex;gap:12px;margin-top:6px;">
+    <span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#64748b;"><span style="width:16px;height:6px;background:#cbd5e1;border-radius:2px;display:inline-block;"></span> Baseline</span>
+    <span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#64748b;"><span style="width:16px;height:8px;background:#006EAB44;border:1px solid #006EAB;border-radius:2px;display:inline-block;"></span> Atual</span>
+    ${dataBaseLine !== null ? '<span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#006EAB;"><span style="width:2px;height:12px;background:#006EAB;display:inline-block;"></span> Data Base</span>' : ""}
+  </div>
+</div>
+<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;">
+  <div style="min-width:${totalWidth}px;">
+    <div style="display:flex;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+      <div style="width:${labelWidth}px;padding:6px 8px;font-size:10px;font-weight:bold;color:#334155;flex-shrink:0;">Tarefa</div>
+      <div style="flex:1;position:relative;min-width:${chartWidth}px;height:24px;">${monthsHtml}</div>
+    </div>
+    <div style="position:relative;">
+      ${rowsHtml}
+      <div style="position:absolute;left:${labelWidth}px;top:0;bottom:0;right:0;">${dataBaseIndicator}</div>
+    </div>
+  </div>
+</div>
+<div style="margin-top:12px;text-align:right;font-size:9px;color:#94a3b8;">
+  Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — Torg Metal
+</div>
+</body></html>`;
+
+  win.document.write(html);
+  win.document.close();
 }
 
 function fmtQtd(v) {
