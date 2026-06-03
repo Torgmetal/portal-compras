@@ -93,45 +93,62 @@ export async function POST(req) {
 
   let processados = 0;
 
-  // Monta o INSERT ... ON CONFLICT para um lote já deduplicado.
-  // Sem RETURNING: $executeRaw é mais leve no executor (não materializa resultado).
-  const montarSQL = (lote) => {
-    const valores = lote.map(o => {
-      const di = parseData(o.dataInicio), df = parseData(o.dataFim);
-      return `(gen_random_uuid()::text, ${q(o.obra)}, ${q(o.op)}, ${q(o.operacao)}, ${q(o.item)}, ` +
-        `${q(o.setor)}, ${q(o.descItem)}, ${q(o.maquina)}, ${q(o.operador)}, ` +
-        `${n(o.planejadoUn)}, ${n(o.produzidoUn)}, ${n(o.rejeitadoUn)}, ${n(o.saldoUn)}, ` +
-        `${n(o.pesoPlanejado)}, ${n(o.pesoProduzido)}, ${n(o.saldoRestante)}, ` +
-        `${q(o.status)}, ${ni(o.productionId)}, ${ts(di)}, ${ts(df)}, ${q(opIdDaObra(o.obra))}, ${q(syncLog.id)}, NOW(), NOW())`;
-    }).join(",");
-    return `
-      INSERT INTO "MesOrdem" (
-        "id","obra","op","operacao","item","setor","descItem","maquina","operador",
-        "planejadoUn","produzidoUn","rejeitadoUn","saldoUn","pesoPlanejado","pesoProduzido","saldoRestante",
-        "status","productionId","dataInicio","dataFim","opId","syncRunId","createdAt","updatedAt"
-      )
-      VALUES ${valores}
-      ON CONFLICT ("obra","op","operacao","item") DO UPDATE SET
-        "setor"         = EXCLUDED."setor",
-        "descItem"      = EXCLUDED."descItem",
-        "maquina"       = EXCLUDED."maquina",
-        "operador"      = EXCLUDED."operador",
-        "planejadoUn"   = EXCLUDED."planejadoUn",
-        "produzidoUn"   = EXCLUDED."produzidoUn",
-        "rejeitadoUn"   = EXCLUDED."rejeitadoUn",
-        "saldoUn"       = EXCLUDED."saldoUn",
-        "pesoPlanejado" = EXCLUDED."pesoPlanejado",
-        "pesoProduzido" = EXCLUDED."pesoProduzido",
-        "saldoRestante" = EXCLUDED."saldoRestante",
-        "status"        = EXCLUDED."status",
-        "productionId"  = EXCLUDED."productionId",
-        "dataInicio"    = EXCLUDED."dataInicio",
-        "dataFim"       = EXCLUDED."dataFim",
-        "opId"          = EXCLUDED."opId",
-        "syncRunId"     = EXCLUDED."syncRunId",
-        "updatedAt"     = NOW()
-    `;
-  };
+  // Statement CONSTANTE com UNNEST + arrays como parâmetros.
+  // Crucial: como o SQL nunca muda (só os parâmetros), o Postgres cacheia
+  // UM ÚNICO plano e o reusa para todo lote — evita o "out of memory" em
+  // CachedPlanQuery que acontecia quando cada lote gerava um SQL diferente.
+  const SQL_UPSERT = `
+    INSERT INTO "MesOrdem" (
+      "id","obra","op","operacao","item","setor","descItem","maquina","operador",
+      "planejadoUn","produzidoUn","rejeitadoUn","saldoUn","pesoPlanejado","pesoProduzido","saldoRestante",
+      "status","productionId","dataInicio","dataFim","opId","syncRunId","createdAt","updatedAt"
+    )
+    SELECT gen_random_uuid()::text, t.*, NOW(), NOW()
+    FROM UNNEST(
+      $1::text[],$2::text[],$3::text[],$4::text[],$5::text[],$6::text[],$7::text[],$8::text[],
+      $9::float8[],$10::float8[],$11::float8[],$12::float8[],$13::float8[],$14::float8[],$15::float8[],
+      $16::text[],$17::int[],$18::timestamptz[],$19::timestamptz[],$20::text[],$21::text[]
+    ) AS t
+    ON CONFLICT ("obra","op","operacao","item") DO UPDATE SET
+      "setor"         = EXCLUDED."setor",
+      "descItem"      = EXCLUDED."descItem",
+      "maquina"       = EXCLUDED."maquina",
+      "operador"      = EXCLUDED."operador",
+      "planejadoUn"   = EXCLUDED."planejadoUn",
+      "produzidoUn"   = EXCLUDED."produzidoUn",
+      "rejeitadoUn"   = EXCLUDED."rejeitadoUn",
+      "saldoUn"       = EXCLUDED."saldoUn",
+      "pesoPlanejado" = EXCLUDED."pesoPlanejado",
+      "pesoProduzido" = EXCLUDED."pesoProduzido",
+      "saldoRestante" = EXCLUDED."saldoRestante",
+      "status"        = EXCLUDED."status",
+      "productionId"  = EXCLUDED."productionId",
+      "dataInicio"    = EXCLUDED."dataInicio",
+      "dataFim"       = EXCLUDED."dataFim",
+      "opId"          = EXCLUDED."opId",
+      "syncRunId"     = EXCLUDED."syncRunId",
+      "updatedAt"     = NOW()
+  `;
+
+  // Converte um lote em 21 parâmetros — cada um é um LITERAL de array Postgres
+  // em TEXTO (ex: '{"a","b",NULL}'). Passar como texto + cast ::tipo[] no SQL
+  // evita o erro de "improper binary format" da codificação de arrays do Prisma.
+  const litEl   = (e) => e == null ? "NULL" : `"${String(e).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  const pgArray = (arr) => `{${arr.map(litEl).join(",")}}`;
+  const numArr  = (lote, f) => lote.map(o => Number.isFinite(o[f]) ? o[f] : 0);
+  const txtArr  = (lote, f) => lote.map(o => (o[f] == null || o[f] === "") ? null : String(o[f]));
+  const paramsDe = (lote) => [
+    pgArray(txtArr(lote, "obra")), pgArray(txtArr(lote, "op")), pgArray(txtArr(lote, "operacao")), pgArray(txtArr(lote, "item")),
+    pgArray(txtArr(lote, "setor")), pgArray(txtArr(lote, "descItem")), pgArray(txtArr(lote, "maquina")), pgArray(txtArr(lote, "operador")),
+    pgArray(numArr(lote, "planejadoUn")), pgArray(numArr(lote, "produzidoUn")), pgArray(numArr(lote, "rejeitadoUn")), pgArray(numArr(lote, "saldoUn")),
+    pgArray(numArr(lote, "pesoPlanejado")), pgArray(numArr(lote, "pesoProduzido")), pgArray(numArr(lote, "saldoRestante")),
+    pgArray(txtArr(lote, "status")),
+    pgArray(lote.map(o => (o.productionId == null || !Number.isFinite(o.productionId)) ? null : Math.trunc(o.productionId))),
+    pgArray(lote.map(o => { const d = parseData(o.dataInicio); return d ? d.toISOString() : null; })),
+    pgArray(lote.map(o => { const d = parseData(o.dataFim);    return d ? d.toISOString() : null; })),
+    pgArray(lote.map(o => opIdDaObra(o.obra))),
+    pgArray(lote.map(() => syncLog.id)),
+  ];
 
   const ehOOM = (e) => /53200|out of memory/i.test(e?.message || "");
 
@@ -140,8 +157,8 @@ export async function POST(req) {
   async function upsertResiliente(lote, tentativa = 0) {
     if (lote.length === 0) return;
     try {
-      // Conexão DIRETA (sem pooler) — evita o OOM do PgBouncer do Neon.
-      await prismaDirect.$executeRawUnsafe(montarSQL(lote));
+      // Conexão DIRETA (sem pooler) + statement constante (1 plano só).
+      await prismaDirect.$executeRawUnsafe(SQL_UPSERT, ...paramsDe(lote));
       processados += lote.length;
     } catch (e) {
       if (ehOOM(e) && lote.length > 1) {
