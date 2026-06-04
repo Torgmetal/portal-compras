@@ -2724,12 +2724,12 @@ function exportarGanttPDF(detail) {
 
 <!-- Footer -->
 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:10px;border-top:2px solid #002945;">
-  <div style="display:flex;align-items:center;gap:8px;">
-    <img src="/torg-logo.png" alt="Torg" style="height:22px;object-fit:contain;opacity:0.5;" onerror="this.style.display='none'" />
-    <span style="font-size:8px;color:#94a3b8;">Torg Metal — Soluções em Estruturas Metálicas</span>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <img src="/torg-logo.png" alt="Torg Metal" style="height:26px;object-fit:contain;" onerror="this.style.display='none'" />
+    <span style="font-size:10px;color:#002945;font-weight:600;">Torg Metal</span>
   </div>
-  <div style="font-size:8px;color:#94a3b8;">
-    Documento gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · ${detail.opNumero || ""}
+  <div style="font-size:10px;color:#64748b;">
+    Documento gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · <strong>${detail.opNumero || ""}</strong>
   </div>
 </div>
 
