@@ -24,7 +24,12 @@ export default function RespostaCobrancaPage({ params }) {
   const [enviado, setEnviado] = useState(false);
 
   useEffect(() => {
-    params.then((p) => setToken(p.token));
+    // Next.js 14: params pode ser Promise (app router novo) ou objeto direto
+    if (typeof params?.then === "function") {
+      params.then((p) => setToken(p.token));
+    } else {
+      setToken(params?.token);
+    }
   }, [params]);
 
   useEffect(() => {
