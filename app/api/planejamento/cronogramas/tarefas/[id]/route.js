@@ -11,6 +11,8 @@ const patchSchema = z.object({
   dataRealizacao: z.string().datetime().nullable().optional(),
   dataInicioPrevista: z.string().datetime().nullable().optional(),
   dataFimPrevista: z.string().datetime().nullable().optional(),
+  dataLiberacao: z.string().datetime().nullable().optional(),
+  motivoBloqueio: z.string().max(300).nullable().optional(),
   justificativa: z.string().max(500).optional(),
   qtdePlanejada: z.number().min(0).optional(),
   qtdeRealizada: z.number().min(0).optional(),
@@ -79,6 +81,16 @@ export async function PATCH(req, { params }) {
     data.antecessoraIds = ids;
   }
   if (parsed.data.observacao !== undefined) data.observacao = parsed.data.observacao;
+  if (parsed.data.motivoBloqueio !== undefined) data.motivoBloqueio = parsed.data.motivoBloqueio;
+  if (parsed.data.dataLiberacao !== undefined) {
+    const novaLib = parsed.data.dataLiberacao ? new Date(parsed.data.dataLiberacao) : null;
+    if (tarefa.dataLiberacao?.toISOString() !== novaLib?.toISOString()) {
+      diffAntes.dataLiberacao = tarefa.dataLiberacao?.toISOString() || null;
+      diffDepois.dataLiberacao = novaLib?.toISOString() || null;
+      antecessorasChanged = true; // trigger recalculo
+    }
+    data.dataLiberacao = novaLib;
+  }
   if (parsed.data.dataRealizacao !== undefined) {
     data.dataRealizacao = parsed.data.dataRealizacao ? new Date(parsed.data.dataRealizacao) : null;
   }

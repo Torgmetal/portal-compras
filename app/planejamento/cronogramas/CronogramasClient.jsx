@@ -1113,6 +1113,11 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   const [collapsed, setCollapsed] = useState(false);
   const [cobrando, setCobrando] = useState(false);
   const [cobrResult, setCobrResult] = useState(null);
+  const [showCobrModal, setShowCobrModal] = useState(false);
+  const [emailsSugeridos, setEmailsSugeridos] = useState([]);
+  const [emailsSelecionados, setEmailsSelecionados] = useState([]);
+  const [emailExtra, setEmailExtra] = useState("");
+  const [loadingEmails, setLoadingEmails] = useState(false);
   const [addingTask, setAddingTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState("");
   const [newTaskInicio, setNewTaskInicio] = useState("");
@@ -1122,21 +1127,59 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   const colors = DEPT_COLORS[dept] || "text-gray-600 bg-gray-50 border-gray-200";
   const atrasadas = tasks.filter((t) => !t.isSummary && t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100);
 
-  const cobrarDept = async (e) => {
+  const abrirModalCobranca = async (e) => {
     e.stopPropagation();
-    if (!confirm(`Enviar e-mail de cobrança para ${DEPT_LABEL[dept] || dept}? (${atrasadas.length} tarefa${atrasadas.length > 1 ? "s" : ""} atrasada${atrasadas.length > 1 ? "s" : ""})`)) return;
+    setCobrResult(null);
+    setShowCobrModal(true);
+    setLoadingEmails(true);
+    setEmailsSugeridos([]);
+    setEmailsSelecionados([]);
+    setEmailExtra("");
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/notificar-atrasos?departamento=${dept}`);
+      const data = await res.json();
+      if (data.success && data.sugeridos) {
+        setEmailsSugeridos(data.sugeridos);
+        setEmailsSelecionados(data.sugeridos.map((u) => u.email));
+      }
+    } catch { /* ignora */ }
+    setLoadingEmails(false);
+  };
+
+  const toggleEmail = (email) => {
+    setEmailsSelecionados((prev) =>
+      prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email]
+    );
+  };
+
+  const addEmailExtra = () => {
+    const e = emailExtra.trim().toLowerCase();
+    if (e && e.includes("@") && !emailsSelecionados.includes(e)) {
+      setEmailsSelecionados((prev) => [...prev, e]);
+      setEmailExtra("");
+    }
+  };
+
+  const enviarCobranca = async () => {
+    if (emailsSelecionados.length === 0) {
+      alert("Selecione pelo menos um destinatário.");
+      return;
+    }
     setCobrando(true);
     setCobrResult(null);
     try {
       const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/notificar-atrasos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ departamento: dept }),
+        body: JSON.stringify({ departamento: dept, emails: emailsSelecionados }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao notificar");
       const r = data.resultados?.[0];
-      setCobrResult(r?.enviado ? { ok: true, msg: `Enviado para ${r.destinatarios} pessoa(s)` } : { ok: false, msg: r?.motivo || data.motivo || "Não enviado" });
+      setCobrResult(r?.enviado
+        ? { ok: true, msg: `Enviado para ${r.emails?.join(", ") || r.destinatarios + " pessoa(s)"}` }
+        : { ok: false, msg: r?.motivo || data.motivo || "Não enviado" });
+      setShowCobrModal(false);
     } catch (err) {
       setCobrResult({ ok: false, msg: err.message });
     } finally {
@@ -1145,6 +1188,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   };
 
   return (
+    <>
     <div className="px-4 py-3">
       <div className="flex items-center justify-between mb-2">
         <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 flex-1 min-w-0">
@@ -1164,7 +1208,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
         <div className="flex items-center gap-2 shrink-0">
           {atrasadas.length > 0 && (
             <button
-              onClick={cobrarDept}
+              onClick={abrirModalCobranca}
               disabled={cobrando}
               className="px-2.5 py-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1 disabled:opacity-50 transition-colors"
               title={`Cobrar ${DEPT_LABEL[dept] || dept} por e-mail`}
@@ -1249,6 +1293,103 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
         </div>
       )}
     </div>
+
+    {/* Modal de cobranca — fora do div com overflow-hidden */}
+    {showCobrModal && (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }} onClick={() => !cobrando && setShowCobrModal(false)}>
+        <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-red-50 border-b border-red-100 px-5 py-3 flex items-center gap-2">
+            <Mail size={16} className="text-red-600" />
+            <h3 className="text-sm font-bold text-red-800">Cobrar {DEPT_LABEL[dept] || dept}</h3>
+            <span className="ml-auto text-xs text-red-500">{atrasadas.length} tarefa{atrasadas.length > 1 ? "s" : ""} atrasada{atrasadas.length > 1 ? "s" : ""}</span>
+          </div>
+          <div className="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+            <div>
+              <p className="text-xs text-torg-gray font-medium mb-2">Destinatários:</p>
+              {loadingEmails ? (
+                <div className="flex items-center gap-2 text-xs text-torg-gray py-2">
+                  <Loader2 size={12} className="animate-spin" /> Buscando emails do setor...
+                </div>
+              ) : (
+                <>
+                  {emailsSugeridos.length > 0 && (
+                    <div className="space-y-1 mb-2">
+                      <p className="text-[10px] text-torg-gray">Usuários do setor:</p>
+                      {emailsSugeridos.map((u) => (
+                        <label key={u.email} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={emailsSelecionados.includes(u.email)}
+                            onChange={() => toggleEmail(u.email)}
+                            className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                          />
+                          <span className="text-xs text-torg-dark">{u.nome || u.email}</span>
+                          <span className="text-[10px] text-torg-gray ml-auto">{u.email}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {emailsSugeridos.length === 0 && !loadingEmails && (
+                    <p className="text-xs text-amber-600 py-1">Nenhum usuário encontrado para este setor. Adicione emails manualmente.</p>
+                  )}
+                </>
+              )}
+              {emailsSelecionados.filter((e) => !emailsSugeridos.some((s) => s.email === e)).length > 0 && (
+                <div className="space-y-1 mb-2">
+                  <p className="text-[10px] text-torg-gray">Adicionados manualmente:</p>
+                  {emailsSelecionados
+                    .filter((e) => !emailsSugeridos.some((s) => s.email === e))
+                    .map((email) => (
+                      <div key={email} className="flex items-center gap-2 px-2 py-1.5 rounded bg-blue-50">
+                        <span className="text-xs text-torg-dark">{email}</span>
+                        <button onClick={() => toggleEmail(email)} className="ml-auto text-red-400 hover:text-red-600">
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="email"
+                  value={emailExtra}
+                  onChange={(e) => setEmailExtra(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addEmailExtra()}
+                  placeholder="Adicionar outro email..."
+                  className="flex-1 text-xs px-2.5 py-1.5 border border-gray-200 rounded bg-white outline-none focus:border-torg-blue"
+                />
+                <button
+                  onClick={addEmailExtra}
+                  disabled={!emailExtra.includes("@")}
+                  className="px-2 py-1.5 text-xs text-torg-blue hover:bg-torg-blue-50 rounded disabled:opacity-30"
+                >
+                  Adicionar
+                </button>
+              </div>
+            </div>
+            <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+              <p className="text-[10px] text-amber-700">
+                O email incluirá a lista de tarefas atrasadas e um link para o setor informar a nova data prevista de cada atividade.
+              </p>
+            </div>
+          </div>
+          <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2 bg-gray-50/50">
+            <button onClick={() => setShowCobrModal(false)} disabled={cobrando} className="px-3 py-1.5 text-xs text-torg-gray hover:text-torg-dark">
+              Cancelar
+            </button>
+            <button
+              onClick={enviarCobranca}
+              disabled={cobrando || emailsSelecionados.length === 0}
+              className="px-4 py-1.5 text-xs font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {cobrando ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+              Enviar para {emailsSelecionados.length} destinatário{emailsSelecionados.length !== 1 ? "s" : ""}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 
   async function adicionarTarefa() {
@@ -1293,6 +1434,8 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
   const [pesoPlan, setPesoPlan] = useState(tarefa.qtdePlanejada || 0);
   const [pesoReal, setPesoReal] = useState(tarefa.qtdeRealizada || 0);
   const [antecessoraIds, setAntecessoraIds] = useState(tarefa.antecessoraIds || []);
+  const [dataLib, setDataLib] = useState(tarefa.dataLiberacao ? new Date(tarefa.dataLiberacao).toISOString().split("T")[0] : "");
+  const [motivoBlq, setMotivoBlq] = useState(tarefa.motivoBloqueio || "");
   const [saving, setSaving] = useState(false);
   const [showReg, setShowReg] = useState(false);
   const [regText, setRegText] = useState("");
@@ -1325,6 +1468,9 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
       if (pesoReal !== t.qtdeRealizada) body.qtdeRealizada = pesoReal;
       // Antecessoras — sempre envia pra garantir persistencia
       body.antecessoraIds = antecessoraIds;
+      // Liberação e motivo de bloqueio
+      body.dataLiberacao = dataLib ? new Date(dataLib + "T12:00:00Z").toISOString() : null;
+      body.motivoBloqueio = motivoBlq || null;
       const res = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1389,6 +1535,8 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
     setPesoPlan(t.qtdePlanejada || 0);
     setPesoReal(t.qtdeRealizada || 0);
     setAntecessoraIds(t.antecessoraIds || []);
+    setDataLib(t.dataLiberacao ? new Date(t.dataLiberacao).toISOString().split("T")[0] : "");
+    setMotivoBlq(t.motivoBloqueio || "");
   };
 
   return (
@@ -1429,6 +1577,16 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
           {t.dataRealizacao && !editing && (
             <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
               <CheckCircle2 size={9} /> {new Date(t.dataRealizacao).toLocaleDateString("pt-BR")}
+            </span>
+          )}
+          {t.dataLiberacao && !editing && (
+            <span className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0" title={t.motivoBloqueio || "Liberação externa"}>
+              <Lock size={8} /> Liberada {new Date(t.dataLiberacao).toLocaleDateString("pt-BR")}
+            </span>
+          )}
+          {t.motivoBloqueio && !t.dataLiberacao && !editing && (
+            <span className="text-[9px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0" title={t.motivoBloqueio}>
+              <Lock size={8} /> {t.motivoBloqueio.length > 30 ? t.motivoBloqueio.slice(0, 30) + "…" : t.motivoBloqueio}
             </span>
           )}
         </div>
@@ -1581,6 +1739,38 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
                   </option>
                 ))}
             </select>
+          </div>
+          {/* Liberação / Bloqueio externo */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Lock size={11} className="text-amber-500" />
+              <span className="text-[10px] text-torg-gray font-medium">Bloqueio / Liberação externa:</span>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-torg-gray whitespace-nowrap">Data liberação:</span>
+                <input
+                  type="date"
+                  value={dataLib}
+                  onChange={(e) => setDataLib(e.target.value)}
+                  className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
+                />
+                {dataLib && (
+                  <button onClick={() => setDataLib("")} className="text-[9px] text-red-400 hover:text-red-600">limpar</button>
+                )}
+              </div>
+              <input
+                value={motivoBlq}
+                onChange={(e) => setMotivoBlq(e.target.value)}
+                placeholder="Motivo do bloqueio (ex: aguardando aditivo)..."
+                className="flex-1 min-w-[180px] text-[10px] px-2 py-1 border border-gray-200 rounded bg-white"
+              />
+            </div>
+            {dataLib && (
+              <p className="text-[9px] text-amber-600 italic">
+                ⚠ Ao salvar, o sistema recalculará as datas mantendo a duração original a partir de {new Date(dataLib + "T12:00:00Z").toLocaleDateString("pt-BR")}.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <input

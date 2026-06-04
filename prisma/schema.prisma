@@ -26,6 +26,7 @@ model User {
   consultaItensRespondidos ConsultaEstoqueItem[] @relation("ConsultaItemRespondidoPor")
   cronogramaRegistros      CronogramaRegistro[]  @relation("CronogramaRegistroCreatedBy")
   cronogramaRevisoes       CronogramaRevisao[]   @relation("CronogramaRevisaoCreatedBy")
+  cronogramaCobrancas      CronogramaCobranca[]  @relation("CobrancaCreatedBy")
   necessidadesSemanais     NecessidadeSemanal[]  @relation("NecessidadeSemanalCreatedBy")
   notificacoes             Notificacao[]
   opsCriadas               OP[]                  @relation("OPCreatedBy")
@@ -1954,6 +1955,7 @@ model Cronograma {
   op             OP?                  @relation(fields: [opId], references: [id])
   tarefas        CronogramaTarefa[]
   revisoes       CronogramaRevisao[]
+  cobrancas      CronogramaCobranca[]
 
   @@index([opNumero])
   @@index([ativo])
@@ -1977,6 +1979,8 @@ model CronogramaTarefa {
   outlineLevel        Int                     @default(0)
   parentUid           Int?
   antecessoraIds      String[]  @default([])  // IDs de tarefas predecessoras (finish-to-start)
+  dataLiberacao       DateTime?               // Data em que a tarefa foi liberada (desbloqueio externo)
+  motivoBloqueio      String?                 // Ex: "Aguardando assinatura do aditivo"
   observacao          String?
   dataRealizacao      DateTime?
   createdAt           DateTime                @default(now())
@@ -2014,6 +2018,27 @@ model CronogramaRevisao {
 
   @@index([cronogramaId])
   @@index([createdAt])
+}
+
+// Cobranca por email — cada envio gera um token publico para o setor responder com novas datas
+model CronogramaCobranca {
+  id              String     @id @default(cuid())
+  token           String     @unique @default(cuid())
+  cronogramaId    String
+  departamento    String
+  emailsEnviados  String[]   // Para quem foi enviado
+  tarefaIds       String[]   // IDs das tarefas cobradas (atrasadas no momento do envio)
+  respondido      Boolean    @default(false)
+  respostas       Json?      // [{ tarefaId, novaData, comentario }]
+  createdById     String
+  createdAt       DateTime   @default(now())
+  respondidoAt    DateTime?
+  respondidoPor   String?    // Nome/email de quem respondeu
+  cronograma      Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+  createdBy       User       @relation("CobrancaCreatedBy", fields: [createdById], references: [id])
+
+  @@index([cronogramaId])
+  @@index([token])
 }
 
 model TarefaPlanejamento {

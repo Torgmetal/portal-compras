@@ -43,7 +43,10 @@ export default withAuth(
           // Sync MES — autenticado por Bearer API key própria (não NextAuth)
           path.startsWith("/api/mes/") ||
           // Sync LPC SharePoint — auth própria (Bearer MES_SYNC_API_KEY ou sessão no handler)
-          path.startsWith("/api/producao/pecas/sync-lpc-sharepoint")
+          path.startsWith("/api/producao/pecas/sync-lpc-sharepoint") ||
+          // Resposta de cobranca de cronograma — publico via token
+          path.startsWith("/planejamento/cronogramas/resposta/") ||
+          path.startsWith("/api/planejamento/cronogramas/cobranca/")
         ) {
           return true;
         }
