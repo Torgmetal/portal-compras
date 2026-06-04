@@ -7,6 +7,7 @@ import {
   Send, X, Briefcase, Wrench, ShoppingCart, Factory, Truck, HardHat,
   GanttChart, Package, FileText, CircleDot, Mail, Calendar,
   History, FileDown, Milestone, Plus, Trash2, Weight, BarChart3,
+  List, Link2, Unlink, RotateCcw,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -635,9 +636,28 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
   const [newFim, setNewFim] = useState("");
   const [savingGlobal, setSavingGlobal] = useState(false);
   const [showImportPeso, setShowImportPeso] = useState(false);
+  const [viewMode, setViewMode] = useState("lista"); // "lista" | "gantt"
+  const [recalculando, setRecalculando] = useState(false);
+  const [recalcMsg, setRecalcMsg] = useState(null);
 
   const now = new Date();
   const tarefas = detail.tarefas || [];
+
+  const recalcular = async () => {
+    setRecalculando(true);
+    setRecalcMsg(null);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/recalcular`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao recalcular");
+      setRecalcMsg({ ok: true, msg: data.message });
+      if (data.alteracoes > 0) onRefresh();
+    } catch (e) {
+      setRecalcMsg({ ok: false, msg: e.message });
+    } finally {
+      setRecalculando(false);
+    }
+  };
 
   const byDept = {};
 
@@ -680,29 +700,79 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
   // Verifica se alguma tarefa ja tem peso
   const temPeso = tarefas.some((t) => t.qtdePlanejada > 0);
 
+  // Conta tarefas com antecessoras
+  const temAntecessoras = tarefas.some((t) => t.antecessoraIds?.length > 0);
+
   return (
     <div className="divide-y divide-gray-50">
-      {/* Botão Importar Peso */}
+      {/* Barra de controles: Peso + View toggle + Recalcular */}
       {hasTarefas && (
-        <div className="px-4 py-2.5 bg-gray-50/40 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Weight size={13} className="text-torg-blue" />
-            <span className="text-xs text-torg-gray">
-              {temPeso ? "Peso importado nas tarefas" : "Sem peso vinculado — importe da lista de peças"}
-            </span>
+        <div className="px-4 py-2.5 bg-gray-50/40 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Weight size={13} className="text-torg-blue" />
+              <span className="text-xs text-torg-gray">
+                {temPeso ? "Peso importado" : "Sem peso"}
+              </span>
+            </div>
+            <button
+              onClick={() => setShowImportPeso(true)}
+              className="px-3 py-1.5 text-[10px] font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 flex items-center gap-1.5"
+            >
+              <Download size={11} /> {temPeso ? "Atualizar Pesos" : "Importar Peso"}
+            </button>
           </div>
-          <button
-            onClick={() => setShowImportPeso(true)}
-            className="px-3 py-1.5 text-[10px] font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 flex items-center gap-1.5"
-          >
-            <Download size={11} /> {temPeso ? "Atualizar Pesos" : "Importar Peso da OP"}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Recalcular datas */}
+            <button
+              onClick={recalcular}
+              disabled={recalculando}
+              className="px-3 py-1.5 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 flex items-center gap-1.5 disabled:opacity-50"
+              title="Recalcula datas das tarefas baseado nas antecessoras. Tarefas atrasadas empurram as sucessoras."
+            >
+              {recalculando ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+              Recalcular Datas
+            </button>
+            {/* Toggle lista / gantt */}
+            <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode("lista")}
+                className={`px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-colors ${
+                  viewMode === "lista" ? "bg-torg-blue text-white" : "text-torg-gray hover:text-torg-dark"
+                }`}
+              >
+                <List size={11} /> Lista
+              </button>
+              <button
+                onClick={() => setViewMode("gantt")}
+                className={`px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-colors ${
+                  viewMode === "gantt" ? "bg-torg-blue text-white" : "text-torg-gray hover:text-torg-dark"
+                }`}
+              >
+                <GanttChart size={11} /> Gantt
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {Object.entries(byDept).map(([dept, { summary, tasks }]) => (
-        <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} />
-      ))}
+      {recalcMsg && (
+        <div className={`px-4 py-2 text-xs flex items-center gap-1.5 ${recalcMsg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+          {recalcMsg.ok ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+          {recalcMsg.msg}
+          <button onClick={() => setRecalcMsg(null)} className="ml-auto p-0.5 hover:opacity-70"><X size={10} /></button>
+        </div>
+      )}
+
+      {viewMode === "gantt" && hasTarefas ? (
+        <GanttInline tarefas={tarefas} detail={detail} />
+      ) : (
+        <>
+          {Object.entries(byDept).map(([dept, { summary, tasks }]) => (
+            <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} />
+          ))}
+        </>
+      )}
 
       {!hasTarefas && !addingGlobal && (
         <div className="py-8 text-center">
@@ -1030,7 +1100,7 @@ function ImportarPesoModal({ cronogramaId, onClose, onImported }) {
   );
 }
 
-function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId }) {
+function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTarefas }) {
   const [collapsed, setCollapsed] = useState(false);
   const [cobrando, setCobrando] = useState(false);
   const [cobrResult, setCobrResult] = useState(null);
@@ -1113,7 +1183,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId }) {
       {!collapsed && (
         <div className="ml-6 space-y-1">
           {tasks.map((t) => (
-            <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} />
+            <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} />
           ))}
           {tasks.length === 0 && (
             <p className="text-xs text-torg-gray italic py-2">Nenhuma tarefa neste departamento.</p>
@@ -1204,7 +1274,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId }) {
   }
 }
 
-function TarefaRow({ tarefa, now, onRefresh }) {
+function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
   const [editing, setEditing] = useState(false);
   const [editNome, setEditNome] = useState(tarefa.nome);
   const [pct, setPct] = useState(tarefa.percentualRealizado);
@@ -1213,6 +1283,7 @@ function TarefaRow({ tarefa, now, onRefresh }) {
   const [justificativa, setJustificativa] = useState("");
   const [pesoPlan, setPesoPlan] = useState(tarefa.qtdePlanejada || 0);
   const [pesoReal, setPesoReal] = useState(tarefa.qtdeRealizada || 0);
+  const [antecessoraIds, setAntecessoraIds] = useState(tarefa.antecessoraIds || []);
   const [saving, setSaving] = useState(false);
   const [showReg, setShowReg] = useState(false);
   const [regText, setRegText] = useState("");
@@ -1236,6 +1307,10 @@ function TarefaRow({ tarefa, now, onRefresh }) {
       if (justificativa.trim()) body.justificativa = justificativa.trim();
       if (pesoPlan !== t.qtdePlanejada) body.qtdePlanejada = pesoPlan;
       if (pesoReal !== t.qtdeRealizada) body.qtdeRealizada = pesoReal;
+      // Antecessoras — sempre envia se mudou
+      const origIds = (t.antecessoraIds || []).join(",");
+      const newIds = antecessoraIds.join(",");
+      if (origIds !== newIds) body.antecessoraIds = antecessoraIds;
       const res = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1295,6 +1370,7 @@ function TarefaRow({ tarefa, now, onRefresh }) {
     setJustificativa("");
     setPesoPlan(t.qtdePlanejada || 0);
     setPesoReal(t.qtdeRealizada || 0);
+    setAntecessoraIds(t.antecessoraIds || []);
   };
 
   return (
@@ -1320,6 +1396,11 @@ function TarefaRow({ tarefa, now, onRefresh }) {
             </span>
           )}
           {t.isSummary && <span className="text-[9px] text-torg-gray bg-gray-100 px-1 rounded">grupo</span>}
+          {!editing && t.antecessoraIds?.length > 0 && (
+            <span className="text-[9px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0" title={`Depende de: ${t.antecessoraIds.map((aid) => { const ant = (allTarefas || []).find((x) => x.id === aid); return ant?.nome || aid.slice(0, 6); }).join(", ")}`}>
+              <Link2 size={8} /> {t.antecessoraIds.length} antecessora{t.antecessoraIds.length > 1 ? "s" : ""}
+            </span>
+          )}
           {t.dataRealizacao && !editing && (
             <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
               <CheckCircle2 size={9} /> {new Date(t.dataRealizacao).toLocaleDateString("pt-BR")}
@@ -1434,6 +1515,47 @@ function TarefaRow({ tarefa, now, onRefresh }) {
               />
               <span className="text-[9px] text-torg-gray">kg</span>
             </div>
+          </div>
+          {/* Antecessoras */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Link2 size={11} className="text-purple-500" />
+              <span className="text-[10px] text-torg-gray font-medium">Antecessoras (depende de):</span>
+            </div>
+            {antecessoraIds.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {antecessoraIds.map((aid) => {
+                  const ant = (allTarefas || []).find((x) => x.id === aid);
+                  return (
+                    <span key={aid} className="inline-flex items-center gap-1 text-[9px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
+                      {ant?.nome || aid.slice(0, 8)}
+                      <button onClick={() => setAntecessoraIds((prev) => prev.filter((x) => x !== aid))} className="hover:text-red-500">
+                        <X size={8} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value && !antecessoraIds.includes(e.target.value)) {
+                  setAntecessoraIds((prev) => [...prev, e.target.value]);
+                }
+                e.target.value = "";
+              }}
+              className="text-[10px] px-2 py-1 border border-gray-200 rounded bg-white w-full max-w-xs"
+            >
+              <option value="">+ Adicionar antecessora...</option>
+              {(allTarefas || [])
+                .filter((x) => x.id !== t.id && !x.isSummary && x.outlineLevel > 1 && !antecessoraIds.includes(x.id))
+                .map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {DEPT_LABEL[x.departamento] || x.departamento} — {x.nome}
+                  </option>
+                ))}
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -1966,6 +2088,244 @@ function ProducaoTab({ cronogramaId }) {
   );
 }
 
+// ── Gantt Inline ──────────────────────────────────────────────────
+function GanttInline({ tarefas, detail }) {
+  const allTasks = tarefas.filter((t) => t.outlineLevel > 0 && t.departamento && !t.isSummary);
+  if (allTasks.length === 0) {
+    return (
+      <div className="py-8 text-center">
+        <GanttChart size={28} className="mx-auto text-gray-300 mb-2" />
+        <p className="text-sm text-torg-gray">Nenhuma tarefa com datas para exibir.</p>
+      </div>
+    );
+  }
+
+  // Range de datas
+  let minDate = Infinity, maxDate = -Infinity;
+  for (const t of allTasks) {
+    if (t.dataInicioPrevista) minDate = Math.min(minDate, new Date(t.dataInicioPrevista).getTime());
+    if (t.dataFimPrevista) maxDate = Math.max(maxDate, new Date(t.dataFimPrevista).getTime());
+    if (t.dataInicioBase) minDate = Math.min(minDate, new Date(t.dataInicioBase).getTime());
+    if (t.dataFimBase) maxDate = Math.max(maxDate, new Date(t.dataFimBase).getTime());
+  }
+  if (!isFinite(minDate) || !isFinite(maxDate)) {
+    return <div className="py-6 text-center text-xs text-torg-gray">Tarefas sem datas definidas.</div>;
+  }
+
+  // Padding 7 dias
+  minDate -= 7 * 86400000;
+  maxDate += 7 * 86400000;
+  const totalDays = Math.ceil((maxDate - minDate) / 86400000);
+  const dayWidth = Math.max(2, Math.min(10, 700 / totalDays));
+  const chartWidth = totalDays * dayWidth;
+  const rowH = 32;
+  const nameColW = 220;
+
+  const now = Date.now();
+  const todayPos = ((now - minDate) / 86400000) * dayWidth;
+
+  // Meses
+  const months = [];
+  const d0 = new Date(minDate);
+  let cur = new Date(d0.getFullYear(), d0.getMonth(), 1);
+  while (cur.getTime() < maxDate) {
+    const start = Math.max(0, (cur.getTime() - minDate) / 86400000);
+    const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    const end = Math.min(totalDays, (next.getTime() - minDate) / 86400000);
+    months.push({
+      label: cur.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
+      left: start * dayWidth,
+      width: (end - start) * dayWidth,
+    });
+    cur = next;
+  }
+
+  // Mapa de task index pra desenhar setas
+  const taskIdx = new Map(allTasks.map((t, i) => [t.id, i]));
+
+  const deptColors = {
+    COMERCIAL: "#2563eb",
+    ENGENHARIA: "#7c3aed",
+    SUPRIMENTOS: "#d97706",
+    FABRICACAO: "#059669",
+    EXPEDICAO: "#0d9488",
+    MONTAGEM: "#ea580c",
+  };
+
+  return (
+    <div className="overflow-x-auto">
+      <div style={{ minWidth: nameColW + chartWidth + 40 }} className="relative">
+        {/* Header meses */}
+        <div className="flex" style={{ height: 24 }}>
+          <div style={{ width: nameColW, flexShrink: 0 }} className="bg-gray-50 border-b border-gray-200 px-2 flex items-center">
+            <span className="text-[9px] font-semibold text-torg-gray uppercase">Tarefa</span>
+          </div>
+          <div className="relative flex-1 bg-gray-50 border-b border-gray-200" style={{ minWidth: chartWidth }}>
+            {months.map((m, i) => (
+              <div
+                key={i}
+                className="absolute text-[8px] font-semibold text-gray-500 border-l border-gray-200 flex items-center justify-center capitalize"
+                style={{ left: m.left, width: m.width, height: 24 }}
+              >
+                {m.width > 30 ? m.label : ""}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Rows */}
+        {allTasks.map((t, idx) => {
+          const color = deptColors[t.departamento] || "#6b7280";
+          const isLate = t.dataFimPrevista && new Date(t.dataFimPrevista) < new Date() && t.percentualRealizado < 100;
+          const isDone = t.percentualRealizado >= 100;
+
+          // Bar position
+          let barLeft = 0, barWidth = 0;
+          if (t.dataInicioPrevista && t.dataFimPrevista) {
+            barLeft = ((new Date(t.dataInicioPrevista).getTime() - minDate) / 86400000) * dayWidth;
+            barWidth = Math.max(4, ((new Date(t.dataFimPrevista).getTime() - new Date(t.dataInicioPrevista).getTime()) / 86400000) * dayWidth);
+          }
+
+          // Baseline bar
+          let baseLeft = 0, baseWidth = 0;
+          if (t.dataInicioBase && t.dataFimBase) {
+            baseLeft = ((new Date(t.dataInicioBase).getTime() - minDate) / 86400000) * dayWidth;
+            baseWidth = Math.max(4, ((new Date(t.dataFimBase).getTime() - new Date(t.dataInicioBase).getTime()) / 86400000) * dayWidth);
+          }
+
+          const fillWidth = barWidth * (t.percentualRealizado / 100);
+          const barColor = isLate ? "#dc2626" : color;
+          const hasAnt = t.antecessoraIds?.length > 0;
+
+          return (
+            <div
+              key={t.id}
+              className={`flex border-b ${isLate ? "bg-red-50/30" : idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
+              style={{ height: rowH }}
+            >
+              {/* Nome */}
+              <div
+                style={{ width: nameColW, flexShrink: 0 }}
+                className="px-2 flex items-center gap-1.5 overflow-hidden"
+              >
+                {isDone ? (
+                  <CheckCircle2 size={10} className="text-emerald-500 shrink-0" />
+                ) : isLate ? (
+                  <AlertTriangle size={10} className="text-red-500 shrink-0" />
+                ) : (
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+                )}
+                <span className={`text-[10px] truncate ${isDone ? "text-torg-gray line-through" : "text-torg-dark"}`} title={t.nome}>
+                  {t.nome}
+                </span>
+                {hasAnt && <Link2 size={8} className="text-purple-400 shrink-0" />}
+                <span className={`text-[9px] font-bold ml-auto shrink-0 ${isDone ? "text-emerald-600" : isLate ? "text-red-600" : "text-torg-gray"}`}>
+                  {t.percentualRealizado}%
+                </span>
+              </div>
+
+              {/* Chart area */}
+              <div className="relative flex-1" style={{ minWidth: chartWidth }}>
+                {/* Month grid lines */}
+                {months.map((m, mi) => (
+                  <div key={mi} className="absolute top-0 bottom-0 border-l border-gray-100" style={{ left: m.left }} />
+                ))}
+
+                {/* Today line */}
+                {todayPos > 0 && todayPos < chartWidth && (
+                  <div className="absolute top-0 bottom-0 bg-orange-400 z-10" style={{ left: todayPos, width: 1.5, opacity: 0.5 }} />
+                )}
+
+                {/* Baseline bar */}
+                {baseWidth > 0 && (
+                  <div
+                    className="absolute rounded-sm"
+                    style={{
+                      left: baseLeft, width: baseWidth,
+                      top: 4, height: 6,
+                      background: "#94a3b8", opacity: 0.3,
+                    }}
+                  />
+                )}
+
+                {/* Current bar */}
+                {barWidth > 0 && (
+                  <div
+                    className="absolute rounded overflow-hidden"
+                    style={{
+                      left: barLeft, width: barWidth,
+                      top: baseWidth > 0 ? 12 : 8, height: 14,
+                      background: `${barColor}15`, border: `1.5px solid ${barColor}`,
+                    }}
+                  >
+                    <div
+                      style={{ width: fillWidth, height: "100%", background: barColor, opacity: 0.7, borderRadius: "2px 0 0 2px" }}
+                    />
+                  </div>
+                )}
+
+                {/* Dependency arrows — draw line from predecessor end to this task start */}
+                {hasAnt && t.dataInicioPrevista && (t.antecessoraIds || []).map((antId) => {
+                  const antIdx = taskIdx.get(antId);
+                  const ant = allTasks[antIdx];
+                  if (!ant || !ant.dataFimPrevista) return null;
+                  const antEnd = ((new Date(ant.dataFimPrevista).getTime() - minDate) / 86400000) * dayWidth;
+                  const thisStart = barLeft;
+                  // Vertical distance between rows
+                  const fromY = (antIdx - idx) * rowH;
+                  // Simple connector: horizontal then vertical
+                  return (
+                    <svg
+                      key={antId}
+                      className="absolute pointer-events-none z-20"
+                      style={{ left: 0, top: 0, width: chartWidth, height: rowH, overflow: "visible" }}
+                    >
+                      {/* Line from ant end to this task start */}
+                      <path
+                        d={`M ${antEnd} ${fromY + rowH / 2} L ${antEnd + 6} ${fromY + rowH / 2} L ${antEnd + 6} ${rowH / 2} L ${thisStart} ${rowH / 2}`}
+                        fill="none"
+                        stroke="#8b5cf6"
+                        strokeWidth="1.2"
+                        strokeDasharray="3,2"
+                        opacity="0.6"
+                      />
+                      {/* Arrowhead */}
+                      <polygon
+                        points={`${thisStart},${rowH / 2} ${thisStart - 5},${rowH / 2 - 3} ${thisStart - 5},${rowH / 2 + 3}`}
+                        fill="#8b5cf6"
+                        opacity="0.6"
+                      />
+                    </svg>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Legenda */}
+        <div className="px-3 py-2 bg-gray-50/40 border-t border-gray-100 flex items-center gap-4 flex-wrap">
+          {Object.entries(deptColors).filter(([d]) => allTasks.some((t) => t.departamento === d)).map(([d, c]) => (
+            <span key={d} className="flex items-center gap-1 text-[9px] text-torg-gray">
+              <div className="w-2.5 h-2.5 rounded-sm" style={{ background: c }} />
+              {DEPT_LABEL[d]}
+            </span>
+          ))}
+          <span className="flex items-center gap-1 text-[9px] text-torg-gray">
+            <div className="w-3 h-1.5 rounded-sm bg-gray-400 opacity-40" /> Baseline
+          </span>
+          <span className="flex items-center gap-1 text-[9px] text-orange-500">
+            <div className="w-0.5 h-3 bg-orange-400" /> Hoje
+          </span>
+          <span className="flex items-center gap-1 text-[9px] text-purple-500">
+            <Link2 size={8} /> Dependência
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HistoricoTab({ revisoes }) {
   if (revisoes.length === 0) {
     return (
@@ -2143,12 +2503,16 @@ function exportarGanttPDF(detail) {
 
       // Realização badge
       const realBadge = t.dataRealizacao ? `<span style="color:#059669;font-weight:600;"> ✓</span>` : "";
+      // Dependencia badge
+      const depBadge = (t.antecessoraIds?.length > 0)
+        ? `<span style="color:#7c3aed;font-size:8px;font-weight:600;margin-left:2px;">🔗${t.antecessoraIds.length}</span>`
+        : "";
 
       const nome = isSummary ? `<b style="color:${dc.text};">${t.nome}</b>` : t.nome;
       rowsHtml += `<div style="display:flex;height:${rowHeight}px;border-bottom:1px solid #f1f5f9;background:${bg};align-items:center;">` +
         // Nome
         `<div style="width:${labelWidth}px;padding:0 8px 0 ${12 + indent}px;display:flex;align-items:center;gap:4px;flex-shrink:0;overflow:hidden;">` +
-          `<span style="font-size:10.5px;color:${isLate ? '#dc2626' : '#334155'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${isSummary ? '' : 'font-weight:400;'}">${nome}${realBadge}</span>` +
+          `<span style="font-size:10.5px;color:${isLate ? '#dc2626' : '#334155'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${isSummary ? '' : 'font-weight:400;'}">${nome}${realBadge}${depBadge}</span>` +
         `</div>` +
         // Percentual
         `<div style="width:${pctWidth}px;text-align:center;flex-shrink:0;">` +

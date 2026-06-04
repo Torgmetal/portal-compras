@@ -13,6 +13,7 @@ const patchSchema = z.object({
   justificativa: z.string().max(500).optional(),
   qtdePlanejada: z.number().min(0).optional(),
   qtdeRealizada: z.number().min(0).optional(),
+  antecessoraIds: z.array(z.string()).optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -63,6 +64,11 @@ export async function PATCH(req, { params }) {
     diffAntes.qtdeRealizada = tarefa.qtdeRealizada;
     diffDepois.qtdeRealizada = parsed.data.qtdeRealizada;
     data.qtdeRealizada = parsed.data.qtdeRealizada;
+  }
+  if (parsed.data.antecessoraIds !== undefined) {
+    // Valida: nao pode ser antecessora de si mesma
+    const ids = parsed.data.antecessoraIds.filter((aid) => aid !== id);
+    data.antecessoraIds = ids;
   }
   if (parsed.data.observacao !== undefined) data.observacao = parsed.data.observacao;
   if (parsed.data.dataRealizacao !== undefined) {
