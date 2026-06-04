@@ -1316,10 +1316,8 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
       if (justificativa.trim()) body.justificativa = justificativa.trim();
       if (pesoPlan !== t.qtdePlanejada) body.qtdePlanejada = pesoPlan;
       if (pesoReal !== t.qtdeRealizada) body.qtdeRealizada = pesoReal;
-      // Antecessoras — sempre envia se mudou
-      const origIds = (t.antecessoraIds || []).join(",");
-      const newIds = antecessoraIds.join(",");
-      if (origIds !== newIds) body.antecessoraIds = antecessoraIds;
+      // Antecessoras — sempre envia pra garantir persistencia
+      body.antecessoraIds = antecessoraIds;
       const res = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

@@ -1976,7 +1976,7 @@ model CronogramaTarefa {
   isSummary           Boolean                 @default(false)
   outlineLevel        Int                     @default(0)
   parentUid           Int?
-  antecessoraIds      String[]                // IDs de tarefas predecessoras (finish-to-start)
+  antecessoraIds      String[]  @default([])  // IDs de tarefas predecessoras (finish-to-start)
   observacao          String?
   dataRealizacao      DateTime?
   createdAt           DateTime                @default(now())
