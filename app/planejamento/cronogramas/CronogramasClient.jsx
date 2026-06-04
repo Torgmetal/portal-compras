@@ -37,6 +37,9 @@ const DEPT_LABEL = {
   MONTAGEM: "Montagem",
 };
 
+// Ordem fixa dos departamentos — Comercial sempre primeiro
+const DEPT_ORDER = ["COMERCIAL", "ENGENHARIA", "SUPRIMENTOS", "FABRICACAO", "EXPEDICAO", "MONTAGEM"];
+
 const fmtData = (d) => {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
@@ -768,9 +771,15 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
         <GanttInline tarefas={tarefas} detail={detail} />
       ) : (
         <>
-          {Object.entries(byDept).map(([dept, { summary, tasks }]) => (
-            <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} />
-          ))}
+          {DEPT_ORDER.filter((d) => byDept[d]).map((dept) => {
+            const { summary, tasks } = byDept[dept];
+            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} />;
+          })}
+          {/* Departamentos fora da ordem padrao (se houver) */}
+          {Object.keys(byDept).filter((d) => !DEPT_ORDER.includes(d)).map((dept) => {
+            const { summary, tasks } = byDept[dept];
+            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} />;
+          })}
         </>
       )}
 
@@ -2090,7 +2099,17 @@ function ProducaoTab({ cronogramaId }) {
 
 // ── Gantt Inline ──────────────────────────────────────────────────
 function GanttInline({ tarefas, detail }) {
-  const allTasks = tarefas.filter((t) => t.outlineLevel > 0 && t.departamento && !t.isSummary);
+  // Ordena por DEPT_ORDER (Comercial primeiro) e dentro do dept por uidMpp
+  const allTasks = tarefas
+    .filter((t) => t.outlineLevel > 0 && t.departamento && !t.isSummary)
+    .sort((a, b) => {
+      const ia = DEPT_ORDER.indexOf(a.departamento);
+      const ib = DEPT_ORDER.indexOf(b.departamento);
+      const oa = ia >= 0 ? ia : 99;
+      const ob = ib >= 0 ? ib : 99;
+      if (oa !== ob) return oa - ob;
+      return (a.uidMpp || 0) - (b.uidMpp || 0);
+    });
   if (allTasks.length === 0) {
     return (
       <div className="py-8 text-center">
@@ -2432,16 +2451,23 @@ function exportarGanttPDF(detail) {
   const dataBaseLine = detail.dataBase ? ((new Date(detail.dataBase).getTime() - minDate) / 86400000) * dayWidth : null;
 
   // Agrupa tarefas por departamento
-  const byDept = {};
+  const byDeptPdf = {};
   for (const t of tarefas) {
-    if (!byDept[t.departamento]) byDept[t.departamento] = [];
-    byDept[t.departamento].push(t);
+    if (!byDeptPdf[t.departamento]) byDeptPdf[t.departamento] = [];
+    byDeptPdf[t.departamento].push(t);
   }
+
+  // Ordena departamentos: Comercial sempre primeiro, depois ordem fixa
+  const deptOrderPdf = [
+    ...DEPT_ORDER.filter((d) => byDeptPdf[d]),
+    ...Object.keys(byDeptPdf).filter((d) => !DEPT_ORDER.includes(d)),
+  ];
 
   // HTML dos rows com separadores de departamento
   let rowsHtml = "";
   let rowIdx = 0;
-  for (const [dept, tasks] of Object.entries(byDept)) {
+  for (const dept of deptOrderPdf) {
+    const tasks = byDeptPdf[dept];
     const dc = deptColors[dept] || { bar: "#6b7280", bg: "#f3f4f6", text: "#374151", label: dept };
     // Header do departamento
     rowsHtml += `<div style="display:flex;height:32px;background:${dc.bg};border-bottom:2px solid ${dc.bar};">` +
@@ -2553,7 +2579,7 @@ function exportarGanttPDF(detail) {
   }
 
   // Legenda departamentos
-  const deptLegend = Object.entries(deptColors).filter(([d]) => byDept[d]).map(([, dc]) =>
+  const deptLegend = Object.entries(deptColors).filter(([d]) => byDeptPdf[d]).map(([, dc]) =>
     `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:14px;font-size:9px;color:#475569;"><span style="width:10px;height:10px;background:${dc.bar};border-radius:2px;display:inline-block;"></span>${dc.label}</span>`
   ).join("");
 
