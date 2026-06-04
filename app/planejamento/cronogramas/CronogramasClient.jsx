@@ -2449,15 +2449,19 @@ function exportarGanttPDF(detail) {
     MONTAGEM: { bar: "#ea580c", bg: "#ffedd5", text: "#9a3412", label: "Montagem" },
   };
 
-  // Config
+  // Config — dimensionar pra caber em A4 landscape (~1080px usaveis)
   const rowHeight = 28;
-  const labelWidth = 320;
-  const pctWidth = 40;
-  const datesWidth = 110;
+  const labelWidth = 280;
+  const pctWidth = 36;
+  const datesWidth = 100;
   const tableLeft = labelWidth + pctWidth + datesWidth;
-  const dayWidth = Math.max(3, Math.min(14, 960 / totalDays));
+  const pageUsable = 1080; // A4 landscape ~297mm - 16mm margens ≈ 1080px
+  const chartAvail = pageUsable - tableLeft - 20;
+  const dayWidth = Math.max(2, Math.min(14, chartAvail / totalDays));
   const chartWidth = totalDays * dayWidth;
   const totalWidth = tableLeft + chartWidth + 20;
+  // Escala pra garantir que cabe na pagina mesmo com muitos dias
+  const printScale = totalWidth > pageUsable ? Math.floor((pageUsable / totalWidth) * 1000) / 1000 : 1;
 
   // Abre janela de impressao
   const win = window.open("", "_blank", `width=${Math.min(totalWidth + 60, 1500)},height=900`);
@@ -2509,7 +2513,7 @@ function exportarGanttPDF(detail) {
         `<div style="width:4px;height:18px;background:${dc.bar};border-radius:2px;"></div>` +
         `<span style="font-size:11px;font-weight:700;color:${dc.text};letter-spacing:0.3px;text-transform:uppercase;">${dc.label}</span>` +
       `</div>` +
-      `<div style="flex:1;min-width:${chartWidth}px;"></div>` +
+      `<div style="flex:0 0 ${chartWidth}px;"></div>` +
     `</div>`;
 
     for (const t of tasks) {
@@ -2583,7 +2587,7 @@ function exportarGanttPDF(detail) {
           `<span style="font-size:8.5px;color:#64748b;font-family:monospace;">${dateStr}</span>` +
         `</div>` +
         // Chart area
-        `<div style="flex:1;position:relative;min-width:${chartWidth}px;height:${rowHeight}px;">${baselineBar}${currentBar}</div>` +
+        `<div style="flex:0 0 ${chartWidth}px;position:relative;height:${rowHeight}px;">${baselineBar}${currentBar}</div>` +
       `</div>`;
       rowIdx++;
     }
@@ -2639,7 +2643,15 @@ function exportarGanttPDF(detail) {
   @page { size: landscape; margin: 8mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; margin: 0; padding: 20px; background: #fff; color: #1e293b; }
-  @media print { body { padding: 0; } .no-print { display: none !important; } }
+  @media print {
+    body { padding: 0; }
+    .no-print { display: none !important; }
+    .print-root {
+      transform: scale(${printScale});
+      transform-origin: top left;
+      width: ${Math.ceil(100 / printScale)}%;
+    }
+  }
   .info-label { font-size:10px; color:#64748b; font-weight:400; }
   .info-value { font-size:10px; color:#002945; font-weight:600; }
 </style></head><body>
@@ -2648,6 +2660,9 @@ function exportarGanttPDF(detail) {
 <div class="no-print" style="position:fixed;top:16px;right:16px;z-index:100;display:flex;gap:8px;">
   <button onclick="window.print()" style="padding:10px 24px;background:#006EAB;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,110,171,0.3);">Imprimir / Salvar PDF</button>
 </div>
+
+<!-- Content wrapper for print scaling -->
+<div class="print-root">
 
 <!-- Header -->
 <div style="margin-bottom:16px;">
@@ -2734,14 +2749,14 @@ function exportarGanttPDF(detail) {
 </div>
 
 <!-- Gantt Chart -->
-<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-  <div style="min-width:${totalWidth}px;">
+<div style="overflow:visible;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+  <div style="width:${totalWidth}px;">
     <!-- Table header -->
     <div style="display:flex;background:#002945;color:#fff;height:30px;align-items:center;">
       <div style="width:${labelWidth}px;padding:0 12px;font-size:10px;font-weight:600;flex-shrink:0;letter-spacing:0.3px;">TAREFA</div>
       <div style="width:${pctWidth}px;text-align:center;font-size:10px;font-weight:600;flex-shrink:0;">%</div>
       <div style="width:${datesWidth}px;text-align:center;font-size:10px;font-weight:600;flex-shrink:0;">PERÍODO</div>
-      <div style="flex:1;position:relative;min-width:${chartWidth}px;height:30px;">${monthsHtml}</div>
+      <div style="flex:0 0 ${chartWidth}px;position:relative;height:30px;">${monthsHtml}</div>
     </div>
     <!-- Rows -->
     <div style="position:relative;">
@@ -2766,6 +2781,8 @@ function exportarGanttPDF(detail) {
     Documento gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · <strong>${detail.opNumero || ""}</strong>
   </div>
 </div>
+
+</div><!-- /print-root -->
 
 </body></html>`;
 
