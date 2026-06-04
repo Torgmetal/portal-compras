@@ -1323,12 +1323,16 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Erro");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Erro ao salvar: ${err.error || "Erro desconhecido"}`);
+        return;
+      }
       setEditing(false);
       setJustificativa("");
       onRefresh();
-    } catch {
-      // keep editing
+    } catch (e) {
+      alert("Erro de conexão ao salvar.");
     } finally {
       setSaving(false);
     }

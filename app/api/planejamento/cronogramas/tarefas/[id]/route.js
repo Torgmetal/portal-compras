@@ -6,7 +6,7 @@ import { z } from "zod";
 const patchSchema = z.object({
   nome: z.string().min(1).max(200).optional(),
   percentualRealizado: z.number().min(0).max(100).optional(),
-  observacao: z.string().max(500).optional(),
+  observacao: z.string().max(500).nullable().optional(),
   dataRealizacao: z.string().datetime().nullable().optional(),
   dataInicioPrevista: z.string().datetime().nullable().optional(),
   dataFimPrevista: z.string().datetime().nullable().optional(),
