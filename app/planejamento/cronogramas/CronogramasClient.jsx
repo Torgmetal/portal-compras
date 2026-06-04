@@ -7,7 +7,7 @@ import {
   Send, X, Briefcase, Wrench, ShoppingCart, Factory, Truck, HardHat,
   GanttChart, Package, FileText, CircleDot, Mail, Calendar,
   History, FileDown, Milestone, Plus, Trash2, Weight, BarChart3,
-  List, Link2, Unlink, RotateCcw,
+  List, Link2, Unlink, RotateCcw, Lock,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -1304,6 +1304,13 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
   const concluida = t.percentualRealizado >= 100;
   const indent = Math.max(0, t.outlineLevel - 2);
 
+  // Verifica se esta tarefa esta bloqueada (tem antecessora nao concluida)
+  const antecessorasIncompletas = (t.antecessoraIds || []).filter((aid) => {
+    const ant = (allTarefas || []).find((x) => x.id === aid);
+    return ant && ant.percentualRealizado < 100;
+  });
+  const bloqueada = antecessorasIncompletas.length > 0 && !concluida;
+
   const salvar = async () => {
     setSaving(true);
     try {
@@ -1385,11 +1392,13 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
   };
 
   return (
-    <div className={`group rounded-lg border ${atrasada ? "border-red-200 bg-red-50/30" : "border-gray-100 bg-white"} p-2.5`} style={{ marginLeft: `${indent * 16}px` }}>
+    <div className={`group rounded-lg border ${bloqueada ? "border-amber-200 bg-amber-50/20" : atrasada ? "border-red-200 bg-red-50/30" : "border-gray-100 bg-white"} p-2.5`} style={{ marginLeft: `${indent * 16}px` }}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {concluida ? (
             <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+          ) : bloqueada ? (
+            <Lock size={14} className="text-amber-500 shrink-0" />
           ) : atrasada ? (
             <AlertTriangle size={14} className="text-red-500 shrink-0" />
           ) : (
@@ -1407,8 +1416,13 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
             </span>
           )}
           {t.isSummary && <span className="text-[9px] text-torg-gray bg-gray-100 px-1 rounded">grupo</span>}
+          {!editing && bloqueada && (
+            <span className="text-[9px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 font-semibold" title={`Aguardando: ${antecessorasIncompletas.map((aid) => { const ant = (allTarefas || []).find((x) => x.id === aid); return ant?.nome || "?"; }).join(", ")}`}>
+              <Lock size={8} /> Bloqueada
+            </span>
+          )}
           {!editing && t.antecessoraIds?.length > 0 && (
-            <span className="text-[9px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0" title={`Depende de: ${t.antecessoraIds.map((aid) => { const ant = (allTarefas || []).find((x) => x.id === aid); return ant?.nome || aid.slice(0, 6); }).join(", ")}`}>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 ${bloqueada ? "text-amber-600 bg-amber-50" : "text-purple-600 bg-purple-50"}`} title={`Depende de: ${t.antecessoraIds.map((aid) => { const ant = (allTarefas || []).find((x) => x.id === aid); return ant?.nome || aid.slice(0, 6); }).join(", ")}`}>
               <Link2 size={8} /> {t.antecessoraIds.length} antecessora{t.antecessoraIds.length > 1 ? "s" : ""}
             </span>
           )}
@@ -2199,6 +2213,13 @@ function GanttInline({ tarefas, detail }) {
           const color = deptColors[t.departamento] || "#6b7280";
           const isLate = t.dataFimPrevista && new Date(t.dataFimPrevista) < new Date() && t.percentualRealizado < 100;
           const isDone = t.percentualRealizado >= 100;
+          const hasAnt = t.antecessoraIds?.length > 0;
+
+          // Bloqueada = tem antecessora nao concluida
+          const isBlocked = hasAnt && !isDone && (t.antecessoraIds || []).some((aid) => {
+            const ant = allTasks.find((x) => x.id === aid);
+            return ant && ant.percentualRealizado < 100;
+          });
 
           // Bar position
           let barLeft = 0, barWidth = 0;
@@ -2215,13 +2236,12 @@ function GanttInline({ tarefas, detail }) {
           }
 
           const fillWidth = barWidth * (t.percentualRealizado / 100);
-          const barColor = isLate ? "#dc2626" : color;
-          const hasAnt = t.antecessoraIds?.length > 0;
+          const barColor = isBlocked ? "#d97706" : isLate ? "#dc2626" : color;
 
           return (
             <div
               key={t.id}
-              className={`flex border-b ${isLate ? "bg-red-50/30" : idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
+              className={`flex border-b ${isBlocked ? "bg-amber-50/30" : isLate ? "bg-red-50/30" : idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
               style={{ height: rowH }}
             >
               {/* Nome */}
@@ -2231,16 +2251,19 @@ function GanttInline({ tarefas, detail }) {
               >
                 {isDone ? (
                   <CheckCircle2 size={10} className="text-emerald-500 shrink-0" />
+                ) : isBlocked ? (
+                  <Lock size={10} className="text-amber-500 shrink-0" />
                 ) : isLate ? (
                   <AlertTriangle size={10} className="text-red-500 shrink-0" />
                 ) : (
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
                 )}
-                <span className={`text-[10px] truncate ${isDone ? "text-torg-gray line-through" : "text-torg-dark"}`} title={t.nome}>
+                <span className={`text-[10px] truncate ${isDone ? "text-torg-gray line-through" : isBlocked ? "text-amber-700" : "text-torg-dark"}`} title={t.nome}>
                   {t.nome}
                 </span>
-                {hasAnt && <Link2 size={8} className="text-purple-400 shrink-0" />}
-                <span className={`text-[9px] font-bold ml-auto shrink-0 ${isDone ? "text-emerald-600" : isLate ? "text-red-600" : "text-torg-gray"}`}>
+                {isBlocked && <span className="text-[7px] text-amber-600 font-bold shrink-0">BLOQ</span>}
+                {hasAnt && !isBlocked && <Link2 size={8} className="text-purple-400 shrink-0" />}
+                <span className={`text-[9px] font-bold ml-auto shrink-0 ${isDone ? "text-emerald-600" : isBlocked ? "text-amber-600" : isLate ? "text-red-600" : "text-torg-gray"}`}>
                   {t.percentualRealizado}%
                 </span>
               </div>
@@ -2276,7 +2299,9 @@ function GanttInline({ tarefas, detail }) {
                     style={{
                       left: barLeft, width: barWidth,
                       top: baseWidth > 0 ? 12 : 8, height: 14,
-                      background: `${barColor}15`, border: `1.5px solid ${barColor}`,
+                      background: isBlocked ? `repeating-linear-gradient(45deg, ${barColor}10, ${barColor}10 3px, ${barColor}25 3px, ${barColor}25 6px)` : `${barColor}15`,
+                      border: `1.5px solid ${barColor}`,
+                      borderStyle: isBlocked ? "dashed" : "solid",
                     }}
                   >
                     <div
@@ -2285,36 +2310,35 @@ function GanttInline({ tarefas, detail }) {
                   </div>
                 )}
 
-                {/* Dependency arrows — draw line from predecessor end to this task start */}
+                {/* Dependency arrows — solid line from predecessor end to this task start */}
                 {hasAnt && t.dataInicioPrevista && (t.antecessoraIds || []).map((antId) => {
                   const antIdx = taskIdx.get(antId);
+                  if (antIdx === undefined) return null;
                   const ant = allTasks[antIdx];
                   if (!ant || !ant.dataFimPrevista) return null;
                   const antEnd = ((new Date(ant.dataFimPrevista).getTime() - minDate) / 86400000) * dayWidth;
                   const thisStart = barLeft;
-                  // Vertical distance between rows
                   const fromY = (antIdx - idx) * rowH;
-                  // Simple connector: horizontal then vertical
+                  const antDone = ant.percentualRealizado >= 100;
+                  const lineColor = antDone ? "#10b981" : "#d97706";
                   return (
                     <svg
                       key={antId}
                       className="absolute pointer-events-none z-20"
                       style={{ left: 0, top: 0, width: chartWidth, height: rowH, overflow: "visible" }}
                     >
-                      {/* Line from ant end to this task start */}
                       <path
-                        d={`M ${antEnd} ${fromY + rowH / 2} L ${antEnd + 6} ${fromY + rowH / 2} L ${antEnd + 6} ${rowH / 2} L ${thisStart} ${rowH / 2}`}
+                        d={`M ${antEnd} ${fromY + rowH / 2} L ${antEnd + 8} ${fromY + rowH / 2} L ${antEnd + 8} ${rowH / 2} L ${thisStart} ${rowH / 2}`}
                         fill="none"
-                        stroke="#8b5cf6"
-                        strokeWidth="1.2"
-                        strokeDasharray="3,2"
-                        opacity="0.6"
+                        stroke={lineColor}
+                        strokeWidth={antDone ? "1.2" : "1.8"}
+                        strokeDasharray={antDone ? "none" : "4,3"}
+                        opacity="0.7"
                       />
-                      {/* Arrowhead */}
                       <polygon
-                        points={`${thisStart},${rowH / 2} ${thisStart - 5},${rowH / 2 - 3} ${thisStart - 5},${rowH / 2 + 3}`}
-                        fill="#8b5cf6"
-                        opacity="0.6"
+                        points={`${thisStart},${rowH / 2} ${thisStart - 6},${rowH / 2 - 3.5} ${thisStart - 6},${rowH / 2 + 3.5}`}
+                        fill={lineColor}
+                        opacity="0.7"
                       />
                     </svg>
                   );
@@ -2338,8 +2362,16 @@ function GanttInline({ tarefas, detail }) {
           <span className="flex items-center gap-1 text-[9px] text-orange-500">
             <div className="w-0.5 h-3 bg-orange-400" /> Hoje
           </span>
-          <span className="flex items-center gap-1 text-[9px] text-purple-500">
-            <Link2 size={8} /> Dependência
+          <span className="flex items-center gap-1 text-[9px] text-amber-600">
+            <Lock size={8} /> Bloqueada
+          </span>
+          <span className="flex items-center gap-1 text-[9px] text-emerald-500">
+            <svg width="16" height="8"><line x1="0" y1="4" x2="12" y2="4" stroke="#10b981" strokeWidth="1.2" /><polygon points="12,4 8,2 8,6" fill="#10b981" /></svg>
+            Concluída
+          </span>
+          <span className="flex items-center gap-1 text-[9px] text-amber-500">
+            <svg width="16" height="8"><line x1="0" y1="4" x2="12" y2="4" stroke="#d97706" strokeWidth="1.5" strokeDasharray="3,2" /><polygon points="12,4 8,2 8,6" fill="#d97706" /></svg>
+            Aguardando
           </span>
         </div>
       </div>

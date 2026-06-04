@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { recalcularCronograma } from "@/lib/cronograma-recalcular";
 
 const patchSchema = z.object({
   nome: z.string().min(1).max(200).optional(),
@@ -44,6 +45,7 @@ export async function PATCH(req, { params }) {
   const data = {};
   const diffAntes = {};
   const diffDepois = {};
+  let antecessorasChanged = false;
 
   if (parsed.data.nome !== undefined && parsed.data.nome !== tarefa.nome) {
     diffAntes.nome = tarefa.nome;
@@ -66,8 +68,14 @@ export async function PATCH(req, { params }) {
     data.qtdeRealizada = parsed.data.qtdeRealizada;
   }
   if (parsed.data.antecessoraIds !== undefined) {
-    // Valida: nao pode ser antecessora de si mesma
     const ids = parsed.data.antecessoraIds.filter((aid) => aid !== id);
+    const oldIds = (tarefa.antecessoraIds || []).sort().join(",");
+    const newIds = ids.sort().join(",");
+    if (oldIds !== newIds) {
+      antecessorasChanged = true;
+      diffAntes.antecessoraIds = tarefa.antecessoraIds || [];
+      diffDepois.antecessoraIds = ids;
+    }
     data.antecessoraIds = ids;
   }
   if (parsed.data.observacao !== undefined) data.observacao = parsed.data.observacao;
@@ -104,7 +112,6 @@ export async function PATCH(req, { params }) {
     }),
   ];
 
-  // Se tem justificativa, cria registro permanente
   if (parsed.data.justificativa) {
     ops.push(
       prisma.cronogramaRegistro.create({
@@ -129,21 +136,38 @@ export async function PATCH(req, { params }) {
     if (diffDepois.dataFimPrevista !== undefined) {
       partes.push(`fim alterado`);
     }
+    if (diffDepois.antecessoraIds !== undefined) {
+      partes.push(`antecessoras alteradas`);
+    }
 
-    ops.push(
-      prisma.cronogramaRevisao.create({
-        data: {
-          cronogramaId: tarefa.cronograma.id,
-          tipo: "TAREFA_ALTERADA",
-          descricao: `${tarefa.nome}: ${partes.join(", ")}`,
-          diff: { tarefa: tarefa.nome, antes: diffAntes, depois: diffDepois },
-          createdById: user.id,
-        },
-      })
-    );
+    if (partes.length > 0) {
+      ops.push(
+        prisma.cronogramaRevisao.create({
+          data: {
+            cronogramaId: tarefa.cronograma.id,
+            tipo: "TAREFA_ALTERADA",
+            descricao: `${tarefa.nome}: ${partes.join(", ")}`,
+            diff: { tarefa: tarefa.nome, antes: diffAntes, depois: diffDepois },
+            createdById: user.id,
+          },
+        })
+      );
+    }
   }
 
   await prisma.$transaction(ops);
+
+  // Se antecessoras mudaram OU progresso mudou, recalcula datas automaticamente
+  // (progresso de uma antecessora pode destravar sucessoras)
+  const progressoMudou = diffDepois.percentualRealizado !== undefined;
+  if (antecessorasChanged || progressoMudou) {
+    try {
+      await recalcularCronograma(tarefa.cronograma.id, user.id);
+    } catch (e) {
+      // Recalculo nao-fatal: a tarefa ja foi salva
+      console.error("Erro no recalculo automatico:", e.message);
+    }
+  }
 
   const updated = await prisma.cronogramaTarefa.findUnique({ where: { id } });
   return NextResponse.json({ success: true, tarefa: updated });
