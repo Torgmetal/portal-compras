@@ -2467,7 +2467,7 @@ function exportarGanttPDF(detail) {
   const win = window.open("", "_blank", `width=${Math.min(totalWidth + 60, 1500)},height=900`);
   if (!win) return alert("Popup bloqueado — permita popups para gerar o PDF.");
 
-  // Gera meses
+  // Gera meses — label curto "Jul/25"
   const months = [];
   const d0 = new Date(minDate);
   let cur = new Date(d0.getFullYear(), d0.getMonth(), 1);
@@ -2475,8 +2475,10 @@ function exportarGanttPDF(detail) {
     const start = Math.max(0, (cur.getTime() - minDate) / 86400000);
     const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
     const end = Math.min(totalDays, (next.getTime() - minDate) / 86400000);
+    const mesNome = cur.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").charAt(0).toUpperCase() + cur.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").slice(1);
+    const anoStr = String(cur.getFullYear()).slice(2);
     months.push({
-      label: cur.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(".", ""),
+      label: `${mesNome}/${anoStr}`,
       left: start * dayWidth,
       width: (end - start) * dayWidth,
     });
@@ -2593,27 +2595,27 @@ function exportarGanttPDF(detail) {
     }
   }
 
-  // Meses header
+  // Meses header — texto branco no fundo escuro, sem quebra
   let monthsHtml = months.map((m) =>
-    `<div style="position:absolute;left:${m.left}px;width:${m.width}px;text-align:center;font-size:9px;font-weight:600;color:#475569;border-left:1px solid #cbd5e1;height:100%;display:flex;align-items:center;justify-content:center;text-transform:capitalize;">${m.label}</div>`
+    `<div style="position:absolute;left:${m.left}px;width:${m.width}px;text-align:center;font-size:9px;font-weight:600;color:#ffffff;border-left:1px solid rgba(255,255,255,0.2);height:100%;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;">${m.width > 28 ? m.label : ""}</div>`
   ).join("");
 
-  // Month grid lines (nas rows)
+  // Month grid lines (nas rows) — linhas sutis verticais
   let gridLines = months.map((m) =>
-    `<div style="position:absolute;left:${m.left}px;top:0;bottom:0;width:1px;background:#f1f5f9;"></div>`
+    `<div style="position:absolute;left:${m.left}px;top:0;bottom:0;width:1px;background:#e2e8f0;"></div>`
   ).join("");
 
-  // Today line
+  // Today line — label dentro da area do chart, nao acima
   const todayLine = (todayPos > 0 && todayPos < chartWidth)
-    ? `<div style="position:absolute;left:${todayPos}px;top:0;bottom:0;width:2px;background:#f97316;z-index:6;opacity:0.7;"></div>` +
-      `<div style="position:absolute;left:${todayPos - 14}px;top:-16px;font-size:7px;color:#f97316;font-weight:700;width:30px;text-align:center;">HOJE</div>`
+    ? `<div style="position:absolute;left:${todayPos}px;top:0;bottom:0;width:2px;background:#f97316;z-index:6;opacity:0.8;"></div>` +
+      `<div style="position:absolute;left:${todayPos - 16}px;top:2px;font-size:8px;color:#fff;font-weight:700;background:#f97316;padding:1px 4px;border-radius:2px;white-space:nowrap;z-index:7;">HOJE</div>`
     : "";
 
-  // Data base indicator
+  // Data base indicator — label visivel
   let dataBaseIndicator = "";
   if (dataBaseLine !== null) {
-    dataBaseIndicator = `<div style="position:absolute;left:${dataBaseLine}px;top:0;bottom:0;width:2px;background:#006EAB;z-index:5;"></div>` +
-      `<div style="position:absolute;left:${dataBaseLine - 8}px;top:-16px;font-size:7px;color:#006EAB;font-weight:700;width:18px;text-align:center;">DB</div>`;
+    dataBaseIndicator = `<div style="position:absolute;left:${dataBaseLine}px;top:0;bottom:0;width:2px;background:#006EAB;z-index:5;opacity:0.8;"></div>` +
+      `<div style="position:absolute;left:${dataBaseLine - 10}px;top:2px;font-size:8px;color:#fff;font-weight:700;background:#006EAB;padding:1px 4px;border-radius:2px;white-space:nowrap;z-index:7;">DB</div>`;
   }
 
   // Legenda departamentos
@@ -2755,8 +2757,8 @@ function exportarGanttPDF(detail) {
     <div style="display:flex;background:#002945;color:#fff;height:30px;align-items:center;">
       <div style="width:${labelWidth}px;padding:0 12px;font-size:10px;font-weight:600;flex-shrink:0;letter-spacing:0.3px;">TAREFA</div>
       <div style="width:${pctWidth}px;text-align:center;font-size:10px;font-weight:600;flex-shrink:0;">%</div>
-      <div style="width:${datesWidth}px;text-align:center;font-size:10px;font-weight:600;flex-shrink:0;">PERÍODO</div>
-      <div style="flex:0 0 ${chartWidth}px;position:relative;height:30px;">${monthsHtml}</div>
+      <div style="width:${datesWidth}px;text-align:center;font-size:10px;font-weight:600;flex-shrink:0;border-right:1px solid rgba(255,255,255,0.15);">PERÍODO</div>
+      <div style="width:${chartWidth}px;position:relative;height:30px;flex-shrink:0;">${monthsHtml}</div>
     </div>
     <!-- Rows -->
     <div style="position:relative;">
