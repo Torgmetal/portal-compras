@@ -32,41 +32,50 @@ export async function GET(req, { params }) {
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
-  const { searchParams } = new URL(req.url);
-  const dept = searchParams.get("departamento");
+  try {
+    const { searchParams } = new URL(req.url);
+    const dept = searchParams.get("departamento");
 
-  if (!dept) {
-    return NextResponse.json({ success: false, error: "departamento obrigatorio" }, { status: 400 });
+    if (!dept) {
+      return NextResponse.json({ success: false, error: "departamento obrigatorio" }, { status: 400 });
+    }
+
+    const modulosAlvo = DEPT_TO_MODULOS[dept] || [];
+
+    // Busca usuarios que tem pelo menos um dos modulos correspondentes
+    // Nota: Prisma 6 rejeita { not: null } — filtramos emails nulos no JS
+    const usuarios = await prisma.user.findMany({
+      where: {
+        ativo: true,
+        OR: [
+          { tipo: "ADMIN" },
+          { modulos: { some: { modulo: { in: modulosAlvo } } } },
+        ],
+      },
+      select: { email: true, name: true, tipo: true, modulos: { select: { modulo: true } } },
+    });
+
+    // Filtra: retorna admins + usuarios com o modulo alvo, mas mostra o modulo no resultado
+    const sugeridos = usuarios
+      .filter((u) => {
+        if (!u.email) return false;
+        if (u.tipo === "ADMIN") return false; // Admins vao no CC, nao como sugeridos
+        return u.modulos.some((m) => modulosAlvo.includes(m.modulo));
+      })
+      .map((u) => ({
+        email: u.email,
+        nome: u.name,
+        modulo: u.modulos.map((m) => m.modulo).join(", "),
+      }));
+
+    return NextResponse.json({ success: true, sugeridos });
+  } catch (e) {
+    console.error("[notificar-atrasos GET] erro:", e?.message);
+    return NextResponse.json(
+      { success: false, error: e?.message || "Erro interno" },
+      { status: 500 }
+    );
   }
-
-  const modulosAlvo = DEPT_TO_MODULOS[dept] || [];
-
-  // Busca usuarios que tem pelo menos um dos modulos correspondentes
-  const usuarios = await prisma.user.findMany({
-    where: {
-      ativo: true,
-      email: { not: null },
-      OR: [
-        { tipo: "ADMIN" },
-        { modulos: { some: { modulo: { in: modulosAlvo } } } },
-      ],
-    },
-    select: { email: true, name: true, tipo: true, modulos: { select: { modulo: true } } },
-  });
-
-  // Filtra: retorna admins + usuarios com o modulo alvo, mas mostra o modulo no resultado
-  const sugeridos = usuarios
-    .filter((u) => {
-      if (u.tipo === "ADMIN") return false; // Admins vao no CC, nao como sugeridos
-      return u.modulos.some((m) => modulosAlvo.includes(m.modulo));
-    })
-    .map((u) => ({
-      email: u.email,
-      nome: u.name,
-      modulo: u.modulos.map((m) => m.modulo).join(", "),
-    }));
-
-  return NextResponse.json({ success: true, sugeridos });
 }
 
 export async function POST(req, { params }) {
@@ -78,6 +87,7 @@ export async function POST(req, { params }) {
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
+  try {
   const { id } = await params;
 
   let filtroDepts = null;
@@ -136,7 +146,6 @@ export async function POST(req, { params }) {
     moduloUsers = await prisma.user.findMany({
       where: {
         ativo: true,
-        email: { not: null },
         modulos: { some: { modulo: { in: allModulos } } },
       },
       select: { email: true, name: true, modulos: { select: { modulo: true } } },
@@ -145,7 +154,7 @@ export async function POST(req, { params }) {
 
   // Admins vao no CC
   const adminUsers = await prisma.user.findMany({
-    where: { ativo: true, tipo: "ADMIN", email: { not: null } },
+    where: { ativo: true, tipo: "ADMIN" },
     select: { email: true },
   });
   const ccEmails = adminUsers.map((u) => u.email).filter(Boolean);
@@ -272,4 +281,12 @@ export async function POST(req, { params }) {
   });
 
   return NextResponse.json({ success: true, resultados });
+
+  } catch (e) {
+    console.error("[notificar-atrasos] erro inesperado:", e?.message);
+    return NextResponse.json(
+      { success: false, error: e?.message || "Erro interno ao notificar" },
+      { status: 500 }
+    );
+  }
 }
