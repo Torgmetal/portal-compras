@@ -1271,6 +1271,7 @@ model PecaConjunto {
   comprimentoMm          Float?                  // comprimento em mm
   areaPinturaM2          Float?                  // area de pintura m²
   statusPrep             String?                 // "PENDENTE" | "PREPARADO" (so croquis)
+  maquina                String?                 // maquina de corte atribuida (LASER_CHAPA, LASER_PERFIL, LASER_TUBO, LASER_CANTONEIRA)
   op                     OP?                     @relation(fields: [opId], references: [id])
   planejamentos          PecaPlanejamento[]
   planejamentoCargaItens PlanejamentoCargaItem[]

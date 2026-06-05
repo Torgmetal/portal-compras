@@ -5,9 +5,11 @@ import * as XLSX from "xlsx";
 import {
   Upload, Loader2, AlertCircle, X, CheckCircle2, Search,
   Package, FileSpreadsheet, ChevronDown, ChevronUp, Filter, Plus, Trash2,
+  Zap, RefreshCw,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { fmtOP } from "@/lib/utils";
+import { MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, calcularResumoBarras, parsePerfil } from "@/lib/maquina-corte";
 
 const STATUS_PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 const STATUS_LABEL = {
@@ -51,6 +53,8 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
   const [modalImportLPC, setModalImportLPC] = useState(false);
   const [modalExcluirLote, setModalExcluirLote] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroMaquina, setFiltroMaquina] = useState("");
+  const [reclassificando, setReclassificando] = useState(false);
 
   // Lista de OPs que tem pecas (pra mostrar so as relevantes no filtro)
   const opsComPecas = useMemo(() => {
@@ -65,13 +69,14 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
       if (filtroTipo === "CROQUI" && p.tipoPeca !== "CROQUI") return false;
       if (filtroTipo === "PECA" && p.tipoPeca != null) return false;
       if (filtroStatus && p.status !== filtroStatus) return false;
+      if (filtroMaquina && p.maquina !== filtroMaquina) return false;
       if (busca) {
         const q = busca.toLowerCase();
         if (!p.marca.toLowerCase().includes(q) && !(p.descricao || "").toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [pecas, filtroOp, filtroTipo, filtroStatus, busca]);
+  }, [pecas, filtroOp, filtroTipo, filtroStatus, filtroMaquina, busca]);
 
   // Resumo
   const resumo = useMemo(() => {
@@ -90,6 +95,56 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
     }
     return r;
   }, [pecasFiltradas]);
+
+  // KPIs por maquina (calculado sobre pecas filtradas)
+  const resumoMaquinas = useMemo(() => {
+    const map = {};
+    for (const maq of Object.keys(MAQUINAS)) map[maq] = { pecas: 0, peso: 0 };
+    map["SEM_MAQUINA"] = { pecas: 0, peso: 0 };
+    for (const p of pecasFiltradas) {
+      const k = p.maquina || "SEM_MAQUINA";
+      if (!map[k]) map[k] = { pecas: 0, peso: 0 };
+      map[k].pecas += p.qte || 1;
+      map[k].peso += p.pesoTotalKg || 0;
+    }
+    return map;
+  }, [pecasFiltradas]);
+
+  // Resumo de barras por maquina (somente pecas filtradas)
+  const resumoBarras = useMemo(() => calcularResumoBarras(pecasFiltradas), [pecasFiltradas]);
+
+  async function reclassificarMaquinas() {
+    setReclassificando(true);
+    try {
+      const res = await fetch("/api/producao/pecas/reclassificar-maquinas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: filtroOp || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      router.refresh();
+    } catch (e) {
+      alert("Erro ao reclassificar: " + e.message);
+    } finally {
+      setReclassificando(false);
+    }
+  }
+
+  async function atualizarMaquina(id, novaMaquina) {
+    try {
+      const res = await fetch(`/api/producao/pecas/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maquina: novaMaquina || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setPecas((prev) => prev.map((p) => (p.id === id ? { ...p, maquina: novaMaquina || null } : p)));
+    } catch (e) {
+      alert("Erro ao atualizar máquina: " + e.message);
+    }
+  }
 
   async function atualizarStatus(id, novoStatus) {
     try {
@@ -182,6 +237,84 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
         <KpiPequeno label="Expedidas" value={resumo.expedidas.toLocaleString("pt-BR")} subtitle={`${fmtKg(resumo.pesoExpedido)} · ${resumo.total > 0 ? ((resumo.expedidas / resumo.total) * 100).toFixed(0) : 0}%`} color="bg-emerald-50 text-emerald-700" />
       </div>
 
+      {/* KPIs por Máquina */}
+      {Object.values(resumoMaquinas).some((m) => m.pecas > 0) && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-torg-dark uppercase tracking-wide flex items-center gap-1.5">
+              <Zap size={13} className="text-torg-blue" /> Distribuição por Máquina
+            </h3>
+            {isAdmin && (
+              <button
+                onClick={reclassificarMaquinas}
+                disabled={reclassificando}
+                className="text-[11px] text-torg-blue hover:text-torg-dark flex items-center gap-1 disabled:opacity-50"
+              >
+                {reclassificando ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                Reclassificar
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {Object.entries(MAQUINA_LABEL).map(([k, label]) => {
+              const m = resumoMaquinas[k] || { pecas: 0, peso: 0 };
+              if (m.pecas === 0) return null;
+              const cor = MAQUINA_COR[k] || { bg: "bg-gray-50", text: "text-gray-600" };
+              return (
+                <button
+                  key={k}
+                  onClick={() => setFiltroMaquina(filtroMaquina === k ? "" : k)}
+                  className={`rounded-xl p-3 text-left transition-all ${cor.bg} ${cor.text} ${filtroMaquina === k ? "ring-2 ring-offset-1 ring-current" : ""}`}
+                >
+                  <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">{label}</p>
+                  <p className="text-lg font-bold tabular-nums">{m.pecas.toLocaleString("pt-BR")}</p>
+                  <p className="text-[10px] opacity-70">{fmtKg(m.peso)}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Resumo de barras por máquina */}
+          {Object.keys(resumoBarras).length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                <h4 className="text-xs font-semibold text-torg-dark uppercase tracking-wide">Barras por Máquina / Perfil</h4>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {Object.entries(resumoBarras).map(([maq, dados]) => {
+                  const perfis = Object.entries(dados.perfis).sort((a, b) => a[0].localeCompare(b[0]));
+                  if (perfis.length === 0) return null;
+                  const cor = MAQUINA_COR[maq] || { dot: "bg-gray-400", text: "text-gray-700" };
+                  const totalBarras = perfis.reduce((s, [, pf]) => s + pf.barras, 0);
+                  return (
+                    <div key={maq} className="px-4 py-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`w-2 h-2 rounded-full ${cor.dot}`} />
+                        <span className="text-xs font-semibold text-torg-dark">{MAQUINA_LABEL[maq] || maq}</span>
+                        <span className="text-[10px] text-torg-gray">
+                          {dados.pecas} peças · {fmtKg(dados.pesoTotal)} · {totalBarras} barra{totalBarras !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+                        {perfis.map(([perfil, pf]) => (
+                          <div key={perfil} className="bg-gray-50 rounded px-2 py-1.5 text-[11px]">
+                            <span className="font-mono font-semibold text-torg-dark">{perfil}</span>
+                            <div className="flex items-center justify-between mt-0.5 text-torg-gray">
+                              <span>{pf.qte} pç · {(pf.compTotalMm / 1000).toFixed(1)}m</span>
+                              <span className="font-semibold text-torg-dark">{pf.barras} barra{pf.barras !== 1 ? "s" : ""}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Filtros */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
         <Filter size={14} className="text-torg-gray" />
@@ -211,6 +344,14 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
           <option value="CROQUI">Croquis</option>
           <option value="PECA">Peças / LE</option>
         </select>
+        <select
+          value={filtroMaquina}
+          onChange={(e) => setFiltroMaquina(e.target.value)}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Todas máquinas</option>
+          {Object.entries(MAQUINA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
         <div className="flex items-center gap-1 flex-1 min-w-[200px]">
           <Search size={12} className="text-torg-gray ml-2" />
           <input
@@ -221,9 +362,9 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
             className="flex-1 px-2 py-1.5 text-xs border-0 focus:ring-0 focus:outline-none"
           />
         </div>
-        {(filtroOp || filtroStatus || filtroTipo || busca) && (
+        {(filtroOp || filtroStatus || filtroTipo || filtroMaquina || busca) && (
           <button
-            onClick={() => { setFiltroOp(""); setFiltroStatus(""); setFiltroTipo(""); setBusca(""); }}
+            onClick={() => { setFiltroOp(""); setFiltroStatus(""); setFiltroTipo(""); setFiltroMaquina(""); setBusca(""); }}
             className="text-xs text-torg-gray hover:text-torg-dark"
           >
             limpar
@@ -262,6 +403,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Qte</th>
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso unit.</th>
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso total</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Máquina</th>
                   <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Status</th>
                   {isAdmin && <th className="px-3 py-2 w-8"></th>}
                 </tr>
@@ -285,6 +427,24 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark">{p.qte}</td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray">{fmtKg(p.pesoUnitKg)}</td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark font-medium">{fmtKg(p.pesoTotalKg)}</td>
+                      <td className="px-3 py-1.5">
+                        {p.tipoPeca === "CROQUI" || (p.tipoPeca == null && p.material) ? (
+                          <select
+                            value={p.maquina || ""}
+                            onChange={(e) => atualizarMaquina(p.id, e.target.value)}
+                            className={`text-[11px] font-medium rounded-md border-0 px-2 py-1 focus:ring-1 focus:ring-torg-blue ${
+                              p.maquina ? (MAQUINA_COR[p.maquina]?.bg || "bg-gray-50") + " " + (MAQUINA_COR[p.maquina]?.text || "text-gray-600") : "bg-gray-50 text-gray-400"
+                            }`}
+                          >
+                            <option value="">—</option>
+                            {Object.entries(MAQUINA_LABEL).map(([k, v]) => (
+                              <option key={k} value={k}>{v}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-[11px] text-gray-300">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-1.5">
                         <select
                           value={p.status}

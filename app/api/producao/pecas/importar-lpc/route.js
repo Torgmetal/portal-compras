@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { parseLPC } from "@/lib/parse-lpc";
+import { classificarMaquina } from "@/lib/maquina-corte";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -109,6 +110,7 @@ export async function POST(req) {
   // --- Upsert croquis (ja deduplicados pelo parser) ---
   for (const cr of parsed.croquis) {
     try {
+      const maq = classificarMaquina(cr.descricao, cr.pesoUnitKg, cr.comprimentoMm);
       const existing = await prisma.pecaConjunto.findUnique({
         where: { opNumero_marca: { opNumero, marca: cr.marca } },
       });
@@ -126,6 +128,7 @@ export async function POST(req) {
             tipoPeca: "CROQUI",
             areaPinturaM2: cr.areaPinturaM2,
             statusPrep: existing.statusPrep || "PENDENTE",
+            maquina: maq || existing.maquina,
           },
         });
         pieceIds.set(cr.marca, existing.id);
@@ -148,6 +151,7 @@ export async function POST(req) {
             statusPrep: "PENDENTE",
             status: "PENDENTE",
             fonte: "LPC_IMPORT",
+            maquina: maq,
           },
         });
         pieceIds.set(cr.marca, created.id);
@@ -161,6 +165,7 @@ export async function POST(req) {
   // --- Upsert avulsas ---
   for (const a of parsed.avulsas) {
     try {
+      const maq = classificarMaquina(a.descricao, a.pesoUnitKg, a.comprimentoMm);
       const existing = await prisma.pecaConjunto.findUnique({
         where: { opNumero_marca: { opNumero, marca: a.marca } },
       });
@@ -176,6 +181,7 @@ export async function POST(req) {
             pesoUnitKg: a.pesoUnitKg,
             pesoTotalKg: a.pesoTotalKg,
             areaPinturaM2: a.areaPinturaM2,
+            maquina: maq || existing.maquina,
           },
         });
         pieceIds.set(a.marca, existing.id);
@@ -196,6 +202,7 @@ export async function POST(req) {
             areaPinturaM2: a.areaPinturaM2,
             status: "PENDENTE",
             fonte: "LPC_IMPORT",
+            maquina: maq,
           },
         });
         pieceIds.set(a.marca, created.id);

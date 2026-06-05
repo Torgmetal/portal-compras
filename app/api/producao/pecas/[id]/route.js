@@ -9,6 +9,8 @@ export const runtime = "nodejs";
 
 const STATUS_VALIDOS = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 
+const MAQUINAS_VALIDAS = ["LASER_CHAPA", "LASER_PERFIL", "LASER_TUBO", "LASER_CANTONEIRA"];
+
 const schemaUpdate = z.object({
   status: z.enum(STATUS_VALIDOS).optional(),
   qte: z.number().int().min(1).optional(),
@@ -17,6 +19,7 @@ const schemaUpdate = z.object({
   descricao: z.string().nullable().optional(),
   observacao: z.string().nullable().optional(),
   fluxoEspecial: z.boolean().optional(),
+  maquina: z.enum(MAQUINAS_VALIDAS).nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -48,19 +51,23 @@ export async function PATCH(req, { params }) {
 }
 
 export async function DELETE(req, { params }) {
+  let user;
   try {
-    await requireRole(["ADMIN"]);
+    user = await requireRole(["ADMIN"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
   const peca = await prisma.pecaConjunto.delete({ where: { id: params.id } });
-  await prisma.auditLog.create({
-    data: {
-      acao: "DELETE_PECA",
-      entidade: "PecaConjunto",
-      entidadeId: params.id,
-      detalhes: { opNumero: peca.opNumero, marca: peca.marca },
-    },
-  });
+  try {
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "DELETE_PECA",
+        entity: "PecaConjunto",
+        entityId: params.id,
+        diff: { opNumero: peca.opNumero, marca: peca.marca },
+      },
+    });
+  } catch {}
   return NextResponse.json({ ok: true });
 }
