@@ -1,14 +1,15 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
 import {
   Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2,
-  Package, Loader2, AlertCircle, RefreshCw, Undo2,
+  Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import {
   MAQUINA_LABEL, MAQUINA_COR, MAQUINAS,
-  calcularResumoBarras, parsePerfil,
+  calcularResumoBarras, parsePerfil, gerarProgramaCorte,
 } from "@/lib/maquina-corte";
 
 const fmtKg = (v) => {
@@ -206,6 +207,118 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
     }
   }
 
+  // Gerar programa de corte e exportar como Excel
+  function exportarProgramaCorte() {
+    const pecasParaPrograma = filtroOp ? pecasFiltradas : pecas.filter((p) => p.maquina);
+    if (pecasParaPrograma.length === 0) {
+      alert("Nenhuma peça com máquina atribuída para gerar programa.");
+      return;
+    }
+
+    const programa = gerarProgramaCorte(pecasParaPrograma);
+    const wb = XLSX.utils.book_new();
+    const opLabel = filtroOp ? `OP ${filtroOp}` : "Todas OPs";
+
+    // Uma aba por maquina
+    for (const [maq, dados] of Object.entries(programa)) {
+      const rows = [];
+      const cor = MAQUINA_COR[maq];
+      const merges = [];
+
+      // Header
+      rows.push([`PROGRAMA DE CORTE — ${dados.label.toUpperCase()}`]);
+      rows.push([`${opLabel} — Gerado em ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`]);
+      rows.push([]);
+
+      // Chapas (se houver)
+      if (dados.chapas && dados.chapas.length > 0) {
+        rows.push(["CHAPAS"]);
+        rows.push(["OP", "Marca", "Descrição", "Qte", "Peso unit. (kg)", "Peso total (kg)"]);
+        for (const ch of dados.chapas) {
+          rows.push([ch.opNumero, ch.marca, ch.descricao, ch.qte || 1, ch.pesoUnitKg || 0, ch.pesoTotalKg || 0]);
+        }
+        const pesoChapas = dados.chapas.reduce((s, c) => s + (c.pesoTotalKg || 0), 0);
+        rows.push(["", "", "TOTAL CHAPAS", dados.chapas.reduce((s, c) => s + (c.qte || 1), 0), "", pesoChapas.toFixed(1)]);
+        rows.push([]);
+      }
+
+      // Perfis com barras
+      const perfis = Object.entries(dados.perfis).sort((a, b) => a[0].localeCompare(b[0]));
+      for (const [desc, grupo] of perfis) {
+        const compBarraM = (grupo.comprimentoBarraMm / 1000).toFixed(1);
+        rows.push([`${desc} — Barra ${compBarraM}m — ${grupo.totalBarras} barra${grupo.totalBarras > 1 ? "s" : ""} — Aproveitamento ${grupo.aproveitamentoMedio.toFixed(0)}%`]);
+        rows.push(["Barra", "OP", "Marca", "Comprimento (mm)", "Peso (kg)", "Usado (mm)", "Sobra (mm)", "Aprov. %"]);
+
+        for (const barra of grupo.barras) {
+          let primeiro = true;
+          for (const peca of barra.pecas) {
+            rows.push([
+              primeiro ? `Barra ${barra.numero}` : "",
+              peca.opNumero || "",
+              peca.marca,
+              peca.comprimentoMm,
+              peca.pesoUnitKg || "",
+              primeiro ? barra.usadoMm : "",
+              primeiro ? barra.sobraMm : "",
+              primeiro ? `${barra.aproveitamento.toFixed(0)}%` : "",
+            ]);
+            primeiro = false;
+          }
+        }
+
+        // Subtotal do perfil
+        const totalUsado = grupo.barras.reduce((s, b) => s + b.usadoMm, 0);
+        const totalDisponivel = grupo.totalBarras * grupo.comprimentoBarraMm;
+        rows.push([
+          `TOTAL ${desc}`,
+          "",
+          `${grupo.totalPecas} peças`,
+          `${(totalUsado / 1000).toFixed(1)}m usado`,
+          "",
+          totalUsado,
+          totalDisponivel - totalUsado,
+          `${grupo.aproveitamentoMedio.toFixed(0)}%`,
+        ]);
+        rows.push([]);
+      }
+
+      // Resumo geral da maquina
+      const totalBarrasMaq = perfis.reduce((s, [, g]) => s + g.totalBarras, 0);
+      const totalPecasMaq = perfis.reduce((s, [, g]) => s + g.totalPecas, 0);
+      const mediaAprov = perfis.length > 0 ? perfis.reduce((s, [, g]) => s + g.aproveitamentoMedio, 0) / perfis.length : 0;
+      rows.push([]);
+      rows.push([`RESUMO ${dados.label.toUpperCase()}: ${totalPecasMaq} peças em ${totalBarrasMaq} barras — Aproveitamento médio: ${mediaAprov.toFixed(0)}%`]);
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+
+      // Ajustar largura das colunas
+      ws["!cols"] = [
+        { wch: 14 }, // Barra
+        { wch: 10 }, // OP
+        { wch: 14 }, // Marca
+        { wch: 18 }, // Comprimento/Descricao
+        { wch: 12 }, // Peso
+        { wch: 12 }, // Usado
+        { wch: 12 }, // Sobra
+        { wch: 10 }, // Aprov
+      ];
+
+      const sheetName = (dados.label || maq).substring(0, 31);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    // Se nenhuma aba foi criada
+    if (wb.SheetNames.length === 0) {
+      alert("Nenhuma peça com perfil válido para gerar programa.");
+      return;
+    }
+
+    const fileName = filtroOp
+      ? `Programa_Corte_OP${filtroOp}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      : `Programa_Corte_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  }
+
   return (
     <div className="space-y-4 max-w-7xl">
       {/* Header */}
@@ -219,6 +332,12 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
+          <button
+            onClick={exportarProgramaCorte}
+            className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
+          >
+            <FileSpreadsheet size={14} /> Gerar Programa
+          </button>
           {isAdmin && (
             <button
               onClick={reclassificarMaquinas}
