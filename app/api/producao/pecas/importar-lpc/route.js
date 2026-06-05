@@ -18,6 +18,8 @@ export async function POST(req) {
     return NextResponse.json({ error: e.message }, { status });
   }
 
+  try {
+
   let body;
   try {
     body = await req.json();
@@ -233,30 +235,34 @@ export async function POST(req) {
     }
   }
 
-  // Audit log
-  await prisma.auditLog.create({
-    data: {
-      userId: user.id,
-      action: "IMPORTAR_LPC",
-      entity: "PecaConjunto",
-      entityId: opNumero,
-      diff: {
-        opNumero,
-        obra: parsed.obra,
-        cliente: parsed.cliente,
-        conjuntos: parsed.conjuntos.length,
-        croquis: parsed.croquis.length,
-        avulsas: parsed.avulsas.length,
-        relacoes: relacoesCriadas,
-        criados,
-        atualizados,
-        ignorados,
-        sobrescrever: !!sobrescrever,
-        pesoTotal: parsed.pesoTotal,
-        areaTotal: parsed.areaTotal,
+  // Audit log (nao-fatal — nao pode abortar uma importacao bem-sucedida)
+  try {
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "IMPORTAR_LPC",
+        entity: "PecaConjunto",
+        entityId: opNumero,
+        diff: {
+          opNumero,
+          obra: parsed.obra,
+          cliente: parsed.cliente,
+          conjuntos: parsed.conjuntos.length,
+          croquis: parsed.croquis.length,
+          avulsas: parsed.avulsas.length,
+          relacoes: relacoesCriadas,
+          criados,
+          atualizados,
+          ignorados,
+          sobrescrever: !!sobrescrever,
+          pesoTotal: parsed.pesoTotal,
+          areaTotal: parsed.areaTotal,
+        },
       },
-    },
-  });
+    });
+  } catch (auditErr) {
+    console.error("[importar-lpc] falha no audit log:", auditErr?.message);
+  }
 
   return NextResponse.json({
     ok: true,
@@ -274,4 +280,12 @@ export async function POST(req) {
     pesoTotal: parsed.pesoTotal,
     areaTotal: parsed.areaTotal,
   });
+
+  } catch (e) {
+    console.error("[importar-lpc] erro inesperado:", e?.message, e?.stack);
+    return NextResponse.json(
+      { error: e?.message || "Erro interno ao importar LPC" },
+      { status: 500 }
+    );
+  }
 }

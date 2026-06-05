@@ -513,7 +513,12 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows, opNumero: opForcada || null, sobrescrever }),
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Erro ${res.status} do servidor ao importar. Tente novamente.`);
+      }
       if (!res.ok) throw new Error(data.error || "Erro ao importar");
       setResultado(data);
     } catch (e) {
