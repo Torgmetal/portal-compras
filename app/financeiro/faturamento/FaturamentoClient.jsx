@@ -150,12 +150,12 @@ Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado
       )}
 
       {/* Conciliação NFS-e Conchal (SigissWeb) */}
-      <ConciliacaoNfse obras={data?.obras || []} onVinculado={() => carregar(false)} />
+      <ConciliacaoNfse projetos={data?.projetos || []} onVinculado={() => carregar(false)} />
     </div>
   );
 }
 
-function ConciliacaoNfse({ obras = [], onVinculado }) {
+function ConciliacaoNfse({ projetos = [], onVinculado }) {
   const hojeISO = new Date().toISOString().slice(0, 10);
   const [data, setData]     = useState(null);
   const [loading, setLoad]  = useState(false);
@@ -186,7 +186,7 @@ function ConciliacaoNfse({ obras = [], onVinculado }) {
   // Vincula/desvincula a nota a um projeto e atualiza o estado local + a tabela acima
   const vincular = async (n, codProjStr) => {
     const codProj = codProjStr ? Number(codProjStr) : null;
-    const proj = obras.find(o => o.codProj === codProj);
+    const proj = projetos.find(p => String(p.codProj) === String(codProj));
     const chave = `${n.numero}-${n.serie}`;
     setSalvando(chave);
     try {
@@ -194,7 +194,7 @@ function ConciliacaoNfse({ obras = [], onVinculado }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           numero: n.numero, serie: n.serie || "", codProj,
-          projetoNome: proj?.projeto ?? null, valor: n.valor, data: n.data,
+          projetoNome: proj?.nome ?? null, valor: n.valor, data: n.data,
           tomadorNome: n.tomadorNome, descricao: n.descricao,
         }),
       });
@@ -204,7 +204,7 @@ function ConciliacaoNfse({ obras = [], onVinculado }) {
       setData(prev => ({
         ...prev,
         notas: prev.notas.map(x => (x.numero === n.numero && x.serie === n.serie)
-          ? { ...x, vinculoCodProj: codProj, vinculoProjeto: proj?.projeto ?? null } : x),
+          ? { ...x, vinculoCodProj: codProj, vinculoProjeto: proj?.nome ?? null } : x),
       }));
       onVinculado?.(); // refaz o cálculo do faturado na tabela acima
     } catch (e) { alert(e.message); } finally { setSalvando(null); }
@@ -308,7 +308,7 @@ function ConciliacaoNfse({ obras = [], onVinculado }) {
                                 onChange={e => vincular(n, e.target.value)}
                                 className={`text-xs border rounded-lg px-2 py-1 max-w-[220px] focus:ring-2 focus:ring-torg-blue focus:border-torg-blue ${n.vinculoCodProj ? "border-green-300 bg-green-50 text-green-800" : "border-gray-300 text-torg-gray"}`}>
                                 <option value="">— escolher obra —</option>
-                                {obras.map(o => <option key={o.codProj} value={o.codProj}>{o.projeto}</option>)}
+                                {projetos.map(p => <option key={p.codProj} value={p.codProj}>{p.nome}</option>)}
                               </select>
                               {salvando === chave
                                 ? <Loader2 size={13} className="animate-spin text-gray-400" />
@@ -350,8 +350,10 @@ function Th({ campo, label, align, ordenarPor, direcao, clicarOrdenar }) {
 function TagTipo({ tipo }) {
   const cor = tipo === "Venda+Serviço" ? "bg-teal-100 text-teal-700 border-teal-200"
     : tipo === "Serviço" ? "bg-purple-100 text-purple-700 border-purple-200"
+    : tipo === "Avulsa" ? "bg-pink-100 text-pink-700 border-pink-200"
     : "bg-blue-100 text-blue-700 border-blue-200";
-  return <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium whitespace-nowrap ${cor}`}>{tipo}</span>;
+  const label = tipo === "Avulsa" ? "Só prefeitura" : tipo;
+  return <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium whitespace-nowrap ${cor}`}>{label}</span>;
 }
 
 function FragmentObra({ obra, aberta, onToggle }) {
