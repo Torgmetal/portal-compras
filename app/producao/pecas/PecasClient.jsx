@@ -3,7 +3,7 @@ import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
-  Upload, Loader2, AlertCircle, X, CheckCircle2, Search,
+  Upload, Loader2, AlertCircle, X, CheckCircle2, Search, Download,
   Package, FileSpreadsheet, ChevronDown, ChevronUp, Filter, Plus, Trash2,
   Zap, RefreshCw, Factory,
 } from "lucide-react";
@@ -133,6 +133,58 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
     } finally {
       setReclassificando(false);
     }
+  }
+
+  function exportarRelatorio() {
+    const dados = pecasFiltradas.map((p) => ({
+      "OP": fmtOP(p.opNumero),
+      "Marca": p.marca,
+      "Tipo": p.tipoPeca === "CONJUNTO" ? "Conjunto" : p.tipoPeca === "CROQUI" ? "Croqui" : "Peça",
+      "Descrição": p.descricao || "",
+      "Material": p.material || "",
+      "Qte": p.qte || 1,
+      "Peso Unit. (kg)": p.pesoUnitKg || 0,
+      "Peso Total (kg)": p.pesoTotalKg || 0,
+      "Produzido": p.qteProduzida || 0,
+      "Falta": Math.max(0, (p.qte || 1) - (p.qteProduzida || 0)),
+      "% Atendido": p.qte > 0 ? Math.round(((p.qteProduzida || 0) / p.qte) * 100) : 0,
+      "Máquina": p.maquina ? (MAQUINA_LABEL[p.maquina] || p.maquina) : "",
+      "Status": STATUS_LABEL[p.status] || p.status,
+      "Data Produção": p.dataProducao ? new Date(p.dataProducao).toLocaleDateString("pt-BR") : "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dados);
+
+    // Larguras de coluna
+    ws["!cols"] = [
+      { wch: 8 },  // OP
+      { wch: 14 }, // Marca
+      { wch: 10 }, // Tipo
+      { wch: 20 }, // Descrição
+      { wch: 14 }, // Material
+      { wch: 6 },  // Qte
+      { wch: 12 }, // Peso Unit
+      { wch: 12 }, // Peso Total
+      { wch: 10 }, // Produzido
+      { wch: 8 },  // Falta
+      { wch: 10 }, // % Atendido
+      { wch: 16 }, // Máquina
+      { wch: 12 }, // Status
+      { wch: 12 }, // Data Produção
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const filtroDesc = [
+      filtroOp ? `OP-${filtroOp}` : "Todas-OPs",
+      filtroStatus ? STATUS_LABEL[filtroStatus] : null,
+      filtroTipo || null,
+      filtroMaquina ? MAQUINA_LABEL[filtroMaquina] : null,
+    ].filter(Boolean).join("_");
+    const nomeAba = (filtroDesc || "Peças").slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+
+    const nomeArquivo = `Peças_${filtroDesc || "Todas"}_${new Date().toISOString().split("T")[0]}.xlsx`;
+    XLSX.writeFile(wb, nomeArquivo);
   }
 
   async function atualizarMaquina(id, novaMaquina) {
@@ -407,6 +459,13 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
             className="flex-1 px-2 py-1.5 text-xs border-0 focus:ring-0 focus:outline-none"
           />
         </div>
+        <button
+          onClick={exportarRelatorio}
+          className="px-3 py-1.5 bg-torg-blue/10 text-torg-blue text-xs rounded-lg hover:bg-torg-blue/20 font-medium flex items-center gap-1.5"
+          title="Exportar peças filtradas para Excel"
+        >
+          <Download size={13} /> Exportar
+        </button>
         {(filtroOp || filtroStatus || filtroTipo || filtroMaquina || busca) && (
           <button
             onClick={() => { setFiltroOp(""); setFiltroStatus(""); setFiltroTipo(""); setFiltroMaquina(""); setBusca(""); }}
