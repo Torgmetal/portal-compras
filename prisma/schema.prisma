@@ -1272,6 +1272,10 @@ model PecaConjunto {
   areaPinturaM2          Float?                  // area de pintura m²
   statusPrep             String?                 // "PENDENTE" | "PREPARADO" (so croquis)
   maquina                String?                 // maquina de corte atribuida (LASER_CHAPA, LASER_PERFIL, LASER_TUBO, LASER_CANTONEIRA)
+  // Campos de produção (populados pelo Syneco)
+  qteProduzida           Int                     @default(0)
+  pesoProduzido          Float                   @default(0)
+  dataProducao           DateTime?               // data fim da produção (Syneco)
   op                     OP?                     @relation(fields: [opId], references: [id])
   planejamentos          PecaPlanejamento[]
   planejamentoCargaItens PlanejamentoCargaItem[]

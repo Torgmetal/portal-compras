@@ -112,14 +112,26 @@ export async function POST(req) {
       }
 
       matched++;
+
+      // Atualizar dados de produção na peça
+      const updateData = {
+        qteProduzida: mes.produzidoUn || 0,
+        pesoProduzido: mes.pesoProduzido || 0,
+        ...(mes.dataFim && { dataProducao: mes.dataFim }),
+      };
+
       if (peca.status === "PENDENTE") {
         await prisma.pecaConjunto.update({
           where: { id: peca.id },
-          data: { status: "CORTE", ultimoSetor: "Corte" },
+          data: { status: "CORTE", ultimoSetor: "Corte", ...updateData },
         });
         statusUpdated++;
         pecasAtualizadas.push(peca.marca);
       } else {
+        await prisma.pecaConjunto.update({
+          where: { id: peca.id },
+          data: updateData,
+        });
         alreadyCut++;
       }
 

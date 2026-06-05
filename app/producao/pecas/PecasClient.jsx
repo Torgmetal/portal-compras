@@ -448,6 +448,8 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Qte</th>
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso unit.</th>
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso total</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Produzido</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Falta</th>
                   <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Máquina</th>
                   <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Status</th>
                   {isAdmin && <th className="px-3 py-2 w-8"></th>}
@@ -472,6 +474,26 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark">{p.qte}</td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray">{fmtKg(p.pesoUnitKg)}</td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark font-medium">{fmtKg(p.pesoTotalKg)}</td>
+                      <td className="px-3 py-1.5 text-right text-xs tabular-nums">
+                        {p.qteProduzida > 0 ? (
+                          <span className={`font-medium ${p.qteProduzida >= p.qte ? "text-emerald-600" : "text-torg-blue"}`}>
+                            {p.qteProduzida}/{p.qte}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-xs tabular-nums">
+                        {p.qteProduzida > 0 ? (
+                          p.qte - p.qteProduzida > 0 ? (
+                            <span className="font-medium text-orange-600">{p.qte - p.qteProduzida}</span>
+                          ) : (
+                            <span className="text-emerald-500">✓</span>
+                          )
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-1.5">
                         {p.tipoPeca === "CROQUI" || (p.tipoPeca == null && p.material) ? (
                           <select
