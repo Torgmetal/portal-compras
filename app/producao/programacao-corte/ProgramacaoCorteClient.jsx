@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import {
-  MAQUINA_LABEL, MAQUINA_COR, MAQUINAS,
+  MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, PERDA_MAQUINA,
   calcularResumoBarras, parsePerfil, gerarProgramaCorte, classificarMaquina,
 } from "@/lib/maquina-corte";
 
@@ -325,7 +325,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
     rows.push(["LISTA DE MATERIAL PARA CORTE"]);
     rows.push([`${opLabel} — Gerado em ${agora}`]);
     rows.push([]);
-    rows.push(["Máquina", "Perfil", "Tipo", "Qte Peças", "Comprimento Total (m)", "Barra Padrão (m)", "Barras Necessárias", "Peso Estimado (kg)"]);
+    rows.push(["Máquina", "Perfil", "Tipo", "Qte Peças", "Comprimento Total (m)", "Barra Padrão (m)", "Barra Útil (m)", "Barras Necessárias", "Peso Estimado (kg)"]);
 
     let totalBarrasGeral = 0;
     let totalPecasGeral = 0;
@@ -341,6 +341,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
           .filter((p) => p.maquina === maq && p.descricao === perfil)
           .reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
 
+        const barraUtilM = pf.barraUtilMm ? (pf.barraUtilMm / 1000).toFixed(2) : barraM.toFixed(0);
         rows.push([
           MAQUINA_LABEL[maq] || maq,
           perfil,
@@ -348,6 +349,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
           pf.qte,
           compTotalM.toFixed(1),
           barraM.toFixed(0),
+          barraUtilM,
           pf.barras,
           pesoEstimado.toFixed(1),
         ]);
@@ -368,7 +370,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
           chapasPorDesc[desc].peso += ch.pesoTotalKg || 0;
         }
         for (const [desc, info] of Object.entries(chapasPorDesc)) {
-          rows.push(["Laser Chapa", desc, "CH", info.qte, "—", "—", info.qte, info.peso.toFixed(1)]);
+          rows.push(["Laser Chapa", desc, "CH", info.qte, "—", "—", "—", info.qte, info.peso.toFixed(1)]);
           totalPecasGeral += info.qte;
           totalBarrasGeral += info.qte;
           totalPesoGeral += info.peso;
@@ -377,12 +379,12 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
     }
 
     rows.push([]);
-    rows.push(["TOTAL", "", "", totalPecasGeral, "", "", totalBarrasGeral, totalPesoGeral.toFixed(1)]);
+    rows.push(["TOTAL", "", "", totalPecasGeral, "", "", "", totalBarrasGeral, totalPesoGeral.toFixed(1)]);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws["!cols"] = [
       { wch: 18 }, { wch: 22 }, { wch: 6 }, { wch: 10 },
-      { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 16 },
+      { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 16 },
     ];
     XLSX.utils.book_append_sheet(wb, ws, "Lista de Material");
 
@@ -412,6 +414,13 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
       // Header
       rows.push([`PROGRAMA DE CORTE — ${dados.label.toUpperCase()}`]);
       rows.push([`${opLabel} — Gerado em ${agora}`]);
+      if (dados.perda) {
+        const perdas = [];
+        if (dados.perda.alinhamento) perdas.push(`${dados.perda.alinhamento}mm alinhamento`);
+        if (dados.perda.zonamorta) perdas.push(`${dados.perda.zonamorta}mm zona morta (mín. cortável)`);
+        if (dados.perda.retalhoMinimo) perdas.push(`${dados.perda.retalhoMinimo}mm retalho mín. (peças < ${dados.perda.limiarSemRetalho}mm)`);
+        if (perdas.length > 0) rows.push([`Perdas da máquina: ${perdas.join(" + ")}`]);
+      }
       rows.push([]);
 
       // Chapas (se houver)
@@ -430,8 +439,10 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
       const perfis = Object.entries(dados.perfis).sort((a, b) => a[0].localeCompare(b[0]));
       for (const [desc, grupo] of perfis) {
         const compBarraM = (grupo.comprimentoBarraMm / 1000).toFixed(1);
-        rows.push([`${desc} — Barra ${compBarraM}m — ${grupo.totalBarras} barra${grupo.totalBarras > 1 ? "s" : ""} — Aproveitamento ${grupo.aproveitamentoMedio.toFixed(0)}%`]);
-        rows.push(["Barra", "OP", "Marca", "Comprimento (mm)", "Peso (kg)", "Usado (mm)", "Sobra (mm)", "Aprov. %"]);
+        const compUtilM = grupo.barraUtilMm ? (grupo.barraUtilMm / 1000).toFixed(2) : compBarraM;
+        const perdaInfo = grupo.perdaMm > 0 ? ` (Útil: ${compUtilM}m | Perda: ${grupo.perdaMm}mm)` : "";
+        rows.push([`${desc} — Barra ${compBarraM}m${perdaInfo} — ${grupo.totalBarras} barra${grupo.totalBarras > 1 ? "s" : ""} — Aproveitamento ${grupo.aproveitamentoMedio.toFixed(0)}%`]);
+        rows.push(["Barra", "OP", "Marca", "Comprimento (mm)", "Peso (kg)", "Útil (mm)", "Usado (mm)", "Sobra (mm)", "Aprov. %"]);
 
         for (const barra of grupo.barras) {
           let primeiro = true;
@@ -442,6 +453,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
               peca.marca,
               peca.comprimentoMm,
               peca.pesoUnitKg || "",
+              primeiro ? barra.barraUtilMm : "",
               primeiro ? barra.usadoMm : "",
               primeiro ? barra.sobraMm : "",
               primeiro ? `${barra.aproveitamento.toFixed(0)}%` : "",
@@ -452,15 +464,16 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
 
         // Subtotal do perfil
         const totalUsado = grupo.barras.reduce((s, b) => s + b.usadoMm, 0);
-        const totalDisponivel = grupo.totalBarras * grupo.comprimentoBarraMm;
+        const totalUtil = grupo.totalBarras * (grupo.barraUtilMm || grupo.comprimentoBarraMm);
         rows.push([
           `TOTAL ${desc}`,
           "",
           `${grupo.totalPecas} peças`,
           `${(totalUsado / 1000).toFixed(1)}m usado`,
           "",
+          totalUtil,
           totalUsado,
-          totalDisponivel - totalUsado,
+          totalUtil - totalUsado,
           `${grupo.aproveitamentoMedio.toFixed(0)}%`,
         ]);
         rows.push([]);
@@ -476,7 +489,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
       const ws = XLSX.utils.aoa_to_sheet(rows);
       ws["!cols"] = [
         { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 18 },
-        { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+        { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
       ];
 
       const sheetName = (dados.label || maq).substring(0, 31);
@@ -707,6 +720,11 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
                           <span className="text-torg-gray">{(pf.compTotalMm / 1000).toFixed(1)}m</span>
                           <span className="text-torg-gray mx-1">→</span>
                           <span className="font-semibold">{pf.barras} barra{pf.barras > 1 ? "s" : ""}</span>
+                          {pf.perdaMm > 0 && (
+                            <span className="text-torg-gray ml-1 text-[10px]" title={`Barra ${(pf.comprimentoBarraMm/1000).toFixed(0)}m → Útil: ${(pf.barraUtilMm/1000).toFixed(2)}m (perda ${pf.perdaMm}mm)`}>
+                              (útil: {(pf.barraUtilMm / 1000).toFixed(2)}m)
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
