@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2,
-  Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList,
+  Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList, ArrowRight,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import {
@@ -151,6 +151,79 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
       setPecas((prev) =>
         prev.map((p) => {
           if (!selecionados.has(p.id) || p.status !== "PENDENTE") return p;
+          return { ...p, status: "CORTE", maquina: maquinasMap[p.id] || p.maquina };
+        })
+      );
+      setSelecionados(new Set());
+    } catch (e) {
+      alert("Erro ao liberar: " + e.message);
+    } finally {
+      setLiberando(false);
+    }
+  }
+
+  // Liberar todas as pendentes de uma maquina especifica
+  async function liberarMaquina(maq) {
+    const pecasMaq = porMaquina[maq]?.filter((p) => p.status === "PENDENTE") || [];
+    if (pecasMaq.length === 0) return;
+    const idsSet = new Set(pecasMaq.map((p) => p.id));
+    // Temporariamente setar selecionados e chamar liberarSelecionados
+    setSelecionados(idsSet);
+    // Executar inline pra evitar timing issue com setState
+    setLiberando(true);
+    try {
+      const maquinasMap = {};
+      for (const p of pecasMaq) {
+        let m = p.maquina;
+        if (!m && p.descricao) m = classificarMaquina(p.descricao, p.pesoUnitKg, p.comprimentoMm);
+        if (m) maquinasMap[p.id] = m;
+      }
+      const res = await fetch("/api/producao/pecas/liberar-corte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...idsSet], maquinas: maquinasMap }),
+      });
+      let data;
+      try { data = await res.json(); } catch { throw new Error(`Erro ${res.status}`); }
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setPecas((prev) =>
+        prev.map((p) => {
+          if (!idsSet.has(p.id) || p.status !== "PENDENTE") return p;
+          return { ...p, status: "CORTE", maquina: maquinasMap[p.id] || p.maquina };
+        })
+      );
+      setSelecionados(new Set());
+    } catch (e) {
+      alert("Erro ao liberar: " + e.message);
+    } finally {
+      setLiberando(false);
+    }
+  }
+
+  // Liberar TODAS as pendentes visíveis
+  async function liberarTodas() {
+    const pendentes = pecasFiltradas.filter((p) => p.status === "PENDENTE");
+    if (pendentes.length === 0) return;
+    const idsSet = new Set(pendentes.map((p) => p.id));
+    setLiberando(true);
+    try {
+      const maquinasMap = {};
+      for (const p of pendentes) {
+        let m = p.maquina;
+        if (!m && p.descricao) m = classificarMaquina(p.descricao, p.pesoUnitKg, p.comprimentoMm);
+        if (m) maquinasMap[p.id] = m;
+      }
+      const res = await fetch("/api/producao/pecas/liberar-corte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...idsSet], maquinas: maquinasMap }),
+      });
+      let data;
+      try { data = await res.json(); } catch { throw new Error(`Erro ${res.status}`); }
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setPecas((prev) =>
+        prev.map((p) => {
+          if (!idsSet.has(p.id) || p.status !== "PENDENTE") return p;
           return { ...p, status: "CORTE", maquina: maquinasMap[p.id] || p.maquina };
         })
       );
@@ -492,6 +565,28 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
         </div>
       </div>
 
+      {/* Ação principal — Liberar para Produção */}
+      {filtroStatus === "PENDENTE" && totalPendentes > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p className="text-sm font-semibold text-emerald-800 flex items-center gap-2">
+              <CheckCircle2 size={16} /> Pronto para liberar?
+            </p>
+            <p className="text-xs text-emerald-700 mt-0.5">
+              Após verificar as planilhas e os perfis, clique para confirmar a programação e enviar para produção.
+            </p>
+          </div>
+          <button
+            onClick={liberarTodas}
+            disabled={liberando}
+            className="px-5 py-2.5 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 font-semibold flex items-center gap-2 disabled:opacity-50 shadow-sm"
+          >
+            {liberando ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+            Liberar {pecasFiltradas.filter((p) => p.status === "PENDENTE").length} Peças para Produção
+          </button>
+        </div>
+      )}
+
       {/* Filtros */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
         <Filter size={14} className="text-torg-gray" />
@@ -701,24 +796,40 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
                   </table>
                 </div>
 
-                {/* Footer da maquina com acao em lote */}
-                <div className="px-4 py-2.5 bg-gray-50/60 border-t border-gray-100 flex items-center justify-between">
+                {/* Footer da maquina */}
+                <div className="px-4 py-3 bg-gray-50/60 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
                   <span className="text-[11px] text-torg-gray">
-                    {pecasMaq.filter((p) => selecionados.has(p.id)).length} de {pecasMaq.length} selecionadas nesta máquina
+                    {pecasMaq.filter((p) => p.status === "PENDENTE").length} pendente{pecasMaq.filter((p) => p.status === "PENDENTE").length !== 1 ? "s" : ""} · {pecasMaq.filter((p) => p.status === "CORTE").length} liberada{pecasMaq.filter((p) => p.status === "CORTE").length !== 1 ? "s" : ""}
                   </span>
                   <div className="flex gap-2">
-                    {filtroStatus === "PENDENTE" && (
+                    {selecionados.size > 0 && pecasMaq.some((p) => selecionados.has(p.id)) && filtroStatus === "PENDENTE" && (
                       <button
-                        onClick={() => {
-                          const ids = pecasMaq.filter((p) => selecionados.has(p.id)).map((p) => p.id);
-                          if (ids.length === 0) {
-                            // Seleciona todas desta maquina e libera
-                            selecionarTodosMaquina(maq);
-                          }
-                        }}
-                        className="text-[11px] text-torg-blue hover:text-torg-dark font-medium"
+                        onClick={liberarSelecionados}
+                        disabled={liberando}
+                        className="px-3 py-1.5 bg-emerald-100 text-emerald-700 text-xs rounded-lg hover:bg-emerald-200 font-medium flex items-center gap-1.5 disabled:opacity-50"
                       >
-                        Selecionar todas
+                        {liberando ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                        Liberar {pecasMaq.filter((p) => selecionados.has(p.id)).length} selecionadas
+                      </button>
+                    )}
+                    {filtroStatus === "PENDENTE" && pecasMaq.some((p) => p.status === "PENDENTE") && (
+                      <button
+                        onClick={() => liberarMaquina(maq)}
+                        disabled={liberando}
+                        className={`px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5 disabled:opacity-50`}
+                      >
+                        {liberando ? <Loader2 size={12} className="animate-spin" /> : <ArrowRight size={12} />}
+                        Liberar {label} para Produção
+                      </button>
+                    )}
+                    {filtroStatus === "CORTE" && pecasMaq.some((p) => p.status === "CORTE") && selecionados.size > 0 && (
+                      <button
+                        onClick={reverterSelecionados}
+                        disabled={revertendo}
+                        className="px-3 py-1.5 bg-orange-100 text-orange-700 text-xs rounded-lg hover:bg-orange-200 font-medium flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {revertendo ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                        Reverter selecionadas
                       </button>
                     )}
                   </div>
