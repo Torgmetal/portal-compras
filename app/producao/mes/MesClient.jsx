@@ -1373,7 +1373,7 @@ export default function MesClient({
             Rastreabilidade Syneco
           </h1>
           <p className="text-sm text-torg-gray mt-0.5">
-            Dados do SKA Syneco — dataset 242 (Rastreabilidade de OP e Item)
+            Dados do SKA Syneco — dataset 150 (Planejado × Produzido, com não iniciadas)
           </p>
         </div>
 

@@ -67,26 +67,64 @@ async function skaLogin() {
   return token;
 }
 
-// Busca o snapshot completo do dataset 150 (uma chamada)
-async function skaFetchSnapshot(token, startDate, endDate) {
-  log(`SKA fetch: ${fmtISO(startDate)} → ${fmtISO(endDate)}`);
+// IMPORTANTE: a API do SKA limita o resultado a 100.000 linhas por chamada.
+// Com a janela larga (#OP=Todos, vários anos) o dataset 150 passa de 100k e as
+// obras MAIS RECENTES (ex: T88) são CORTADAS — vinham com produção zerada.
+// Solução: buscar em JANELAS de data e, se uma janela bater no teto, dividir ao
+// meio recursivamente. O "Produzido" é acumulado (cada operação aparece na
+// janela da sua data com o valor cheio), então juntamos por chave pegando o MAX.
+const CAP_SKA = 100000;
+const DIA_MS  = 86400000;
+
+// Uma chamada para um intervalo de datas.
+async function skaFetchRange(token, ini, fim) {
   const qs = [
     "interval=0",
-    `%23StartDate=${encodeURIComponent(fmtISO(startDate))}`,
-    `%23EndDate=${encodeURIComponent(fmtISO(endDate))}`,
+    `%23StartDate=${encodeURIComponent(fmtISO(ini))}`,
+    `%23EndDate=${encodeURIComponent(fmtISO(fim))}`,
     "%23OP=Todos", "%23Item=Todos", "%23Obra=Todos",
     "%23Setor=Todos", "%23Status=TODOS",
     "%23Resource=Todos", "%23Resource_concat=Todos",
-    "page=1", "pageSize=999999",
+    "page=1", "pageSize=99999",
   ].join("&");
   const resp = await fetch(`${SKA_API_URL}/v1/dataset/${SKA_DATASET_ID}/run?${qs}`, {
-    method: "GET", headers: { token }, timeout: 300000, // 5 min — snapshot grande
+    method: "GET", headers: { token }, timeout: 300000,
   });
   if (!resp.ok) throw new Error(`Dataset ${SKA_DATASET_ID} erro (${resp.status}): ${(await resp.text().catch(()=>"")).slice(0,300)}`);
   const data = await resp.json();
   const rows = Array.isArray(data) ? data : (data.data || data.rows || data.result || []);
   if (!Array.isArray(rows)) throw new Error("Formato inesperado: " + JSON.stringify(data).slice(0,200));
   return rows;
+}
+
+// Busca recursiva: divide a janela se bater no teto de 100k.
+async function skaFetchJanela(token, ini, fim, prof = 0) {
+  const rows = await skaFetchRange(token, ini, fim);
+  const ind = "  ".repeat(prof);
+  log(`${ind}janela ${fmtData(ini)} → ${fmtData(fim)}: ${rows.length} linhas${rows.length >= CAP_SKA ? " (teto → dividindo)" : ""}`);
+  if (rows.length >= CAP_SKA && (fim - ini) > DIA_MS) {
+    const meio = new Date((ini.getTime() + fim.getTime()) / 2); meio.setHours(23, 59, 59, 0);
+    const prox = new Date(meio.getTime() + DIA_MS); prox.setHours(0, 0, 0, 0);
+    const a = await skaFetchJanela(token, ini, meio, prof + 1);
+    const b = await skaFetchJanela(token, prox, fim, prof + 1);
+    return a.concat(b);
+  }
+  return rows;
+}
+
+// Busca o snapshot completo em janelas e junta por chave (MAX produzido).
+async function skaFetchSnapshot(token, startDate, endDate) {
+  log(`SKA fetch (janelas): ${fmtISO(startDate)} → ${fmtISO(endDate)}`);
+  const todas = await skaFetchJanela(token, startDate, endDate);
+  const map = new Map();
+  for (const r of todas) {
+    const k = `${r["Obra"]}|${r["OP"]}|${r["Operação"] || r["Operacao"]}|${r["Item"]}`;
+    const prev = map.get(k);
+    if (!prev || num(r["Produzido"]) > num(prev["Produzido"])) map.set(k, r);
+  }
+  const uniq = [...map.values()];
+  log(`Total bruto ${todas.length} → ${uniq.length} linhas únicas (após juntar janelas)`);
+  return uniq;
 }
 
 function transformarLinha(row) {
