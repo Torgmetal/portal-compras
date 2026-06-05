@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import {
   Upload, Loader2, AlertCircle, X, CheckCircle2, Search,
   Package, FileSpreadsheet, ChevronDown, ChevronUp, Filter, Plus, Trash2,
-  Zap, RefreshCw,
+  Zap, RefreshCw, Factory,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { fmtOP } from "@/lib/utils";
@@ -55,6 +55,10 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroMaquina, setFiltroMaquina] = useState("");
   const [reclassificando, setReclassificando] = useState(false);
+  const [modalSyneco, setModalSyneco] = useState(false);
+  const [importandoSyneco, setImportandoSyneco] = useState(false);
+  const [resultadoSyneco, setResultadoSyneco] = useState(null);
+  const [synecoOpSelecionada, setSynecoOpSelecionada] = useState("");
 
   // Lista de OPs que tem pecas (pra mostrar so as relevantes no filtro)
   const opsComPecas = useMemo(() => {
@@ -191,6 +195,41 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
     }
   }
 
+  // Importar produção do Syneco (MES) → atualiza peças + cria ProducaoSemanal
+  async function importarSyneco() {
+    const opNum = synecoOpSelecionada || filtroOp;
+    if (!opNum) {
+      alert("Selecione uma OP para importar.");
+      return;
+    }
+    setImportandoSyneco(true);
+    setResultadoSyneco(null);
+    try {
+      const res = await fetch("/api/producao/importar-syneco-corte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: opNum }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
+      setResultadoSyneco(data);
+      // Atualizar peças locais se houve updates
+      if (data.statusUpdated > 0) {
+        router.refresh();
+      }
+    } catch (e) {
+      setResultadoSyneco({ error: e.message });
+    } finally {
+      setImportandoSyneco(false);
+    }
+  }
+
+  function abrirModalSyneco() {
+    setSynecoOpSelecionada(filtroOp || "");
+    setResultadoSyneco(null);
+    setModalSyneco(true);
+  }
+
   const isAdmin = userRole === "ADMIN";
 
   return (
@@ -217,6 +256,12 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
             className="px-3 py-1.5 bg-torg-dark text-white text-xs rounded-lg hover:bg-torg-dark/90 font-medium flex items-center gap-1.5"
           >
             <Upload size={14} /> Importar LPC
+          </button>
+          <button
+            onClick={abrirModalSyneco}
+            className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5"
+          >
+            <Factory size={14} /> Importar Syneco
           </button>
           {isAdmin && opsComPecas.length > 0 && (
             <button
@@ -490,6 +535,168 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
           onClose={() => setModalImportLPC(false)}
           onImportado={() => { setModalImportLPC(false); router.refresh(); }}
         />
+      )}
+
+      {/* Modal Importar Syneco */}
+      {modalSyneco && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !importandoSyneco && setModalSyneco(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Factory size={18} className="text-emerald-600" />
+                <h3 className="text-base font-bold text-torg-dark">Importar Produção Syneco</h3>
+              </div>
+              <button onClick={() => !importandoSyneco && setModalSyneco(false)} className="text-torg-gray hover:text-torg-dark">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <div className="bg-emerald-50 rounded-xl p-3 text-xs text-emerald-800">
+                <p className="font-medium">Importa do MES Syneco (MesOrdem) apenas o setor <strong>Corte</strong>.</p>
+                <p className="mt-1 text-emerald-700">
+                  Peças com produção confirmada terão status atualizado para CORTE.
+                  As datas de fabricação serão registradas no Controle de Produção.
+                </p>
+              </div>
+
+              {/* Seletor de OP */}
+              <div>
+                <label className="text-xs font-semibold text-torg-dark block mb-1">OP para importar</label>
+                <select
+                  value={synecoOpSelecionada}
+                  onChange={(e) => { setSynecoOpSelecionada(e.target.value); setResultadoSyneco(null); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  disabled={importandoSyneco}
+                >
+                  <option value="">Selecione uma OP...</option>
+                  {opsComPecas.map((op) => (
+                    <option key={op} value={op}>OP {op}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Setor fixo */}
+              <div>
+                <label className="text-xs font-semibold text-torg-dark block mb-1">Setor</label>
+                <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-torg-dark font-medium">
+                  🔴 Corte
+                </div>
+                <p className="text-[10px] text-torg-gray mt-1">
+                  Filtrando apenas o setor de Corte para evitar dados incorretos.
+                </p>
+              </div>
+
+              {/* Resultado da importação */}
+              {resultadoSyneco && !resultadoSyneco.error && (
+                <div className="bg-white border border-emerald-200 rounded-xl p-4 space-y-2">
+                  <p className="text-sm font-bold text-emerald-800 flex items-center gap-1.5">
+                    <CheckCircle2 size={16} /> Importação concluída
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-gray-50 rounded p-2">
+                      <span className="text-torg-gray">Obra Syneco</span>
+                      <p className="font-bold text-torg-dark">{resultadoSyneco.obraCode}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2">
+                      <span className="text-torg-gray">Registros MES</span>
+                      <p className="font-bold text-torg-dark">{resultadoSyneco.totalMes}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2">
+                      <span className="text-torg-gray">Com produção</span>
+                      <p className="font-bold text-torg-dark">{resultadoSyneco.comProducao}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2">
+                      <span className="text-torg-gray">Peças encontradas</span>
+                      <p className="font-bold text-torg-dark">{resultadoSyneco.matched}</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded p-2">
+                      <span className="text-emerald-700">Status atualizados</span>
+                      <p className="font-bold text-emerald-700">{resultadoSyneco.statusUpdated}</p>
+                      <p className="text-[10px] text-emerald-600">PENDENTE → CORTE</p>
+                    </div>
+                    <div className="bg-blue-50 rounded p-2">
+                      <span className="text-blue-700">Dias de produção</span>
+                      <p className="font-bold text-blue-700">{resultadoSyneco.diasProducao}</p>
+                      <p className="text-[10px] text-blue-600">registrados no controle</p>
+                    </div>
+                  </div>
+
+                  {resultadoSyneco.alreadyCut > 0 && (
+                    <p className="text-[11px] text-torg-gray">
+                      {resultadoSyneco.alreadyCut} peça{resultadoSyneco.alreadyCut > 1 ? "s" : ""} já estavam em CORTE ou posterior.
+                    </p>
+                  )}
+
+                  {resultadoSyneco.notFound?.length > 0 && (
+                    <div className="text-[11px]">
+                      <p className="text-orange-700 font-medium">
+                        {resultadoSyneco.notFound.length} item(ns) do Syneco sem peça correspondente no portal:
+                      </p>
+                      <p className="text-torg-gray font-mono mt-0.5">
+                        {resultadoSyneco.notFound.slice(0, 15).join(", ")}
+                        {resultadoSyneco.notFound.length > 15 ? ` ...+${resultadoSyneco.notFound.length - 15}` : ""}
+                      </p>
+                    </div>
+                  )}
+
+                  {resultadoSyneco.pesosPorData && Object.keys(resultadoSyneco.pesosPorData).length > 0 && (
+                    <div className="text-[11px]">
+                      <p className="text-torg-dark font-medium mb-1">Peso produzido por dia:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(resultadoSyneco.pesosPorData)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([data, peso]) => (
+                            <span key={data} className="bg-gray-100 rounded px-2 py-0.5 font-mono">
+                              {data.split("-").reverse().join("/")} → {peso.toFixed(1)} kg
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Erro */}
+              {resultadoSyneco?.error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
+                  <p className="font-medium flex items-center gap-1.5">
+                    <AlertCircle size={14} /> Erro na importação
+                  </p>
+                  <p className="mt-1">{resultadoSyneco.error}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
+              <button
+                onClick={() => { setModalSyneco(false); setResultadoSyneco(null); }}
+                disabled={importandoSyneco}
+                className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark disabled:opacity-50"
+              >
+                {resultadoSyneco ? "Fechar" : "Cancelar"}
+              </button>
+              {!resultadoSyneco && (
+                <button
+                  onClick={importarSyneco}
+                  disabled={importandoSyneco || !synecoOpSelecionada}
+                  className="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {importandoSyneco ? <Loader2 size={14} className="animate-spin" /> : <Factory size={14} />}
+                  Importar Corte
+                </button>
+              )}
+              {resultadoSyneco && !resultadoSyneco.error && resultadoSyneco.statusUpdated > 0 && (
+                <button
+                  onClick={() => { setModalSyneco(false); setResultadoSyneco(null); router.refresh(); }}
+                  className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium"
+                >
+                  Atualizar Página
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {modalExcluirLote && (
