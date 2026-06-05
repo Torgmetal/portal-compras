@@ -156,16 +156,22 @@ Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado
 }
 
 function ConciliacaoNfse({ obras = [], onVinculado }) {
+  const hojeISO = new Date().toISOString().slice(0, 10);
   const [data, setData]     = useState(null);
   const [loading, setLoad]  = useState(false);
   const [erro, setErro]     = useState("");
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(null); // chave da nota sendo salva
+  const [de, setDe]   = useState(`${new Date().getFullYear()}-01-01`); // início do ano
+  const [ate, setAte] = useState(hojeISO);
 
   const consultar = async () => {
     setLoad(true); setErro("");
     try {
-      const res = await fetch("/api/financeiro/nfse-conchal");
+      const qs = new URLSearchParams();
+      if (de)  qs.set("de", de);
+      if (ate) qs.set("ate", ate);
+      const res = await fetch(`/api/financeiro/nfse-conchal?${qs}`);
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Erro");
       setData(d);
@@ -236,15 +242,25 @@ function ConciliacaoNfse({ obras = [], onVinculado }) {
             </div>
           ) : data ? (
             <div className="space-y-3">
+              {/* Seletor de período */}
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="text-torg-gray font-medium">Período:</span>
+                <input type="date" value={de} max={ate} onChange={e => setDe(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+                <span className="text-gray-400">até</span>
+                <input type="date" value={ate} min={de} max={hojeISO} onChange={e => setAte(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+                <button onClick={consultar} disabled={loading}
+                  className="px-2.5 py-1 bg-torg-blue text-white rounded-lg hover:opacity-90 inline-flex items-center gap-1 disabled:opacity-50">
+                  {loading ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />} Buscar
+                </button>
+              </div>
               <div className="flex items-center gap-4 flex-wrap text-sm">
-                <span className="text-torg-gray">Período {fmtData(data.periodo?.de)} → {fmtData(data.periodo?.ate)}</span>
+                <span className="text-torg-gray">Mostrando {fmtData(data.periodo?.de)} → {fmtData(data.periodo?.ate)}</span>
                 <span className="text-torg-dark"><strong>{data.resumo?.ativas || 0}</strong> notas ativas</span>
                 <span className="text-red-700 font-semibold">{data.resumo?.foraDoOmie || 0} fora do Omie</span>
                 <span className="text-green-700">{foraDoOmie.filter(n => n.vinculoCodProj).length} vinculadas</span>
                 <span className="text-amber-700">{fmtMoeda(data.resumo?.valorForaDoOmie)} fora do Omie</span>
-                <button onClick={consultar} className="ml-auto text-xs px-2 py-1 border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-1">
-                  <RefreshCw size={12} /> Atualizar
-                </button>
               </div>
               <div className="text-xs text-torg-gray">Vincule cada nota ao projeto do Omie — o valor soma no <strong>faturado</strong> da obra na tabela acima.</div>
               {data.truncadoEnriquecimento && (
