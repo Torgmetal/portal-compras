@@ -49,6 +49,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [modalImportLPC, setModalImportLPC] = useState(false);
+  const [modalExcluirLote, setModalExcluirLote] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState("");
 
   // Lista de OPs que tem pecas (pra mostrar so as relevantes no filtro)
@@ -162,6 +163,14 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
           >
             <Upload size={14} /> Importar LPC
           </button>
+          {isAdmin && opsComPecas.length > 0 && (
+            <button
+              onClick={() => setModalExcluirLote(true)}
+              className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg hover:bg-red-100 font-medium flex items-center gap-1.5 border border-red-200"
+            >
+              <Trash2 size={14} /> Excluir em Lote
+            </button>
+          )}
         </div>
       </div>
 
@@ -323,6 +332,18 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
         />
       )}
 
+      {modalExcluirLote && (
+        <ModalExcluirLote
+          pecas={pecas}
+          opsComPecas={opsComPecas}
+          onClose={() => setModalExcluirLote(false)}
+          onExcluido={(opsRemovidas) => {
+            setPecas((prev) => prev.filter((p) => !opsRemovidas.includes(p.opNumero)));
+            setModalExcluirLote(false);
+          }}
+        />
+      )}
+
       <ConfirmModal
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
@@ -350,6 +371,209 @@ function KpiPequeno({ label, value, subtitle, color }) {
       <p className="text-[10px] uppercase tracking-wider font-semibold opacity-80">{label}</p>
       <p className="text-2xl font-extrabold tabular-nums leading-tight mt-0.5">{value}</p>
       {subtitle && <p className="text-[10px] opacity-70 mt-0.5">{subtitle}</p>}
+    </div>
+  );
+}
+
+function ModalExcluirLote({ pecas, opsComPecas, onClose, onExcluido }) {
+  const [selecionadas, setSelecionadas] = useState(new Set());
+  const [excluindo, setExcluindo] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [resultado, setResultado] = useState(null);
+
+  // Resumo por OP
+  const resumoPorOp = useMemo(() => {
+    const map = {};
+    for (const p of pecas) {
+      if (!map[p.opNumero]) map[p.opNumero] = { total: 0, peso: 0, expedidas: 0 };
+      map[p.opNumero].total += p.qte;
+      map[p.opNumero].peso += p.pesoTotalKg || 0;
+      if (p.status === "EXPEDIDO") map[p.opNumero].expedidas += p.qte;
+    }
+    return map;
+  }, [pecas]);
+
+  const toggleOp = (op) => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(op)) next.delete(op); else next.add(op);
+      return next;
+    });
+  };
+  const toggleTodas = () => {
+    if (selecionadas.size === opsComPecas.length) setSelecionadas(new Set());
+    else setSelecionadas(new Set(opsComPecas));
+  };
+
+  const totalSelecionado = useMemo(() => {
+    let total = 0, peso = 0;
+    for (const op of selecionadas) {
+      if (resumoPorOp[op]) { total += resumoPorOp[op].total; peso += resumoPorOp[op].peso; }
+    }
+    return { total, peso };
+  }, [selecionadas, resumoPorOp]);
+
+  const executar = async () => {
+    setErro("");
+    setExcluindo(true);
+    try {
+      const res = await fetch("/api/producao/pecas", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ops: [...selecionadas] }),
+      });
+      let data;
+      try { data = await res.json(); } catch { throw new Error(`Erro ${res.status} do servidor`); }
+      if (!res.ok) throw new Error(data.error || "Erro ao excluir");
+      setResultado({ removidas: data.removidas, ops: [...selecionadas] });
+    } catch (e) {
+      setErro(e.message);
+      setExcluindo(false);
+      setConfirmando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <Trash2 size={18} className="text-red-500" /> Excluir OPs em Lote
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-4 flex-1 overflow-y-auto space-y-3">
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" /> <span>{erro}</span>
+            </div>
+          )}
+
+          {resultado ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-center">
+              <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-2" />
+              <p className="text-sm font-semibold text-emerald-800">
+                {resultado.removidas} peça{resultado.removidas !== 1 ? "s" : ""} removida{resultado.removidas !== 1 ? "s" : ""} de {resultado.ops.length} OP{resultado.ops.length > 1 ? "s" : ""}
+              </p>
+              <button
+                onClick={() => onExcluido(resultado.ops)}
+                className="mt-3 px-4 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          ) : confirmando ? (
+            <div className="space-y-3">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-red-800 mb-2 flex items-center gap-2">
+                  <AlertCircle size={16} /> Confirmar exclusão
+                </p>
+                <p className="text-sm text-red-700">
+                  Serão excluídas <strong>{totalSelecionado.total.toLocaleString("pt-BR")} peças</strong> ({fmtKg(totalSelecionado.peso)}) de <strong>{selecionadas.size} OP{selecionadas.size > 1 ? "s" : ""}</strong>:
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {[...selecionadas].sort().map((op) => (
+                    <span key={op} className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-mono font-medium">
+                      {fmtOP(op)}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-red-600 mt-3 font-medium">
+                  Esta ação não pode ser desfeita.
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmando(false)}
+                  disabled={excluindo}
+                  className="px-4 py-2 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={executar}
+                  disabled={excluindo}
+                  className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
+                >
+                  {excluindo ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  {excluindo ? "Excluindo..." : "Excluir definitivamente"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-torg-gray">
+                Selecione as OPs cujas peças serão removidas. Todas as peças, conjuntos e croquis dessas OPs serão excluídos.
+              </p>
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                <label className="flex items-center gap-2 cursor-pointer text-xs">
+                  <input
+                    type="checkbox"
+                    checked={selecionadas.size === opsComPecas.length && opsComPecas.length > 0}
+                    onChange={toggleTodas}
+                    className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                  />
+                  <span className="font-medium text-torg-dark">
+                    Selecionar todas ({opsComPecas.length})
+                  </span>
+                </label>
+                {selecionadas.size > 0 && (
+                  <span className="text-[10px] text-torg-gray ml-auto">
+                    {selecionadas.size} selecionada{selecionadas.size > 1 ? "s" : ""} · {totalSelecionado.total.toLocaleString("pt-BR")} peças · {fmtKg(totalSelecionado.peso)}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1 max-h-[40vh] overflow-y-auto">
+                {opsComPecas.map((op) => {
+                  const info = resumoPorOp[op] || { total: 0, peso: 0, expedidas: 0 };
+                  const temExpedidas = info.expedidas > 0;
+                  return (
+                    <label
+                      key={op}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                        selecionadas.has(op) ? "bg-red-50 border border-red-200" : "hover:bg-gray-50 border border-transparent"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selecionadas.has(op)}
+                        onChange={() => toggleOp(op)}
+                        className="rounded border-gray-300 text-red-500 focus:ring-red-400"
+                      />
+                      <span className="font-mono text-sm font-semibold text-torg-dark min-w-[60px]">{fmtOP(op)}</span>
+                      <span className="text-xs text-torg-gray flex-1">
+                        {info.total} peça{info.total !== 1 ? "s" : ""} · {fmtKg(info.peso)}
+                      </span>
+                      {temExpedidas && (
+                        <span className="text-[10px] text-emerald-600 font-medium">
+                          {info.expedidas} expedida{info.expedidas > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {!resultado && !confirmando && (
+          <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between shrink-0">
+            <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">
+              Cancelar
+            </button>
+            <button
+              onClick={() => setConfirmando(true)}
+              disabled={selecionadas.size === 0}
+              className="px-4 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 size={13} /> Excluir {selecionadas.size > 0 ? `${selecionadas.size} OP${selecionadas.size > 1 ? "s" : ""}` : "selecionadas"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

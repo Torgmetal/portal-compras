@@ -69,30 +69,58 @@ export async function GET(req) {
 }
 
 export async function DELETE(req) {
+  let user;
   try {
-    await requireRole(["ADMIN"]);
+    user = await requireRole(["ADMIN"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: e.message }, { status });
   }
 
-  const opNumero = new URL(req.url, "http://n").searchParams.get("op");
-  if (!opNumero) {
-    return NextResponse.json({ error: "Parâmetro 'op' é obrigatório" }, { status: 400 });
+  // Suporta exclusao em lote via body JSON { ops: ["85","86"] } OU single via ?op=X
+  let opsParaDeletar = [];
+  const opQuery = new URL(req.url, "http://n").searchParams.get("op");
+  if (opQuery) {
+    opsParaDeletar = [opQuery];
+  } else {
+    try {
+      const body = await req.json();
+      if (Array.isArray(body.ops) && body.ops.length > 0) {
+        opsParaDeletar = body.ops.filter((o) => typeof o === "string" && o.trim());
+      }
+    } catch {
+      // body vazio — segue sem ops
+    }
   }
 
-  const deleted = await prisma.pecaConjunto.deleteMany({ where: { opNumero } });
+  if (opsParaDeletar.length === 0) {
+    return NextResponse.json({ error: "Informe ao menos uma OP para excluir (query ?op= ou body { ops: [] })" }, { status: 400 });
+  }
 
-  await prisma.auditLog.create({
-    data: {
-      acao: "DELETE_PECAS_LOTE",
-      entidade: "PecaConjunto",
-      entidadeId: opNumero,
-      detalhes: { opNumero, totalRemovidas: deleted.count },
-    },
-  });
+  try {
+    const deleted = await prisma.pecaConjunto.deleteMany({
+      where: { opNumero: { in: opsParaDeletar } },
+    });
 
-  return NextResponse.json({ ok: true, removidas: deleted.count });
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: "DELETE_PECAS_LOTE",
+          entity: "PecaConjunto",
+          entityId: opsParaDeletar.join(","),
+          diff: { ops: opsParaDeletar, totalRemovidas: deleted.count },
+        },
+      });
+    } catch (auditErr) {
+      console.error("[pecas DELETE] falha no audit log:", auditErr?.message);
+    }
+
+    return NextResponse.json({ ok: true, removidas: deleted.count, ops: opsParaDeletar });
+  } catch (e) {
+    console.error("[pecas DELETE] erro:", e?.message);
+    return NextResponse.json({ error: e?.message || "Erro ao excluir" }, { status: 500 });
+  }
 }
 
 const schemaPeca = z.object({
