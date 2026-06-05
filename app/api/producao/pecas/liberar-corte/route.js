@@ -11,7 +11,8 @@ const MAQUINAS_VALIDAS = ["LASER_CHAPA", "LASER_PERFIL", "LASER_TUBO", "LASER_CA
 const schema = z.object({
   ids: z.array(z.string()).min(1, "Selecione ao menos uma peça"),
   reverter: z.boolean().optional(),
-  maquina: z.enum(MAQUINAS_VALIDAS).optional(),
+  // Mapa de id → maquina para salvar na liberação
+  maquinas: z.record(z.string(), z.enum(MAQUINAS_VALIDAS).nullable()).optional(),
 });
 
 export async function POST(req) {
@@ -31,15 +32,33 @@ export async function POST(req) {
       return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
     }
 
-    const { ids, reverter } = body;
+    const { ids, reverter, maquinas } = body;
 
     const statusDe = reverter ? "CORTE" : "PENDENTE";
     const statusPara = reverter ? "PENDENTE" : "CORTE";
 
-    const result = await prisma.pecaConjunto.updateMany({
-      where: { id: { in: ids }, status: statusDe },
-      data: { status: statusPara },
-    });
+    let atualizados = 0;
+
+    if (!reverter && maquinas && Object.keys(maquinas).length > 0) {
+      // Liberar: atualiza maquina + status peça a peça (pra cada uma ter sua maquina correta)
+      for (const id of ids) {
+        const maq = maquinas[id] || null;
+        const data = { status: statusPara };
+        if (maq) data.maquina = maq;
+        const r = await prisma.pecaConjunto.updateMany({
+          where: { id, status: statusDe },
+          data,
+        });
+        atualizados += r.count;
+      }
+    } else {
+      // Sem maquinas ou reverter: batch update só status
+      const result = await prisma.pecaConjunto.updateMany({
+        where: { id: { in: ids }, status: statusDe },
+        data: { status: statusPara },
+      });
+      atualizados = result.count;
+    }
 
     try {
       await prisma.auditLog.create({
@@ -49,11 +68,12 @@ export async function POST(req) {
           entity: "PecaConjunto",
           entityId: ids.length === 1 ? ids[0] : `${ids.length} pecas`,
           diff: {
-            ids,
+            ids: ids.slice(0, 20), // limitar pra não estourar JSON
+            total: ids.length,
             de: statusDe,
             para: statusPara,
-            atualizados: result.count,
-            maquina: body.maquina || null,
+            atualizados,
+            comMaquina: maquinas ? Object.keys(maquinas).length : 0,
           },
         },
       });
@@ -61,7 +81,7 @@ export async function POST(req) {
 
     return NextResponse.json({
       ok: true,
-      atualizados: result.count,
+      atualizados,
       acao: reverter ? "REVERTIDO" : "LIBERADO",
     });
   } catch (e) {

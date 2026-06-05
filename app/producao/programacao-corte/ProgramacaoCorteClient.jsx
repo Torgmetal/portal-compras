@@ -121,23 +121,38 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
     }
   };
 
-  // Liberar para corte
+  // Liberar para corte — salva maquina + muda status
   async function liberarSelecionados() {
     if (selecionados.size === 0) return;
     setLiberando(true);
     try {
+      // Montar mapa de id → maquina (incluindo auto-classificação para peças sem maquina)
+      const maquinasMap = {};
+      for (const id of selecionados) {
+        const p = pecas.find((x) => x.id === id);
+        if (!p) continue;
+        let maq = p.maquina;
+        if (!maq && p.descricao) {
+          maq = classificarMaquina(p.descricao, p.pesoUnitKg, p.comprimentoMm);
+        }
+        if (maq) maquinasMap[id] = maq;
+      }
+
       const res = await fetch("/api/producao/pecas/liberar-corte", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [...selecionados] }),
+        body: JSON.stringify({ ids: [...selecionados], maquinas: maquinasMap }),
       });
       let data;
       try { data = await res.json(); } catch { throw new Error(`Erro ${res.status}`); }
       if (!res.ok) throw new Error(data.error || "Erro");
 
-      // Update otimista
+      // Update otimista — atualiza status E maquina
       setPecas((prev) =>
-        prev.map((p) => (selecionados.has(p.id) && p.status === "PENDENTE" ? { ...p, status: "CORTE" } : p))
+        prev.map((p) => {
+          if (!selecionados.has(p.id) || p.status !== "PENDENTE") return p;
+          return { ...p, status: "CORTE", maquina: maquinasMap[p.id] || p.maquina };
+        })
       );
       setSelecionados(new Set());
     } catch (e) {
