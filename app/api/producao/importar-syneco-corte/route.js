@@ -144,7 +144,18 @@ export async function POST(req) {
     totais.percentualQte = totais.qtePlanejada > 0 ? (totais.qteProduzida / totais.qtePlanejada * 100) : 0;
     totais.percentualPeso = totais.pesoPlanejado > 0 ? (totais.pesoProduzido / totais.pesoPlanejado * 100) : 0;
 
-    // Criar ProducaoSemanal por data
+    // Ler registros antigos do Syneco para esta OP (para subtrair do ProducaoDiaria na re-importação)
+    const oldSyneco = await prisma.producaoSemanal.findMany({
+      where: { opId: op.id, setor: "Corte", fonte: "SYNECO" },
+      select: { data: true, pesoRealizadoKg: true },
+    });
+    const oldPesosPorData = {};
+    for (const r of oldSyneco) {
+      const k = r.data.toISOString().split("T")[0];
+      oldPesosPorData[k] = (oldPesosPorData[k] || 0) + r.pesoRealizadoKg;
+    }
+
+    // Limpar ProducaoSemanal antigos e recriar
     await prisma.producaoSemanal.deleteMany({
       where: { opId: op.id, setor: "Corte", fonte: "SYNECO" },
     });
@@ -174,6 +185,42 @@ export async function POST(req) {
         },
       });
       diasCriados++;
+    }
+
+    // Upsert ProducaoDiaria — alimenta o Controle de Produção
+    // Primeiro subtrai valores antigos desta OP (idempotência na re-importação)
+    let diasControle = 0;
+    const todasDatas = new Set([...Object.keys(oldPesosPorData), ...Object.keys(pesosPorData)]);
+    for (const dataStr of todasDatas) {
+      const oldPeso = oldPesosPorData[dataStr] || 0;
+      const newPeso = pesosPorData[dataStr] || 0;
+      const delta = newPeso - oldPeso;
+      if (delta === 0) continue;
+
+      const dataDia = new Date(dataStr + "T00:00:00.000Z");
+      try {
+        const existing = await prisma.producaoDiaria.findUnique({
+          where: { data_setor: { data: dataDia, setor: "CORTE" } },
+        });
+        if (existing) {
+          await prisma.producaoDiaria.update({
+            where: { data_setor: { data: dataDia, setor: "CORTE" } },
+            data: { pesoRealizadoKg: Math.max(0, existing.pesoRealizadoKg + delta) },
+          });
+        } else if (newPeso > 0) {
+          await prisma.producaoDiaria.create({
+            data: {
+              data: dataDia,
+              setor: "CORTE",
+              pesoRealizadoKg: newPeso,
+              pesoMetaKg: 0,
+              observacao: `Syneco ${obraCode}`,
+              createdById: user.id,
+            },
+          });
+        }
+        diasControle++;
+      } catch {}
     }
 
     // Audit log
