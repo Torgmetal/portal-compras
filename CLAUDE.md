@@ -111,6 +111,11 @@ Audit trail via `AuditLog` — write an entry for every critical mutation.
 - **Vercel Blob** — PDF/file storage; metadata saved in DB after upload via `/api/upload-blob`
 - **Resend** — transactional email
 - **SharePoint** — production planning sheet sync (optional cron at 8 AM)
+- **SigissWeb** (`lib/sigissweb.js`) — web service REST de NFS-e da prefeitura de **Conchal**, para conciliar notas de serviço emitidas direto no portal da prefeitura (quando o Omie falha na emissão) que não aparecem nas Ordens de Serviço do Omie. Endpoint `/api/financeiro/nfse-conchal`; UI no painel de conciliação da tela Faturamento por obra.
+  - **Env** (valores no `.env.local` / Vercel, **nunca** commitados): `SIGISS_URL` (= `https://wsconchal.sigissweb.com/rest`), `SIGISS_LOGIN` (CNPJ do prestador, só dígitos), `SIGISS_SENHA`. Opcionais: `SIGISS_SISTEMA_OMIE` (string que identifica o Omie no campo `sistema_gerador`, default `omie`) e `SIGISS_TLS_INSEGURO=false` para reativar a verificação de TLS.
+  - **Gotcha — senha do web service ≠ senha do portal.** A `SIGISS_SENHA` **não** é a senha de acesso ao portal; é gerada à parte no SigissWeb em **Gerenciamento → Usuários → ícone de cadeado da coluna "Web. Serv." → gerar senha de PRODUÇÃO**. Login no WS com a senha do portal retorna HTTP 400 "Login e/ou Senha inválido(s)".
+  - **Gotcha — TLS.** O servidor serve a cadeia de certificado incompleta (falta o intermediário) → `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. A lib usa um dispatcher undici com `rejectUnauthorized:false` **escopado só às chamadas do SigissWeb**.
+  - **Método-chave**: `GET /lancamentos/pegalancamentosescriturados/{cnpj}/mes/{m}/ano/{a}/tipo/P` (tipo P = prestador) → XML `<LANCAMENTOS>`. A descrição/obra vem do XML completo da nota (`/nfes/pegaxmlpelonumeronf/{num}/serienf/{serie}`).
 
 ### Vercel cron jobs (`vercel.json`)
 
