@@ -540,8 +540,8 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
       {/* Modal Importar Syneco */}
       {modalSyneco && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !importandoSyneco && setModalSyneco(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-2">
                 <Factory size={18} className="text-emerald-600" />
                 <h3 className="text-base font-bold text-torg-dark">Importar Produção Syneco</h3>
@@ -551,110 +551,201 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
               </button>
             </div>
 
-            <div className="px-5 py-4 space-y-4">
-              <div className="bg-emerald-50 rounded-xl p-3 text-xs text-emerald-800">
-                <p className="font-medium">Importa do MES Syneco (MesOrdem) apenas o setor <strong>Corte</strong>.</p>
-                <p className="mt-1 text-emerald-700">
-                  Peças com produção confirmada terão status atualizado para CORTE.
-                  As datas de fabricação serão registradas no Controle de Produção.
-                </p>
-              </div>
-
-              {/* Seletor de OP */}
-              <div>
-                <label className="text-xs font-semibold text-torg-dark block mb-1">OP para importar</label>
-                <select
-                  value={synecoOpSelecionada}
-                  onChange={(e) => { setSynecoOpSelecionada(e.target.value); setResultadoSyneco(null); }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  disabled={importandoSyneco}
-                >
-                  <option value="">Selecione uma OP...</option>
-                  {opsComPecas.map((op) => (
-                    <option key={op} value={op}>OP {op}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Setor fixo */}
-              <div>
-                <label className="text-xs font-semibold text-torg-dark block mb-1">Setor</label>
-                <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-torg-dark font-medium">
-                  🔴 Corte
-                </div>
-                <p className="text-[10px] text-torg-gray mt-1">
-                  Filtrando apenas o setor de Corte para evitar dados incorretos.
-                </p>
-              </div>
-
-              {/* Resultado da importação */}
-              {resultadoSyneco && !resultadoSyneco.error && (
-                <div className="bg-white border border-emerald-200 rounded-xl p-4 space-y-2">
-                  <p className="text-sm font-bold text-emerald-800 flex items-center gap-1.5">
-                    <CheckCircle2 size={16} /> Importação concluída
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-gray-50 rounded p-2">
-                      <span className="text-torg-gray">Obra Syneco</span>
-                      <p className="font-bold text-torg-dark">{resultadoSyneco.obraCode}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <span className="text-torg-gray">Registros MES</span>
-                      <p className="font-bold text-torg-dark">{resultadoSyneco.totalMes}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <span className="text-torg-gray">Com produção</span>
-                      <p className="font-bold text-torg-dark">{resultadoSyneco.comProducao}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <span className="text-torg-gray">Peças encontradas</span>
-                      <p className="font-bold text-torg-dark">{resultadoSyneco.matched}</p>
-                    </div>
-                    <div className="bg-emerald-50 rounded p-2">
-                      <span className="text-emerald-700">Status atualizados</span>
-                      <p className="font-bold text-emerald-700">{resultadoSyneco.statusUpdated}</p>
-                      <p className="text-[10px] text-emerald-600">PENDENTE → CORTE</p>
-                    </div>
-                    <div className="bg-blue-50 rounded p-2">
-                      <span className="text-blue-700">Dias de produção</span>
-                      <p className="font-bold text-blue-700">{resultadoSyneco.diasProducao}</p>
-                      <p className="text-[10px] text-blue-600">registrados no controle</p>
-                    </div>
+            <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
+              {!resultadoSyneco && (
+                <>
+                  <div className="bg-emerald-50 rounded-xl p-3 text-xs text-emerald-800">
+                    <p className="font-medium">Importa do MES Syneco (MesOrdem) apenas o setor <strong>Corte</strong>.</p>
+                    <p className="mt-1 text-emerald-700">
+                      Peças com produção confirmada terão status atualizado para CORTE.
+                      As datas de fabricação serão registradas no Controle de Produção.
+                    </p>
                   </div>
 
-                  {resultadoSyneco.alreadyCut > 0 && (
-                    <p className="text-[11px] text-torg-gray">
-                      {resultadoSyneco.alreadyCut} peça{resultadoSyneco.alreadyCut > 1 ? "s" : ""} já estavam em CORTE ou posterior.
-                    </p>
-                  )}
+                  <div>
+                    <label className="text-xs font-semibold text-torg-dark block mb-1">OP para importar</label>
+                    <select
+                      value={synecoOpSelecionada}
+                      onChange={(e) => setSynecoOpSelecionada(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      disabled={importandoSyneco}
+                    >
+                      <option value="">Selecione uma OP...</option>
+                      {opsComPecas.map((op) => (
+                        <option key={op} value={op}>OP {op}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                  {resultadoSyneco.notFound?.length > 0 && (
-                    <div className="text-[11px]">
-                      <p className="text-orange-700 font-medium">
-                        {resultadoSyneco.notFound.length} item(ns) do Syneco sem peça correspondente no portal:
-                      </p>
-                      <p className="text-torg-gray font-mono mt-0.5">
-                        {resultadoSyneco.notFound.slice(0, 15).join(", ")}
-                        {resultadoSyneco.notFound.length > 15 ? ` ...+${resultadoSyneco.notFound.length - 15}` : ""}
-                      </p>
+                  <div>
+                    <label className="text-xs font-semibold text-torg-dark block mb-1">Setor</label>
+                    <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">
+                      Corte
+                    </div>
+                    <p className="text-[10px] text-torg-gray mt-1">
+                      Filtrando apenas o setor de Corte para evitar dados incorretos.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Resultado — KPIs de atendimento */}
+              {resultadoSyneco && !resultadoSyneco.error && (
+                <>
+                  {/* Barra de atendimento */}
+                  {resultadoSyneco.totais && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-torg-dark">Atendimento do Corte — {resultadoSyneco.obraCode}</p>
+                        <span className="text-xs text-torg-gray">{resultadoSyneco.opObra}</span>
+                      </div>
+
+                      {/* Barra visual de progresso */}
+                      <div>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-medium text-torg-dark">
+                            {resultadoSyneco.totais.percentualQte.toFixed(0)}% concluído
+                          </span>
+                          <span className="text-torg-gray">
+                            {resultadoSyneco.totais.qteProduzida.toLocaleString("pt-BR")} / {resultadoSyneco.totais.qtePlanejada.toLocaleString("pt-BR")} peças
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${resultadoSyneco.totais.percentualQte >= 100 ? "bg-emerald-500" : resultadoSyneco.totais.percentualQte >= 50 ? "bg-torg-blue" : "bg-orange-400"}`}
+                            style={{ width: `${Math.min(100, resultadoSyneco.totais.percentualQte)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* KPIs */}
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-600">Produzido</p>
+                          <p className="text-xl font-extrabold text-emerald-700 tabular-nums">{resultadoSyneco.totais.qteProduzida.toLocaleString("pt-BR")}</p>
+                          <p className="text-[10px] text-emerald-600">{fmtKg(resultadoSyneco.totais.pesoProduzido)}</p>
+                        </div>
+                        <div className="bg-orange-50 rounded-xl p-3 text-center">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-orange-600">Faltam</p>
+                          <p className="text-xl font-extrabold text-orange-700 tabular-nums">{resultadoSyneco.totais.qteFalta.toLocaleString("pt-BR")}</p>
+                          <p className="text-[10px] text-orange-600">{fmtKg(resultadoSyneco.totais.pesoFalta)}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl p-3 text-center">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-torg-gray">Planejado</p>
+                          <p className="text-xl font-extrabold text-torg-dark tabular-nums">{resultadoSyneco.totais.qtePlanejada.toLocaleString("pt-BR")}</p>
+                          <p className="text-[10px] text-torg-gray">{fmtKg(resultadoSyneco.totais.pesoPlanejado)}</p>
+                        </div>
+                      </div>
+
+                      {/* Info de atualização */}
+                      <div className="flex gap-2 text-[11px] flex-wrap">
+                        {resultadoSyneco.statusUpdated > 0 && (
+                          <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                            {resultadoSyneco.statusUpdated} status atualizados
+                          </span>
+                        )}
+                        {resultadoSyneco.diasProducao > 0 && (
+                          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                            {resultadoSyneco.diasProducao} dia{resultadoSyneco.diasProducao > 1 ? "s" : ""} registrado{resultadoSyneco.diasProducao > 1 ? "s" : ""} no controle
+                          </span>
+                        )}
+                        {resultadoSyneco.alreadyCut > 0 && (
+                          <span className="bg-gray-100 text-torg-gray px-2 py-0.5 rounded-full">
+                            {resultadoSyneco.alreadyCut} já cortadas
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
 
+                  {/* Tabela de detalhes por peça */}
+                  {resultadoSyneco.detalhes?.length > 0 && (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wide">Detalhamento por Peça</p>
+                        <span className="text-[10px] text-torg-gray">{resultadoSyneco.detalhes.length} itens</span>
+                      </div>
+                      <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
+                        <table className="w-full text-[11px]">
+                          <thead className="bg-gray-50/80 sticky top-0">
+                            <tr>
+                              <th className="px-2 py-1.5 text-left font-medium text-gray-500">Marca</th>
+                              <th className="px-2 py-1.5 text-left font-medium text-gray-500">Descrição</th>
+                              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Planej.</th>
+                              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Produz.</th>
+                              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Falta</th>
+                              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Peso Prod.</th>
+                              <th className="px-2 py-1.5 text-center font-medium text-gray-500">Status</th>
+                              <th className="px-2 py-1.5 text-left font-medium text-gray-500">Data Fim</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {resultadoSyneco.detalhes.map((d, i) => {
+                              const pct = d.qtePlanejada > 0 ? (d.qteProduzida / d.qtePlanejada * 100) : 0;
+                              const corLinha = d.qteFalta === 0 && d.qteProduzida > 0
+                                ? "bg-emerald-50/40"
+                                : d.qteProduzida > 0 ? "bg-yellow-50/30" : "";
+                              return (
+                                <tr key={i} className={`${corLinha} hover:bg-gray-50`}>
+                                  <td className="px-2 py-1 font-mono font-semibold text-torg-dark whitespace-nowrap">{d.marca}</td>
+                                  <td className="px-2 py-1 text-torg-gray max-w-[120px] truncate" title={d.descricao}>{d.descricao || "—"}</td>
+                                  <td className="px-2 py-1 text-right tabular-nums text-torg-dark">{d.qtePlanejada}</td>
+                                  <td className="px-2 py-1 text-right tabular-nums font-semibold text-emerald-700">{d.qteProduzida}</td>
+                                  <td className={`px-2 py-1 text-right tabular-nums font-semibold ${d.qteFalta > 0 ? "text-orange-600" : "text-emerald-600"}`}>
+                                    {d.qteFalta > 0 ? d.qteFalta : "✓"}
+                                  </td>
+                                  <td className="px-2 py-1 text-right tabular-nums text-torg-gray">
+                                    {d.pesoProduzido > 0 ? `${d.pesoProduzido.toFixed(1)}` : "—"}
+                                  </td>
+                                  <td className="px-2 py-1 text-center">
+                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                      pct >= 100 ? "bg-emerald-100 text-emerald-700" :
+                                      pct > 0 ? "bg-yellow-100 text-yellow-700" :
+                                      "bg-gray-100 text-gray-500"
+                                    }`}>
+                                      {pct >= 100 ? "Completo" : pct > 0 ? `${pct.toFixed(0)}%` : "Pendente"}
+                                    </span>
+                                  </td>
+                                  <td className="px-2 py-1 text-torg-gray whitespace-nowrap font-mono">
+                                    {d.dataFim ? d.dataFim.split("-").reverse().join("/") : "—"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Peso por dia */}
                   {resultadoSyneco.pesosPorData && Object.keys(resultadoSyneco.pesosPorData).length > 0 && (
                     <div className="text-[11px]">
-                      <p className="text-torg-dark font-medium mb-1">Peso produzido por dia:</p>
+                      <p className="text-torg-dark font-medium mb-1">Peso produzido por dia (registrado no Controle de Produção):</p>
                       <div className="flex flex-wrap gap-1">
                         {Object.entries(resultadoSyneco.pesosPorData)
                           .sort(([a], [b]) => a.localeCompare(b))
                           .map(([data, peso]) => (
-                            <span key={data} className="bg-gray-100 rounded px-2 py-0.5 font-mono">
+                            <span key={data} className="bg-blue-50 text-blue-700 rounded px-2 py-0.5 font-mono">
                               {data.split("-").reverse().join("/")} → {peso.toFixed(1)} kg
                             </span>
                           ))}
                       </div>
                     </div>
                   )}
-                </div>
+
+                  {resultadoSyneco.notFound?.length > 0 && (
+                    <div className="text-[11px] bg-orange-50 rounded-lg p-2.5">
+                      <p className="text-orange-700 font-medium">
+                        {resultadoSyneco.notFound.length} item(ns) do Syneco sem peça no portal:
+                      </p>
+                      <p className="text-orange-600 font-mono mt-0.5">
+                        {resultadoSyneco.notFound.slice(0, 15).join(", ")}
+                        {resultadoSyneco.notFound.length > 15 ? ` ...+${resultadoSyneco.notFound.length - 15}` : ""}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Erro */}
@@ -668,7 +759,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
               )}
             </div>
 
-            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
               <button
                 onClick={() => { setModalSyneco(false); setResultadoSyneco(null); }}
                 disabled={importandoSyneco}
@@ -686,7 +777,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                   Importar Corte
                 </button>
               )}
-              {resultadoSyneco && !resultadoSyneco.error && resultadoSyneco.statusUpdated > 0 && (
+              {resultadoSyneco && !resultadoSyneco.error && (
                 <button
                   onClick={() => { setModalSyneco(false); setResultadoSyneco(null); router.refresh(); }}
                   className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium"

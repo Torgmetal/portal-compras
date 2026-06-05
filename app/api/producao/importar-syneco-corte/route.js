@@ -1,6 +1,7 @@
 // POST /api/producao/importar-syneco-corte
 // Importa produção do Syneco (MesOrdem) para PecaConjunto e ProducaoSemanal.
 // Filtra por OP + setor Corte — atualiza status das peças e cria registros diários.
+// Retorna detalhes de atendimento: planejado vs produzido vs faltante.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -62,64 +63,67 @@ export async function POST(req) {
     // Buscar PecaConjunto desta OP
     const pecas = await prisma.pecaConjunto.findMany({
       where: { opNumero },
-      select: { id: true, marca: true, status: true, pesoTotalKg: true, qte: true },
+      select: { id: true, marca: true, descricao: true, status: true, pesoTotalKg: true, qte: true },
     });
     const pecasPorMarca = Object.fromEntries(pecas.map(p => [p.marca, p]));
 
-    // Processar cada registro do MES
+    // Processar cada registro do MES — coletar detalhes de atendimento
     let matched = 0;
     let statusUpdated = 0;
     const notFound = [];
     let alreadyCut = 0;
-    let semProducao = 0;
-    const pesosPorData = {}; // { "2026-05-04": totalPesoKg }
-    const pecasAtualizadas = []; // marcas que tiveram status atualizado
+    const pesosPorData = {};
+    const pecasAtualizadas = [];
+    const detalhes = []; // detalhes de atendimento por peça
 
     for (const mes of mesOrdens) {
-      if (mes.produzidoUn <= 0) {
-        semProducao++;
+      // Tentar achar a peça no portal
+      let peca = pecasPorMarca[mes.item];
+      if (!peca) {
+        peca = pecas.find(p =>
+          p.marca === mes.op ||
+          mes.item.endsWith(p.marca) ||
+          p.marca.endsWith(mes.item)
+        ) || null;
+      }
+
+      const detalhe = {
+        marca: peca?.marca || mes.item,
+        descricao: mes.descItem || peca?.descricao || "",
+        qtePlanejada: mes.planejadoUn || 0,
+        qteProduzida: mes.produzidoUn || 0,
+        qteFalta: Math.max(0, (mes.planejadoUn || 0) - (mes.produzidoUn || 0)),
+        pesoPlanejado: mes.pesoPlanejado || 0,
+        pesoProduzido: mes.pesoProduzido || 0,
+        pesoFalta: Math.max(0, (mes.pesoPlanejado || 0) - (mes.pesoProduzido || 0)),
+        statusSyneco: mes.status || "—",
+        dataFim: mes.dataFim ? mes.dataFim.toISOString().split("T")[0] : null,
+        encontrada: !!peca,
+        statusPortal: peca?.status || null,
+      };
+      detalhes.push(detalhe);
+
+      // Sem produção — registrar no detalhe mas não mudar status
+      if (mes.produzidoUn <= 0) continue;
+
+      if (!peca) {
+        notFound.push(mes.item);
         continue;
       }
 
-      const peca = pecasPorMarca[mes.item];
-      if (!peca) {
-        // Tentar match parcial — o item do Syneco pode ter sufixo ou prefixo diferente
-        const pecaAlt = pecas.find(p =>
-          p.marca === mes.op || // op pode ser a marca
-          mes.item.endsWith(p.marca) ||
-          p.marca.endsWith(mes.item)
-        );
-        if (!pecaAlt) {
-          notFound.push(mes.item);
-          continue;
-        }
-        // Match alternativo encontrado
-        matched++;
-        if (pecaAlt.status === "PENDENTE") {
-          await prisma.pecaConjunto.update({
-            where: { id: pecaAlt.id },
-            data: { status: "CORTE", ultimoSetor: "Corte" },
-          });
-          statusUpdated++;
-          pecasAtualizadas.push(pecaAlt.marca);
-        } else {
-          alreadyCut++;
-        }
+      matched++;
+      if (peca.status === "PENDENTE") {
+        await prisma.pecaConjunto.update({
+          where: { id: peca.id },
+          data: { status: "CORTE", ultimoSetor: "Corte" },
+        });
+        statusUpdated++;
+        pecasAtualizadas.push(peca.marca);
       } else {
-        matched++;
-        if (peca.status === "PENDENTE") {
-          await prisma.pecaConjunto.update({
-            where: { id: peca.id },
-            data: { status: "CORTE", ultimoSetor: "Corte" },
-          });
-          statusUpdated++;
-          pecasAtualizadas.push(peca.marca);
-        } else {
-          alreadyCut++;
-        }
+        alreadyCut++;
       }
 
-      // Agrupar peso produzido por data (usar dataFim preferencialmente)
+      // Agrupar peso por data
       const dataRef = mes.dataFim || mes.dataInicio;
       if (dataRef) {
         const dataKey = dataRef.toISOString().split("T")[0];
@@ -128,8 +132,19 @@ export async function POST(req) {
       }
     }
 
-    // Criar ProducaoSemanal por data de produção
-    // Primeiro limpar registros anteriores do Syneco para esta OP + Corte (permite re-importar)
+    // Totais de atendimento
+    const totais = {
+      qtePlanejada: detalhes.reduce((s, d) => s + d.qtePlanejada, 0),
+      qteProduzida: detalhes.reduce((s, d) => s + d.qteProduzida, 0),
+      qteFalta: detalhes.reduce((s, d) => s + d.qteFalta, 0),
+      pesoPlanejado: detalhes.reduce((s, d) => s + d.pesoPlanejado, 0),
+      pesoProduzido: detalhes.reduce((s, d) => s + d.pesoProduzido, 0),
+      pesoFalta: detalhes.reduce((s, d) => s + d.pesoFalta, 0),
+    };
+    totais.percentualQte = totais.qtePlanejada > 0 ? (totais.qteProduzida / totais.qtePlanejada * 100) : 0;
+    totais.percentualPeso = totais.pesoPlanejado > 0 ? (totais.pesoProduzido / totais.pesoPlanejado * 100) : 0;
+
+    // Criar ProducaoSemanal por data
     await prisma.producaoSemanal.deleteMany({
       where: { opId: op.id, setor: "Corte", fonte: "SYNECO" },
     });
@@ -170,16 +185,10 @@ export async function POST(req) {
           entity: "PecaConjunto",
           entityId: op.id,
           diff: {
-            obraCode,
-            opNumero,
-            totalMes: mesOrdens.length,
-            comProducao: mesOrdens.length - semProducao,
-            matched,
-            statusUpdated,
-            alreadyCut,
+            obraCode, opNumero, matched, statusUpdated, alreadyCut,
             notFound: notFound.slice(0, 30),
             diasProducao: diasCriados,
-            pecasAtualizadas: pecasAtualizadas.slice(0, 30),
+            totais,
           },
         },
       });
@@ -190,15 +199,14 @@ export async function POST(req) {
       obraCode,
       opCliente: op.cliente,
       opObra: op.obra,
-      totalMes: mesOrdens.length,
-      comProducao: mesOrdens.length - semProducao,
-      semProducao,
       matched,
       statusUpdated,
       alreadyCut,
       notFound,
       diasProducao: diasCriados,
       pesosPorData,
+      detalhes,
+      totais,
     });
   } catch (e) {
     console.error("[importar-syneco-corte] erro:", e?.message);
