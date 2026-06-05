@@ -1,6 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import { FileText, RefreshCw, Clock, Search, Loader2, AlertCircle, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
+import { FileText, RefreshCw, Clock, Search, Loader2, AlertCircle, ArrowUp, ArrowDown, ChevronsUpDown, Landmark, AlertTriangle } from "lucide-react";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -146,6 +146,120 @@ Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Conciliação NFS-e Conchal (SigissWeb) */}
+      <ConciliacaoNfse />
+    </div>
+  );
+}
+
+function ConciliacaoNfse() {
+  const [data, setData]     = useState(null);
+  const [loading, setLoad]  = useState(false);
+  const [erro, setErro]     = useState("");
+  const [aberto, setAberto] = useState(false);
+
+  const consultar = async () => {
+    setLoad(true); setErro("");
+    try {
+      const res = await fetch("/api/financeiro/nfse-conchal");
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Erro");
+      setData(d);
+    } catch (e) { setErro(e.message); } finally { setLoad(false); }
+  };
+
+  const onToggle = () => {
+    const novo = !aberto; setAberto(novo);
+    if (novo && !data && !loading) consultar();
+  };
+
+  const foraDoOmie = (data?.notas || []).filter(n => !n.cancelada && n.foraDoOmie === true);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <button onClick={onToggle}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/60 transition-colors">
+        <span className="flex items-center gap-2 text-sm font-semibold text-torg-dark">
+          <span className={`text-gray-400 transition-transform ${aberto ? "rotate-90" : ""}`}>▶</span>
+          <Landmark size={16} className="text-purple-600" />
+          Conciliação NFS-e — Prefeitura de Conchal (SigissWeb)
+        </span>
+        <span className="text-xs text-torg-gray">notas de serviço emitidas fora do Omie</span>
+      </button>
+
+      {aberto && (
+        <div className="border-t border-gray-50 p-4">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-torg-gray">
+              <Loader2 size={18} className="animate-spin" /> <span>Consultando SigissWeb… (pode levar ~30s)</span>
+            </div>
+          ) : erro ? (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" /> <span>{erro}</span>
+              <button onClick={consultar} className="ml-auto underline shrink-0">Tentar novamente</button>
+            </div>
+          ) : data && !data.configurado ? (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>{data.aviso} <span className="text-amber-600">(env: SIGISS_URL, SIGISS_LOGIN, SIGISS_SENHA)</span></span>
+            </div>
+          ) : data ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-4 flex-wrap text-sm">
+                <span className="text-torg-gray">Período {fmtData(data.periodo?.de)} → {fmtData(data.periodo?.ate)}</span>
+                <span className="text-torg-dark"><strong>{data.resumo?.ativas || 0}</strong> notas ativas</span>
+                <span className="text-red-700 font-semibold">{data.resumo?.foraDoOmie || 0} fora do Omie</span>
+                <span className="text-amber-700">{fmtMoeda(data.resumo?.valorForaDoOmie)} a conciliar</span>
+                <button onClick={consultar} className="ml-auto text-xs px-2 py-1 border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-1">
+                  <RefreshCw size={12} /> Atualizar
+                </button>
+              </div>
+              {data.truncadoEnriquecimento && (
+                <div className="text-xs text-amber-600 flex items-center gap-1">
+                  <AlertTriangle size={11} /> Muitas notas no período — detalhada só as 150 mais recentes. Reduza o período para ver todas.
+                </div>
+              )}
+              {foraDoOmie.length === 0 ? (
+                <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  ✓ Nenhuma NFS-e fora do Omie no período — tudo conciliado.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50/60">
+                      <tr>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">NFS-e</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Data</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Tomador</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Obra</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Valor</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {foraDoOmie.map(n => (
+                        <tr key={`${n.numero}-${n.serie}`} className="hover:bg-gray-50/50">
+                          <td className="px-3 py-2 font-mono text-xs text-torg-blue whitespace-nowrap">{n.numero}/{n.serie}</td>
+                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtData(n.data)}</td>
+                          <td className="px-3 py-2 text-gray-700 max-w-[180px] truncate" title={n.tomadorNome}>{n.tomadorNome || "—"}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {n.obra
+                              ? <span className="text-xs px-1.5 py-0.5 rounded-full border border-torg-blue-200 bg-torg-blue-50 text-torg-blue font-medium">{n.obra}</span>
+                              : <span className="text-xs text-gray-400">a classificar</span>}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-amber-700 font-semibold whitespace-nowrap">{fmtMoeda(n.valor)}</td>
+                          <td className="px-3 py-2 text-gray-600 max-w-[260px] truncate" title={n.descricao}>{n.descricao || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       )}
     </div>
