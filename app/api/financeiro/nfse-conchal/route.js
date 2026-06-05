@@ -5,6 +5,7 @@
 // que são as que não aparecem na listagem de Ordens de Serviço.
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 import { sigissConfigurado, listarNfsePrestadas } from "@/lib/sigissweb";
 
 export const runtime = "nodejs";
@@ -39,7 +40,16 @@ export async function GET(req) {
   try {
     const { notas, truncado } = await listarNfsePrestadas({ de, ate, enriquecer: true, maxEnriquecer: 150 });
 
-    const serial = notas.map(n => ({
+    // Vínculos manuais já salvos (NFS-e avulsa → projeto Omie)
+    const numeros = [...new Set(notas.map(n => n.numero).filter(Boolean))];
+    const vinculos = numeros.length
+      ? await prisma.nfseConchalVinculo.findMany({ where: { numero: { in: numeros } } })
+      : [];
+    const vincDe = new Map(vinculos.map(v => [`${v.numero}|${v.serie}`, v]));
+
+    const serial = notas.map(n => {
+      const v = vincDe.get(`${n.numero}|${n.serie || ""}`);
+      return {
       numero: n.numero, serie: n.serie,
       data: n.data ? n.data.toISOString() : null,
       valor: n.valor, valorServico: n.valorServico,
@@ -49,7 +59,10 @@ export async function GET(req) {
       obra: n.obra ?? null, numeroOp: n.numeroOp ?? null,
       sistemaGerador: n.sistemaGerador ?? null,
       foraDoOmie: n.foraDoOmie ?? null,
-    }));
+      vinculoCodProj: v?.codProj ?? null,
+      vinculoProjeto: v?.projetoNome ?? null,
+      };
+    });
 
     const ativas = serial.filter(n => !n.cancelada);
     return NextResponse.json({

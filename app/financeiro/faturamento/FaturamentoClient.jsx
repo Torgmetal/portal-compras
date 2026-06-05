@@ -150,16 +150,17 @@ Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado
       )}
 
       {/* Conciliação NFS-e Conchal (SigissWeb) */}
-      <ConciliacaoNfse />
+      <ConciliacaoNfse obras={data?.obras || []} onVinculado={() => carregar(false)} />
     </div>
   );
 }
 
-function ConciliacaoNfse() {
+function ConciliacaoNfse({ obras = [], onVinculado }) {
   const [data, setData]     = useState(null);
   const [loading, setLoad]  = useState(false);
   const [erro, setErro]     = useState("");
   const [aberto, setAberto] = useState(false);
+  const [salvando, setSalvando] = useState(null); // chave da nota sendo salva
 
   const consultar = async () => {
     setLoad(true); setErro("");
@@ -174,6 +175,33 @@ function ConciliacaoNfse() {
   const onToggle = () => {
     const novo = !aberto; setAberto(novo);
     if (novo && !data && !loading) consultar();
+  };
+
+  // Vincula/desvincula a nota a um projeto e atualiza o estado local + a tabela acima
+  const vincular = async (n, codProjStr) => {
+    const codProj = codProjStr ? Number(codProjStr) : null;
+    const proj = obras.find(o => o.codProj === codProj);
+    const chave = `${n.numero}-${n.serie}`;
+    setSalvando(chave);
+    try {
+      const res = await fetch("/api/financeiro/nfse-conchal/vincular", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          numero: n.numero, serie: n.serie || "", codProj,
+          projetoNome: proj?.projeto ?? null, valor: n.valor, data: n.data,
+          tomadorNome: n.tomadorNome, descricao: n.descricao,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Erro ao vincular");
+      // update otimista local
+      setData(prev => ({
+        ...prev,
+        notas: prev.notas.map(x => (x.numero === n.numero && x.serie === n.serie)
+          ? { ...x, vinculoCodProj: codProj, vinculoProjeto: proj?.projeto ?? null } : x),
+      }));
+      onVinculado?.(); // refaz o cálculo do faturado na tabela acima
+    } catch (e) { alert(e.message); } finally { setSalvando(null); }
   };
 
   const foraDoOmie = (data?.notas || []).filter(n => !n.cancelada && n.foraDoOmie === true);
@@ -212,11 +240,13 @@ function ConciliacaoNfse() {
                 <span className="text-torg-gray">Período {fmtData(data.periodo?.de)} → {fmtData(data.periodo?.ate)}</span>
                 <span className="text-torg-dark"><strong>{data.resumo?.ativas || 0}</strong> notas ativas</span>
                 <span className="text-red-700 font-semibold">{data.resumo?.foraDoOmie || 0} fora do Omie</span>
-                <span className="text-amber-700">{fmtMoeda(data.resumo?.valorForaDoOmie)} a conciliar</span>
+                <span className="text-green-700">{foraDoOmie.filter(n => n.vinculoCodProj).length} vinculadas</span>
+                <span className="text-amber-700">{fmtMoeda(data.resumo?.valorForaDoOmie)} fora do Omie</span>
                 <button onClick={consultar} className="ml-auto text-xs px-2 py-1 border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-1">
                   <RefreshCw size={12} /> Atualizar
                 </button>
               </div>
+              <div className="text-xs text-torg-gray">Vincule cada nota ao projeto do Omie — o valor soma no <strong>faturado</strong> da obra na tabela acima.</div>
               {data.truncadoEnriquecimento && (
                 <div className="text-xs text-amber-600 flex items-center gap-1">
                   <AlertTriangle size={11} /> Muitas notas no período — detalhada só as 150 mais recentes. Reduza o período para ver todas.
@@ -234,26 +264,45 @@ function ConciliacaoNfse() {
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">NFS-e</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Data</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Tomador</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Obra</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Obra (descrição)</th>
                         <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Valor</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Vincular ao projeto Omie</th>
                         <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Descrição</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {foraDoOmie.map(n => (
-                        <tr key={`${n.numero}-${n.serie}`} className="hover:bg-gray-50/50">
+                      {foraDoOmie.map(n => {
+                        const chave = `${n.numero}-${n.serie}`;
+                        return (
+                        <tr key={chave} className={`hover:bg-gray-50/50 ${n.vinculoCodProj ? "bg-green-50/40" : ""}`}>
                           <td className="px-3 py-2 font-mono text-xs text-torg-blue whitespace-nowrap">{n.numero}/{n.serie}</td>
                           <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtData(n.data)}</td>
-                          <td className="px-3 py-2 text-gray-700 max-w-[180px] truncate" title={n.tomadorNome}>{n.tomadorNome || "—"}</td>
+                          <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate" title={n.tomadorNome}>{n.tomadorNome || "—"}</td>
                           <td className="px-3 py-2 whitespace-nowrap">
                             {n.obra
-                              ? <span className="text-xs px-1.5 py-0.5 rounded-full border border-torg-blue-200 bg-torg-blue-50 text-torg-blue font-medium">{n.obra}</span>
-                              : <span className="text-xs text-gray-400">a classificar</span>}
+                              ? <span className="text-xs px-1.5 py-0.5 rounded-full border border-gray-200 bg-gray-50 text-gray-600 font-medium" title="extraído da descrição">{n.obra}</span>
+                              : <span className="text-xs text-gray-400">—</span>}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-amber-700 font-semibold whitespace-nowrap">{fmtMoeda(n.valor)}</td>
-                          <td className="px-3 py-2 text-gray-600 max-w-[260px] truncate" title={n.descricao}>{n.descricao || "—"}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                value={n.vinculoCodProj || ""}
+                                disabled={salvando === chave}
+                                onChange={e => vincular(n, e.target.value)}
+                                className={`text-xs border rounded-lg px-2 py-1 max-w-[220px] focus:ring-2 focus:ring-torg-blue focus:border-torg-blue ${n.vinculoCodProj ? "border-green-300 bg-green-50 text-green-800" : "border-gray-300 text-torg-gray"}`}>
+                                <option value="">— escolher obra —</option>
+                                {obras.map(o => <option key={o.codProj} value={o.codProj}>{o.projeto}</option>)}
+                              </select>
+                              {salvando === chave
+                                ? <Loader2 size={13} className="animate-spin text-gray-400" />
+                                : n.vinculoCodProj ? <span className="text-green-600 text-xs">✓</span> : null}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-gray-600 max-w-[240px] truncate" title={n.descricao}>{n.descricao || "—"}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -298,6 +347,12 @@ function FragmentObra({ obra, aberta, onToggle }) {
             <span className={`text-gray-400 transition-transform ${aberta ? "rotate-90" : ""}`}>▶</span>
             <span className="text-torg-dark font-medium">{obra.projeto}</span>
             <TagTipo tipo={obra.tipo} />
+            {obra.faturadoAvulso > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200 inline-flex items-center gap-1"
+                title={`Inclui ${fmtMoeda(obra.faturadoAvulso)} de ${obra.qtdAvulsas} NFS-e avulsa(s) da prefeitura vinculada(s)`}>
+                <Landmark size={10} /> +{fmtMoeda(obra.faturadoAvulso)} avulsa
+              </span>
+            )}
             {obra.atrasado && <Clock size={13} className="text-red-500" />}
           </div>
         </td>
