@@ -5,7 +5,7 @@
 // que são as que não aparecem na listagem de Ordens de Serviço.
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
-import { prisma } from "@/lib/prisma";
+import { prismaDirect } from "@/lib/prisma";
 import { sigissConfigurado, listarNfsePrestadas } from "@/lib/sigissweb";
 
 export const runtime = "nodejs";
@@ -43,7 +43,7 @@ export async function GET(req) {
     // Vínculos manuais já salvos (NFS-e avulsa → projeto Omie)
     const numeros = [...new Set(notas.map(n => n.numero).filter(Boolean))];
     const vinculos = numeros.length
-      ? await prisma.nfseConchalVinculo.findMany({ where: { numero: { in: numeros } } })
+      ? await prismaDirect.nfseConchalVinculo.findMany({ where: { numero: { in: numeros } } })
       : [];
     const vincDe = new Map(vinculos.map(v => [`${v.numero}|${v.serie}`, v]));
 

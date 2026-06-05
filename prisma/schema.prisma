@@ -1922,7 +1922,7 @@ model NfseConchalVinculo {
   id          String    @id @default(cuid())
   numero      String // NUM_DOCU_FISCAL
   serie       String // SERIE_DOCU_FISCAL
-  codProj     Int // projeto Omie vinculado (= obra na tela Faturamento)
+  codProj     String // projeto Omie vinculado (= obra na tela Faturamento). String: o codProj do Omie estoura INT4.
   projetoNome String?
   valor       Float     @default(0)
   data        DateTime?

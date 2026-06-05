@@ -3,7 +3,7 @@
 // codProj = 0 ou null → desvincula.
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaDirect } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 const schema = z.object({
   numero:      z.string().min(1),
   serie:       z.string().default(""),
-  codProj:     z.number().int().nullable(),
+  codProj:     z.union([z.number(), z.string()]).nullable(),
   projetoNome: z.string().nullable().optional(),
   valor:       z.number().optional(),
   data:        z.string().nullable().optional(),
@@ -32,13 +32,14 @@ export async function POST(req) {
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
   const chave = { numero: body.numero, serie: body.serie || "" };
+  const codProj = (body.codProj == null || body.codProj === "" || body.codProj === 0) ? null : String(body.codProj);
 
   try {
     // Desvincular
-    if (!body.codProj) {
-      const existente = await prisma.nfseConchalVinculo.findUnique({ where: { numero_serie: chave } });
+    if (!codProj) {
+      const existente = await prismaDirect.nfseConchalVinculo.findUnique({ where: { numero_serie: chave } });
       if (existente) {
-        await prisma.nfseConchalVinculo.delete({ where: { numero_serie: chave } });
+        await prismaDirect.nfseConchalVinculo.delete({ where: { numero_serie: chave } });
         await prisma.auditLog.create({
           data: {
             userId: user.id, action: "nfse_conchal_desvincular", entity: "NfseConchalVinculo",
@@ -51,16 +52,16 @@ export async function POST(req) {
 
     // Vincular / atualizar
     const dataDt = body.data ? new Date(body.data) : null;
-    const vinculo = await prisma.nfseConchalVinculo.upsert({
+    const vinculo = await prismaDirect.nfseConchalVinculo.upsert({
       where: { numero_serie: chave },
       create: {
-        ...chave, codProj: body.codProj, projetoNome: body.projetoNome ?? null,
-        valor: body.valor ?? 0, data: isNaN(dataDt?.getTime()) ? null : dataDt,
+        ...chave, codProj, projetoNome: body.projetoNome ?? null,
+        valor: body.valor ?? 0, data: (dataDt && !isNaN(dataDt.getTime())) ? dataDt : null,
         tomadorNome: body.tomadorNome ?? null, descricao: body.descricao ?? null,
         vinculadoPor: user.id,
       },
       update: {
-        codProj: body.codProj, projetoNome: body.projetoNome ?? null,
+        codProj, projetoNome: body.projetoNome ?? null,
         valor: body.valor ?? 0, tomadorNome: body.tomadorNome ?? null,
         descricao: body.descricao ?? null, vinculadoPor: user.id,
       },
@@ -70,7 +71,7 @@ export async function POST(req) {
       data: {
         userId: user.id, action: "nfse_conchal_vincular", entity: "NfseConchalVinculo",
         entityId: vinculo.id,
-        diff: { nota: `${chave.numero}/${chave.serie}`, codProj: body.codProj, projeto: body.projetoNome, valor: body.valor },
+        diff: { nota: `${chave.numero}/${chave.serie}`, codProj, projeto: body.projetoNome, valor: body.valor },
       },
     }).catch(() => {});
 
