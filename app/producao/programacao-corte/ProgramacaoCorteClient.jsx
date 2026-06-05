@@ -4,12 +4,12 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2,
-  Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet,
+  Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import {
   MAQUINA_LABEL, MAQUINA_COR, MAQUINAS,
-  calcularResumoBarras, parsePerfil, gerarProgramaCorte,
+  calcularResumoBarras, parsePerfil, gerarProgramaCorte, classificarMaquina,
 } from "@/lib/maquina-corte";
 
 const fmtKg = (v) => {
@@ -207,27 +207,123 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
     }
   }
 
-  // Gerar programa de corte e exportar como Excel
-  function exportarProgramaCorte() {
-    const pecasParaPrograma = filtroOp ? pecasFiltradas : pecas.filter((p) => p.maquina);
-    if (pecasParaPrograma.length === 0) {
-      alert("Nenhuma peça com máquina atribuída para gerar programa.");
+  // Prepara pecas com auto-classificação para peças sem maquina
+  function prepararPecas() {
+    const base = filtroOp ? pecasFiltradas : pecas;
+    return base.map((p) => {
+      if (p.maquina) return p;
+      if (!p.descricao) return p;
+      const maq = classificarMaquina(p.descricao, p.pesoUnitKg, p.comprimentoMm);
+      return maq ? { ...p, maquina: maq } : p;
+    }).filter((p) => p.maquina);
+  }
+
+  // --- BOTAO 1: Lista de Material ---
+  function exportarListaMaterial() {
+    const pecasComMaq = prepararPecas();
+    if (pecasComMaq.length === 0) {
+      alert("Nenhuma peça com perfil reconhecido para gerar lista de material.");
       return;
     }
 
-    const programa = gerarProgramaCorte(pecasParaPrograma);
     const wb = XLSX.utils.book_new();
     const opLabel = filtroOp ? `OP ${filtroOp}` : "Todas OPs";
+    const agora = `${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+
+    // Agrupar por maquina → perfil → totais
+    const resumo = calcularResumoBarras(pecasComMaq);
+
+    const rows = [];
+    rows.push(["LISTA DE MATERIAL PARA CORTE"]);
+    rows.push([`${opLabel} — Gerado em ${agora}`]);
+    rows.push([]);
+    rows.push(["Máquina", "Perfil", "Tipo", "Qte Peças", "Comprimento Total (m)", "Barra Padrão (m)", "Barras Necessárias", "Peso Estimado (kg)"]);
+
+    let totalBarrasGeral = 0;
+    let totalPecasGeral = 0;
+    let totalPesoGeral = 0;
+
+    for (const [maq, dados] of Object.entries(resumo)) {
+      const perfis = Object.entries(dados.perfis).sort((a, b) => a[0].localeCompare(b[0]));
+      for (const [perfil, pf] of perfis) {
+        const compTotalM = (pf.compTotalMm / 1000);
+        const barraM = (pf.comprimentoBarraMm / 1000);
+        // Estimar peso: peso medio por mm * comprimento total
+        const pesoEstimado = pecasComMaq
+          .filter((p) => p.maquina === maq && p.descricao === perfil)
+          .reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+
+        rows.push([
+          MAQUINA_LABEL[maq] || maq,
+          perfil,
+          pf.tipo,
+          pf.qte,
+          compTotalM.toFixed(1),
+          barraM.toFixed(0),
+          pf.barras,
+          pesoEstimado.toFixed(1),
+        ]);
+        totalBarrasGeral += pf.barras;
+        totalPecasGeral += pf.qte;
+        totalPesoGeral += pesoEstimado;
+      }
+
+      // Chapas desta maquina (se Laser Chapa)
+      if (maq === "LASER_CHAPA") {
+        const chapas = pecasComMaq.filter((p) => p.maquina === "LASER_CHAPA");
+        // Agrupar chapas por descricao
+        const chapasPorDesc = {};
+        for (const ch of chapas) {
+          const desc = ch.descricao || "Chapa";
+          if (!chapasPorDesc[desc]) chapasPorDesc[desc] = { qte: 0, peso: 0 };
+          chapasPorDesc[desc].qte += ch.qte || 1;
+          chapasPorDesc[desc].peso += ch.pesoTotalKg || 0;
+        }
+        for (const [desc, info] of Object.entries(chapasPorDesc)) {
+          rows.push(["Laser Chapa", desc, "CH", info.qte, "—", "—", info.qte, info.peso.toFixed(1)]);
+          totalPecasGeral += info.qte;
+          totalBarrasGeral += info.qte;
+          totalPesoGeral += info.peso;
+        }
+      }
+    }
+
+    rows.push([]);
+    rows.push(["TOTAL", "", "", totalPecasGeral, "", "", totalBarrasGeral, totalPesoGeral.toFixed(1)]);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 18 }, { wch: 22 }, { wch: 6 }, { wch: 10 },
+      { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 16 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, "Lista de Material");
+
+    const fileName = filtroOp
+      ? `Lista_Material_OP${filtroOp}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      : `Lista_Material_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  }
+
+  // --- BOTAO 2: Programa de Corte ---
+  function exportarProgramaCorte() {
+    const pecasComMaq = prepararPecas();
+    if (pecasComMaq.length === 0) {
+      alert("Nenhuma peça com perfil reconhecido para gerar programa de corte.");
+      return;
+    }
+
+    const programa = gerarProgramaCorte(pecasComMaq);
+    const wb = XLSX.utils.book_new();
+    const opLabel = filtroOp ? `OP ${filtroOp}` : "Todas OPs";
+    const agora = `${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
 
     // Uma aba por maquina
     for (const [maq, dados] of Object.entries(programa)) {
       const rows = [];
-      const cor = MAQUINA_COR[maq];
-      const merges = [];
 
       // Header
       rows.push([`PROGRAMA DE CORTE — ${dados.label.toUpperCase()}`]);
-      rows.push([`${opLabel} — Gerado em ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`]);
+      rows.push([`${opLabel} — Gerado em ${agora}`]);
       rows.push([]);
 
       // Chapas (se houver)
@@ -290,24 +386,15 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
       rows.push([`RESUMO ${dados.label.toUpperCase()}: ${totalPecasMaq} peças em ${totalBarrasMaq} barras — Aproveitamento médio: ${mediaAprov.toFixed(0)}%`]);
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
-
-      // Ajustar largura das colunas
       ws["!cols"] = [
-        { wch: 14 }, // Barra
-        { wch: 10 }, // OP
-        { wch: 14 }, // Marca
-        { wch: 18 }, // Comprimento/Descricao
-        { wch: 12 }, // Peso
-        { wch: 12 }, // Usado
-        { wch: 12 }, // Sobra
-        { wch: 10 }, // Aprov
+        { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 18 },
+        { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
       ];
 
       const sheetName = (dados.label || maq).substring(0, 31);
       XLSX.utils.book_append_sheet(wb, ws, sheetName);
     }
 
-    // Se nenhuma aba foi criada
     if (wb.SheetNames.length === 0) {
       alert("Nenhuma peça com perfil válido para gerar programa.");
       return;
@@ -333,10 +420,16 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           <button
+            onClick={exportarListaMaterial}
+            className="px-3 py-1.5 bg-torg-dark text-white text-xs rounded-lg hover:bg-torg-dark/90 font-medium flex items-center gap-1.5"
+          >
+            <ClipboardList size={14} /> Lista de Material
+          </button>
+          <button
             onClick={exportarProgramaCorte}
             className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
           >
-            <FileSpreadsheet size={14} /> Gerar Programa
+            <FileSpreadsheet size={14} /> Programa de Corte
           </button>
           {isAdmin && (
             <button
