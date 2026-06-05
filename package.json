@@ -32,6 +32,7 @@
     "resend": "^6.12.3",
     "unpdf": "^0.12.1",
     "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0",
     "zod": "^4.4.2"
   },
   "devDependencies": {
