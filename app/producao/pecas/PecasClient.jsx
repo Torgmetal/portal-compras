@@ -183,6 +183,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
     const headers = ["OP", "Marca", "Tipo", "Descrição", "Material", "Qte", "Peso Unit.", "Peso Total", "Produzido", "Falta", "% Atend.", "Máquina", "Status", "Data Prod."];
     adicionarHeaderTabela(ws, row, headers);
     row++;
+    const primeiraLinhaDados = row;
 
     for (const p of pecasFiltradas) {
       const prod = p.qteProduzida || 0;
@@ -223,9 +224,16 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
       row++;
     }
 
+    const ultimaLinhaDados = row - 1;
     adicionarLinhaTotais(ws, row, [
-      "TOTAL", "", "", "", "", totalPecas, "", totalPeso.toFixed(1),
-      totalProd, totalPecas - totalProd, `${pctGeral}%`, "", "", "",
+      "TOTAL", "", "", "", "",
+      { formula: `SUM(F${primeiraLinhaDados}:F${ultimaLinhaDados})` },
+      "",
+      { formula: `SUM(H${primeiraLinhaDados}:H${ultimaLinhaDados})` },
+      { formula: `SUM(I${primeiraLinhaDados}:I${ultimaLinhaDados})` },
+      { formula: `SUM(J${primeiraLinhaDados}:J${ultimaLinhaDados})` },
+      { formula: `IF(F${row}=0,"0%",ROUND(I${row}/F${row}*100,0)&"%")` },
+      "", "", "",
     ]);
     row++;
 

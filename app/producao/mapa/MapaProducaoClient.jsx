@@ -430,10 +430,9 @@ function PecasDetalhe({ area, pecas, loading, data }) {
       // Header
       adicionarHeaderTabela(ws, row, ["OP", "Marca", "Descrição", "Qtd", "Peso unit.", "Peso total", "Tempo no setor", "Alerta"]);
       row++;
+      const primeiraLinha = row;
 
       // Dados
-      let totalQte = 0;
-      let totalPeso = 0;
       for (const [opNum, { pecas: pecasOp }] of Object.entries(porOp)) {
         for (const p of pecasOp) {
           const dias = diasDesde(p.atualizadoEm);
@@ -448,24 +447,26 @@ function PecasDetalhe({ area, pecas, loading, data }) {
             p.marca,
             p.descricao || "—",
             p.qte,
-            p.pesoUnitKg ? `${p.pesoUnitKg.toFixed(1)} kg` : "—",
-            p.pesoTotalKg ? `${p.pesoTotalKg.toFixed(1)} kg` : "—",
+            p.pesoUnitKg ? Number(p.pesoUnitKg.toFixed(1)) : 0,
+            p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : 0,
             fmtTempo(dias),
-            temAlerta ? "⚠ PARADA" : "OK",
+            temAlerta ? "PARADA" : "OK",
           ], {
             fillColor: temAlerta ? "FEF2F2" : undefined,
             fontColors,
             alinhamento: { 3: "center", 4: "right", 5: "right", 6: "center", 7: "center" },
           });
-          totalQte += p.qte || 0;
-          totalPeso += p.pesoTotalKg || 0;
           row++;
         }
       }
 
-      // Totais
+      // Totais com formulas Excel
+      const ultimaLinha = row - 1;
       adicionarLinhaTotais(ws, row, [
-        "TOTAL", "", "", totalQte, "", `${totalPeso.toFixed(1)} kg`,
+        "TOTAL", "", "",
+        { formula: `SUM(D${primeiraLinha}:D${ultimaLinha})` },
+        "",
+        { formula: `SUM(F${primeiraLinha}:F${ultimaLinha})` },
         pecasComAlerta.length > 0 ? `${totalAlerta} paradas` : "—", "",
       ]);
       const fileName = `Mapa_${area.label}_${new Date().toISOString().slice(0, 10)}.xlsx`;
