@@ -3,8 +3,12 @@ import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import {
   Upload, Download, FileSpreadsheet, Loader2,
-  Construction, Filter, Search,
+  Construction,
 } from "lucide-react";
+import {
+  criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
+  downloadWorkbook,
+} from "@/lib/excel-relatorio";
 
 /**
  * Componente placeholder para setores em construção.
@@ -45,42 +49,52 @@ export default function SetorPlaceholder({ setor, icon: Icon, cor = "torg-blue" 
     reader.readAsArrayBuffer(file);
   }
 
-  // Exportar relatório placeholder
-  function exportarRelatorio() {
+  // Exportar relatório com template Torg
+  async function exportarRelatorio() {
     setExportando(true);
     try {
-      const wb = XLSX.utils.book_new();
-      const agora = new Date().toLocaleDateString("pt-BR") + " " +
-        new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const totalCols = dadosImportados ? dadosImportados.colunas.length : 5;
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: `Programação — ${setor}`,
+        subtitulo: dadosImportados
+          ? `Dados de: ${dadosImportados.arquivo} · ${dadosImportados.linhas} linhas`
+          : "Setor em construção",
+        totalColunas: Math.max(totalCols, 5),
+        nomePlanilha: setor,
+      });
 
-      const rows = [
-        [`PROGRAMAÇÃO — ${setor.toUpperCase()}`],
-        [`Gerado em ${agora}`],
-        [],
-        ["Este setor ainda está sendo configurado."],
-        ["Os dados de programação serão preenchidos em breve."],
-      ];
+      let row = linhaInicio;
 
       if (dadosImportados) {
-        rows.push([]);
-        rows.push([`Dados importados de: ${dadosImportados.arquivo}`]);
-        rows.push([`Total de linhas: ${dadosImportados.linhas}`]);
-        rows.push([]);
-        rows.push(dadosImportados.colunas);
-        for (const row of dadosImportados.amostra) {
-          rows.push(dadosImportados.colunas.map((c) => row[c] ?? ""));
+        // Header com colunas do arquivo
+        adicionarHeaderTabela(ws, row, dadosImportados.colunas);
+        row++;
+
+        // Dados completos (não só amostra)
+        // Para placeholder usa amostra mesmo, dados completos viriam do import real
+        for (const dataRow of dadosImportados.amostra) {
+          adicionarLinhaTabela(ws, row, dadosImportados.colunas.map((c) => dataRow[c] ?? ""));
+          row++;
         }
         if (dadosImportados.linhas > 5) {
-          rows.push([`... e mais ${dadosImportados.linhas - 5} linhas`]);
+          const cell = ws.getCell(row, 1);
+          cell.value = `... e mais ${dadosImportados.linhas - 5} linhas (preview limitado)`;
+          cell.font = { name: "Arial", size: 9, italic: true, color: { argb: "999999" } };
         }
+      } else {
+        const cell = ws.getCell(row, 1);
+        cell.value = "Este setor ainda está sendo configurado. Importe uma planilha para preencher os dados.";
+        cell.font = { name: "Arial", size: 10, color: { argb: "999999" } };
+        ws.mergeCells(row, 1, row, 5);
       }
 
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = Array(10).fill({ wch: 18 });
-      XLSX.utils.book_append_sheet(wb, ws, setor);
+      // Ajustar larguras
+      for (let i = 1; i <= totalCols; i++) {
+        ws.getColumn(i).width = 18;
+      }
 
-      const fileName = `Programacao_${setor}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      XLSX.writeFile(wb, fileName);
+      const fileName = `Torg_Programacao_${setor}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      await downloadWorkbook(workbook, fileName);
     } catch (err) {
       alert("Erro ao exportar: " + err.message);
     } finally {

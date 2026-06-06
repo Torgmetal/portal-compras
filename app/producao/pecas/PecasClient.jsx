@@ -1,12 +1,16 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import XLSX from "xlsx-js-style";
+import * as XLSX from "xlsx";
 import {
   Upload, Loader2, AlertCircle, X, CheckCircle2, Search, Download,
   Package, FileSpreadsheet, ChevronDown, ChevronUp, Filter, Plus, Trash2,
   Zap, RefreshCw, Factory,
 } from "lucide-react";
+import {
+  criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
+  adicionarLinhaTotais, downloadWorkbook, CORES,
+} from "@/lib/excel-relatorio";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { fmtOP } from "@/lib/utils";
 import { MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, calcularResumoBarras, parsePerfil } from "@/lib/maquina-corte";
@@ -143,26 +147,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
     }
   }
 
-  function exportarRelatorio() {
-    // --- Cores Torg ---
-    const TORG_BLUE = "006EAB";
-    const TORG_DARK = "002945";
-    const HEADER_BG = "00406B";
-    const LIGHT_BLUE = "E8F4FD";
-    const LIGHT_GREEN = "E8F8E8";
-    const LIGHT_ORANGE = "FFF3E8";
-    const BORDER = { style: "thin", color: { rgb: "D0D5DD" } };
-    const borders = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
-
-    const ws = {};
-    const colunas = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N"];
-    const numCols = colunas.length;
-
-    // --- Cabeçalho Torg (linhas 1-4) ---
-    ws["A1"] = { v: "TORG METAL", s: { font: { bold: true, sz: 18, color: { rgb: TORG_BLUE } }, alignment: { horizontal: "left", vertical: "center" } } };
-    ws["A2"] = { v: "Estruturas Metálicas", s: { font: { sz: 10, color: { rgb: "576D7E" }, italic: true } } };
-
-    // Título do relatório
+  async function exportarRelatorio() {
     const filtrosAtivos = [
       filtroOp ? `OP ${filtroOp}` : null,
       filtroStatus ? STATUS_LABEL[filtroStatus] : null,
@@ -170,118 +155,87 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
       filtroMaquina ? MAQUINA_LABEL[filtroMaquina] : null,
       filtroAtendimento === "COMPLETO" ? "Completo" : filtroAtendimento === "PARCIAL" ? "Parcial" : filtroAtendimento === "PENDENTE" ? "Pendente" : null,
     ].filter(Boolean);
-    const tituloFiltro = filtrosAtivos.length > 0 ? ` — ${filtrosAtivos.join(" · ")}` : "";
+    const tituloFiltro = filtrosAtivos.length > 0 ? filtrosAtivos.join(" · ") : "Todas as OPs";
 
-    ws["A3"] = { v: `Relatório de Peças${tituloFiltro}`, s: { font: { bold: true, sz: 13, color: { rgb: TORG_DARK } }, alignment: { vertical: "center" } } };
-    ws["A4"] = { v: `Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}  •  ${pecasFiltradas.length} peças`, s: { font: { sz: 9, color: { rgb: "576D7E" } } } };
-
-    // Resumo KPIs (linha 5)
     const totalPecas = pecasFiltradas.reduce((s, p) => s + (p.qte || 1), 0);
     const totalProd = pecasFiltradas.reduce((s, p) => s + (p.qteProduzida || 0), 0);
     const totalPeso = pecasFiltradas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
     const pctGeral = totalPecas > 0 ? Math.round((totalProd / totalPecas) * 100) : 0;
-    ws["A5"] = { v: `Total: ${totalPecas} pç  |  Produzido: ${totalProd} pç (${pctGeral}%)  |  Peso: ${(totalPeso / 1000).toFixed(1)} t`, s: { font: { sz: 10, bold: true, color: { rgb: TORG_BLUE } } } };
 
-    // Merge cabeçalho
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: numCols - 1 } },
-      { s: { r: 3, c: 0 }, e: { r: 3, c: numCols - 1 } },
-      { s: { r: 4, c: 0 }, e: { r: 4, c: numCols - 1 } },
-    ];
-
-    // --- Header da tabela (linha 7) ---
-    const headers = ["OP", "Marca", "Tipo", "Descrição", "Material", "Qte", "Peso Unit.", "Peso Total", "Produzido", "Falta", "% Atend.", "Máquina", "Status", "Data Prod."];
-    const headerRow = 6;
-    headers.forEach((h, i) => {
-      ws[colunas[i] + (headerRow + 1)] = {
-        v: h,
-        s: {
-          font: { bold: true, sz: 10, color: { rgb: "FFFFFF" } },
-          fill: { fgColor: { rgb: HEADER_BG } },
-          alignment: { horizontal: i >= 5 && i <= 10 ? "right" : "left", vertical: "center" },
-          borders,
-        },
-      };
+    const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+      titulo: "Controle de Peças",
+      subtitulo: tituloFiltro,
+      kpis: [
+        `Total: ${totalPecas} pç  |  Produzido: ${totalProd} pç (${pctGeral}%)  |  Peso: ${(totalPeso / 1000).toFixed(1)} t`,
+      ],
+      totalColunas: 14,
+      nomePlanilha: "Peças",
     });
 
-    // --- Dados (a partir da linha 8) ---
-    pecasFiltradas.forEach((p, idx) => {
-      const row = headerRow + 2 + idx;
+    ws.columns = [
+      { width: 8 }, { width: 14 }, { width: 10 }, { width: 24 }, { width: 14 },
+      { width: 7 }, { width: 11 }, { width: 11 }, { width: 10 }, { width: 8 },
+      { width: 10 }, { width: 16 }, { width: 12 }, { width: 12 },
+    ];
+
+    let row = linhaInicio;
+    const headers = ["OP", "Marca", "Tipo", "Descrição", "Material", "Qte", "Peso Unit.", "Peso Total", "Produzido", "Falta", "% Atend.", "Máquina", "Status", "Data Prod."];
+    adicionarHeaderTabela(ws, row, headers);
+    row++;
+
+    for (const p of pecasFiltradas) {
       const prod = p.qteProduzida || 0;
       const total = p.qte || 1;
       const falta = Math.max(0, total - prod);
       const pct = total > 0 ? Math.round((prod / total) * 100) : 0;
+      const fillColor = prod >= total ? CORES.LIGHT_GREEN : prod > 0 ? CORES.LIGHT_ORANGE : undefined;
 
-      // Cor da linha: verde se completo, laranja se parcial, branco se pendente
-      const rowFill = prod >= total ? LIGHT_GREEN : prod > 0 ? LIGHT_ORANGE : null;
-      const cellStyle = (align = "left") => ({
-        font: { sz: 10, color: { rgb: "1A1A1A" } },
-        ...(rowFill && { fill: { fgColor: { rgb: rowFill } } }),
-        alignment: { horizontal: align, vertical: "center" },
-        borders,
+      const fontColors = {};
+      fontColors[8] = prod >= total ? "16A34A" : prod > 0 ? "EA580C" : "9CA3AF";
+      fontColors[9] = falta === 0 ? "16A34A" : "EA580C";
+
+      adicionarLinhaTabela(ws, row, [
+        fmtOP(p.opNumero),
+        p.marca,
+        p.tipoPeca === "CONJUNTO" ? "Conjunto" : p.tipoPeca === "CROQUI" ? "Croqui" : "Peça",
+        p.descricao || "",
+        p.material || "",
+        total,
+        p.pesoUnitKg ? Number(p.pesoUnitKg.toFixed(1)) : 0,
+        p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : 0,
+        prod,
+        falta,
+        `${pct}%`,
+        p.maquina ? (MAQUINA_LABEL[p.maquina] || p.maquina) : "",
+        STATUS_LABEL[p.status] || p.status,
+        p.dataProducao ? new Date(p.dataProducao).toLocaleDateString("pt-BR") : "",
+      ], {
+        fillColor,
+        fontColors,
+        alinhamento: { 5: "right", 6: "right", 7: "right", 8: "right", 9: "right", 10: "right" },
       });
+      // Bold na marca
+      ws.getCell(row, 2).font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
+      // Bold no produzido e falta
+      ws.getCell(row, 9).font = { name: "Arial", size: 9, bold: true, color: { argb: fontColors[8] } };
+      ws.getCell(row, 10).font = { name: "Arial", size: 9, bold: true, color: { argb: fontColors[9] } };
+      row++;
+    }
 
-      const valores = [
-        { v: fmtOP(p.opNumero), s: cellStyle() },
-        { v: p.marca, s: { ...cellStyle(), font: { sz: 10, bold: true, color: { rgb: TORG_DARK } } } },
-        { v: p.tipoPeca === "CONJUNTO" ? "Conjunto" : p.tipoPeca === "CROQUI" ? "Croqui" : "Peça", s: cellStyle() },
-        { v: p.descricao || "", s: cellStyle() },
-        { v: p.material || "", s: cellStyle() },
-        { v: total, t: "n", s: cellStyle("right") },
-        { v: p.pesoUnitKg || 0, t: "n", z: "#,##0.0", s: cellStyle("right") },
-        { v: p.pesoTotalKg || 0, t: "n", z: "#,##0.0", s: cellStyle("right") },
-        { v: prod, t: "n", s: { ...cellStyle("right"), font: { sz: 10, bold: true, color: { rgb: prod >= total ? "16A34A" : prod > 0 ? "EA580C" : "9CA3AF" } } } },
-        { v: falta, t: "n", s: { ...cellStyle("right"), font: { sz: 10, bold: true, color: { rgb: falta === 0 ? "16A34A" : "EA580C" } } } },
-        { v: pct, t: "n", z: "0\"%\"", s: cellStyle("right") },
-        { v: p.maquina ? (MAQUINA_LABEL[p.maquina] || p.maquina) : "", s: cellStyle() },
-        { v: STATUS_LABEL[p.status] || p.status, s: cellStyle() },
-        { v: p.dataProducao ? new Date(p.dataProducao).toLocaleDateString("pt-BR") : "", s: cellStyle() },
-      ];
-      valores.forEach((cell, i) => {
-        ws[colunas[i] + row] = cell;
-      });
-    });
+    adicionarLinhaTotais(ws, row, [
+      "TOTAL", "", "", "", "", totalPecas, "", totalPeso.toFixed(1),
+      totalProd, totalPecas - totalProd, `${pctGeral}%`, "", "", "",
+    ]);
 
-    // --- Linha de totais ---
-    const totalRow = headerRow + 2 + pecasFiltradas.length;
-    const totalStyle = (align = "right") => ({
-      font: { bold: true, sz: 10, color: { rgb: TORG_DARK } },
-      fill: { fgColor: { rgb: "F0F4F8" } },
-      alignment: { horizontal: align, vertical: "center" },
-      borders,
-    });
-    ws["A" + totalRow] = { v: "TOTAL", s: totalStyle("left") };
-    for (let i = 1; i <= 4; i++) ws[colunas[i] + totalRow] = { v: "", s: totalStyle() };
-    ws["F" + totalRow] = { v: totalPecas, t: "n", s: totalStyle() };
-    ws["G" + totalRow] = { v: "", s: totalStyle() };
-    ws["H" + totalRow] = { v: totalPeso, t: "n", z: "#,##0.0", s: totalStyle() };
-    ws["I" + totalRow] = { v: totalProd, t: "n", s: totalStyle() };
-    ws["J" + totalRow] = { v: totalPecas - totalProd, t: "n", s: totalStyle() };
-    ws["K" + totalRow] = { v: pctGeral, t: "n", z: "0\"%\"", s: totalStyle() };
-    for (let i = 11; i < numCols; i++) ws[colunas[i] + totalRow] = { v: "", s: totalStyle() };
-
-    // --- Config da planilha ---
-    ws["!ref"] = `A1:${colunas[numCols - 1]}${totalRow}`;
-    ws["!cols"] = [
-      { wch: 8 }, { wch: 14 }, { wch: 10 }, { wch: 22 }, { wch: 14 },
-      { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 8 },
-      { wch: 9 }, { wch: 16 }, { wch: 12 }, { wch: 11 },
-    ];
-    ws["!rows"] = [{ hpt: 28 }, { hpt: 16 }, { hpt: 22 }, { hpt: 16 }, { hpt: 18 }, { hpt: 6 }, { hpt: 22 }];
-
-    // Montar workbook
-    const wb = XLSX.utils.book_new();
     const filtroDesc = [
       filtroOp ? `OP-${filtroOp}` : "Todas-OPs",
       filtroStatus ? STATUS_LABEL[filtroStatus] : null,
       filtroAtendimento || null,
       filtroMaquina ? MAQUINA_LABEL[filtroMaquina] : null,
     ].filter(Boolean).join("_");
-    XLSX.utils.book_append_sheet(wb, ws, (filtroDesc || "Pecas").slice(0, 31));
 
     const nomeArquivo = `Torg_Pecas_${filtroDesc || "Todas"}_${new Date().toISOString().split("T")[0]}.xlsx`;
-    XLSX.writeFile(wb, nomeArquivo);
+    await downloadWorkbook(workbook, nomeArquivo);
   }
 
   async function atualizarMaquina(id, novaMaquina) {

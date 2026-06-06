@@ -2,8 +2,13 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, MapPin,
+  AlertTriangle, Clock, Download,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import {
+  criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
+  adicionarLinhaTotais, downloadWorkbook, CORES,
+} from "@/lib/excel-relatorio";
 
 const AREAS = [
   { id: "PENDENTE", label: "Estoque", rects: [{ x: 30, y: 15, w: 810, h: 80 }], stroke: "#64748b", fill: "#f1f5f9", statusKey: "PENDENTE" },
@@ -26,6 +31,22 @@ const fmtPeso = (kg) => {
 const fmtData = (d) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+/** Calcula dias desde uma data */
+function diasDesde(data) {
+  if (!data) return null;
+  const d = new Date(data);
+  const agora = new Date();
+  return Math.floor((agora - d) / (1000 * 60 * 60 * 24));
+}
+
+/** Formata tempo no setor */
+function fmtTempo(dias) {
+  if (dias == null) return "—";
+  if (dias === 0) return "Hoje";
+  if (dias === 1) return "1 dia";
+  return `${dias} dias`;
+}
 
 export default function MapaProducaoClient() {
   const [dados, setDados] = useState(null);
@@ -74,8 +95,8 @@ export default function MapaProducaoClient() {
   };
 
   const getSetorData = (key) => {
-    if (!dados) return { qtd: 0, pesoKg: 0 };
-    return dados.statusAgg.find((s) => s.status === key) || { qtd: 0, pesoKg: 0 };
+    if (!dados) return { qtd: 0, pesoKg: 0, alertas: null };
+    return dados.statusAgg.find((s) => s.status === key) || { qtd: 0, pesoKg: 0, alertas: null };
   };
 
   const getMeta = (key) => {
@@ -94,6 +115,11 @@ export default function MapaProducaoClient() {
   const totalEmProducao = dados ? dados.statusAgg.filter((s) => s.status !== "EXPEDIDO").reduce((sum, s) => sum + (s.qtd || 0), 0) : 0;
   const pesoEmProducao = dados ? dados.statusAgg.filter((s) => s.status !== "EXPEDIDO").reduce((sum, s) => sum + (s.pesoKg || 0), 0) : 0;
   const totalExpedido = getSetorData("EXPEDIDO");
+
+  // Total de alertas
+  const totalAlertas = dados
+    ? dados.statusAgg.reduce((sum, s) => sum + (s.alertas?.qtd || 0), 0)
+    : 0;
 
   if (loading) {
     return (
@@ -144,12 +170,30 @@ export default function MapaProducaoClient() {
       </div>
 
       {/* KPI Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <KpiCard label="Em produção" valor={totalEmProducao} sub="peças" cor="#2563eb" />
         <KpiCard label="Peso em produção" valor={fmtPeso(pesoEmProducao)} cor="#059669" />
         <KpiCard label="Expedido no mês" valor={totalExpedido.qtd} sub="peças" cor="#0d9488" />
         <KpiCard label="Peso expedido" valor={fmtPeso(totalExpedido.pesoKg)} cor="#0d9488" />
+        {totalAlertas > 0 && (
+          <KpiCard label="Peças paradas" valor={totalAlertas} sub="há +1 dia" cor="#dc2626" icon={AlertTriangle} />
+        )}
       </div>
+
+      {/* Alerta geral se houver peças paradas */}
+      {totalAlertas > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <AlertTriangle size={18} className="text-red-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-red-800">
+              {totalAlertas} peça{totalAlertas > 1 ? "s" : ""} parada{totalAlertas > 1 ? "s" : ""} há mais de 1 dia
+            </p>
+            <p className="text-xs text-red-600 mt-0.5">
+              Clique no setor para ver os detalhes e tomar providências.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Factory floor SVG map */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -199,6 +243,7 @@ export default function MapaProducaoClient() {
               const isWide = r.w > 500;
               const isSmall = r.h < 130;
               const barW = isWide ? 160 : isSmall ? 80 : 120;
+              const alertaQtd = d.alertas?.qtd || 0;
 
               return (
                 <g key={area.id}>
@@ -220,6 +265,22 @@ export default function MapaProducaoClient() {
                   >
                     {area.label}
                   </text>
+
+                  {/* Badge de alerta — peças paradas >1 dia */}
+                  {alertaQtd > 0 && (
+                    <g className="pointer-events-none">
+                      <circle
+                        cx={r.x + r.w - 16} cy={r.y + 16} r={14}
+                        fill="#dc2626" stroke="white" strokeWidth={2}
+                      />
+                      <text
+                        x={r.x + r.w - 16} y={r.y + 20}
+                        textAnchor="middle" fill="white" fontSize={10} fontWeight="800"
+                      >
+                        {alertaQtd > 99 ? "99+" : alertaQtd}
+                      </text>
+                    </g>
+                  )}
 
                   {/* Piece data */}
                   {d.qtd > 0 ? (
@@ -258,29 +319,17 @@ export default function MapaProducaoClient() {
               );
             })}
 
-            {/* Flow arrows: Estoque → Prep → Mont → Solda → Jato ... Pintura → Exp */}
-
-            {/* 1. Estoque → Preparação */}
+            {/* Flow arrows */}
             <path d="M435,97 L435,113" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={445} y={108} fill="#94a3b8" fontSize={8} fontWeight="600">①</text>
-
-            {/* 2. Preparação → Montagem */}
             <path d="M300,237 L300,253" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={310} y={248} fill="#94a3b8" fontSize={8} fontWeight="600">②</text>
-
-            {/* 3. Montagem → Solda */}
             <path d="M427,350 L438,350" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={433} y={342} fill="#94a3b8" fontSize={8} fontWeight="600">③</text>
-
-            {/* 4. Solda → Jato */}
             <path d="M640,442 L640,468" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={650} y={458} fill="#94a3b8" fontSize={8} fontWeight="600">④</text>
-
-            {/* 5. Jato → Pintura */}
             <path d="M842,525 L1030,525 L1030,447" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={930} y={518} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
-
-            {/* 6. Pintura → Expedição (up in Galpão 02) */}
             <path d="M1030,233 L1030,217" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
             <text x={1040} y={228} fill="#94a3b8" fontSize={8} fontWeight="600">⑥</text>
           </svg>
@@ -299,6 +348,10 @@ export default function MapaProducaoClient() {
               </span>
             );
           })}
+          <span className="flex items-center gap-1 ml-2">
+            <span className="w-3 h-3 rounded-full bg-red-600 inline-block" />
+            <span className="text-red-600 font-medium">Parada há +1 dia</span>
+          </span>
         </div>
       </div>
 
@@ -315,10 +368,13 @@ export default function MapaProducaoClient() {
   );
 }
 
-function KpiCard({ label, valor, sub, cor }) {
+function KpiCard({ label, valor, sub, cor, icon: Icon }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
-      <p className="text-xs text-torg-gray uppercase tracking-wide">{label}</p>
+      <p className="text-xs text-torg-gray uppercase tracking-wide flex items-center gap-1.5">
+        {Icon && <Icon size={12} />}
+        {label}
+      </p>
       <div className="flex items-baseline gap-1.5 mt-1">
         <span className="text-2xl font-bold" style={{ color: cor }}>{valor}</span>
         {sub && <span className="text-xs text-torg-gray">{sub}</span>}
@@ -329,12 +385,98 @@ function KpiCard({ label, valor, sub, cor }) {
 
 function PecasDetalhe({ area, pecas, loading, data }) {
   const [expandido, setExpandido] = useState(true);
+  const [exportando, setExportando] = useState(false);
 
   const porOp = {};
   pecas.forEach((p) => {
-    if (!porOp[p.opNumero]) porOp[p.opNumero] = { cliente: p.op?.cliente || "—", pecas: [] };
+    if (!porOp[p.opNumero]) porOp[p.opNumero] = { cliente: p.op?.cliente || "—", obra: p.op?.obra || "", pecas: [] };
     porOp[p.opNumero].pecas.push(p);
   });
+
+  // Peças com alerta (>1 dia no setor)
+  const pecasComAlerta = pecas.filter((p) => diasDesde(p.atualizadoEm) > 1);
+  const totalAlerta = pecasComAlerta.reduce((s, p) => s + (p.qte || 1), 0);
+
+  // Exportar relatório do setor
+  async function exportarSetor() {
+    setExportando(true);
+    try {
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: `Mapa da Produção — ${area.label}`,
+        subtitulo: `${data.qtd} peças · ${fmtPeso(data.pesoKg)}`,
+        kpis: [
+          totalAlerta > 0
+            ? `⚠ ${totalAlerta} peça${totalAlerta > 1 ? "s" : ""} parada${totalAlerta > 1 ? "s" : ""} há mais de 1 dia`
+            : `✓ Nenhuma peça parada há mais de 1 dia`,
+        ],
+        totalColunas: 8,
+        nomePlanilha: area.label,
+      });
+
+      // Larguras
+      ws.columns = [
+        { width: 10 }, // OP
+        { width: 14 }, // Marca
+        { width: 28 }, // Descrição
+        { width: 8 },  // Qtd
+        { width: 12 }, // Peso unit
+        { width: 12 }, // Peso total
+        { width: 14 }, // Tempo no setor
+        { width: 10 }, // Alerta
+      ];
+
+      let row = linhaInicio;
+
+      // Header
+      adicionarHeaderTabela(ws, row, ["OP", "Marca", "Descrição", "Qtd", "Peso unit.", "Peso total", "Tempo no setor", "Alerta"]);
+      row++;
+
+      // Dados
+      let totalQte = 0;
+      let totalPeso = 0;
+      for (const [opNum, { pecas: pecasOp }] of Object.entries(porOp)) {
+        for (const p of pecasOp) {
+          const dias = diasDesde(p.atualizadoEm);
+          const temAlerta = dias > 1;
+          const fontColors = {};
+          if (temAlerta) {
+            fontColors[6] = "DC2626"; // vermelho
+            fontColors[7] = "DC2626";
+          }
+          adicionarLinhaTabela(ws, row, [
+            fmtOP(opNum),
+            p.marca,
+            p.descricao || "—",
+            p.qte,
+            p.pesoUnitKg ? `${p.pesoUnitKg.toFixed(1)} kg` : "—",
+            p.pesoTotalKg ? `${p.pesoTotalKg.toFixed(1)} kg` : "—",
+            fmtTempo(dias),
+            temAlerta ? "⚠ PARADA" : "OK",
+          ], {
+            fillColor: temAlerta ? "FEF2F2" : undefined,
+            fontColors,
+            alinhamento: { 3: "center", 4: "right", 5: "right", 6: "center", 7: "center" },
+          });
+          totalQte += p.qte || 0;
+          totalPeso += p.pesoTotalKg || 0;
+          row++;
+        }
+      }
+
+      // Totais
+      adicionarLinhaTotais(ws, row, [
+        "TOTAL", "", "", totalQte, "", `${totalPeso.toFixed(1)} kg`,
+        pecasComAlerta.length > 0 ? `${totalAlerta} paradas` : "—", "",
+      ]);
+
+      const fileName = `Mapa_${area.label}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      await downloadWorkbook(workbook, fileName);
+    } catch (e) {
+      alert("Erro ao exportar: " + e.message);
+    } finally {
+      setExportando(false);
+    }
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -345,11 +487,29 @@ function PecasDetalhe({ area, pecas, loading, data }) {
         <div className="flex items-center gap-3">
           <div className="w-2 h-8 rounded-full" style={{ backgroundColor: area.stroke }} />
           <div className="text-left">
-            <h3 className="text-sm font-semibold text-torg-dark">{area.label}</h3>
+            <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2">
+              {area.label}
+              {totalAlerta > 0 && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1">
+                  <AlertTriangle size={10} />
+                  {totalAlerta} parada{totalAlerta > 1 ? "s" : ""}
+                </span>
+              )}
+            </h3>
             <p className="text-xs text-torg-gray">{data.qtd} peças · {fmtPeso(data.pesoKg)}</p>
           </div>
         </div>
-        {expandido ? <ChevronUp size={16} className="text-torg-gray" /> : <ChevronDown size={16} className="text-torg-gray" />}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); exportarSetor(); }}
+            disabled={exportando || loading || pecas.length === 0}
+            className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {exportando ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+            Exportar
+          </button>
+          {expandido ? <ChevronUp size={16} className="text-torg-gray" /> : <ChevronDown size={16} className="text-torg-gray" />}
+        </div>
       </button>
 
       {expandido && (
@@ -362,11 +522,11 @@ function PecasDetalhe({ area, pecas, loading, data }) {
             <p className="text-sm text-torg-gray text-center py-6">Nenhuma peça neste setor</p>
           ) : (
             <div className="space-y-4">
-              {Object.entries(porOp).map(([opNum, { cliente, pecas: pecasOp }]) => (
+              {Object.entries(porOp).map(([opNum, { cliente, obra, pecas: pecasOp }]) => (
                 <div key={opNum}>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-xs font-bold text-torg-dark bg-gray-100 px-2 py-0.5 rounded">{fmtOP(opNum)}</span>
-                    <span className="text-xs text-torg-gray">{cliente}</span>
+                    <span className="text-xs text-torg-gray">{cliente}{obra ? ` · ${obra}` : ""}</span>
                     <span className="text-xs text-torg-gray ml-auto">{pecasOp.reduce((s, p) => s + p.qte, 0)} pç · {fmtPeso(pecasOp.reduce((s, p) => s + p.pesoTotalKg, 0))}</span>
                   </div>
                   <div className="overflow-x-auto">
@@ -377,19 +537,45 @@ function PecasDetalhe({ area, pecas, loading, data }) {
                           <th className="py-1.5 pr-3 font-medium">Descrição</th>
                           <th className="py-1.5 pr-3 font-medium text-right">Qtd</th>
                           <th className="py-1.5 pr-3 font-medium text-right">Peso unit.</th>
-                          <th className="py-1.5 font-medium text-right">Peso total</th>
+                          <th className="py-1.5 pr-3 font-medium text-right">Peso total</th>
+                          <th className="py-1.5 pr-3 font-medium text-center">Tempo no setor</th>
+                          <th className="py-1.5 font-medium text-center">Status</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pecasOp.map((p) => (
-                          <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                            <td className="py-1.5 pr-3 font-mono font-medium text-torg-dark">{p.marca}</td>
-                            <td className="py-1.5 pr-3 text-torg-gray">{p.descricao || "—"}</td>
-                            <td className="py-1.5 pr-3 text-right text-torg-dark">{p.qte}</td>
-                            <td className="py-1.5 pr-3 text-right text-torg-gray">{fmtPeso(p.pesoUnitKg)}</td>
-                            <td className="py-1.5 text-right font-medium text-torg-dark">{fmtPeso(p.pesoTotalKg)}</td>
-                          </tr>
-                        ))}
+                        {pecasOp.map((p) => {
+                          const dias = diasDesde(p.atualizadoEm);
+                          const temAlerta = dias > 1 && area.statusKey !== "PENDENTE" && area.statusKey !== "EXPEDIDO";
+                          return (
+                            <tr
+                              key={p.id}
+                              className={`border-b border-gray-50 hover:bg-gray-50/50 ${temAlerta ? "bg-red-50/60" : ""}`}
+                            >
+                              <td className="py-1.5 pr-3 font-mono font-medium text-torg-dark">{p.marca}</td>
+                              <td className="py-1.5 pr-3 text-torg-gray max-w-[200px] truncate" title={p.descricao}>{p.descricao || "—"}</td>
+                              <td className="py-1.5 pr-3 text-right text-torg-dark">{p.qte}</td>
+                              <td className="py-1.5 pr-3 text-right text-torg-gray">{fmtPeso(p.pesoUnitKg)}</td>
+                              <td className="py-1.5 pr-3 text-right font-medium text-torg-dark">{fmtPeso(p.pesoTotalKg)}</td>
+                              <td className="py-1.5 pr-3 text-center">
+                                <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${
+                                  temAlerta ? "text-red-600" : dias === 0 ? "text-emerald-600" : "text-torg-gray"
+                                }`}>
+                                  <Clock size={10} />
+                                  {fmtTempo(dias)}
+                                </span>
+                              </td>
+                              <td className="py-1.5 text-center">
+                                {temAlerta ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                                    <AlertTriangle size={9} /> PARADA
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-medium text-emerald-600">OK</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

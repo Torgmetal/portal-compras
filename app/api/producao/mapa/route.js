@@ -30,6 +30,18 @@ export async function GET(req) {
     _sum: { pesoTotalKg: true, qte: true },
   });
 
+  // Contagem de peças com mais de 1 dia no setor (para alertas no mapa)
+  const umDiaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const alertasPorStatus = await prisma.pecaConjunto.groupBy({
+    by: ["status"],
+    where: {
+      status: { notIn: ["PENDENTE", "EXPEDIDO"] },
+      atualizadoEm: { lt: umDiaAtras },
+    },
+    _count: true,
+    _sum: { qte: true },
+  });
+
   const metas = await prisma.meta.findMany({
     where: { modulo: "PRODUCAO", tipo: "PESO_KG", ano, mes },
   });
@@ -47,12 +59,19 @@ export async function GET(req) {
       select: {
         id: true, opNumero: true, marca: true, descricao: true,
         qte: true, pesoUnitKg: true, pesoTotalKg: true, status: true,
-        fluxoEspecial: true, dataPrevista: true,
-        op: { select: { numero: true, cliente: true } },
+        fluxoEspecial: true, dataPrevista: true, atualizadoEm: true,
+        ultimoSetor: true, dataProducao: true,
+        op: { select: { numero: true, cliente: true, obra: true } },
       },
       orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
       take: 1000,
     });
+  }
+
+  // Mapear alertas por status
+  const alertasMap = {};
+  for (const a of alertasPorStatus) {
+    alertasMap[a.status] = { count: a._count, qtd: a._sum.qte || 0 };
   }
 
   return NextResponse.json({
@@ -61,6 +80,7 @@ export async function GET(req) {
       count: s._count,
       qtd: s._sum.qte || 0,
       pesoKg: s._sum.pesoTotalKg || 0,
+      alertas: alertasMap[s.status] || null,
     })),
     metas: metas.map((m) => ({ setor: m.setor, valorMensal: m.valorMensal })),
     realizadoMes: realizadoMes.map((r) => ({
