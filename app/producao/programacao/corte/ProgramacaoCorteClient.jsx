@@ -600,6 +600,45 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
         </div>
       )}
 
+      {/* Resumo de barras por máquina / perfil */}
+      {Object.keys(resumoBarras).length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+            <h4 className="text-xs font-semibold text-torg-dark uppercase tracking-wide">Barras por Máquina / Perfil</h4>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {Object.entries(resumoBarras).map(([maq, dados]) => {
+              const perfis = Object.entries(dados.perfis).sort((a, b) => a[0].localeCompare(b[0]));
+              if (perfis.length === 0) return null;
+              const cor = MAQUINA_COR[maq] || { dot: "bg-gray-400", text: "text-gray-700" };
+              const totalBarras = perfis.reduce((s, [, pf]) => s + pf.barras, 0);
+              return (
+                <div key={maq} className="px-4 py-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`w-2 h-2 rounded-full ${cor.dot}`} />
+                    <span className="text-xs font-semibold text-torg-dark">{MAQUINA_LABEL[maq] || maq}</span>
+                    <span className="text-[10px] text-torg-gray">
+                      {dados.pecas} peças · {fmtKg(dados.pesoTotal)} · {totalBarras} barra{totalBarras !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+                    {perfis.map(([perfil, pf]) => (
+                      <div key={perfil} className="bg-gray-50 rounded px-2 py-1.5 text-[11px]">
+                        <span className="font-mono font-semibold text-torg-dark">{perfil}</span>
+                        <div className="flex items-center justify-between mt-0.5 text-torg-gray">
+                          <span>{pf.qte} pç · {(pf.compTotalMm / 1000).toFixed(1)}m</span>
+                          <span className="font-semibold text-torg-dark">{pf.barras} barra{pf.barras !== 1 ? "s" : ""}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Filtros */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
         <Filter size={14} className="text-torg-gray" />
