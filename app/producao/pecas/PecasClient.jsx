@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
-  adicionarLinhaTotais, downloadWorkbook, CORES,
+  adicionarLinhaTotais, adicionarRodapeISO, adicionarLegenda,
+  downloadWorkbook, CORES,
 } from "@/lib/excel-relatorio";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { fmtOP } from "@/lib/utils";
@@ -226,6 +227,20 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
       "TOTAL", "", "", "", "", totalPecas, "", totalPeso.toFixed(1),
       totalProd, totalPecas - totalProd, `${pctGeral}%`, "", "", "",
     ]);
+    row++;
+
+    // Legenda
+    row++;
+    adicionarLegenda(ws, row, [
+      { cor: CORES.LIGHT_GREEN, label: "Verde = 100% produzido" },
+      { cor: CORES.LIGHT_ORANGE, label: "Laranja = parcialmente produzido" },
+      { cor: "FFFFFF", label: "Branco = pendente" },
+    ], 14);
+    row++;
+
+    // Rodape ISO 9001
+    row++;
+    adicionarRodapeISO(ws, row, 14);
 
     const filtroDesc = [
       filtroOp ? `OP-${filtroOp}` : "Todas-OPs",
