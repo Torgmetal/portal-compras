@@ -976,7 +976,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
                               />
                             </td>
                             <td className="px-3 py-1.5 text-xs font-mono text-torg-blue whitespace-nowrap">{fmtOP(p.opNumero)}</td>
-                            <td className="px-3 py-1.5">
+                            <td className="px-3 py-1.5 whitespace-nowrap">
                               <span className="text-xs font-semibold text-torg-dark font-mono">{p.marca}</span>
                               {p.tipoPeca === "CROQUI" && <span className="ml-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">CR</span>}
                             </td>
@@ -984,17 +984,17 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
                               {p.descricao || "—"}
                             </td>
                             <td className="px-3 py-1.5 text-xs text-torg-gray whitespace-nowrap">{p.material || "—"}</td>
-                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark">{p.qte}</td>
+                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark whitespace-nowrap">{p.qte}</td>
                             <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray whitespace-nowrap">{fmtMm(p.comprimentoMm)}</td>
-                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray">{fmtKg(p.pesoUnitKg)}</td>
-                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark font-medium">{fmtKg(p.pesoTotalKg)}</td>
-                            <td className={`px-3 py-1.5 text-right text-xs tabular-nums font-semibold ${prod >= total && prod > 0 ? "text-emerald-600" : prod > 0 ? "text-orange-600" : "text-gray-400"}`}>
+                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray whitespace-nowrap">{fmtKg(p.pesoUnitKg)}</td>
+                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark font-medium whitespace-nowrap">{fmtKg(p.pesoTotalKg)}</td>
+                            <td className={`px-3 py-1.5 text-right text-xs tabular-nums font-semibold whitespace-nowrap ${prod >= total && prod > 0 ? "text-emerald-600" : prod > 0 ? "text-orange-600" : "text-gray-400"}`}>
                               {prod > 0 ? prod : "—"}
                             </td>
-                            <td className={`px-3 py-1.5 text-right text-xs tabular-nums font-semibold ${falta === 0 ? "text-emerald-600" : "text-orange-600"}`}>
+                            <td className={`px-3 py-1.5 text-right text-xs tabular-nums font-semibold whitespace-nowrap ${falta === 0 ? "text-emerald-600" : "text-orange-600"}`}>
                               {prod > 0 ? (falta === 0 ? "✓" : falta) : "—"}
                             </td>
-                            <td className="px-3 py-1.5">
+                            <td className="px-3 py-1.5 whitespace-nowrap">
                               <select
                                 value={p.maquina || ""}
                                 onChange={(e) => atualizarMaquina(p.id, e.target.value)}
@@ -1008,7 +1008,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
                                 ))}
                               </select>
                             </td>
-                            <td className="px-3 py-1.5 text-center">
+                            <td className="px-3 py-1.5 text-center whitespace-nowrap">
                               {p.status === "CORTE" ? (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                                   <CheckCircle2 size={10} /> Liberado
