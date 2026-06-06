@@ -7,7 +7,7 @@ import {
 import { fmtOP } from "@/lib/utils";
 import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
-  adicionarLinhaTotais, adicionarRodapeISO, downloadWorkbook, CORES,
+  adicionarLinhaTotais, downloadWorkbook, CORES,
 } from "@/lib/excel-relatorio";
 
 const AREAS = [
@@ -468,12 +468,6 @@ function PecasDetalhe({ area, pecas, loading, data }) {
         "TOTAL", "", "", totalQte, "", `${totalPeso.toFixed(1)} kg`,
         pecasComAlerta.length > 0 ? `${totalAlerta} paradas` : "—", "",
       ]);
-      row++;
-
-      // Rodape ISO 9001
-      row += 2;
-      adicionarRodapeISO(ws, row, 8);
-
       const fileName = `Mapa_${area.label}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       await downloadWorkbook(workbook, fileName);
     } catch (e) {
