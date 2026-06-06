@@ -3,14 +3,25 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
-  Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2,
+  Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download,
   Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList, ArrowRight,
 } from "lucide-react";
+import {
+  criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
+  adicionarLinhaTotais, adicionarLegenda,
+  downloadWorkbook, CORES,
+} from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
 import {
   MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, PERDA_MAQUINA,
   calcularResumoBarras, parsePerfil, gerarProgramaCorte, classificarMaquina,
 } from "@/lib/maquina-corte";
+
+const STATUS_PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
+const STATUS_LABEL = {
+  PENDENTE: "Pendente", CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
+  ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDIDO: "Expedido",
+};
 
 const fmtKg = (v) => {
   if (v == null) return "—";
@@ -31,6 +42,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
   const [pecas, setPecas] = useState(pecasIniciais);
   const [filtroOp, setFiltroOp] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("PENDENTE");
+  const [filtroMaquina, setFiltroMaquina] = useState("");
+  const [filtroAtendimento, setFiltroAtendimento] = useState("");
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
   const [liberando, setLiberando] = useState(false);
@@ -51,6 +64,14 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
     return pecas.filter((p) => {
       if (filtroOp && p.opNumero !== filtroOp) return false;
       if (filtroStatus && p.status !== filtroStatus) return false;
+      if (filtroMaquina && (p.maquina || "SEM_MAQUINA") !== filtroMaquina) return false;
+      if (filtroAtendimento) {
+        const prod = p.qteProduzida || 0;
+        const total = p.qte || 1;
+        if (filtroAtendimento === "COMPLETO" && prod < total) return false;
+        if (filtroAtendimento === "PARCIAL" && (prod === 0 || prod >= total)) return false;
+        if (filtroAtendimento === "PENDENTE" && prod > 0) return false;
+      }
       if (busca) {
         const q = busca.toLowerCase();
         if (
@@ -61,7 +82,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
       }
       return true;
     });
-  }, [pecas, filtroOp, filtroStatus, busca]);
+  }, [pecas, filtroOp, filtroStatus, filtroMaquina, filtroAtendimento, busca]);
 
   // Agrupar por maquina
   const porMaquina = useMemo(() => {
@@ -507,6 +528,113 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
     XLSX.writeFile(wb, fileName);
   }
 
+  // Exportar relatorio no padrao ISO
+  async function exportarRelatorio() {
+    const filtrosAtivos = [
+      filtroOp ? `OP ${filtroOp}` : null,
+      filtroStatus ? STATUS_LABEL[filtroStatus] : null,
+      filtroMaquina ? (MAQUINA_LABEL[filtroMaquina] || filtroMaquina) : null,
+      filtroAtendimento === "COMPLETO" ? "Completo" : filtroAtendimento === "PARCIAL" ? "Parcial" : filtroAtendimento === "PENDENTE" ? "Pendente" : null,
+    ].filter(Boolean);
+    const tituloFiltro = filtrosAtivos.length > 0 ? filtrosAtivos.join(" · ") : "Todas as OPs";
+
+    const totalPecas = pecasFiltradas.reduce((s, p) => s + (p.qte || 1), 0);
+    const totalProd = pecasFiltradas.reduce((s, p) => s + (p.qteProduzida || 0), 0);
+    const totalPeso = pecasFiltradas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+    const pctGeral = totalPecas > 0 ? Math.round((totalProd / totalPecas) * 100) : 0;
+
+    const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+      titulo: "Programacao de Corte",
+      subtitulo: tituloFiltro,
+      kpis: [
+        `Total: ${totalPecas} pc  |  Produzido: ${totalProd} pc (${pctGeral}%)  |  Peso: ${(totalPeso / 1000).toFixed(1)} t`,
+      ],
+      totalColunas: 14,
+      nomePlanilha: "Corte",
+      codigoDoc: "REL-PRD-003",
+    });
+
+    ws.columns = [
+      { width: 8 }, { width: 14 }, { width: 24 }, { width: 14 },
+      { width: 7 }, { width: 11 }, { width: 11 }, { width: 11 },
+      { width: 10 }, { width: 8 }, { width: 10 }, { width: 16 },
+      { width: 12 }, { width: 12 },
+    ];
+
+    let row = linhaInicio;
+    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Comp.", "Peso Unit.", "Peso Total", "Produzido", "Falta", "% Atend.", "Maquina", "Status", "Data Prod."];
+    adicionarHeaderTabela(ws, row, headers);
+    row++;
+    const primeiraLinhaDados = row;
+
+    for (const p of pecasFiltradas) {
+      const prod = p.qteProduzida || 0;
+      const total = p.qte || 1;
+      const falta = Math.max(0, total - prod);
+      const pct = total > 0 ? Math.round((prod / total) * 100) : 0;
+      const fillColor = prod >= total ? CORES.LIGHT_GREEN : prod > 0 ? CORES.LIGHT_ORANGE : undefined;
+
+      const fontColors = {};
+      fontColors[8] = prod >= total ? "16A34A" : prod > 0 ? "EA580C" : "9CA3AF";
+      fontColors[9] = falta === 0 ? "16A34A" : "EA580C";
+
+      adicionarLinhaTabela(ws, row, [
+        fmtOP(p.opNumero),
+        p.marca,
+        p.descricao || "",
+        p.material || "",
+        total,
+        p.comprimentoMm ? `${p.comprimentoMm} mm` : "",
+        p.pesoUnitKg ? Number(p.pesoUnitKg.toFixed(1)) : 0,
+        p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : 0,
+        prod,
+        falta,
+        `${pct}%`,
+        p.maquina ? (MAQUINA_LABEL[p.maquina] || p.maquina) : "",
+        STATUS_LABEL[p.status] || p.status,
+        p.dataProducao ? new Date(p.dataProducao).toLocaleDateString("pt-BR") : "",
+      ], {
+        fillColor,
+        fontColors,
+        alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right", 9: "right", 10: "right" },
+      });
+      ws.getCell(row, 2).font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
+      ws.getCell(row, 9).font = { name: "Arial", size: 9, bold: true, color: { argb: fontColors[8] } };
+      ws.getCell(row, 10).font = { name: "Arial", size: 9, bold: true, color: { argb: fontColors[9] } };
+      row++;
+    }
+
+    const ultimaLinhaDados = row - 1;
+    adicionarLinhaTotais(ws, row, [
+      "TOTAL", "", "", "",
+      { formula: `SUM(E${primeiraLinhaDados}:E${ultimaLinhaDados})` },
+      "",
+      "",
+      { formula: `SUM(H${primeiraLinhaDados}:H${ultimaLinhaDados})` },
+      { formula: `SUM(I${primeiraLinhaDados}:I${ultimaLinhaDados})` },
+      { formula: `SUM(J${primeiraLinhaDados}:J${ultimaLinhaDados})` },
+      { formula: `IF(E${row}=0,"0%",ROUND(I${row}/E${row}*100,0)&"%")` },
+      "", "", "",
+    ]);
+    row++;
+
+    row++;
+    adicionarLegenda(ws, row, [
+      { cor: CORES.LIGHT_GREEN, label: "Verde = 100% produzido" },
+      { cor: CORES.LIGHT_ORANGE, label: "Laranja = parcialmente produzido" },
+      { cor: "FFFFFF", label: "Branco = pendente" },
+    ], 14);
+
+    const filtroDesc = [
+      filtroOp ? `OP-${filtroOp}` : "Todas-OPs",
+      filtroStatus ? STATUS_LABEL[filtroStatus] : null,
+      filtroMaquina ? (MAQUINA_LABEL[filtroMaquina] || filtroMaquina) : null,
+    ].filter(Boolean).join("_");
+
+    const nomeArquivo = `Torg_Corte_${filtroDesc || "Todas"}_${new Date().toISOString().split("T")[0]}.xlsx`;
+    await downloadWorkbook(workbook, nomeArquivo);
+  }
+
   return (
     <div className="space-y-4 max-w-7xl">
       {/* Header */}
@@ -650,19 +778,53 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
           <option value="">Todas as OPs</option>
           {opsComPecas.map((op) => <option key={op} value={op}>OP {op}</option>)}
         </select>
+        <select
+          value={filtroStatus}
+          onChange={(e) => { setFiltroStatus(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Todos status</option>
+          {STATUS_PIPELINE.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+        </select>
+        <select
+          value={filtroMaquina}
+          onChange={(e) => { setFiltroMaquina(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Todas maquinas</option>
+          {Object.entries(MAQUINA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          <option value="SEM_MAQUINA">Sem maquina</option>
+        </select>
+        <select
+          value={filtroAtendimento}
+          onChange={(e) => setFiltroAtendimento(e.target.value)}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Atendimento</option>
+          <option value="COMPLETO">Completo</option>
+          <option value="PARCIAL">Parcial</option>
+          <option value="PENDENTE">Pendente</option>
+        </select>
         <div className="flex items-center gap-1 flex-1 min-w-[180px]">
           <Search size={12} className="text-torg-gray ml-2" />
           <input
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar marca, descrição ou material..."
+            placeholder="Buscar marca, descricao ou material..."
             className="flex-1 px-2 py-1.5 text-xs border-0 focus:ring-0 focus:outline-none"
           />
         </div>
-        {(filtroOp || busca) && (
+        <button
+          onClick={exportarRelatorio}
+          className="px-3 py-1.5 bg-torg-blue/10 text-torg-blue text-xs rounded-lg hover:bg-torg-blue/20 font-medium flex items-center gap-1.5"
+          title="Exportar pecas filtradas para Excel"
+        >
+          <Download size={13} /> Exportar
+        </button>
+        {(filtroOp || filtroMaquina || filtroAtendimento || busca) && (
           <button
-            onClick={() => { setFiltroOp(""); setBusca(""); }}
+            onClick={() => { setFiltroOp(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
             className="text-xs text-torg-gray hover:text-torg-dark"
           >
             limpar
@@ -791,6 +953,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
                         <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Comp.</th>
                         <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso unit.</th>
                         <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso total</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Produzido</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Falta</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Máquina</th>
                         <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Status</th>
                       </tr>
@@ -798,8 +962,11 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
                     <tbody className="divide-y divide-gray-50">
                       {pecasMaq.map((p) => {
                         const perfil = parsePerfil(p.descricao);
+                        const prod = p.qteProduzida || 0;
+                        const total = p.qte || 1;
+                        const falta = Math.max(0, total - prod);
                         return (
-                          <tr key={p.id} className={`hover:bg-gray-50 ${selecionados.has(p.id) ? "bg-torg-blue-50/30" : ""}`}>
+                          <tr key={p.id} className={`hover:bg-gray-50 ${selecionados.has(p.id) ? "bg-torg-blue-50/30" : ""} ${prod >= total && prod > 0 ? "bg-emerald-50/30" : prod > 0 ? "bg-yellow-50/20" : ""}`}>
                             <td className="px-3 py-1.5">
                               <input
                                 type="checkbox"
@@ -821,6 +988,12 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
                             <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray whitespace-nowrap">{fmtMm(p.comprimentoMm)}</td>
                             <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray">{fmtKg(p.pesoUnitKg)}</td>
                             <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark font-medium">{fmtKg(p.pesoTotalKg)}</td>
+                            <td className={`px-3 py-1.5 text-right text-xs tabular-nums font-semibold ${prod >= total && prod > 0 ? "text-emerald-600" : prod > 0 ? "text-orange-600" : "text-gray-400"}`}>
+                              {prod > 0 ? prod : "—"}
+                            </td>
+                            <td className={`px-3 py-1.5 text-right text-xs tabular-nums font-semibold ${falta === 0 ? "text-emerald-600" : "text-orange-600"}`}>
+                              {prod > 0 ? (falta === 0 ? "✓" : falta) : "—"}
+                            </td>
                             <td className="px-3 py-1.5">
                               <select
                                 value={p.maquina || ""}
