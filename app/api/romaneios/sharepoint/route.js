@@ -108,15 +108,32 @@ async function parseRomaneioXlsm(token, filePath) {
   const encodedPath = filePath.split("/").filter(Boolean).map(encodeURIComponent).join("/");
   const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${encodedPath}:/content`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error("Erro ao baixar arquivo");
+  if (!res.ok) {
+    const status = res.status;
+    if (status === 401 || status === 403) throw new Error("Token do SharePoint expirado ou sem permissao. Tente novamente.");
+    if (status === 404) throw new Error("Arquivo nao encontrado no SharePoint. Pode ter sido movido ou renomeado.");
+    throw new Error(`Erro ao baixar arquivo do SharePoint (HTTP ${status})`);
+  }
   const buffer = Buffer.from(await res.arrayBuffer());
 
   // Parse com ExcelJS
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer);
-  const ws = wb.getWorksheet("ROMANEIO");
-  if (!ws) throw new Error("Aba ROMANEIO nao encontrada");
+  try {
+    await wb.xlsx.load(buffer);
+  } catch (parseErr) {
+    throw new Error(`Arquivo corrompido ou formato nao suportado: ${parseErr.message}`);
+  }
+
+  // Procura aba por nome (case-insensitive) — pode ser "ROMANEIO", "Romaneio", etc.
+  const abasDisponiveis = wb.worksheets.map((s) => s.name);
+  let ws = wb.getWorksheet("ROMANEIO");
+  if (!ws) {
+    ws = wb.worksheets.find((s) => s.name.toLowerCase().includes("romaneio"));
+  }
+  if (!ws) {
+    throw new Error(`Aba ROMANEIO nao encontrada. Abas disponiveis: ${abasDisponiveis.join(", ")}`);
+  }
 
   const getVal = (r, c) => {
     const v = ws.getRow(r).getCell(c).value;

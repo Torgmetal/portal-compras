@@ -21,6 +21,7 @@ export default function RomaneiosSharepoint({ ops }) {
   const [erro, setErro] = useState("");
   const [expandedNum, setExpandedNum] = useState(null);
   const [detalhe, setDetalhe] = useState(null);
+  const [erroDetalhe, setErroDetalhe] = useState("");
   const [loadingDetalhe, setLoadingDetalhe] = useState(false);
 
   const carregarRomaneios = useCallback(async (opNumero) => {
@@ -46,9 +47,11 @@ export default function RomaneiosSharepoint({ ops }) {
     if (expandedNum === rom.numero) {
       setExpandedNum(null);
       setDetalhe(null);
+      setErroDetalhe("");
       return;
     }
     setExpandedNum(rom.numero);
+    setErroDetalhe("");
     if (!rom.xlsm) { setDetalhe(null); return; }
     setLoadingDetalhe(true);
     try {
@@ -56,8 +59,9 @@ export default function RomaneiosSharepoint({ ops }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao carregar detalhe");
       setDetalhe(data);
-    } catch {
+    } catch (e) {
       setDetalhe(null);
+      setErroDetalhe(e.message || "Erro desconhecido ao ler romaneio");
     } finally {
       setLoadingDetalhe(false);
     }
@@ -156,6 +160,7 @@ export default function RomaneiosSharepoint({ ops }) {
               expanded={expandedNum === rom.numero}
               onToggle={() => expandir(rom)}
               detalhe={expandedNum === rom.numero ? detalhe : null}
+              erroDetalhe={expandedNum === rom.numero ? erroDetalhe : ""}
               loadingDetalhe={expandedNum === rom.numero && loadingDetalhe}
             />
           ))}
@@ -165,7 +170,7 @@ export default function RomaneiosSharepoint({ ops }) {
   );
 }
 
-function RomaneioCard({ rom, expanded, onToggle, detalhe, loadingDetalhe }) {
+function RomaneioCard({ rom, expanded, onToggle, detalhe, erroDetalhe, loadingDetalhe }) {
   const modified = rom.xlsm?.modified || rom.pdf?.modified;
 
   return (
@@ -213,9 +218,15 @@ function RomaneioCard({ rom, expanded, onToggle, detalhe, loadingDetalhe }) {
             </div>
           ) : detalhe ? (
             <RomaneioDetalhe data={detalhe} />
+          ) : erroDetalhe ? (
+            <div className="py-6 text-center">
+              <AlertCircle size={20} className="mx-auto text-red-400 mb-2" />
+              <p className="text-sm text-red-600 font-medium">Erro ao ler romaneio</p>
+              <p className="text-xs text-red-500 mt-1">{erroDetalhe}</p>
+            </div>
           ) : (
             <div className="py-6 text-center text-sm text-torg-gray">
-              {rom.xlsm ? "Erro ao ler romaneio." : "Apenas PDF disponível — sem dados para extrair."}
+              {rom.xlsm ? "Clique para carregar os dados do romaneio." : "Apenas PDF disponível — sem dados para extrair."}
             </div>
           )}
         </div>
