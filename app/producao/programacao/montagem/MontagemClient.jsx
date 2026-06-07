@@ -2,11 +2,27 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Wrench, ChevronDown, ChevronUp, Search, CheckCircle2, Loader2,
-  AlertCircle, ArrowRight, X, Package, Undo2, Filter,
+  Wrench, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download,
+  Loader2, AlertCircle, ArrowRight, X, Package, Undo2,
 } from "lucide-react";
+import {
+  criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
+  adicionarLinhaTotais, adicionarLegenda,
+  downloadWorkbook, CORES,
+} from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
+
+const STATUS_LABEL = {
+  PENDENTE: "Pendente", CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
+  ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDIDO: "Expedido",
+};
+
+const PRONTIDAO_LABEL = {
+  PRONTO: "Pronto p/ montar",
+  PARCIAL: "Parcial",
+  PENDENTE: "Sem croquis cortados",
+};
 
 const fmtKg = (v) => {
   if (v == null) return "—";
@@ -25,7 +41,7 @@ const fmtMm = (v) => {
 // Verifica se todos os croquis de um conjunto estão atendidos (cortados)
 function calcularProntidao(conjunto) {
   const croquis = conjunto.conjuntoCroquis || [];
-  if (croquis.length === 0) return { pronto: false, total: 0, atendidos: 0, pct: 0, itens: [] };
+  if (croquis.length === 0) return { pronto: false, total: 0, atendidos: 0, pct: 0, itens: [], categoria: "PENDENTE" };
 
   let total = 0;
   let atendidos = 0;
@@ -55,21 +71,24 @@ function calcularProntidao(conjunto) {
   }
 
   const pct = total > 0 ? Math.round((atendidos / total) * 100) : 0;
-  return { pronto: atendidos === total && total > 0, total, atendidos, pct, itens };
+  const pronto = atendidos === total && total > 0;
+  const categoria = pronto ? "PRONTO" : atendidos > 0 ? "PARCIAL" : "PENDENTE";
+  return { pronto, total, atendidos, pct, itens, categoria };
 }
 
 export default function MontagemClient({ conjuntosIniciais, userRole }) {
   const router = useRouter();
   const [conjuntos, setConjuntos] = useState(conjuntosIniciais);
   const [filtroOp, setFiltroOp] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("CORTE"); // CORTE = aguardando montagem
+  const [filtroStatus, setFiltroStatus] = useState("CORTE");
+  const [filtroProntidao, setFiltroProntidao] = useState("");
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
   const [expandidos, setExpandidos] = useState(new Set());
   const [liberando, setLiberando] = useState(false);
   const [revertendo, setRevertendo] = useState(false);
 
-  // OPs disponíveis
+  // OPs disponíveis (que têm conjuntos)
   const opsDisponiveis = useMemo(() => {
     const set = new Set(conjuntos.map((c) => c.opNumero));
     return [...set].sort();
@@ -88,22 +107,27 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
     return conjuntosEnriquecidos.filter((c) => {
       if (filtroOp && c.opNumero !== filtroOp) return false;
       if (filtroStatus && c.status !== filtroStatus) return false;
+      if (filtroProntidao && c.prontidao.categoria !== filtroProntidao) return false;
       if (busca) {
         const q = busca.toLowerCase();
         if (
           !c.marca.toLowerCase().includes(q) &&
           !(c.descricao || "").toLowerCase().includes(q) &&
-          !c.opNumero.toLowerCase().includes(q)
+          !c.opNumero.toLowerCase().includes(q) &&
+          !(c.op?.cliente || "").toLowerCase().includes(q)
         ) return false;
       }
       return true;
     });
-  }, [conjuntosEnriquecidos, filtroOp, filtroStatus, busca]);
+  }, [conjuntosEnriquecidos, filtroOp, filtroStatus, filtroProntidao, busca]);
 
   // Contadores
   const totalAguardando = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "CORTE").length, [conjuntosEnriquecidos]);
   const totalProntos = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "CORTE" && c.prontidao.pronto).length, [conjuntosEnriquecidos]);
   const totalEmMontagem = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "MONTAGEM").length, [conjuntosEnriquecidos]);
+
+  // Peso total dos conjuntos filtrados
+  const pesoFiltrados = useMemo(() => filtrados.reduce((s, c) => s + (c.pesoTotalKg || 0), 0), [filtrados]);
 
   // Toggle expand
   const toggleExpandido = (id) => {
@@ -123,11 +147,20 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
     });
   };
   const selecionarTodos = () => {
-    const prontos = filtrados.filter((c) => c.prontidao.pronto && c.status === "CORTE");
-    if (prontos.every((c) => selecionados.has(c.id))) {
-      setSelecionados(new Set());
-    } else {
-      setSelecionados(new Set(prontos.map((c) => c.id)));
+    if (filtroStatus === "CORTE") {
+      const prontos = filtrados.filter((c) => c.prontidao.pronto && c.status === "CORTE");
+      if (prontos.every((c) => selecionados.has(c.id))) {
+        setSelecionados(new Set());
+      } else {
+        setSelecionados(new Set(prontos.map((c) => c.id)));
+      }
+    } else if (filtroStatus === "MONTAGEM") {
+      const emMontagem = filtrados.filter((c) => c.status === "MONTAGEM");
+      if (emMontagem.every((c) => selecionados.has(c.id))) {
+        setSelecionados(new Set());
+      } else {
+        setSelecionados(new Set(emMontagem.map((c) => c.id)));
+      }
     }
   };
 
@@ -181,8 +214,105 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
     }
   }
 
-  // Peso total dos conjuntos filtrados
-  const pesoFiltrados = useMemo(() => filtrados.reduce((s, c) => s + (c.pesoTotalKg || 0), 0), [filtrados]);
+  // Exportar relatório padrão ISO
+  async function exportarRelatorio() {
+    const filtrosAtivos = [
+      filtroOp ? `OP ${filtroOp}` : null,
+      filtroStatus ? STATUS_LABEL[filtroStatus] : null,
+      filtroProntidao ? PRONTIDAO_LABEL[filtroProntidao] : null,
+    ].filter(Boolean);
+    const tituloFiltro = filtrosAtivos.length > 0 ? filtrosAtivos.join(" · ") : "Todos os conjuntos";
+
+    const totalPecas = filtrados.reduce((s, c) => s + (c.qte || 1), 0);
+    const totalCroquis = filtrados.reduce((s, c) => s + (c.prontidao.total || 0), 0);
+    const totalAtendidos = filtrados.reduce((s, c) => s + (c.prontidao.atendidos || 0), 0);
+    const totalPeso = filtrados.reduce((s, c) => s + (c.pesoTotalKg || 0), 0);
+    const pctGeral = totalCroquis > 0 ? Math.round((totalAtendidos / totalCroquis) * 100) : 0;
+
+    const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+      titulo: "Programacao de Montagem",
+      subtitulo: tituloFiltro,
+      kpis: [
+        `Total: ${filtrados.length} conjuntos (${totalPecas} pc)  |  Croquis: ${totalAtendidos}/${totalCroquis} cortados (${pctGeral}%)  |  Peso: ${(totalPeso / 1000).toFixed(1)} t`,
+      ],
+      totalColunas: 11,
+      nomePlanilha: "Montagem",
+      codigoDoc: "REL-PRD-004",
+    });
+
+    ws.columns = [
+      { width: 8 }, { width: 14 }, { width: 30 }, { width: 14 },
+      { width: 7 }, { width: 11 }, { width: 11 }, { width: 10 },
+      { width: 10 }, { width: 12 }, { width: 14 },
+    ];
+
+    let row = linhaInicio;
+    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Peso Total", "Croquis", "Cortados", "Faltam", "Prontidao", "Status"];
+    adicionarHeaderTabela(ws, row, headers);
+    row++;
+    const primeiraLinhaDados = row;
+
+    for (const c of filtrados) {
+      const { prontidao } = c;
+      const fillColor = prontidao.pronto ? CORES.LIGHT_GREEN : prontidao.atendidos > 0 ? CORES.LIGHT_ORANGE : undefined;
+      const faltam = prontidao.total - prontidao.atendidos;
+
+      const fontColors = {};
+      fontColors[7] = prontidao.pronto ? "16A34A" : prontidao.atendidos > 0 ? "EA580C" : "9CA3AF";
+      fontColors[8] = faltam === 0 ? "16A34A" : "EA580C";
+
+      adicionarLinhaTabela(ws, row, [
+        fmtOP(c.opNumero),
+        c.marca,
+        c.descricao || "",
+        c.material || "",
+        c.qte || 1,
+        c.pesoTotalKg ? Number(c.pesoTotalKg.toFixed(1)) : 0,
+        prontidao.total,
+        prontidao.atendidos,
+        faltam,
+        prontidao.pronto ? "Pronto" : `${prontidao.pct}%`,
+        STATUS_LABEL[c.status] || c.status,
+      ], {
+        fillColor,
+        fontColors,
+        alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right", 9: "right" },
+      });
+      ws.getCell(row, 2).font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
+      ws.getCell(row, 8).font = { name: "Arial", size: 9, bold: true, color: { argb: fontColors[7] } };
+      ws.getCell(row, 9).font = { name: "Arial", size: 9, bold: true, color: { argb: fontColors[8] } };
+      row++;
+    }
+
+    const ultimaLinhaDados = row - 1;
+    adicionarLinhaTotais(ws, row, [
+      "TOTAL", "", "", "",
+      { formula: `SUM(E${primeiraLinhaDados}:E${ultimaLinhaDados})` },
+      { formula: `SUM(F${primeiraLinhaDados}:F${ultimaLinhaDados})` },
+      { formula: `SUM(G${primeiraLinhaDados}:G${ultimaLinhaDados})` },
+      { formula: `SUM(H${primeiraLinhaDados}:H${ultimaLinhaDados})` },
+      { formula: `SUM(I${primeiraLinhaDados}:I${ultimaLinhaDados})` },
+      { formula: `IF(G${row}=0,"0%",ROUND(H${row}/G${row}*100,0)&"%")` },
+      "",
+    ]);
+    row++;
+
+    row++;
+    adicionarLegenda(ws, row, [
+      { cor: CORES.LIGHT_GREEN, label: "Verde = 100% croquis cortados (pronto para montar)" },
+      { cor: CORES.LIGHT_ORANGE, label: "Laranja = parcialmente cortado" },
+      { cor: "FFFFFF", label: "Branco = nenhum croqui cortado" },
+    ], 11);
+
+    const filtroDesc = [
+      filtroOp ? `OP-${filtroOp}` : "Todas-OPs",
+      filtroStatus ? STATUS_LABEL[filtroStatus] : null,
+      filtroProntidao ? PRONTIDAO_LABEL[filtroProntidao] : null,
+    ].filter(Boolean).join("_");
+
+    const nomeArquivo = `Torg_Montagem_${filtroDesc || "Todas"}_${new Date().toISOString().split("T")[0]}.xlsx`;
+    await downloadWorkbook(workbook, nomeArquivo);
+  }
 
   return (
     <div className="space-y-4 max-w-7xl">
@@ -201,23 +331,23 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <button
-          onClick={() => setFiltroStatus("CORTE")}
-          className={`rounded-xl p-3 text-left transition-all bg-orange-50 text-orange-700 ${filtroStatus === "CORTE" ? "ring-2 ring-offset-1 ring-orange-400" : ""}`}
+          onClick={() => { setFiltroStatus("CORTE"); setFiltroProntidao(""); setSelecionados(new Set()); }}
+          className={`rounded-xl p-3 text-left transition-all bg-orange-50 text-orange-700 ${filtroStatus === "CORTE" && !filtroProntidao ? "ring-2 ring-offset-1 ring-orange-400" : ""}`}
         >
           <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Aguardando</p>
           <p className="text-2xl font-extrabold tabular-nums">{totalAguardando}</p>
           <p className="text-[10px] opacity-70">conjuntos no corte</p>
         </button>
         <button
-          onClick={() => { setFiltroStatus("CORTE"); }}
-          className={`rounded-xl p-3 text-left transition-all bg-emerald-50 text-emerald-700`}
+          onClick={() => { setFiltroStatus("CORTE"); setFiltroProntidao("PRONTO"); setSelecionados(new Set()); }}
+          className={`rounded-xl p-3 text-left transition-all bg-emerald-50 text-emerald-700 ${filtroProntidao === "PRONTO" ? "ring-2 ring-offset-1 ring-emerald-400" : ""}`}
         >
           <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Prontos p/ montar</p>
           <p className="text-2xl font-extrabold tabular-nums">{totalProntos}</p>
           <p className="text-[10px] opacity-70">croquis 100% cortados</p>
         </button>
         <button
-          onClick={() => setFiltroStatus("MONTAGEM")}
+          onClick={() => { setFiltroStatus("MONTAGEM"); setFiltroProntidao(""); setSelecionados(new Set()); }}
           className={`rounded-xl p-3 text-left transition-all bg-blue-50 text-blue-700 ${filtroStatus === "MONTAGEM" ? "ring-2 ring-offset-1 ring-blue-400" : ""}`}
         >
           <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Em montagem</p>
@@ -225,8 +355,8 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
           <p className="text-[10px] opacity-70">liberados</p>
         </button>
         <button
-          onClick={() => setFiltroStatus("")}
-          className={`rounded-xl p-3 text-left transition-all bg-gray-50 text-torg-gray ${filtroStatus === "" ? "ring-2 ring-offset-1 ring-gray-400" : ""}`}
+          onClick={() => { setFiltroStatus(""); setFiltroProntidao(""); setSelecionados(new Set()); }}
+          className={`rounded-xl p-3 text-left transition-all bg-gray-50 text-torg-gray ${filtroStatus === "" && !filtroProntidao ? "ring-2 ring-offset-1 ring-gray-400" : ""}`}
         >
           <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Total</p>
           <p className="text-2xl font-extrabold tabular-nums">{conjuntos.length}</p>
@@ -234,85 +364,119 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <Filter size={14} className="text-torg-gray" />
-          <select
-            value={filtroOp}
-            onChange={(e) => setFiltroOp(e.target.value)}
-            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-torg-dark focus:ring-1 focus:ring-torg-blue"
-          >
-            <option value="">Todas as OPs</option>
-            {opsDisponiveis.map((op) => (
-              <option key={op} value={op}>{fmtOP(op)}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+      {/* Filtros — mesmo layout do Corte */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
+        <Filter size={14} className="text-torg-gray" />
+        <select
+          value={filtroOp}
+          onChange={(e) => { setFiltroOp(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Todas as OPs</option>
+          {opsDisponiveis.map((op) => <option key={op} value={op}>OP {op}</option>)}
+        </select>
+        <select
+          value={filtroStatus}
+          onChange={(e) => { setFiltroStatus(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Todos status</option>
+          <option value="CORTE">Corte (aguardando)</option>
+          <option value="MONTAGEM">Em montagem</option>
+          <option value="SOLDA">Solda</option>
+          <option value="ACABAMENTO">Acabamento</option>
+          <option value="JATO">Jato</option>
+          <option value="PINTURA">Pintura</option>
+          <option value="EXPEDIDO">Expedido</option>
+        </select>
+        <select
+          value={filtroProntidao}
+          onChange={(e) => { setFiltroProntidao(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Prontidão</option>
+          <option value="PRONTO">Pronto p/ montar</option>
+          <option value="PARCIAL">Parcial</option>
+          <option value="PENDENTE">Sem croquis cortados</option>
+        </select>
+        <div className="flex items-center gap-1 flex-1 min-w-[180px]">
+          <Search size={12} className="text-torg-gray ml-2" />
           <input
             type="text"
-            placeholder="Buscar conjunto..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="pl-8 pr-8 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-torg-blue w-48"
+            placeholder="Buscar marca, descricao, OP ou cliente..."
+            className="flex-1 px-2 py-1.5 text-xs border-0 focus:ring-0 focus:outline-none"
           />
-          {busca && (
-            <button onClick={() => setBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400">
-              <X size={12} />
-            </button>
-          )}
         </div>
+        <button
+          onClick={exportarRelatorio}
+          className="px-3 py-1.5 bg-torg-blue/10 text-torg-blue text-xs rounded-lg hover:bg-torg-blue/20 font-medium flex items-center gap-1.5"
+          title="Exportar conjuntos filtrados para Excel"
+        >
+          <Download size={13} /> Exportar
+        </button>
+        {(filtroOp || filtroProntidao || busca) && (
+          <button
+            onClick={() => { setFiltroOp(""); setFiltroProntidao(""); setBusca(""); }}
+            className="text-xs text-torg-gray hover:text-torg-dark"
+          >
+            limpar
+          </button>
+        )}
 
-        {filtrados.length > 0 && (
-          <span className="text-[11px] text-torg-gray">
-            {filtrados.length} conjunto{filtrados.length > 1 ? "s" : ""} · {fmtKg(pesoFiltrados)}
-          </span>
+        {/* Ações em lote inline */}
+        {selecionados.size > 0 && (
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-[11px] text-torg-gray font-medium">
+              {selecionados.size} selecionado{selecionados.size > 1 ? "s" : ""}
+            </span>
+            {filtroStatus === "CORTE" && (
+              <button
+                onClick={liberarSelecionados}
+                disabled={liberando}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {liberando ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
+                Liberar Montagem
+              </button>
+            )}
+            {filtroStatus === "MONTAGEM" && (
+              <button
+                onClick={reverterSelecionados}
+                disabled={revertendo}
+                className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded-lg hover:bg-orange-600 font-medium flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {revertendo ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />}
+                Reverter para Corte
+              </button>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Ação: Liberar prontos */}
-      {filtroStatus === "CORTE" && selecionados.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <p className="text-sm font-semibold text-blue-800 flex items-center gap-2">
-              <Wrench size={16} /> {selecionados.size} conjunto{selecionados.size > 1 ? "s" : ""} selecionado{selecionados.size > 1 ? "s" : ""}
-            </p>
-            <p className="text-xs text-blue-700 mt-0.5">
-              Liberar para montagem (status: Corte → Montagem).
-            </p>
-          </div>
+      {/* Info: total filtrado */}
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[11px] text-torg-gray">
+          {filtrados.length} conjunto{filtrados.length !== 1 ? "s" : ""} · {fmtKg(pesoFiltrados)}
+        </span>
+        {filtroStatus === "CORTE" && filtrados.filter((c) => c.prontidao.pronto).length > 0 && (
           <button
-            onClick={liberarSelecionados}
-            disabled={liberando}
-            className="px-5 py-2.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 font-semibold flex items-center gap-2 disabled:opacity-50 shadow-sm"
+            onClick={selecionarTodos}
+            className="text-[11px] text-torg-blue hover:underline font-medium"
           >
-            {liberando ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
-            Liberar para Montagem
+            Selecionar todos os prontos ({filtrados.filter((c) => c.prontidao.pronto).length})
           </button>
-        </div>
-      )}
-
-      {/* Ação: Reverter */}
-      {filtroStatus === "MONTAGEM" && selecionados.size > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <p className="text-sm font-semibold text-amber-800">
-              {selecionados.size} conjunto{selecionados.size > 1 ? "s" : ""} selecionado{selecionados.size > 1 ? "s" : ""}
-            </p>
-          </div>
+        )}
+        {filtroStatus === "MONTAGEM" && filtrados.length > 0 && (
           <button
-            onClick={reverterSelecionados}
-            disabled={revertendo}
-            className="px-4 py-2 bg-amber-500 text-white text-sm rounded-lg hover:bg-amber-600 font-semibold flex items-center gap-2 disabled:opacity-50"
+            onClick={selecionarTodos}
+            className="text-[11px] text-torg-blue hover:underline font-medium"
           >
-            {revertendo ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} />}
-            Reverter para Corte
+            Selecionar todos ({filtrados.length})
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Resultado vazio */}
       {filtrados.length === 0 && (
@@ -329,18 +493,6 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
       {/* Lista de conjuntos */}
       {filtrados.length > 0 && (
         <div className="space-y-2">
-          {/* Selecionar todos (só prontos) */}
-          {filtroStatus === "CORTE" && (
-            <div className="flex items-center gap-2 px-1">
-              <button
-                onClick={selecionarTodos}
-                className="text-[11px] text-torg-blue hover:underline font-medium"
-              >
-                Selecionar todos os prontos ({filtrados.filter((c) => c.prontidao.pronto).length})
-              </button>
-            </div>
-          )}
-
           {filtrados.map((c) => {
             const { prontidao } = c;
             const isExpanded = expandidos.has(c.id);
@@ -423,12 +575,12 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
                         <thead className="bg-gray-50/60">
                           <tr>
                             <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Croqui</th>
-                            <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Descrição</th>
+                            <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Descricao</th>
                             <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Material</th>
                             <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Comp.</th>
                             <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso</th>
-                            <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Máquina</th>
-                            <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Necessário</th>
+                            <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Maquina</th>
+                            <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Necessario</th>
                             <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Produzido</th>
                             <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Falta</th>
                             <th className="px-4 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Status</th>
