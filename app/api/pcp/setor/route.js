@@ -99,18 +99,16 @@ export async function GET(req) {
       ORDER BY dia ASC
     `,
 
-    // Máquinas produzindo agora
-    prisma.mesApontamento.findMany({
-      where: {
-        setor: { contains: setor, mode: "insensitive" },
-        status: "Produzindo",
-      },
-      select: {
-        maquina: true, codigoMaquina: true, obra: true, opSka: true,
-        descricaoItem: true, operador: true, dataInicio: true, produzidoKg: true,
-      },
-      orderBy: { dataInicio: "desc" },
-    }),
+    // Último apontamento de cada máquina do setor (todas, não só "Produzindo")
+    prisma.$queryRaw`
+      SELECT DISTINCT ON (maquina)
+        maquina, "codigoMaquina", obra, "opSka",
+        "descricaoItem", operador, status, "dataInicio", "produzidoKg"
+      FROM "MesApontamento"
+      WHERE setor ILIKE ${"%" + setor + "%"}
+        AND maquina IS NOT NULL
+      ORDER BY maquina, "dataInicio" DESC
+    `,
   ]);
 
   // Operadores do setor (últimos N dias)
@@ -132,12 +130,20 @@ export async function GET(req) {
     .filter((a) => new Date(a.dataInicio) >= hoje)
     .reduce((s, a) => s + (a.produzidoKg || 0), 0);
 
-  // Deduplica máquinas produzindo
-  const produzindoMap = new Map();
-  for (const m of produzindoAgora) {
-    const key = m.maquina || m.codigoMaquina;
-    if (!produzindoMap.has(key)) produzindoMap.set(key, m);
-  }
+  // Normaliza resultado $queryRaw de máquinas
+  const todasMaquinas = produzindoAgora
+    .map((m) => ({
+      maquina: m.maquina,
+      codigoMaquina: m.codigoMaquina,
+      obra: m.obra,
+      opSka: m.opSka,
+      descricaoItem: m.descricaoItem,
+      operador: m.operador,
+      status: m.status,
+      dataInicio: m.dataInicio,
+      produzidoKg: Number(m.produzidoKg) || 0,
+    }))
+    .sort((a, b) => (a.maquina || "").localeCompare(b.maquina || ""));
 
   return NextResponse.json({
     setor,
@@ -151,7 +157,7 @@ export async function GET(req) {
       un: Number(r.un) || 0,
       apontamentos: r.apontamentos,
     })),
-    produzindoAgora: [...produzindoMap.values()],
+    produzindoAgora: todasMaquinas,
     operadores,
   });
   } catch (e) {

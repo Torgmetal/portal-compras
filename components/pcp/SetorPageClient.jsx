@@ -127,37 +127,55 @@ export default function SetorPageClient({ setor, titulo, icon: Icon, corHex }) {
           value={fmtKg(kgDiario.reduce((s, d) => s + d.kg, 0))}
           cor={corHex}
         />
-        <KpiCard icon={Cpu} label="Máquinas ativas" value={produzindoAgora.length} cor={corHex} />
+        <KpiCard icon={Cpu} label="Bancadas" value={produzindoAgora.length} cor={corHex} />
         <KpiCard icon={Package} label="Peças no setor" value={pecasNoSetor.length} cor={corHex} />
       </div>
 
-      {/* Máquinas produzindo agora */}
+      {/* Bancadas / Máquinas do setor */}
       {produzindoAgora.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
             <Cpu size={16} style={{ color: corHex }} />
-            <h3 className="text-base font-semibold text-torg-dark">Produzindo agora</h3>
-            <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-              {produzindoAgora.length} máquinas
+            <h3 className="text-base font-semibold text-torg-dark">Bancadas — {titulo}</h3>
+            <span className="ml-auto flex items-center gap-3 text-xs">
+              <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                {produzindoAgora.filter((m) => m.status === "Produzindo").length} produzindo
+              </span>
+              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                {produzindoAgora.filter((m) => m.status !== "Produzindo").length} ociosas
+              </span>
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
-            {produzindoAgora.map((m, i) => (
-              <div key={i} className="border border-gray-100 rounded-lg p-3 hover:border-torg-blue-200 transition-colors">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-mono text-sm font-bold" style={{ color: corHex }}>
-                    {m.maquina || m.codigoMaquina || "—"}
-                  </span>
-                  <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Produzindo</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4">
+            {produzindoAgora.map((m, i) => {
+              const isProduzindo = m.status === "Produzindo";
+              return (
+                <div
+                  key={i}
+                  className={`border rounded-lg p-3 transition-colors ${
+                    isProduzindo
+                      ? "border-green-300 bg-green-50/40 ring-1 ring-green-200"
+                      : "border-gray-100 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono text-sm font-bold" style={{ color: corHex }}>
+                      {m.maquina || m.codigoMaquina || "—"}
+                    </span>
+                    <MaquinaStatusBadge status={m.status} />
+                  </div>
+                  <div className="space-y-0.5 text-xs text-torg-gray">
+                    <p>OP: <span className="font-medium text-torg-blue">{m.obra || "—"}</span></p>
+                    <p>Peça: <span className="text-torg-dark">{m.descricaoItem || m.opSka || "—"}</span></p>
+                    <p>Operador: <span className="text-torg-dark">{m.operador || "—"}</span></p>
+                    <p>Último registro: <span className="text-torg-dark">{fmtData(m.dataInicio)}</span></p>
+                    <p className="pt-1">
+                      <span className="font-medium text-torg-dark text-sm">{fmtKg(m.produzidoKg)}</span>
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-0.5 text-xs text-torg-gray">
-                  <p>OP: <span className="font-medium text-torg-dark">{m.obra || "—"}</span></p>
-                  <p>Peça: <span className="text-torg-dark">{m.descricaoItem || m.opSka || "—"}</span></p>
-                  <p>Operador: <span className="text-torg-dark">{m.operador || "—"}</span></p>
-                  <p>KG: <span className="font-medium text-torg-dark">{fmtKg(m.produzidoKg)}</span></p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -320,12 +338,28 @@ function StatusBadge({ status }) {
   const map = {
     "Finalizado":         "bg-green-50 text-green-700",
     "Finalizado Total":   "bg-green-50 text-green-700",
-    "Finalizado Parcial": "bg-yellow-50 text-yellow-700",
+    "Finalizada Parcial": "bg-yellow-50 text-yellow-700",
     "Produzindo":         "bg-blue-50 text-blue-700",
   };
   return (
     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${map[status] || "bg-gray-50 text-gray-600"}`}>
       {status || "—"}
+    </span>
+  );
+}
+
+function MaquinaStatusBadge({ status }) {
+  const cfg = {
+    Produzindo:           { bg: "bg-green-100", text: "text-green-700", dot: "bg-green-500 animate-pulse", label: "Produzindo" },
+    Finalizado:           { bg: "bg-gray-100",  text: "text-gray-600",  dot: "bg-gray-400",               label: "Finalizado" },
+    "Finalizado Total":   { bg: "bg-gray-100",  text: "text-gray-600",  dot: "bg-gray-400",               label: "Finalizado" },
+    "Finalizada Parcial": { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500",              label: "Parcial" },
+  };
+  const c = cfg[status] || { bg: "bg-gray-100", text: "text-gray-500", dot: "bg-gray-400", label: status || "—" };
+  return (
+    <span className={`text-[10px] ${c.bg} ${c.text} px-1.5 py-0.5 rounded font-medium flex items-center gap-1`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      {c.label}
     </span>
   );
 }
