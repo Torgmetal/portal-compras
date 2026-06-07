@@ -7,12 +7,16 @@ export const maxDuration = 30;
 /**
  * GET /api/pcp/dashboard
  * Retorna dados agregados pra o Dashboard do PCP:
- *  - KG produzido por setor (hoje, semana, mês) — via MesApontamento
+ *  - KG produzido por setor (hoje, semana, mês) — via MesOrdem
  *  - Meta vs Realizado por setor — via ProducaoDiaria
  *  - Pipeline de peças por status — via PecaConjunto
  *  - Produção diária últimos 14 dias — pra gráfico de tendência
- *  - Máquinas ativas agora — via MesApontamento status=Produzindo
+ *  - Máquinas (último estado de cada) — via MesOrdem
  *  - OPs ativas com progresso
+ *
+ * NOTA: migrado de MesApontamento → MesOrdem em jun/2026.
+ *   MesOrdem é alimentada pelo sync-agent (dataset 150, snapshot).
+ *   Campo de peso: pesoProduzido (não produzidoKg).
  */
 export async function GET() {
   try {
@@ -36,33 +40,32 @@ export async function GET() {
     kgPorSetorSemana,
     kgPorSetorMes,
     pipelinePecas,
-    producaoDiaria14d,
     maquinasAtivas,
     opsAtivas,
     totalPecasAtivas,
     metasSemana,
   ] = await Promise.all([
     // KG por setor hoje
-    prisma.mesApontamento.groupBy({
+    prisma.mesOrdem.groupBy({
       by: ["setor"],
-      where: { dataInicio: { gte: hoje } },
-      _sum: { produzidoKg: true, produzidoUn: true },
+      where: { dataInicio: { gte: hoje }, pesoProduzido: { gt: 0 } },
+      _sum: { pesoProduzido: true, produzidoUn: true },
       _count: true,
     }),
 
     // KG por setor esta semana
-    prisma.mesApontamento.groupBy({
+    prisma.mesOrdem.groupBy({
       by: ["setor"],
-      where: { dataInicio: { gte: inicioSemana } },
-      _sum: { produzidoKg: true, produzidoUn: true },
+      where: { dataInicio: { gte: inicioSemana }, pesoProduzido: { gt: 0 } },
+      _sum: { pesoProduzido: true, produzidoUn: true },
       _count: true,
     }),
 
     // KG por setor este mês
-    prisma.mesApontamento.groupBy({
+    prisma.mesOrdem.groupBy({
       by: ["setor"],
-      where: { dataInicio: { gte: inicioMes } },
-      _sum: { produzidoKg: true, produzidoUn: true },
+      where: { dataInicio: { gte: inicioMes }, pesoProduzido: { gt: 0 } },
+      _sum: { pesoProduzido: true, produzidoUn: true },
       _count: true,
     }),
 
@@ -73,21 +76,14 @@ export async function GET() {
       _sum: { pesoTotalKg: true },
     }),
 
-    // Produção diária últimos 14 dias (pra gráfico de tendência)
-    prisma.mesApontamento.groupBy({
-      by: ["setor"],
-      where: { dataInicio: { gte: inicio14d } },
-      _sum: { produzidoKg: true },
-      _count: true,
-    }),
-
-    // Último apontamento de cada máquina (todas, não só "Produzindo")
+    // Último registro de cada máquina (todas, via MesOrdem)
     prisma.$queryRaw`
       SELECT DISTINCT ON (maquina, setor)
-        setor, maquina, "codigoMaquina", obra, "opSka",
-        "descricaoItem", operador, status, "dataInicio", "produzidoKg"
-      FROM "MesApontamento"
-      WHERE maquina IS NOT NULL
+        setor, maquina, obra, op as "opSka",
+        "descItem" as "descricaoItem", operador, status,
+        "dataInicio", "pesoProduzido" as "produzidoKg"
+      FROM "MesOrdem"
+      WHERE maquina IS NOT NULL AND maquina != '' AND maquina != '---'
       ORDER BY maquina, setor, "dataInicio" DESC
     `,
 
@@ -163,12 +159,13 @@ export async function GET() {
     }
   }
 
-  // Tendência diária (últimos 14 dias) — agrupa MesApontamento por dia
+  // Tendência diária (últimos 14 dias) — via MesOrdem
   const tendenciaRaw = await prisma.$queryRaw`
     SELECT DATE("dataInicio") as dia, setor,
-           SUM("produzidoKg") as kg, COUNT(*)::int as apontamentos
-    FROM "MesApontamento"
+           SUM("pesoProduzido") as kg, COUNT(*)::int as apontamentos
+    FROM "MesOrdem"
     WHERE "dataInicio" >= ${inicio14d}
+      AND "pesoProduzido" > 0
     GROUP BY DATE("dataInicio"), setor
     ORDER BY dia ASC
   `;
@@ -184,11 +181,19 @@ export async function GET() {
   }
   const tendencia = Object.values(tendenciaDias).sort((a, b) => a.dia.localeCompare(b.dia));
 
-  // Normaliza resultado $queryRaw (BigInt → Number, garante campos)
+  // Normaliza KG por setor (adapta campo pesoProduzido → produzidoKg pra manter compatibilidade do front)
+  const adaptKg = (arr) =>
+    arr.map((r) => ({
+      setor: r.setor,
+      _sum: { produzidoKg: r._sum.pesoProduzido || 0, produzidoUn: r._sum.produzidoUn || 0 },
+      _count: r._count,
+    }));
+
+  // Normaliza resultado $queryRaw de máquinas
   const maquinasList = maquinasAtivas.map((m) => ({
     setor: m.setor,
     maquina: m.maquina,
-    codigoMaquina: m.codigoMaquina,
+    codigoMaquina: null,
     obra: m.obra,
     opSka: m.opSka,
     descricaoItem: m.descricaoItem,
@@ -199,7 +204,7 @@ export async function GET() {
   }));
 
   return NextResponse.json({
-    kgPorSetor: { hoje: kgPorSetorHoje, semana: kgPorSetorSemana, mes: kgPorSetorMes },
+    kgPorSetor: { hoje: adaptKg(kgPorSetorHoje), semana: adaptKg(kgPorSetorSemana), mes: adaptKg(kgPorSetorMes) },
     pipeline: pipelinePecas,
     tendencia,
     maquinasAtivas: maquinasList,

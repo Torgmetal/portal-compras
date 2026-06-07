@@ -6,12 +6,16 @@ export const maxDuration = 30;
 
 /**
  * GET /api/pcp/setor?setor=Montagem&dias=7
- * Retorna dados de um setor específico:
+ * Retorna dados de um setor específico (fonte: MesOrdem):
  *  - Apontamentos recentes (últimos N dias)
- *  - Máquinas do setor (agrupadas)
+ *  - Máquinas do setor (último estado de cada)
  *  - Peças no status correspondente ao setor
  *  - Operadores ativos
  *  - KG por dia (tendência)
+ *
+ * NOTA: migrado de MesApontamento → MesOrdem em jun/2026.
+ *   MesOrdem usa pesoProduzido (não produzidoKg), descItem (não descricaoItem),
+ *   op (não opSka). O response normaliza pra manter compatibilidade do front.
  */
 export async function GET(req) {
   try {
@@ -43,32 +47,35 @@ export async function GET(req) {
   const setorNorm = setor.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z]/g, "");
   const statusPeca = statusMap[setorNorm] || null;
 
-  const [apontamentos, maquinas, pecasNoSetor, kgDiario, produzindoAgora] = await Promise.all([
-    // Apontamentos recentes
-    prisma.mesApontamento.findMany({
+  const [apontamentosRaw, maquinasRaw, pecasNoSetor, kgDiario, maquinasUltimo] = await Promise.all([
+    // Apontamentos recentes (via MesOrdem)
+    prisma.mesOrdem.findMany({
       where: {
         setor: { contains: setor, mode: "insensitive" },
         dataInicio: { gte: inicio },
+        pesoProduzido: { gt: 0 },
       },
       select: {
-        id: true, obra: true, opSka: true, descricaoItem: true,
-        setor: true, maquina: true, codigoMaquina: true, operador: true,
-        status: true, produzidoKg: true, produzidoUn: true,
-        rejeitado: true, retrabalhado: true,
+        id: true, obra: true, op: true, descItem: true,
+        setor: true, maquina: true, operador: true,
+        status: true, pesoProduzido: true, produzidoUn: true,
+        rejeitadoUn: true, planejadoUn: true,
         dataInicio: true, dataFim: true,
       },
       orderBy: { dataInicio: "desc" },
       take: 200,
     }),
 
-    // Máquinas do setor (distinct)
-    prisma.mesApontamento.groupBy({
-      by: ["maquina", "codigoMaquina"],
+    // Máquinas do setor (distinct) — produção acumulada no período
+    prisma.mesOrdem.groupBy({
+      by: ["maquina"],
       where: {
         setor: { contains: setor, mode: "insensitive" },
         dataInicio: { gte: inicio },
+        maquina: { not: null },
+        pesoProduzido: { gt: 0 },
       },
-      _sum: { produzidoKg: true, produzidoUn: true },
+      _sum: { pesoProduzido: true, produzidoUn: true },
       _count: true,
     }),
 
@@ -86,30 +93,59 @@ export async function GET(req) {
         })
       : [],
 
-    // KG por dia no setor
+    // KG por dia no setor (via MesOrdem)
     prisma.$queryRaw`
       SELECT DATE("dataInicio") as dia,
-             SUM("produzidoKg") as kg,
-             SUM("produzidoUn") as un,
+             SUM("pesoProduzido") as kg,
+             SUM("produzidoUn")::int as un,
              COUNT(*)::int as apontamentos
-      FROM "MesApontamento"
+      FROM "MesOrdem"
       WHERE "setor" ILIKE ${"%" + setor + "%"}
         AND "dataInicio" >= ${inicio}
+        AND "pesoProduzido" > 0
       GROUP BY DATE("dataInicio")
       ORDER BY dia ASC
     `,
 
-    // Último apontamento de cada máquina do setor (todas, não só "Produzindo")
+    // Último registro de cada máquina do setor (via MesOrdem)
     prisma.$queryRaw`
       SELECT DISTINCT ON (maquina)
-        maquina, "codigoMaquina", obra, "opSka",
-        "descricaoItem", operador, status, "dataInicio", "produzidoKg"
-      FROM "MesApontamento"
+        maquina, obra, op as "opSka",
+        "descItem" as "descricaoItem", operador, status,
+        "dataInicio", "pesoProduzido" as "produzidoKg"
+      FROM "MesOrdem"
       WHERE setor ILIKE ${"%" + setor + "%"}
-        AND maquina IS NOT NULL
+        AND maquina IS NOT NULL AND maquina != '' AND maquina != '---'
       ORDER BY maquina, "dataInicio" DESC
     `,
   ]);
+
+  // Normaliza apontamentos pra manter compatibilidade do front
+  const apontamentos = apontamentosRaw.map((a) => ({
+    id: a.id,
+    obra: a.obra,
+    opSka: a.op,
+    descricaoItem: a.descItem,
+    setor: a.setor,
+    maquina: a.maquina,
+    codigoMaquina: null,
+    operador: a.operador,
+    status: a.status,
+    produzidoKg: a.pesoProduzido || 0,
+    produzidoUn: a.produzidoUn || 0,
+    rejeitado: a.rejeitadoUn || 0,
+    retrabalhado: 0,
+    dataInicio: a.dataInicio,
+    dataFim: a.dataFim,
+  }));
+
+  // Normaliza máquinas agrupadas
+  const maquinas = maquinasRaw.map((m) => ({
+    maquina: m.maquina,
+    codigoMaquina: null,
+    _sum: { produzidoKg: m._sum.pesoProduzido || 0, produzidoUn: m._sum.produzidoUn || 0 },
+    _count: m._count,
+  }));
 
   // Operadores do setor (últimos N dias)
   const operadoresMap = new Map();
@@ -131,10 +167,10 @@ export async function GET(req) {
     .reduce((s, a) => s + (a.produzidoKg || 0), 0);
 
   // Normaliza resultado $queryRaw de máquinas
-  const todasMaquinas = produzindoAgora
+  const todasMaquinas = maquinasUltimo
     .map((m) => ({
       maquina: m.maquina,
-      codigoMaquina: m.codigoMaquina,
+      codigoMaquina: null,
       obra: m.obra,
       opSka: m.opSka,
       descricaoItem: m.descricaoItem,

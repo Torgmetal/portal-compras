@@ -138,11 +138,11 @@ export default function SetorPageClient({ setor, titulo, icon: Icon, corHex }) {
             <Cpu size={16} style={{ color: corHex }} />
             <h3 className="text-base font-semibold text-torg-dark">Bancadas — {titulo}</h3>
             <span className="ml-auto flex items-center gap-3 text-xs">
-              <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                {produzindoAgora.filter((m) => m.status === "Produzindo").length} produzindo
+              <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                {produzindoAgora.filter((m) => m.status === "Finalizada Parcial").length} em andamento
               </span>
-              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
-                {produzindoAgora.filter((m) => m.status !== "Produzindo").length} ociosas
+              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                {produzindoAgora.filter((m) => m.status === "Finalizado" || m.status === "Finalizado Total").length} finalizadas
               </span>
             </span>
           </div>
@@ -350,15 +350,17 @@ function StatusBadge({ status }) {
 
 function MaquinaStatusBadge({ status }) {
   const cfg = {
-    Produzindo:           { bg: "bg-green-100", text: "text-green-700", dot: "bg-green-500 animate-pulse", label: "Produzindo" },
-    Finalizado:           { bg: "bg-gray-100",  text: "text-gray-600",  dot: "bg-gray-400",               label: "Finalizado" },
-    "Finalizado Total":   { bg: "bg-gray-100",  text: "text-gray-600",  dot: "bg-gray-400",               label: "Finalizado" },
-    "Finalizada Parcial": { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500",              label: "Parcial" },
+    Produzindo:           { bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500 animate-pulse", label: "Produzindo" },
+    Finalizado:           { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-400",             label: "Finalizado" },
+    "Finalizado Total":   { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-400",             label: "Finalizado" },
+    "Finalizada Parcial": { bg: "bg-amber-100",  text: "text-amber-700",  dot: "bg-amber-500",               label: "Parcial" },
+    "Não Inicializada":   { bg: "bg-gray-100",   text: "text-gray-500",   dot: "bg-gray-300",                label: "Não iniciada" },
   };
   const c = cfg[status] || { bg: "bg-gray-100", text: "text-gray-500", dot: "bg-gray-400", label: status || "—" };
+  const ativa = status === "Produzindo" || status === "Finalizada Parcial";
   return (
     <span className={`text-[10px] ${c.bg} ${c.text} px-1.5 py-0.5 rounded font-medium flex items-center gap-1`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot} ${ativa ? "animate-pulse" : ""}`} />
       {c.label}
     </span>
   );
