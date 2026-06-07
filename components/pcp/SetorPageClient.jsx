@@ -3,10 +3,10 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, AlertCircle, RefreshCw, Weight, Package,
   Users, TrendingUp, Search, Cpu,
-  Wrench, Flame, Wind, Paintbrush,
+  Wrench, Flame, Wind, Paintbrush, Scissors, Sparkles,
 } from "lucide-react";
 
-const ICON_MAP = { Wrench, Flame, Wind, Paintbrush, Cpu };
+const ICON_MAP = { Wrench, Flame, Wind, Paintbrush, Cpu, Scissors, Sparkles };
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,

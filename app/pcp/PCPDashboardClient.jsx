@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard, Loader2, AlertCircle, RefreshCw, Weight,
   Package, Cpu, Users, TrendingUp, ChevronRight, Activity,
+  Scissors, Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -171,9 +172,9 @@ export default function PCPDashboardClient() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
             <Cpu size={18} className="text-torg-blue" />
-            <h3 className="text-lg font-semibold text-torg-dark">Máquinas produzindo agora</h3>
+            <h3 className="text-lg font-semibold text-torg-dark">Setores produzindo agora</h3>
             <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-              {maquinasAtivas.length} ativas
+              {maquinasAtivas.length} em produção
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -194,9 +195,11 @@ export default function PCPDashboardClient() {
                   return (
                     <tr key={i} className="hover:bg-gray-50">
                       <td className="px-4 py-2">
-                        <span className={`text-xs px-2 py-0.5 rounded border ${c.bg} ${c.text} ${c.border}`}>
-                          {m.setor || "—"}
-                        </span>
+                        <Link href={`/pcp/${(m.setor || "").toLowerCase()}`}>
+                          <span className={`text-xs px-2 py-0.5 rounded border ${c.bg} ${c.text} ${c.border} cursor-pointer hover:opacity-75 transition-opacity`}>
+                            {m.setor || "—"}
+                          </span>
+                        </Link>
                       </td>
                       <td className="px-4 py-2 font-mono text-xs text-torg-dark">{m.maquina || "—"}</td>
                       <td className="px-4 py-2 text-xs font-medium text-torg-blue">{m.obra || "—"}</td>
@@ -362,13 +365,15 @@ export default function PCPDashboardClient() {
       )}
 
       {/* Links rápidos pros setores */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {[
-          { href: "/pcp/maquinas", label: "Máquinas", icon: Cpu },
+          { href: "/pcp/corte", label: "Corte", icon: Scissors },
           { href: "/pcp/montagem", label: "Montagem", icon: Package },
           { href: "/pcp/solda", label: "Solda", icon: Activity },
+          { href: "/pcp/acabamento", label: "Acabamento", icon: Sparkles },
           { href: "/pcp/jato", label: "Jato", icon: Activity },
           { href: "/pcp/pintura", label: "Pintura", icon: Activity },
+          { href: "/pcp/maquinas", label: "Máquinas", icon: Cpu },
         ].map((s) => {
           const Icon = s.icon;
           return (
