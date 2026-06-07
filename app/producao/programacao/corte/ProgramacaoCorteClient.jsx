@@ -1,11 +1,13 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
-  Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download,
-  Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList, ArrowRight,
+  Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download, Upload,
+  Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList,
+  ArrowRight, X, Trash2, Factory,
 } from "lucide-react";
+import ConfirmModal from "@/components/admin/ConfirmModal";
 import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
   adicionarLinhaTotais, adicionarLegenda,
@@ -37,19 +39,31 @@ const fmtMm = (v) => {
   return `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mm`;
 };
 
-export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
+export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole }) {
   const router = useRouter();
   const [pecas, setPecas] = useState(pecasIniciais);
   const [filtroOp, setFiltroOp] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("PENDENTE");
   const [filtroMaquina, setFiltroMaquina] = useState("");
   const [filtroAtendimento, setFiltroAtendimento] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("");
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
   const [liberando, setLiberando] = useState(false);
   const [revertendo, setRevertendo] = useState(false);
   const [expandido, setExpandido] = useState(new Set(Object.keys(MAQUINAS)));
   const [reclassificando, setReclassificando] = useState(false);
+
+  // Modais de importacao
+  const [modalImport, setModalImport] = useState(false);
+  const [modalImportLPC, setModalImportLPC] = useState(false);
+  const [modalExcluirLote, setModalExcluirLote] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [modalSyneco, setModalSyneco] = useState(false);
+  const [importandoSyneco, setImportandoSyneco] = useState(false);
+  const [resultadoSyneco, setResultadoSyneco] = useState(null);
+  const [synecoOpSelecionada, setSynecoOpSelecionada] = useState("");
 
   const isAdmin = userRole === "ADMIN";
 
@@ -64,6 +78,9 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
     return pecas.filter((p) => {
       if (filtroOp && p.opNumero !== filtroOp) return false;
       if (filtroStatus && p.status !== filtroStatus) return false;
+      if (filtroTipo === "CONJUNTO" && p.tipoPeca !== "CONJUNTO") return false;
+      if (filtroTipo === "CROQUI" && p.tipoPeca !== "CROQUI") return false;
+      if (filtroTipo === "PECA" && p.tipoPeca != null) return false;
       if (filtroMaquina && (p.maquina || "SEM_MAQUINA") !== filtroMaquina) return false;
       if (filtroAtendimento) {
         const prod = p.qteProduzida || 0;
@@ -82,7 +99,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
       }
       return true;
     });
-  }, [pecas, filtroOp, filtroStatus, filtroMaquina, filtroAtendimento, busca]);
+  }, [pecas, filtroOp, filtroStatus, filtroTipo, filtroMaquina, filtroAtendimento, busca]);
 
   // Agrupar por maquina
   const porMaquina = useMemo(() => {
@@ -314,6 +331,67 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
     } catch (e) {
       alert("Erro ao atualizar máquina: " + e.message);
     }
+  }
+
+  // Deletar peca individual
+  async function deletarPeca(id) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/producao/pecas/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setPecas((prev) => prev.filter((p) => p.id !== id));
+    } catch (e) {
+      alert("Erro ao excluir: " + e.message);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(null);
+    }
+  }
+
+  // Deletar todas pecas de uma OP
+  async function deletarLoteOp(opNumero) {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/producao/pecas?op=${encodeURIComponent(opNumero)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      setPecas((prev) => prev.filter((p) => p.opNumero !== opNumero));
+    } catch (e) {
+      alert("Erro ao excluir lote: " + e.message);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(null);
+    }
+  }
+
+  // Importar producao do Syneco
+  async function importarSyneco() {
+    const opNum = synecoOpSelecionada || filtroOp;
+    if (!opNum) { alert("Selecione uma OP para importar."); return; }
+    setImportandoSyneco(true);
+    setResultadoSyneco(null);
+    try {
+      const res = await fetch("/api/producao/importar-syneco-corte", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: opNum }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
+      setResultadoSyneco(data);
+      if (data.statusUpdated > 0) router.refresh();
+    } catch (e) {
+      setResultadoSyneco({ error: e.message });
+    } finally {
+      setImportandoSyneco(false);
+    }
+  }
+
+  function abrirModalSyneco() {
+    setSynecoOpSelecionada(filtroOp || "");
+    setResultadoSyneco(null);
+    setModalSyneco(true);
   }
 
   // Prepara pecas com auto-classificação para peças sem maquina
@@ -649,14 +727,32 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           <button
-            onClick={exportarListaMaterial}
+            onClick={() => setModalImport(true)}
+            className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
+          >
+            <Upload size={14} /> Importar LE
+          </button>
+          <button
+            onClick={() => setModalImportLPC(true)}
             className="px-3 py-1.5 bg-torg-dark text-white text-xs rounded-lg hover:bg-torg-dark/90 font-medium flex items-center gap-1.5"
+          >
+            <Upload size={14} /> Importar LPC
+          </button>
+          <button
+            onClick={abrirModalSyneco}
+            className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5"
+          >
+            <Factory size={14} /> Importar Syneco
+          </button>
+          <button
+            onClick={exportarListaMaterial}
+            className="px-3 py-1.5 bg-gray-100 text-torg-dark text-xs rounded-lg hover:bg-gray-200 font-medium flex items-center gap-1.5"
           >
             <ClipboardList size={14} /> Lista de Material
           </button>
           <button
             onClick={exportarProgramaCorte}
-            className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-gray-100 text-torg-dark text-xs rounded-lg hover:bg-gray-200 font-medium flex items-center gap-1.5"
           >
             <FileSpreadsheet size={14} /> Programa de Corte
           </button>
@@ -668,6 +764,14 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
             >
               {reclassificando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               Reclassificar
+            </button>
+          )}
+          {isAdmin && opsComPecas.length > 0 && (
+            <button
+              onClick={() => setModalExcluirLote(true)}
+              className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg hover:bg-red-100 font-medium flex items-center gap-1.5 border border-red-200"
+            >
+              <Trash2 size={14} /> Excluir em Lote
             </button>
           )}
         </div>
@@ -787,6 +891,16 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
           {STATUS_PIPELINE.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
         </select>
         <select
+          value={filtroTipo}
+          onChange={(e) => setFiltroTipo(e.target.value)}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Todos tipos</option>
+          <option value="CONJUNTO">Conjuntos</option>
+          <option value="CROQUI">Croquis</option>
+          <option value="PECA">Avulsas</option>
+        </select>
+        <select
           value={filtroMaquina}
           onChange={(e) => { setFiltroMaquina(e.target.value); setSelecionados(new Set()); }}
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
@@ -822,9 +936,9 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
         >
           <Download size={13} /> Exportar
         </button>
-        {(filtroOp || filtroMaquina || filtroAtendimento || busca) && (
+        {(filtroOp || filtroTipo || filtroMaquina || filtroAtendimento || busca) && (
           <button
-            onClick={() => { setFiltroOp(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
+            onClick={() => { setFiltroOp(""); setFiltroTipo(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
             className="text-xs text-torg-gray hover:text-torg-dark"
           >
             limpar
@@ -867,7 +981,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
           <Package size={32} className="mx-auto text-gray-300 mb-2" />
           <p className="text-sm text-torg-gray">
             {pecas.length === 0
-              ? "Nenhuma peça com material importada. Importe uma LPC no Controle de Peças."
+              ? "Nenhuma peça importada. Use os botões Importar LE ou Importar LPC acima."
               : "Nenhuma peça no filtro selecionado."}
           </p>
         </div>
@@ -1137,6 +1251,789 @@ export default function ProgramacaoCorteClient({ pecasIniciais, userRole }) {
           )}
         </div>
       )}
+
+      {/* --- Modais --- */}
+      {modalImport && (
+        <ModalImportarLE
+          ops={ops}
+          onClose={() => setModalImport(false)}
+          onImportado={() => { setModalImport(false); router.refresh(); }}
+        />
+      )}
+
+      {modalImportLPC && (
+        <ModalImportarLPC
+          ops={ops}
+          onClose={() => setModalImportLPC(false)}
+          onImportado={() => { setModalImportLPC(false); router.refresh(); }}
+        />
+      )}
+
+      {/* Modal Importar Syneco */}
+      {modalSyneco && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !importandoSyneco && setModalSyneco(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <Factory size={18} className="text-emerald-600" />
+                <h3 className="text-base font-bold text-torg-dark">Importar Produção Syneco</h3>
+              </div>
+              <button onClick={() => !importandoSyneco && setModalSyneco(false)} className="text-torg-gray hover:text-torg-dark">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
+              {!resultadoSyneco && (
+                <>
+                  <div className="bg-emerald-50 rounded-xl p-3 text-xs text-emerald-800">
+                    <p className="font-medium">Importa do MES Syneco (MesOrdem) apenas o setor <strong>Corte</strong>.</p>
+                    <p className="mt-1 text-emerald-700">
+                      Peças com produção confirmada terão status atualizado para CORTE.
+                      As datas de fabricação serão registradas no Controle de Produção.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-torg-dark block mb-1">OP para importar</label>
+                    <select
+                      value={synecoOpSelecionada}
+                      onChange={(e) => setSynecoOpSelecionada(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      disabled={importandoSyneco}
+                    >
+                      <option value="">Selecione uma OP...</option>
+                      {opsComPecas.map((op) => (
+                        <option key={op} value={op}>OP {op}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-torg-dark block mb-1">Setor</label>
+                    <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-medium">
+                      Corte
+                    </div>
+                    <p className="text-[10px] text-torg-gray mt-1">
+                      Filtrando apenas o setor de Corte para evitar dados incorretos.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Resultado — KPIs de atendimento */}
+              {resultadoSyneco && !resultadoSyneco.error && (
+                <>
+                  {resultadoSyneco.totais && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-torg-dark">Atendimento do Corte — {resultadoSyneco.obraCode}</p>
+                        <span className="text-xs text-torg-gray">{resultadoSyneco.opObra}</span>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-medium text-torg-dark">
+                            {resultadoSyneco.totais.percentualQte.toFixed(0)}% concluído
+                          </span>
+                          <span className="text-torg-gray">
+                            {resultadoSyneco.totais.qteProduzida.toLocaleString("pt-BR")} / {resultadoSyneco.totais.qtePlanejada.toLocaleString("pt-BR")} peças
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${resultadoSyneco.totais.percentualQte >= 100 ? "bg-emerald-500" : resultadoSyneco.totais.percentualQte >= 50 ? "bg-torg-blue" : "bg-orange-400"}`}
+                            style={{ width: `${Math.min(100, resultadoSyneco.totais.percentualQte)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-600">Produzido</p>
+                          <p className="text-xl font-extrabold text-emerald-700 tabular-nums">{resultadoSyneco.totais.qteProduzida.toLocaleString("pt-BR")}</p>
+                          <p className="text-[10px] text-emerald-600">{fmtKg(resultadoSyneco.totais.pesoProduzido)}</p>
+                        </div>
+                        <div className="bg-orange-50 rounded-xl p-3 text-center">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-orange-600">Faltam</p>
+                          <p className="text-xl font-extrabold text-orange-700 tabular-nums">{resultadoSyneco.totais.qteFalta.toLocaleString("pt-BR")}</p>
+                          <p className="text-[10px] text-orange-600">{fmtKg(resultadoSyneco.totais.pesoFalta)}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl p-3 text-center">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-torg-gray">Planejado</p>
+                          <p className="text-xl font-extrabold text-torg-dark tabular-nums">{resultadoSyneco.totais.qtePlanejada.toLocaleString("pt-BR")}</p>
+                          <p className="text-[10px] text-torg-gray">{fmtKg(resultadoSyneco.totais.pesoPlanejado)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 text-[11px] flex-wrap">
+                        {resultadoSyneco.statusUpdated > 0 && (
+                          <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                            {resultadoSyneco.statusUpdated} status atualizados
+                          </span>
+                        )}
+                        {resultadoSyneco.diasProducao > 0 && (
+                          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                            {resultadoSyneco.diasProducao} dia{resultadoSyneco.diasProducao > 1 ? "s" : ""} registrado{resultadoSyneco.diasProducao > 1 ? "s" : ""} no controle
+                          </span>
+                        )}
+                        {resultadoSyneco.alreadyCut > 0 && (
+                          <span className="bg-gray-100 text-torg-gray px-2 py-0.5 rounded-full">
+                            {resultadoSyneco.alreadyCut} já cortadas
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {resultadoSyneco.detalhes?.length > 0 && (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wide">Detalhamento por Peça</p>
+                        <span className="text-[10px] text-torg-gray">{resultadoSyneco.detalhes.length} itens</span>
+                      </div>
+                      <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
+                        <table className="w-full text-[11px]">
+                          <thead className="bg-gray-50/80 sticky top-0">
+                            <tr>
+                              <th className="px-2 py-1.5 text-left font-medium text-gray-500">Marca</th>
+                              <th className="px-2 py-1.5 text-left font-medium text-gray-500">Descrição</th>
+                              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Planej.</th>
+                              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Produz.</th>
+                              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Falta</th>
+                              <th className="px-2 py-1.5 text-right font-medium text-gray-500">Peso Prod.</th>
+                              <th className="px-2 py-1.5 text-center font-medium text-gray-500">Status</th>
+                              <th className="px-2 py-1.5 text-left font-medium text-gray-500">Data Fim</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {resultadoSyneco.detalhes.map((d, i) => {
+                              const pct = d.qtePlanejada > 0 ? (d.qteProduzida / d.qtePlanejada * 100) : 0;
+                              const corLinha = d.qteFalta === 0 && d.qteProduzida > 0
+                                ? "bg-emerald-50/40"
+                                : d.qteProduzida > 0 ? "bg-yellow-50/30" : "";
+                              return (
+                                <tr key={i} className={`${corLinha} hover:bg-gray-50`}>
+                                  <td className="px-2 py-1 font-mono font-semibold text-torg-dark whitespace-nowrap">{d.marca}</td>
+                                  <td className="px-2 py-1 text-torg-gray max-w-[120px] truncate" title={d.descricao}>{d.descricao || "—"}</td>
+                                  <td className="px-2 py-1 text-right tabular-nums text-torg-dark">{d.qtePlanejada}</td>
+                                  <td className="px-2 py-1 text-right tabular-nums font-semibold text-emerald-700">{d.qteProduzida}</td>
+                                  <td className={`px-2 py-1 text-right tabular-nums font-semibold ${d.qteFalta > 0 ? "text-orange-600" : "text-emerald-600"}`}>
+                                    {d.qteFalta > 0 ? d.qteFalta : "✓"}
+                                  </td>
+                                  <td className="px-2 py-1 text-right tabular-nums text-torg-gray">
+                                    {d.pesoProduzido > 0 ? `${d.pesoProduzido.toFixed(1)}` : "—"}
+                                  </td>
+                                  <td className="px-2 py-1 text-center">
+                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                      pct >= 100 ? "bg-emerald-100 text-emerald-700" :
+                                      pct > 0 ? "bg-yellow-100 text-yellow-700" :
+                                      "bg-gray-100 text-gray-500"
+                                    }`}>
+                                      {pct >= 100 ? "Completo" : pct > 0 ? `${pct.toFixed(0)}%` : "Pendente"}
+                                    </span>
+                                  </td>
+                                  <td className="px-2 py-1 text-torg-gray whitespace-nowrap font-mono">
+                                    {d.dataFim ? d.dataFim.split("-").reverse().join("/") : "—"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {resultadoSyneco.pesosPorData && Object.keys(resultadoSyneco.pesosPorData).length > 0 && (
+                    <div className="text-[11px]">
+                      <p className="text-torg-dark font-medium mb-1">Peso produzido por dia (registrado no Controle de Produção):</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(resultadoSyneco.pesosPorData)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([data, peso]) => (
+                            <span key={data} className="bg-blue-50 text-blue-700 rounded px-2 py-0.5 font-mono">
+                              {data.split("-").reverse().join("/")} → {peso.toFixed(1)} kg
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {resultadoSyneco.notFound?.length > 0 && (
+                    <div className="text-[11px] bg-orange-50 rounded-lg p-2.5">
+                      <p className="text-orange-700 font-medium">
+                        {resultadoSyneco.notFound.length} item(ns) do Syneco sem peça no portal:
+                      </p>
+                      <p className="text-orange-600 font-mono mt-0.5">
+                        {resultadoSyneco.notFound.slice(0, 15).join(", ")}
+                        {resultadoSyneco.notFound.length > 15 ? ` ...+${resultadoSyneco.notFound.length - 15}` : ""}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {resultadoSyneco?.error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
+                  <p className="font-medium flex items-center gap-1.5">
+                    <AlertCircle size={14} /> Erro na importação
+                  </p>
+                  <p className="mt-1">{resultadoSyneco.error}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
+              <button
+                onClick={() => { setModalSyneco(false); setResultadoSyneco(null); }}
+                disabled={importandoSyneco}
+                className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark disabled:opacity-50"
+              >
+                {resultadoSyneco ? "Fechar" : "Cancelar"}
+              </button>
+              {!resultadoSyneco && (
+                <button
+                  onClick={importarSyneco}
+                  disabled={importandoSyneco || !synecoOpSelecionada}
+                  className="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {importandoSyneco ? <Loader2 size={14} className="animate-spin" /> : <Factory size={14} />}
+                  Importar Corte
+                </button>
+              )}
+              {resultadoSyneco && !resultadoSyneco.error && (
+                <button
+                  onClick={() => { setModalSyneco(false); setResultadoSyneco(null); router.refresh(); }}
+                  className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium"
+                >
+                  Atualizar Página
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalExcluirLote && (
+        <ModalExcluirLote
+          pecas={pecas}
+          opsComPecas={opsComPecas}
+          onClose={() => setModalExcluirLote(false)}
+          onExcluido={(opsRemovidas) => {
+            setPecas((prev) => prev.filter((p) => !opsRemovidas.includes(p.opNumero)));
+            setModalExcluirLote(false);
+          }}
+        />
+      )}
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => {
+          if (confirmDelete?.tipo === "lote") deletarLoteOp(confirmDelete.opNumero);
+          else if (confirmDelete?.tipo === "peca") deletarPeca(confirmDelete.id);
+        }}
+        titulo={confirmDelete?.tipo === "lote" ? "Excluir todas as peças da OP?" : "Excluir peça?"}
+        mensagem={
+          confirmDelete?.tipo === "lote"
+            ? `Todas as peças da ${fmtOP(confirmDelete?.opNumero)} serão removidas permanentemente. Esta ação não pode ser desfeita.`
+            : `A peça "${confirmDelete?.marca}" da ${fmtOP(confirmDelete?.opNumero)} será removida permanentemente.`
+        }
+        labelConfirmar="Excluir"
+        variant="destrutivo"
+        loading={deleting}
+      />
+    </div>
+  );
+}
+
+/* ========================================================================
+   Componentes modais auxiliares
+   ======================================================================== */
+
+function ModalExcluirLote({ pecas, opsComPecas, onClose, onExcluido }) {
+  const [selecionadas, setSelecionadas] = useState(new Set());
+  const [excluindo, setExcluindo] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [resultado, setResultado] = useState(null);
+
+  const resumoPorOp = useMemo(() => {
+    const map = {};
+    for (const p of pecas) {
+      if (!map[p.opNumero]) map[p.opNumero] = { total: 0, peso: 0, expedidas: 0 };
+      map[p.opNumero].total += p.qte;
+      map[p.opNumero].peso += p.pesoTotalKg || 0;
+      if (p.status === "EXPEDIDO") map[p.opNumero].expedidas += p.qte;
+    }
+    return map;
+  }, [pecas]);
+
+  const toggleOp = (op) => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(op)) next.delete(op); else next.add(op);
+      return next;
+    });
+  };
+  const toggleTodas = () => {
+    if (selecionadas.size === opsComPecas.length) setSelecionadas(new Set());
+    else setSelecionadas(new Set(opsComPecas));
+  };
+
+  const totalSelecionado = useMemo(() => {
+    let total = 0, peso = 0;
+    for (const op of selecionadas) {
+      if (resumoPorOp[op]) { total += resumoPorOp[op].total; peso += resumoPorOp[op].peso; }
+    }
+    return { total, peso };
+  }, [selecionadas, resumoPorOp]);
+
+  const executar = async () => {
+    setErro("");
+    setExcluindo(true);
+    try {
+      const res = await fetch("/api/producao/pecas", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ops: [...selecionadas] }),
+      });
+      let data;
+      try { data = await res.json(); } catch { throw new Error(`Erro ${res.status} do servidor`); }
+      if (!res.ok) throw new Error(data.error || "Erro ao excluir");
+      setResultado({ removidas: data.removidas, ops: [...selecionadas] });
+    } catch (e) {
+      setErro(e.message);
+      setExcluindo(false);
+      setConfirmando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <Trash2 size={18} className="text-red-500" /> Excluir OPs em Lote
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-6 py-4 flex-1 overflow-y-auto space-y-3">
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" /> <span>{erro}</span>
+            </div>
+          )}
+
+          {resultado ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-center">
+              <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-2" />
+              <p className="text-sm font-semibold text-emerald-800">
+                {resultado.removidas} peça{resultado.removidas !== 1 ? "s" : ""} removida{resultado.removidas !== 1 ? "s" : ""} de {resultado.ops.length} OP{resultado.ops.length > 1 ? "s" : ""}
+              </p>
+              <button
+                onClick={() => onExcluido(resultado.ops)}
+                className="mt-3 px-4 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          ) : confirmando ? (
+            <div className="space-y-3">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-red-800 mb-2 flex items-center gap-2">
+                  <AlertCircle size={16} /> Confirmar exclusão
+                </p>
+                <p className="text-sm text-red-700">
+                  Serão excluídas <strong>{totalSelecionado.total.toLocaleString("pt-BR")} peças</strong> ({fmtKg(totalSelecionado.peso)}) de <strong>{selecionadas.size} OP{selecionadas.size > 1 ? "s" : ""}</strong>:
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {[...selecionadas].sort().map((op) => (
+                    <span key={op} className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-mono font-medium">
+                      {fmtOP(op)}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-red-600 mt-3 font-medium">
+                  Esta ação não pode ser desfeita.
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmando(false)}
+                  disabled={excluindo}
+                  className="px-4 py-2 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={executar}
+                  disabled={excluindo}
+                  className="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
+                >
+                  {excluindo ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  {excluindo ? "Excluindo..." : "Excluir definitivamente"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-torg-gray">
+                Selecione as OPs cujas peças serão removidas. Todas as peças, conjuntos e croquis dessas OPs serão excluídos.
+              </p>
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                <label className="flex items-center gap-2 cursor-pointer text-xs">
+                  <input
+                    type="checkbox"
+                    checked={selecionadas.size === opsComPecas.length && opsComPecas.length > 0}
+                    onChange={toggleTodas}
+                    className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                  />
+                  <span className="font-medium text-torg-dark">
+                    Selecionar todas ({opsComPecas.length})
+                  </span>
+                </label>
+                {selecionadas.size > 0 && (
+                  <span className="text-[10px] text-torg-gray ml-auto">
+                    {selecionadas.size} selecionada{selecionadas.size > 1 ? "s" : ""} · {totalSelecionado.total.toLocaleString("pt-BR")} peças · {fmtKg(totalSelecionado.peso)}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1 max-h-[40vh] overflow-y-auto">
+                {opsComPecas.map((op) => {
+                  const info = resumoPorOp[op] || { total: 0, peso: 0, expedidas: 0 };
+                  const temExpedidas = info.expedidas > 0;
+                  return (
+                    <label
+                      key={op}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                        selecionadas.has(op) ? "bg-red-50 border border-red-200" : "hover:bg-gray-50 border border-transparent"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selecionadas.has(op)}
+                        onChange={() => toggleOp(op)}
+                        className="rounded border-gray-300 text-red-500 focus:ring-red-400"
+                      />
+                      <span className="font-mono text-sm font-semibold text-torg-dark min-w-[60px]">{fmtOP(op)}</span>
+                      <span className="text-xs text-torg-gray flex-1">
+                        {info.total} peça{info.total !== 1 ? "s" : ""} · {fmtKg(info.peso)}
+                      </span>
+                      {temExpedidas && (
+                        <span className="text-[10px] text-emerald-600 font-medium">
+                          {info.expedidas} expedida{info.expedidas > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {!resultado && !confirmando && (
+          <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between shrink-0">
+            <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">
+              Cancelar
+            </button>
+            <button
+              onClick={() => setConfirmando(true)}
+              disabled={selecionadas.size === 0}
+              className="px-4 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 size={13} /> Excluir {selecionadas.size > 0 ? `${selecionadas.size} OP${selecionadas.size > 1 ? "s" : ""}` : "selecionadas"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ModalImportarLE({ ops, onClose, onImportado }) {
+  const fileRef = useRef(null);
+  const [arquivoNome, setArquivoNome] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [erro, setErro] = useState("");
+  const [opForcada, setOpForcada] = useState("");
+  const [sobrescrever, setSobrescrever] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function processar(file) {
+    if (!file) return;
+    setErro("");
+    setParsing(true);
+    setArquivoNome(file.name);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
+
+      const res = await fetch("/api/producao/pecas/importar-le", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows, opNumero: opForcada || null, sobrescrever }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao importar");
+      setResultado(data);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <Upload size={18} className="text-torg-blue" /> Importar Lista de Estrutura
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-6 py-5 space-y-3">
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+            </div>
+          )}
+          {resultado ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded p-4 text-sm">
+              <p className="text-emerald-800 font-semibold flex items-center gap-2 mb-2">
+                <CheckCircle2 size={16} /> {fmtOP(resultado.opNumero)} importada com sucesso
+              </p>
+              <ul className="text-xs text-emerald-700 space-y-1">
+                <li>• {resultado.criados} {resultado.criados === 1 ? "peça nova" : "peças novas"}</li>
+                <li>• {resultado.atualizados} {resultado.atualizados === 1 ? "atualizada" : "atualizadas"}</li>
+                {resultado.ignorados > 0 && <li>• {resultado.ignorados} ignoradas (erro)</li>}
+                <li>• Total: {resultado.qteTotal} unidades · {fmtKg(resultado.pesoTotal)}</li>
+                {!resultado.opEncontrada && <li className="text-yellow-700">⚠ {fmtOP(resultado.opNumero)} não cadastrada no portal — peças ficaram sem vínculo</li>}
+              </ul>
+              <button
+                onClick={onImportado}
+                className="mt-3 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700"
+              >
+                Ver na lista
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="bg-torg-blue-50/30 border border-torg-blue-100 rounded p-4 text-center">
+                <FileSpreadsheet size={28} className="mx-auto text-torg-blue mb-2" />
+                <p className="text-sm text-torg-dark font-medium mb-1">
+                  Suba o arquivo de LE (xlsx FORM 21)
+                </p>
+                <p className="text-xs text-torg-gray mb-3">
+                  O parser identifica OP, marca, qte, descrição e peso automaticamente.
+                </p>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={parsing}
+                  className="px-4 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-2 disabled:opacity-50"
+                >
+                  {parsing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {parsing ? "Processando..." : "Selecionar arquivo"}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => { processar(e.target.files?.[0]); e.target.value = ""; }}
+                />
+                {arquivoNome && (
+                  <p className="text-[11px] text-torg-gray mt-2 truncate">{arquivoNome}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-torg-dark mb-1">
+                  Forçar OP (opcional — se a planilha não tiver "OP:" no cabeçalho)
+                </label>
+                <input
+                  type="text"
+                  value={opForcada}
+                  onChange={(e) => setOpForcada(e.target.value.toUpperCase())}
+                  placeholder="Ex: T64K"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+
+              <label className="flex items-start gap-2 text-xs text-torg-gray">
+                <input
+                  type="checkbox"
+                  checked={sobrescrever}
+                  onChange={(e) => setSobrescrever(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>Sobrescrever — apaga peças anteriores dessa OP que foram importadas via LE antes de importar de novo. Útil se a LE foi revisada.</span>
+              </label>
+            </>
+          )}
+        </div>
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">
+            {resultado ? "Fechar" : "Cancelar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalImportarLPC({ ops, onClose, onImportado }) {
+  const fileRef = useRef(null);
+  const [arquivoNome, setArquivoNome] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [erro, setErro] = useState("");
+  const [opForcada, setOpForcada] = useState("");
+  const [sobrescrever, setSobrescrever] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function processar(file) {
+    if (!file) return;
+    setErro("");
+    setParsing(true);
+    setArquivoNome(file.name);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
+
+      const res = await fetch("/api/producao/pecas/importar-lpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows, opNumero: opForcada || null, sobrescrever }),
+      });
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Erro ${res.status} do servidor ao importar. Tente novamente.`);
+      }
+      if (!res.ok) throw new Error(data.error || "Erro ao importar");
+      setResultado(data);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+            <Upload size={18} className="text-torg-dark" /> Importar LPC
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-6 py-5 space-y-3">
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+            </div>
+          )}
+          {resultado ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded p-4 text-sm">
+              <p className="text-emerald-800 font-semibold flex items-center gap-2 mb-2">
+                <CheckCircle2 size={16} /> {fmtOP(resultado.opNumero)} — LPC importada
+              </p>
+              {resultado.obra && (
+                <p className="text-xs text-emerald-700 mb-2">
+                  {resultado.obra}{resultado.cliente ? ` — ${resultado.cliente}` : ""}
+                </p>
+              )}
+              <ul className="text-xs text-emerald-700 space-y-1">
+                <li>• {resultado.conjuntos} {resultado.conjuntos === 1 ? "conjunto" : "conjuntos"}</li>
+                <li>• {resultado.croquis} {resultado.croquis === 1 ? "croqui" : "croquis"}</li>
+                {resultado.avulsas > 0 && <li>• {resultado.avulsas} {resultado.avulsas === 1 ? "peça avulsa" : "peças avulsas"}</li>}
+                <li>• {resultado.relacoes} {resultado.relacoes === 1 ? "relação" : "relações"} conjunto↔croqui</li>
+                <li className="pt-1 border-t border-emerald-200 mt-1">
+                  {resultado.criados} {resultado.criados === 1 ? "nova" : "novas"} · {resultado.atualizados} {resultado.atualizados === 1 ? "atualizada" : "atualizadas"}
+                  {resultado.ignorados > 0 && ` · ${resultado.ignorados} ignorada(s)`}
+                </li>
+                <li>• Peso: {Number(resultado.pesoTotal).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg · Pintura: {Number(resultado.areaTotal).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} m²</li>
+                {!resultado.opEncontrada && <li className="text-yellow-700">⚠ {fmtOP(resultado.opNumero)} não cadastrada — peças ficaram sem vínculo</li>}
+              </ul>
+              <button
+                onClick={onImportado}
+                className="mt-3 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700"
+              >
+                Ver na lista
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="bg-torg-dark/5 border border-torg-dark/10 rounded p-4 text-center">
+                <FileSpreadsheet size={28} className="mx-auto text-torg-dark mb-2" />
+                <p className="text-sm text-torg-dark font-medium mb-1">
+                  Suba o arquivo LPC (Lista de Peças por Conjunto)
+                </p>
+                <p className="text-xs text-torg-gray mb-3">
+                  Identifica conjuntos, croquis e peças avulsas automaticamente.
+                  Croquis com "-P" recebem status de preparação.
+                </p>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={parsing}
+                  className="px-4 py-1.5 bg-torg-dark text-white text-xs rounded-lg hover:bg-torg-dark/90 font-medium inline-flex items-center gap-2 disabled:opacity-50"
+                >
+                  {parsing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {parsing ? "Processando..." : "Selecionar arquivo"}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => { processar(e.target.files?.[0]); e.target.value = ""; }}
+                />
+                {arquivoNome && (
+                  <p className="text-[11px] text-torg-gray mt-2 truncate">{arquivoNome}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-torg-dark mb-1">
+                  Forçar OP (opcional — o parser detecta automaticamente pela marca)
+                </label>
+                <input
+                  type="text"
+                  value={opForcada}
+                  onChange={(e) => setOpForcada(e.target.value.toUpperCase())}
+                  placeholder="Ex: T82A"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+
+              <label className="flex items-start gap-2 text-xs text-torg-gray">
+                <input
+                  type="checkbox"
+                  checked={sobrescrever}
+                  onChange={(e) => setSobrescrever(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>Sobrescrever — apaga peças anteriores dessa OP que foram importadas via LPC antes de importar de novo.</span>
+              </label>
+            </>
+          )}
+        </div>
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">
+            {resultado ? "Fechar" : "Cancelar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

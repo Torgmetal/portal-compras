@@ -7,24 +7,25 @@ export const metadata = {
 };
 
 export default async function ProgramacaoCorte() {
-  const user = await requireRole(["ADMIN", "PRODUCAO"]);
+  const user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
 
-  // Busca apenas croquis e avulsas (peças que passam por máquina)
-  const pecas = await prisma.pecaConjunto.findMany({
-    where: {
-      OR: [
-        { tipoPeca: "CROQUI" },
-        { tipoPeca: null, material: { not: null } },
-      ],
-    },
-    orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
-    include: { op: { select: { id: true, numero: true, cliente: true, obra: true } } },
-    take: 5000,
-  });
+  const [pecas, ops] = await Promise.all([
+    prisma.pecaConjunto.findMany({
+      orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
+      include: { op: { select: { id: true, numero: true, cliente: true, obra: true } } },
+      take: 5000,
+    }),
+    prisma.oP.findMany({
+      where: { status: { notIn: ["ENCERRADA", "CANCELADA"] } },
+      select: { id: true, numero: true, cliente: true, obra: true },
+      orderBy: { numero: "desc" },
+    }),
+  ]);
 
   return (
     <ProgramacaoCorteClient
       pecasIniciais={JSON.parse(JSON.stringify(pecas))}
+      ops={ops}
       userRole={user.role}
     />
   );

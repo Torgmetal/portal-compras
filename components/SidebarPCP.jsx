@@ -10,7 +10,7 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/pcp",              label: "Dashboard",        icon: LayoutDashboard, exact: true },
-  { href: "/pcp/pecas",        label: "Peças / LPC",      icon: Package },
+  { href: "/producao/programacao/corte", label: "Peças / Corte", icon: Package },
   { href: "/pcp/maquinas",     label: "Máquinas",         icon: Cpu },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
   { href: "/pcp/solda",        label: "Solda",            icon: Flame },
