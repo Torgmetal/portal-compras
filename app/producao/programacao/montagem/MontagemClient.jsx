@@ -19,9 +19,10 @@ const STATUS_LABEL = {
 };
 
 const PRONTIDAO_LABEL = {
-  PRONTO: "Pronto p/ montar",
-  PARCIAL: "Parcial",
-  PENDENTE: "Sem croquis cortados",
+  PRONTO: "Liberados para montagem",
+  PARCIAL: "Conjunto liberado para montagem parcial",
+  PENDENTE: "Aguardando peças",
+  MONTADO: "Conjuntos montados",
 };
 
 const fmtKg = (v) => {
@@ -107,7 +108,9 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
     return conjuntosEnriquecidos.filter((c) => {
       if (filtroOp && c.opNumero !== filtroOp) return false;
       if (filtroStatus && c.status !== filtroStatus) return false;
-      if (filtroProntidao && c.prontidao.categoria !== filtroProntidao) return false;
+      if (filtroProntidao === "MONTADO") {
+        if (c.status !== "MONTAGEM") return false;
+      } else if (filtroProntidao && c.prontidao.categoria !== filtroProntidao) return false;
       if (busca) {
         const q = busca.toLowerCase();
         if (
@@ -395,9 +398,10 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
         >
           <option value="">Prontidão</option>
-          <option value="PRONTO">Pronto p/ montar</option>
-          <option value="PARCIAL">Parcial</option>
-          <option value="PENDENTE">Sem croquis cortados</option>
+          <option value="PRONTO">Liberados para montagem</option>
+          <option value="PARCIAL">Conjunto liberado para montagem parcial</option>
+          <option value="PENDENTE">Aguardando peças</option>
+          <option value="MONTADO">Conjuntos montados</option>
         </select>
         <div className="flex items-center gap-1 flex-1 min-w-[180px]">
           <Search size={12} className="text-torg-gray ml-2" />
