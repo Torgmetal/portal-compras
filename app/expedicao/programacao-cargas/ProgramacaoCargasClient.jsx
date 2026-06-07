@@ -127,14 +127,14 @@ export default function ProgramacaoCargasClient() {
               </p>
               <div className="mt-3 space-y-2">
                 {alertas.pecasEsquecidas.map((alerta) => (
-                  <div key={alerta.opId} className="flex items-start gap-2">
+                  <div key={alerta.opId} className="flex items-start gap-2 flex-wrap">
                     <Link
                       href={`/expedicao/checklist`}
                       className="text-xs font-mono font-bold text-red-700 hover:underline flex-shrink-0"
                     >
                       {fmtOP(alerta.opNumero)}
                     </Link>
-                    <span className="text-xs text-red-600">
+                    <span className="text-xs text-red-600 flex-shrink-0">
                       {alerta.cliente} — {alerta.pecas.length} {alerta.pecas.length === 1 ? "peca" : "pecas"}:
                     </span>
                     <div className="flex flex-wrap gap-1">
@@ -307,20 +307,20 @@ function CargaCard({ carga, borderClass }) {
             </p>
           </div>
 
-          <div className="border-l border-gray-200 pl-4">
-            <div className="flex items-center gap-2">
+          <div className="border-l border-gray-200 pl-4 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <Link
                 href="/expedicao/checklist"
-                className="font-mono text-sm font-bold text-torg-blue hover:underline"
+                className="font-mono text-sm font-bold text-torg-blue hover:underline whitespace-nowrap"
               >
                 {fmtOP(carga.opNumero)}
               </Link>
-              <span className="text-xs text-torg-gray">— {carga.cliente}</span>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${st.bg} ${st.text}`}>
+              <span className="text-xs text-torg-gray truncate max-w-[200px]" title={carga.cliente}>— {carga.cliente}</span>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${st.bg} ${st.text}`}>
                 {st.label}
               </span>
               {carga.vencida && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 whitespace-nowrap">
                   <Clock size={10} /> Vencida
                 </span>
               )}
@@ -331,7 +331,7 @@ function CargaCard({ carga, borderClass }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-torg-gray">
+        <div className="flex items-center gap-3 text-xs text-torg-gray flex-wrap">
           <span className="flex items-center gap-1">
             <Package size={12} /> {carga.totalItens} itens
           </span>
@@ -391,11 +391,11 @@ function TabProgressoOPs({ progressoOPs, busca }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[800px]">
           <thead className="bg-gray-50/60">
             <tr>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Cliente / Obra</th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">OP</th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cliente / Obra</th>
               <th className="px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Pecas</th>
               <th className="px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase w-48">Progresso</th>
               <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Peso expedido</th>
@@ -421,8 +421,8 @@ function TabProgressoOPs({ progressoOPs, busca }) {
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-xs text-torg-dark truncate max-w-[200px]">{op.cliente}</p>
-                    {op.obra && <p className="text-[10px] text-torg-gray truncate max-w-[200px]">{op.obra}</p>}
+                    <p className="text-xs text-torg-dark truncate max-w-[280px]" title={op.cliente}>{op.cliente}</p>
+                    {op.obra && <p className="text-[10px] text-torg-gray truncate max-w-[280px]" title={op.obra}>{op.obra}</p>}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className="text-sm font-bold text-torg-dark">{op.pecasExpedidas}</span>

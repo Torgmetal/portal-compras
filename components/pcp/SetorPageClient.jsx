@@ -137,10 +137,10 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
       {/* Bancadas / Máquinas do setor */}
       {produzindoAgora.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2 flex-wrap">
             <Cpu size={16} style={{ color: corHex }} />
             <h3 className="text-base font-semibold text-torg-dark">Bancadas — {titulo}</h3>
-            <span className="ml-auto flex items-center gap-3 text-xs">
+            <span className="ml-auto flex items-center gap-2 text-xs flex-wrap">
               <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
                 {produzindoAgora.filter((m) => m.status === "Finalizada Parcial").length} em andamento
               </span>
@@ -241,14 +241,14 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
             <p className="text-xs text-torg-gray mt-0.5">Peças com status correspondente a este setor.</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[600px]">
               <thead className="bg-gray-50/60">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Marca</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Peso (kg)</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">OP</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Marca</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descrição</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Qtd</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Peso (kg)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -256,7 +256,7 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
                   <tr key={p.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 font-mono text-xs text-torg-blue font-medium">{p.opNumero}</td>
                     <td className="px-4 py-2 font-mono text-xs text-torg-dark">{p.marca}</td>
-                    <td className="px-4 py-2 text-xs text-torg-gray max-w-[200px] truncate">{p.descricao || "—"}</td>
+                    <td className="px-4 py-2 text-xs text-torg-gray max-w-[250px] truncate" title={p.descricao || ""}>{p.descricao || "—"}</td>
                     <td className="px-4 py-2 text-right text-xs tabular-nums">{p.qte}</td>
                     <td className="px-4 py-2 text-right text-xs tabular-nums font-medium">{fmtKg(p.pesoTotalKg)}</td>
                   </tr>
@@ -286,17 +286,17 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
           <p className="px-6 py-8 text-sm text-torg-gray text-center">Nenhum apontamento encontrado.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[750px]">
               <thead className="bg-gray-50/60">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Peça</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Máquina</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Operador</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">KG</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Un</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Data</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">OP</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Peça</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Máquina</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Operador</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Status</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">KG</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Un</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -304,7 +304,7 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap">{fmtDataHora(a.dataInicio)}</td>
                     <td className="px-3 py-2 text-xs font-medium text-torg-blue">{a.obra || "—"}</td>
-                    <td className="px-3 py-2 text-xs text-torg-dark max-w-[150px] truncate" title={a.descricaoItem}>{a.descricaoItem || a.opSka || "—"}</td>
+                    <td className="px-3 py-2 text-xs text-torg-dark max-w-[200px] truncate" title={a.descricaoItem || a.opSka || ""}>{a.descricaoItem || a.opSka || "—"}</td>
                     <td className="px-3 py-2 text-xs font-mono text-torg-gray">{a.maquina || "—"}</td>
                     <td className="px-3 py-2 text-xs text-torg-dark">{a.operador || "—"}</td>
                     <td className="px-3 py-2 text-xs">

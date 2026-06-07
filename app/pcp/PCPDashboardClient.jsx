@@ -173,15 +173,15 @@ export default function PCPDashboardClient() {
             </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[700px]">
               <thead className="bg-gray-50/60">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Setor</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Máquina</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Peça</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Operador</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">KG</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Setor</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Máquina</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">OP</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Peça</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Operador</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">KG</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -198,7 +198,7 @@ export default function PCPDashboardClient() {
                       </td>
                       <td className="px-4 py-2 font-mono text-xs text-torg-dark">{m.maquina || "—"}</td>
                       <td className="px-4 py-2 text-xs font-medium text-torg-blue">{m.obra || "—"}</td>
-                      <td className="px-4 py-2 text-xs text-torg-gray max-w-[200px] truncate">{m.descricaoItem || m.opSka || "—"}</td>
+                      <td className="px-4 py-2 text-xs text-torg-gray max-w-[250px] truncate" title={m.descricaoItem || m.opSka || ""}>{m.descricaoItem || m.opSka || "—"}</td>
                       <td className="px-4 py-2 text-xs text-torg-dark">{m.operador || "—"}</td>
                       <td className="px-4 py-2 text-right text-xs tabular-nums font-medium">{fmtKg(m.produzidoKg)}</td>
                     </tr>
@@ -241,8 +241,8 @@ export default function PCPDashboardClient() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h3 className="text-sm font-semibold text-torg-dark mb-4">Pipeline de peças</h3>
           {pipelineData.length > 0 ? (
-            <div className="flex items-center gap-4">
-              <ResponsiveContainer width="50%" height={220}>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <ResponsiveContainer width="100%" height={220} className="sm:!w-1/2">
                 <PieChart>
                   <Pie
                     data={pipelineData}
@@ -360,7 +360,7 @@ export default function PCPDashboardClient() {
       )}
 
       {/* Links rápidos pros setores */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         {[
           { href: "/pcp/corte", label: "Corte", icon: Scissors },
           { href: "/pcp/montagem", label: "Montagem", icon: Package },

@@ -78,7 +78,7 @@ export default function RomaneiosSharepoint({ ops }) {
     <div className="space-y-4">
       {/* Seletor de OP */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 shrink-0">
             <Package size={16} className="text-torg-blue" />
             <span className="text-sm font-semibold text-torg-dark">Selecionar OP</span>
@@ -175,7 +175,7 @@ function RomaneioCard({ rom, expanded, onToggle, detalhe, erroDetalhe, loadingDe
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <button onClick={onToggle} className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/50 transition-colors">
+      <button onClick={onToggle} className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/50 transition-colors flex-wrap gap-2">
         <div className="flex items-center gap-3">
           {expanded ? <ChevronDown size={14} className="text-torg-gray" /> : <ChevronRight size={14} className="text-torg-gray" />}
           <span className="text-sm font-bold text-torg-blue font-mono">Romaneio {rom.numero.padStart(2, "0")}</span>
@@ -261,17 +261,17 @@ function RomaneioDetalhe({ data }) {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-        <div>
+        <div className="min-w-0">
           <span className="text-torg-gray">Cliente:</span>{" "}
-          <span className="font-medium text-torg-dark">{cabecalho.cliente || "—"}</span>
+          <span className="font-medium text-torg-dark truncate block" title={cabecalho.cliente || ""}>{cabecalho.cliente || "—"}</span>
         </div>
-        <div>
+        <div className="min-w-0">
           <span className="text-torg-gray">Data saída:</span>{" "}
           <span className="font-medium text-torg-dark">{fmtData(cabecalho.dataSaida)}</span>
         </div>
-        <div>
+        <div className="min-w-0">
           <span className="text-torg-gray">Transportador:</span>{" "}
-          <span className="font-medium text-torg-dark">{cabecalho.transportador || "—"}</span>
+          <span className="font-medium text-torg-dark truncate block" title={cabecalho.transportador || ""}>{cabecalho.transportador || "—"}</span>
         </div>
       </div>
 
@@ -294,7 +294,7 @@ function RomaneioDetalhe({ data }) {
 
       {/* Tabela de itens */}
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-xs min-w-[600px]">
           <thead>
             <tr className="bg-gray-50/60 text-torg-gray">
               <th className="text-left px-2 py-1.5 font-medium">Vol.</th>
@@ -340,7 +340,7 @@ function InfoCard({ icon: Icon, label, value, highlight }) {
         <Icon size={12} className="text-torg-gray" />
         <span className="text-[10px] text-torg-gray">{label}</span>
       </div>
-      <p className={`text-sm font-bold mt-0.5 ${highlight ? "text-torg-blue" : "text-torg-dark"}`}>{value}</p>
+      <p className={`text-sm font-bold mt-0.5 whitespace-nowrap ${highlight ? "text-torg-blue" : "text-torg-dark"}`}>{value}</p>
     </div>
   );
 }
