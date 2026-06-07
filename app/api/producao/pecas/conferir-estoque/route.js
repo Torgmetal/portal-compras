@@ -58,7 +58,10 @@ export async function POST(request) {
     const pecas = await prisma.pecaConjunto.findMany({
       where: {
         opNumero,
-        tipoPeca: { in: ["CROQUI", null] }, // croquis e peças legado LE
+        OR: [
+          { tipoPeca: "CROQUI" },
+          { tipoPeca: null },
+        ],
         descricao: { not: null },
       },
       select: {

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
-import { PackageSearch, Search, X, Inbox, Boxes } from "lucide-react";
+import { PackageSearch, Search, X, Inbox } from "lucide-react";
 
 const fmtQtd = (v, unidade = "") =>
   v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 3 })} ${unidade}`.trim() : "—";
@@ -17,9 +17,6 @@ export default function EstoqueProducaoClient({ itens }) {
     });
   }, [itens, busca]);
 
-  const totalComEstoque = useMemo(() => filtrados.filter((i) => i.qtdAtual > 0).length, [filtrados]);
-  const totalSemEstoque = filtrados.length - totalComEstoque;
-
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
@@ -31,26 +28,6 @@ export default function EstoqueProducaoClient({ itens }) {
         <p className="text-sm text-torg-gray mt-1">
           Consulta rápida de saldo em estoque dos itens de matéria-prima.
         </p>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs text-torg-gray uppercase font-medium">Total de itens</p>
-          <p className="text-2xl font-bold text-torg-dark mt-1">{itens.length}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs text-torg-gray uppercase font-medium">Exibindo</p>
-          <p className="text-2xl font-bold text-torg-blue mt-1">{filtrados.length}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs text-emerald-600 uppercase font-medium">Com estoque</p>
-          <p className="text-2xl font-bold text-emerald-600 mt-1">{totalComEstoque}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs text-red-500 uppercase font-medium">Sem estoque</p>
-          <p className="text-2xl font-bold text-red-500 mt-1">{totalSemEstoque}</p>
-        </div>
       </div>
 
       {/* Busca */}
