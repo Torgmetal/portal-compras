@@ -18,7 +18,7 @@ export const maxDuration = 30;
  *   MesOrdem é alimentada pelo sync-agent (dataset 150, snapshot).
  *   Campo de peso: pesoProduzido (não produzidoKg).
  */
-export async function GET() {
+export async function GET(req) {
   try {
     await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
   } catch (e) {
@@ -27,18 +27,49 @@ export async function GET() {
   }
 
   try {
+  const { searchParams } = new URL(req.url);
+  const periodo = searchParams.get("periodo") || "semana";
+
   const agora = new Date();
   const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
   const inicioSemana = new Date(hoje);
   inicioSemana.setDate(hoje.getDate() - ((hoje.getDay() + 6) % 7)); // segunda
   const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
-  const inicio14d = new Date(hoje);
-  inicio14d.setDate(hoje.getDate() - 14);
+  const inicioMesAnterior = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+  const fimMesAnterior = new Date(agora.getFullYear(), agora.getMonth(), 0, 23, 59, 59, 999);
+
+  // Tendência: range dinâmico baseado no período selecionado
+  let inicioTendencia, fimTendencia;
+  if (periodo === "mesAnterior") {
+    inicioTendencia = inicioMesAnterior;
+    fimTendencia = fimMesAnterior;
+  } else if (periodo === "mes") {
+    inicioTendencia = inicioMes;
+    fimTendencia = agora;
+  } else {
+    inicioTendencia = new Date(hoje);
+    inicioTendencia.setDate(hoje.getDate() - 14);
+    fimTendencia = agora;
+  }
+
+  // Metas: range dinâmico baseado no período selecionado
+  let inicioMetas, fimMetas;
+  if (periodo === "mesAnterior") {
+    inicioMetas = inicioMesAnterior;
+    fimMetas = fimMesAnterior;
+  } else if (periodo === "mes") {
+    inicioMetas = inicioMes;
+    fimMetas = agora;
+  } else {
+    inicioMetas = inicioSemana;
+    fimMetas = agora;
+  }
 
   const [
     kgPorSetorHoje,
     kgPorSetorSemana,
     kgPorSetorMes,
+    kgPorSetorMesAnterior,
     pipelinePecas,
     maquinasAtivas,
     opsAtivas,
@@ -65,6 +96,17 @@ export async function GET() {
     prisma.mesOrdem.groupBy({
       by: ["setor"],
       where: { dataInicio: { gte: inicioMes }, pesoProduzido: { gt: 0 } },
+      _sum: { pesoProduzido: true, produzidoUn: true },
+      _count: true,
+    }),
+
+    // KG por setor mês anterior
+    prisma.mesOrdem.groupBy({
+      by: ["setor"],
+      where: {
+        dataInicio: { gte: inicioMesAnterior, lte: fimMesAnterior },
+        pesoProduzido: { gt: 0 },
+      },
       _sum: { pesoProduzido: true, produzidoUn: true },
       _count: true,
     }),
@@ -106,9 +148,9 @@ export async function GET() {
       where: { status: { not: "EXPEDIDO" } },
     }),
 
-    // Metas da semana (ProducaoDiaria)
+    // Metas do período (ProducaoDiaria)
     prisma.producaoDiaria.findMany({
-      where: { data: { gte: inicioSemana } },
+      where: { data: { gte: inicioMetas, lte: fimMetas } },
       select: {
         data: true,
         setor: true,
@@ -164,7 +206,8 @@ export async function GET() {
     SELECT DATE("dataInicio") as dia, setor,
            SUM("pesoProduzido") as kg, COUNT(*)::int as apontamentos
     FROM "MesOrdem"
-    WHERE "dataInicio" >= ${inicio14d}
+    WHERE "dataInicio" >= ${inicioTendencia}
+      AND "dataInicio" <= ${fimTendencia}
       AND "pesoProduzido" > 0
     GROUP BY DATE("dataInicio"), setor
     ORDER BY dia ASC
@@ -204,7 +247,8 @@ export async function GET() {
   }));
 
   return NextResponse.json({
-    kgPorSetor: { hoje: adaptKg(kgPorSetorHoje), semana: adaptKg(kgPorSetorSemana), mes: adaptKg(kgPorSetorMes) },
+    kgPorSetor: { hoje: adaptKg(kgPorSetorHoje), semana: adaptKg(kgPorSetorSemana), mes: adaptKg(kgPorSetorMes), mesAnterior: adaptKg(kgPorSetorMesAnterior) },
+    periodo,
     pipeline: pipelinePecas,
     tendencia,
     maquinasAtivas: maquinasList,

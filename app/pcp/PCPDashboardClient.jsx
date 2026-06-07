@@ -27,16 +27,23 @@ const STATUS_LABELS = {
   ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDIDO: "Expedido",
 };
 
+const PERIODOS = [
+  { key: "semana", label: "Semana" },
+  { key: "mes", label: "Mês atual" },
+  { key: "mesAnterior", label: "Mês anterior" },
+];
+
 export default function PCPDashboardClient() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [periodo, setPeriodo] = useState("semana");
 
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro("");
     try {
-      const res = await fetch("/api/pcp/dashboard");
+      const res = await fetch(`/api/pcp/dashboard?periodo=${periodo}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erro ao carregar");
       setData(json);
@@ -45,7 +52,7 @@ export default function PCPDashboardClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [periodo]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -87,16 +94,22 @@ export default function PCPDashboardClient() {
     })
     .filter(Boolean);
 
-  // KG por setor hoje pra gráfico de barras
-  const setorHojeData = FLUXO_VISUAL.map((setor) => {
+  // KG por setor do período selecionado pra gráfico de barras
+  const fontePeriodo = periodo === "mesAnterior" ? kgPorSetor.mesAnterior
+    : periodo === "mes" ? kgPorSetor.mes
+    : kgPorSetor.semana;
+  const setorPeriodoData = FLUXO_VISUAL.map((setor) => {
     const norm = normSetor(setor);
-    const item = kgPorSetor.hoje.find((r) => normSetor(r.setor) === norm);
+    const item = (fontePeriodo || []).find((r) => normSetor(r.setor) === norm);
     return {
       setor,
       kg: item?._sum.produzidoKg || 0,
       fill: corSetor(setor).hex,
     };
   }).filter((s) => s.kg > 0);
+
+  const labelPeriodo = periodo === "mesAnterior" ? "mês anterior"
+    : periodo === "mes" ? "este mês" : "esta semana";
 
   // Meta vs Realizado da semana agrupado por setor
   const metasPorSetor = {};
@@ -120,12 +133,29 @@ export default function PCPDashboardClient() {
             Visão consolidada do chão de fábrica — dados do Syneco em tempo real.
           </p>
         </div>
-        <button
-          onClick={carregar}
-          className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
-        >
-          <RefreshCw size={14} /> Atualizar
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+            {PERIODOS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setPeriodo(p.key)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  periodo === p.key
+                    ? "bg-white text-torg-blue shadow-sm"
+                    : "text-torg-gray hover:text-torg-dark"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={carregar}
+            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+          >
+            <RefreshCw size={14} /> Atualizar
+          </button>
+        </div>
       </div>
 
       {/* KPIs principais */}
@@ -186,10 +216,10 @@ export default function PCPDashboardClient() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* KG por setor hoje */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-semibold text-torg-dark mb-4">KG produzido hoje por setor</h3>
-          {setorHojeData.length > 0 ? (
+          <h3 className="text-sm font-semibold text-torg-dark mb-4">KG produzido {labelPeriodo} por setor</h3>
+          {setorPeriodoData.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={setorHojeData} layout="vertical" margin={{ left: 10, right: 20 }}>
+              <BarChart data={setorPeriodoData} layout="vertical" margin={{ left: 10, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(1)}t`} />
                 <YAxis type="category" dataKey="setor" tick={{ fontSize: 11 }} width={80} />
@@ -198,14 +228,14 @@ export default function PCPDashboardClient() {
                   contentStyle={{ fontSize: 12, borderRadius: 8 }}
                 />
                 <Bar dataKey="kg" radius={[0, 4, 4, 0]}>
-                  {setorHojeData.map((entry, i) => (
+                  {setorPeriodoData.map((entry, i) => (
                     <Cell key={i} fill={entry.fill} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="text-sm text-torg-gray text-center py-8">Sem produção registrada hoje.</p>
+            <p className="text-sm text-torg-gray text-center py-8">Sem produção registrada {labelPeriodo}.</p>
           )}
         </div>
 
@@ -252,7 +282,11 @@ export default function PCPDashboardClient() {
       {/* Tendência 14 dias */}
       {tendencia.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-semibold text-torg-dark mb-4">Produção diária — últimos 14 dias (kg)</h3>
+          <h3 className="text-sm font-semibold text-torg-dark mb-4">
+            {periodo === "mesAnterior" ? "Produção diária — mês anterior (kg)"
+              : periodo === "mes" ? "Produção diária — mês atual (kg)"
+              : "Produção diária — últimos 14 dias (kg)"}
+          </h3>
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={tendencia} margin={{ left: 10, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -276,7 +310,11 @@ export default function PCPDashboardClient() {
       {/* Meta vs Realizado da semana */}
       {metasArr.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-semibold text-torg-dark mb-4">Meta vs Realizado — semana atual</h3>
+          <h3 className="text-sm font-semibold text-torg-dark mb-4">
+            {periodo === "mesAnterior" ? "Meta vs Realizado — mês anterior"
+              : periodo === "mes" ? "Meta vs Realizado — mês atual"
+              : "Meta vs Realizado — semana atual"}
+          </h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={metasArr} margin={{ left: 10, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
