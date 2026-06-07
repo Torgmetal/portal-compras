@@ -3,20 +3,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Cpu, Wrench, Flame,
-  Wind, Paintbrush, Scissors, Package,
+  Wind, Paintbrush, Package, Target,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/pcp",              label: "Dashboard",        icon: LayoutDashboard, exact: true },
+  { href: "/pcp/pmp",          label: "PMP",              icon: Target },
   { href: "/producao/programacao/corte", label: "Peças / Corte", icon: Package },
   { href: "/pcp/maquinas",     label: "Máquinas",         icon: Cpu },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
   { href: "/pcp/solda",        label: "Solda",            icon: Flame },
   { href: "/pcp/jato",         label: "Jato",             icon: Wind },
   { href: "/pcp/pintura",      label: "Pintura",          icon: Paintbrush },
-  { href: "/pcp/aproveitamento", label: "Aproveitamento", icon: Scissors },
 ];
 
 export default function SidebarPCP() {

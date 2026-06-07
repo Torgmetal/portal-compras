@@ -44,6 +44,7 @@ model User {
   solicitacoesDecididas    SolicitacaoVerba[]    @relation("SolicitacaoDecididoBy")
   tarefasPlanejamento      TarefaPlanejamento[]  @relation("TarefaPlanejamentoCreatedBy")
   modulos                  UserModulo[]
+  pmpMetas                 PmpMeta[]             @relation("PmpMetaCriador")
 }
 
 model PasswordResetToken {
@@ -137,6 +138,7 @@ model OP {
   revisoes             Revisao[]
   romaneios            Romaneio[]
   tarefasPlanejamento  TarefaPlanejamento[]
+  pmpMetas             PmpMeta[]             @relation("PmpMetaOP")
 
   @@index([numero])
   @@index([status])
@@ -2312,4 +2314,26 @@ enum DepartamentoCronograma {
   FABRICACAO
   EXPEDICAO
   MONTAGEM
+}
+
+// ── PMP — Plano Mestre de Producao ────────────────────────────
+// Meta diaria de producao por OP + setor.
+// Visao semanal = SUM(metas da semana).
+model PmpMeta {
+  id          String   @id @default(cuid())
+  data        DateTime @db.Date          // dia-alvo
+  setor       String                     // CORTE, MONTAGEM, SOLDA, ACABAMENTO, JATO, PINTURA, EXPEDIDO
+  opNumero    String                     // OP
+  metaPecas   Int      @default(0)       // meta em pecas
+  metaPesoKg  Float    @default(0)       // meta em kg
+  observacao  String?
+  criadoPorId String
+  criadoPor   User     @relation("PmpMetaCriador", fields: [criadoPorId], references: [id])
+  op          OP       @relation("PmpMetaOP", fields: [opNumero], references: [numero])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([data, setor, opNumero])
+  @@index([data])
+  @@index([opNumero])
 }
