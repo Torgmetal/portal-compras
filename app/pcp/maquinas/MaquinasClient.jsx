@@ -4,10 +4,6 @@ import {
   Loader2, AlertCircle, RefreshCw, Cpu, Weight,
   Search, Package, Users,
 } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell,
-} from "recharts";
 import { FLUXO_VISUAL, corSetor, normSetor } from "@/lib/setores";
 
 const fmtKg = (v) =>
@@ -79,7 +75,7 @@ export default function MaquinasClient() {
 
   if (!data) return null;
 
-  const { maquinasAtivas: todasMaquinas, kgPorSetor } = data;
+  const { maquinasAtivas: todasMaquinas } = data;
 
   // Filtra: página de Máquinas mostra apenas equipamentos reais (IoT/CNC)
   // Corte → só lasers; Montagem e Solda → bancadas de pessoas (exibem na aba do setor)
@@ -116,13 +112,6 @@ export default function MaquinasClient() {
       (m.setor || "").toLowerCase().includes(filtroLower)
     );
   };
-
-  // KG por setor pra gráfico
-  const setorBarData = FLUXO_VISUAL.map((setor) => {
-    const norm = normSetor(setor);
-    const item = kgPorSetor.hoje.find((r) => normSetor(r.setor) === norm);
-    return { setor, kg: item?._sum.produzidoKg || 0, fill: corSetor(setor).hex };
-  }).filter((s) => s.kg > 0);
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -192,26 +181,6 @@ export default function MaquinasClient() {
           </div>
         </div>
       </div>
-
-      {/* Gráfico KG por setor hoje */}
-      {setorBarData.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-semibold text-torg-dark mb-4">KG produzido hoje por setor</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={setorBarData} margin={{ left: 10, right: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="setor" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(1)}t`} />
-              <Tooltip formatter={(v) => [fmtKg(v), "Produzido"]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-              <Bar dataKey="kg" radius={[4, 4, 0, 0]}>
-                {setorBarData.map((entry, i) => (
-                  <Cell key={i} fill={entry.fill} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
 
       {/* Máquinas agrupadas por setor */}
       {maquinasAtivas.length === 0 ? (
