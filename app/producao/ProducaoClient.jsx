@@ -12,12 +12,11 @@ import { fmtOP } from "@/lib/utils";
 
 // Periodos pre-definidos para o seletor (em dias relativos a hoje)
 const PERIODOS = [
-  { id: "ytd",   label: "Ano (YTD)",      desc: "1 jan ate hoje" },
-  { id: "30",    label: "Últimos 30 dias", desc: "" },
-  { id: "90",    label: "Últimos 90 dias", desc: "" },
   { id: "mes",   label: "Mês atual",       desc: "" },
   { id: "anterior", label: "Mês anterior", desc: "" },
-  { id: "tudo",  label: "Tudo",            desc: "Sem filtro de data" },
+  { id: "30",    label: "Últimos 30 dias", desc: "" },
+  { id: "90",    label: "Últimos 90 dias", desc: "" },
+  { id: "ytd",   label: "Ano (YTD)",      desc: "1 jan ate hoje" },
 ];
 
 function calcularRangePeriodo(periodoId) {
@@ -44,9 +43,9 @@ function calcularRangePeriodo(periodoId) {
       const fim = new Date(hoje.getFullYear(), hoje.getMonth(), 0, 23, 59, 59, 999);
       return { inicio, fim };
     }
-    case "tudo":
     default:
-      return { inicio: new Date(2020, 0, 1), fim: hoje };
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      break;
   }
   return { inicio, fim: hoje };
 }
@@ -133,8 +132,8 @@ export default function ProducaoClient({ ops, semanas, semanaAtual, producoes })
   const [modalImport, setModalImport] = useState(false);
   // Setor selecionado pra filtrar exibicao. Default: Expedicao.
   const [setorFiltro, setSetorFiltro] = useState("Expedicao");
-  // Periodo selecionado. Default: YTD (ano corrente).
-  const [periodo, setPeriodo] = useState("ytd");
+  // Periodo selecionado. Default: mês atual.
+  const [periodo, setPeriodo] = useState("mes");
   const rangePeriodo = useMemo(() => calcularRangePeriodo(periodo), [periodo]);
 
   // Identifica setores que tem dados no banco
@@ -1048,132 +1047,100 @@ function Toolbar({ periodo, onChangePeriodo, range, setorFiltro, onChangeSetor, 
   );
 }
 
-// Donut SVG pra aderencia (sem dependencia externa).
-function DonutAderencia({ pct, color, label }) {
-  const r = 52;
-  const stroke = 11;
-  const c = 2 * Math.PI * r;
-  const clamped = Math.max(0, Math.min(100, pct));
-  const offset = c - (clamped / 100) * c;
-  return (
-    <div className="relative shrink-0">
-      <svg width="140" height="140" viewBox="0 0 140 140">
-        <circle cx="70" cy="70" r={r} fill="none" stroke="#f3f4f6" strokeWidth={stroke} />
-        <circle
-          cx="70" cy="70" r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          transform="rotate(-90 70 70)"
-          style={{ transition: "stroke-dashoffset 0.4s" }}
-        />
-        <text x="70" y="74" textAnchor="middle" fontSize="28" fontWeight="800" fill={color} fontFamily="ui-sans-serif,system-ui">
-          {pct.toFixed(0)}%
-        </text>
-        <text x="70" y="92" textAnchor="middle" fontSize="9" fill="#6b7280" fontWeight="600" letterSpacing="1">
-          ADERÊNCIA
-        </text>
-      </svg>
-    </div>
-  );
-}
-
 // Card grande com os numeros chave do periodo + setor.
 function HeroKpi({ kpi, setor, kpiSemana }) {
-  const cor = kpi.aderencia >= 90 ? "#1d4ed8" : kpi.aderencia >= 70 ? "#ea580c" : "#dc2626";
   const semDado = kpi.prevTotal === 0 && kpi.realTotal === 0;
   const falta = Math.max(0, kpi.prevTotal - kpi.realTotal);
   const setorLabel = SETOR_LABEL[setor] || setor;
   const aderSemana = kpiSemana.prevKg > 0 ? (kpiSemana.realKg / kpiSemana.prevKg) * 100 : 0;
+  const aderColor = kpi.aderencia >= 90 ? "text-emerald-600" : kpi.aderencia >= 70 ? "text-torg-orange-700" : "text-red-600";
+  const aderBg = kpi.aderencia >= 90 ? "bg-emerald-500" : kpi.aderencia >= 70 ? "bg-orange-400" : "bg-red-500";
+
+  if (semDado) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-8 text-center">
+        <Package size={28} className="mx-auto text-gray-300 mb-2" />
+        <p className="text-sm text-torg-gray">Sem produção no período selecionado para <strong>{setorLabel}</strong>.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
-      {semDado ? (
-        <p className="text-sm text-torg-gray text-center py-4">
-          Sem produção no período selecionado pra {setorLabel}.
-        </p>
-      ) : (
-        <div className="flex items-center gap-6 flex-wrap">
-          {/* Esquerda: Donut + setor label */}
-          <div className="flex flex-col items-center shrink-0">
-            <DonutAderencia pct={kpi.aderencia} color={cor} />
-            <p className="text-[11px] text-torg-gray mt-1 font-medium uppercase tracking-wide">{setorLabel}</p>
-          </div>
-
-          {/* Direita: stats em grid */}
-          <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4 min-w-[280px]">
-            <Stat
-              label="Realizado"
-              value={fmtPesoCompacto(kpi.realTotal)}
-              valueColor="text-torg-dark"
-              accent={cor}
-            />
-            <Stat
-              label="Previsto"
-              value={fmtPesoCompacto(kpi.prevTotal)}
-              valueColor="text-torg-gray"
-            />
-            <Stat
-              label="Falta produzir"
-              value={fmtPesoCompacto(falta)}
-              valueColor={falta > 0 ? "text-torg-orange-700" : "text-torg-blue"}
-              sub={kpi.prevTotal > 0 ? `${((falta / kpi.prevTotal) * 100).toFixed(0)}% do previsto` : ""}
-            />
-            <Stat
-              label="Média diária"
-              value={fmtPesoCompacto(kpi.mediaDiariaReal)}
-              valueColor="text-torg-dark"
-              sub={`${kpi.dias} ${kpi.dias === 1 ? "dia" : "dias"} com produção`}
-            />
-          </div>
-
-          {/* Faixa inferior: semana atual */}
-          <div className="w-full border-t border-gray-100 pt-3 flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-torg-gray uppercase tracking-wider font-semibold">Semana atual</span>
-              <span className="text-lg font-bold tabular-nums text-torg-dark">{fmtPesoCompacto(kpiSemana.realKg)}</span>
-              <span className="text-xs text-torg-gray tabular-nums">de {fmtPesoCompacto(kpiSemana.prevKg)} previsto</span>
-              {kpiSemana.prevKg > 0 && (
-                <span className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded ${
-                  aderSemana >= 90 ? "bg-torg-blue-50 text-torg-blue" :
-                  aderSemana >= 70 ? "bg-orange-50 text-torg-orange-700" :
-                  "bg-red-50 text-red-600"
-                }`}>
-                  {aderSemana.toFixed(0)}%
-                </span>
-              )}
-            </div>
-            {/* Mini progress bar da semana */}
-            {kpiSemana.prevKg > 0 && (
-              <div className="flex-1 max-w-xs bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className="h-full transition-all"
-                  style={{
-                    width: `${Math.min(aderSemana, 100)}%`,
-                    backgroundColor: aderSemana >= 90 ? "#1d4ed8" : aderSemana >= 70 ? "#ea580c" : "#dc2626",
-                  }}
-                />
-              </div>
-            )}
+    <div className="space-y-3">
+      {/* Barra de aderencia geral + 4 KPIs */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+        {/* Aderencia (destaque) */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col justify-center">
+          <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold mb-1">{setorLabel} — Aderência</p>
+          <p className={`text-4xl font-extrabold tabular-nums ${aderColor}`}>
+            {kpi.aderencia.toFixed(0)}%
+          </p>
+          <div className="w-full bg-gray-100 rounded-full h-2 mt-3 overflow-hidden">
+            <div className={`h-full rounded-full ${aderBg} transition-all`} style={{ width: `${Math.min(kpi.aderencia, 100)}%` }} />
           </div>
         </div>
-      )}
-    </div>
-  );
-}
 
-function Stat({ label, value, valueColor = "text-torg-dark", sub, accent }) {
-  return (
-    <div>
-      <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold flex items-center gap-1.5">
-        {accent && <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />}
-        {label}
-      </p>
-      <p className={`text-2xl font-extrabold tabular-nums leading-tight ${valueColor}`}>{value}</p>
-      {sub && <p className="text-[10px] text-torg-gray mt-0.5">{sub}</p>}
+        {/* Realizado */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold">Realizado</p>
+          <p className="text-2xl font-extrabold text-torg-dark tabular-nums mt-1">{fmtPesoCompacto(kpi.realTotal)}</p>
+          <p className="text-[10px] text-torg-gray mt-1">produzido no período</p>
+        </div>
+
+        {/* Previsto */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold">Previsto</p>
+          <p className="text-2xl font-extrabold text-torg-gray tabular-nums mt-1">{fmtPesoCompacto(kpi.prevTotal)}</p>
+          <p className="text-[10px] text-torg-gray mt-1">meta do período</p>
+        </div>
+
+        {/* Falta */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold">Falta produzir</p>
+          <p className={`text-2xl font-extrabold tabular-nums mt-1 ${falta > 0 ? "text-orange-600" : "text-emerald-600"}`}>
+            {falta > 0 ? fmtPesoCompacto(falta) : "✓"}
+          </p>
+          <p className="text-[10px] text-torg-gray mt-1">
+            {kpi.prevTotal > 0 ? `${((falta / kpi.prevTotal) * 100).toFixed(0)}% do previsto` : ""}
+          </p>
+        </div>
+
+        {/* Média diária */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <p className="text-[10px] text-torg-gray uppercase tracking-wider font-semibold">Média diária</p>
+          <p className="text-2xl font-extrabold text-torg-dark tabular-nums mt-1">{fmtPesoCompacto(kpi.mediaDiariaReal)}</p>
+          <p className="text-[10px] text-torg-gray mt-1">{kpi.dias} dia{kpi.dias !== 1 ? "s" : ""} com produção</p>
+        </div>
+      </div>
+
+      {/* Semana atual */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-5 py-3 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-torg-gray uppercase tracking-wider font-semibold">Semana atual</span>
+          <span className="text-lg font-bold tabular-nums text-torg-dark">{fmtPesoCompacto(kpiSemana.realKg)}</span>
+          <span className="text-xs text-torg-gray tabular-nums">de {fmtPesoCompacto(kpiSemana.prevKg)} previsto</span>
+          {kpiSemana.prevKg > 0 && (
+            <span className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded ${
+              aderSemana >= 90 ? "bg-emerald-50 text-emerald-600" :
+              aderSemana >= 70 ? "bg-orange-50 text-orange-600" :
+              "bg-red-50 text-red-600"
+            }`}>
+              {aderSemana.toFixed(0)}%
+            </span>
+          )}
+        </div>
+        {kpiSemana.prevKg > 0 && (
+          <div className="flex-1 max-w-xs bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${Math.min(aderSemana, 100)}%`,
+                backgroundColor: aderSemana >= 90 ? "#059669" : aderSemana >= 70 ? "#ea580c" : "#dc2626",
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1391,16 +1358,16 @@ function MapaProducao({ comparacaoSetores, setorFiltro, onChangeSetor }) {
   );
 }
 
-// Funil compacto: 7 etapas em sequencia com barra prev/real e %.
+// Funil compacto: 7 etapas em cards horizontais com barra.
 function FunilSetores({ comparacao, setorFiltro, onSelect, setoresDisponiveis }) {
-  const maxPrev = Math.max(...comparacao.map((c) => c.prev), 1);
   const temDado = comparacao.some((c) => c.prev > 0 || c.real > 0);
 
   if (!temDado) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
-        <p className="text-sm text-torg-gray text-center">
-          Sem dados de setor no período. Clique <strong>"Sincronizar agora"</strong> no card SharePoint pra puxar a planilha.
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-8 text-center">
+        <Package size={24} className="mx-auto text-gray-300 mb-2" />
+        <p className="text-sm text-torg-gray">
+          Sem dados de setor no período. Clique <strong>"Sincronizar mês atual"</strong> pra puxar a planilha.
         </p>
       </div>
     );
@@ -1409,84 +1376,62 @@ function FunilSetores({ comparacao, setorFiltro, onSelect, setoresDisponiveis })
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">Funil da produção</h3>
+        <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">Comparativo por setor</h3>
         <p className="text-[11px] text-torg-gray">Clique no setor pra filtrar</p>
       </div>
-      <div className="px-4 py-3 space-y-1">
-        {comparacao.map((c) => {
-          const ader = c.prev > 0 ? (c.real / c.prev) * 100 : 0;
-          const isAtual = setorFiltro === c.setor;
-          const widthPrev = (c.prev / maxPrev) * 100;
-          const widthReal = c.prev > 0 ? (c.real / c.prev) * 100 : 0;
-          const corBar = ader >= 90 ? "bg-torg-blue" : ader >= 70 ? "bg-torg-orange" : "bg-red-400";
-          return (
-            <button
-              key={c.setor}
-              onClick={() => onSelect(c.setor)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition ${
-                isAtual ? "bg-torg-blue-50 ring-1 ring-torg-blue" : "hover:bg-gray-50"
-              }`}
-            >
-              <span className={`text-xs font-semibold w-24 shrink-0 ${isAtual ? "text-torg-blue" : "text-torg-dark"}`}>
-                {SETOR_LABEL[c.setor] || c.setor}
-              </span>
-              <div className="flex-1 relative h-5 bg-gray-100 rounded overflow-hidden" style={{ maxWidth: `${Math.max(widthPrev, 8)}%` }}>
-                <div className={`h-full ${corBar}`} style={{ width: `${Math.min(widthReal, 100)}%` }} />
-              </div>
-              <span className="text-[11px] text-torg-gray tabular-nums w-44 text-right shrink-0">
-                {fmtKg(c.real)} / {fmtKg(c.prev)}
-              </span>
-              <span className={`text-sm font-bold w-12 text-right shrink-0 tabular-nums ${
-                c.prev === 0 ? "text-gray-300" : ader >= 90 ? "text-torg-blue" : ader >= 70 ? "text-torg-orange-700" : "text-red-600"
-              }`}>
-                {c.prev > 0 ? `${ader.toFixed(0)}%` : "—"}
-              </span>
-            </button>
-          );
-        })}
+      <div className="p-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
+          {comparacao.map((c) => {
+            const ader = c.prev > 0 ? (c.real / c.prev) * 100 : 0;
+            const isAtual = setorFiltro === c.setor;
+            const corText = c.prev === 0 ? "text-gray-300" : ader >= 90 ? "text-emerald-600" : ader >= 70 ? "text-orange-600" : "text-red-500";
+            const corBar = ader >= 90 ? "bg-emerald-500" : ader >= 70 ? "bg-orange-400" : ader > 0 ? "bg-red-400" : "bg-gray-200";
+            return (
+              <button
+                key={c.setor}
+                onClick={() => onSelect(c.setor)}
+                className={`rounded-xl p-3 text-left transition-all ${
+                  isAtual ? "bg-torg-blue-50 ring-2 ring-torg-blue shadow-sm" : "bg-gray-50/60 hover:bg-gray-100"
+                }`}
+              >
+                <p className={`text-[10px] font-semibold uppercase tracking-wide mb-1 ${isAtual ? "text-torg-blue" : "text-torg-gray"}`}>
+                  {SETOR_LABEL[c.setor] || c.setor}
+                </p>
+                <p className={`text-xl font-extrabold tabular-nums ${corText}`}>
+                  {c.prev > 0 ? `${ader.toFixed(0)}%` : "—"}
+                </p>
+                <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2 overflow-hidden">
+                  <div className={`h-full rounded-full ${corBar} transition-all`} style={{ width: `${Math.min(ader, 100)}%` }} />
+                </div>
+                <p className="text-[9px] text-torg-gray mt-1.5 tabular-nums truncate">
+                  {fmtPesoCompacto(c.real)} / {fmtPesoCompacto(c.prev)}
+                </p>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-// Grafico de evolucao semanal: linha SVG com previsto (pontilhado) + realizado (continuo).
+// Evolucao semanal: barras verticais (previsto tracejado + realizado solido).
 function EvolucaoSemanal({ producaoPorSemana, semanaAtual, setorLabel }) {
   const semanasComDado = producaoPorSemana.filter((s) => s.prevKg > 0 || s.realKg > 0);
-  const semanas = semanasComDado.slice(-26);
+  const semanas = semanasComDado.slice(-16);
 
   if (semanas.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-5">
-        <div className="flex items-center gap-2 mb-2">
-          <TrendingUp size={14} className="text-torg-blue" />
-          <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">Evolução semanal — {setorLabel}</h3>
-        </div>
-        <p className="text-xs text-torg-gray text-center py-4">
-          Sem produção registrada nesse setor no período. Click <strong>"Buscar histórico"</strong> pra puxar meses anteriores.
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-8 text-center">
+        <TrendingUp size={24} className="mx-auto text-gray-300 mb-2" />
+        <p className="text-sm text-torg-gray">
+          Sem produção registrada para <strong>{setorLabel}</strong> no período.
         </p>
       </div>
     );
   }
 
   const maxKg = Math.max(...semanas.map((s) => Math.max(s.prevKg, s.realKg)), 1);
-
-  // SVG dimensions (viewBox responsivo — viewBox redimensiona com o container)
-  const W = 800;
-  const H = 280;
-  const padL = 50, padR = 20, padT = 20, padB = 40;
-  const plotW = W - padL - padR;
-  const plotH = H - padT - padB;
-
-  // Escala
-  const x = (i) => padL + (semanas.length === 1 ? plotW / 2 : (i / (semanas.length - 1)) * plotW);
-  const y = (val) => padT + plotH - (val / maxKg) * plotH;
-
-  // Paths das duas linhas
-  const prevPath = semanas.map((s, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(s.prevKg).toFixed(1)}`).join(" ");
-  const realPath = semanas.map((s, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(s.realKg).toFixed(1)}`).join(" ");
-
-  // Y ticks (4 + zero)
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((p) => maxKg * p);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -1495,82 +1440,68 @@ function EvolucaoSemanal({ producaoPorSemana, semanaAtual, setorLabel }) {
           <TrendingUp size={14} className="text-torg-blue" />
           <h3 className="text-sm font-semibold text-torg-dark uppercase tracking-wide">Evolução semanal — {setorLabel}</h3>
         </div>
-        <p className="text-[11px] text-torg-gray flex items-center gap-4">
-          <span className="inline-flex items-center gap-1.5">
-            <svg width="22" height="6" className="inline-block">
-              <line x1="0" y1="3" x2="22" y2="3" stroke="#9ca3af" strokeWidth="2" strokeDasharray="5,3" />
-            </svg>
-            Previsto
+        <div className="flex items-center gap-4 text-[11px] text-torg-gray">
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-gray-200 border border-dashed border-gray-400 inline-block" /> Previsto
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <svg width="22" height="6" className="inline-block">
-              <line x1="0" y1="3" x2="22" y2="3" stroke="#1e40af" strokeWidth="2.5" />
-            </svg>
-            Realizado
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-torg-blue inline-block" /> Realizado
           </span>
-        </p>
+        </div>
       </div>
-      <div className="px-4 py-3">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet" style={{ maxHeight: "320px" }}>
-          {/* Grid + labels Y */}
-          {yTicks.map((t, i) => (
-            <g key={i}>
-              <line x1={padL} y1={y(t)} x2={W - padR} y2={y(t)} stroke="#f3f4f6" strokeWidth="1" />
-              <text x={padL - 8} y={y(t) + 4} fontSize="11" fill="#6b7280" textAnchor="end" fontFamily="ui-monospace,monospace">
-                {Math.round(t / 1000)}t
-              </text>
-            </g>
-          ))}
-          {/* Eixo Y vertical */}
-          <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="#d1d5db" strokeWidth="1" />
-          {/* Eixo X horizontal */}
-          <line x1={padL} y1={padT + plotH} x2={W - padR} y2={padT + plotH} stroke="#d1d5db" strokeWidth="1" />
-
-          {/* Linha previsto (pontilhada cinza) */}
-          <path d={prevPath} fill="none" stroke="#9ca3af" strokeWidth="2" strokeDasharray="5,3" />
-          {/* Linha realizado (continua azul) */}
-          <path d={realPath} fill="none" stroke="#1e40af" strokeWidth="2.5" />
-
-          {/* Pontos */}
-          {semanas.map((s, i) => {
+      <div className="px-4 py-4">
+        <div className="flex items-end gap-1" style={{ height: 200 }}>
+          {semanas.map((s) => {
             const ader = s.prevKg > 0 ? (s.realKg / s.prevKg) * 100 : 0;
             const isAtual = s.semana === semanaAtual;
-            const corPonto = ader >= 90 ? "#1e40af" : ader >= 70 ? "#ea580c" : "#dc2626";
-            return (
-              <g key={s.semana}>
-                <circle cx={x(i)} cy={y(s.prevKg)} r="3" fill="#9ca3af" />
-                <circle cx={x(i)} cy={y(s.realKg)} r="4" fill={corPonto}>
-                  <title>{`${s.semana}: previsto ${fmtKg(s.prevKg)} | realizado ${fmtKg(s.realKg)} (${ader.toFixed(0)}%)`}</title>
-                </circle>
-                {isAtual && (
-                  <circle cx={x(i)} cy={y(s.realKg)} r="8" fill="none" stroke={corPonto} strokeWidth="1.5" opacity="0.4" />
-                )}
-              </g>
-            );
-          })}
+            const prevH = (s.prevKg / maxKg) * 100;
+            const realH = (s.realKg / maxKg) * 100;
+            const barColor = ader >= 90 ? "bg-emerald-500" : ader >= 70 ? "bg-orange-400" : ader > 0 ? "bg-red-400" : "bg-gray-200";
+            const weekNum = s.semana.split("-W")[1];
 
-          {/* Labels X (semanas) */}
-          {semanas.map((s, i) => {
-            const isAtual = s.semana === semanaAtual;
-            // Pula labels intermediarios quando tem muitas semanas pra nao sobrepor
-            const step = Math.ceil(semanas.length / 14);
-            if (i % step !== 0 && i !== semanas.length - 1 && !isAtual) return null;
             return (
-              <text
-                key={s.semana}
-                x={x(i)}
-                y={H - padB + 16}
-                fontSize="10"
-                fill={isAtual ? "#1e40af" : "#6b7280"}
-                textAnchor="middle"
-                fontWeight={isAtual ? "bold" : "normal"}
-                fontFamily="ui-monospace,monospace"
-              >
-                W{s.semana.split("-W")[1]}
-              </text>
+              <div key={s.semana} className={`flex-1 flex flex-col items-center gap-0.5 group ${isAtual ? "" : ""}`}>
+                {/* Aderencia % */}
+                <span className={`text-[9px] font-bold tabular-nums mb-0.5 ${
+                  s.prevKg === 0 ? "text-gray-300" :
+                  ader >= 90 ? "text-emerald-600" : ader >= 70 ? "text-orange-600" : "text-red-500"
+                }`}>
+                  {s.prevKg > 0 ? `${ader.toFixed(0)}%` : ""}
+                </span>
+
+                {/* Container das barras */}
+                <div className="w-full flex justify-center gap-px relative" style={{ height: "160px" }}>
+                  {/* Barra previsto (fundo) */}
+                  <div className="w-[40%] flex flex-col justify-end">
+                    <div
+                      className="w-full bg-gray-100 border border-dashed border-gray-300 rounded-t transition-all"
+                      style={{ height: `${Math.max(prevH, 1)}%` }}
+                      title={`Previsto: ${fmtKg(s.prevKg)}`}
+                    />
+                  </div>
+                  {/* Barra realizado */}
+                  <div className="w-[40%] flex flex-col justify-end">
+                    <div
+                      className={`w-full ${barColor} rounded-t transition-all`}
+                      style={{ height: `${Math.max(realH, s.realKg > 0 ? 2 : 0)}%` }}
+                      title={`Realizado: ${fmtKg(s.realKg)}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Label da semana */}
+                <span className={`text-[9px] font-mono mt-1 ${isAtual ? "text-torg-blue font-bold" : "text-torg-gray"}`}>
+                  W{weekNum}
+                </span>
+
+                {/* Tooltip no hover */}
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-torg-dark text-white text-[10px] px-2 py-1 rounded whitespace-nowrap hidden group-hover:block z-10 pointer-events-none">
+                  {fmtPesoCompacto(s.realKg)} / {fmtPesoCompacto(s.prevKg)}
+                </div>
+              </div>
             );
           })}
-        </svg>
+        </div>
       </div>
     </div>
   );
