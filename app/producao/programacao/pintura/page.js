@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import SetorClient from "../SetorClient";
-import { Paintbrush } from "lucide-react";
-
 export const metadata = { title: "Workspace Torg — Programação · Pintura" };
 
 export default async function ProgramacaoPintura() {
@@ -29,7 +27,6 @@ export default async function ProgramacaoPintura() {
       setorAnterior="JATO"
       setorProximo="EXPEDIDO"
       titulo="Programação de Pintura"
-      icon={Paintbrush}
       iconColor="text-pink-500"
       codigoDoc="REL-PRD-008"
     />

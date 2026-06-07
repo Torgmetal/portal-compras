@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import SetorClient from "../SetorClient";
-import { Flame } from "lucide-react";
-
 export const metadata = { title: "Workspace Torg — Programação · Solda" };
 
 export default async function ProgramacaoSolda() {
@@ -29,7 +27,6 @@ export default async function ProgramacaoSolda() {
       setorAnterior="MONTAGEM"
       setorProximo="ACABAMENTO"
       titulo="Programação de Solda"
-      icon={Flame}
       iconColor="text-orange-500"
       codigoDoc="REL-PRD-005"
     />

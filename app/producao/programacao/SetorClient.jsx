@@ -3,7 +3,16 @@ import { useState, useMemo, Fragment } from "react";
 import {
   Filter, Search, CheckCircle2, Download, Loader2,
   ArrowRight, X, Package, Undo2, ChevronDown, ChevronUp,
+  Flame, Sparkles, Wind, Paintbrush, Truck,
 } from "lucide-react";
+
+const ICON_MAP = {
+  SOLDA: Flame,
+  ACABAMENTO: Sparkles,
+  JATO: Wind,
+  PINTURA: Paintbrush,
+  EXPEDIDO: Truck,
+};
 import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
   adicionarLinhaTotais, downloadWorkbook, CORES,
@@ -33,14 +42,14 @@ const fmtKg = (v) => {
  * @param {string} props.setorAnterior - Status anterior (ex: "MONTAGEM")
  * @param {string} props.setorProximo - Próximo status (ex: "ACABAMENTO")
  * @param {string} props.titulo - Título da página
- * @param {React.Component} props.icon - Ícone lucide
  * @param {string} props.iconColor - Classe de cor do ícone
  * @param {string} props.codigoDoc - Código ISO do relatório
  */
 export default function SetorClient({
   pecasIniciais, setorAtual, setorAnterior, setorProximo,
-  titulo, icon: Icon, iconColor = "text-torg-blue", codigoDoc = "REL-PRD-005",
+  titulo, iconColor = "text-torg-blue", codigoDoc = "REL-PRD-005",
 }) {
+  const Icon = ICON_MAP[setorAtual] || Package;
   const [pecas, setPecas] = useState(pecasIniciais);
   const [filtroOp, setFiltroOp] = useState("");
   const [busca, setBusca] = useState("");

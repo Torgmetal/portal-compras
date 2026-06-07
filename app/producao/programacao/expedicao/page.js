@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import SetorClient from "../SetorClient";
-import { Truck } from "lucide-react";
-
 export const metadata = { title: "Workspace Torg — Programação · Expedição" };
 
 export default async function ProgramacaoExpedicao() {
@@ -29,7 +27,6 @@ export default async function ProgramacaoExpedicao() {
       setorAnterior="PINTURA"
       setorProximo="EXPEDIDO"
       titulo="Expedição"
-      icon={Truck}
       iconColor="text-emerald-600"
       codigoDoc="REL-PRD-009"
     />

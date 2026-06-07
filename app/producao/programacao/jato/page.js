@@ -1,8 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import SetorClient from "../SetorClient";
-import { Wind } from "lucide-react";
-
 export const metadata = { title: "Workspace Torg — Programação · Jato" };
 
 export default async function ProgramacaoJato() {
@@ -29,7 +27,6 @@ export default async function ProgramacaoJato() {
       setorAnterior="ACABAMENTO"
       setorProximo="PINTURA"
       titulo="Programação de Jato"
-      icon={Wind}
       iconColor="text-cyan-500"
       codigoDoc="REL-PRD-007"
     />
