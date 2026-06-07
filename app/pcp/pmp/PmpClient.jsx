@@ -1,10 +1,12 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   CalendarDays, ChevronLeft, ChevronRight, Save, Loader2,
   Plus, Trash2, Target, TrendingUp, Factory, AlertCircle,
+  Upload, Download,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import * as XLSX from "xlsx";
 
 const SETORES = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 const SETOR_LABEL = {
@@ -62,6 +64,9 @@ export default function PmpClient() {
   // Nova linha
   const [novaOp, setNovaOp] = useState("");
   const [novoSetor, setNovoSetor] = useState("CORTE");
+
+  // Import
+  const fileRef = useRef(null);
 
   // ── Buscar dados ────────────────────────────────────────────
   const carregar = useCallback(async () => {
@@ -124,6 +129,101 @@ export default function PmpClient() {
   const removerLinha = (idx) => {
     setLinhas((prev) => prev.filter((_, i) => i !== idx));
     setDirty(true);
+  };
+
+  // ── Importar planilha ────────────────────────────────────────
+  const importarPlanilha = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb = XLSX.read(evt.target.result, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+        // Encontrar header (primeira linha que contém "OP" e "Setor")
+        let headerIdx = -1;
+        for (let i = 0; i < Math.min(rows.length, 10); i++) {
+          const row = (rows[i] || []).map((c) => String(c || "").trim().toUpperCase());
+          if (row.includes("OP") && row.includes("SETOR")) {
+            headerIdx = i;
+            break;
+          }
+        }
+        if (headerIdx === -1) {
+          alert("Planilha sem cabeçalho válido. A primeira linha deve conter: OP | Setor | Seg | Ter | Qua | Qui | Sex");
+          return;
+        }
+
+        const header = (rows[headerIdx] || []).map((c) => String(c || "").trim().toUpperCase());
+        const colOP = header.indexOf("OP");
+        const colSetor = header.indexOf("SETOR");
+        const colSeg = header.findIndex((h) => h === "SEG" || h === "SEGUNDA");
+        const colTer = header.findIndex((h) => h === "TER" || h === "TERCA" || h === "TERÇA");
+        const colQua = header.findIndex((h) => h === "QUA" || h === "QUARTA");
+        const colQui = header.findIndex((h) => h === "QUI" || h === "QUINTA");
+        const colSex = header.findIndex((h) => h === "SEX" || h === "SEXTA");
+
+        // Se não encontrou dias individuais, tenta pegar colunas 2-6 como dias
+        const colsDias = [colSeg, colTer, colQua, colQui, colSex];
+        const temDias = colsDias.every((c) => c >= 0);
+        const diasCols = temDias ? colsDias : [2, 3, 4, 5, 6];
+
+        const opsValidas = new Set((dados?.ops || []).map((o) => o.numero));
+        const novasLinhas = [];
+        let ignoradas = 0;
+
+        for (let i = headerIdx + 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || !row[colOP]) continue;
+
+          const opStr = String(row[colOP]).trim().replace(/^OP\s*/i, "");
+          const setorStr = String(row[colSetor] || "").trim().toUpperCase();
+
+          if (!opStr || !SETORES.includes(setorStr)) { ignoradas++; continue; }
+          if (!opsValidas.has(opStr)) { ignoradas++; continue; }
+
+          // Verificar duplicata com linhas existentes
+          const jaExiste = linhas.some((l) => l.opNumero === opStr && l.setor === setorStr);
+          const jaNova = novasLinhas.some((l) => l.opNumero === opStr && l.setor === setorStr);
+          if (jaExiste || jaNova) { ignoradas++; continue; }
+
+          const dias = diasCols.map((c) => Math.max(0, parseInt(row[c]) || 0));
+          novasLinhas.push({ opNumero: opStr, setor: setorStr, dias, obs: "" });
+        }
+
+        if (novasLinhas.length === 0) {
+          alert(`Nenhuma linha válida encontrada.${ignoradas > 0 ? ` ${ignoradas} linha(s) ignorada(s) (OP não encontrada ou setor inválido).` : ""}`);
+          return;
+        }
+
+        setLinhas((prev) => [...prev, ...novasLinhas]);
+        setDirty(true);
+        const msg = `${novasLinhas.length} linha(s) importada(s) com sucesso!`;
+        alert(ignoradas > 0 ? `${msg}\n${ignoradas} linha(s) ignorada(s).` : msg);
+      } catch (err) {
+        alert("Erro ao ler a planilha: " + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    // Limpar input para permitir reimportar mesmo arquivo
+    e.target.value = "";
+  };
+
+  // ── Baixar modelo de planilha ──────────────────────────────
+  const baixarModelo = () => {
+    const header = ["OP", "Setor", "Seg", "Ter", "Qua", "Qui", "Sex"];
+    const exemplo = [
+      ["82", "CORTE", 10, 15, 12, 8, 20],
+      ["82", "SOLDA", 5, 10, 8, 6, 12],
+      ["83", "MONTAGEM", 20, 20, 20, 20, 20],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([header, ...exemplo]);
+    ws["!cols"] = [{ wch: 10 }, { wch: 14 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "PMP");
+    XLSX.writeFile(wb, "modelo-pmp.xlsx");
   };
 
   // ── Salvar ──────────────────────────────────────────────────
@@ -249,7 +349,7 @@ export default function PmpClient() {
         </button>
       </div>
 
-      {/* Adicionar linha */}
+      {/* Adicionar linha + importar */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
         <Plus size={14} className="text-torg-gray" />
         <select
@@ -279,6 +379,28 @@ export default function PmpClient() {
           className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50"
         >
           Adicionar meta
+        </button>
+
+        <div className="h-5 w-px bg-gray-200 mx-1" />
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xlsx,.xls"
+          onChange={importarPlanilha}
+          className="hidden"
+        />
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
+        >
+          <Upload size={13} /> Importar planilha
+        </button>
+        <button
+          onClick={baixarModelo}
+          className="px-3 py-1.5 border border-gray-300 text-torg-gray text-xs rounded-lg hover:bg-gray-50 font-medium flex items-center gap-1.5"
+        >
+          <Download size={13} /> Baixar modelo
         </button>
       </div>
 

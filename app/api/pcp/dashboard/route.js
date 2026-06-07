@@ -81,22 +81,15 @@ export async function GET() {
       _count: true,
     }),
 
-    // Máquinas com status Produzindo (ativas agora)
-    prisma.mesApontamento.findMany({
-      where: { status: "Produzindo" },
-      select: {
-        setor: true,
-        maquina: true,
-        codigoMaquina: true,
-        obra: true,
-        opSka: true,
-        descricaoItem: true,
-        operador: true,
-        dataInicio: true,
-        produzidoKg: true,
-      },
-      orderBy: { dataInicio: "desc" },
-    }),
+    // Último apontamento de cada máquina (todas, não só "Produzindo")
+    prisma.$queryRaw`
+      SELECT DISTINCT ON (maquina, setor)
+        setor, maquina, "codigoMaquina", obra, "opSka",
+        "descricaoItem", operador, status, "dataInicio", "produzidoKg"
+      FROM "MesApontamento"
+      WHERE maquina IS NOT NULL
+      ORDER BY maquina, setor, "dataInicio" DESC
+    `,
 
     // OPs ativas (pra mostrar progresso)
     prisma.oP.findMany({
@@ -191,18 +184,25 @@ export async function GET() {
   }
   const tendencia = Object.values(tendenciaDias).sort((a, b) => a.dia.localeCompare(b.dia));
 
-  // Deduplica máquinas ativas (pega último apontamento por máquina)
-  const maquinaMap = new Map();
-  for (const m of maquinasAtivas) {
-    const key = `${m.setor}|${m.maquina}`;
-    if (!maquinaMap.has(key)) maquinaMap.set(key, m);
-  }
+  // Normaliza resultado $queryRaw (BigInt → Number, garante campos)
+  const maquinasList = maquinasAtivas.map((m) => ({
+    setor: m.setor,
+    maquina: m.maquina,
+    codigoMaquina: m.codigoMaquina,
+    obra: m.obra,
+    opSka: m.opSka,
+    descricaoItem: m.descricaoItem,
+    operador: m.operador,
+    status: m.status,
+    dataInicio: m.dataInicio,
+    produzidoKg: Number(m.produzidoKg) || 0,
+  }));
 
   return NextResponse.json({
     kgPorSetor: { hoje: kgPorSetorHoje, semana: kgPorSetorSemana, mes: kgPorSetorMes },
     pipeline: pipelinePecas,
     tendencia,
-    maquinasAtivas: [...maquinaMap.values()],
+    maquinasAtivas: maquinasList,
     ops: opsComProgresso,
     totalPecasAtivas,
     metasSemana,

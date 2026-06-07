@@ -18,6 +18,14 @@ const fmtData = (d) => {
     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
   });
 };
+const STATUS_BADGE = {
+  Produzindo:         { bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500",  label: "Produzindo" },
+  Finalizado:         { bg: "bg-gray-100",   text: "text-gray-600",   dot: "bg-gray-400",   label: "Finalizado" },
+  "Finalizado Total": { bg: "bg-gray-100",   text: "text-gray-600",   dot: "bg-gray-400",   label: "Finalizado" },
+  "Finalizada Parcial": { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500",  label: "Parcial" },
+};
+const getStatusBadge = (status) =>
+  STATUS_BADGE[status] || { bg: "bg-gray-100", text: "text-gray-500", dot: "bg-gray-400", label: status || "—" };
 
 /**
  * Página especial de Máquinas — mostra TODAS as máquinas de todos os setores,
@@ -139,18 +147,27 @@ export default function MaquinasClient() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
           <div className="bg-torg-blue p-2.5 rounded-lg"><Cpu size={20} className="text-white" /></div>
           <div>
-            <p className="text-xs text-torg-gray">Máquinas ativas</p>
+            <p className="text-xs text-torg-gray">Total de máquinas</p>
             <p className="text-xl font-extrabold text-torg-dark">{maquinasAtivas.length}</p>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
-          <div className="bg-emerald-600 p-2.5 rounded-lg"><Package size={20} className="text-white" /></div>
+        <div className="bg-white rounded-xl shadow-sm border border-emerald-100 p-4 flex items-center gap-3">
+          <div className="bg-emerald-600 p-2.5 rounded-lg"><Cpu size={20} className="text-white" /></div>
           <div>
-            <p className="text-xs text-torg-gray">Setores ativos</p>
+            <p className="text-xs text-torg-gray">Produzindo agora</p>
+            <p className="text-xl font-extrabold text-emerald-600">
+              {maquinasAtivas.filter((m) => m.status === "Produzindo").length}
+            </p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+          <div className="bg-torg-blue-700 p-2.5 rounded-lg"><Package size={20} className="text-white" /></div>
+          <div>
+            <p className="text-xs text-torg-gray">Setores</p>
             <p className="text-xl font-extrabold text-torg-dark">{setoresOrdenados.length}</p>
           </div>
         </div>
@@ -189,8 +206,8 @@ export default function MaquinasClient() {
       {maquinasAtivas.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
           <Cpu size={36} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-torg-gray">Nenhuma máquina produzindo no momento.</p>
-          <p className="text-xs text-torg-gray mt-1">Os dados atualizam automaticamente com o sync do Syneco.</p>
+          <p className="text-sm text-torg-gray">Nenhum apontamento registrado no Syneco.</p>
+          <p className="text-xs text-torg-gray mt-1">Os dados atualizam automaticamente com o sync do MES.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -206,27 +223,36 @@ export default function MaquinasClient() {
                   <span className="text-xs text-torg-gray ml-1">({maquinas.length} máquinas)</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
-                  {maquinas.map((m, i) => (
-                    <div key={i} className="border rounded-lg p-3 hover:shadow-sm transition-shadow" style={{ borderColor: c.hex + "40" }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-mono text-sm font-bold" style={{ color: c.hex }}>
-                          {m.maquina || m.codigoMaquina || "Máquina"}
-                        </span>
-                        <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">
-                          ● Ativa
-                        </span>
+                  {maquinas.map((m, i) => {
+                    const badge = getStatusBadge(m.status);
+                    const isProduzindo = m.status === "Produzindo";
+                    return (
+                      <div
+                        key={i}
+                        className={`border rounded-lg p-3 hover:shadow-sm transition-shadow ${isProduzindo ? "ring-1 ring-green-300 bg-green-50/30" : ""}`}
+                        style={{ borderColor: isProduzindo ? undefined : c.hex + "40" }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono text-sm font-bold" style={{ color: c.hex }}>
+                            {m.maquina || m.codigoMaquina || "Máquina"}
+                          </span>
+                          <span className={`text-[10px] ${badge.bg} ${badge.text} px-1.5 py-0.5 rounded font-medium flex items-center gap-1`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${badge.dot} ${isProduzindo ? "animate-pulse" : ""}`} />
+                            {badge.label}
+                          </span>
+                        </div>
+                        <div className="space-y-0.5 text-xs text-torg-gray">
+                          <p>OP: <span className="font-medium text-torg-blue">{m.obra || "—"}</span></p>
+                          <p>Peça: <span className="text-torg-dark">{m.descricaoItem || m.opSka || "—"}</span></p>
+                          <p>Operador: <span className="text-torg-dark">{m.operador || "—"}</span></p>
+                          <p>Último registro: <span className="text-torg-dark">{fmtData(m.dataInicio)}</span></p>
+                          <p className="pt-1">
+                            <span className="font-medium text-torg-dark text-sm">{fmtKg(m.produzidoKg)}</span>
+                          </p>
+                        </div>
                       </div>
-                      <div className="space-y-0.5 text-xs text-torg-gray">
-                        <p>OP: <span className="font-medium text-torg-blue">{m.obra || "—"}</span></p>
-                        <p>Peça: <span className="text-torg-dark">{m.descricaoItem || m.opSka || "—"}</span></p>
-                        <p>Operador: <span className="text-torg-dark">{m.operador || "—"}</span></p>
-                        <p>Início: <span className="text-torg-dark">{fmtData(m.dataInicio)}</span></p>
-                        <p className="pt-1">
-                          <span className="font-medium text-torg-dark text-sm">{fmtKg(m.produzidoKg)}</span>
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
