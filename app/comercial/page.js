@@ -192,10 +192,10 @@ export default async function ComercialHome({ searchParams }) {
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[800px]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nº OP</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Nº OP</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Obra</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
@@ -210,15 +210,15 @@ export default async function ComercialHome({ searchParams }) {
                   const s = STATUS_LABELS[op.statusCalc] || STATUS_LABELS.ABERTA;
                   return (
                     <tr key={op.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 whitespace-nowrap">
                         <Link href={`/comercial/${op.id}`} className="font-mono font-semibold text-torg-blue hover:underline">
                           {fmtOP(op.numero)}
                         </Link>
                       </td>
-                      <td className="px-6 py-3 text-torg-dark">{op.cliente}</td>
-                      <td className="px-6 py-3 text-torg-gray">{op.obra || "—"}</td>
-                      <td className="px-6 py-3 text-torg-gray">{fmtData(op.dataInicio)}</td>
-                      <td className="px-6 py-3 text-torg-gray">{fmtData(op.dataFimPrevista)}</td>
+                      <td className="px-6 py-3 text-torg-dark max-w-[200px] truncate" title={op.cliente}>{op.cliente}</td>
+                      <td className="px-6 py-3 text-torg-gray max-w-[180px] truncate" title={op.obra || ""}>{op.obra || "—"}</td>
+                      <td className="px-6 py-3 text-torg-gray whitespace-nowrap">{fmtData(op.dataInicio)}</td>
+                      <td className="px-6 py-3 text-torg-gray whitespace-nowrap">{fmtData(op.dataFimPrevista)}</td>
                       <td className="px-6 py-3 text-center text-torg-gray">{op._count.rms}</td>
                       <td className="px-6 py-3 whitespace-nowrap">
                         <span className={`inline-block text-xs text-center px-3 py-1 rounded-full font-medium ${s.className}`}>
