@@ -3,7 +3,10 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, AlertCircle, RefreshCw, Weight, Package,
   Users, TrendingUp, Search, Cpu,
+  Wrench, Flame, Wind, Paintbrush,
 } from "lucide-react";
+
+const ICON_MAP = { Wrench, Flame, Wind, Paintbrush, Cpu };
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
@@ -21,9 +24,10 @@ const fmtData = (d) => {
 
 /**
  * Componente reutilizável pra todas as páginas de setor.
- * @param {{ setor: string, titulo: string, icon: any, corHex: string }} props
+ * @param {{ setor: string, titulo: string, iconName: string, corHex: string }} props
  */
-export default function SetorPageClient({ setor, titulo, icon: Icon, corHex }) {
+export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
+  const Icon = ICON_MAP[iconName] || Cpu;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
