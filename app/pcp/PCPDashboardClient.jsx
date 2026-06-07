@@ -11,12 +11,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
 import { FLUXO_VISUAL, corSetor, normSetor } from "@/lib/setores";
-import { fmtOP } from "@/lib/utils";
-
-const fmtKg = (v) =>
-  v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg` : "—";
-const fmtNum = (v) =>
-  v != null ? Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) : "—";
+import { fmtOP, fmtKg, fmtNum } from "@/lib/utils";
 
 const STATUS_ORDEM = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 const STATUS_CORES = {

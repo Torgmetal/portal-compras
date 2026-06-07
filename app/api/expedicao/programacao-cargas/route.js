@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { validarProntidaoExpedicao } from "@/lib/expedicao";
 
 export const maxDuration = 30;
 
@@ -77,11 +78,10 @@ export async function GET() {
     }));
 
     // ─── Processa progresso por OP ─────────────────────────────
-    // Status de producao "prontos pra expedir": PINTURA concluida
-    // JATO e PINTURA = em processo, quase prontos
-    // Antes de JATO = bloqueado
-    const PRONTOS_EXPEDIR = new Set(["PINTURA", "EXPEDIDO"]);
-    const EM_PROCESSO = new Set(["JATO"]);
+    // Usa validarProntidaoExpedicao de lib/expedicao.js para classificar pecas:
+    //   BLOQUEIO = antes de Jato (nao pronta)
+    //   ATENCAO  = em Jato ou Pintura (quase pronta)
+    //   OK       = EXPEDIDO
 
     const progressoOPs = [];
     const pecasEsquecidas = [];
@@ -92,8 +92,16 @@ export async function GET() {
       if (total === 0) continue;
 
       const expedidas = pecas.filter((p) => p.status === "EXPEDIDO").length;
-      const prontas = pecas.filter((p) => PRONTOS_EXPEDIR.has(p.status) && p.status !== "EXPEDIDO");
-      const emProcesso = pecas.filter((p) => EM_PROCESSO.has(p.status));
+      // Pecas prontas = em PINTURA (ATENCAO) mas nao EXPEDIDO
+      const prontas = pecas.filter((p) => {
+        const v = validarProntidaoExpedicao(p.status);
+        return v.nivel === "ATENCAO" && p.status === "PINTURA";
+      });
+      // Pecas em processo = em JATO (ATENCAO)
+      const emProcesso = pecas.filter((p) => {
+        const v = validarProntidaoExpedicao(p.status);
+        return v.nivel === "ATENCAO" && p.status === "JATO";
+      });
 
       // Pecas prontas (Pintura) sem nenhuma carga planejada
       const prontasSemCarga = prontas.filter((p) => p.planejamentoCargaItens.length === 0);

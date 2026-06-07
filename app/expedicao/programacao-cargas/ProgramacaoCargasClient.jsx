@@ -3,21 +3,10 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   Truck, Loader2, AlertCircle, RefreshCw, Package, Calendar,
-  ChevronRight, CheckCircle2, Clock, AlertTriangle, Search,
-  ClipboardCheck, TrendingUp, Weight, Ban, Eye,
+  CheckCircle2, Clock, AlertTriangle, Search,
+  Weight, Ban, Eye,
 } from "lucide-react";
-import { fmtOP } from "@/lib/utils";
-
-const fmtKg = (v) =>
-  v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg` : "—";
-const fmtPesoCompacto = (v) => {
-  if (v == null || v === 0) return "0 kg";
-  const kg = Number(v);
-  if (Math.abs(kg) >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}t`;
-  return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
-};
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
-const fmtPct = (v) => `${Math.round(v)}%`;
+import { fmtOP, fmtKg, fmtPesoCompacto, fmtData, fmtPct } from "@/lib/utils";
 
 const STATUS_COR = {
   PLANEJADO: { bg: "bg-blue-100", text: "text-blue-700", label: "Planejado" },

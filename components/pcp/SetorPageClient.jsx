@@ -12,10 +12,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { corSetor } from "@/lib/setores";
+import { fmtKg } from "@/lib/utils";
 
-const fmtKg = (v) =>
-  v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg` : "—";
-const fmtData = (d) => {
+const fmtDataHora = (d) => {
   if (!d) return "—";
   return new Date(d).toLocaleString("pt-BR", {
     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
@@ -172,7 +171,7 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
                     <p>OP: <span className="font-medium text-torg-blue">{m.obra || "—"}</span></p>
                     <p>Peça: <span className="text-torg-dark">{m.descricaoItem || m.opSka || "—"}</span></p>
                     <p>Operador: <span className="text-torg-dark">{m.operador || "—"}</span></p>
-                    <p>Último registro: <span className="text-torg-dark">{fmtData(m.dataInicio)}</span></p>
+                    <p>Último registro: <span className="text-torg-dark">{fmtDataHora(m.dataInicio)}</span></p>
                     <p className="pt-1">
                       <span className="font-medium text-torg-dark text-sm">{fmtKg(m.produzidoKg)}</span>
                     </p>
@@ -303,7 +302,7 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
               <tbody className="divide-y divide-gray-50">
                 {apontFiltrados.slice(0, 100).map((a) => (
                   <tr key={a.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap">{fmtData(a.dataInicio)}</td>
+                    <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap">{fmtDataHora(a.dataInicio)}</td>
                     <td className="px-3 py-2 text-xs font-medium text-torg-blue">{a.obra || "—"}</td>
                     <td className="px-3 py-2 text-xs text-torg-dark max-w-[150px] truncate" title={a.descricaoItem}>{a.descricaoItem || a.opSka || "—"}</td>
                     <td className="px-3 py-2 text-xs font-mono text-torg-gray">{a.maquina || "—"}</td>
