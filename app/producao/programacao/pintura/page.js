@@ -1,10 +1,37 @@
+import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import SetorPlaceholder from "../SetorPlaceholder";
+import SetorClient from "../SetorClient";
 import { Paintbrush } from "lucide-react";
 
 export const metadata = { title: "Workspace Torg — Programação · Pintura" };
 
 export default async function ProgramacaoPintura() {
-  await requireRole(["ADMIN", "PRODUCAO"]);
-  return <SetorPlaceholder setor="Pintura" icon={Paintbrush} />;
+  await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL"]);
+
+  const pecas = await prisma.pecaConjunto.findMany({
+    where: { tipoPeca: "CONJUNTO", status: { in: ["PINTURA", "EXPEDIDO"] } },
+    orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
+    include: {
+      op: { select: { id: true, numero: true, cliente: true, obra: true } },
+      conjuntoCroquis: {
+        include: {
+          croqui: { select: { id: true, marca: true, descricao: true, qte: true, qteProduzida: true, status: true } },
+        },
+      },
+    },
+    take: 3000,
+  });
+
+  return (
+    <SetorClient
+      pecasIniciais={JSON.parse(JSON.stringify(pecas))}
+      setorAtual="PINTURA"
+      setorAnterior="JATO"
+      setorProximo="EXPEDIDO"
+      titulo="Programação de Pintura"
+      icon={Paintbrush}
+      iconColor="text-pink-500"
+      codigoDoc="REL-PRD-008"
+    />
+  );
 }
