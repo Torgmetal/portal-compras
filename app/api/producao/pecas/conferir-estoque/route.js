@@ -15,23 +15,41 @@ const schema = z.object({
  * Normaliza a descrição do perfil para criar uma chave de comparação.
  * PecaConjunto.descricao = "W410X46.1" → chave = "W|410X46.1"
  * EstoqueFisico perfil="W", bitola="410X46.1" → chave = "W|410X46.1"
+ *
+ * Para CHAPAS (CH): estoque guarda apenas a espessura como bitola (ex: "12.5"),
+ * mas a peça tem espessura × largura (ex: "CH12.50X396").
+ * A chave da chapa usa só a espessura normalizada: "CH|12.5"
  */
 function normalizarChave(tipo, bitola) {
-  return `${(tipo || "").toUpperCase()}|${(bitola || "").toUpperCase().replace(/\s+/g, "").replace(",", ".")}`;
+  const t = (tipo || "").toUpperCase();
+  const b = (bitola || "").toUpperCase().replace(/\s+/g, "").replace(",", ".");
+  // Chapas: normalizar bitola como float (espessura só)
+  if (t === "CH" || t === "CHX") {
+    const esp = parseFloat(b);
+    return `${t}|${isNaN(esp) ? b : esp}`;
+  }
+  return `${t}|${b}`;
 }
 
 /**
- * Extrai a chave de estoque a partir da descrição da peça.
+ * Extrai a chave de estoque a partir da descrição da peça (PecaConjunto).
  * Ex: "W410X46.1" → "W|410X46.1"
- *     "CH6.40X70" → "CH|6.40X70"
+ *     "CH12.50X396" → "CH|12.5" (só espessura, para casar com estoque)
  *     "L50X50X5" → "L|50X50X5"
  */
 function chaveFromDescricao(descricao) {
   if (!descricao) return null;
   const d = descricao.trim().toUpperCase().replace(/\s+/g, "");
 
-  // Extrair prefixo do tipo (CH, TB, FR, FC, HP, W, U, L, H, C)
-  const m = d.match(/^(CH|TB|FR|FC|HP|W|U|L|H|C)/);
+  // Chapas: usar parsePerfil para extrair espessura e ignorar a largura
+  const perfil = parsePerfil(descricao);
+  if (perfil && (perfil.tipo === "CH")) {
+    const esp = perfil.espessuraMm;
+    return `CH|${isNaN(esp) ? 0 : esp}`;
+  }
+
+  // Demais perfis: tipo + restante da string
+  const m = d.match(/^(CHX|CH|TB|FR|FC|HP|W|U|L|H|C)/);
   if (!m) return null;
 
   const tipo = m[1];
