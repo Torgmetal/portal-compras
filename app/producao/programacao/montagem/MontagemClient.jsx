@@ -397,7 +397,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
           onChange={(e) => { setFiltroProntidao(e.target.value); setSelecionados(new Set()); }}
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
         >
-          <option value="">Prontidão</option>
+          <option value="">Situação</option>
           <option value="PRONTO">Liberados para montagem</option>
           <option value="PARCIAL">Conjunto liberado para montagem parcial</option>
           <option value="PENDENTE">Aguardando peças</option>
