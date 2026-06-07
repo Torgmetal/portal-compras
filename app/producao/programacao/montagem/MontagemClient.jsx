@@ -250,7 +250,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
     ];
 
     let row = linhaInicio;
-    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Peso Total", "Croquis", "Cortados", "Faltam", "Prontidao", "Status"];
+    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Peso Total", "Croquis", "Cortados", "Faltam", "Situacao", "Status"];
     adicionarHeaderTabela(ws, row, headers);
     row++;
     const primeiraLinhaDados = row;
