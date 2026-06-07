@@ -238,74 +238,94 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
       kpis: [
         `Total: ${filtrados.length} conjuntos (${totalPecas} pc)  |  Croquis: ${totalAtendidos}/${totalCroquis} cortados (${pctGeral}%)  |  Peso: ${(totalPeso / 1000).toFixed(1)} t`,
       ],
-      totalColunas: 11,
+      totalColunas: 12,
       nomePlanilha: "Montagem",
       codigoDoc: "REL-PRD-004",
     });
 
     ws.columns = [
       { width: 8 }, { width: 14 }, { width: 30 }, { width: 14 },
-      { width: 7 }, { width: 11 }, { width: 11 }, { width: 10 },
-      { width: 10 }, { width: 12 }, { width: 14 },
+      { width: 7 }, { width: 11 }, { width: 11 }, { width: 11 },
+      { width: 10 }, { width: 10 }, { width: 12 }, { width: 14 },
     ];
 
     let row = linhaInicio;
-    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Peso Total", "Croquis", "Cortados", "Faltam", "Situacao", "Status"];
+    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Comp.", "Peso", "Maquina", "Produzido", "Falta", "Situacao", "Status"];
     adicionarHeaderTabela(ws, row, headers);
     row++;
-    const primeiraLinhaDados = row;
 
     for (const c of filtrados) {
       const { prontidao } = c;
       const fillColor = prontidao.pronto ? CORES.LIGHT_GREEN : prontidao.atendidos > 0 ? CORES.LIGHT_ORANGE : undefined;
       const faltam = prontidao.total - prontidao.atendidos;
 
-      const fontColors = {};
-      fontColors[7] = prontidao.pronto ? "16A34A" : prontidao.atendidos > 0 ? "EA580C" : "9CA3AF";
-      fontColors[8] = faltam === 0 ? "16A34A" : "EA580C";
-
+      // Linha do CONJUNTO (negrito, destaque)
       adicionarLinhaTabela(ws, row, [
         fmtOP(c.opNumero),
         c.marca,
         c.descricao || "",
         c.material || "",
         c.qte || 1,
+        "",
         c.pesoTotalKg ? Number(c.pesoTotalKg.toFixed(1)) : 0,
-        prontidao.total,
-        prontidao.atendidos,
+        "",
+        `${prontidao.atendidos}/${prontidao.total}`,
         faltam,
         prontidao.pronto ? "Pronto" : `${prontidao.pct}%`,
         STATUS_LABEL[c.status] || c.status,
       ], {
         fillColor,
-        fontColors,
-        alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right", 9: "right" },
+        alinhamento: { 4: "right", 5: "right", 6: "right", 8: "right", 9: "right", 10: "right" },
       });
-      ws.getCell(row, 2).font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
-      ws.getCell(row, 8).font = { name: "Arial", size: 9, bold: true, color: { argb: fontColors[7] } };
-      ws.getCell(row, 9).font = { name: "Arial", size: 9, bold: true, color: { argb: fontColors[8] } };
+      // Negrito em toda a linha do conjunto
+      for (let col = 1; col <= 12; col++) {
+        const cell = ws.getCell(row, col);
+        cell.font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
+      }
+      ws.getCell(row, 9).font = { name: "Arial", size: 9, bold: true, color: { argb: prontidao.pronto ? "16A34A" : prontidao.atendidos > 0 ? "EA580C" : "9CA3AF" } };
+      ws.getCell(row, 10).font = { name: "Arial", size: 9, bold: true, color: { argb: faltam === 0 ? "16A34A" : "EA580C" } };
       row++;
-    }
 
-    const ultimaLinhaDados = row - 1;
-    adicionarLinhaTotais(ws, row, [
-      "TOTAL", "", "", "",
-      { formula: `SUM(E${primeiraLinhaDados}:E${ultimaLinhaDados})` },
-      { formula: `SUM(F${primeiraLinhaDados}:F${ultimaLinhaDados})` },
-      { formula: `SUM(G${primeiraLinhaDados}:G${ultimaLinhaDados})` },
-      { formula: `SUM(H${primeiraLinhaDados}:H${ultimaLinhaDados})` },
-      { formula: `SUM(I${primeiraLinhaDados}:I${ultimaLinhaDados})` },
-      { formula: `IF(G${row}=0,"0%",ROUND(H${row}/G${row}*100,0)&"%")` },
-      "",
-    ]);
-    row++;
+      // Linhas dos CROQUIS (indentados, fonte menor)
+      for (const item of prontidao.itens) {
+        const croquiFill = item.ok ? "E8F5E9" : undefined;
+        adicionarLinhaTabela(ws, row, [
+          "",
+          `  ${item.marca}`,
+          item.descricao || "",
+          item.material || "",
+          item.qte,
+          item.comprimentoMm ? `${item.comprimentoMm} mm` : "",
+          item.pesoUnitKg ? Number(Number(item.pesoUnitKg).toFixed(1)) : 0,
+          item.maquina ? (MAQUINA_LABEL[item.maquina] || item.maquina) : "",
+          item.qteProduzida,
+          item.falta === 0 ? "✓" : `-${item.falta}`,
+          item.ok ? "OK" : "Falta",
+          "",
+        ], {
+          fillColor: croquiFill,
+          alinhamento: { 4: "right", 5: "right", 6: "right", 8: "right", 9: "right", 10: "right" },
+        });
+        // Estilo croqui: cinza, fonte 8
+        for (let col = 1; col <= 12; col++) {
+          const cell = ws.getCell(row, col);
+          cell.font = { name: "Arial", size: 8, color: { argb: "576D7E" } };
+        }
+        ws.getCell(row, 2).font = { name: "Arial", size: 8, bold: true, color: { argb: "576D7E" } };
+        ws.getCell(row, 9).font = { name: "Arial", size: 8, bold: true, color: { argb: item.ok ? "16A34A" : item.qteProduzida > 0 ? "EA580C" : "9CA3AF" } };
+        ws.getCell(row, 10).font = { name: "Arial", size: 8, bold: true, color: { argb: item.falta === 0 ? "16A34A" : "EA580C" } };
+        ws.getCell(row, 11).font = { name: "Arial", size: 8, bold: true, color: { argb: item.ok ? "16A34A" : "EA580C" } };
+        row++;
+      }
+    }
 
     row++;
     adicionarLegenda(ws, row, [
       { cor: CORES.LIGHT_GREEN, label: "Verde = 100% croquis cortados (pronto para montar)" },
       { cor: CORES.LIGHT_ORANGE, label: "Laranja = parcialmente cortado" },
       { cor: "FFFFFF", label: "Branco = nenhum croqui cortado" },
-    ], 11);
+      { cor: "E8F5E9", label: "Croqui verde claro = croqui ja cortado" },
+    ], 12);
 
     const filtroDesc = [
       filtroOp ? `OP-${filtroOp}` : "Todas-OPs",
