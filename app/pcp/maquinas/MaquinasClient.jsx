@@ -79,7 +79,16 @@ export default function MaquinasClient() {
 
   if (!data) return null;
 
-  const { maquinasAtivas, kgPorSetor } = data;
+  const { maquinasAtivas: todasMaquinas, kgPorSetor } = data;
+
+  // Filtra: página de Máquinas mostra apenas equipamentos reais (IoT/CNC)
+  // Corte → só lasers; Montagem e Solda → bancadas de pessoas (exibem na aba do setor)
+  const maquinasAtivas = todasMaquinas.filter((m) => {
+    const s = (m.setor || "").toLowerCase();
+    if (s === "corte") return (m.maquina || "").toUpperCase().startsWith("LASER");
+    if (s === "montagem" || s === "solda") return false;
+    return true;
+  });
 
   // Agrupa máquinas por setor
   const porSetor = {};
