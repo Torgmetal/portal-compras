@@ -56,7 +56,7 @@ export async function GET(req) {
 
   // 3) OPs ativas (para dropdown)
   const ops = await prisma.oP.findMany({
-    where: { status: { in: ["ABERTA", "EM_PRODUCAO"] } },
+    where: { status: { in: ["ABERTA", "EM_EXECUCAO"] } },
     select: { numero: true, cliente: true, obra: true },
     orderBy: { numero: "asc" },
   });
