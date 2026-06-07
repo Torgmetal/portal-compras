@@ -14,7 +14,6 @@ import { fmtOP } from "@/lib/utils";
 const PERIODOS = [
   { id: "mes",   label: "Mês atual",       desc: "" },
   { id: "anterior", label: "Mês anterior", desc: "" },
-  { id: "30",    label: "Últimos 30 dias", desc: "" },
   { id: "90",    label: "Últimos 90 dias", desc: "" },
   { id: "ytd",   label: "Ano (YTD)",      desc: "1 jan ate hoje" },
 ];
@@ -26,10 +25,6 @@ function calcularRangePeriodo(periodoId) {
   switch (periodoId) {
     case "ytd":
       inicio = new Date(hoje.getFullYear(), 0, 1);
-      break;
-    case "30":
-      inicio = new Date(hoje);
-      inicio.setDate(inicio.getDate() - 30);
       break;
     case "90":
       inicio = new Date(hoje);

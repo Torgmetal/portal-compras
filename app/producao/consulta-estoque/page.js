@@ -1,31 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import ConsultaEstoqueListClient from "./ConsultaEstoqueListClient";
+import EstoqueProducaoClient from "./EstoqueProducaoClient";
 
-export const metadata = { title: "Workspace Torg — Consultas de Estoque" };
+export const metadata = { title: "Workspace Torg — Estoque Matéria-Prima" };
 
-export default async function ConsultaEstoqueListPage() {
-  await requireRole(["ADMIN", "PRODUCAO"]);
+export default async function EstoqueProducaoPage() {
+  await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL"]);
 
-  const consultas = await prisma.consultaEstoque.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 50,
-    include: {
-      rm: {
-        select: {
-          id: true, numero: true, descricao: true,
-          op: { select: { numero: true, cliente: true } },
-        },
-      },
-      createdBy: { select: { name: true } },
-      itens: {
-        select: {
-          id: true, resposta: true,
-          rmItem: { select: { descricao: true } },
-        },
-      },
+  // Busca apenas itens ativos cuja categoriaLabel contém "matéria-prima" (case insensitive)
+  const itens = await prisma.estoqueItem.findMany({
+    where: {
+      ativo: true,
+      categoriaLabel: { contains: "prima", mode: "insensitive" },
     },
+    orderBy: { descricao: "asc" },
   });
 
-  return <ConsultaEstoqueListClient consultas={JSON.parse(JSON.stringify(consultas))} />;
+  return <EstoqueProducaoClient itens={JSON.parse(JSON.stringify(itens))} />;
 }

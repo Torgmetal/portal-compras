@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import {
   Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download, Upload,
   Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList,
-  ArrowRight, X, Trash2, Factory,
+  ArrowRight, X, Trash2, Factory, PackageSearch, AlertTriangle, XCircle,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import {
@@ -64,6 +64,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [importandoSyneco, setImportandoSyneco] = useState(false);
   const [resultadoSyneco, setResultadoSyneco] = useState(null);
   const [synecoOpSelecionada, setSynecoOpSelecionada] = useState("");
+  const [conferindoEstoque, setConferindoEstoque] = useState(false);
+  const [resultadoEstoque, setResultadoEstoque] = useState(null);
 
   const isAdmin = userRole === "ADMIN";
 
@@ -392,6 +394,40 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
     setSynecoOpSelecionada(filtroOp || "");
     setResultadoSyneco(null);
     setModalSyneco(true);
+  }
+
+  // Conferir estoque para OP selecionada
+  async function conferirEstoque() {
+    const opNum = filtroOp;
+    if (!opNum) { alert("Selecione uma OP para conferir o estoque."); return; }
+    setConferindoEstoque(true);
+    setResultadoEstoque(null);
+    try {
+      const res = await fetch("/api/producao/pecas/conferir-estoque", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: opNum }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
+      setResultadoEstoque(data);
+      // Atualizar statusEstoque local nas peças
+      const statusMap = {};
+      for (const c of data.conferencia) {
+        statusMap[c.perfil] = c.status;
+      }
+      setPecas((prev) =>
+        prev.map((p) => {
+          if (p.opNumero !== opNum) return p;
+          const st = statusMap[p.descricao || ""];
+          return st ? { ...p, statusEstoque: st } : p;
+        })
+      );
+    } catch (e) {
+      alert("Erro ao conferir estoque: " + e.message);
+    } finally {
+      setConferindoEstoque(false);
+    }
   }
 
   // Prepara pecas com auto-classificação para peças sem maquina
@@ -745,6 +781,15 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
             <Factory size={14} /> Importar Syneco
           </button>
           <button
+            onClick={conferirEstoque}
+            disabled={conferindoEstoque || !filtroOp}
+            className="px-3 py-1.5 bg-amber-500 text-white text-xs rounded-lg hover:bg-amber-600 font-medium flex items-center gap-1.5 disabled:opacity-50"
+            title={!filtroOp ? "Selecione uma OP para conferir" : ""}
+          >
+            {conferindoEstoque ? <Loader2 size={14} className="animate-spin" /> : <PackageSearch size={14} />}
+            Conferir Estoque
+          </button>
+          <button
             onClick={exportarListaMaterial}
             className="px-3 py-1.5 bg-gray-100 text-torg-dark text-xs rounded-lg hover:bg-gray-200 font-medium flex items-center gap-1.5"
           >
@@ -809,6 +854,101 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           <p className="text-[10px] opacity-70">classificar manualmente</p>
         </div>
       </div>
+
+      {/* Alerta de conferência de estoque */}
+      {resultadoEstoque && resultadoEstoque.conferencia && (
+        <div className={`rounded-xl border p-4 space-y-3 ${
+          resultadoEstoque.resumo.indisponivel > 0
+            ? "bg-red-50 border-red-200"
+            : resultadoEstoque.resumo.parcial > 0
+              ? "bg-amber-50 border-amber-200"
+              : "bg-emerald-50 border-emerald-200"
+        }`}>
+          <div className="flex items-center justify-between">
+            <p className={`text-sm font-semibold flex items-center gap-2 ${
+              resultadoEstoque.resumo.indisponivel > 0
+                ? "text-red-800"
+                : resultadoEstoque.resumo.parcial > 0
+                  ? "text-amber-800"
+                  : "text-emerald-800"
+            }`}>
+              <PackageSearch size={16} />
+              Conferência de Estoque — OP {resultadoEstoque.opNumero}
+            </p>
+            <div className="flex items-center gap-3 text-xs font-medium">
+              {resultadoEstoque.resumo.disponivel > 0 && (
+                <span className="text-emerald-700 flex items-center gap-1">
+                  <CheckCircle2 size={12} /> {resultadoEstoque.resumo.disponivel} disponível
+                </span>
+              )}
+              {resultadoEstoque.resumo.parcial > 0 && (
+                <span className="text-amber-700 flex items-center gap-1">
+                  <AlertTriangle size={12} /> {resultadoEstoque.resumo.parcial} parcial
+                </span>
+              )}
+              {resultadoEstoque.resumo.indisponivel > 0 && (
+                <span className="text-red-700 flex items-center gap-1">
+                  <XCircle size={12} /> {resultadoEstoque.resumo.indisponivel} indisponível
+                </span>
+              )}
+              <button onClick={() => setResultadoEstoque(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-500 border-b border-gray-200/50">
+                  <th className="text-left py-1.5 px-2 font-medium">Perfil</th>
+                  <th className="text-left py-1.5 px-2 font-medium">Máquina</th>
+                  <th className="text-right py-1.5 px-2 font-medium">Barras necessárias</th>
+                  <th className="text-right py-1.5 px-2 font-medium">Barras em estoque</th>
+                  <th className="text-right py-1.5 px-2 font-medium">Falta</th>
+                  <th className="text-center py-1.5 px-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultadoEstoque.conferencia.map((c, i) => {
+                  const falta = Math.max(0, c.barrasNecessarias - c.barrasDisponiveis);
+                  return (
+                    <tr key={i} className="border-b border-gray-100/50">
+                      <td className="py-1.5 px-2 font-mono font-semibold text-torg-dark">{c.perfil}</td>
+                      <td className="py-1.5 px-2 text-torg-gray">{MAQUINA_LABEL[c.maquina] || c.maquina}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-medium">{c.barrasNecessarias}</td>
+                      <td className="py-1.5 px-2 text-right tabular-nums font-medium">{c.barrasDisponiveis}</td>
+                      <td className={`py-1.5 px-2 text-right tabular-nums font-bold ${falta > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                        {falta > 0 ? `-${falta}` : "✓"}
+                      </td>
+                      <td className="py-1.5 px-2 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          c.status === "DISPONIVEL" ? "bg-emerald-100 text-emerald-700" :
+                          c.status === "PARCIAL" ? "bg-amber-100 text-amber-700" :
+                          "bg-red-100 text-red-700"
+                        }`}>
+                          {c.status === "DISPONIVEL" ? "Disponível" : c.status === "PARCIAL" ? "Parcial" : "Indisponível"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {resultadoEstoque.resumo.indisponivel === 0 && resultadoEstoque.resumo.parcial === 0 && (
+            <p className="text-xs text-emerald-700 font-medium">
+              ✓ Todos os perfis possuem barras disponíveis em estoque. Pronto para produção!
+            </p>
+          )}
+          {resultadoEstoque.resumo.indisponivel > 0 && (
+            <p className="text-xs text-red-700 font-medium">
+              ⚠ {resultadoEstoque.resumo.indisponivel} perfil(is) sem estoque — providencie a compra antes de liberar para produção.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Ação principal — Liberar para Produção */}
       {filtroStatus === "PENDENTE" && totalPendentes > 0 && (
@@ -1070,6 +1210,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                         <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Produzido</th>
                         <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Falta</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Máquina</th>
+                        <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Estoque</th>
                         <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Status</th>
                       </tr>
                     </thead>
@@ -1121,6 +1262,23 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                                   <option key={k} value={k}>{v}</option>
                                 ))}
                               </select>
+                            </td>
+                            <td className="px-3 py-1.5 text-center whitespace-nowrap">
+                              {p.statusEstoque === "DISPONIVEL" ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                  <CheckCircle2 size={9} /> OK
+                                </span>
+                              ) : p.statusEstoque === "PARCIAL" ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                  <AlertTriangle size={9} /> Parcial
+                                </span>
+                              ) : p.statusEstoque === "INDISPONIVEL" ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">
+                                  <XCircle size={9} /> Falta
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-gray-300">—</span>
+                              )}
                             </td>
                             <td className="px-3 py-1.5 text-center whitespace-nowrap">
                               {p.status === "CORTE" ? (
