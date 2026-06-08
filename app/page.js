@@ -71,8 +71,8 @@ export default function Landing() {
       {/* Hero */}
       <section className="relative h-[80vh] min-h-[560px] overflow-hidden">
         <Image
-          src="/obras/ponte-sunset.jpg"
-          alt="Estrutura metálica Torg Metal"
+          src="/obras/planta-industrial.jpg"
+          alt="Planta industrial Torg Metal"
           fill
           priority
           className="object-cover"
@@ -166,10 +166,10 @@ export default function Landing() {
               <li className="flex gap-2"><span className="text-torg-orange font-bold">›</span> Galpões, torres, pipe racks e estruturas residenciais</li>
             </ul>
           </div>
-          <div className="relative aspect-[16/9] rounded-2xl overflow-hidden shadow-2xl">
+          <div className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl">
             <Image
-              src="/obras/planta-industrial.jpg"
-              alt="Planta industrial com estrutura metálica Torg Metal"
+              src="/obras/ponte-trelica.jpg"
+              alt="Treliça metálica"
               fill
               className="object-cover"
               sizes="(max-width: 1024px) 100vw, 50vw"
