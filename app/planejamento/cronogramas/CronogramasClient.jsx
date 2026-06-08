@@ -7,7 +7,7 @@ import {
   Send, X, Briefcase, Wrench, ShoppingCart, Factory, Truck, HardHat,
   GanttChart, Package, FileText, CircleDot, Mail, Calendar,
   History, FileDown, Milestone, Plus, Trash2, Weight, BarChart3,
-  List, Link2, Unlink, RotateCcw, Lock,
+  List, Link2, Unlink, RotateCcw, Lock, Archive, ArchiveRestore,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -54,6 +54,9 @@ export default function CronogramasClient() {
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showNovoModal, setShowNovoModal] = useState(false);
+  const [abaAtiva, setAbaAtiva] = useState("ativos"); // "ativos" | "historico"
+  const [encerrados, setEncerrados] = useState([]);
+  const [loadingEncerrados, setLoadingEncerrados] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -69,7 +72,21 @@ export default function CronogramasClient() {
     }
   }, []);
 
+  const carregarEncerrados = useCallback(async () => {
+    setLoadingEncerrados(true);
+    try {
+      const res = await fetch("/api/planejamento/cronogramas?ativo=false");
+      if (!res.ok) throw new Error("Erro ao carregar histórico");
+      setEncerrados(await res.json());
+    } catch {
+      setEncerrados([]);
+    } finally {
+      setLoadingEncerrados(false);
+    }
+  }, []);
+
   useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => { if (abaAtiva === "historico") carregarEncerrados(); }, [abaAtiva, carregarEncerrados]);
 
   const sincronizar = async () => {
     setSyncing(true);
@@ -165,41 +182,92 @@ export default function CronogramasClient() {
         </div>
       )}
 
-      {cronogramas.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-          <GanttChart size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-torg-gray mb-4">Nenhum cronograma criado ainda.</p>
-          <div className="flex items-center justify-center gap-3">
-            <button
-              onClick={() => setShowNovoModal(true)}
-              className="px-4 py-2 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium inline-flex items-center gap-1.5"
-            >
-              <Plus size={14} /> Criar Cronograma
-            </button>
-            <button
-              onClick={sincronizar}
-              disabled={syncing}
-              className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5"
-            >
-              <Download size={14} /> Importar do SharePoint
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {cronogramas.map((c) => (
-            <CronogramaCard
-              key={c.id}
-              cronograma={c}
-              expanded={expandedId === c.id}
-              onToggle={() => expandir(c.id)}
-              detail={expandedId === c.id ? detail : null}
-              loadingDetail={expandedId === c.id && loadingDetail}
-              onRefreshDetail={() => recarregarDetail(c.id)}
-              onDeleted={() => { setExpandedId(null); setDetail(null); carregar(); }}
-            />
-          ))}
-        </div>
+      {/* Abas Ativos / Histórico */}
+      <div className="flex items-center gap-1 border-b border-gray-200">
+        <button
+          onClick={() => setAbaAtiva("ativos")}
+          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+            abaAtiva === "ativos" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
+          }`}
+        >
+          <GanttChart size={13} /> Ativos ({cronogramas.length})
+        </button>
+        <button
+          onClick={() => setAbaAtiva("historico")}
+          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+            abaAtiva === "historico" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
+          }`}
+        >
+          <Archive size={13} /> Histórico {encerrados.length > 0 && `(${encerrados.length})`}
+        </button>
+      </div>
+
+      {abaAtiva === "ativos" && (
+        <>
+          {cronogramas.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+              <GanttChart size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-sm text-torg-gray mb-4">Nenhum cronograma ativo.</p>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setShowNovoModal(true)}
+                  className="px-4 py-2 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium inline-flex items-center gap-1.5"
+                >
+                  <Plus size={14} /> Criar Cronograma
+                </button>
+                <button
+                  onClick={sincronizar}
+                  disabled={syncing}
+                  className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5"
+                >
+                  <Download size={14} /> Importar do SharePoint
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {cronogramas.map((c) => (
+                <CronogramaCard
+                  key={c.id}
+                  cronograma={c}
+                  expanded={expandedId === c.id}
+                  onToggle={() => expandir(c.id)}
+                  detail={expandedId === c.id ? detail : null}
+                  loadingDetail={expandedId === c.id && loadingDetail}
+                  onRefreshDetail={() => recarregarDetail(c.id)}
+                  onDeleted={() => { setExpandedId(null); setDetail(null); carregar(); }}
+                  onEncerrado={() => { setExpandedId(null); setDetail(null); carregar(); }}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {abaAtiva === "historico" && (
+        <HistoricoEncerrados
+          encerrados={encerrados}
+          loading={loadingEncerrados}
+          onReabrir={async (id) => {
+            try {
+              const res = await fetch(`/api/planejamento/cronogramas/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ativo: true }),
+              });
+              if (!res.ok) throw new Error("Erro ao reabrir");
+              carregarEncerrados();
+              carregar();
+            } catch (e) {
+              alert(e.message);
+            }
+          }}
+          expandedId={expandedId}
+          onToggle={expandir}
+          detail={detail}
+          loadingDetail={loadingDetail}
+          onRefreshDetail={recarregarDetail}
+        />
       )}
 
       {showNovoModal && (
@@ -211,6 +279,99 @@ export default function CronogramasClient() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function HistoricoEncerrados({ encerrados, loading, onReabrir, expandedId, onToggle, detail, loadingDetail, onRefreshDetail }) {
+  const [reabrindo, setReabrindo] = useState(null);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="animate-spin text-torg-gray" size={20} />
+        <span className="ml-2 text-sm text-torg-gray">Carregando histórico...</span>
+      </div>
+    );
+  }
+
+  if (encerrados.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
+        <Archive size={32} className="mx-auto text-gray-300 mb-2" />
+        <p className="text-sm text-torg-gray">Nenhum cronograma encerrado.</p>
+        <p className="text-xs text-torg-gray mt-1">Cronogramas encerrados aparecem aqui para consulta.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {encerrados.map((c) => (
+        <div key={c.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden opacity-90">
+          <div className="flex items-center justify-between px-4 py-3">
+            <button onClick={() => onToggle(c.id)} className="flex items-center gap-3 text-left flex-1 min-w-0">
+              {expandedId === c.id ? <ChevronDown size={16} className="text-torg-gray" /> : <ChevronRight size={16} className="text-torg-gray" />}
+              <span className="text-sm font-bold text-torg-gray font-mono">{fmtOP(c.opNumero)}</span>
+              <span className="text-sm text-torg-dark/70 font-medium truncate max-w-xs">{c.titulo}</span>
+              {c.op && <span className="text-xs text-torg-gray">({c.op.cliente})</span>}
+              <span className="text-[9px] bg-gray-100 text-torg-gray px-1.5 py-0.5 rounded font-medium">
+                Encerrado
+              </span>
+            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] text-torg-gray">
+                {fmtData(c.dataInicio)} — {fmtData(c.dataFim)}
+              </span>
+              <button
+                onClick={async () => {
+                  if (!confirm(`Reabrir o cronograma ${fmtOP(c.opNumero)} — ${c.titulo}?`)) return;
+                  setReabrindo(c.id);
+                  await onReabrir(c.id);
+                  setReabrindo(null);
+                }}
+                disabled={reabrindo === c.id}
+                className="px-2.5 py-1 text-[10px] font-medium text-torg-blue bg-torg-blue-50 border border-torg-blue/20 rounded-lg hover:bg-torg-blue-100 flex items-center gap-1 disabled:opacity-50"
+              >
+                {reabrindo === c.id ? <Loader2 size={10} className="animate-spin" /> : <ArchiveRestore size={10} />}
+                Reabrir
+              </button>
+            </div>
+          </div>
+
+          {/* Department summary pills */}
+          {expandedId !== c.id && c.deptSummary?.length > 0 && (
+            <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+              {c.deptSummary.map((d, i) => {
+                const Icon = DEPT_ICONS[d.departamento] || Factory;
+                return (
+                  <span
+                    key={i}
+                    className={`px-2 py-0.5 text-[10px] font-medium rounded-full border flex items-center gap-1 ${
+                      DEPT_COLORS[d.departamento] || "bg-gray-50 text-torg-gray border-gray-200"
+                    }`}
+                  >
+                    <Icon size={10} />
+                    {DEPT_LABEL[d.departamento] || d.nome}
+                    <span className="font-bold">{d.percentual}%</span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {expandedId === c.id && (
+            <CronogramaExpandido
+              detail={detail}
+              loadingDetail={loadingDetail}
+              onRefreshDetail={() => onRefreshDetail(c.id)}
+              cronogramaId={c.id}
+              onDeleted={() => {}}
+              readOnly
+            />
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -409,7 +570,7 @@ function NovoCronogramaModal({ onClose, onCreated }) {
   );
 }
 
-function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail, onRefreshDetail, onDeleted }) {
+function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail, onRefreshDetail, onDeleted, onEncerrado }) {
   const c = cronograma;
   const now = new Date();
   const diasRestantes = c.dataFim
@@ -424,6 +585,12 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
           <span className="text-sm font-bold text-torg-blue font-mono">{fmtOP(c.opNumero)}</span>
           <span className="text-sm text-torg-dark font-medium truncate max-w-xs">{c.titulo}</span>
           {c.op && <span className="text-xs text-torg-gray">({c.op.cliente})</span>}
+          {c.op?.status === "ENCERRADA" && (
+            <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-semibold">OP Encerrada</span>
+          )}
+          {c.op?.status === "CANCELADA" && (
+            <span className="text-[9px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-semibold">OP Cancelada</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {c.atrasados > 0 && (
@@ -475,17 +642,20 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
           onRefreshDetail={onRefreshDetail}
           cronogramaId={c.id}
           onDeleted={onDeleted}
+          onEncerrado={onEncerrado}
+          opStatus={c.op?.status}
         />
       )}
     </div>
   );
 }
 
-function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId, onDeleted }) {
+function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogramaId, onDeleted, onEncerrado, opStatus, readOnly }) {
   const [tab, setTab] = useState("cronograma");
   const [settingBase, setSettingBase] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [savingTipoDias, setSavingTipoDias] = useState(false);
+  const [encerrando, setEncerrando] = useState(false);
 
   const definirDataBase = async () => {
     const hoje = new Date().toISOString().split("T")[0];
@@ -543,6 +713,29 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
     }
   };
 
+  const encerrarCronograma = async () => {
+    if (!confirm("Encerrar este cronograma? Ele será movido para o histórico e poderá ser consultado ou reaberto a qualquer momento.")) return;
+    setEncerrando(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ativo: false }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Erro ao encerrar");
+      }
+      if (onEncerrado) onEncerrado();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setEncerrando(false);
+    }
+  };
+
+  const opFinalizada = opStatus === "ENCERRADA" || opStatus === "CANCELADA";
+
   const tabs = [
     { key: "cronograma", label: "Cronograma", icon: GanttChart },
     { key: "producao", label: "Produção / Peso", icon: Weight },
@@ -554,8 +747,13 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
     <div className="border-t border-gray-100">
       {/* Data Base badge + ações */}
       {detail && (
-        <div className="px-4 py-2 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+        <div className={`px-4 py-2 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 ${readOnly ? "bg-gray-100/70" : "bg-gray-50/60"}`}>
           <div className="flex items-center gap-3">
+            {readOnly && (
+              <span className="text-[9px] bg-gray-200 text-torg-gray px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                <Archive size={9} /> Somente consulta
+              </span>
+            )}
             <div className="flex items-center gap-1.5">
               <Milestone size={13} className="text-torg-blue" />
               <span className="text-xs font-medium text-torg-dark">Data Base:</span>
@@ -565,13 +763,15 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
                 <span className="text-xs text-torg-gray italic">Não definida</span>
               )}
             </div>
-            <button
-              onClick={definirDataBase}
-              disabled={settingBase}
-              className="px-2 py-0.5 text-[10px] font-medium text-torg-blue bg-torg-blue-50 border border-torg-blue/20 rounded hover:bg-torg-blue-100 disabled:opacity-50"
-            >
-              {settingBase ? "..." : detail.dataBase ? "Redefinir" : "Definir"}
-            </button>
+            {!readOnly && (
+              <button
+                onClick={definirDataBase}
+                disabled={settingBase}
+                className="px-2 py-0.5 text-[10px] font-medium text-torg-blue bg-torg-blue-50 border border-torg-blue/20 rounded hover:bg-torg-blue-100 disabled:opacity-50"
+              >
+                {settingBase ? "..." : detail.dataBase ? "Redefinir" : "Definir"}
+              </button>
+            )}
             {detail.dataBase && (
               <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
                 Datas do cronograma travadas
@@ -580,53 +780,70 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
             {/* Toggle DU / DC */}
             <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-200">
               <Calendar size={12} className="text-torg-gray" />
-              <div className="flex rounded-md overflow-hidden border border-gray-200">
-                <button
-                  onClick={() => alterarTipoDias("DU")}
-                  disabled={savingTipoDias || (detail.tipoDias || "DU") === "DU"}
-                  className={`px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-                    (detail.tipoDias || "DU") === "DU"
-                      ? "bg-torg-blue text-white"
-                      : "bg-white text-torg-gray hover:bg-gray-50"
-                  } disabled:opacity-70`}
-                  title="Dias Úteis (seg-sex)"
-                >
-                  DU
-                </button>
-                <button
-                  onClick={() => alterarTipoDias("DC")}
-                  disabled={savingTipoDias || detail.tipoDias === "DC"}
-                  className={`px-2 py-0.5 text-[10px] font-semibold transition-colors border-l border-gray-200 ${
-                    detail.tipoDias === "DC"
-                      ? "bg-torg-blue text-white"
-                      : "bg-white text-torg-gray hover:bg-gray-50"
-                  } disabled:opacity-70`}
-                  title="Dias Corridos (todos os dias)"
-                >
-                  DC
-                </button>
-              </div>
+              {!readOnly ? (
+                <div className="flex rounded-md overflow-hidden border border-gray-200">
+                  <button
+                    onClick={() => alterarTipoDias("DU")}
+                    disabled={savingTipoDias || (detail.tipoDias || "DU") === "DU"}
+                    className={`px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                      (detail.tipoDias || "DU") === "DU"
+                        ? "bg-torg-blue text-white"
+                        : "bg-white text-torg-gray hover:bg-gray-50"
+                    } disabled:opacity-70`}
+                    title="Dias Úteis (seg-sex)"
+                  >
+                    DU
+                  </button>
+                  <button
+                    onClick={() => alterarTipoDias("DC")}
+                    disabled={savingTipoDias || detail.tipoDias === "DC"}
+                    className={`px-2 py-0.5 text-[10px] font-semibold transition-colors border-l border-gray-200 ${
+                      detail.tipoDias === "DC"
+                        ? "bg-torg-blue text-white"
+                        : "bg-white text-torg-gray hover:bg-gray-50"
+                    } disabled:opacity-70`}
+                    title="Dias Corridos (todos os dias)"
+                  >
+                    DC
+                  </button>
+                </div>
+              ) : (
+                <span className="text-[10px] font-semibold text-torg-blue bg-torg-blue-50 px-2 py-0.5 rounded">
+                  {(detail.tipoDias || "DU") === "DU" ? "DU" : "DC"}
+                </span>
+              )}
               <span className="text-[9px] text-torg-gray">
                 {(detail.tipoDias || "DU") === "DU" ? "Dias Úteis" : "Dias Corridos"}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => exportarGanttPDF(detail)}
-              className="px-3 py-1 text-[10px] font-medium text-white bg-torg-blue rounded-lg hover:bg-torg-blue-700 flex items-center gap-1.5"
-            >
-              <FileDown size={12} /> Exportar Gantt (PDF)
-            </button>
-            <button
-              onClick={excluirCronograma}
-              disabled={deleting}
-              className="px-3 py-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-              Excluir
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => exportarGanttPDF(detail)}
+                className="px-3 py-1 text-[10px] font-medium text-white bg-torg-blue rounded-lg hover:bg-torg-blue-700 flex items-center gap-1.5"
+              >
+                <FileDown size={12} /> Exportar Gantt (PDF)
+              </button>
+              <button
+                onClick={encerrarCronograma}
+                disabled={encerrando}
+                className="px-3 py-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 flex items-center gap-1.5 disabled:opacity-50"
+                title="Encerrar e mover para histórico"
+              >
+                {encerrando ? <Loader2 size={12} className="animate-spin" /> : <Archive size={12} />}
+                Encerrar
+              </button>
+              <button
+                onClick={excluirCronograma}
+                disabled={deleting}
+                className="px-3 py-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                Excluir
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -824,12 +1041,12 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
         <>
           {DEPT_ORDER.filter((d) => byDept[d]).map((dept) => {
             const { summary, tasks } = byDept[dept];
-            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} />;
+            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} readOnly={readOnly} />;
           })}
           {/* Departamentos fora da ordem padrao (se houver) */}
           {Object.keys(byDept).filter((d) => !DEPT_ORDER.includes(d)).map((dept) => {
             const { summary, tasks } = byDept[dept];
-            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} />;
+            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} readOnly={readOnly} />;
           })}
         </>
       )}
@@ -838,17 +1055,24 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
         <div className="py-8 text-center">
           <GanttChart size={28} className="mx-auto text-gray-300 mb-2" />
           <p className="text-sm text-torg-gray mb-1">Cronograma vazio.</p>
-          <p className="text-xs text-torg-gray mb-4">Adicione as tarefas de cada departamento.</p>
-          <button
-            onClick={() => setAddingGlobal(true)}
-            className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5"
-          >
-            <Plus size={14} /> Adicionar Tarefa
-          </button>
+          {!readOnly ? (
+            <>
+              <p className="text-xs text-torg-gray mb-4">Adicione as tarefas de cada departamento.</p>
+              <button
+                onClick={() => setAddingGlobal(true)}
+                className="px-4 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5"
+              >
+                <Plus size={14} /> Adicionar Tarefa
+              </button>
+            </>
+          ) : (
+            <p className="text-xs text-torg-gray">Nenhuma tarefa registrada neste cronograma.</p>
+          )}
         </div>
       )}
 
       {/* Botão global de adicionar tarefa (sempre visível quando já tem tarefas) */}
+      {!readOnly && (
       <div className="px-4 py-3">
         {!addingGlobal ? (
           <button
@@ -906,6 +1130,7 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
           </div>
         )}
       </div>
+      )}
 
       {showImportPeso && (
         <ImportarPesoModal
@@ -1160,7 +1385,7 @@ function ImportarPesoModal({ cronogramaId, onClose, onImported }) {
   );
 }
 
-function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTarefas, dataBase, tipoDias }) {
+function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTarefas, dataBase, tipoDias, readOnly }) {
   const [collapsed, setCollapsed] = useState(false);
   const [cobrando, setCobrando] = useState(false);
   const [cobrResult, setCobrResult] = useState(null);
@@ -1259,7 +1484,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
           )}
         </button>
         <div className="flex items-center gap-2 shrink-0">
-          {atrasadas.length > 0 && (
+          {!readOnly && atrasadas.length > 0 && (
             <button
               onClick={abrirModalCobranca}
               disabled={cobrando}
@@ -1289,14 +1514,14 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
       {!collapsed && (
         <div className="ml-6 space-y-1">
           {tasks.map((t) => (
-            <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} dataBase={dataBase} tipoDias={tipoDias} />
+            <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} dataBase={dataBase} tipoDias={tipoDias} readOnly={readOnly} />
           ))}
           {tasks.length === 0 && (
             <p className="text-xs text-torg-gray italic py-2">Nenhuma tarefa neste departamento.</p>
           )}
 
           {/* Adicionar tarefa */}
-          {!addingTask ? (
+          {!readOnly && (!addingTask ? (
             <button
               onClick={() => setAddingTask(true)}
               className="flex items-center gap-1 text-[10px] text-torg-gray hover:text-torg-blue py-1 px-2 rounded hover:bg-gray-50 transition-colors"
@@ -1377,7 +1602,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                   </button>
               </div>
             </div>
-          )}
+          ))}
         </div>
       )}
     </div>
@@ -1516,7 +1741,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   }
 }
 
-function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias }) {
+function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, readOnly }) {
   const [editing, setEditing] = useState(false);
   const [editNome, setEditNome] = useState(tarefa.nome);
   const [pct, setPct] = useState(tarefa.percentualRealizado);
@@ -1724,7 +1949,7 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias }) {
             )}
           </span>
 
-          {!editing ? (
+          {!readOnly && !editing ? (
             <button
               onClick={() => setEditing(true)}
               className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
@@ -1736,6 +1961,15 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias }) {
             >
               {pct}%
             </button>
+          ) : readOnly ? (
+            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+              concluida ? "bg-emerald-100 text-emerald-700"
+              : atrasada ? "bg-red-100 text-red-700"
+              : pct > 0 ? "bg-torg-blue-50 text-torg-blue"
+              : "bg-gray-100 text-torg-gray"
+            }`}>
+              {pct}%
+            </span>
           ) : (
             <div className="flex items-center gap-1">
               <input
@@ -1750,25 +1984,29 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias }) {
             </div>
           )}
 
-          <button
-            onClick={() => setShowReg(!showReg)}
-            className="p-0.5 text-torg-gray hover:text-torg-blue rounded"
-            title="Adicionar registro"
-          >
-            <MessageSquarePlus size={12} />
-          </button>
-          <button
-            onClick={excluirTarefa}
-            disabled={deleting}
-            className="p-0.5 text-torg-gray hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Excluir tarefa"
-          >
-            {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
-          </button>
+          {!readOnly && (
+            <>
+              <button
+                onClick={() => setShowReg(!showReg)}
+                className="p-0.5 text-torg-gray hover:text-torg-blue rounded"
+                title="Adicionar registro"
+              >
+                <MessageSquarePlus size={12} />
+              </button>
+              <button
+                onClick={excluirTarefa}
+                disabled={deleting}
+                className="p-0.5 text-torg-gray hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Excluir tarefa"
+              >
+                {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {editing && (
+      {!readOnly && editing && (
         <div className="mt-2 space-y-2 bg-gray-50/50 rounded-lg p-2.5 border border-gray-100">
           <div className="flex items-center gap-2">
             <input

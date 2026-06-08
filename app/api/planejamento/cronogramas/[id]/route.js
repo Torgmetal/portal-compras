@@ -56,6 +56,7 @@ const patchSchema = z.object({
   dataInicio: z.string().datetime().optional(),
   dataFim: z.string().datetime().optional(),
   tipoDias: z.enum(["DU", "DC"]).optional(),
+  ativo: z.boolean().optional(), // false = encerrar, true = reabrir
 });
 
 export async function PATCH(req, { params }) {
@@ -84,6 +85,37 @@ export async function PATCH(req, { params }) {
 
   const ops = [];
   const revisoes = [];
+
+  // Encerrar ou reabrir cronograma
+  if (parsed.data.ativo !== undefined && parsed.data.ativo !== cronograma.ativo) {
+    const encerrar = !parsed.data.ativo;
+    ops.push(
+      prisma.cronograma.update({
+        where: { id },
+        data: { ativo: parsed.data.ativo },
+      })
+    );
+    revisoes.push({
+      cronogramaId: id,
+      tipo: encerrar ? "CRONOGRAMA_ENCERRADO" : "CRONOGRAMA_REABERTO",
+      descricao: encerrar
+        ? `Cronograma encerrado por ${user.name || "usuário"}`
+        : `Cronograma reaberto por ${user.name || "usuário"}`,
+      diff: { ativo: { antes: cronograma.ativo, depois: parsed.data.ativo } },
+      createdById: user.id,
+    });
+    ops.push(
+      prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: encerrar ? "ENCERRAR_CRONOGRAMA" : "REABRIR_CRONOGRAMA",
+          entity: "Cronograma",
+          entityId: id,
+          diff: { opNumero: cronograma.opNumero, titulo: cronograma.titulo },
+        },
+      })
+    );
+  }
 
   // Definir/alterar data base → snapshot baseline
   if (parsed.data.dataBase) {

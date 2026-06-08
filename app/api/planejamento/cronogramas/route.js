@@ -6,7 +6,7 @@ import { parseMpp, extrairOpNumero } from "@/lib/mpp-parser";
 
 export const maxDuration = 60;
 
-export async function GET() {
+export async function GET(req) {
   try {
     await requireRole(["ADMIN", "PRODUCAO", "PLANEJAMENTO", "COMERCIAL", "ENGENHARIA", "COMPRAS", "EXPEDICAO"]);
   } catch (e) {
@@ -14,24 +14,30 @@ export async function GET() {
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
-  // Auto-link unlinked cronogramas to OPs
-  const unlinked = await prisma.cronograma.findMany({ where: { ativo: true, opId: null } });
-  if (unlinked.length > 0) {
-    const opNums = unlinked.map((c) => c.opNumero.replace(/^T0*/, "").padStart(3, "0"));
-    const ops = await prisma.oP.findMany({ where: { numero: { in: opNums } }, select: { id: true, numero: true } });
-    const opMap = Object.fromEntries(ops.map((o) => [o.numero, o.id]));
-    for (const c of unlinked) {
-      const num = c.opNumero.replace(/^T0*/, "").padStart(3, "0");
-      if (opMap[num]) {
-        await prisma.cronograma.update({ where: { id: c.id }, data: { opId: opMap[num] } });
+  const { searchParams } = new URL(req.url);
+  const ativoParam = searchParams.get("ativo");
+  const filtroAtivo = ativoParam === "false" ? false : true;
+
+  // Auto-link unlinked cronogramas to OPs (somente ativos)
+  if (filtroAtivo) {
+    const unlinked = await prisma.cronograma.findMany({ where: { ativo: true, opId: null } });
+    if (unlinked.length > 0) {
+      const opNums = unlinked.map((c) => c.opNumero.replace(/^T0*/, "").padStart(3, "0"));
+      const ops = await prisma.oP.findMany({ where: { numero: { in: opNums } }, select: { id: true, numero: true } });
+      const opMap = Object.fromEntries(ops.map((o) => [o.numero, o.id]));
+      for (const c of unlinked) {
+        const num = c.opNumero.replace(/^T0*/, "").padStart(3, "0");
+        if (opMap[num]) {
+          await prisma.cronograma.update({ where: { id: c.id }, data: { opId: opMap[num] } });
+        }
       }
     }
   }
 
   const cronogramas = await prisma.cronograma.findMany({
-    where: { ativo: true },
+    where: { ativo: filtroAtivo },
     include: {
-      op: { select: { id: true, numero: true, cliente: true, obra: true } },
+      op: { select: { id: true, numero: true, cliente: true, obra: true, status: true } },
       tarefas: {
         where: { isSummary: true, outlineLevel: 1 },
         select: { id: true, nome: true, departamento: true, percentualRealizado: true, dataFimPrevista: true },
