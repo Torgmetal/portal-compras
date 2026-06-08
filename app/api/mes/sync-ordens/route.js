@@ -43,12 +43,16 @@ function obraParaNumeroOP(obra) {
   return m ? String(parseInt(m[1])).padStart(3, "0") : obra;
 }
 
+// As datas do Syneco vêm em horário de Brasília (UTC-3). Interpretamos como BRT
+// (offset -03:00) para gravar o instante UTC correto — senão "08/06 00:00" BRT
+// virava 00:00Z, que ao exibir em BRT cai no dia anterior (21:00 do dia 07).
 function parseData(s) {
   if (!s) return null;
+  if (s === "---") return null;
   if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
     const [d, t] = s.split(" ");
     const [dd, mm, yyyy] = d.split("/");
-    const dt = new Date(`${yyyy}-${mm}-${dd}T${t || "00:00:00"}.000Z`);
+    const dt = new Date(`${yyyy}-${mm}-${dd}T${t || "00:00:00"}.000-03:00`);
     return isNaN(dt.getTime()) ? null : dt;
   }
   const dt = new Date(s);

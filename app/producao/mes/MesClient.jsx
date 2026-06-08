@@ -73,17 +73,18 @@ function fmtNum(n, dec = 1) {
     maximumFractionDigits: dec,
   });
 }
+// Datas do Syneco são em horário de Brasília — exibe em BRT (não UTC).
 function fmtData(d) {
   if (!d) return "—";
   return new Date(d).toLocaleString("pt-BR", {
-    timeZone: "UTC", day: "2-digit", month: "2-digit",
+    timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit",
     year: "numeric", hour: "2-digit", minute: "2-digit",
   });
 }
 function fmtDataCurta(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("pt-BR", {
-    timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric",
+    timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric",
   });
 }
 function tempoRelativo(d) {
