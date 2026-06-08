@@ -1,11 +1,11 @@
 "use client";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
-  Trash2, Upload, FileSpreadsheet, X, RailSymbol, Building2, Plus,
+  Trash2, Upload, FileSpreadsheet, X, RailSymbol, Building2, Plus, Search, Package,
 } from "lucide-react";
 import {
   labelCategoria,
@@ -54,7 +54,32 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
   const [importando, setImportando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const [proximoNumInterna, setProximoNumInterna] = useState(""); // preview RI-NNNN
   const fileRef = useRef(null);
+
+  const ehInterna = tipoRM === "INTERNA";
+
+  // Busca o próximo número sequencial quando muda para Interna Torg
+  useEffect(() => {
+    if (!ehInterna) return;
+    let ativo = true;
+    fetch("/api/rm/proximo-numero")
+      .then((r) => r.json())
+      .then((d) => { if (ativo && d.numero) setProximoNumInterna(d.numero); })
+      .catch(() => {});
+    return () => { ativo = false; };
+  }, [ehInterna]);
+
+  // Adiciona um produto do Omie como item manual da RM
+  const adicionarProdutoOmie = (p) => {
+    setItensImportados((prev) => [
+      ...prev,
+      {
+        descricao: p.descricao, codigo: p.codigo, codigoOmieEstoque: p.codigo,
+        material: "", qtd: 1, unidade: p.unidade || "UN", peso: 0, comprimento: "", manual: true,
+      },
+    ]);
+  };
 
   // Anexos (desenhos, especificacoes, etc) — uploaded ao Vercel Blob.
   // Quando a RM e criada, vinculamos via metadados no payload do POST /api/rm.
@@ -184,7 +209,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
     if (precisaCategorias && categoriasCobertas.length === 0) {
       return setErro("Marque pelo menos uma categoria do escopo coberta por essa RM.");
     }
-    if (!numero.trim()) return setErro("Informe o número da RM.");
+    if (!ehInterna && !numero.trim()) return setErro("Informe o número da RM.");
     if (!descricao.trim()) return setErro("Descreva a RM.");
     // Filtra itens manuais vazios (descricao em branco)
     const itensValidos = itensImportados.filter((it) => it.descricao && it.descricao.trim());
@@ -218,7 +243,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          numero: numero.trim(),
+          numero: ehInterna ? null : numero.trim(),
           tipoRM,
           opId: precisaOP ? opSelecionada : null,
           categoriasOP: precisaCategorias ? categoriasCobertas : [],
@@ -408,16 +433,30 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Nº RM *</label>
-            <input
-              type="text"
-              value={numero}
-              onChange={(e) => setNumero(e.target.value.toUpperCase())}
-              placeholder="Ex: T83-001"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono font-semibold focus:ring-2 focus:ring-torg-blue"
-            />
-            <p className="text-[10px] text-torg-gray mt-1">
-              Pré-preenchido com o número do Tekla quando você sobe a planilha. Pode editar.
-            </p>
+            {ehInterna ? (
+              <>
+                <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-mono font-semibold text-torg-blue flex items-center gap-2">
+                  {proximoNumInterna || "RI-…"}
+                  <span className="text-[10px] font-sans font-normal text-torg-gray bg-white border border-gray-200 rounded px-1.5 py-0.5">automático</span>
+                </div>
+                <p className="text-[10px] text-torg-gray mt-1">
+                  Número sequencial gerado automaticamente para RM interna.
+                </p>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={numero}
+                  onChange={(e) => setNumero(e.target.value.toUpperCase())}
+                  placeholder="Ex: T83-001"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono font-semibold focus:ring-2 focus:ring-torg-blue"
+                />
+                <p className="text-[10px] text-torg-gray mt-1">
+                  Pré-preenchido com o número do Tekla quando você sobe a planilha. Pode editar.
+                </p>
+              </>
+            )}
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-torg-dark mb-1">Descrição da RM *</label>
@@ -521,6 +560,11 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
               </button>
             </span>
           )}
+        </div>
+
+        {/* Busca no catálogo de produtos do Omie — digite e selecione pra adicionar */}
+        <div className="mt-4">
+          <BuscaProdutoOmie onAdd={adicionarProdutoOmie} />
         </div>
 
         {itensImportados.length > 0 && (
@@ -748,6 +792,90 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
           {salvando ? "Salvando..." : "Criar RM"}
         </button>
       </div>
+    </div>
+  );
+}
+
+// Busca de produto no catálogo do Omie (descrição ou código) → adiciona como item.
+function BuscaProdutoOmie({ onAdd }) {
+  const [q, setQ] = useState("");
+  const [resultados, setResultados] = useState([]);
+  const [aberto, setAberto] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  const timer = useRef(null);
+  const boxRef = useRef(null);
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    const fora = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setAberto(false); };
+    document.addEventListener("mousedown", fora);
+    return () => document.removeEventListener("mousedown", fora);
+  }, []);
+
+  const buscar = (texto) => {
+    setQ(texto);
+    clearTimeout(timer.current);
+    if (texto.trim().length < 2) { setResultados([]); setAberto(false); return; }
+    timer.current = setTimeout(async () => {
+      setCarregando(true);
+      try {
+        const res = await fetch(`/api/omie/buscar-produto?q=${encodeURIComponent(texto.trim())}&limit=20`);
+        const d = await res.json();
+        setResultados(d.itens || []);
+        setAberto(true);
+      } catch { setResultados([]); } finally { setCarregando(false); }
+    }, 300);
+  };
+
+  const escolher = (p) => {
+    onAdd(p);
+    setQ(""); setResultados([]); setAberto(false);
+  };
+
+  return (
+    <div ref={boxRef} className="relative max-w-2xl">
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => buscar(e.target.value)}
+          onFocus={() => { if (resultados.length) setAberto(true); }}
+          placeholder="Buscar produto no Omie (descrição ou código)…"
+          className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue"
+        />
+        {carregando && <Loader2 size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" />}
+      </div>
+
+      {aberto && (
+        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+          {resultados.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-torg-gray flex items-center gap-2">
+              <Package size={14} className="text-gray-300" />
+              {q.trim().length < 2 ? "Digite ao menos 2 caracteres." : "Nenhum produto encontrado no Omie."}
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-50">
+              {resultados.map((p) => (
+                <li key={`${p.codigo}-${p.descricao}`}>
+                  <button
+                    type="button"
+                    onClick={() => escolher(p)}
+                    className="w-full text-left px-3 py-2 hover:bg-torg-blue-50 flex items-center gap-2"
+                  >
+                    <Package size={14} className="text-torg-blue shrink-0" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm text-torg-dark truncate">{p.descricao}</span>
+                      <span className="block text-[11px] text-torg-gray font-mono">cód. {p.codigo} · {p.unidade || "UN"}</span>
+                    </span>
+                    <Plus size={14} className="text-torg-gray shrink-0" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

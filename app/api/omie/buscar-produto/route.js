@@ -28,7 +28,7 @@ async function callOmie(payload) {
 
 export async function GET(req) {
   try {
-    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "REQUISICOES", "ENGENHARIA", "ALMOXARIFADO"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
   }

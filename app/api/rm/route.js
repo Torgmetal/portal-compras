@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { notificarEvento } from "@/lib/email";
 import { criarNotificacao } from "@/lib/notificacoes";
+import { proximoNumeroInterno } from "@/lib/rm-numero";
 
 const itemSchema = z.object({
   opItemId: z.string().nullable().optional(),
@@ -66,25 +67,31 @@ export async function POST(req) {
     return NextResponse.json({ error: "Dados inválidos: " + (e.message || "") }, { status: 400 });
   }
 
-  // Numero da RM: usa o que o usuario informou (geralmente vem do Tekla,
-  // tipo "T83-001"). Se nao vier, gera sequencial como fallback.
-  let numeroRM = (body.numero || "").trim().toUpperCase();
-  if (!numeroRM) {
-    const ultima = await prisma.rM.findFirst({ orderBy: { createdAt: "desc" }, select: { numero: true } });
-    let proximoNumero = "0001";
-    if (ultima?.numero) {
-      const m = ultima.numero.match(/^(?:RM-)?(\d+)$/);
-      if (m) proximoNumero = String(parseInt(m[1]) + 1).padStart(4, "0");
+  // Numero da RM:
+  //  - INTERNA: SEMPRE sequencial automatico "RI-NNNN" (ignora o que veio do form).
+  //  - ENGENHARIA: usa o numero informado (vem do Tekla, ex "T83-001"); fallback RM-NNNN.
+  let numeroRM;
+  if (body.tipoRM === "INTERNA") {
+    numeroRM = await proximoNumeroInterno();
+  } else {
+    numeroRM = (body.numero || "").trim().toUpperCase();
+    if (!numeroRM) {
+      const ultima = await prisma.rM.findFirst({ orderBy: { createdAt: "desc" }, select: { numero: true } });
+      let proximoNumero = "0001";
+      if (ultima?.numero) {
+        const m = ultima.numero.match(/^(?:RM-)?(\d+)$/);
+        if (m) proximoNumero = String(parseInt(m[1]) + 1).padStart(4, "0");
+      }
+      numeroRM = `RM-${proximoNumero}`;
     }
-    numeroRM = `RM-${proximoNumero}`;
-  }
-  // Valida unicidade
-  const existe = await prisma.rM.findUnique({ where: { numero: numeroRM } });
-  if (existe) {
-    return NextResponse.json(
-      { error: `Já existe uma RM com o número "${numeroRM}". Use outro número.` },
-      { status: 409 }
-    );
+    // Valida unicidade (so para nao-interna; a interna ja vem livre)
+    const existe = await prisma.rM.findUnique({ where: { numero: numeroRM } });
+    if (existe) {
+      return NextResponse.json(
+        { error: `Já existe uma RM com o número "${numeroRM}". Use outro número.` },
+        { status: 409 }
+      );
+    }
   }
 
   const rm = await prisma.rM.create({
