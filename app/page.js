@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import TorgLogo from "@/components/TorgLogo";
-import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity, DollarSign, FileText, Users } from "lucide-react";
+import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity, DollarSign, FileText, Users, Gauge, CalendarClock, BarChart3 } from "lucide-react";
 
 const FOOTER_LOGO_W = 180;
 const FOOTER_LOGO_H = Math.round((FOOTER_LOGO_W * 1080) / 1920);
@@ -36,11 +36,32 @@ const portais = [
     bg: "bg-torg-orange-700",
   },
   {
+    href: "/pcp",
+    label: "PCP",
+    desc: "Dashboard de setores, peças por status, máquinas e progresso por OP.",
+    Icon: Gauge,
+    bg: "bg-emerald-600",
+  },
+  {
     href: "/expedicao",
     label: "Expedição",
-    desc: "Romaneios de saída — peso real expedido por OP.",
+    desc: "Checklist, romaneios, programação de cargas e peso expedido por OP.",
     Icon: FileText,
     bg: "bg-torg-orange",
+  },
+  {
+    href: "/planejamento",
+    label: "Planejamento",
+    desc: "Cronogramas de obra, programação de corte e expedição semanal.",
+    Icon: CalendarClock,
+    bg: "bg-violet-600",
+  },
+  {
+    href: "/indicadores",
+    label: "Indicadores",
+    desc: "KPIs de compras, comercial e RH — visão gerencial consolidada.",
+    Icon: BarChart3,
+    bg: "bg-cyan-700",
   },
   {
     href: "/financeiro",
