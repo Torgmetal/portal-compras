@@ -3,7 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
-const SETORES = ["PRODUCAO", "PINTURA", "EXPEDICAO"];
+const SETORES = [
+  "PRODUCAO", "PINTURA", "PCP", "EXPEDICAO", "COMERCIAL",
+  "ENGENHARIA", "COMPRAS", "ALMOXARIFADO", "FINANCEIRO", "RH", "PLANEJAMENTO",
+];
 const STATUS = ["PENDENTE", "EM_ANDAMENTO", "CONCLUIDA", "CANCELADA"];
 const PRIORIDADES = ["ALTA", "MEDIA", "BAIXA"];
 

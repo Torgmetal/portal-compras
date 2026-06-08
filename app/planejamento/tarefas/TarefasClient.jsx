@@ -3,12 +3,20 @@ import { useState, useEffect, useCallback } from "react";
 import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
-  CheckCircle2, Clock, Circle, ListTodo,
+  CheckCircle2, Clock, Circle, ListTodo, Bell, Send,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
-const SETORES = ["PRODUCAO", "PINTURA", "EXPEDICAO"];
-const SETOR_LABEL = { PRODUCAO: "Producao", PINTURA: "Pintura", EXPEDICAO: "Expedicao" };
+const SETORES = [
+  "PRODUCAO", "PINTURA", "PCP", "EXPEDICAO", "COMERCIAL",
+  "ENGENHARIA", "COMPRAS", "ALMOXARIFADO", "FINANCEIRO", "RH", "PLANEJAMENTO",
+];
+const SETOR_LABEL = {
+  PRODUCAO: "Produção", PINTURA: "Pintura", PCP: "PCP",
+  EXPEDICAO: "Expedição", COMERCIAL: "Comercial", ENGENHARIA: "Engenharia",
+  COMPRAS: "Compras", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro",
+  RH: "Recursos Humanos", PLANEJAMENTO: "Planejamento",
+};
 const STATUS_LABEL = { PENDENTE: "Pendente", EM_ANDAMENTO: "Em Andamento", CONCLUIDA: "Concluida", CANCELADA: "Cancelada" };
 const PRIORIDADE_COR = {
   ALTA: "bg-red-50 text-red-700 border-red-200",
@@ -44,6 +52,30 @@ export default function TarefasClient() {
   const [modalNova, setModalNova] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [enviandoLembrete, setEnviandoLembrete] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  function showToast(msg, tipo = "sucesso") {
+    setToast({ msg, tipo });
+    setTimeout(() => setToast(null), 4000);
+  }
+
+  async function enviarLembrete(tarefa) {
+    setEnviandoLembrete(tarefa.id);
+    try {
+      const res = await fetch(`/api/planejamento/tarefas/${tarefa.id}/lembrete`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao enviar");
+      const nomes = data.destinatarios?.length > 0
+        ? data.destinatarios.join(", ")
+        : `${data.enviados} pessoa(s)`;
+      showToast(`Lembrete enviado para ${nomes}`, "sucesso");
+    } catch (e) {
+      showToast(e.message, "erro");
+    } finally {
+      setEnviandoLembrete(null);
+    }
+  }
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -195,6 +227,14 @@ export default function TarefasClient() {
                         >
                           {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
+                        <button
+                          onClick={() => enviarLembrete(t)}
+                          disabled={enviandoLembrete === t.id}
+                          className="text-gray-300 hover:text-torg-blue p-1 disabled:opacity-50"
+                          title="Enviar lembrete por e-mail"
+                        >
+                          {enviandoLembrete === t.id ? <Loader2 size={13} className="animate-spin" /> : <Bell size={13} />}
+                        </button>
                         <button onClick={() => setConfirmDelete(t)} className="text-gray-300 hover:text-red-500 p-1">
                           <Trash2 size={13} />
                         </button>
@@ -215,6 +255,16 @@ export default function TarefasClient() {
           onClose={() => setModalNova(false)}
           onCriada={(t) => { setTarefas((prev) => [t, ...prev]); setModalNova(false); }}
         />
+      )}
+
+      {/* Toast de lembrete */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-fade-in ${
+          toast.tipo === "sucesso" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+        }`}>
+          {toast.tipo === "sucesso" ? <Send size={15} /> : <AlertCircle size={15} />}
+          {toast.msg}
+        </div>
       )}
 
       <ConfirmModal
