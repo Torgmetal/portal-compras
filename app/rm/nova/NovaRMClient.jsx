@@ -861,9 +861,23 @@ function BuscaProdutoOmie({ onAdd }) {
                   <button
                     type="button"
                     onClick={() => escolher(p)}
-                    className="w-full text-left px-3 py-2 hover:bg-torg-blue-50 flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 hover:bg-torg-blue-50 flex items-center gap-2.5"
                   >
-                    <Package size={14} className="text-torg-blue shrink-0" />
+                    {/* Saldo em estoque (Omie) — na frente do nome */}
+                    <span
+                      title="Saldo atual em estoque (Omie)"
+                      className={`shrink-0 text-[11px] font-bold px-2 py-1 rounded-md text-center min-w-[60px] border ${
+                        p.saldo == null
+                          ? "bg-gray-100 text-gray-400 border-gray-200"
+                          : p.saldo > 0
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : "bg-red-50 text-red-600 border-red-200"
+                      }`}
+                    >
+                      {p.saldo == null
+                        ? "—"
+                        : `${Number(p.saldo).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${p.unidade || "UN"}`}
+                    </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm text-torg-dark truncate">{p.descricao}</span>
                       <span className="block text-[11px] text-torg-gray font-mono">cód. {p.codigo} · {p.unidade || "UN"}</span>

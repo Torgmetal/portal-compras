@@ -66,7 +66,7 @@ export async function GET(req) {
         ],
       },
       take: limit,
-      select: { codigoOmie: true, descricao: true, unidade: true },
+      select: { codigoOmie: true, descricao: true, unidade: true, qtdAtual: true },
       orderBy: { descricao: "asc" },
     });
     if (local.length > 0) {
@@ -75,6 +75,7 @@ export async function GET(req) {
           codigo: p.codigoOmie,
           descricao: decodeEntities(p.descricao),
           unidade: p.unidade,
+          saldo: p.qtdAtual ?? null,
         })),
         origem: "estoque-local",
       });
@@ -109,6 +110,7 @@ export async function GET(req) {
         codigo: String(p.codigo || p.codigo_produto || ""),
         descricao: decodeEntities(String(p.descricao || "").trim()),
         unidade: String(p.unidade || "UN").trim().toUpperCase(),
+        saldo: null, // produto não sincronizado no estoque local — sem saldo
       })).filter((i) => i.codigo && i.descricao),
       origem: "omie",
     });
