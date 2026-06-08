@@ -124,15 +124,16 @@ export default function TorguinhoChat() {
         }
       } catch { /* localStorage indisponível — segue sem a frase */ }
 
-      const intro = [];
-      if (frase) {
-        intro.push({ role: "assistant", meta: "intro", content: `✨ **Frase do dia, ${nome}:**\n\n_${frase}_` });
-      }
-      intro.push({
-        role: "assistant", meta: "intro",
-        content: `E aí, ${nome}! 👷 Sou o Torguinho, assistente da Torg Metal!\n\nPosso te ajudar com dúvidas sobre metalurgia, processos, materiais e também consultar dados do portal — como OPs, estoque e produção. O que você precisa? 🔩`,
-      });
-      setMensagens(intro);
+      // Tudo numa única bolha: frase do dia (quando houver) + saudação
+      const saudacao = frase
+        ? `👷 Sou o **Torguinho**, seu parceiro aqui na Torg! Posso ajudar com dúvidas de metalurgia, processos e materiais, e consultar dados do portal — OPs, estoque, produção. O que você precisa? 🔩`
+        : `E aí, ${nome}! 👷 Sou o **Torguinho**, seu parceiro aqui na Torg! Posso ajudar com dúvidas de metalurgia, processos e materiais, e consultar dados do portal — OPs, estoque, produção. O que você precisa? 🔩`;
+
+      const content = frase
+        ? `✨ **Frase do dia, ${nome}:**\n"${frase}"\n\n${saudacao}`
+        : saudacao;
+
+      setMensagens([{ role: "assistant", meta: "intro", content }]);
     }
   }, [aberto, config]);
 
