@@ -49,22 +49,32 @@ export default function ContasPagarClient() {
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Erro");
       setData(j);
-    } catch (e) { setErro(e.message); } finally { setLoad(false); }
+      return j;
+    } catch (e) { setErro(e.message); return null; } finally { setLoad(false); }
   };
-  useEffect(() => { carregar(hojeR.de, hojeR.ate); /* eslint-disable-next-line */ }, []);
+
+  // Ao abrir: mostra o cache na hora e, se o último sync for > 5 min, atualiza em background.
+  useEffect(() => {
+    (async () => {
+      const j = await carregar(hojeR.de, hojeR.ate);
+      const idadeMin = j?.ultimoSync ? (Date.now() - new Date(j.ultimoSync).getTime()) / 60000 : Infinity;
+      if (idadeMin > 5) sincronizar(false);
+    })();
+    /* eslint-disable-next-line */
+  }, []);
 
   const aplicarPreset = (p) => {
     const r = p === "hoje" ? rangeHoje() : p === "semana" ? rangeSemana() : rangeMes();
     setPreset(p); setDe(r.de); setAte(r.ate); carregar(r.de, r.ate);
   };
 
-  // Atualiza do Omie (sync incremental) e recarrega
-  const atualizar = async () => {
-    setSinc(true); setErro("");
+  // Sincroniza do Omie (incremental) e recarrega. manual=false é o auto ao abrir (silencioso em erro).
+  const sincronizar = async (manual = true) => {
+    setSinc(true); if (manual) setErro("");
     try {
       await fetch("/api/cron/contas-pagar");
       await carregar();
-    } catch (e) { setErro("Falha ao atualizar: " + e.message); } finally { setSinc(false); }
+    } catch (e) { if (manual) setErro("Falha ao atualizar: " + e.message); } finally { setSinc(false); }
   };
 
   const contas = data?.contas || [];
@@ -118,7 +128,7 @@ export default function ContasPagarClient() {
             {data?.ultimoSync && ` Sincronizado ${fmtData(data.ultimoSync)} ${new Date(data.ultimoSync).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" })}.`}
           </p>
         </div>
-        <button onClick={atualizar} disabled={sincronizando || loading}
+        <button onClick={() => sincronizar(true)} disabled={sincronizando || loading}
           className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
           {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           {sincronizando ? "Atualizando…" : "Atualizar"}
