@@ -219,20 +219,16 @@ export default function MetasClient() {
   // ─── Totais calculados ──────────────────────────────────
 
   const totais = useMemo(() => {
-    const porMes = {};
     const porSetor = {};
-    let totalGeral = 0;
 
     for (const setor of modulo?.setores || []) {
       porSetor[setor.id] = 0;
       for (let m = 1; m <= 12; m++) {
         const val = grid[setor.id]?.[m]?.valorMensal || 0;
-        porMes[m] = (porMes[m] || 0) + val;
         porSetor[setor.id] += val;
-        totalGeral += val;
       }
     }
-    return { porMes, porSetor, totalGeral };
+    return { porSetor };
   }, [grid, modulo]);
 
   // ─── Render ─────────────────────────────────────────────
@@ -402,20 +398,7 @@ export default function MetasClient() {
                       </td>
                     </tr>
                   ))}
-                  {/* Linha de total */}
-                  <tr className="bg-gray-50/80 border-t-2 border-gray-200">
-                    <td className="px-4 py-3 font-bold text-torg-dark sticky left-0 bg-gray-50/80 z-10">
-                      Total
-                    </td>
-                    {MESES.map((_, i) => (
-                      <td key={i} className="px-2 py-3 text-center font-bold text-torg-dark whitespace-nowrap">
-                        {fmtValor(totais.porMes[i + 1], unidade)}
-                      </td>
-                    ))}
-                    <td className="px-4 py-3 text-center font-bold text-torg-blue bg-torg-blue-50/50 whitespace-nowrap">
-                      {fmtValor(totais.totalGeral, unidade)}
-                    </td>
-                  </tr>
+                  {/* Nota: não soma setores entre si — são etapas sequenciais do mesmo material */}
                 </tbody>
               </table>
             </div>
