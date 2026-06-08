@@ -17,6 +17,7 @@ const patchSchema = z.object({
   qtdePlanejada: z.number().min(0).optional(),
   qtdeRealizada: z.number().min(0).optional(),
   antecessoraIds: z.array(z.string()).optional(),
+  duracaoDias: z.number().int().min(0).max(9999).optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -42,6 +43,21 @@ export async function PATCH(req, { params }) {
   });
   if (!tarefa) {
     return NextResponse.json({ success: false, error: "Tarefa nao encontrada" }, { status: 404 });
+  }
+
+  // Se cronograma esta validado (dataBase existe) e datas estao mudando, exige justificativa
+  const inicioMudou =
+    parsed.data.dataInicioPrevista !== undefined &&
+    tarefa.dataInicioPrevista?.toISOString() !== (parsed.data.dataInicioPrevista ? new Date(parsed.data.dataInicioPrevista).toISOString() : null);
+  const fimMudou =
+    parsed.data.dataFimPrevista !== undefined &&
+    tarefa.dataFimPrevista?.toISOString() !== (parsed.data.dataFimPrevista ? new Date(parsed.data.dataFimPrevista).toISOString() : null);
+
+  if (tarefa.cronograma.dataBase && (inicioMudou || fimMudou) && !parsed.data.justificativa?.trim()) {
+    return NextResponse.json(
+      { success: false, error: "Justificativa obrigatória para alterar datas após validação do cronograma." },
+      { status: 400 }
+    );
   }
 
   const data = {};
@@ -79,6 +95,12 @@ export async function PATCH(req, { params }) {
       diffDepois.antecessoraIds = ids;
     }
     data.antecessoraIds = ids;
+  }
+  if (parsed.data.duracaoDias !== undefined && parsed.data.duracaoDias !== tarefa.duracaoDias) {
+    diffAntes.duracaoDias = tarefa.duracaoDias;
+    diffDepois.duracaoDias = parsed.data.duracaoDias;
+    data.duracaoDias = parsed.data.duracaoDias;
+    antecessorasChanged = true; // trigger recalculo
   }
   if (parsed.data.observacao !== undefined) data.observacao = parsed.data.observacao;
   if (parsed.data.motivoBloqueio !== undefined) data.motivoBloqueio = parsed.data.motivoBloqueio;
@@ -153,13 +175,18 @@ export async function PATCH(req, { params }) {
     }
 
     if (partes.length > 0) {
+      // Usa tipo DATA_ALTERADA quando datas mudaram, senao TAREFA_ALTERADA
+      const tipoRevisao = (diffDepois.dataInicioPrevista !== undefined || diffDepois.dataFimPrevista !== undefined)
+        ? "DATA_ALTERADA"
+        : "TAREFA_ALTERADA";
+      const descJust = parsed.data.justificativa ? ` — Motivo: ${parsed.data.justificativa}` : "";
       ops.push(
         prisma.cronogramaRevisao.create({
           data: {
             cronogramaId: tarefa.cronograma.id,
-            tipo: "TAREFA_ALTERADA",
-            descricao: `${tarefa.nome}: ${partes.join(", ")}`,
-            diff: { tarefa: tarefa.nome, antes: diffAntes, depois: diffDepois },
+            tipo: tipoRevisao,
+            descricao: `${tarefa.nome}: ${partes.join(", ")}${descJust}`,
+            diff: { tarefa: tarefa.nome, antes: diffAntes, depois: diffDepois, justificativa: parsed.data.justificativa || null },
             createdById: user.id,
           },
         })

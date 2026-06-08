@@ -55,6 +55,7 @@ const patchSchema = z.object({
   dataBase: z.string().datetime().optional(),
   dataInicio: z.string().datetime().optional(),
   dataFim: z.string().datetime().optional(),
+  tipoDias: z.enum(["DU", "DC"]).optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -119,6 +120,24 @@ export async function PATCH(req, { params }) {
         antes: cronograma.dataBase ? cronograma.dataBase.toISOString() : null,
         depois: novaDataBase.toISOString(),
       },
+      createdById: user.id,
+    });
+  }
+
+  // Alterar tipo de dias (DU/DC)
+  if (parsed.data.tipoDias && parsed.data.tipoDias !== cronograma.tipoDias) {
+    const anterior = cronograma.tipoDias || "DU";
+    ops.push(
+      prisma.cronograma.update({
+        where: { id },
+        data: { tipoDias: parsed.data.tipoDias },
+      })
+    );
+    revisoes.push({
+      cronogramaId: id,
+      tipo: "TAREFA_ALTERADA",
+      descricao: `Tipo de dias alterado: ${anterior === "DU" ? "Dias Úteis" : "Dias Corridos"} → ${parsed.data.tipoDias === "DU" ? "Dias Úteis" : "Dias Corridos"}`,
+      diff: { campo: "tipoDias", antes: anterior, depois: parsed.data.tipoDias },
       createdById: user.id,
     });
   }

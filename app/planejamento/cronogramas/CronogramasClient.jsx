@@ -485,6 +485,7 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
   const [tab, setTab] = useState("cronograma");
   const [settingBase, setSettingBase] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [savingTipoDias, setSavingTipoDias] = useState(false);
 
   const definirDataBase = async () => {
     const hoje = new Date().toISOString().split("T")[0];
@@ -505,6 +506,23 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
       alert(e.message);
     } finally {
       setSettingBase(false);
+    }
+  };
+
+  const alterarTipoDias = async (novoTipo) => {
+    setSavingTipoDias(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipoDias: novoTipo }),
+      });
+      if (!res.ok) throw new Error("Erro ao alterar tipo de dias");
+      onRefreshDetail();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSavingTipoDias(false);
     }
   };
 
@@ -559,6 +577,39 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
                 Datas do cronograma travadas
               </span>
             )}
+            {/* Toggle DU / DC */}
+            <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-200">
+              <Calendar size={12} className="text-torg-gray" />
+              <div className="flex rounded-md overflow-hidden border border-gray-200">
+                <button
+                  onClick={() => alterarTipoDias("DU")}
+                  disabled={savingTipoDias || (detail.tipoDias || "DU") === "DU"}
+                  className={`px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                    (detail.tipoDias || "DU") === "DU"
+                      ? "bg-torg-blue text-white"
+                      : "bg-white text-torg-gray hover:bg-gray-50"
+                  } disabled:opacity-70`}
+                  title="Dias Úteis (seg-sex)"
+                >
+                  DU
+                </button>
+                <button
+                  onClick={() => alterarTipoDias("DC")}
+                  disabled={savingTipoDias || detail.tipoDias === "DC"}
+                  className={`px-2 py-0.5 text-[10px] font-semibold transition-colors border-l border-gray-200 ${
+                    detail.tipoDias === "DC"
+                      ? "bg-torg-blue text-white"
+                      : "bg-white text-torg-gray hover:bg-gray-50"
+                  } disabled:opacity-70`}
+                  title="Dias Corridos (todos os dias)"
+                >
+                  DC
+                </button>
+              </div>
+              <span className="text-[9px] text-torg-gray">
+                {(detail.tipoDias || "DU") === "DU" ? "Dias Úteis" : "Dias Corridos"}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -773,12 +824,12 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
         <>
           {DEPT_ORDER.filter((d) => byDept[d]).map((dept) => {
             const { summary, tasks } = byDept[dept];
-            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} />;
+            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} />;
           })}
           {/* Departamentos fora da ordem padrao (se houver) */}
           {Object.keys(byDept).filter((d) => !DEPT_ORDER.includes(d)).map((dept) => {
             const { summary, tasks } = byDept[dept];
-            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} />;
+            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} />;
           })}
         </>
       )}
@@ -1109,7 +1160,7 @@ function ImportarPesoModal({ cronogramaId, onClose, onImported }) {
   );
 }
 
-function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTarefas }) {
+function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTarefas, dataBase, tipoDias }) {
   const [collapsed, setCollapsed] = useState(false);
   const [cobrando, setCobrando] = useState(false);
   const [cobrResult, setCobrResult] = useState(null);
@@ -1122,6 +1173,8 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   const [newTaskName, setNewTaskName] = useState("");
   const [newTaskInicio, setNewTaskInicio] = useState("");
   const [newTaskFim, setNewTaskFim] = useState("");
+  const [newTaskDuracao, setNewTaskDuracao] = useState(0);
+  const [newTaskAntecessoras, setNewTaskAntecessoras] = useState([]);
   const [savingTask, setSavingTask] = useState(false);
   const Icon = DEPT_ICONS[dept] || Factory;
   const colors = DEPT_COLORS[dept] || "text-gray-600 bg-gray-50 border-gray-200";
@@ -1236,7 +1289,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
       {!collapsed && (
         <div className="ml-6 space-y-1">
           {tasks.map((t) => (
-            <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} />
+            <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} dataBase={dataBase} tipoDias={tipoDias} />
           ))}
           {tasks.length === 0 && (
             <p className="text-xs text-torg-gray italic py-2">Nenhuma tarefa neste departamento.</p>
@@ -1263,7 +1316,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                   if (e.key === "Escape") { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); }
                 }}
               />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] text-torg-gray">Início:</span>
                   <input type="date" value={newTaskInicio} onChange={(e) => setNewTaskInicio(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
@@ -1272,9 +1325,45 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                   <span className="text-[10px] text-torg-gray">Fim:</span>
                   <input type="date" value={newTaskFim} onChange={(e) => setNewTaskFim(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
                 </div>
-                <div className="flex items-center gap-1 ml-auto">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-torg-gray">Duração:</span>
+                  <input type="number" min={0} max={9999} value={newTaskDuracao || ""} onChange={(e) => setNewTaskDuracao(Math.max(0, parseInt(e.target.value) || 0))} className="w-14 text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white text-center" placeholder="0" />
+                  <span className="text-[9px] text-torg-gray">{(tipoDias || "DU") === "DU" ? "DU" : "DC"}</span>
+                </div>
+              </div>
+              {/* Antecessoras na criação */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] text-torg-gray">Antecessoras:</span>
+                {newTaskAntecessoras.map((aid) => {
+                  const ant = (allTarefas || []).find((x) => x.id === aid);
+                  return (
+                    <span key={aid} className="inline-flex items-center gap-1 text-[9px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
+                      {ant?.nome || aid.slice(0, 8)}
+                      <button onClick={() => setNewTaskAntecessoras((prev) => prev.filter((x) => x !== aid))} className="hover:text-red-500"><X size={8} /></button>
+                    </span>
+                  );
+                })}
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value && !newTaskAntecessoras.includes(e.target.value)) {
+                      setNewTaskAntecessoras((prev) => [...prev, e.target.value]);
+                    }
+                    e.target.value = "";
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white max-w-[200px]"
+                >
+                  <option value="">+ Adicionar...</option>
+                  {(allTarefas || [])
+                    .filter((x) => !x.isSummary && x.outlineLevel > 1 && !newTaskAntecessoras.includes(x.id))
+                    .map((x) => (
+                      <option key={x.id} value={x.id}>{DEPT_LABEL[x.departamento] || x.departamento} — {x.nome}</option>
+                    ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-1 justify-end">
                   <button
-                    onClick={() => { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); }}
+                    onClick={() => { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); setNewTaskDuracao(0); setNewTaskAntecessoras([]); }}
                     className="px-2 py-1 text-[10px] text-torg-gray hover:text-torg-dark"
                   >
                     Cancelar
@@ -1286,7 +1375,6 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                   >
                     {savingTask ? "..." : "Adicionar"}
                   </button>
-                </div>
               </div>
             </div>
           )}
@@ -1404,6 +1492,8 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
       };
       if (newTaskInicio) body.dataInicioPrevista = new Date(newTaskInicio + "T12:00:00Z").toISOString();
       if (newTaskFim) body.dataFimPrevista = new Date(newTaskFim + "T12:00:00Z").toISOString();
+      if (newTaskDuracao > 0) body.duracaoDias = newTaskDuracao;
+      if (newTaskAntecessoras.length > 0) body.antecessoraIds = newTaskAntecessoras;
 
       const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/tarefas`, {
         method: "POST",
@@ -1415,6 +1505,8 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
       setNewTaskName("");
       setNewTaskInicio("");
       setNewTaskFim("");
+      setNewTaskDuracao(0);
+      setNewTaskAntecessoras([]);
       onRefresh();
     } catch {
       // keep form open
@@ -1424,7 +1516,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   }
 }
 
-function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
+function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias }) {
   const [editing, setEditing] = useState(false);
   const [editNome, setEditNome] = useState(tarefa.nome);
   const [pct, setPct] = useState(tarefa.percentualRealizado);
@@ -1436,11 +1528,21 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
   const [antecessoraIds, setAntecessoraIds] = useState(tarefa.antecessoraIds || []);
   const [dataLib, setDataLib] = useState(tarefa.dataLiberacao ? new Date(tarefa.dataLiberacao).toISOString().split("T")[0] : "");
   const [motivoBlq, setMotivoBlq] = useState(tarefa.motivoBloqueio || "");
+  const [editInicio, setEditInicio] = useState(tarefa.dataInicioPrevista ? new Date(tarefa.dataInicioPrevista).toISOString().split("T")[0] : "");
+  const [editFim, setEditFim] = useState(tarefa.dataFimPrevista ? new Date(tarefa.dataFimPrevista).toISOString().split("T")[0] : "");
+  const [duracaoDias, setDuracaoDias] = useState(tarefa.duracaoDias || 0);
   const [saving, setSaving] = useState(false);
   const [showReg, setShowReg] = useState(false);
   const [regText, setRegText] = useState("");
   const [sendingReg, setSendingReg] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Detecta se datas previstas foram alteradas em relação ao original
+  const inicioOriginal = tarefa.dataInicioPrevista ? new Date(tarefa.dataInicioPrevista).toISOString().split("T")[0] : "";
+  const fimOriginal = tarefa.dataFimPrevista ? new Date(tarefa.dataFimPrevista).toISOString().split("T")[0] : "";
+  const datasMudaram = editInicio !== inicioOriginal || editFim !== fimOriginal;
+  const cronogramaValidado = !!dataBase;
+  const exigeJustificativa = cronogramaValidado && datasMudaram;
 
   const t = tarefa;
   const atrasada = t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100;
@@ -1455,6 +1557,11 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
   const bloqueada = antecessorasIncompletas.length > 0 && !concluida;
 
   const salvar = async () => {
+    // Validação local: justificativa obrigatória quando cronograma validado e datas mudaram
+    if (exigeJustificativa && !justificativa.trim()) {
+      alert("Justificativa obrigatória para alterar datas após validação do cronograma.");
+      return;
+    }
     setSaving(true);
     try {
       const body = {
@@ -1466,6 +1573,14 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
       if (justificativa.trim()) body.justificativa = justificativa.trim();
       if (pesoPlan !== t.qtdePlanejada) body.qtdePlanejada = pesoPlan;
       if (pesoReal !== t.qtdeRealizada) body.qtdeRealizada = pesoReal;
+      if (duracaoDias !== (t.duracaoDias || 0)) body.duracaoDias = duracaoDias;
+      // Datas previstas — envia se mudou
+      if (editInicio !== inicioOriginal) {
+        body.dataInicioPrevista = editInicio ? new Date(editInicio + "T12:00:00Z").toISOString() : null;
+      }
+      if (editFim !== fimOriginal) {
+        body.dataFimPrevista = editFim ? new Date(editFim + "T12:00:00Z").toISOString() : null;
+      }
       // Antecessoras — sempre envia pra garantir persistencia
       body.antecessoraIds = antecessoraIds;
       // Liberação e motivo de bloqueio
@@ -1537,6 +1652,9 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
     setAntecessoraIds(t.antecessoraIds || []);
     setDataLib(t.dataLiberacao ? new Date(t.dataLiberacao).toISOString().split("T")[0] : "");
     setMotivoBlq(t.motivoBloqueio || "");
+    setEditInicio(t.dataInicioPrevista ? new Date(t.dataInicioPrevista).toISOString().split("T")[0] : "");
+    setEditFim(t.dataFimPrevista ? new Date(t.dataFimPrevista).toISOString().split("T")[0] : "");
+    setDuracaoDias(t.duracaoDias || 0);
   };
 
   return (
@@ -1594,6 +1712,11 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[10px] text-torg-gray whitespace-nowrap">
             {fmtData(t.dataInicioPrevista)} — {fmtData(t.dataFimPrevista)}
+            {t.duracaoDias > 0 && (
+              <span className="ml-1 text-torg-blue font-semibold" title={`Duração: ${t.duracaoDias} ${(tipoDias || "DU") === "DU" ? "dias úteis" : "dias corridos"}`}>
+                ({t.duracaoDias}d)
+              </span>
+            )}
             {t.dataFimBase && t.dataFimPrevista && new Date(t.dataFimPrevista) > new Date(t.dataFimBase) && (
               <span className="ml-1 text-red-500 font-semibold" title={`Baseline: ${fmtData(t.dataFimBase)}`}>
                 ▲{Math.ceil((new Date(t.dataFimPrevista) - new Date(t.dataFimBase)) / 86400000)}d
@@ -1654,6 +1777,66 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
               placeholder="Observação..."
               className="flex-1 text-[10px] px-2 py-1 border border-gray-200 rounded bg-white"
             />
+          </div>
+          {/* Datas previstas */}
+          <div className={`flex items-center gap-3 flex-wrap rounded-lg p-1.5 -mx-1.5 ${datasMudaram && cronogramaValidado ? "bg-amber-50 border border-amber-200" : ""}`}>
+            <div className="flex items-center gap-1.5">
+              <Calendar size={11} className={cronogramaValidado && datasMudaram ? "text-amber-500" : "text-torg-blue"} />
+              <span className="text-[10px] text-torg-gray whitespace-nowrap font-medium">Início previsto:</span>
+              <input
+                type="date"
+                value={editInicio}
+                onChange={(e) => setEditInicio(e.target.value)}
+                className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
+              />
+              {editInicio && (
+                <button onClick={() => setEditInicio("")} className="text-[9px] text-red-400 hover:text-red-600">limpar</button>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-torg-gray whitespace-nowrap font-medium">Fim previsto:</span>
+              <input
+                type="date"
+                value={editFim}
+                onChange={(e) => setEditFim(e.target.value)}
+                className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
+              />
+              {editFim && (
+                <button onClick={() => setEditFim("")} className="text-[9px] text-red-400 hover:text-red-600">limpar</button>
+              )}
+            </div>
+            {datasMudaram && cronogramaValidado && (
+              <span className="text-[9px] text-amber-600 font-semibold flex items-center gap-0.5">
+                <AlertTriangle size={9} /> Datas alteradas — justificativa obrigatória
+              </span>
+            )}
+            {datasMudaram && !cronogramaValidado && (
+              <span className="text-[9px] text-torg-blue italic">
+                Datas ajustadas livremente (cronograma não validado)
+              </span>
+            )}
+          </div>
+          {/* Duração em dias */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Clock size={11} className="text-torg-blue" />
+              <span className="text-[10px] text-torg-gray whitespace-nowrap font-medium">Duração:</span>
+              <input
+                type="number"
+                min={0}
+                max={9999}
+                value={duracaoDias || ""}
+                onChange={(e) => setDuracaoDias(Math.max(0, parseInt(e.target.value) || 0))}
+                className="w-16 text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white text-center"
+                placeholder="0"
+              />
+              <span className="text-[9px] text-torg-gray">{(tipoDias || "DU") === "DU" ? "dias úteis" : "dias corridos"}</span>
+            </div>
+            {duracaoDias > 0 && editInicio && (
+              <span className="text-[9px] text-emerald-600 italic">
+                Fim será calculado automaticamente ao recalcular
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
@@ -1776,16 +1959,19 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas }) {
             <input
               value={justificativa}
               onChange={(e) => setJustificativa(e.target.value)}
-              placeholder="Justificativa / motivo da alteração..."
-              className="flex-1 text-[10px] px-2 py-1 border border-gray-200 rounded bg-white"
+              placeholder={exigeJustificativa ? "⚠ Justificativa obrigatória — explique o motivo da alteração de datas..." : "Justificativa / motivo da alteração (opcional)..."}
+              className={`flex-1 text-[10px] px-2 py-1 border rounded bg-white ${exigeJustificativa ? (justificativa.trim() ? "border-emerald-300" : "border-amber-400 ring-1 ring-amber-200") : "border-gray-200"}`}
               onKeyDown={(e) => e.key === "Enter" && salvar()}
             />
+            {exigeJustificativa && !justificativa.trim() && (
+              <span className="text-[9px] text-red-500 font-semibold whitespace-nowrap">Obrigatório</span>
+            )}
           </div>
           <div className="flex items-center gap-2 justify-end">
             <button onClick={cancelarEdicao} className="px-2 py-1 text-[10px] text-torg-gray hover:text-torg-dark">
               Cancelar
             </button>
-            <button onClick={salvar} disabled={saving} className="px-3 py-1 bg-torg-blue text-white text-[10px] rounded hover:bg-torg-blue-700 disabled:opacity-50 font-medium">
+            <button onClick={salvar} disabled={saving || (exigeJustificativa && !justificativa.trim())} className="px-3 py-1 bg-torg-blue text-white text-[10px] rounded hover:bg-torg-blue-700 disabled:opacity-50 font-medium">
               {saving ? "Salvando..." : "Salvar"}
             </button>
           </div>

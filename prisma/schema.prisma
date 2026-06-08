@@ -1978,6 +1978,7 @@ model Cronograma {
   dataInicio     DateTime?
   dataFim        DateTime?
   dataBase       DateTime?            // Data base (baseline) — referencia do cronograma
+  tipoDias       String               @default("DU") // DU = dias uteis, DC = dias corridos
   ultimoSync     DateTime             @default(now())
   ativo          Boolean              @default(true)
   createdAt      DateTime             @default(now())
@@ -2009,6 +2010,7 @@ model CronogramaTarefa {
   outlineLevel        Int                     @default(0)
   parentUid           Int?
   antecessoraIds      String[]  @default([])  // IDs de tarefas predecessoras (finish-to-start)
+  duracaoDias         Int                     @default(0) // Duracao em dias (DU ou DC conforme cronograma)
   dataLiberacao       DateTime?               // Data em que a tarefa foi liberada (desbloqueio externo)
   motivoBloqueio      String?                 // Ex: "Aguardando assinatura do aditivo"
   observacao          String?

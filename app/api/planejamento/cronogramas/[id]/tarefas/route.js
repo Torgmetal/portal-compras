@@ -10,6 +10,8 @@ const createSchema = z.object({
   dataFimPrevista: z.string().datetime().nullable().optional(),
   isSummary: z.boolean().default(false),
   outlineLevel: z.number().int().min(0).max(5).default(2),
+  duracaoDias: z.number().int().min(0).max(9999).optional(),
+  antecessoraIds: z.array(z.string()).optional(),
 });
 
 export async function POST(req, { params }) {
@@ -48,6 +50,8 @@ export async function POST(req, { params }) {
       dataFimPrevista: parsed.data.dataFimPrevista ? new Date(parsed.data.dataFimPrevista) : null,
       isSummary: parsed.data.isSummary,
       outlineLevel: parsed.data.outlineLevel,
+      duracaoDias: parsed.data.duracaoDias || 0,
+      antecessoraIds: parsed.data.antecessoraIds || [],
     },
   });
 
