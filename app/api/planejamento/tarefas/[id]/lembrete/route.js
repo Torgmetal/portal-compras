@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { criarCompromissosDaTarefa } from "@/lib/compromissos";
 
 // Mapeamento setor da tarefa → modulo do sistema (para buscar usuarios)
 const SETOR_MODULO = {
@@ -153,6 +154,9 @@ export async function POST(req, { params }) {
     console.error("[audit] falha ao registrar lembrete:", e?.message);
   }
 
+  // Cria/reforça compromissos na agenda dos envolvidos (best-effort)
+  const compromissos = await criarCompromissosDaTarefa(tarefa, user.id);
+
   if (!resultado.ok) {
     return NextResponse.json(
       { error: `Falha ao enviar: ${resultado.error}` },
@@ -164,5 +168,6 @@ export async function POST(req, { params }) {
     ok: true,
     enviados: destinatarios.length,
     destinatarios: usuarios.map((u) => u.name).filter(Boolean),
+    compromissosCriados: compromissos.criados,
   });
 }

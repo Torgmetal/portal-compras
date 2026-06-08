@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { criarCompromissosDaTarefa } from "@/lib/compromissos";
 
 const SETORES = [
   "PRODUCAO", "PINTURA", "PCP", "EXPEDICAO", "COMERCIAL",
@@ -92,5 +93,8 @@ export async function POST(req) {
     },
   });
 
-  return NextResponse.json({ tarefa }, { status: 201 });
+  // Cria compromissos na agenda de cada usuário do setor (best-effort)
+  const compromissos = await criarCompromissosDaTarefa(tarefa, user.id);
+
+  return NextResponse.json({ tarefa, compromissos }, { status: 201 });
 }

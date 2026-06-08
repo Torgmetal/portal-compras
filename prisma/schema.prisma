@@ -43,6 +43,8 @@ model User {
   solicitacoesCriadas      SolicitacaoVerba[]    @relation("SolicitacaoCreatedBy")
   solicitacoesDecididas    SolicitacaoVerba[]    @relation("SolicitacaoDecididoBy")
   tarefasPlanejamento      TarefaPlanejamento[]  @relation("TarefaPlanejamentoCreatedBy")
+  compromissos             Compromisso[]         @relation("CompromissoUser")
+  compromissosCriados      Compromisso[]         @relation("CompromissoCriadoPor")
   modulos                  UserModulo[]
   pmpMetas                 PmpMeta[]             @relation("PmpMetaCriador")
 }
@@ -2089,6 +2091,7 @@ model TarefaPlanejamento {
   updatedAt     DateTime  @updatedAt
   createdBy     User?     @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id])
   op            OP?       @relation(fields: [opId], references: [id])
+  compromissos  Compromisso[]
 
   @@index([semanaIso, ano])
   @@index([setor])
@@ -2336,4 +2339,28 @@ model PmpMeta {
   @@unique([data, setor, opNumero])
   @@index([data])
   @@index([opNumero])
+}
+
+model Compromisso {
+  id          String    @id @default(cuid())
+  titulo      String
+  descricao   String?
+  data        DateTime
+  concluido   Boolean   @default(false)
+  concluidoEm DateTime?
+  userId      String
+  tarefaId    String?
+  opNumero    String?
+  setor       String?
+  prioridade  String    @default("MEDIA")
+  criadoPorId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation("CompromissoUser", fields: [userId], references: [id])
+  tarefa      TarefaPlanejamento? @relation(fields: [tarefaId], references: [id])
+  criadoPor   User?     @relation("CompromissoCriadoPor", fields: [criadoPorId], references: [id])
+
+  @@index([userId, data])
+  @@index([userId, concluido])
+  @@index([tarefaId])
 }
