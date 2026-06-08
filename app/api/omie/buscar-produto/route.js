@@ -15,6 +15,21 @@ export const dynamic = "force-dynamic";
 
 const OMIE_PROD_URL = "https://app.omie.com.br/api/v1/geral/produtos/";
 
+// O Omie guarda descrições com entidades HTML (ex: 12&quot; → 12"). Decodifica.
+function decodeEntities(s) {
+  if (!s) return s;
+  return String(s)
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&amp;/g, "&"); // &amp; por último para não re-decodificar
+}
+
 async function callOmie(payload) {
   const resp = await fetch(OMIE_PROD_URL, {
     method: "POST",
@@ -58,7 +73,7 @@ export async function GET(req) {
       return NextResponse.json({
         itens: local.map((p) => ({
           codigo: p.codigoOmie,
-          descricao: p.descricao,
+          descricao: decodeEntities(p.descricao),
           unidade: p.unidade,
         })),
         origem: "estoque-local",
@@ -92,7 +107,7 @@ export async function GET(req) {
     return NextResponse.json({
       itens: lista.map((p) => ({
         codigo: String(p.codigo || p.codigo_produto || ""),
-        descricao: String(p.descricao || "").trim(),
+        descricao: decodeEntities(String(p.descricao || "").trim()),
         unidade: String(p.unidade || "UN").trim().toUpperCase(),
       })).filter((i) => i.codigo && i.descricao),
       origem: "omie",
