@@ -14,13 +14,10 @@ export default async function MesPage() {
   const hojeStr = new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Sao_Paulo" })
     .format(new Date()); // retorna "YYYY-MM-DD"
 
-  // Default: últimos 30 dias (melhor visão geral de produção)
-  const hoje30 = new Date();
-  hoje30.setDate(hoje30.getDate() - 30);
-  const de30Str = new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Sao_Paulo" }).format(hoje30);
-
-  const de  = new Date(de30Str + "T00:00:00.000Z");
-  const ate = new Date(hojeStr + "T23:59:59.999Z");
+  // Default: SÓ O DIA DE HOJE (início = fim = hoje). Pra ver dias anteriores,
+  // o usuário ajusta o filtro de datas na tela. Fronteiras em BRT (-03:00).
+  const de  = new Date(hojeStr + "T00:00:00.000-03:00");
+  const ate = new Date(hojeStr + "T23:59:59.999-03:00");
 
   const [grupos0, totais0, statusGrupos, opsDb, ultimoSync, totalGeral] = await Promise.all([
     prisma.mesOrdem.groupBy({
@@ -124,7 +121,7 @@ export default async function MesPage() {
       setoresDisponiveis={setoresUnicos}
       ultimoSync={JSON.parse(JSON.stringify(ultimoSync))}
       totalGeralBanco={totalGeral}
-      deInicial={de30Str}
+      deInicial={hojeStr}
       ateInicial={hojeStr}
     />
   );
