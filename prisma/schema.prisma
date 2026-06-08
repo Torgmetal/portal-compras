@@ -1945,6 +1945,15 @@ model NfseConchalVinculo {
   @@index([codProj])
 }
 
+// Cache do snapshot de Faturamento por obra (dados do Omie), pra a tela não
+// consultar o Omie (~40s) a cada acesso. Atualizado no botão "Atualizar" e por
+// cron 1x/dia. id fixo "default" (linha única).
+model FaturamentoCache {
+  id           String   @id
+  dados        Json
+  atualizadoEm DateTime @default(now())
+}
+
 model Recebimento {
   id              String            @id @default(cuid())
   pedidoOmieId    String?

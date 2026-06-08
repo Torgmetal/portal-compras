@@ -1,9 +1,11 @@
 // GET /api/financeiro/pedidos-venda[?forcar=1]
-// Lista os pedidos de venda (Medições) em aberto/atrasado do Omie, com o projeto (obra).
+// Lê o snapshot de Faturamento do CACHE no banco (instantâneo). Só consulta o
+// Omie (~40s) quando forcar=1 (botão Atualizar) ou na 1ª vez (cache vazio).
+// O cron /api/cron/faturamento atualiza o cache 1x/dia.
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { prismaDirect } from "@/lib/prisma";
-import { listarPedidosVendaAbertos } from "@/lib/omie-pedidos-abertos";
+import { lerCacheFaturamento, atualizarCacheFaturamento } from "@/lib/faturamento-cache";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,7 +19,9 @@ export async function GET(req) {
 
   const forcar = new URL(req.url).searchParams.get("forcar") === "1";
   try {
-    const data = await listarPedidosVendaAbertos(forcar);
+    // Cache-first: lê do banco; só vai ao Omie se forçar ou se nunca foi computado.
+    let data = forcar ? null : await lerCacheFaturamento();
+    if (!data) data = await atualizarCacheFaturamento();
 
     // Soma as NFS-e avulsas de Conchal vinculadas a cada obra (faturado fora do Omie)
     let vinculos = [];
