@@ -4,7 +4,7 @@ import { Scissors, Construction } from "lucide-react";
 export const metadata = { title: "Workspace Torg — PCP Aproveitamento" };
 
 export default async function AproveitamentoPage() {
-  await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
+  await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
 
   return (
     <div className="space-y-6 max-w-7xl">

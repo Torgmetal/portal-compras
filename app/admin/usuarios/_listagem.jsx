@@ -33,6 +33,7 @@ const MODULO_LABELS = {
   EXPEDICAO:    { label: "Expedição",    cor: "bg-teal-100 text-teal-700" },
   RH:           { label: "RH",           cor: "bg-indigo-100 text-indigo-700" },
   PLANEJAMENTO: { label: "Planejamento", cor: "bg-purple-100 text-purple-700" },
+  PCP:          { label: "PCP",          cor: "bg-emerald-100 text-emerald-700" },
 };
 
 const FILTRO_OPCOES = [

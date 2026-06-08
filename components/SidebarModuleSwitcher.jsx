@@ -101,7 +101,7 @@ const MODULOS = [
     desc: "Máquinas, setores e aproveitamento",
     icon: Cog,
     cor: "bg-emerald-100 text-emerald-700",
-    modulos: ["PLANEJAMENTO", "PRODUCAO"],
+    modulos: ["PCP", "PLANEJAMENTO", "PRODUCAO"],
   },
   {
     href: "/admin/usuarios",

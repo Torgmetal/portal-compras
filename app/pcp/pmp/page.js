@@ -4,6 +4,6 @@ import PmpClient from "./PmpClient";
 export const metadata = { title: "Workspace Torg — PMP" };
 
 export default async function PmpPage() {
-  await requireRole(["ADMIN", "PRODUCAO", "PLANEJAMENTO"]);
+  await requireRole(["ADMIN", "PCP", "PRODUCAO", "PLANEJAMENTO"]);
   return <PmpClient />;
 }

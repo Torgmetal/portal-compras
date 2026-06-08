@@ -19,7 +19,7 @@ export const maxDuration = 30;
  */
 export async function GET(req) {
   try {
-    await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
+    await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ error: e.message }, { status });

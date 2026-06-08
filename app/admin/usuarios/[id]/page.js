@@ -29,6 +29,7 @@ const MODULOS_OPCOES = [
   { value: "EXPEDICAO",    label: "Expedição" },
   { value: "RH",           label: "RH" },
   { value: "PLANEJAMENTO", label: "Planejamento" },
+  { value: "PCP",          label: "PCP" },
 ];
 
 export default function PageEditarUsuario() {

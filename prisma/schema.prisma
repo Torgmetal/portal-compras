@@ -2149,6 +2149,7 @@ enum Modulo {
   EXPEDICAO
   RH
   PLANEJAMENTO
+  PCP
 }
 
 enum OPStatus {

@@ -4,6 +4,6 @@ import SetorPageClient from "@/components/pcp/SetorPageClient";
 export const metadata = { title: "Workspace Torg — PCP Montagem" };
 
 export default async function MontagemPage() {
-  await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
+  await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
   return <SetorPageClient setor="Montagem" titulo="Montagem" iconName="Wrench" corHex="#1d4ed8" />;
 }

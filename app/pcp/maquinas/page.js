@@ -4,6 +4,6 @@ import MaquinasClient from "./MaquinasClient";
 export const metadata = { title: "Workspace Torg — PCP Máquinas" };
 
 export default async function MaquinasPage() {
-  await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
+  await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
   return <MaquinasClient />;
 }

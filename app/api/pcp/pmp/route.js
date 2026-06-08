@@ -10,7 +10,7 @@ const PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO"
 // ── GET — buscar metas + realizado da semana ──────────────────
 export async function GET(req) {
   try {
-    await requireRole(["ADMIN", "PRODUCAO", "PLANEJAMENTO"]);
+    await requireRole(["ADMIN", "PCP", "PRODUCAO", "PLANEJAMENTO"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ error: e.message }, { status });
@@ -86,7 +86,7 @@ const bodySchema = z.object({
 export async function POST(req) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "PRODUCAO", "PLANEJAMENTO"]);
+    user = await requireRole(["ADMIN", "PCP", "PRODUCAO", "PLANEJAMENTO"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ error: e.message }, { status });
