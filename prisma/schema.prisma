@@ -1954,6 +1954,48 @@ model FaturamentoCache {
   atualizadoEm DateTime @default(now())
 }
 
+// Espelho das Contas a Pagar do Omie (financas/contapagar). Sincronizado
+// incrementalmente (só o que mudou) por cron + botão Atualizar. id = codigo_lancamento_omie.
+model ContaPagar {
+  id                 String    @id // codigo_lancamento_omie (string)
+  fornecedorCodigo   String?
+  fornecedorNome     String?
+  valor              Float     @default(0)
+  valorPago          Float     @default(0)
+  dataEmissao        DateTime?
+  dataVencimento     DateTime?
+  dataPrevisao       DateTime?
+  numeroDocumento    String? // ex: "RPS 3300293"
+  numeroDocFiscal    String? // NF
+  numeroParcela      String?
+  numeroPedidoCompra String?
+  categoriaCodigo    String?
+  categoriaNome      String?
+  projetoCodigo      String?
+  tipoDocumento      String? // BOL, etc.
+  status             String? // ABERTO/PAGO/ATRASADO/VENCIDO/CANCELADO
+  observacao         String?
+  contaCorrenteId    String?
+  chaveNfe           String?
+  detalheCarregado   Boolean   @default(false) // se já buscou observação/pedido via detalhe
+  dataAlteracaoOmie  DateTime?
+  syncedAt           DateTime  @default(now())
+
+  @@index([dataVencimento])
+  @@index([status])
+  @@index([fornecedorNome])
+  @@index([categoriaNome])
+}
+
+// Estado do sync incremental por entidade do Omie ("contapagar" / "contareceber").
+model OmieSyncState {
+  id              String    @id // "contapagar"
+  ultimoSync      DateTime?
+  ultimaAlteracao DateTime? // maior data de alteração já sincronizada
+  totalRegistros  Int       @default(0)
+  updatedAt       DateTime  @updatedAt
+}
+
 model Recebimento {
   id              String            @id @default(cuid())
   pedidoOmieId    String?

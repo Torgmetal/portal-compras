@@ -1,14 +1,15 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { DollarSign, FileText } from "lucide-react";
+import { DollarSign, FileText, ArrowDownCircle } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/financeiro", label: "Fluxo de Caixa", icon: DollarSign, exact: true },
   { href: "/financeiro/faturamento", label: "Faturamento por obra", icon: FileText },
-  // Futuro: Receita projetada, Tributos, Conciliação, etc.
+  { href: "/financeiro/contas-pagar", label: "Contas a Pagar", icon: ArrowDownCircle },
+  // Futuro: Contas a Receber, Tributos, Conciliação, etc.
 ];
 
 export default function SidebarFinanceiro() {
