@@ -114,24 +114,12 @@ export default function TorguinhoChat() {
       const nome = session?.user?.name?.split(" ")[0] || "colega";
       setIniciado(true);
 
-      // Frase motivacional do dia — só na 1ª abertura de cada dia (por usuário/navegador)
-      let frase = null;
-      try {
-        const hojeStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD local
-        if (localStorage.getItem("torguinho_frase_dia") !== hojeStr) {
-          frase = fraseDoDia();
-          localStorage.setItem("torguinho_frase_dia", hojeStr);
-        }
-      } catch { /* localStorage indisponível — segue sem a frase */ }
+      // Frase motivacional do dia — aparece TODA vez que abre o chat (rotaciona a cada dia)
+      const frase = fraseDoDia();
 
-      // Tudo numa única bolha: frase do dia (quando houver) + saudação
-      const saudacao = frase
-        ? `👷 Sou o **Torguinho**, seu parceiro aqui na Torg! Posso ajudar com dúvidas de metalurgia, processos e materiais, e consultar dados do portal — OPs, estoque, produção. O que você precisa? 🔩`
-        : `E aí, ${nome}! 👷 Sou o **Torguinho**, seu parceiro aqui na Torg! Posso ajudar com dúvidas de metalurgia, processos e materiais, e consultar dados do portal — OPs, estoque, produção. O que você precisa? 🔩`;
-
-      const content = frase
-        ? `✨ **Frase do dia, ${nome}:**\n"${frase}"\n\n${saudacao}`
-        : saudacao;
+      // Tudo numa única bolha: frase do dia + saudação
+      const saudacao = `👷 Sou o **Torguinho**, seu parceiro aqui na Torg! Posso ajudar com dúvidas de metalurgia, processos e materiais, e consultar dados do portal — OPs, estoque, produção. O que você precisa? 🔩`;
+      const content = `✨ **Frase do dia, ${nome}:**\n"${frase}"\n\n${saudacao}`;
 
       setMensagens([{ role: "assistant", meta: "intro", content }]);
     }
