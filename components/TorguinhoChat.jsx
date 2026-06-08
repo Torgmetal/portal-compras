@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Send, Loader2, MessageCircle, ChevronDown } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { fraseDoDia } from "@/lib/torguinho-frases";
 
 // ─── Renderiza markdown simples (negrito, listas, emojis) ─────────────────────
 function MensagemTexto({ texto }) {
@@ -112,10 +113,26 @@ export default function TorguinhoChat() {
     if (!iniciado) {
       const nome = session?.user?.name?.split(" ")[0] || "colega";
       setIniciado(true);
-      setMensagens([{
-        role: "assistant",
+
+      // Frase motivacional do dia — só na 1ª abertura de cada dia (por usuário/navegador)
+      let frase = null;
+      try {
+        const hojeStr = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD local
+        if (localStorage.getItem("torguinho_frase_dia") !== hojeStr) {
+          frase = fraseDoDia();
+          localStorage.setItem("torguinho_frase_dia", hojeStr);
+        }
+      } catch { /* localStorage indisponível — segue sem a frase */ }
+
+      const intro = [];
+      if (frase) {
+        intro.push({ role: "assistant", meta: "intro", content: `✨ **Frase do dia, ${nome}:**\n\n_${frase}_` });
+      }
+      intro.push({
+        role: "assistant", meta: "intro",
         content: `E aí, ${nome}! 👷 Sou o Torguinho, assistente da Torg Metal!\n\nPosso te ajudar com dúvidas sobre metalurgia, processos, materiais e também consultar dados do portal — como OPs, estoque e produção. O que você precisa? 🔩`,
-      }]);
+      });
+      setMensagens(intro);
     }
   }, [aberto, config]);
 
@@ -139,10 +156,10 @@ export default function TorguinhoChat() {
     setCarregando(true);
 
     try {
-      // Envia apenas as mensagens sem a de boas-vindas (para não confundir o Claude)
-      const historico = novasMensagens.filter(
-        (m) => !(m.role === "assistant" && m.content.includes("Sou o Torguinho"))
-      );
+      // Envia apenas as mensagens reais (sem boas-vindas/frase do dia)
+      const historico = novasMensagens
+        .filter((m) => !m.meta)
+        .map(({ role, content }) => ({ role, content }));
 
       const res = await fetch("/api/assistente/chat", {
         method: "POST",
