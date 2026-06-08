@@ -166,10 +166,10 @@ export default function Landing() {
               <li className="flex gap-2"><span className="text-torg-orange font-bold">›</span> Galpões, torres, pipe racks e estruturas residenciais</li>
             </ul>
           </div>
-          <div className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl">
+          <div className="relative aspect-[16/9] rounded-2xl overflow-hidden shadow-2xl">
             <Image
-              src="/obras/ponte-trelica.jpg"
-              alt="Treliça metálica"
+              src="/obras/planta-industrial.jpg"
+              alt="Planta industrial com estrutura metálica Torg Metal"
               fill
               className="object-cover"
               sizes="(max-width: 1024px) 100vw, 50vw"
