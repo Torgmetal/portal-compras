@@ -878,7 +878,7 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
             <span className="ml-2 text-sm text-torg-gray">Carregando tarefas...</span>
           </div>
         ) : detail ? (
-          <CronogramaDetail detail={detail} onRefresh={onRefreshDetail} cronogramaId={cronogramaId} />
+          <CronogramaDetail detail={detail} onRefresh={onRefreshDetail} cronogramaId={cronogramaId} readOnly={readOnly} />
         ) : (
           <div className="py-6 text-center text-sm text-torg-gray">Erro ao carregar detalhe.</div>
         )
@@ -899,7 +899,7 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
   );
 }
 
-function CronogramaDetail({ detail, onRefresh, cronogramaId }) {
+function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const [addingGlobal, setAddingGlobal] = useState(false);
   const [newDept, setNewDept] = useState("FABRICACAO");
   const [newName, setNewName] = useState("");
