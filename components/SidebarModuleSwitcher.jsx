@@ -45,7 +45,7 @@ const MODULOS = [
     desc: "Criar e acompanhar RMs",
     icon: RailSymbol,
     cor: "bg-cyan-100 text-cyan-700",
-    modulos: ["ENGENHARIA", "ALMOXARIFADO"],
+    modulos: ["REQUISICOES", "ENGENHARIA", "ALMOXARIFADO"],
   },
   {
     href: "/producao",

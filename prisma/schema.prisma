@@ -2150,6 +2150,7 @@ enum Modulo {
   RH
   PLANEJAMENTO
   PCP
+  REQUISICOES
 }
 
 enum OPStatus {

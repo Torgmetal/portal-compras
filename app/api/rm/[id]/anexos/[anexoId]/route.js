@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/session";
 export async function DELETE(req, { params }) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "COMPRAS", "ENGENHARIA", "COMERCIAL"]);
+    user = await requireRole(["ADMIN", "COMPRAS", "ENGENHARIA", "COMERCIAL", "REQUISICOES"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao." }, { status: 403 });
   }

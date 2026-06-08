@@ -30,6 +30,7 @@ const MODULOS_OPCOES = [
   { value: "RH",           label: "RH" },
   { value: "PLANEJAMENTO", label: "Planejamento" },
   { value: "PCP",          label: "PCP" },
+  { value: "REQUISICOES",  label: "Requisições" },
 ];
 
 export default function PageEditarUsuario() {

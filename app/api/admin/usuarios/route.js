@@ -8,7 +8,7 @@ import { requireRole } from "@/lib/session";
 import { gerarSenhaTemporaria } from "@/lib/gerar-senha";
 
 const TIPOS_VALIDOS   = ["ADMIN", "USUARIO"];
-const MODULOS_VALIDOS = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "ALMOXARIFADO", "FINANCEIRO", "EXPEDICAO", "RH", "PLANEJAMENTO", "PCP"];
+const MODULOS_VALIDOS = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "ALMOXARIFADO", "FINANCEIRO", "EXPEDICAO", "RH", "PLANEJAMENTO", "PCP", "REQUISICOES"];
 
 const schemaPost = z.object({
   name:             z.string().min(2, "Nome deve ter pelo menos 2 caracteres").max(100),
