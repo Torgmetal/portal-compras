@@ -4,6 +4,7 @@ import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
   CheckCircle2, Clock, Circle, ListTodo, Bell, Send,
+  GanttChart, AlertTriangle, Mail, User, Building2,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
@@ -11,6 +12,19 @@ const SETORES = [
   "PRODUCAO", "PINTURA", "PCP", "EXPEDICAO", "COMERCIAL",
   "ENGENHARIA", "COMPRAS", "ALMOXARIFADO", "FINANCEIRO", "RH", "PLANEJAMENTO",
 ];
+
+const DEPT_LABEL = {
+  COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", SUPRIMENTOS: "Suprimentos",
+  FABRICACAO: "Fabricação", EXPEDICAO: "Expedição", MONTAGEM: "Montagem",
+};
+const DEPT_COR = {
+  COMERCIAL: "bg-blue-50 text-blue-700 border-blue-200",
+  ENGENHARIA: "bg-purple-50 text-purple-700 border-purple-200",
+  SUPRIMENTOS: "bg-amber-50 text-amber-700 border-amber-200",
+  FABRICACAO: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  EXPEDICAO: "bg-teal-50 text-teal-700 border-teal-200",
+  MONTAGEM: "bg-orange-50 text-orange-700 border-orange-200",
+};
 const SETOR_LABEL = {
   PRODUCAO: "Produção", PINTURA: "Pintura", PCP: "PCP",
   EXPEDICAO: "Expedição", COMERCIAL: "Comercial", ENGENHARIA: "Engenharia",
@@ -42,6 +56,7 @@ function getISOWeek() {
 }
 
 export default function TarefasClient() {
+  const [aba, setAba] = useState("semanais"); // "semanais" | "cronograma"
   const { semana: semanaInit, ano: anoInit } = getISOWeek();
   const [tarefas, setTarefas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -130,16 +145,46 @@ export default function TarefasClient() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">Tarefas</h2>
-          <p className="text-xs text-torg-gray mt-0.5">Acompanhamento por setor — Semana {semana}/{ano}</p>
+          <p className="text-xs text-torg-gray mt-0.5">
+            {aba === "semanais" ? `Acompanhamento por setor — Semana ${semana}/${ano}` : "Atividades dos cronogramas ativos"}
+          </p>
         </div>
+        {aba === "semanais" && (
+          <button
+            onClick={() => setModalNova(true)}
+            className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
+          >
+            <Plus size={14} /> Nova Tarefa
+          </button>
+        )}
+      </div>
+
+      {/* Abas */}
+      <div className="flex items-center gap-1 border-b border-gray-200">
         <button
-          onClick={() => setModalNova(true)}
-          className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
+          onClick={() => setAba("semanais")}
+          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+            aba === "semanais" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
+          }`}
         >
-          <Plus size={14} /> Nova Tarefa
+          <ListTodo size={13} /> Semanais
+        </button>
+        <button
+          onClick={() => setAba("cronograma")}
+          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+            aba === "cronograma" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
+          }`}
+        >
+          <GanttChart size={13} /> Cronograma
         </button>
       </div>
 
+      {aba === "cronograma" && (
+        <AtividadesCronograma showToast={showToast} />
+      )}
+
+      {aba === "semanais" && (
+      <>
       {/* Filtros */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
         <Filter size={14} className="text-torg-gray" />
@@ -246,6 +291,9 @@ export default function TarefasClient() {
             );
           })}
         </div>
+      )}
+
+      </>
       )}
 
       {modalNova && (
@@ -378,6 +426,388 @@ function ModalNovaTarefa({ semana, ano, onClose, onCriada }) {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// ─── Aba Cronograma ──────────────────────────────────────
+const DEPTOS = ["COMERCIAL", "ENGENHARIA", "SUPRIMENTOS", "FABRICACAO", "EXPEDICAO", "MONTAGEM"];
+
+function AtividadesCronograma({ showToast }) {
+  const [atividades, setAtividades] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [filtroDepto, setFiltroDepto] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState(""); // "" | "atrasada" | "no_prazo" | "concluida"
+  const [filtroOp, setFiltroOp] = useState("");
+  const [notificarAtiv, setNotificarAtiv] = useState(null);
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    setErro("");
+    try {
+      const params = new URLSearchParams();
+      if (filtroDepto) params.set("departamento", filtroDepto);
+      if (filtroStatus) params.set("status", filtroStatus);
+      if (filtroOp.trim()) params.set("op", filtroOp.trim());
+      const res = await fetch(`/api/planejamento/cronogramas/atividades?${params}`);
+      if (!res.ok) throw new Error("Erro ao carregar");
+      const data = await res.json();
+      setAtividades(data.atividades || []);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [filtroDepto, filtroStatus, filtroOp]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const fmtData = (d) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  };
+
+  const atrasadas = atividades.filter((a) => a.atrasada).length;
+  const concluidas = atividades.filter((a) => a.concluida).length;
+  const emAndamento = atividades.length - atrasadas - concluidas;
+
+  return (
+    <>
+      {/* Filtros */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
+        <Filter size={14} className="text-torg-gray" />
+        <select value={filtroDepto} onChange={(e) => setFiltroDepto(e.target.value)}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white">
+          <option value="">Todos departamentos</option>
+          {DEPTOS.map((d) => <option key={d} value={d}>{DEPT_LABEL[d]}</option>)}
+        </select>
+        <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white">
+          <option value="">Todos status</option>
+          <option value="atrasada">Atrasadas</option>
+          <option value="no_prazo">No prazo</option>
+          <option value="concluida">Concluídas</option>
+        </select>
+        <input
+          type="text"
+          value={filtroOp}
+          onChange={(e) => setFiltroOp(e.target.value)}
+          placeholder="Filtrar por OP..."
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white w-32"
+        />
+        <button onClick={() => { setFiltroDepto(""); setFiltroStatus(""); setFiltroOp(""); }}
+          className="text-xs text-torg-gray hover:text-torg-dark ml-auto">
+          Limpar
+        </button>
+        <button onClick={carregar} className="p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100">
+          <RefreshCw size={14} />
+        </button>
+      </div>
+
+      {/* KPIs rápidos */}
+      {!loading && atividades.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-torg-gray">{atividades.length} atividades</span>
+          {atrasadas > 0 && (
+            <button onClick={() => setFiltroStatus("atrasada")}
+              className="px-2.5 py-1 bg-red-50 text-red-600 text-[11px] font-semibold rounded-full flex items-center gap-1 border border-red-200 hover:bg-red-100">
+              <AlertTriangle size={11} /> {atrasadas} atrasada{atrasadas > 1 ? "s" : ""}
+            </button>
+          )}
+          {emAndamento > 0 && (
+            <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-[11px] font-medium rounded-full border border-amber-200">
+              {emAndamento} em andamento
+            </span>
+          )}
+          {concluidas > 0 && (
+            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-medium rounded-full border border-emerald-200">
+              {concluidas} concluída{concluidas > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="animate-spin text-torg-blue" size={24} />
+        </div>
+      ) : erro ? (
+        <div className="text-center py-10">
+          <AlertCircle size={28} className="mx-auto text-red-400 mb-2" />
+          <p className="text-sm text-red-600">{erro}</p>
+          <button onClick={carregar} className="text-sm text-torg-blue hover:underline mt-2 flex items-center gap-1 mx-auto">
+            <RefreshCw size={14} /> Tentar novamente
+          </button>
+        </div>
+      ) : atividades.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
+          <GanttChart size={32} className="mx-auto text-gray-300 mb-2" />
+          <p className="text-sm text-torg-gray">Nenhuma atividade encontrada.</p>
+          <p className="text-xs text-torg-gray mt-1">Ajuste os filtros ou crie tarefas nos cronogramas.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50/60">
+              <tr>
+                <th className="px-4 py-2 text-left text-[10px] font-semibold text-torg-gray uppercase">OP</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold text-torg-gray uppercase">Atividade</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Depto</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Prazo</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">%</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Status</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Ação</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {atividades.map((a) => (
+                <tr key={a.id} className={`hover:bg-gray-50/50 transition-colors ${a.concluida ? "opacity-50" : ""}`}>
+                  <td className="px-4 py-2.5">
+                    <span className="text-xs font-bold text-torg-blue font-mono">{fmtOP(a.opNumero)}</span>
+                    {a.opCliente && <p className="text-[10px] text-torg-gray truncate max-w-[120px]">{a.opCliente}</p>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <p className={`text-xs font-medium ${a.concluida ? "line-through text-torg-gray" : "text-torg-dark"}`}>{a.nome}</p>
+                  </td>
+                  <td className="px-3 py-2.5 text-center">
+                    <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${DEPT_COR[a.departamento] || "bg-gray-50 text-torg-gray border-gray-200"}`}>
+                      {DEPT_LABEL[a.departamento] || a.departamento}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-center">
+                    <span className="text-xs text-torg-dark">{fmtData(a.dataFimPrevista)}</span>
+                  </td>
+                  <td className="px-3 py-2.5 text-center">
+                    <span className={`text-xs font-bold ${
+                      a.concluida ? "text-emerald-600" : a.atrasada ? "text-red-600" : "text-torg-dark"
+                    }`}>
+                      {a.percentualRealizado}%
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-center">
+                    {a.concluida ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-full">
+                        <CheckCircle2 size={10} /> OK
+                      </span>
+                    ) : a.atrasada ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-semibold rounded-full">
+                        <AlertTriangle size={10} /> {a.diasAtraso}d
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-medium rounded-full">
+                        <Clock size={10} /> No prazo
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-center">
+                    {!a.concluida && (
+                      <button
+                        onClick={() => setNotificarAtiv(a)}
+                        className="p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100 transition-colors"
+                        title="Notificar por e-mail"
+                      >
+                        <Mail size={14} />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {notificarAtiv && (
+        <ModalNotificar
+          atividade={notificarAtiv}
+          onClose={() => setNotificarAtiv(null)}
+          onEnviado={(msg) => { setNotificarAtiv(null); showToast(msg, "sucesso"); }}
+          onErro={(msg) => showToast(msg, "erro")}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Modal para escolher emails e notificar ──────────────
+function ModalNotificar({ atividade, onClose, onEnviado, onErro }) {
+  const [sugeridos, setSugeridos] = useState([]);
+  const [loadingSugeridos, setLoadingSugeridos] = useState(true);
+  const [selecionados, setSelecionados] = useState([]);
+  const [emailExtra, setEmailExtra] = useState("");
+  const [mensagem, setMensagem] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    setLoadingSugeridos(true);
+    fetch(`/api/planejamento/cronogramas/tarefas/${atividade.id}/notificar`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.sugeridos) {
+          setSugeridos(data.sugeridos);
+          setSelecionados(data.sugeridos.map((s) => s.email));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSugeridos(false));
+  }, [atividade.id]);
+
+  function toggleEmail(email) {
+    setSelecionados((prev) =>
+      prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email]
+    );
+  }
+
+  function adicionarExtra() {
+    const e = emailExtra.trim().toLowerCase();
+    if (!e || !e.includes("@")) return;
+    if (!selecionados.includes(e)) setSelecionados((prev) => [...prev, e]);
+    if (!sugeridos.find((s) => s.email === e)) {
+      setSugeridos((prev) => [...prev, { email: e, nome: e, origem: "manual" }]);
+    }
+    setEmailExtra("");
+  }
+
+  async function enviar() {
+    if (selecionados.length === 0) return;
+    setEnviando(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/tarefas/${atividade.id}/notificar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails: selecionados, mensagem: mensagem.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao enviar");
+      onEnviado(`Notificação enviada para ${data.enviados} destinatário(s)`);
+    } catch (e) {
+      onErro(e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  const a = atividade;
+  const fmtData = (d) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2">
+            <Mail size={15} className="text-torg-blue" /> Notificar Atividade
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        {/* Resumo da atividade */}
+        <div className="px-6 py-3 bg-gray-50/50 border-b border-gray-100">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-bold text-torg-blue font-mono">{fmtOP(a.opNumero)}</span>
+            {a.opCliente && <span className="text-[10px] text-torg-gray">({a.opCliente})</span>}
+            <span className={`ml-auto px-2 py-0.5 text-[10px] font-semibold rounded border ${DEPT_COR[a.departamento] || "bg-gray-50 text-torg-gray border-gray-200"}`}>
+              {DEPT_LABEL[a.departamento] || a.departamento}
+            </span>
+          </div>
+          <p className="text-sm font-medium text-torg-dark">{a.nome}</p>
+          <div className="flex items-center gap-3 mt-1 text-[10px] text-torg-gray">
+            <span>Prazo: {fmtData(a.dataFimPrevista)}</span>
+            <span>Realizado: {a.percentualRealizado}%</span>
+            {a.atrasada && <span className="text-red-600 font-semibold">{a.diasAtraso}d de atraso</span>}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 space-y-3">
+          {/* Destinatários */}
+          <div>
+            <label className="block text-xs font-semibold text-torg-dark mb-2">Destinatários</label>
+            {loadingSugeridos ? (
+              <div className="flex items-center gap-2 text-xs text-torg-gray py-2">
+                <Loader2 size={12} className="animate-spin" /> Buscando e-mails sugeridos...
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {sugeridos.map((s) => (
+                  <label key={s.email} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selecionados.includes(s.email)}
+                      onChange={() => toggleEmail(s.email)}
+                      className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+                    />
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      {s.origem === "cliente" ? (
+                        <Building2 size={12} className="text-amber-600 shrink-0" />
+                      ) : s.origem === "manual" ? (
+                        <Mail size={12} className="text-torg-gray shrink-0" />
+                      ) : (
+                        <User size={12} className="text-torg-blue shrink-0" />
+                      )}
+                      <span className="text-xs text-torg-dark font-medium truncate">{s.nome}</span>
+                      <span className="text-[10px] text-torg-gray truncate">{s.email}</span>
+                    </div>
+                    {s.origem === "cliente" && (
+                      <span className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-medium shrink-0">Cliente</span>
+                    )}
+                  </label>
+                ))}
+                {sugeridos.length === 0 && (
+                  <p className="text-xs text-torg-gray italic py-1">Nenhum e-mail sugerido para este departamento.</p>
+                )}
+              </div>
+            )}
+
+            {/* Adicionar email manual */}
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="email"
+                value={emailExtra}
+                onChange={(e) => setEmailExtra(e.target.value)}
+                placeholder="Adicionar outro e-mail..."
+                className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs"
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), adicionarExtra())}
+              />
+              <button
+                onClick={adicionarExtra}
+                disabled={!emailExtra.includes("@")}
+                className="px-3 py-1.5 text-xs text-torg-blue border border-torg-blue/30 rounded-lg hover:bg-torg-blue-50 disabled:opacity-40"
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+          </div>
+
+          {/* Mensagem opcional */}
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Mensagem (opcional)</label>
+            <textarea
+              value={mensagem}
+              onChange={(e) => setMensagem(e.target.value)}
+              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs"
+              rows={2}
+              placeholder="Ex: Favor priorizar esta atividade..."
+            />
+          </div>
+        </div>
+
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+          <span className="text-[10px] text-torg-gray">{selecionados.length} destinatário(s)</span>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">
+              Cancelar
+            </button>
+            <button
+              onClick={enviar}
+              disabled={enviando || selecionados.length === 0}
+              className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {enviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {enviando ? "Enviando..." : "Enviar"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
