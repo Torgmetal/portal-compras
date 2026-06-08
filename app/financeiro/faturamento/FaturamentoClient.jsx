@@ -56,6 +56,20 @@ export default function FaturamentoClient() {
     return ordenada;
   }, [data, busca, soAFaturar, ordenarPor, direcao]);
 
+  // KPIs do topo: calculados sobre a lista FILTRADA (mudam conforme busca/"só a faturar")
+  const totais = useMemo(() => {
+    const faturado = obras.reduce((s, o) => s + (o.faturado || 0), 0);
+    const aFaturar = obras.reduce((s, o) => s + (o.aFaturar || 0), 0);
+    return {
+      faturado, aFaturar,
+      contratado: faturado + aFaturar,
+      qtd: obras.length,
+      comAtraso: obras.filter((o) => o.atrasado).length,
+    };
+  }, [obras]);
+
+  const filtrado = soAFaturar || !!busca.trim();
+
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -74,25 +88,25 @@ Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado
         </button>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs — refletem o filtro atual */}
       {data && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl shadow-sm border border-green-100 p-4">
-            <p className="text-xs text-torg-gray">Já faturado</p>
-            <p className="text-xl font-extrabold text-green-700 tabular-nums mt-1">{fmtMoeda(data.totalFaturado)}</p>
+            <p className="text-xs text-torg-gray">Já faturado{filtrado && " (filtro)"}</p>
+            <p className="text-xl font-extrabold text-green-700 tabular-nums mt-1">{fmtMoeda(totais.faturado)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-amber-100 p-4">
-            <p className="text-xs text-torg-gray">A faturar</p>
-            <p className="text-xl font-extrabold text-amber-700 tabular-nums mt-1">{fmtMoeda(data.totalAFaturar)}</p>
+            <p className="text-xs text-torg-gray">A faturar{filtrado && " (filtro)"}</p>
+            <p className="text-xl font-extrabold text-amber-700 tabular-nums mt-1">{fmtMoeda(totais.aFaturar)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4">
-            <p className="text-xs text-torg-gray">Total contratado</p>
-            <p className="text-xl font-extrabold text-torg-blue tabular-nums mt-1">{fmtMoeda(data.totalContratado)}</p>
+            <p className="text-xs text-torg-gray">Total contratado{filtrado && " (filtro)"}</p>
+            <p className="text-xl font-extrabold text-torg-blue tabular-nums mt-1">{fmtMoeda(totais.contratado)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <p className="text-xs text-torg-gray">Obras</p>
-            <p className="text-xl font-extrabold text-torg-dark tabular-nums mt-1">{data.totalObras}</p>
-            <p className="text-[10px] text-red-600 mt-0.5">{data.obrasComAtraso} com atraso</p>
+            <p className="text-xs text-torg-gray">Obras{filtrado && " (filtro)"}</p>
+            <p className="text-xl font-extrabold text-torg-dark tabular-nums mt-1">{totais.qtd}</p>
+            <p className="text-[10px] text-red-600 mt-0.5">{totais.comAtraso} com atraso</p>
           </div>
         </div>
       )}
