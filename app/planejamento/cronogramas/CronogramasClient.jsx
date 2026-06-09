@@ -3301,8 +3301,10 @@ function exportarGanttPDF(detail) {
       const indent = Math.max(0, t.outlineLevel - 2) * 16;
       const isSummary = t.isSummary;
       const pct = t.percentualRealizado;
-      const bg = rowIdx % 2 === 0 ? "#ffffff" : "#f8fafc";
       const isLate = t.dataFimPrevista && new Date(t.dataFimPrevista) < new Date() && pct < 100;
+      const isExtBlocked = !!t.motivoBloqueio && !t.dataLiberacao && pct < 100;
+      const wasExtBlocked = !!t.motivoBloqueio && !!t.dataLiberacao;
+      const bg = isExtBlocked ? "#fef2f2" : rowIdx % 2 === 0 ? "#ffffff" : "#f8fafc";
 
       // Datas formatadas
       const fmtD = (d) => d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "";
@@ -3322,8 +3324,9 @@ function exportarGanttPDF(detail) {
         const cStart = ((new Date(t.dataInicioPrevista).getTime() - minDate) / 86400000) * dayWidth;
         const cWidth = Math.max(4, ((new Date(t.dataFimPrevista).getTime() - new Date(t.dataInicioPrevista).getTime()) / 86400000) * dayWidth);
         const fillWidth = Math.round(cWidth * pct / 100);
-        const barColor = isLate ? "#dc2626" : dc.bar;
-        const barBg = isLate ? "#fecaca" : `${dc.bar}20`;
+        const barColor = isExtBlocked ? "#dc2626" : isLate ? "#dc2626" : dc.bar;
+        const barBg = isExtBlocked ? "repeating-linear-gradient(45deg, #dc262615, #dc262615 3px, #dc262630 3px, #dc262630 6px)" : isLate ? "#fecaca" : `${dc.bar}20`;
+        const barBorder = isExtBlocked ? "2px dashed #dc2626" : `1.5px solid ${barColor}`;
         const yPos = t.dataInicioBase ? 13 : 7;
         const barH = isSummary ? 6 : 12;
 
@@ -3335,9 +3338,15 @@ function exportarGanttPDF(detail) {
             `<div style="position:absolute;right:0;top:0;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid ${barColor};"></div>` +
           `</div>`;
         } else {
-          currentBar = `<div style="position:absolute;top:${yPos}px;left:${cStart}px;width:${cWidth}px;height:${barH}px;background:${barBg};border:1.5px solid ${barColor};border-radius:4px;overflow:hidden;">` +
+          currentBar = `<div style="position:absolute;top:${yPos}px;left:${cStart}px;width:${cWidth}px;height:${barH}px;background:${barBg};border:${barBorder};border-radius:4px;overflow:hidden;">` +
             `<div style="width:${fillWidth}px;height:100%;background:${barColor};opacity:0.85;border-radius:2px 0 0 2px;"></div>` +
           `</div>`;
+          // Bloqueio externo label sobre a barra
+          if (isExtBlocked && cWidth > 40) {
+            currentBar += `<div style="position:absolute;top:${yPos}px;left:${cStart}px;width:${cWidth}px;height:${barH}px;display:flex;align-items:center;justify-content:center;z-index:3;">` +
+              `<span style="font-size:7px;font-weight:700;color:#991b1b;background:#fecaca;padding:0 3px;border-radius:2px;white-space:nowrap;">⏸ ${(t.motivoBloqueio || "").length > 18 ? t.motivoBloqueio.slice(0, 18) + "…" : t.motivoBloqueio}</span>` +
+            `</div>`;
+          }
           // Pct label ao lado da barra
           if (pct > 0) {
             currentBar += `<div style="position:absolute;top:${yPos + 1}px;left:${cStart + cWidth + 4}px;font-size:8px;font-weight:700;color:${barColor};white-space:nowrap;">${pct}%</div>`;
@@ -3351,12 +3360,19 @@ function exportarGanttPDF(detail) {
       const depBadge = (t.antecessoraIds?.length > 0)
         ? `<span style="color:#7c3aed;font-size:8px;font-weight:600;margin-left:2px;">🔗${t.antecessoraIds.length}</span>`
         : "";
+      // Bloqueio externo badge
+      const bloqBadge = isExtBlocked
+        ? `<span style="font-size:7px;font-weight:700;color:#fff;background:#dc2626;padding:1px 4px;border-radius:3px;margin-left:4px;white-space:nowrap;">🔒 BLOQUEADO</span>`
+        : wasExtBlocked
+        ? `<span style="font-size:7px;font-weight:700;color:#059669;background:#d1fae5;padding:1px 4px;border-radius:3px;margin-left:4px;">LIBERADA</span>`
+        : "";
 
       const nome = isSummary ? `<b style="color:${dc.text};">${t.nome}</b>` : t.nome;
+      const nameColor = isExtBlocked ? '#991b1b' : isLate ? '#dc2626' : '#334155';
       rowsHtml += `<div style="display:flex;height:${rowHeight}px;border-bottom:1px solid #f1f5f9;background:${bg};align-items:center;">` +
         // Nome
         `<div style="width:${labelWidth}px;padding:0 8px 0 ${12 + indent}px;display:flex;align-items:center;gap:4px;flex-shrink:0;overflow:hidden;">` +
-          `<span style="font-size:10.5px;color:${isLate ? '#dc2626' : '#334155'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${isSummary ? '' : 'font-weight:400;'}">${nome}${realBadge}${depBadge}</span>` +
+          `<span style="font-size:10.5px;color:${nameColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${isSummary ? '' : 'font-weight:400;'}">${nome}${realBadge}${depBadge}${bloqBadge}</span>` +
         `</div>` +
         // Percentual
         `<div style="width:${pctWidth}px;text-align:center;flex-shrink:0;">` +
@@ -3524,6 +3540,7 @@ function exportarGanttPDF(detail) {
   <div style="display:flex;align-items:center;gap:14px;">
     <span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:#64748b;"><span style="width:14px;height:5px;background:#94a3b8;border-radius:2px;display:inline-block;opacity:0.5;"></span> Baseline</span>
     <span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:#f97316;"><span style="width:2px;height:10px;background:#f97316;display:inline-block;opacity:0.7;"></span> Hoje</span>
+    <span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:#dc2626;"><span style="width:14px;height:8px;border:1.5px dashed #dc2626;border-radius:2px;display:inline-block;background:repeating-linear-gradient(45deg,#dc262610,#dc262610 2px,#dc262625 2px,#dc262625 4px);"></span> Bloqueio externo</span>
     ${dataBaseLine !== null ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:#006EAB;"><span style="width:2px;height:10px;background:#006EAB;display:inline-block;"></span> Data Base</span>` : ""}
   </div>
 </div>
