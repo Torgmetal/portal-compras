@@ -126,31 +126,142 @@ export default function ControleOPClient() {
 
   const totalPaginas = Math.ceil(itemsFiltrados.length / POR_PAGINA);
 
-  // Exportar CSV
-  const exportarCSV = useCallback(() => {
+  // Exportar XLSX profissional
+  const [exportando, setExportando] = useState(false);
+  const exportarXlsx = useCallback(async () => {
     if (!data || itemsFiltrados.length === 0) return;
-    const setores = data.setoresOrdem || [];
-    const header = ["Item", "Descrição", "Grupo", ...setores.flatMap((s) => [`${s} Status`, `${s} Plan(kg)`, `${s} Prod(kg)`, `${s} Saldo(kg)`])];
-    const rows = itemsFiltrados.map((i) => [
-      i.item,
-      i.descItem || "",
-      i.grupo || "",
-      ...setores.flatMap((s) => {
-        const d = i.setores[s];
-        return d
-          ? [d.status || "", (d.pesoPlanejado || 0).toFixed(1), (d.pesoProduzido || 0).toFixed(1), (d.saldoRestante || 0).toFixed(1)]
-          : ["—", "—", "—", "—"];
-      }),
-    ]);
-    const csv = [header, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `controle-producao-${data.obra}-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [data, itemsFiltrados]);
+    setExportando(true);
+    try {
+      const {
+        criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
+        adicionarLinhaTotais, adicionarRodapeISO, adicionarLegenda, downloadWorkbook, CORES,
+      } = await import("@/lib/excel-relatorio");
+
+      const setores = data.setoresOrdem || [];
+      // Colunas: Nº | Item | Descrição | Grupo | (Status + Plan + Prod + Saldo) por setor
+      const totalColunas = 4 + setores.length * 3;
+
+      const clienteNome = obraInfo?.op?.cliente || "";
+      const filtrosAtivos = [
+        setorFiltro && `Setor: ${setorFiltro}`,
+        grupoFiltro && `Grupo: ${grupoFiltro}`,
+        statusFiltro !== "todos" && `Status: ${statusFiltro === "pendente" ? "Pendentes" : "Finalizados"}`,
+        buscaDebounced && `Busca: "${buscaDebounced}"`,
+      ].filter(Boolean).join("  |  ");
+
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: `Controle de Producao — ${data.obra}${clienteNome ? ` — ${clienteNome}` : ""}`,
+        subtitulo: filtrosAtivos || undefined,
+        nomePlanilha: `Producao ${data.obra}`,
+        codigoDoc: "REL-PRD-004",
+        totalColunas,
+        kpis: [
+          `Peso Total: ${fmtKg(data.kpis.pesoTotalKg)}  |  Produzido: ${fmtKg(data.kpis.pesoProduzidoKg)} (${data.kpis.pctGeral}%)  |  Faltante: ${fmtKg(data.kpis.pesoFaltanteKg)}  |  Pecas: ${data.kpis.itensUnicos}`,
+          ...data.setoresResumo.map((s) =>
+            `${s.setor}: ${s.pct}% — ${fmtKg(s.produzido)}/${fmtKg(s.planejado)} — ${s.finalizados}/${s.total} itens (${s.pendentes} pendentes)`
+          ),
+        ],
+      });
+
+      // Largura das colunas
+      const colWidths = [5, 32, 24, 8];
+      for (const s of setores) {
+        colWidths.push(14, 14, 14); // Plan(kg) | Prod(kg) | Saldo(kg)
+      }
+      colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+      // Header da tabela
+      let row = linhaInicio;
+      const headers = ["Nº", "Item", "Descricao", "Grupo"];
+      for (const s of setores) {
+        headers.push(`${s} Plan(kg)`, `${s} Prod(kg)`, `${s} Saldo(kg)`);
+      }
+      adicionarHeaderTabela(ws, row, headers);
+      row++;
+
+      // Totais acumulados por setor
+      const totais = {};
+      for (const s of setores) {
+        totais[s] = { plan: 0, prod: 0, saldo: 0 };
+      }
+
+      // Linhas de dados
+      itemsFiltrados.forEach((item, idx) => {
+        const valores = [idx + 1, item.item, item.descItem || "", item.grupo || ""];
+        const fontColors = {};
+        const alinhamento = { 0: "center", 3: "center" };
+
+        for (let si = 0; si < setores.length; si++) {
+          const s = setores[si];
+          const d = item.setores[s];
+          const baseCol = 4 + si * 3;
+          alinhamento[baseCol] = "right";
+          alinhamento[baseCol + 1] = "right";
+          alinhamento[baseCol + 2] = "right";
+
+          if (d) {
+            valores.push(
+              parseFloat((d.pesoPlanejado || 0).toFixed(1)),
+              parseFloat((d.pesoProduzido || 0).toFixed(1)),
+              parseFloat((d.saldoRestante || 0).toFixed(1))
+            );
+            totais[s].plan += d.pesoPlanejado || 0;
+            totais[s].prod += d.pesoProduzido || 0;
+            totais[s].saldo += d.saldoRestante || 0;
+
+            // Cor do saldo: vermelho se > 0 (pendente), verde se zerado
+            if ((d.saldoRestante || 0) > 0) {
+              fontColors[baseCol + 2] = "D32F2F";
+            } else if (d.status?.includes("Finalizado")) {
+              fontColors[baseCol + 2] = "2E7D32";
+            }
+          } else {
+            valores.push("", "", "");
+          }
+        }
+
+        const fillColor = idx % 2 === 1 ? "F8FAFC" : undefined;
+        adicionarLinhaTabela(ws, row, valores, { fillColor, alinhamento, fontColors });
+        row++;
+      });
+
+      // Linha de totais
+      const totaisValores = ["", "TOTAL", `${itemsFiltrados.length} pecas`, ""];
+      for (const s of setores) {
+        totaisValores.push(
+          parseFloat(totais[s].plan.toFixed(1)),
+          parseFloat(totais[s].prod.toFixed(1)),
+          parseFloat(totais[s].saldo.toFixed(1))
+        );
+      }
+      adicionarLinhaTotais(ws, row, totaisValores);
+      row += 2;
+
+      // Legenda
+      adicionarLegenda(ws, row, [
+        { cor: "2E7D32", label: "Saldo 0 = Finalizado" },
+        { cor: "D32F2F", label: "Saldo > 0 = Pendente" },
+        { cor: "666", label: "Celula vazia = Item nao passa por este setor" },
+      ], totalColunas);
+      row += 2;
+
+      // Rodapé ISO
+      adicionarRodapeISO(ws, row, totalColunas, {
+        elaboradoPor: "PCP / Producao",
+      });
+
+      // Congelar painel no header
+      ws.views = [{ state: "frozen", ySplit: linhaInicio, xSplit: 2 }];
+
+      const fileName = `Controle_Producao_${data.obra}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      await downloadWorkbook(workbook, fileName);
+    } catch (e) {
+      console.error("Erro ao exportar:", e);
+      alert("Erro ao gerar planilha: " + e.message);
+    } finally {
+      setExportando(false);
+    }
+  }, [data, itemsFiltrados, obraInfo, setorFiltro, grupoFiltro, statusFiltro, buscaDebounced]);
 
   // Obra info para header
   const obraInfo = useMemo(() => {
@@ -182,11 +293,16 @@ export default function ControleOPClient() {
         </div>
         {data && (
           <button
-            onClick={exportarCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-torg-dark hover:bg-gray-50 transition-colors shadow-sm"
+            onClick={exportarXlsx}
+            disabled={exportando}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-torg-dark hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
           >
-            <Download size={16} />
-            Exportar CSV
+            {exportando ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-torg-blue" />
+            ) : (
+              <Download size={16} />
+            )}
+            {exportando ? "Gerando..." : "Exportar Planilha"}
           </button>
         )}
       </div>
