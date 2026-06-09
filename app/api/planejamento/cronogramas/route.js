@@ -6,6 +6,30 @@ import { parseMpp, extrairOpNumero } from "@/lib/mpp-parser";
 
 export const maxDuration = 60;
 
+/**
+ * Limpa o titulo do cronograma removendo prefixos redundantes de OP,
+ * prefixo CR-, sufixo de revisao (-R00) e extensao de arquivo.
+ * Ex: "OP-085-CR-DANPOWER-ENC 325-Precipitador-R00.mpp" → "DANPOWER - ENC 325 - Precipitador"
+ *     "OP071 - DANPOWER - ENC 0326" → "DANPOWER - ENC 0326"
+ */
+function limparTituloCronograma(titulo) {
+  if (!titulo) return titulo;
+  let t = titulo;
+  // Remove extensao .mpp / .xml
+  t = t.replace(/\.(mpp|xml)$/i, "");
+  // Remove sufixo de revisao: -R00, -R01, etc
+  t = t.replace(/[-\s]*R\d{2,3}$/i, "");
+  // Remove prefixo OP com numero: "OP-085-", "OP085-", "OP-085 ", "OP085 - ", "T085-", "T085 "
+  t = t.replace(/^(?:OP|T)[-\s]?\d{2,4}[-\s]*/i, "");
+  // Remove prefixo CR- (Cronograma)
+  t = t.replace(/^CR[-\s]*/i, "");
+  // Substitui hifens entre palavras por " - " limpo
+  t = t.replace(/\s*-\s*/g, " - ").trim();
+  // Remove " - " no inicio se sobrou
+  t = t.replace(/^-\s*/, "").trim();
+  return t || titulo; // fallback pro original se ficou vazio
+}
+
 export async function GET(req) {
   try {
     await requireRole(["ADMIN", "PRODUCAO", "PLANEJAMENTO", "COMERCIAL", "ENGENHARIA", "COMPRAS", "EXPEDICAO"]);
@@ -142,7 +166,7 @@ export async function POST(req) {
         await prisma.cronograma.update({
           where: { id: existing.id },
           data: {
-            titulo: parsed.titulo || file.name,
+            titulo: limparTituloCronograma(parsed.titulo || file.name),
             dataInicio: parsed.dataInicio,
             dataFim: parsed.dataFim,
             ultimoSync: new Date(),
@@ -171,7 +195,7 @@ export async function POST(req) {
             opNumero: opNumFormatted,
             opId: op?.id || null,
             nomeArquivo: file.name,
-            titulo: parsed.titulo || file.name,
+            titulo: limparTituloCronograma(parsed.titulo || file.name),
             sharepointPath: fullPath,
             dataInicio: parsed.dataInicio,
             dataFim: parsed.dataFim,
