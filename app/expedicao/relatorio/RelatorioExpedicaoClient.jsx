@@ -515,7 +515,7 @@ export default function RelatorioExpedicaoClient() {
             type="file"
             accept=".xlsx,.xls,.csv"
             onChange={handleImportarLE}
-            className="hidden"
+            style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
           />
           <button
             onClick={() => leInputRef.current?.click()}
