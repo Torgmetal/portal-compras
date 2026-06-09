@@ -1,19 +1,22 @@
-// GET /api/rm/proximo-numero — preview do próximo número sequencial de RM Interna.
+// GET /api/rm/proximo-numero?tipo=INTERNA|ALUGUEL — preview do próximo número sequencial.
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
-import { proximoNumeroInterno } from "@/lib/rm-numero";
+import { proximoNumeroInterno, proximoNumeroAluguel } from "@/lib/rm-numero";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req) {
   try {
     await requireUser();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const numero = await proximoNumeroInterno();
+    const tipo = new URL(req.url).searchParams.get("tipo") || "INTERNA";
+    const numero = tipo === "ALUGUEL"
+      ? await proximoNumeroAluguel()
+      : await proximoNumeroInterno();
     return NextResponse.json({ numero });
   } catch (e) {
     return NextResponse.json({ error: e?.message || "erro" }, { status: 500 });

@@ -19,6 +19,7 @@ const STATUS_LABELS = {
 const TIPO_RM_LABELS = {
   ENGENHARIA: { label: "Engenharia", className: "bg-torg-blue-50 text-torg-blue" },
   INTERNA:    { label: "Interna",    className: "bg-gray-100 text-gray-700" },
+  ALUGUEL:    { label: "Aluguel",    className: "bg-torg-orange-50 text-torg-orange-700" },
 };
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");

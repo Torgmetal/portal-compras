@@ -6,6 +6,7 @@ import { fmtOP } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
   Trash2, Upload, FileSpreadsheet, X, RailSymbol, Building2, Plus, Search, Package,
+  Forklift,
 } from "lucide-react";
 import {
   labelCategoria,
@@ -35,6 +36,13 @@ const TIPOS_RM = [
     icon: Building2,
     cor: "torg-dark",
   },
+  {
+    codigo: "ALUGUEL",
+    label: "Aluguel de Equipamentos",
+    desc: "Locação de equipamentos com diária, quantidade de dias e OP obrigatória.",
+    icon: Forklift,
+    cor: "torg-orange",
+  },
 ];
 
 export default function NovaRMClient({ ops, userSetor, userModulos = [], userTipo }) {
@@ -58,17 +66,20 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
   const fileRef = useRef(null);
 
   const ehInterna = tipoRM === "INTERNA";
+  const ehAluguel = tipoRM === "ALUGUEL";
+  const ehAutoNum = ehInterna || ehAluguel;
 
-  // Busca o próximo número sequencial quando muda para Interna Torg
+  // Busca o próximo número sequencial quando muda para Interna ou Aluguel
   useEffect(() => {
-    if (!ehInterna) return;
+    if (!ehAutoNum) return;
     let ativo = true;
-    fetch("/api/rm/proximo-numero")
+    const tipo = ehAluguel ? "ALUGUEL" : "INTERNA";
+    fetch(`/api/rm/proximo-numero?tipo=${tipo}`)
       .then((r) => r.json())
       .then((d) => { if (ativo && d.numero) setProximoNumInterna(d.numero); })
       .catch(() => {});
     return () => { ativo = false; };
-  }, [ehInterna]);
+  }, [ehAutoNum, ehAluguel]);
 
   // Adiciona um produto do Omie como item manual da RM
   const adicionarProdutoOmie = (p) => {
@@ -128,7 +139,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
   const op = useMemo(() => ops.find((o) => o.id === opSelecionada), [ops, opSelecionada]);
   const categoriasOpDisponiveis = useMemo(() => (op ? categoriasUnicasOP(op) : []), [op]);
 
-  const precisaOP = tipoRM === "ENGENHARIA";
+  const precisaOP = tipoRM === "ENGENHARIA" || tipoRM === "ALUGUEL";
   const precisaCategorias = tipoRM === "ENGENHARIA";
 
   const toggleCategoria = (cat) => {
@@ -209,12 +220,20 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
     if (precisaCategorias && categoriasCobertas.length === 0) {
       return setErro("Marque pelo menos uma categoria do escopo coberta por essa RM.");
     }
-    if (!ehInterna && !numero.trim()) return setErro("Informe o número da RM.");
+    if (!ehAutoNum && !numero.trim()) return setErro("Informe o número da RM.");
     if (!descricao.trim()) return setErro("Descreva a RM.");
     // Filtra itens manuais vazios (descricao em branco)
     const itensValidos = itensImportados.filter((it) => it.descricao && it.descricao.trim());
     if (itensValidos.length === 0) {
       return setErro("Adicione ao menos um item — pela planilha ou manualmente.");
+    }
+    // Validação específica de Aluguel: diária e dias obrigatórios
+    if (ehAluguel) {
+      for (let i = 0; i < itensValidos.length; i++) {
+        const it = itensValidos[i];
+        if (!it.valorDiaria || it.valorDiaria <= 0) return setErro(`Item ${i + 1}: informe o valor da diária.`);
+        if (!it.qtdDias || it.qtdDias <= 0) return setErro(`Item ${i + 1}: informe a quantidade de dias.`);
+      }
     }
 
     const itens = itensValidos.map((it) => ({
@@ -235,6 +254,9 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
       tratamento: it.tratamento || null,
       peso: Number(it.peso) || null,
       pesoLinear: Number(it.pesoLinear) || null,
+      valorDiaria: Number(it.valorDiaria) || null,
+      qtdDias: Number(it.qtdDias) || null,
+      valorTotal: Number(it.valorTotal) || null,
     }));
 
     setSalvando(true);
@@ -243,7 +265,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          numero: ehInterna ? null : numero.trim(),
+          numero: ehAutoNum ? null : numero.trim(),
           tipoRM,
           opId: precisaOP ? opSelecionada : null,
           categoriasOP: precisaCategorias ? categoriasCobertas : [],
@@ -297,6 +319,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                 onClick={() => {
                   setTipoRM(t.codigo);
                   if (t.codigo === "INTERNA") setOpSelecionada("");
+                  if (t.codigo === "ALUGUEL") { setItensImportados([]); setArquivoNome(""); }
                   if (t.codigo !== "ENGENHARIA") setCategoriasCobertas([]);
                 }}
                 className={`text-left p-4 rounded-lg border-2 transition-colors ${
@@ -433,14 +456,14 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Nº RM *</label>
-            {ehInterna ? (
+            {ehAutoNum ? (
               <>
                 <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-mono font-semibold text-torg-blue flex items-center gap-2">
-                  {proximoNumInterna || "RI-…"}
+                  {proximoNumInterna || (ehAluguel ? "RA-…" : "RI-…")}
                   <span className="text-[10px] font-sans font-normal text-torg-gray bg-white border border-gray-200 rounded px-1.5 py-0.5">automático</span>
                 </div>
                 <p className="text-[10px] text-torg-gray mt-1">
-                  Número sequencial gerado automaticamente para RM interna.
+                  Número sequencial gerado automaticamente{ehAluguel ? " para aluguel de equipamentos" : " para RM interna"}.
                 </p>
               </>
             ) : (
@@ -505,7 +528,126 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
         </div>
       </div>
 
-      {/* Step 3: itens da RM (planilha ou manual) */}
+      {/* Step 3: itens — versão Aluguel ou padrão */}
+      {ehAluguel ? (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+              <Forklift size={20} className="text-torg-orange" /> Equipamentos
+            </h3>
+            <p className="text-sm text-torg-gray mt-1">
+              Informe os equipamentos, valor da diária e quantidade de dias.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setItensImportados((prev) => [
+                ...prev,
+                { descricao: "", qtd: 1, unidade: "UN", valorDiaria: "", qtdDias: "", valorTotal: "", manual: true },
+              ]);
+            }}
+            className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange/90 font-medium flex items-center gap-2"
+          >
+            <Plus size={16} /> Adicionar equipamento
+          </button>
+        </div>
+
+        {itensImportados.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
+            <Forklift size={36} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-torg-gray text-sm">Nenhum equipamento adicionado</p>
+            <p className="text-xs text-gray-400 mt-1">Clique em "Adicionar equipamento" para começar</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {itensImportados.map((it, i) => (
+              <div key={i} className="border border-gray-200 rounded-lg p-4 hover:border-torg-orange/40 transition-colors">
+                <div className="flex items-start gap-3">
+                  <span className="text-xs font-bold text-torg-gray bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center mt-1">{i + 1}</span>
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-torg-dark mb-1">Descrição do equipamento *</label>
+                      <input
+                        type="text"
+                        value={it.descricao || ""}
+                        onChange={(e) => editarItem(i, "descricao", e.target.value)}
+                        placeholder="Ex: Guindaste 30 ton, Plataforma elevatória..."
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-orange"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-torg-dark mb-1">Valor da diária (R$) *</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={it.valorDiaria || ""}
+                          onChange={(e) => {
+                            const vd = parseFloat(e.target.value) || 0;
+                            setItensImportados((prev) => prev.map((x, j) => j === i
+                              ? { ...x, valorDiaria: vd, valorTotal: vd * (Number(x.qtdDias) || 0) }
+                              : x));
+                          }}
+                          placeholder="0,00"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-orange"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-torg-dark mb-1">Qtd de dias *</label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={it.qtdDias || ""}
+                          onChange={(e) => {
+                            const dias = parseInt(e.target.value) || 0;
+                            setItensImportados((prev) => prev.map((x, j) => j === i
+                              ? { ...x, qtdDias: dias, valorTotal: (Number(x.valorDiaria) || 0) * dias }
+                              : x));
+                          }}
+                          placeholder="0"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-orange"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-torg-dark mb-1">Valor total (R$)</label>
+                        <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-semibold text-torg-dark tabular-nums">
+                          {fmtMoeda((Number(it.valorDiaria) || 0) * (Number(it.qtdDias) || 0))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-torg-dark mb-1">Qtd</label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={it.qtd || 1}
+                          onChange={(e) => editarItem(i, "qtd", parseInt(e.target.value) || 1)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-orange"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => removerImportado(i)} className="text-red-400 hover:text-red-600 mt-1">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {/* Totalizador */}
+            <div className="bg-torg-orange/5 border border-torg-orange/20 rounded-lg px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-medium text-torg-dark">{itensImportados.length} {itensImportados.length === 1 ? "equipamento" : "equipamentos"}</span>
+              <span className="text-sm font-bold text-torg-dark">
+                Total: {fmtMoeda(itensImportados.reduce((s, it) => s + (Number(it.valorDiaria) || 0) * (Number(it.qtdDias) || 0) * (Number(it.qtd) || 1), 0))}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+      ) : (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <div>
@@ -709,6 +851,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
           </div>
         )}
       </div>
+      )}
 
       {/* Step 4: anexos (desenhos, especificacoes) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">

@@ -573,6 +573,9 @@ model RMItem {
   codigoOmieEstoque      String?
   destinoEstoque         Boolean                 @default(false)
   opDestinoId            String?
+  valorDiaria            Float?
+  qtdDias                Int?
+  valorTotal             Float?
   consultaEstoqueItens   ConsultaEstoqueItem[]
   cotacaoItens           CotacaoItem[]
   planejamentoCargaItens PlanejamentoCargaItem[]
@@ -2274,6 +2277,7 @@ enum RMStatus {
 enum TipoRM {
   ENGENHARIA
   INTERNA
+  ALUGUEL
 }
 
 enum RMItemStatus {

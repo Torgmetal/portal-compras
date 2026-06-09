@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { notificarEvento } from "@/lib/email";
 import { criarNotificacao } from "@/lib/notificacoes";
-import { proximoNumeroInterno } from "@/lib/rm-numero";
+import { proximoNumeroInterno, proximoNumeroAluguel } from "@/lib/rm-numero";
 
 const itemSchema = z.object({
   opItemId: z.string().nullable().optional(),
@@ -28,6 +28,9 @@ const itemSchema = z.object({
   tratamento: z.string().optional().nullable(),
   peso: z.number().optional().nullable(),
   pesoLinear: z.number().optional().nullable(),
+  valorDiaria: z.number().optional().nullable(),
+  qtdDias: z.number().int().optional().nullable(),
+  valorTotal: z.number().optional().nullable(),
 });
 
 const anexoSchema = z.object({
@@ -39,7 +42,7 @@ const anexoSchema = z.object({
 
 const schema = z.object({
   numero: z.string().optional().nullable(),
-  tipoRM: z.enum(["ENGENHARIA", "INTERNA"]).default("ENGENHARIA"),
+  tipoRM: z.enum(["ENGENHARIA", "INTERNA", "ALUGUEL"]).default("ENGENHARIA"),
   opId: z.string().nullable().optional(),
   categoriasOP: z.array(z.string()).default([]),
   tipo: z.string().default("Material"),
@@ -69,10 +72,13 @@ export async function POST(req) {
 
   // Numero da RM:
   //  - INTERNA: SEMPRE sequencial automatico "RI-NNNN" (ignora o que veio do form).
+  //  - ALUGUEL: SEMPRE sequencial automatico "RA-NNNN".
   //  - ENGENHARIA: usa o numero informado (vem do Tekla, ex "T83-001"); fallback RM-NNNN.
   let numeroRM;
   if (body.tipoRM === "INTERNA") {
     numeroRM = await proximoNumeroInterno();
+  } else if (body.tipoRM === "ALUGUEL") {
+    numeroRM = await proximoNumeroAluguel();
   } else {
     numeroRM = (body.numero || "").trim().toUpperCase();
     if (!numeroRM) {
@@ -123,6 +129,9 @@ export async function POST(req) {
           tratamento: it.tratamento || null,
           peso: it.peso ?? null,
           pesoLinear: it.pesoLinear ?? null,
+          valorDiaria: it.valorDiaria ?? null,
+          qtdDias: it.qtdDias ?? null,
+          valorTotal: it.valorTotal ?? null,
         })),
       },
       ...(body.anexos.length > 0
