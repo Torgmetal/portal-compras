@@ -126,6 +126,12 @@ export default function ControleOPClient() {
 
   const totalPaginas = Math.ceil(itemsFiltrados.length / POR_PAGINA);
 
+  // Obra info para header
+  const obraInfo = useMemo(() => {
+    if (!obraSel) return null;
+    return obras.find((o) => o.obra === obraSel);
+  }, [obras, obraSel]);
+
   // Exportar XLSX profissional
   const [exportando, setExportando] = useState(false);
   const exportarXlsx = useCallback(async () => {
@@ -262,12 +268,6 @@ export default function ControleOPClient() {
       setExportando(false);
     }
   }, [data, itemsFiltrados, obraInfo, setorFiltro, grupoFiltro, statusFiltro, buscaDebounced]);
-
-  // Obra info para header
-  const obraInfo = useMemo(() => {
-    if (!obraSel) return null;
-    return obras.find((o) => o.obra === obraSel);
-  }, [obras, obraSel]);
 
   if (loading) {
     return (
