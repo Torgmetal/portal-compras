@@ -598,6 +598,10 @@ function NovoCronogramaModal({ onClose, onCreated }) {
 }
 
 function SoloView({ soloCrono, soloId, detail, loadingDetail, onBack, onRefresh, onRenamed }) {
+  // Calcula atrasados a partir das tarefas reais (não do summary que pode estar desatualizado)
+  const atrasadosReal = detail?.tarefas
+    ? detail.tarefas.filter((t) => !t.isSummary && t.dataFimPrevista && new Date(t.dataFimPrevista) < new Date() && t.percentualRealizado < 100).length
+    : (soloCrono?.atrasados || 0);
   const [editingTitulo, setEditingTitulo] = useState(false);
   const [tituloEdit, setTituloEdit] = useState("");
   const [savingTitulo, setSavingTitulo] = useState(false);
@@ -701,8 +705,8 @@ function SoloView({ soloCrono, soloId, detail, loadingDetail, onBack, onRefresh,
           {soloCrono && (
             <p className="text-xs text-torg-gray mt-0.5">
               {fmtData(soloCrono.dataInicio)} — {fmtData(soloCrono.dataFim)}
-              {soloCrono.atrasados > 0 && (
-                <span className="ml-2 text-red-600 font-semibold">{soloCrono.atrasados} atrasado{soloCrono.atrasados > 1 ? "s" : ""}</span>
+              {atrasadosReal > 0 && (
+                <span className="ml-2 text-red-600 font-semibold">{atrasadosReal} atrasado{atrasadosReal > 1 ? "s" : ""}</span>
               )}
             </p>
           )}

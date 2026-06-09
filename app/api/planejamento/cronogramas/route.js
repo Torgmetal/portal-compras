@@ -39,8 +39,8 @@ export async function GET(req) {
     include: {
       op: { select: { id: true, numero: true, cliente: true, obra: true, status: true } },
       tarefas: {
-        where: { isSummary: true, outlineLevel: 1 },
-        select: { id: true, nome: true, departamento: true, percentualRealizado: true, dataFimPrevista: true },
+        where: { outlineLevel: { gte: 1 } },
+        select: { id: true, nome: true, departamento: true, percentualRealizado: true, dataFimPrevista: true, isSummary: true, outlineLevel: true },
       },
     },
     orderBy: { opNumero: "desc" },
@@ -48,14 +48,20 @@ export async function GET(req) {
 
   const now = new Date();
   const result = cronogramas.map((c) => {
-    const deptSummary = c.tarefas.map((t) => ({
+    const summaryTasks = c.tarefas.filter((t) => t.isSummary && t.outlineLevel === 1);
+    const realTasks = c.tarefas.filter((t) => !t.isSummary);
+
+    const deptSummary = summaryTasks.map((t) => ({
       nome: t.nome,
       departamento: t.departamento,
       percentual: t.percentualRealizado,
-      atrasado: t.dataFimPrevista && t.dataFimPrevista < now && t.percentualRealizado < 100,
+      atrasado: realTasks.some((r) => r.departamento === t.departamento && r.dataFimPrevista && r.dataFimPrevista < now && r.percentualRealizado < 100),
     }));
-    const atrasados = deptSummary.filter((d) => d.atrasado).length;
-    return { ...c, deptSummary, atrasados };
+    // Conta tarefas reais atrasadas (não summaries)
+    const atrasados = realTasks.filter((t) => t.dataFimPrevista && t.dataFimPrevista < now && t.percentualRealizado < 100).length;
+    // Remove tarefas do response pra não pesar
+    const { tarefas, ...rest } = c;
+    return { ...rest, deptSummary, atrasados };
   });
 
   return NextResponse.json(result);
