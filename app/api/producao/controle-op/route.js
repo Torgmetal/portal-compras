@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/session";
 
 export const maxDuration = 60;
 
-const SETORES_ORDEM = ["Corte", "Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+const SETORES_ORDEM = ["Corte", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
 
 /**
  * GET /api/producao/controle-op
@@ -73,7 +73,7 @@ export async function GET(req) {
   const grupo = searchParams.get("grupo");
   const busca = searchParams.get("busca");
 
-  const where = { obra };
+  const where = { obra, setor: { not: "Preparação" } };
   if (setor) where.setor = setor;
 
   const registros = await prisma.mesOrdem.findMany({

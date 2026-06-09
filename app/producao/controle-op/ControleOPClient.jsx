@@ -7,7 +7,6 @@ import {
 
 const SETOR_CORES = {
   Corte: { bg: "bg-blue-50", text: "text-blue-700", bar: "bg-blue-500", border: "border-blue-200" },
-  Preparação: { bg: "bg-purple-50", text: "text-purple-700", bar: "bg-purple-500", border: "border-purple-200" },
   Montagem: { bg: "bg-amber-50", text: "text-amber-700", bar: "bg-amber-500", border: "border-amber-200" },
   Solda: { bg: "bg-red-50", text: "text-red-700", bar: "bg-red-500", border: "border-red-200" },
   Acabamento: { bg: "bg-emerald-50", text: "text-emerald-700", bar: "bg-emerald-500", border: "border-emerald-200" },
