@@ -169,20 +169,29 @@ export default function ControleOPClient() {
         ],
       });
 
-      // Largura das colunas
-      const colWidths = [5, 32, 24, 8];
+      // Margens reduzidas para maximizar area util em paisagem
+      ws.pageSetup.margins = { left: 0.25, right: 0.25, top: 0.6, bottom: 0.6, header: 0.2, footer: 0.2 };
+
+      // Largura das colunas — compacta para caber em paisagem A4
+      const colWidths = [3, 14, 12, 6];
       for (const s of setores) {
-        colWidths.push(10, 10, 12, 12, 12); // Qtd Plan | Qtd Prod | Plan(kg) | Prod(kg) | Saldo(kg)
+        colWidths.push(5.5, 5.5, 7, 7, 7); // Q.Pl | Q.Pr | Plan | Prod | Saldo
       }
       colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
-      // Header da tabela
+      // Header da tabela — abreviado para colunas estreitas
       let row = linhaInicio;
-      const headers = ["No", "Item", "Descricao", "Grupo"];
+      const headers = ["No", "Item", "Descricao", "Grp"];
       for (const s of setores) {
-        headers.push(`${s} Qtd Plan`, `${s} Qtd Prod`, `${s} Plan(kg)`, `${s} Prod(kg)`, `${s} Saldo(kg)`);
+        headers.push(`${s}\nQ.Pl`, `${s}\nQ.Pr`, `${s}\nPlan`, `${s}\nProd`, `${s}\nSaldo`);
       }
       adicionarHeaderTabela(ws, row, headers);
+      ws.getRow(row).height = 28; // Altura maior para cabecalho com 2 linhas
+      // Fonte 8 no header para consistencia com layout compacto
+      for (let ci = 1; ci <= totalColunas; ci++) {
+        const c = ws.getCell(row, ci);
+        c.font = { ...c.font, size: 8 };
+      }
       row++;
 
       // Totais acumulados por setor
@@ -241,7 +250,7 @@ export default function ControleOPClient() {
         }
 
         const fillColor = idx % 2 === 1 ? "F8FAFC" : undefined;
-        adicionarLinhaTabela(ws, row, valores, { fillColor, alinhamento, fontColors });
+        adicionarLinhaTabela(ws, row, valores, { fillColor, alinhamento, fontColors, fontSize: 8, rowHeight: 18 });
         row++;
       });
 
