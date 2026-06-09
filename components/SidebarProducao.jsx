@@ -28,6 +28,7 @@ const menu = [
     ],
   },
   { href: "/producao/controle", label: "Controle de Produção", icon: ClipboardList },
+  { href: "/producao/controle-op", label: "Produção por OP", icon: Package },
   { href: "/producao/consulta-estoque", label: "Estoque", icon: PackageSearch },
   { href: "/producao/romaneios", label: "Romaneios", icon: FileText },
   { href: "/producao/mes", label: "Rastreabilidade Syneco", icon: Factory },
