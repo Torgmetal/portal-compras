@@ -467,6 +467,7 @@ model RM {
   updatedAt          DateTime          @updatedAt
   categoriasOP       String[]          @default([])
   tipoRM             TipoRM            @default(ENGENHARIA)
+  faturamentoDireto  Boolean           @default(false)
   anexos             Anexo[]
   consultasEstoque   ConsultaEstoque[]
   cotacoes           Cotacao[]

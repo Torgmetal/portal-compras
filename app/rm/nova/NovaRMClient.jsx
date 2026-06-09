@@ -52,7 +52,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
   const [tipoRM, setTipoRM] = useState(isAlmoxSemEng ? "INTERNA" : "ENGENHARIA");
   const [opSelecionada, setOpSelecionada] = useState("");
   const [categoriasCobertas, setCategoriasCobertas] = useState([]);
-  const [tipo, setTipo] = useState("Material");
+  const [faturamentoDireto, setFaturamentoDireto] = useState(false);
   const [numero, setNumero] = useState("");
   const [descricao, setDescricao] = useState("");
   const [observacao, setObservacao] = useState("");
@@ -269,7 +269,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
           tipoRM,
           opId: precisaOP ? opSelecionada : null,
           categoriasOP: precisaCategorias ? categoriasCobertas : [],
-          tipo,
+          faturamentoDireto: ehAluguel ? faturamentoDireto : false,
           descricao: descricao.trim(),
           observacao: observacao.trim() || null,
           setor: setor || null,
@@ -493,18 +493,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Tipo de material</label>
-            <select
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
-            >
-              <option>Material</option>
-              <option>Consumível</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-torg-dark mb-1">Setor</label>
             <input
@@ -539,6 +528,17 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
             <p className="text-sm text-torg-gray mt-1">
               Informe os equipamentos, valor da diária e quantidade de dias.
             </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <div
+                onClick={() => setFaturamentoDireto(!faturamentoDireto)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${faturamentoDireto ? "bg-torg-orange" : "bg-gray-300"}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${faturamentoDireto ? "translate-x-6" : "translate-x-1"}`} />
+              </div>
+              <span className="text-sm font-medium text-torg-dark">Faturamento direto</span>
+            </label>
           </div>
           <button
             type="button"

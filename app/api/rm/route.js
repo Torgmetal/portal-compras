@@ -46,6 +46,7 @@ const schema = z.object({
   opId: z.string().nullable().optional(),
   categoriasOP: z.array(z.string()).default([]),
   tipo: z.string().default("Material"),
+  faturamentoDireto: z.boolean().default(false),
   descricao: z.string().min(1),
   observacao: z.string().optional().nullable(),
   setor: z.string().optional().nullable(),
@@ -104,6 +105,7 @@ export async function POST(req) {
     data: {
       numero: numeroRM,
       tipoRM: body.tipoRM,
+      faturamentoDireto: body.faturamentoDireto,
       opId: body.opId || null,
       categoriasOP: body.categoriasOP,
       tipo: body.tipo,
