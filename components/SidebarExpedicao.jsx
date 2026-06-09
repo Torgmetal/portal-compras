@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, ClipboardCheck, Truck, FileBarChart2 } from "lucide-react";
+import { FileText, ClipboardCheck, Truck, FileBarChart2, GitCompareArrows } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -10,6 +10,7 @@ const menu = [
   { href: "/expedicao/checklist", label: "Checklist", icon: ClipboardCheck },
   { href: "/expedicao/programacao-cargas", label: "Prog. Cargas", icon: Truck },
   { href: "/expedicao/relatorio", label: "Relatório por OP", icon: FileBarChart2 },
+  { href: "/expedicao/confronto", label: "Confronto", icon: GitCompareArrows },
 ];
 
 export default function SidebarExpedicao() {
