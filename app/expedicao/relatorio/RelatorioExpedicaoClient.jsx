@@ -101,7 +101,7 @@ export default function RelatorioExpedicaoClient() {
   // Importar LE (XLSX) — usa SheetJS no client + endpoint existente
   const handleImportarLE = useCallback(async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !opSel) return;
+    if (!file) return;
     setImportandoLE(true);
     setErro(null);
     try {
@@ -111,19 +111,30 @@ export default function RelatorioExpedicaoClient() {
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
 
-      const opNum = ops.find((o) => o.id === opSel)?.numero || "";
+      // Se tem OP selecionada, usa o número dela; senão deixa o parser extrair do arquivo
+      const opNum = opSel ? (ops.find((o) => o.id === opSel)?.numero || "") : "";
       const r = await fetch("/api/producao/pecas/importar-le", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, opNumero: opNum, sobrescrever: false }),
+        body: JSON.stringify({ rows, opNumero: opNum || null, sobrescrever: false }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Erro ao importar LE");
 
-      // Recarregar dados da OP após importação
-      await carregarOP(opSel);
-      // Limpar confronto para recarregar se estiver nessa aba
-      setConfrontoData(null);
+      // Recarregar lista de OPs para refletir novas peças
+      const rOps = await fetch("/api/expedicao/relatorio");
+      const dOps = await rOps.json();
+      if (rOps.ok && dOps.ops) setOps(dOps.ops);
+
+      // Se a OP importada já estava selecionada, recarregar detalhes
+      if (opSel) {
+        await carregarOP(opSel);
+        setConfrontoData(null);
+      } else if (d.opNumero) {
+        // Selecionar automaticamente a OP importada
+        const opImportada = (dOps.ops || ops).find((o) => String(o.numero) === String(d.opNumero));
+        if (opImportada) setOpSel(opImportada.id);
+      }
     } catch (err) {
       setErro(err.message);
     } finally {
@@ -508,7 +519,7 @@ export default function RelatorioExpedicaoClient() {
           />
           <button
             onClick={() => leInputRef.current?.click()}
-            disabled={!opSel || importandoLE}
+            disabled={importandoLE}
             className="flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-lg text-sm font-medium hover:bg-torg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {importandoLE ? (
