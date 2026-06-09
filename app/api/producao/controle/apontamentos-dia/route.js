@@ -14,15 +14,18 @@ export async function GET(req) {
   const url = new URL(req.url);
   const dataStr = url.searchParams.get("data") || new Date().toISOString().slice(0, 10);
 
-  // Limites do dia (UTC)
-  const inicioDia = new Date(dataStr + "T00:00:00.000Z");
-  const fimDia = new Date(dataStr + "T23:59:59.999Z");
+  // Limites do dia no fuso de Brasília (UTC-3)
+  const inicioDia = new Date(dataStr + "T00:00:00.000-03:00");
+  const fimDia   = new Date(dataStr + "T23:59:59.999-03:00");
 
   // Mês/ano para buscar metas
-  const ano = inicioDia.getFullYear();
-  const mes = inicioDia.getMonth() + 1;
-  const inicioMes = new Date(ano, mes - 1, 1);
-  const fimMes = new Date(ano, mes, 0, 23, 59, 59, 999);
+  // Usar o dataStr diretamente para evitar confusão de timezone
+  const [anoStr, mesStr] = dataStr.split("-");
+  const ano = Number(anoStr);
+  const mes = Number(mesStr);
+  const inicioMes = new Date(`${ano}-${mesStr}-01T00:00:00.000-03:00`);
+  const ultimoDia = new Date(ano, mes, 0).getDate(); // último dia do mês
+  const fimMes = new Date(`${ano}-${mesStr}-${String(ultimoDia).padStart(2, "0")}T23:59:59.999-03:00`);
 
   // 1) Apontamentos do dia (MesApontamento)
   const apontamentos = await prisma.mesApontamento.findMany({
