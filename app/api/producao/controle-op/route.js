@@ -28,16 +28,27 @@ export async function GET(req) {
   const obra = searchParams.get("obra");
 
   // ── Sem obra: retorna lista de obras com resumo ──
+  // Usa apenas o setor Corte para calcular peso real (a mesma peça passa por
+  // vários setores — somar todos inflaria o peso em ~6x).
   if (!obra) {
-    const obrasRaw = await prisma.mesOrdem.groupBy({
+    const obrasCorte = await prisma.mesOrdem.groupBy({
       by: ["obra"],
+      where: { setor: "Corte" },
       _count: true,
       _sum: { pesoPlanejado: true, pesoProduzido: true },
       orderBy: { obra: "asc" },
     });
 
+    // Total de registros (todos os setores) por obra para info
+    const obrasTotal = await prisma.mesOrdem.groupBy({
+      by: ["obra"],
+      _count: true,
+      orderBy: { obra: "asc" },
+    });
+    const totalMap = Object.fromEntries(obrasTotal.map((o) => [o.obra, o._count]));
+
     // Buscar OPs para vincular nome/cliente
-    const opNums = obrasRaw.map((o) => {
+    const opNums = obrasCorte.map((o) => {
       const m = o.obra.match(/^T(\d+)/i);
       return m ? String(parseInt(m[1])).padStart(3, "0") : null;
     }).filter(Boolean);
@@ -48,7 +59,7 @@ export async function GET(req) {
     });
     const opMap = Object.fromEntries(ops.map((o) => [o.numero, o]));
 
-    const obras = obrasRaw.map((o) => {
+    const obras = obrasCorte.map((o) => {
       const m = o.obra.match(/^T(\d+)/i);
       const num = m ? String(parseInt(m[1])).padStart(3, "0") : null;
       const op = num ? opMap[num] : null;
@@ -56,7 +67,8 @@ export async function GET(req) {
       const produzido = o._sum.pesoProduzido || 0;
       return {
         obra: o.obra,
-        registros: o._count,
+        registros: totalMap[o.obra] || o._count,
+        pecas: o._count,
         planejadoKg: planejado,
         produzidoKg: produzido,
         pct: planejado > 0 ? Math.round((produzido / planejado) * 100) : 0,

@@ -326,7 +326,7 @@ export default function ControleOPClient() {
               <option value="">— Selecione uma OP —</option>
               {obras.map((o) => (
                 <option key={o.obra} value={o.obra}>
-                  {o.obra} {o.op ? `— ${o.op.cliente || o.op.obra}` : ""} ({fmtPct(o.pct)} • {fmtKg(o.planejadoKg)})
+                  {o.obra} {o.op ? `— ${o.op.cliente || o.op.obra}` : ""} ({fmtPct(o.pct)} • {fmtKg(o.planejadoKg)} • {o.pecas || "?"} peças)
                 </option>
               ))}
             </select>
