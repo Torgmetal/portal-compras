@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { rollupPercentualDepartamentos } from "@/lib/cronograma-recalcular";
 
 /**
  * GET /api/planejamento/cronogramas/[id]/importar-peso
@@ -206,6 +207,13 @@ export async function POST(req, { params }) {
       })
     );
     await prisma.$transaction(ops);
+
+    // Rollup: recalcular percentuais das tarefas-resumo (departamentos)
+    try {
+      await rollupPercentualDepartamentos(id, null); // null = todos os departamentos
+    } catch (e) {
+      console.error("Erro no rollup apos importar peso:", e.message);
+    }
   }
 
   return NextResponse.json({ success: true, atualizados: atualizados.length });

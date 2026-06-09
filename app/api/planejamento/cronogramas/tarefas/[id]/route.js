@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
-import { recalcularCronograma } from "@/lib/cronograma-recalcular";
+import { recalcularCronograma, rollupPercentualDepartamentos } from "@/lib/cronograma-recalcular";
 
 const patchSchema = z.object({
   nome: z.string().min(1).max(200).optional(),
@@ -205,6 +205,15 @@ export async function PATCH(req, { params }) {
     } catch (e) {
       // Recalculo nao-fatal: a tarefa ja foi salva
       console.error("Erro no recalculo automatico:", e.message);
+    }
+  }
+
+  // Rollup: recalcular percentual da tarefa-resumo do departamento
+  if (progressoMudou && tarefa.departamento) {
+    try {
+      await rollupPercentualDepartamentos(tarefa.cronograma.id, tarefa.departamento);
+    } catch (e) {
+      console.error("Erro no rollup de departamento:", e.message);
     }
   }
 
