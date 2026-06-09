@@ -62,8 +62,9 @@ export default function RelatorioExpedicaoClient() {
   // Carregar lista de OPs
   useEffect(() => {
     fetch("/api/expedicao/relatorio")
-      .then((r) => r.json())
-      .then((d) => {
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Erro ao carregar OPs");
         setOps(d.ops || []);
         setLoading(false);
       })

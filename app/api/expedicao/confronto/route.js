@@ -18,6 +18,7 @@ export async function GET(req) {
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
+  try {
   const { searchParams } = new URL(req.url);
   const opId = searchParams.get("opId");
 
@@ -31,20 +32,20 @@ export async function GET(req) {
         cliente: true,
         obra: true,
         status: true,
-        _count: { select: { pecas: true, romaneios: true } },
+        _count: { select: { pecasConjunto: true, romaneios: true } },
       },
       orderBy: { numero: "asc" },
     });
 
     const lista = ops
-      .filter((o) => o._count.pecas > 0)
+      .filter((o) => o._count.pecasConjunto > 0)
       .map((o) => ({
         id: o.id,
         numero: o.numero,
         cliente: o.cliente,
         obra: o.obra,
         status: o.status,
-        totalPecas: o._count.pecas,
+        totalPecas: o._count.pecasConjunto,
         totalRomaneios: o._count.romaneios,
       }));
 
@@ -234,4 +235,8 @@ export async function GET(req) {
       pesoKg: ie.pesoKg,
     })),
   });
+  } catch (e) {
+    console.error("Erro em /api/expedicao/confronto:", e);
+    return NextResponse.json({ success: false, error: e.message || "Erro interno" }, { status: 500 });
+  }
 }

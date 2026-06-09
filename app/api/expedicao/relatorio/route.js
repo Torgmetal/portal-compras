@@ -19,6 +19,7 @@ export async function GET(req) {
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
+  try {
   const { searchParams } = new URL(req.url);
   const opId = searchParams.get("opId");
 
@@ -39,7 +40,7 @@ export async function GET(req) {
             valorTotal: true,
           },
         },
-        pecas: {
+        pecasConjunto: {
           select: {
             id: true,
             pesoTotalKg: true,
@@ -54,9 +55,9 @@ export async function GET(req) {
       const totalRomaneios = op.romaneios.length;
       const pesoExpedido = op.romaneios.reduce((s, r) => s + (r.pesoRealKg || 0), 0);
       const valorExpedido = op.romaneios.reduce((s, r) => s + (r.valorTotal || 0), 0);
-      const totalPecas = op.pecas.length;
-      const pecasExpedidas = op.pecas.filter((p) => p.status === "EXPEDIDO").length;
-      const pesoTotalPecas = op.pecas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+      const totalPecas = op.pecasConjunto.length;
+      const pecasExpedidas = op.pecasConjunto.filter((p) => p.status === "EXPEDIDO").length;
+      const pesoTotalPecas = op.pecasConjunto.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
 
       return {
         id: op.id,
@@ -233,4 +234,8 @@ export async function GET(req) {
     pecasPendentes,
     itensExpedidos,
   });
+  } catch (e) {
+    console.error("Erro em /api/expedicao/relatorio:", e);
+    return NextResponse.json({ success: false, error: e.message || "Erro interno" }, { status: 500 });
+  }
 }
