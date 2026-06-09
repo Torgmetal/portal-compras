@@ -1987,6 +1987,43 @@ model ContaPagar {
   @@index([categoriaNome])
 }
 
+// Espelho das Contas a Receber do Omie. Fonte: financas/mf (movimentos
+// financeiros, cNatureza="R"), que — diferente de financas/contareceber —
+// expõe o saldo em aberto (nValAberto) e o valor recebido (nValPago), captando
+// os títulos "recebidos parcialmente". id = nCodTitulo. Sincronizado por cron + botão.
+model ContaReceber {
+  id                String    @id // nCodTitulo (string)
+  clienteCodigo     String?
+  clienteNome       String?
+  valor             Float     @default(0) // nValorTitulo (total do título)
+  valorRecebido     Float     @default(0) // nValPago
+  saldo             Float     @default(0) // nValAberto (a receber)
+  dataEmissao       DateTime?
+  dataVencimento    DateTime?
+  dataPrevisao      DateTime?
+  numeroDocumento   String? // cNumTitulo (ex: "RPS 45")
+  numeroDocFiscal   String? // cNumDocFiscal — NF emitida
+  numeroParcela     String?
+  numeroPedidoVenda String?
+  numeroOS          String? // cNumOS
+  categoriaCodigo   String?
+  categoriaNome     String?
+  projetoCodigo     String?
+  tipoDocumento     String? // cTipo (NFS, NFE, BOL...)
+  status            String? // A VENCER/ATRASADO/RECEBIDO/CANCELADO (do Omie)
+  observacao        String?
+  contaCorrenteId   String?
+  chaveNfe          String?
+  detalheCarregado  Boolean   @default(false)
+  dataAlteracaoOmie DateTime?
+  syncedAt          DateTime  @default(now())
+
+  @@index([dataVencimento])
+  @@index([status])
+  @@index([clienteNome])
+  @@index([categoriaNome])
+}
+
 // Estado do sync incremental por entidade do Omie ("contapagar" / "contareceber").
 model OmieSyncState {
   id              String    @id // "contapagar"

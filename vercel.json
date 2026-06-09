@@ -37,6 +37,10 @@
     {
       "path": "/api/cron/contas-pagar",
       "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/contas-receber",
+      "schedule": "45 7 * * *"
     }
   ]
 }
