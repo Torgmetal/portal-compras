@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import {
   FileBarChart2, Search, Package, Truck, Weight, DollarSign,
   Clock, CheckCircle2, AlertTriangle, Download, ChevronDown,
-  ChevronUp, X, BarChart3, FileText,
+  ChevronUp, X, BarChart3, FileText, GitCompareArrows, ArrowRightLeft,
 } from "lucide-react";
 
 function fmtKg(v) {
@@ -46,11 +46,18 @@ export default function RelatorioExpedicaoClient() {
   // Expandir romaneios
   const [expandidos, setExpandidos] = useState(new Set());
 
-  // Aba: expedidos | pendentes
+  // Aba: expedidos | pendentes | confronto
   const [aba, setAba] = useState("expedidos");
 
   // Busca
   const [busca, setBusca] = useState("");
+
+  // Confronto
+  const [confrontoData, setConfrontoData] = useState(null);
+  const [confrontoLoading, setConfrontoLoading] = useState(false);
+  const [filtroConfronto, setFiltroConfronto] = useState("todos");
+  const [buscaConfronto, setBuscaConfronto] = useState("");
+  const [expandidosConfronto, setExpandidosConfronto] = useState(new Set());
 
   // Carregar lista de OPs
   useEffect(() => {
@@ -91,6 +98,35 @@ export default function RelatorioExpedicaoClient() {
     if (opSel) carregarOP(opSel, dataDe, dataAte);
   }, [opSel, dataDe, dataAte, carregarOP]);
 
+  // Carregar dados de confronto (lazy — ao clicar na aba)
+  const carregarConfronto = useCallback(async (opId) => {
+    if (!opId || confrontoData?.opId === opId) return;
+    setConfrontoLoading(true);
+    try {
+      const r = await fetch(`/api/expedicao/confronto?opId=${opId}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Erro ao carregar confronto");
+      setConfrontoData({ ...d, opId });
+      setExpandidosConfronto(new Set());
+      setFiltroConfronto("todos");
+      setBuscaConfronto("");
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setConfrontoLoading(false);
+    }
+  }, [confrontoData?.opId]);
+
+  // Quando muda aba para confronto, carregar dados
+  useEffect(() => {
+    if (aba === "confronto" && opSel) carregarConfronto(opSel);
+  }, [aba, opSel, carregarConfronto]);
+
+  // Limpar confronto quando muda OP
+  useEffect(() => {
+    setConfrontoData(null);
+  }, [opSel]);
+
   // Toggle expandir romaneio
   const toggleExpand = (id) => {
     setExpandidos((prev) => {
@@ -120,6 +156,43 @@ export default function RelatorioExpedicaoClient() {
         p.material?.toLowerCase().includes(b)
     );
   }, [data?.pecasPendentes, busca]);
+
+  // Filtrar peças do confronto
+  const confrontoFiltrado = useMemo(() => {
+    if (!confrontoData?.pecas) return [];
+    let lista = confrontoData.pecas;
+    if (filtroConfronto !== "todos") {
+      lista = lista.filter((p) => p.statusConfronto === filtroConfronto);
+    }
+    if (buscaConfronto) {
+      const b = buscaConfronto.toLowerCase();
+      lista = lista.filter(
+        (p) => p.marca?.toLowerCase().includes(b) ||
+          p.descricao?.toLowerCase().includes(b) ||
+          p.material?.toLowerCase().includes(b) ||
+          p.perfil?.toLowerCase().includes(b)
+      );
+    }
+    return lista;
+  }, [confrontoData?.pecas, filtroConfronto, buscaConfronto]);
+
+  const confrontoTotais = useMemo(() => {
+    const qtdPlan = confrontoFiltrado.reduce((s, p) => s + p.qtdPlanejada, 0);
+    const qtdExp = confrontoFiltrado.reduce((s, p) => s + p.qtdExpedida, 0);
+    const qtdPend = confrontoFiltrado.reduce((s, p) => s + p.qtdPendente, 0);
+    const pesoTotal = confrontoFiltrado.reduce((s, p) => s + p.pesoTotalKg, 0);
+    const pesoExp = confrontoFiltrado.reduce((s, p) => s + p.pesoExpedido, 0);
+    const pesoPend = confrontoFiltrado.reduce((s, p) => s + p.pesoPendente, 0);
+    return { qtdPlan, qtdExp, qtdPend, pesoTotal, pesoExp, pesoPend };
+  }, [confrontoFiltrado]);
+
+  const toggleConfronto = (id) => {
+    setExpandidosConfronto((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // Obra info do dropdown
   const opInfo = useMemo(() => {
@@ -536,6 +609,17 @@ export default function RelatorioExpedicaoClient() {
               <Clock size={14} className="inline mr-1.5 -mt-0.5" />
               Pendentes ({data.pecasPendentes?.length || 0} peças)
             </button>
+            <button
+              onClick={() => setAba("confronto")}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                aba === "confronto"
+                  ? "bg-white text-torg-dark shadow-sm"
+                  : "text-torg-gray hover:text-torg-dark"
+              }`}
+            >
+              <GitCompareArrows size={14} className="inline mr-1.5 -mt-0.5" />
+              Confronto
+            </button>
           </div>
 
           {/* ABA: Expedidos */}
@@ -730,6 +814,275 @@ export default function RelatorioExpedicaoClient() {
                     </tfoot>
                   </table>
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* ABA: Confronto */}
+          {aba === "confronto" && (
+            <div className="space-y-4">
+              {confrontoLoading && (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-torg-blue" />
+                  <span className="ml-3 text-torg-gray text-sm">Carregando confronto...</span>
+                </div>
+              )}
+
+              {confrontoData && !confrontoLoading && (
+                <>
+                  {/* KPIs do confronto */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-torg-gray font-medium">Total</span>
+                        <Package size={16} className="text-torg-blue" />
+                      </div>
+                      <div className="text-lg font-bold text-torg-dark">{confrontoData.kpis.totalPecas}</div>
+                      <div className="text-xs text-torg-gray">{fmtKg(confrontoData.kpis.pesoTotal)}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-green-100 shadow-sm p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-torg-gray font-medium">Completas</span>
+                        <CheckCircle2 size={16} className="text-green-500" />
+                      </div>
+                      <div className="text-lg font-bold text-green-700">{confrontoData.kpis.pecasCompletas}</div>
+                      <div className="text-xs text-torg-gray">{confrontoData.kpis.pctPecas}% das peças</div>
+                    </div>
+                    <div className={`bg-white rounded-xl border shadow-sm p-3 ${confrontoData.kpis.pecasParciais > 0 ? "border-amber-100" : "border-gray-100"}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-torg-gray font-medium">Parciais</span>
+                        <ArrowRightLeft size={16} className="text-amber-500" />
+                      </div>
+                      <div className="text-lg font-bold text-amber-600">{confrontoData.kpis.pecasParciais}</div>
+                      <div className="text-xs text-torg-gray">Expedida &lt; planejada</div>
+                    </div>
+                    <div className={`bg-white rounded-xl border shadow-sm p-3 ${confrontoData.kpis.pecasPendentes > 0 ? "border-red-100" : "border-gray-100"}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-torg-gray font-medium">Pendentes</span>
+                        <Clock size={16} className="text-red-500" />
+                      </div>
+                      <div className="text-lg font-bold text-red-600">{confrontoData.kpis.pecasPendentes}</div>
+                      <div className="text-xs text-torg-gray">{fmtKg(confrontoData.kpis.pesoPendente)}</div>
+                    </div>
+                  </div>
+
+                  {/* Filtros do confronto */}
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                      {[
+                        { key: "todos", label: "Todos", count: confrontoData.kpis.totalPecas },
+                        { key: "PENDENTE", label: "Pendentes", count: confrontoData.kpis.pecasPendentes },
+                        { key: "PARCIAL", label: "Parciais", count: confrontoData.kpis.pecasParciais },
+                        { key: "COMPLETO", label: "Completos", count: confrontoData.kpis.pecasCompletas },
+                      ].map((f) => (
+                        <button
+                          key={f.key}
+                          onClick={() => setFiltroConfronto(f.key)}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            filtroConfronto === f.key
+                              ? "bg-white text-torg-dark shadow-sm"
+                              : "text-torg-gray hover:text-torg-dark"
+                          }`}
+                        >
+                          {f.label} ({f.count})
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="relative w-56">
+                      <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        value={buscaConfronto}
+                        onChange={(e) => setBuscaConfronto(e.target.value)}
+                        placeholder="Buscar marca, material..."
+                        className="w-full border border-gray-200 rounded-lg pl-8 pr-8 py-1.5 text-xs focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
+                      />
+                      {buscaConfronto && (
+                        <button onClick={() => setBuscaConfronto("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tabela de confronto */}
+                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50/60">
+                          <tr>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-torg-gray uppercase w-28">Marca</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-torg-gray uppercase">Descrição</th>
+                            <th className="text-left px-3 py-2 text-xs font-medium text-torg-gray uppercase w-20">Material</th>
+                            <th className="text-center px-3 py-2 text-xs font-medium text-torg-gray uppercase w-14">
+                              <span className="block">Qtd</span><span className="text-[10px] font-normal">Plan</span>
+                            </th>
+                            <th className="text-center px-3 py-2 text-xs font-medium text-torg-gray uppercase w-14">
+                              <span className="block">Qtd</span><span className="text-[10px] font-normal">Exped</span>
+                            </th>
+                            <th className="text-center px-3 py-2 text-xs font-medium text-torg-gray uppercase w-14">
+                              <span className="block">Qtd</span><span className="text-[10px] font-normal">Pend</span>
+                            </th>
+                            <th className="text-right px-3 py-2 text-xs font-medium text-torg-gray uppercase w-20">Peso Plan</th>
+                            <th className="text-right px-3 py-2 text-xs font-medium text-torg-gray uppercase w-20">Peso Exp</th>
+                            <th className="text-right px-3 py-2 text-xs font-medium text-torg-gray uppercase w-20">Peso Pend</th>
+                            <th className="text-center px-3 py-2 text-xs font-medium text-torg-gray uppercase w-20">Situação</th>
+                            <th className="w-8"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {confrontoFiltrado.length === 0 ? (
+                            <tr>
+                              <td colSpan={11} className="px-4 py-8 text-center text-torg-gray text-sm">
+                                Nenhuma peça encontrada com os filtros selecionados
+                              </td>
+                            </tr>
+                          ) : (
+                            confrontoFiltrado.map((p) => {
+                              const isExp = expandidosConfronto.has(p.id);
+                              const temRom = p.romaneios.length > 0;
+                              return (
+                                <Fragment key={p.id}>
+                                  <tr
+                                    className={`hover:bg-gray-50/50 ${temRom ? "cursor-pointer" : ""}`}
+                                    onClick={temRom ? () => toggleConfronto(p.id) : undefined}
+                                  >
+                                    <td className="px-3 py-2 text-xs font-mono text-torg-dark font-medium">{p.marca}</td>
+                                    <td className="px-3 py-2 text-xs text-torg-gray max-w-[180px] truncate" title={p.descricao}>{p.descricao || "—"}</td>
+                                    <td className="px-3 py-2 text-xs text-torg-gray">{p.material || "—"}</td>
+                                    <td className="px-3 py-2 text-center text-xs font-medium">{p.qtdPlanejada}</td>
+                                    <td className={`px-3 py-2 text-center text-xs font-bold ${
+                                      p.statusConfronto === "COMPLETO" ? "text-green-700"
+                                        : p.statusConfronto === "PARCIAL" ? "text-amber-600" : "text-gray-400"
+                                    }`}>
+                                      {p.qtdExpedida}
+                                    </td>
+                                    <td className={`px-3 py-2 text-center text-xs font-bold ${
+                                      p.qtdPendente > 0 ? "text-red-600" : "text-green-600"
+                                    }`}>
+                                      {p.qtdPendente}
+                                    </td>
+                                    <td className="px-3 py-2 text-right text-xs">{fmtKg(p.pesoTotalKg)}</td>
+                                    <td className="px-3 py-2 text-right text-xs">{fmtKg(p.pesoExpedido)}</td>
+                                    <td className={`px-3 py-2 text-right text-xs font-medium ${
+                                      p.pesoPendente > 0 ? "text-red-600" : "text-green-600"
+                                    }`}>
+                                      {p.pesoPendente > 0 ? fmtKg(p.pesoPendente) : "—"}
+                                    </td>
+                                    <td className="px-3 py-2 text-center">
+                                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                                        p.statusConfronto === "COMPLETO" ? "bg-green-100 text-green-700"
+                                          : p.statusConfronto === "PARCIAL" ? "bg-amber-100 text-amber-700"
+                                          : "bg-red-100 text-red-700"
+                                      }`}>
+                                        {p.statusConfronto}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-center">
+                                      {temRom && (
+                                        isExp
+                                          ? <ChevronUp size={14} className="text-gray-400" />
+                                          : <ChevronDown size={14} className="text-gray-400" />
+                                      )}
+                                    </td>
+                                  </tr>
+
+                                  {isExp && p.romaneios.length > 0 && (
+                                    <tr>
+                                      <td colSpan={11} className="bg-blue-50/40 px-6 py-2">
+                                        <div className="text-xs text-torg-gray mb-1.5 font-medium">Romaneios vinculados:</div>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                          {p.romaneios.map((r, ri) => (
+                                            <div key={ri} className="bg-white rounded-lg border border-gray-100 px-3 py-2 flex items-center gap-2">
+                                              <FileText size={14} className="text-torg-blue flex-shrink-0" />
+                                              <div>
+                                                <span className="font-mono text-xs font-bold text-torg-dark">{r.numero}</span>
+                                                <span className="text-[10px] text-torg-gray ml-2">{fmtData(r.data)}</span>
+                                                <div className="text-[10px] text-torg-gray">
+                                                  Qtd: {r.qtd} • {r.pesoKg ? fmtKg(r.pesoKg) : "—"}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </Fragment>
+                              );
+                            })
+                          )}
+                        </tbody>
+                        {confrontoFiltrado.length > 0 && (
+                          <tfoot>
+                            <tr className="bg-gray-50 font-semibold">
+                              <td className="px-3 py-2.5 text-xs text-torg-dark" colSpan={3}>
+                                TOTAL — {confrontoFiltrado.length} peças
+                              </td>
+                              <td className="px-3 py-2.5 text-center text-xs">{confrontoTotais.qtdPlan}</td>
+                              <td className="px-3 py-2.5 text-center text-xs text-green-700">{confrontoTotais.qtdExp}</td>
+                              <td className={`px-3 py-2.5 text-center text-xs ${confrontoTotais.qtdPend > 0 ? "text-red-600" : "text-green-600"}`}>
+                                {confrontoTotais.qtdPend}
+                              </td>
+                              <td className="px-3 py-2.5 text-right text-xs">{fmtKg(confrontoTotais.pesoTotal)}</td>
+                              <td className="px-3 py-2.5 text-right text-xs">{fmtKg(confrontoTotais.pesoExp)}</td>
+                              <td className={`px-3 py-2.5 text-right text-xs ${confrontoTotais.pesoPend > 0 ? "text-red-600" : "text-green-600"}`}>
+                                {fmtKg(confrontoTotais.pesoPend)}
+                              </td>
+                              <td colSpan={2}></td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Itens extras */}
+                  {confrontoData.itensExtras?.length > 0 && (
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                      <div className="px-5 py-3 border-b border-gray-50">
+                        <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2">
+                          <Truck size={16} className="text-torg-gray" />
+                          Itens Extras em Romaneios
+                          <span className="text-xs text-torg-gray bg-gray-100 px-2 py-0.5 rounded-full">
+                            {confrontoData.itensExtras.length} sem peça vinculada
+                          </span>
+                        </h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50/60">
+                            <tr>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-torg-gray uppercase">Romaneio</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-torg-gray uppercase">Data</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-torg-gray uppercase">Tipo</th>
+                              <th className="text-left px-4 py-2 text-xs font-medium text-torg-gray uppercase">Descrição</th>
+                              <th className="text-center px-4 py-2 text-xs font-medium text-torg-gray uppercase">Qtd</th>
+                              <th className="text-right px-4 py-2 text-xs font-medium text-torg-gray uppercase">Peso</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {confrontoData.itensExtras.map((ie, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50/50">
+                                <td className="px-4 py-2 text-xs font-mono font-medium">{ie.romaneioNumero}</td>
+                                <td className="px-4 py-2 text-xs text-torg-gray">{fmtData(ie.data)}</td>
+                                <td className="px-4 py-2">
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-medium">
+                                    {ie.tipo === "peca" ? "Peça" : "Acess."}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2 text-xs text-torg-dark">{ie.descricao || "—"}</td>
+                                <td className="px-4 py-2 text-center text-xs">{ie.qtd || 1}</td>
+                                <td className="px-4 py-2 text-right text-xs">{ie.pesoKg ? fmtKg(ie.pesoKg) : "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
