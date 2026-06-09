@@ -144,8 +144,8 @@ export default function ControleOPClient() {
       } = await import("@/lib/excel-relatorio");
 
       const setores = data.setoresOrdem || [];
-      // Colunas: Nº | Item | Descrição | Grupo | (Status + Plan + Prod + Saldo) por setor
-      const totalColunas = 4 + setores.length * 3;
+      // Colunas: Nº | Item | Descrição | Grupo | (Qtd Plan | Qtd Prod | Plan kg | Prod kg | Saldo kg) por setor
+      const totalColunas = 4 + setores.length * 5;
 
       const clienteNome = obraInfo?.op?.cliente || "";
       const filtrosAtivos = [
@@ -172,15 +172,15 @@ export default function ControleOPClient() {
       // Largura das colunas
       const colWidths = [5, 32, 24, 8];
       for (const s of setores) {
-        colWidths.push(14, 14, 14); // Plan(kg) | Prod(kg) | Saldo(kg)
+        colWidths.push(10, 10, 12, 12, 12); // Qtd Plan | Qtd Prod | Plan(kg) | Prod(kg) | Saldo(kg)
       }
       colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
       // Header da tabela
       let row = linhaInicio;
-      const headers = ["Nº", "Item", "Descricao", "Grupo"];
+      const headers = ["No", "Item", "Descricao", "Grupo"];
       for (const s of setores) {
-        headers.push(`${s} Plan(kg)`, `${s} Prod(kg)`, `${s} Saldo(kg)`);
+        headers.push(`${s} Qtd Plan`, `${s} Qtd Prod`, `${s} Plan(kg)`, `${s} Prod(kg)`, `${s} Saldo(kg)`);
       }
       adicionarHeaderTabela(ws, row, headers);
       row++;
@@ -188,7 +188,7 @@ export default function ControleOPClient() {
       // Totais acumulados por setor
       const totais = {};
       for (const s of setores) {
-        totais[s] = { plan: 0, prod: 0, saldo: 0 };
+        totais[s] = { qtdPlan: 0, qtdProd: 0, plan: 0, prod: 0, saldo: 0 };
       }
 
       // Linhas de dados
@@ -200,29 +200,43 @@ export default function ControleOPClient() {
         for (let si = 0; si < setores.length; si++) {
           const s = setores[si];
           const d = item.setores[s];
-          const baseCol = 4 + si * 3;
-          alinhamento[baseCol] = "right";
-          alinhamento[baseCol + 1] = "right";
+          const baseCol = 4 + si * 5;
+          alinhamento[baseCol] = "center";
+          alinhamento[baseCol + 1] = "center";
           alinhamento[baseCol + 2] = "right";
+          alinhamento[baseCol + 3] = "right";
+          alinhamento[baseCol + 4] = "right";
 
           if (d) {
+            const qtdPlan = d.planejadoUn || 0;
+            const qtdProd = d.produzidoUn || 0;
             valores.push(
+              qtdPlan,
+              qtdProd,
               parseFloat((d.pesoPlanejado || 0).toFixed(1)),
               parseFloat((d.pesoProduzido || 0).toFixed(1)),
               parseFloat((d.saldoRestante || 0).toFixed(1))
             );
+            totais[s].qtdPlan += qtdPlan;
+            totais[s].qtdProd += qtdProd;
             totais[s].plan += d.pesoPlanejado || 0;
             totais[s].prod += d.pesoProduzido || 0;
             totais[s].saldo += d.saldoRestante || 0;
 
             // Cor do saldo: vermelho se > 0 (pendente), verde se zerado
             if ((d.saldoRestante || 0) > 0) {
-              fontColors[baseCol + 2] = "D32F2F";
+              fontColors[baseCol + 4] = "D32F2F";
             } else if (d.status?.includes("Finalizado")) {
-              fontColors[baseCol + 2] = "2E7D32";
+              fontColors[baseCol + 4] = "2E7D32";
+            }
+            // Cor da qtd produzida: verde se igual ao planejado
+            if (qtdPlan > 0 && qtdProd >= qtdPlan) {
+              fontColors[baseCol + 1] = "2E7D32";
+            } else if (qtdPlan > 0 && qtdProd < qtdPlan) {
+              fontColors[baseCol + 1] = "D32F2F";
             }
           } else {
-            valores.push("", "", "");
+            valores.push("", "", "", "", "");
           }
         }
 
@@ -235,6 +249,8 @@ export default function ControleOPClient() {
       const totaisValores = ["", "TOTAL", `${itemsFiltrados.length} pecas`, ""];
       for (const s of setores) {
         totaisValores.push(
+          totais[s].qtdPlan,
+          totais[s].qtdProd,
           parseFloat(totais[s].plan.toFixed(1)),
           parseFloat(totais[s].prod.toFixed(1)),
           parseFloat(totais[s].saldo.toFixed(1))
