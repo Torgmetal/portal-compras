@@ -103,7 +103,14 @@ export async function PATCH(req, { params }) {
     antecessorasChanged = true; // trigger recalculo
   }
   if (parsed.data.observacao !== undefined) data.observacao = parsed.data.observacao;
-  if (parsed.data.motivoBloqueio !== undefined) data.motivoBloqueio = parsed.data.motivoBloqueio;
+  if (parsed.data.motivoBloqueio !== undefined) {
+    if ((parsed.data.motivoBloqueio || null) !== (tarefa.motivoBloqueio || null)) {
+      diffAntes.motivoBloqueio = tarefa.motivoBloqueio || null;
+      diffDepois.motivoBloqueio = parsed.data.motivoBloqueio || null;
+      antecessorasChanged = true; // trigger recalculo — bloqueio afeta successoras
+    }
+    data.motivoBloqueio = parsed.data.motivoBloqueio;
+  }
   if (parsed.data.dataLiberacao !== undefined) {
     const novaLib = parsed.data.dataLiberacao ? new Date(parsed.data.dataLiberacao) : null;
     if (tarefa.dataLiberacao?.toISOString() !== novaLib?.toISOString()) {

@@ -2045,14 +2045,14 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
               <CheckCircle2 size={9} /> {new Date(t.dataRealizacao).toLocaleDateString("pt-BR")}
             </span>
           )}
-          {t.dataLiberacao && !editing && (
-            <span className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0" title={t.motivoBloqueio || "Liberação externa"}>
-              <Lock size={8} /> Liberada {new Date(t.dataLiberacao).toLocaleDateString("pt-BR")}
+          {t.motivoBloqueio && !t.dataLiberacao && !editing && (
+            <span className="text-[9px] text-white bg-red-500 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 font-semibold animate-pulse" title={t.motivoBloqueio}>
+              <Lock size={9} /> Bloqueado — {t.motivoBloqueio.length > 25 ? t.motivoBloqueio.slice(0, 25) + "…" : t.motivoBloqueio}
             </span>
           )}
-          {t.motivoBloqueio && !t.dataLiberacao && !editing && (
-            <span className="text-[9px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0" title={t.motivoBloqueio}>
-              <Lock size={8} /> {t.motivoBloqueio.length > 30 ? t.motivoBloqueio.slice(0, 30) + "…" : t.motivoBloqueio}
+          {t.dataLiberacao && !editing && (
+            <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0" title={t.motivoBloqueio || "Liberação externa"}>
+              <CheckCircle2 size={8} /> Liberada {new Date(t.dataLiberacao).toLocaleDateString("pt-BR")}
             </span>
           )}
         </div>
@@ -2250,36 +2250,89 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
             selecionadas={antecessoraIds}
             onChange={setAntecessoraIds}
           />
-          {/* Liberação / Bloqueio externo */}
+          {/* Bloqueio externo */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
               <Lock size={11} className="text-amber-500" />
-              <span className="text-[10px] text-torg-gray font-medium">Bloqueio / Liberação externa:</span>
+              <span className="text-[10px] text-torg-gray font-medium">Bloqueio externo:</span>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-torg-gray whitespace-nowrap">Data liberação:</span>
+
+            {motivoBlq && !dataLib ? (
+              /* ── Estado: Bloqueado, aguardando liberação ── */
+              <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Lock size={12} className="text-red-500 shrink-0" />
+                  <span className="text-[10px] text-red-700 font-semibold">Bloqueado — aguardando liberação</span>
+                </div>
                 <input
-                  type="date"
-                  value={dataLib}
-                  onChange={(e) => setDataLib(e.target.value)}
-                  className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
+                  value={motivoBlq}
+                  onChange={(e) => setMotivoBlq(e.target.value)}
+                  className="w-full text-[10px] px-2 py-1 border border-red-200 rounded bg-white text-red-700"
                 />
-                {dataLib && (
-                  <button onClick={() => setDataLib("")} className="text-[9px] text-red-400 hover:text-red-600">limpar</button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const hoje = new Date().toISOString().split("T")[0];
+                      setDataLib(hoje);
+                    }}
+                    className="px-3 py-1 text-[10px] font-semibold text-white bg-emerald-600 rounded hover:bg-emerald-700 flex items-center gap-1"
+                  >
+                    <CheckCircle2 size={10} /> Liberar agora (data de hoje)
+                  </button>
+                  <button
+                    onClick={() => { setMotivoBlq(""); setDataLib(""); }}
+                    className="px-2 py-1 text-[10px] text-torg-gray hover:text-red-500"
+                  >
+                    Remover bloqueio
+                  </button>
+                </div>
+                <p className="text-[9px] text-red-600/70 italic">
+                  Tarefas que dependem desta estão pausadas até a liberação. Ao liberar, o sistema recalculará as datas automaticamente.
+                </p>
+              </div>
+            ) : dataLib ? (
+              /* ── Estado: Já liberado ── */
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
+                  <span className="text-[10px] text-emerald-700 font-semibold">
+                    Liberado em {new Date(dataLib + "T12:00:00Z").toLocaleDateString("pt-BR")}
+                  </span>
+                  {motivoBlq && <span className="text-[9px] text-torg-gray">({motivoBlq})</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-torg-gray whitespace-nowrap">Alterar data:</span>
+                    <input
+                      type="date"
+                      value={dataLib}
+                      onChange={(e) => setDataLib(e.target.value)}
+                      className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
+                    />
+                  </div>
+                  <button
+                    onClick={() => { setDataLib(""); setMotivoBlq(""); }}
+                    className="text-[9px] text-red-400 hover:text-red-600"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ── Estado: Sem bloqueio ── */
+              <div className="flex items-center gap-2">
+                <input
+                  value={motivoBlq}
+                  onChange={(e) => setMotivoBlq(e.target.value)}
+                  placeholder="Ex: aguardando aprovação do cliente, aditivo pendente..."
+                  className="flex-1 min-w-[180px] text-[10px] px-2 py-1 border border-gray-200 rounded bg-white"
+                />
+                {motivoBlq.trim() && (
+                  <span className="text-[9px] text-amber-600 italic whitespace-nowrap">
+                    Ao salvar, tarefa será bloqueada
+                  </span>
                 )}
               </div>
-              <input
-                value={motivoBlq}
-                onChange={(e) => setMotivoBlq(e.target.value)}
-                placeholder="Motivo do bloqueio (ex: aguardando aditivo)..."
-                className="flex-1 min-w-[180px] text-[10px] px-2 py-1 border border-gray-200 rounded bg-white"
-              />
-            </div>
-            {dataLib && (
-              <p className="text-[9px] text-amber-600 italic">
-                ⚠ Ao salvar, o sistema recalculará as datas mantendo a duração original a partir de {new Date(dataLib + "T12:00:00Z").toLocaleDateString("pt-BR")}.
-              </p>
             )}
           </div>
           <div className="flex items-center gap-2">
