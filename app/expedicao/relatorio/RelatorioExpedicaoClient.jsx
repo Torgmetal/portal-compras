@@ -511,7 +511,7 @@ export default function RelatorioExpedicaoClient() {
           </div>
 
           <label
-            className={`flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-lg text-sm font-medium hover:bg-torg-blue-700 transition-colors shadow-sm cursor-pointer ${importandoLE ? "opacity-50 pointer-events-none" : ""}`}
+            className={`relative flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-lg text-sm font-medium hover:bg-torg-blue-700 transition-colors shadow-sm cursor-pointer overflow-hidden ${importandoLE ? "opacity-50 pointer-events-none" : ""}`}
           >
             {importandoLE ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -523,7 +523,8 @@ export default function RelatorioExpedicaoClient() {
               type="file"
               accept=".xlsx,.xls,.csv"
               onChange={handleImportarLE}
-              className="sr-only"
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              style={{ fontSize: "100px" }}
             />
           </label>
         </div>
