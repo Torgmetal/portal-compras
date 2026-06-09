@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
-import { recalcularCronograma } from "@/lib/cronograma-recalcular";
+import { recalcularCronograma, rollupPercentualDepartamentos } from "@/lib/cronograma-recalcular";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -19,6 +19,9 @@ export async function POST(req, { params }) {
   const { id } = await params;
 
   const { updates, alteracoes, error } = await recalcularCronograma(id, user.id);
+
+  // Sempre faz rollup de percentual + datas dos resumos de departamento
+  await rollupPercentualDepartamentos(id, null);
 
   if (error) {
     return NextResponse.json({ success: false, error }, { status: 400 });

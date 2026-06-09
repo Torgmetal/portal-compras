@@ -215,8 +215,9 @@ export async function PATCH(req, { params }) {
     }
   }
 
-  // Rollup: recalcular percentual da tarefa-resumo do departamento
-  if (progressoMudou && tarefa.departamento) {
+  // Rollup: recalcular percentual + datas da tarefa-resumo do departamento
+  const datasMudaram = diffDepois.dataInicioPrevista !== undefined || diffDepois.dataFimPrevista !== undefined || diffDepois.dataLiberacao !== undefined || diffDepois.motivoBloqueio !== undefined;
+  if ((progressoMudou || antecessorasChanged || datasMudaram) && tarefa.departamento) {
     try {
       await rollupPercentualDepartamentos(tarefa.cronograma.id, tarefa.departamento);
     } catch (e) {
