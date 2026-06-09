@@ -46,17 +46,45 @@ export async function GET(req) {
     orderBy: { opNumero: "desc" },
   });
 
+  const DEPT_ORDER = ["COMERCIAL", "ENGENHARIA", "SUPRIMENTOS", "FABRICACAO", "EXPEDICAO", "MONTAGEM"];
   const now = new Date();
   const result = cronogramas.map((c) => {
     const summaryTasks = c.tarefas.filter((t) => t.isSummary && t.outlineLevel === 1);
     const realTasks = c.tarefas.filter((t) => !t.isSummary);
 
-    const deptSummary = summaryTasks.map((t) => ({
-      nome: t.nome,
-      departamento: t.departamento,
-      percentual: t.percentualRealizado,
-      atrasado: realTasks.some((r) => r.departamento === t.departamento && r.dataFimPrevista && r.dataFimPrevista < now && r.percentualRealizado < 100),
-    }));
+    let deptSummary;
+    if (summaryTasks.length > 0) {
+      // Tem summaries — usa eles, mas valida atrasado pelas tarefas reais
+      deptSummary = summaryTasks.map((t) => ({
+        nome: t.nome,
+        departamento: t.departamento,
+        percentual: t.percentualRealizado,
+        atrasado: realTasks.some((r) => r.departamento === t.departamento && r.dataFimPrevista && r.dataFimPrevista < now && r.percentualRealizado < 100),
+      }));
+    } else {
+      // Sem summaries — calcula resumo a partir das tarefas reais agrupadas por departamento
+      const porDept = {};
+      for (const t of realTasks) {
+        const d = t.departamento || "OUTROS";
+        if (!porDept[d]) porDept[d] = { pcts: [], atrasado: false };
+        porDept[d].pcts.push(t.percentualRealizado || 0);
+        if (t.dataFimPrevista && t.dataFimPrevista < now && t.percentualRealizado < 100) {
+          porDept[d].atrasado = true;
+        }
+      }
+      deptSummary = DEPT_ORDER
+        .filter((d) => porDept[d])
+        .concat(Object.keys(porDept).filter((d) => !DEPT_ORDER.includes(d)))
+        .map((d) => ({
+          nome: d,
+          departamento: d,
+          percentual: porDept[d].pcts.length > 0
+            ? Math.round(porDept[d].pcts.reduce((a, b) => a + b, 0) / porDept[d].pcts.length)
+            : 0,
+          atrasado: porDept[d].atrasado,
+        }));
+    }
+
     // Conta tarefas reais atrasadas (não summaries)
     const atrasados = realTasks.filter((t) => t.dataFimPrevista && t.dataFimPrevista < now && t.percentualRealizado < 100).length;
     // Remove tarefas do response pra não pesar
