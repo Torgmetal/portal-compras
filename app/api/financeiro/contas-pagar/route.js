@@ -55,6 +55,7 @@ export async function GET(req) {
       previsao: c.dataPrevisao ? c.dataPrevisao.toISOString() : null,
       numeroDocumento: c.numeroDocumento,
       nf: c.numeroDocFiscal,
+      chaveNfe: c.chaveNfe || null,
       parcela: c.numeroParcela,
       pedidoCompra: c.numeroPedidoCompra,
       categoria: c.categoriaNome,

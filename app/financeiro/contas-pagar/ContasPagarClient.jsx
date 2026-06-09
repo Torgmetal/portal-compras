@@ -2,8 +2,15 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   ArrowDownCircle, RefreshCw, Loader2, AlertCircle, Search, Clock,
-  CalendarDays, ChevronDown, ChevronRight, Tag, Building2,
+  CalendarDays, ChevronDown, ChevronRight, Tag, Building2, ExternalLink, Check,
 } from "lucide-react";
+
+// Módulo Compras do Omie (tenant Torg). O Omie não expõe API/URL estável para
+// abrir um pedido/NF específico (ObterImpressaoPedCompra não existe e a chave
+// NFe vem vazia na maioria), então o clique copia o número e abre o módulo —
+// o usuário cola na busca do Omie.
+const OMIE_TENANT = process.env.NEXT_PUBLIC_OMIE_TENANT || "torg-5mos4yik";
+const OMIE_COMPRAS_URL = `https://app.omie.com.br/gestao/${OMIE_TENANT}/#COM`;
 
 const fmtMoeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -238,8 +245,8 @@ export default function ContasPagarClient() {
                       <td className="px-3 py-2 text-gray-700 max-w-[200px] truncate" title={c.fornecedor}>{c.fornecedor}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-torg-dark whitespace-nowrap">{fmtMoeda(c.valor)}</td>
                       <td className="px-3 py-2 text-gray-600 max-w-[160px] truncate" title={c.categoria}>{c.categoria || "—"}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-gray-600 whitespace-nowrap">{c.nf || "—"}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-gray-600 whitespace-nowrap">{c.pedidoCompra || "—"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap"><OmieCell valor={c.nf} copiar={c.chaveNfe || c.nf} rotulo="NF" /></td>
+                      <td className="px-3 py-2 whitespace-nowrap"><OmieCell valor={c.pedidoCompra} copiar={c.pedidoCompra} rotulo="Pedido" /></td>
                       <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{c.parcela || "—"}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${SIT_COR[c.situacao] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
@@ -256,6 +263,25 @@ export default function ContasPagarClient() {
         </div>
       )}
     </div>
+  );
+}
+
+// Célula clicável de NF / Pedido: copia o número (ou a chave NFe) e abre o
+// módulo Compras do Omie em nova aba, pra colar na busca.
+function OmieCell({ valor, copiar, rotulo }) {
+  const [copiado, setCopiado] = useState(false);
+  if (!valor) return <span className="text-gray-400 text-xs">—</span>;
+  const onClick = () => {
+    try { navigator.clipboard?.writeText(String(copiar || valor)); } catch { /* sem clipboard */ }
+    setCopiado(true); setTimeout(() => setCopiado(false), 1500);
+    window.open(OMIE_COMPRAS_URL, "_blank", "noopener,noreferrer");
+  };
+  return (
+    <button onClick={onClick} title={`Copiar ${rotulo} ${copiar || valor} e abrir o Omie`}
+      className="font-mono text-xs text-torg-blue hover:underline inline-flex items-center gap-1">
+      {valor}
+      {copiado ? <Check size={11} className="text-green-600" /> : <ExternalLink size={10} className="opacity-50" />}
+    </button>
   );
 }
 
