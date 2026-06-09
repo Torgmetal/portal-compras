@@ -2977,6 +2977,10 @@ function GanttInline({ tarefas, detail }) {
             return ant && ant.percentualRealizado < 100;
           });
 
+          // Bloqueio externo = motivoBloqueio preenchido sem dataLiberacao
+          const isExtBlocked = !!t.motivoBloqueio && !t.dataLiberacao && !isDone;
+          const wasExtBlocked = !!t.motivoBloqueio && !!t.dataLiberacao;
+
           // Bar position
           let barLeft = 0, barWidth = 0;
           if (t.dataInicioPrevista && t.dataFimPrevista) {
@@ -2992,12 +2996,12 @@ function GanttInline({ tarefas, detail }) {
           }
 
           const fillWidth = barWidth * (t.percentualRealizado / 100);
-          const barColor = isBlocked ? "#d97706" : isLate ? "#dc2626" : color;
+          const barColor = isExtBlocked ? "#dc2626" : isBlocked ? "#d97706" : isLate ? "#dc2626" : color;
 
           return (
             <div
               key={t.id}
-              className={`flex border-b ${isBlocked ? "bg-amber-50/30" : isLate ? "bg-red-50/30" : idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
+              className={`flex border-b ${isExtBlocked ? "bg-red-50/40" : isBlocked ? "bg-amber-50/30" : isLate ? "bg-red-50/30" : idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
               style={{ height: rowH }}
             >
               {/* Nome */}
@@ -3007,6 +3011,8 @@ function GanttInline({ tarefas, detail }) {
               >
                 {isDone ? (
                   <CheckCircle2 size={10} className="text-emerald-500 shrink-0" />
+                ) : isExtBlocked ? (
+                  <Lock size={10} className="text-red-500 shrink-0" />
                 ) : isBlocked ? (
                   <Lock size={10} className="text-amber-500 shrink-0" />
                 ) : isLate ? (
@@ -3014,11 +3020,13 @@ function GanttInline({ tarefas, detail }) {
                 ) : (
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
                 )}
-                <span className={`text-[10px] truncate ${isDone ? "text-torg-gray line-through" : isBlocked ? "text-amber-700" : "text-torg-dark"}`} title={t.nome}>
+                <span className={`text-[10px] truncate ${isDone ? "text-torg-gray line-through" : isExtBlocked ? "text-red-700" : isBlocked ? "text-amber-700" : "text-torg-dark"}`} title={t.nome}>
                   {t.nome}
                 </span>
-                {isBlocked && <span className="text-[7px] text-amber-600 font-bold shrink-0">BLOQ</span>}
-                {hasAnt && !isBlocked && <Link2 size={8} className="text-purple-400 shrink-0" />}
+                {isExtBlocked && <span className="text-[7px] text-white bg-red-500 px-1 py-px rounded font-bold shrink-0" title={t.motivoBloqueio}>BLOQ EXT</span>}
+                {wasExtBlocked && !isDone && <span className="text-[7px] text-emerald-600 bg-emerald-50 px-1 py-px rounded font-bold shrink-0">LIBERADA</span>}
+                {isBlocked && !isExtBlocked && <span className="text-[7px] text-amber-600 font-bold shrink-0">BLOQ</span>}
+                {hasAnt && !isBlocked && !isExtBlocked && <Link2 size={8} className="text-purple-400 shrink-0" />}
                 <span className={`text-[9px] font-bold ml-auto shrink-0 ${isDone ? "text-emerald-600" : isBlocked ? "text-amber-600" : isLate ? "text-red-600" : "text-torg-gray"}`}>
                   {t.percentualRealizado}%
                 </span>
@@ -3051,18 +3059,29 @@ function GanttInline({ tarefas, detail }) {
                 {/* Current bar */}
                 {barWidth > 0 && (
                   <div
-                    className="absolute rounded overflow-hidden"
+                    className={`absolute rounded overflow-hidden ${isExtBlocked ? "animate-pulse" : ""}`}
                     style={{
                       left: barLeft, width: barWidth,
                       top: baseWidth > 0 ? 12 : 8, height: 14,
-                      background: isBlocked ? `repeating-linear-gradient(45deg, ${barColor}10, ${barColor}10 3px, ${barColor}25 3px, ${barColor}25 6px)` : `${barColor}15`,
+                      background: isExtBlocked
+                        ? `repeating-linear-gradient(45deg, #dc262620, #dc262620 3px, #dc262640 3px, #dc262640 6px)`
+                        : isBlocked
+                        ? `repeating-linear-gradient(45deg, ${barColor}10, ${barColor}10 3px, ${barColor}25 3px, ${barColor}25 6px)`
+                        : `${barColor}15`,
                       border: `1.5px solid ${barColor}`,
-                      borderStyle: isBlocked ? "dashed" : "solid",
+                      borderStyle: isExtBlocked ? "dashed" : isBlocked ? "dashed" : "solid",
                     }}
                   >
                     <div
                       style={{ width: fillWidth, height: "100%", background: barColor, opacity: 0.7, borderRadius: "2px 0 0 2px" }}
                     />
+                    {isExtBlocked && barWidth > 50 && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[7px] text-red-700 font-bold bg-red-100/80 px-1 rounded">
+                          ⏸ {t.motivoBloqueio?.length > 15 ? t.motivoBloqueio.slice(0, 15) + "…" : t.motivoBloqueio}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3118,8 +3137,11 @@ function GanttInline({ tarefas, detail }) {
           <span className="flex items-center gap-1 text-[9px] text-orange-500">
             <div className="w-0.5 h-3 bg-orange-400" /> Hoje
           </span>
+          <span className="flex items-center gap-1 text-[9px] text-red-600">
+            <Lock size={8} /> Bloqueio externo
+          </span>
           <span className="flex items-center gap-1 text-[9px] text-amber-600">
-            <Lock size={8} /> Bloqueada
+            <Lock size={8} /> Aguardando antecessora
           </span>
           <span className="flex items-center gap-1 text-[9px] text-emerald-500">
             <svg width="16" height="8"><line x1="0" y1="4" x2="12" y2="4" stroke="#10b981" strokeWidth="1.2" /><polygon points="12,4 8,2 8,6" fill="#10b981" /></svg>
