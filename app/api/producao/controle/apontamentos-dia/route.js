@@ -91,14 +91,20 @@ export async function GET(req) {
     }
   }
 
-  // Monta metas indexadas por setor
+  // Monta metas indexadas por setor (normaliza pra UPPERCASE)
+  // Se houver duplicatas (ex: "Corte" e "CORTE"), prefere o menor valorMensal
+  // pois valores absurdamente altos (250M+) indicam cadastro errado.
   const metasMap = {};
   for (const m of metas) {
-    metasMap[m.setor] = {
-      valorMensal: m.valorMensal,
-      semana1: m.semana1, semana2: m.semana2, semana3: m.semana3,
-      semana4: m.semana4, semana5: m.semana5,
-    };
+    const key = (m.setor || "").toUpperCase();
+    const existing = metasMap[key];
+    if (!existing || m.valorMensal < existing.valorMensal) {
+      metasMap[key] = {
+        valorMensal: m.valorMensal,
+        semana1: m.semana1, semana2: m.semana2, semana3: m.semana3,
+        semana4: m.semana4, semana5: m.semana5,
+      };
+    }
   }
 
   // Realizado do mês indexado por setor
