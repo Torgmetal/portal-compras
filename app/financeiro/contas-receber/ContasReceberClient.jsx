@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   ArrowUpCircle, RefreshCw, Loader2, AlertCircle, Search,
-  CalendarDays, ChevronDown, ChevronRight, Tag, Building2, ExternalLink, Check,
+  CalendarDays, ChevronDown, ChevronRight, Tag, Building2, ExternalLink, Check, ArrowDownUp,
 } from "lucide-react";
 
 // Módulo do Omie (tenant Torg). O Omie não expõe API/URL estável para abrir uma
@@ -47,6 +47,7 @@ export default function ContasReceberClient() {
   const [busca, setBusca] = useState("");
   const [filtroSit, setFiltroSit] = useState(""); // "" | VENCIDA | A VENCER | HOJE
   const [verResumo, setVerResumo] = useState(false);
+  const [aVencerPrimeiro, setAVencerPrimeiro] = useState(true); // A VENCER antes dos parciais/vencidas
 
   const carregar = async (d1 = de, d2 = ate) => {
     setLoad(true); setErro("");
@@ -96,8 +97,17 @@ export default function ContasReceberClient() {
     if (t) base = base.filter((c) =>
       [c.cliente, c.categoria, c.nf, c.numeroDocumento, c.os]
         .some((x) => (x || "").toLowerCase().includes(t)));
+    if (aVencerPrimeiro) {
+      // A VENCER primeiro; dentro de cada grupo, não-parcial antes do parcial;
+      // depois por vencimento crescente.
+      const rank = (c) => (c.situacao === "A VENCER" ? 0 : 1);
+      base = [...base].sort((a, b) =>
+        rank(a) - rank(b)
+        || (a.parcial ? 1 : 0) - (b.parcial ? 1 : 0)
+        || (a.vencimento || "").localeCompare(b.vencimento || ""));
+    }
     return base;
-  }, [contas, filtroSit, busca, hojeStr]);
+  }, [contas, filtroSit, busca, hojeStr, aVencerPrimeiro]);
 
   // Tudo em SALDO (o que falta receber), não no valor total — capta os parciais.
   const totais = useMemo(() => {
@@ -193,6 +203,11 @@ export default function ContasReceberClient() {
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente, NF, categoria, pedido, observação…"
               className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
           </div>
+          <button onClick={() => setAVencerPrimeiro((v) => !v)}
+            title="Ordena os títulos A Vencer antes dos recebidos parcialmente / vencidos"
+            className={`px-3 py-2 text-sm rounded-lg border inline-flex items-center gap-1.5 transition-colors ${aVencerPrimeiro ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:bg-gray-50"}`}>
+            <ArrowDownUp size={14} /> A vencer primeiro
+          </button>
           <button onClick={() => setVerResumo((v) => !v)}
             className="px-3 py-2 text-sm border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1.5">
             {verResumo ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Resumos por categoria/cliente
