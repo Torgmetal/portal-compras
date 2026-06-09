@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronRight,
@@ -7,7 +8,7 @@ import {
   Send, X, Briefcase, Wrench, ShoppingCart, Factory, Truck, HardHat,
   GanttChart, Package, FileText, CircleDot, Mail, Calendar,
   History, FileDown, Milestone, Plus, Trash2, Weight, BarChart3,
-  List, Link2, Unlink, RotateCcw, Lock, Archive, ArchiveRestore,
+  List, Link2, Unlink, RotateCcw, Lock, Archive, ArchiveRestore, Search,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -45,12 +46,13 @@ const fmtData = (d) => {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 };
 
-export default function CronogramasClient() {
+export default function CronogramasClient({ soloId }) {
+  const router = useRouter();
   const [cronogramas, setCronogramas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [erro, setErro] = useState("");
-  const [expandedId, setExpandedId] = useState(null);
+  const [expandedId, setExpandedId] = useState(soloId || null);
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showNovoModal, setShowNovoModal] = useState(false);
@@ -103,6 +105,12 @@ export default function CronogramasClient() {
   };
 
   const expandir = async (id) => {
+    // Em modo lista, navega pra página exclusiva da OP
+    if (!soloId) {
+      router.push(`/planejamento/cronogramas/${id}`);
+      return;
+    }
+    // Em modo solo (já na página da OP), toggle de seções funciona normal
     if (expandedId === id) {
       setExpandedId(null);
       setDetail(null);
@@ -125,6 +133,13 @@ export default function CronogramasClient() {
     }
   };
 
+  // Modo solo: auto-carrega detalhe do cronograma
+  useEffect(() => {
+    if (soloId) {
+      recarregarDetail(soloId);
+    }
+  }, [soloId]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -146,6 +161,63 @@ export default function CronogramasClient() {
     );
   }
 
+  // ─── Modo Solo (página exclusiva de uma OP) ─────────────
+  if (soloId) {
+    const soloCrono = cronogramas.find((c) => c.id === soloId);
+    return (
+      <div className="space-y-4 max-w-7xl">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push("/planejamento/cronogramas")}
+            className="p-2 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100"
+            title="Voltar para lista"
+          >
+            <ChevronRight size={18} className="rotate-180" />
+          </button>
+          <div className="flex-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              {soloCrono ? (
+                <>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-torg-dark tracking-tight">
+                    {fmtOP(soloCrono.opNumero)}
+                  </h2>
+                  <span className="text-sm text-torg-dark font-medium">{soloCrono.titulo}</span>
+                  {soloCrono.op && <span className="text-xs text-torg-gray">({soloCrono.op.cliente})</span>}
+                </>
+              ) : (
+                <h2 className="text-xl font-extrabold text-torg-dark tracking-tight">Cronograma</h2>
+              )}
+            </div>
+            {soloCrono && (
+              <p className="text-xs text-torg-gray mt-0.5">
+                {fmtData(soloCrono.dataInicio)} — {fmtData(soloCrono.dataFim)}
+                {soloCrono.atrasados > 0 && (
+                  <span className="ml-2 text-red-600 font-semibold">{soloCrono.atrasados} atrasado{soloCrono.atrasados > 1 ? "s" : ""}</span>
+                )}
+              </p>
+            )}
+          </div>
+          <button onClick={() => recarregarDetail(soloId)} className="p-2 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100">
+            <RefreshCw size={16} />
+          </button>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <CronogramaExpandido
+            detail={detail}
+            loadingDetail={loadingDetail}
+            onRefreshDetail={() => recarregarDetail(soloId)}
+            cronogramaId={soloId}
+            onDeleted={() => router.push("/planejamento/cronogramas")}
+            onEncerrado={() => router.push("/planejamento/cronogramas")}
+            opStatus={soloCrono?.op?.status}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Modo Lista (todas as OPs) ─────────────
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="flex items-center justify-between">
@@ -230,13 +302,7 @@ export default function CronogramasClient() {
                 <CronogramaCard
                   key={c.id}
                   cronograma={c}
-                  expanded={expandedId === c.id}
                   onToggle={() => expandir(c.id)}
-                  detail={expandedId === c.id ? detail : null}
-                  loadingDetail={expandedId === c.id && loadingDetail}
-                  onRefreshDetail={() => recarregarDetail(c.id)}
-                  onDeleted={() => { setExpandedId(null); setDetail(null); carregar(); }}
-                  onEncerrado={() => { setExpandedId(null); setDetail(null); carregar(); }}
                 />
               ))}
             </div>
@@ -570,7 +636,7 @@ function NovoCronogramaModal({ onClose, onCreated }) {
   );
 }
 
-function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail, onRefreshDetail, onDeleted, onEncerrado }) {
+function CronogramaCard({ cronograma, onToggle }) {
   const c = cronograma;
   const now = new Date();
   const diasRestantes = c.dataFim
@@ -581,7 +647,7 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
       <button onClick={onToggle} className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/50 transition-colors">
         <div className="flex items-center gap-3">
-          {expanded ? <ChevronDown size={16} className="text-torg-gray" /> : <ChevronRight size={16} className="text-torg-gray" />}
+          <ChevronRight size={16} className="text-torg-gray" />
           <span className="text-sm font-bold text-torg-blue font-mono">{fmtOP(c.opNumero)}</span>
           <span className="text-sm text-torg-dark font-medium truncate max-w-xs">{c.titulo}</span>
           {c.op && <span className="text-xs text-torg-gray">({c.op.cliente})</span>}
@@ -615,7 +681,7 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
       </button>
 
       {/* Department summary pills */}
-      {!expanded && c.deptSummary?.length > 0 && (
+      {c.deptSummary?.length > 0 && (
         <div className="px-4 pb-3 flex flex-wrap gap-1.5">
           {c.deptSummary.map((d, i) => {
             const Icon = DEPT_ICONS[d.departamento] || Factory;
@@ -633,18 +699,6 @@ function CronogramaCard({ cronograma, expanded, onToggle, detail, loadingDetail,
             );
           })}
         </div>
-      )}
-
-      {expanded && (
-        <CronogramaExpandido
-          detail={detail}
-          loadingDetail={loadingDetail}
-          onRefreshDetail={onRefreshDetail}
-          cronogramaId={c.id}
-          onDeleted={onDeleted}
-          onEncerrado={onEncerrado}
-          opStatus={c.op?.status}
-        />
       )}
     </div>
   );
@@ -1557,35 +1611,13 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                 </div>
               </div>
               {/* Antecessoras na criação */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] text-torg-gray">Antecessoras:</span>
-                {newTaskAntecessoras.map((aid) => {
-                  const ant = (allTarefas || []).find((x) => x.id === aid);
-                  return (
-                    <span key={aid} className="inline-flex items-center gap-1 text-[9px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
-                      {ant?.nome || aid.slice(0, 8)}
-                      <button onClick={() => setNewTaskAntecessoras((prev) => prev.filter((x) => x !== aid))} className="hover:text-red-500"><X size={8} /></button>
-                    </span>
-                  );
-                })}
-                <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value && !newTaskAntecessoras.includes(e.target.value)) {
-                      setNewTaskAntecessoras((prev) => [...prev, e.target.value]);
-                    }
-                    e.target.value = "";
-                  }}
-                  className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white max-w-[200px]"
-                >
-                  <option value="">+ Adicionar...</option>
-                  {(allTarefas || [])
-                    .filter((x) => !x.isSummary && x.outlineLevel > 1 && !newTaskAntecessoras.includes(x.id))
-                    .map((x) => (
-                      <option key={x.id} value={x.id}>{DEPT_LABEL[x.departamento] || x.departamento} — {x.nome}</option>
-                    ))}
-                </select>
-              </div>
+              <AntecessorasPicker
+                tarefaId={null}
+                allTarefas={allTarefas}
+                selecionadas={newTaskAntecessoras}
+                onChange={setNewTaskAntecessoras}
+                compact
+              />
               <div className="flex items-center gap-1 justify-end">
                   <button
                     onClick={() => { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); setNewTaskDuracao(0); setNewTaskAntecessoras([]); }}
@@ -2121,46 +2153,12 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
             </div>
           </div>
           {/* Antecessoras */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5">
-              <Link2 size={11} className="text-purple-500" />
-              <span className="text-[10px] text-torg-gray font-medium">Antecessoras (depende de):</span>
-            </div>
-            {antecessoraIds.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {antecessoraIds.map((aid) => {
-                  const ant = (allTarefas || []).find((x) => x.id === aid);
-                  return (
-                    <span key={aid} className="inline-flex items-center gap-1 text-[9px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">
-                      {ant?.nome || aid.slice(0, 8)}
-                      <button onClick={() => setAntecessoraIds((prev) => prev.filter((x) => x !== aid))} className="hover:text-red-500">
-                        <X size={8} />
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-            <select
-              value=""
-              onChange={(e) => {
-                if (e.target.value && !antecessoraIds.includes(e.target.value)) {
-                  setAntecessoraIds((prev) => [...prev, e.target.value]);
-                }
-                e.target.value = "";
-              }}
-              className="text-[10px] px-2 py-1 border border-gray-200 rounded bg-white w-full max-w-xs"
-            >
-              <option value="">+ Adicionar antecessora...</option>
-              {(allTarefas || [])
-                .filter((x) => x.id !== t.id && !x.isSummary && x.outlineLevel > 1 && !antecessoraIds.includes(x.id))
-                .map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {DEPT_LABEL[x.departamento] || x.departamento} — {x.nome}
-                  </option>
-                ))}
-            </select>
-          </div>
+          <AntecessorasPicker
+            tarefaId={t.id}
+            allTarefas={allTarefas}
+            selecionadas={antecessoraIds}
+            onChange={setAntecessoraIds}
+          />
           {/* Liberação / Bloqueio externo */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
@@ -3404,6 +3402,166 @@ function exportarGanttPDF(detail) {
 
   win.document.write(html);
   win.document.close();
+}
+
+// ─── Seletor de Antecessoras (agrupado por departamento + busca) ──────
+function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, compact }) {
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState("");
+  const ref = useRef(null);
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    if (!aberto) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setAberto(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [aberto]);
+
+  const disponiveis = (allTarefas || []).filter(
+    (x) => x.id !== tarefaId && !x.isSummary && x.outlineLevel > 1 && !selecionadas.includes(x.id)
+  );
+
+  const filtradas = busca.trim()
+    ? disponiveis.filter((x) => {
+        const term = busca.toLowerCase();
+        return x.nome.toLowerCase().includes(term) ||
+          (DEPT_LABEL[x.departamento] || x.departamento || "").toLowerCase().includes(term);
+      })
+    : disponiveis;
+
+  // Agrupar por departamento
+  const grupos = {};
+  for (const t of filtradas) {
+    const dept = t.departamento || "OUTROS";
+    if (!grupos[dept]) grupos[dept] = [];
+    grupos[dept].push(t);
+  }
+
+  const addAnt = (id) => {
+    if (!selecionadas.includes(id)) onChange([...selecionadas, id]);
+  };
+
+  const removeAnt = (id) => {
+    onChange(selecionadas.filter((x) => x !== id));
+  };
+
+  return (
+    <div className={`space-y-1.5 ${compact ? "" : ""}`} ref={ref}>
+      {!compact && (
+        <div className="flex items-center gap-1.5">
+          <Link2 size={11} className="text-purple-500" />
+          <span className="text-[10px] text-torg-gray font-medium">Antecessoras (depende de):</span>
+        </div>
+      )}
+
+      {/* Tags selecionadas */}
+      {selecionadas.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selecionadas.map((aid) => {
+            const ant = (allTarefas || []).find((x) => x.id === aid);
+            const deptColor = ant?.departamento ? (DEPT_COLORS[ant.departamento] || "bg-gray-50 text-torg-gray border-gray-200") : "bg-purple-50 text-purple-700 border-purple-200";
+            return (
+              <span key={aid} className={`inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border ${deptColor}`}>
+                {ant ? `${DEPT_LABEL[ant.departamento] || ant.departamento}: ${ant.nome}` : aid.slice(0, 8)}
+                <button onClick={() => removeAnt(aid)} className="hover:text-red-500 ml-0.5">
+                  <X size={8} />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Botão de abrir / Input de busca */}
+      <div className="relative">
+        {!aberto ? (
+          <button
+            onClick={() => { setAberto(true); setBusca(""); }}
+            className={`flex items-center gap-1.5 text-[10px] px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-50 text-torg-gray ${compact ? "w-auto" : "w-full max-w-xs"}`}
+          >
+            <Link2 size={10} className="text-purple-400" />
+            {compact ? "Antecessoras" : "+ Adicionar antecessora..."}
+            {selecionadas.length > 0 && !compact && (
+              <span className="ml-auto text-[9px] text-purple-600 font-semibold">{selecionadas.length}</span>
+            )}
+          </button>
+        ) : (
+          <div className={`border border-purple-300 rounded-lg bg-white shadow-lg ${compact ? "w-72" : "w-full max-w-sm"} absolute z-30`}>
+            {/* Barra de busca */}
+            <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-gray-100">
+              <Search size={12} className="text-torg-gray shrink-0" />
+              <input
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar tarefa..."
+                className="flex-1 text-[11px] outline-none bg-transparent"
+                autoFocus
+              />
+              <button onClick={() => setAberto(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={12} />
+              </button>
+            </div>
+
+            {/* Lista agrupada */}
+            <div className="max-h-48 overflow-y-auto">
+              {Object.keys(grupos).length === 0 ? (
+                <p className="text-[10px] text-torg-gray text-center py-3 italic">
+                  {busca ? "Nenhuma tarefa encontrada" : "Sem tarefas disponíveis"}
+                </p>
+              ) : (
+                DEPT_ORDER.filter((d) => grupos[d]).map((dept) => (
+                  <div key={dept}>
+                    <div className={`px-2 py-1 text-[9px] font-bold uppercase tracking-wider sticky top-0 border-b border-gray-50 ${
+                      DEPT_COLORS[dept]?.replace("border-", "bg-").split(" ")[1] || "text-torg-gray"
+                    } bg-gray-50/80`}>
+                      {DEPT_LABEL[dept] || dept}
+                    </div>
+                    {grupos[dept].map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => { addAnt(t.id); }}
+                        className="w-full text-left px-3 py-1.5 text-[10px] text-torg-dark hover:bg-purple-50 transition-colors flex items-center gap-1.5"
+                      >
+                        <Plus size={9} className="text-purple-400 shrink-0" />
+                        <span className="truncate">{t.nome}</span>
+                        {t.percentualRealizado > 0 && (
+                          <span className={`ml-auto text-[8px] font-bold shrink-0 ${t.percentualRealizado >= 100 ? "text-emerald-600" : "text-torg-gray"}`}>
+                            {t.percentualRealizado}%
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ))
+              )}
+              {/* Departamentos fora da ordem padrão */}
+              {Object.keys(grupos).filter((d) => !DEPT_ORDER.includes(d)).map((dept) => (
+                <div key={dept}>
+                  <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-torg-gray bg-gray-50/80 sticky top-0 border-b border-gray-50">
+                    {DEPT_LABEL[dept] || dept}
+                  </div>
+                  {grupos[dept].map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => { addAnt(t.id); }}
+                      className="w-full text-left px-3 py-1.5 text-[10px] text-torg-dark hover:bg-purple-50 transition-colors flex items-center gap-1.5"
+                    >
+                      <Plus size={9} className="text-purple-400 shrink-0" />
+                      <span className="truncate">{t.nome}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function fmtQtd(v) {
