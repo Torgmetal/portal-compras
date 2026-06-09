@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import {
   FileBarChart2, Search, Package, Truck, Weight, DollarSign,
   Clock, CheckCircle2, AlertTriangle, Download, ChevronDown,
@@ -42,7 +42,6 @@ export default function RelatorioExpedicaoClient() {
 
   // Importar LE
   const [importandoLE, setImportandoLE] = useState(false);
-  const leInputRef = useRef(null);
 
   // Expandir romaneios
   const [expandidos, setExpandidos] = useState(new Set());
@@ -139,7 +138,8 @@ export default function RelatorioExpedicaoClient() {
       setErro(err.message);
     } finally {
       setImportandoLE(false);
-      if (leInputRef.current) leInputRef.current.value = "";
+      // Resetar input para permitir reimportar o mesmo arquivo
+      if (e.target) e.target.value = "";
     }
   }, [opSel, ops, carregarOP]);
 
@@ -510,17 +510,8 @@ export default function RelatorioExpedicaoClient() {
             </select>
           </div>
 
-          <input
-            ref={leInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleImportarLE}
-            style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
-          />
-          <button
-            onClick={() => leInputRef.current?.click()}
-            disabled={importandoLE}
-            className="flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-lg text-sm font-medium hover:bg-torg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          <label
+            className={`flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-lg text-sm font-medium hover:bg-torg-blue-700 transition-colors shadow-sm cursor-pointer ${importandoLE ? "opacity-50 pointer-events-none" : ""}`}
           >
             {importandoLE ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -528,7 +519,13 @@ export default function RelatorioExpedicaoClient() {
               <Upload size={16} />
             )}
             {importandoLE ? "Importando..." : "Importar LE"}
-          </button>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleImportarLE}
+              className="sr-only"
+            />
+          </label>
         </div>
       </div>
 
