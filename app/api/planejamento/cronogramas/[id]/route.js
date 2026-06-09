@@ -57,6 +57,7 @@ const patchSchema = z.object({
   dataFim: z.string().datetime().optional(),
   tipoDias: z.enum(["DU", "DC"]).optional(),
   ativo: z.boolean().optional(), // false = encerrar, true = reabrir
+  titulo: z.string().min(1).max(300).optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -112,6 +113,27 @@ export async function PATCH(req, { params }) {
           entity: "Cronograma",
           entityId: id,
           diff: { opNumero: cronograma.opNumero, titulo: cronograma.titulo },
+        },
+      })
+    );
+  }
+
+  // Alterar titulo
+  if (parsed.data.titulo && parsed.data.titulo !== cronograma.titulo) {
+    ops.push(
+      prisma.cronograma.update({
+        where: { id },
+        data: { titulo: parsed.data.titulo },
+      })
+    );
+    ops.push(
+      prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: "RENAME_CRONOGRAMA",
+          entity: "Cronograma",
+          entityId: id,
+          diff: { antes: { titulo: cronograma.titulo }, depois: { titulo: parsed.data.titulo } },
         },
       })
     );

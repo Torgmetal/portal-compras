@@ -9,6 +9,7 @@ import {
   GanttChart, Package, FileText, CircleDot, Mail, Calendar,
   History, FileDown, Milestone, Plus, Trash2, Weight, BarChart3,
   List, Link2, Unlink, RotateCcw, Lock, Archive, ArchiveRestore, Search,
+  Pencil, Check,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -165,55 +166,15 @@ export default function CronogramasClient({ soloId }) {
   if (soloId) {
     const soloCrono = cronogramas.find((c) => c.id === soloId);
     return (
-      <div className="space-y-4 max-w-7xl">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/planejamento/cronogramas")}
-            className="p-2 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100"
-            title="Voltar para lista"
-          >
-            <ChevronRight size={18} className="rotate-180" />
-          </button>
-          <div className="flex-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              {soloCrono ? (
-                <>
-                  <h2 className="text-xl sm:text-2xl font-extrabold text-torg-dark tracking-tight">
-                    {fmtOP(soloCrono.opNumero)}
-                  </h2>
-                  <span className="text-sm text-torg-dark font-medium">{soloCrono.titulo}</span>
-                  {soloCrono.op && <span className="text-xs text-torg-gray">({soloCrono.op.cliente})</span>}
-                </>
-              ) : (
-                <h2 className="text-xl font-extrabold text-torg-dark tracking-tight">Cronograma</h2>
-              )}
-            </div>
-            {soloCrono && (
-              <p className="text-xs text-torg-gray mt-0.5">
-                {fmtData(soloCrono.dataInicio)} — {fmtData(soloCrono.dataFim)}
-                {soloCrono.atrasados > 0 && (
-                  <span className="ml-2 text-red-600 font-semibold">{soloCrono.atrasados} atrasado{soloCrono.atrasados > 1 ? "s" : ""}</span>
-                )}
-              </p>
-            )}
-          </div>
-          <button onClick={() => recarregarDetail(soloId)} className="p-2 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100">
-            <RefreshCw size={16} />
-          </button>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <CronogramaExpandido
-            detail={detail}
-            loadingDetail={loadingDetail}
-            onRefreshDetail={() => recarregarDetail(soloId)}
-            cronogramaId={soloId}
-            onDeleted={() => router.push("/planejamento/cronogramas")}
-            onEncerrado={() => router.push("/planejamento/cronogramas")}
-            opStatus={soloCrono?.op?.status}
-          />
-        </div>
-      </div>
+      <SoloView
+        soloCrono={soloCrono}
+        soloId={soloId}
+        detail={detail}
+        loadingDetail={loadingDetail}
+        onBack={() => router.push("/planejamento/cronogramas")}
+        onRefresh={() => recarregarDetail(soloId)}
+        onRenamed={carregar}
+      />
     );
   }
 
@@ -631,6 +592,136 @@ function NovoCronogramaModal({ onClose, onCreated }) {
             {saving ? "Criando..." : "Criar Cronograma"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SoloView({ soloCrono, soloId, detail, loadingDetail, onBack, onRefresh, onRenamed }) {
+  const [editingTitulo, setEditingTitulo] = useState(false);
+  const [tituloEdit, setTituloEdit] = useState("");
+  const [savingTitulo, setSavingTitulo] = useState(false);
+
+  const startEdit = () => {
+    setTituloEdit(soloCrono?.titulo || "");
+    setEditingTitulo(true);
+  };
+
+  const salvarTitulo = async () => {
+    const novo = tituloEdit.trim();
+    if (!novo || novo === soloCrono?.titulo) {
+      setEditingTitulo(false);
+      return;
+    }
+    setSavingTitulo(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${soloId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titulo: novo }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Erro ao salvar");
+      }
+      setEditingTitulo(false);
+      onRenamed(); // recarrega lista pra pegar titulo novo
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSavingTitulo(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 max-w-7xl">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onBack}
+          className="p-2 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100"
+          title="Voltar para lista"
+        >
+          <ChevronRight size={18} className="rotate-180" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            {soloCrono ? (
+              <>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-torg-dark tracking-tight shrink-0">
+                  {fmtOP(soloCrono.opNumero)}
+                </h2>
+                {editingTitulo ? (
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={tituloEdit}
+                      onChange={(e) => setTituloEdit(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") salvarTitulo();
+                        if (e.key === "Escape") setEditingTitulo(false);
+                      }}
+                      className="flex-1 min-w-0 text-sm font-medium text-torg-dark px-2 py-1 border border-torg-blue rounded-lg outline-none focus:ring-2 focus:ring-torg-blue/30"
+                      autoFocus
+                      disabled={savingTitulo}
+                    />
+                    <button
+                      onClick={salvarTitulo}
+                      disabled={savingTitulo}
+                      className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg disabled:opacity-50"
+                      title="Salvar"
+                    >
+                      {savingTitulo ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    </button>
+                    <button
+                      onClick={() => setEditingTitulo(false)}
+                      className="p-1.5 text-torg-gray hover:bg-gray-100 rounded-lg"
+                      title="Cancelar"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-sm text-torg-dark font-medium truncate">{soloCrono.titulo}</span>
+                    <button
+                      onClick={startEdit}
+                      className="p-1 text-torg-gray hover:text-torg-blue hover:bg-gray-100 rounded shrink-0"
+                      title="Editar nome"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  </div>
+                )}
+                {!editingTitulo && soloCrono.op && <span className="text-xs text-torg-gray shrink-0">({soloCrono.op.cliente})</span>}
+              </>
+            ) : (
+              <h2 className="text-xl font-extrabold text-torg-dark tracking-tight">Cronograma</h2>
+            )}
+          </div>
+          {soloCrono && (
+            <p className="text-xs text-torg-gray mt-0.5">
+              {fmtData(soloCrono.dataInicio)} — {fmtData(soloCrono.dataFim)}
+              {soloCrono.atrasados > 0 && (
+                <span className="ml-2 text-red-600 font-semibold">{soloCrono.atrasados} atrasado{soloCrono.atrasados > 1 ? "s" : ""}</span>
+              )}
+            </p>
+          )}
+        </div>
+        <button onClick={onRefresh} className="p-2 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100">
+          <RefreshCw size={16} />
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <CronogramaExpandido
+          detail={detail}
+          loadingDetail={loadingDetail}
+          onRefreshDetail={onRefresh}
+          cronogramaId={soloId}
+          onDeleted={onBack}
+          onEncerrado={onBack}
+          opStatus={soloCrono?.op?.status}
+        />
       </div>
     </div>
   );
