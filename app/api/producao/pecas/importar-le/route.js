@@ -13,7 +13,7 @@ export const maxDuration = 60;
 export async function POST(req) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "PRODUCAO"]);
+    user = await requireRole(["ADMIN", "PRODUCAO", "EXPEDICAO", "ENGENHARIA", "COMERCIAL", "COMPRAS"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
@@ -42,13 +42,20 @@ export async function POST(req) {
     return NextResponse.json({ error: "Falha ao processar planilha: " + e.message }, { status: 400 });
   }
 
-  // Resolve opId
-  const op = await prisma.oP.findUnique({ where: { numero: parsed.opNumero } });
+  // Resolve opId — busca no banco se parsed.opNumero é string valida
+  let op = null;
+  try {
+    if (parsed.opNumero) {
+      op = await prisma.oP.findUnique({ where: { numero: String(parsed.opNumero) } });
+    }
+  } catch (e) {
+    console.error("[importar-le] findUnique OP erro:", e?.message);
+  }
 
   // Se sobrescrever, deleta todas as pecas da OP primeiro
   if (sobrescrever) {
     await prisma.pecaConjunto.deleteMany({
-      where: { opNumero: parsed.opNumero, fonte: "LE_IMPORT" },
+      where: { opNumero: String(parsed.opNumero), fonte: "LE_IMPORT" },
     });
   }
 

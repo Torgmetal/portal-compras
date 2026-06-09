@@ -117,8 +117,16 @@ export default function RelatorioExpedicaoClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows, opNumero: opNum || null, sobrescrever: false }),
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Erro ao importar LE");
+      let d;
+      try {
+        d = await r.json();
+      } catch {
+        throw new Error(`Erro do servidor (HTTP ${r.status})`);
+      }
+      if (!r.ok) {
+        const errMsg = typeof d.error === "string" ? d.error : JSON.stringify(d.error || d);
+        throw new Error(errMsg || "Erro ao importar LE");
+      }
 
       // Recarregar lista de OPs para refletir novas peças
       const rOps = await fetch("/api/expedicao/relatorio");
@@ -135,7 +143,11 @@ export default function RelatorioExpedicaoClient() {
         if (opImportada) setOpSel(opImportada.id);
       }
     } catch (err) {
-      setErro(err.message);
+      console.error("[importar-le] erro:", err);
+      const msg = err instanceof Error ? err.message
+        : typeof err === "string" ? err
+        : JSON.stringify(err) || "Erro desconhecido ao importar LE";
+      setErro(msg);
     } finally {
       setImportandoLE(false);
       // Resetar input para permitir reimportar o mesmo arquivo
