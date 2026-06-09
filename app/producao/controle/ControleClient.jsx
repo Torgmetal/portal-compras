@@ -4,6 +4,7 @@ import {
   CalendarDays, Users, Clock, Target, Weight, Plus, Trash2, Check,
   ChevronLeft, ChevronRight, Save, Loader2, Search, X, ClipboardList,
   TrendingUp, AlertCircle, Upload, FileSpreadsheet, Download,
+  Activity, ChevronDown as ChevronDownIcon,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { fmtOP } from "@/lib/utils";
@@ -65,6 +66,11 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
   const [pecasDisponiveis, setPecasDisponiveis] = useState(pecasInicial);
   const fileInputRef = useRef(null);
 
+  // Syneco — apontamentos do dia
+  const [synecoDia, setSynecoDia] = useState(null);
+  const [synecoLoading, setSynecoLoading] = useState(false);
+  const [synecoExpandido, setSynecoExpandido] = useState(false);
+
   // PRODUCAO pode checar peças (não só admin)
   const podeChecar = isAdmin || userRole === "PRODUCAO";
 
@@ -99,6 +105,26 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
   }, [weekDays]);
 
   useEffect(() => { fetchSemana(); }, [fetchSemana]);
+
+  // Carregar apontamentos Syneco do dia selecionado
+  useEffect(() => {
+    let cancel = false;
+    const fetchSyneco = async () => {
+      setSynecoLoading(true);
+      try {
+        const res = await fetch(`/api/producao/controle/apontamentos-dia?data=${dataSelecionada}`);
+        if (!res.ok) throw new Error();
+        const d = await res.json();
+        if (!cancel) setSynecoDia(d);
+      } catch {
+        if (!cancel) setSynecoDia(null);
+      } finally {
+        if (!cancel) setSynecoLoading(false);
+      }
+    };
+    fetchSyneco();
+    return () => { cancel = true; };
+  }, [dataSelecionada]);
 
   // Registro do dia+setor selecionado
   const registroAtual = useMemo(() => {
@@ -524,6 +550,180 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
           </div>
         ))}
       </div>
+
+      {/* Apontamentos Syneco do dia */}
+      {(() => {
+        if (synecoLoading) return (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-3 text-sm text-torg-gray">
+            <Loader2 size={16} className="animate-spin" /> Carregando apontamentos Syneco...
+          </div>
+        );
+        if (!synecoDia) return null;
+
+        const setorData = synecoDia.resumoDia?.[setorSelecionado] || { totalKg: 0, totalUn: 0, count: 0 };
+        const metaSetor = synecoDia.metas?.[setorSelecionado];
+        const realizadoMes = synecoDia.realizadoMes?.[setorSelecionado] || { kg: 0, un: 0 };
+        const metaMensal = metaSetor?.valorMensal || 0;
+        const metaDiaria = metaMensal > 0 ? metaMensal / (synecoDia.diasUteis || 22) : 0;
+        const pctDia = metaDiaria > 0 ? Math.min((setorData.totalKg / metaDiaria) * 100, 100) : 0;
+        const pctMes = metaMensal > 0 ? Math.min((realizadoMes.kg / metaMensal) * 100, 100) : 0;
+
+        // Apontamentos do dia filtrados pelo setor selecionado
+        const apontSetor = (synecoDia.apontamentos || []).filter(
+          (a) => a.setorNormalizado === setorSelecionado
+        );
+
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2">
+                <Activity size={16} className="text-torg-orange" />
+                Syneco — {SETOR_LABELS[setorSelecionado]} — {fmtData(dataSelecionada)}
+              </h3>
+              <span className="text-xs text-torg-gray">
+                {setorData.count} apontamento{setorData.count !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Cards: meta diária vs realizado + acumulado mês */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              {/* Realizado hoje */}
+              <div className="border border-gray-100 rounded-lg p-3">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1">Realizado hoje</p>
+                <p className="text-xl font-extrabold text-torg-dark tabular-nums">
+                  {(setorData.totalKg / 1000).toFixed(2)}
+                  <span className="text-sm font-normal text-torg-gray ml-1">t</span>
+                </p>
+                {metaDiaria > 0 && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-[10px] text-torg-gray mb-0.5">
+                      <span>Meta dia: {(metaDiaria / 1000).toFixed(2)}t</span>
+                      <span className={pctDia >= 80 ? "text-emerald-600 font-semibold" : "text-amber-600 font-semibold"}>
+                        {pctDia.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${pctDia >= 80 ? "bg-emerald-500" : "bg-amber-500"}`}
+                        style={{ width: `${Math.min(pctDia, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Acumulado mês */}
+              <div className="border border-gray-100 rounded-lg p-3">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1">Acumulado mês</p>
+                <p className="text-xl font-extrabold text-torg-dark tabular-nums">
+                  {(realizadoMes.kg / 1000).toFixed(1)}
+                  <span className="text-sm font-normal text-torg-gray ml-1">t</span>
+                </p>
+                {metaMensal > 0 && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-[10px] text-torg-gray mb-0.5">
+                      <span>Meta mês: {(metaMensal / 1000).toFixed(1)}t</span>
+                      <span className={pctMes >= 60 ? "text-emerald-600 font-semibold" : "text-amber-600 font-semibold"}>
+                        {pctMes.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${pctMes >= 60 ? "bg-emerald-500" : "bg-amber-500"}`}
+                        style={{ width: `${Math.min(pctMes, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Unidades */}
+              <div className="border border-gray-100 rounded-lg p-3">
+                <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1">Peças hoje</p>
+                <p className="text-xl font-extrabold text-torg-dark tabular-nums">
+                  {Math.round(setorData.totalUn)}
+                  <span className="text-sm font-normal text-torg-gray ml-1">un</span>
+                </p>
+                <p className="text-xs text-torg-gray mt-1">
+                  Mês: {Math.round(realizadoMes.un)} un
+                </p>
+              </div>
+            </div>
+
+            {/* Lista de apontamentos do dia */}
+            {apontSetor.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setSynecoExpandido(!synecoExpandido)}
+                  className="flex items-center gap-1 text-xs font-medium text-torg-blue hover:underline mb-2"
+                >
+                  <ChevronDownIcon size={14} className={`transition-transform ${synecoExpandido ? "rotate-180" : ""}`} />
+                  {synecoExpandido ? "Ocultar detalhes" : `Ver ${apontSetor.length} apontamentos`}
+                </button>
+
+                {synecoExpandido && (
+                  <div className="border border-gray-100 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium text-gray-500">Hora</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-500">Obra</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-500">Item</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-500">Operação</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-500">Máquina</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-500">Operador</th>
+                            <th className="px-3 py-2 text-right font-medium text-gray-500">Peso (kg)</th>
+                            <th className="px-3 py-2 text-right font-medium text-gray-500">Qtd</th>
+                            <th className="px-3 py-2 text-left font-medium text-gray-500">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {apontSetor.map((a) => (
+                            <tr key={a.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-1.5 text-torg-gray tabular-nums whitespace-nowrap">
+                                {new Date(a.dataInicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                              </td>
+                              <td className="px-3 py-1.5 font-mono font-medium text-torg-dark">{a.obra}</td>
+                              <td className="px-3 py-1.5 text-torg-dark max-w-[200px] truncate" title={a.descricaoItem}>
+                                {a.descricaoItem || "—"}
+                              </td>
+                              <td className="px-3 py-1.5 text-torg-gray">{a.operacao || "—"}</td>
+                              <td className="px-3 py-1.5 text-torg-gray">{a.maquina || "—"}</td>
+                              <td className="px-3 py-1.5 text-torg-gray">{a.operador || "—"}</td>
+                              <td className="px-3 py-1.5 text-right font-semibold text-torg-dark tabular-nums">
+                                {(a.produzidoKg || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                              </td>
+                              <td className="px-3 py-1.5 text-right tabular-nums text-torg-gray">
+                                {a.produzidoUn || 0}
+                              </td>
+                              <td className="px-3 py-1.5">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                  a.status === "Finalizado" ? "bg-emerald-100 text-emerald-700"
+                                  : a.status === "Produzindo" ? "bg-blue-100 text-blue-700"
+                                  : "bg-gray-100 text-gray-600"
+                                }`}>
+                                  {a.status || "—"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {apontSetor.length === 0 && setorData.count === 0 && (
+              <p className="text-xs text-torg-gray text-center py-3">
+                Nenhum apontamento do Syneco para {SETOR_LABELS[setorSelecionado]} neste dia.
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Formulário do dia */}
       {isAdmin ? (
