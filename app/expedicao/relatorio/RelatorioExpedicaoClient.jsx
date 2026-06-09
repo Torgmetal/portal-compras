@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import {
   FileBarChart2, Search, Package, Truck, Weight, DollarSign,
   Clock, CheckCircle2, AlertTriangle, Download, ChevronDown,
   ChevronUp, X, BarChart3, FileText, GitCompareArrows, ArrowRightLeft,
+  Upload,
 } from "lucide-react";
 
 function fmtKg(v) {
@@ -39,9 +40,9 @@ export default function RelatorioExpedicaoClient() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [erro, setErro] = useState(null);
 
-  // Filtros de data
-  const [dataDe, setDataDe] = useState("");
-  const [dataAte, setDataAte] = useState("");
+  // Importar LE
+  const [importandoLE, setImportandoLE] = useState(false);
+  const leInputRef = useRef(null);
 
   // Expandir romaneios
   const [expandidos, setExpandidos] = useState(new Set());
@@ -75,14 +76,12 @@ export default function RelatorioExpedicaoClient() {
   }, []);
 
   // Carregar detalhes da OP selecionada
-  const carregarOP = useCallback(async (opId, de, ate) => {
+  const carregarOP = useCallback(async (opId) => {
     if (!opId) { setData(null); return; }
     setLoadingDetail(true);
     setErro(null);
     try {
       const params = new URLSearchParams({ opId });
-      if (de) params.set("de", de);
-      if (ate) params.set("ate", ate);
       const r = await fetch(`/api/expedicao/relatorio?${params}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Erro ao carregar");
@@ -96,8 +95,42 @@ export default function RelatorioExpedicaoClient() {
   }, []);
 
   useEffect(() => {
-    if (opSel) carregarOP(opSel, dataDe, dataAte);
-  }, [opSel, dataDe, dataAte, carregarOP]);
+    if (opSel) carregarOP(opSel);
+  }, [opSel, carregarOP]);
+
+  // Importar LE (XLSX) — usa SheetJS no client + endpoint existente
+  const handleImportarLE = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !opSel) return;
+    setImportandoLE(true);
+    setErro(null);
+    try {
+      const XLSX = (await import("xlsx")).default || (await import("xlsx"));
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
+
+      const opNum = ops.find((o) => o.id === opSel)?.numero || "";
+      const r = await fetch("/api/producao/pecas/importar-le", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows, opNumero: opNum, sobrescrever: false }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Erro ao importar LE");
+
+      // Recarregar dados da OP após importação
+      await carregarOP(opSel);
+      // Limpar confronto para recarregar se estiver nessa aba
+      setConfrontoData(null);
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setImportandoLE(false);
+      if (leInputRef.current) leInputRef.current.value = "";
+    }
+  }, [opSel, ops, carregarOP]);
 
   // Carregar dados de confronto (lazy — ao clicar na aba)
   const carregarConfronto = useCallback(async (opId) => {
@@ -213,14 +246,9 @@ export default function RelatorioExpedicaoClient() {
       } = await import("@/lib/excel-relatorio");
 
       const totalColunas = 9;
-      const filtros = [
-        dataDe && `De: ${fmtData(dataDe)}`,
-        dataAte && `Ate: ${fmtData(dataAte)}`,
-      ].filter(Boolean).join("  |  ");
 
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: `Relatorio de Expedicao — OP ${data.op.numero} — ${data.op.cliente || data.op.obra}`,
-        subtitulo: filtros || undefined,
         nomePlanilha: `Expedicao OP-${data.op.numero}`,
         codigoDoc: "REL-EXP-001",
         totalColunas,
@@ -408,7 +436,7 @@ export default function RelatorioExpedicaoClient() {
     } finally {
       setExportando(false);
     }
-  }, [data, dataDe, dataAte, opInfo]);
+  }, [data, opInfo]);
 
   if (loading) {
     return (
@@ -448,7 +476,7 @@ export default function RelatorioExpedicaoClient() {
         )}
       </div>
 
-      {/* Seletor + Filtros */}
+      {/* Seletor + Importar LE */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <div className="flex items-end gap-4 flex-wrap">
           <div className="flex-1 min-w-[280px]">
@@ -471,34 +499,25 @@ export default function RelatorioExpedicaoClient() {
             </select>
           </div>
 
-          <div className="min-w-[140px]">
-            <label className="block text-xs font-medium text-torg-gray mb-1">Data início</label>
-            <input
-              type="date"
-              value={dataDe}
-              onChange={(e) => setDataDe(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
-            />
-          </div>
-
-          <div className="min-w-[140px]">
-            <label className="block text-xs font-medium text-torg-gray mb-1">Data fim</label>
-            <input
-              type="date"
-              value={dataAte}
-              onChange={(e) => setDataAte(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
-            />
-          </div>
-
-          {(dataDe || dataAte) && (
-            <button
-              onClick={() => { setDataDe(""); setDataAte(""); }}
-              className="text-xs text-torg-blue hover:text-torg-blue-700 flex items-center gap-1 pb-1"
-            >
-              <X size={12} /> Limpar período
-            </button>
-          )}
+          <input
+            ref={leInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleImportarLE}
+            className="hidden"
+          />
+          <button
+            onClick={() => leInputRef.current?.click()}
+            disabled={!opSel || importandoLE}
+            className="flex items-center gap-2 px-4 py-2.5 bg-torg-blue text-white rounded-lg text-sm font-medium hover:bg-torg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {importandoLE ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+            ) : (
+              <Upload size={16} />
+            )}
+            {importandoLE ? "Importando..." : "Importar LE"}
+          </button>
         </div>
       </div>
 
@@ -644,7 +663,7 @@ export default function RelatorioExpedicaoClient() {
               {(!data.romaneios || data.romaneios.length === 0) && (
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center">
                   <Truck size={40} className="mx-auto text-gray-300 mb-3" />
-                  <p className="text-torg-gray text-sm">Nenhum romaneio emitido{dataDe || dataAte ? " no período selecionado" : ""}</p>
+                  <p className="text-torg-gray text-sm">Nenhum romaneio emitido para esta OP</p>
                 </div>
               )}
 

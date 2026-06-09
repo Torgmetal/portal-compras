@@ -67,7 +67,8 @@ export default withAuth(
         if (path.startsWith("/financeiro") && !temModulo("FINANCEIRO"))  return false;
         if (path.startsWith("/expedicao")  && !temModulo("EXPEDICAO"))   return false;
         if (path.startsWith("/producao")   && !temModulo("PRODUCAO"))    return false;
-        if (path.startsWith("/rm")         && !temModulo("ENGENHARIA", "ALMOXARIFADO", "REQUISICOES", "COMPRAS"))  return false;
+        // /rm aberto para todos os modulos (historico visivel para todos)
+        if (path.startsWith("/rm")         && !token)  return false;
         if (path.startsWith("/rh")         && !temModulo("RH"))            return false;
         if (path.startsWith("/planejamento") && !temModulo("PLANEJAMENTO", "PRODUCAO")) return false;
         if (path.startsWith("/pcp")        && !temModulo("PCP", "PLANEJAMENTO", "PRODUCAO")) return false;
