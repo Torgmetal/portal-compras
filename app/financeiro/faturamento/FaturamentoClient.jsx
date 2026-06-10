@@ -79,7 +79,7 @@ export default function FaturamentoClient() {
     try {
       const {
         criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
-        adicionarLinhaTotais, adicionarRodapeISO, downloadWorkbook,
+        adicionarLinhaTotais, downloadWorkbook,
       } = await import("@/lib/excel-relatorio");
 
       const totalColunas = 8;
@@ -139,8 +139,6 @@ export default function FaturamentoClient() {
       adicionarLinhaTotais(ws, row, ["", "", "", "", "", "TOTAL", Number(somaFat.toFixed(2)), Number(somaAFat.toFixed(2))]);
       ws.getCell(row, 7).numFmt = "#,##0.00";
       ws.getCell(row, 8).numFmt = "#,##0.00";
-      row += 2;
-      adicionarRodapeISO(ws, row, totalColunas, { elaboradoPor: "Financeiro" });
       ws.views = [{ state: "frozen", ySplit: linhaInicio }];
 
       await downloadWorkbook(workbook, `Faturamento_por_obra_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -169,7 +167,7 @@ Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado
             title="Exportar o faturamento por obra (com a NF emitida) para Excel"
             className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
             {exportando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} className="text-emerald-600" />}
-            {exportando ? "Gerando…" : "Exportar Excel"}
+            {exportando ? "Gerando…" : "Extrair relatório"}
           </button>
           <button onClick={() => carregar(true)} disabled={loading}
             className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">

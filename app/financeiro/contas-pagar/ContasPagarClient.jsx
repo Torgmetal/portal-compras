@@ -130,7 +130,7 @@ export default function ContasPagarClient() {
     try {
       const {
         criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
-        adicionarLinhaTotais, adicionarRodapeISO, downloadWorkbook,
+        adicionarLinhaTotais, downloadWorkbook,
       } = await import("@/lib/excel-relatorio");
 
       const totalColunas = 9;
@@ -177,8 +177,6 @@ export default function ContasPagarClient() {
 
       adicionarLinhaTotais(ws, row, ["", "TOTAL", Number(soma.toFixed(2)), "", "", "", "", "", `${filtradas.length} títulos`]);
       ws.getCell(row, 3).numFmt = "#,##0.00";
-      row += 2;
-      adicionarRodapeISO(ws, row, totalColunas, { elaboradoPor: "Financeiro" });
       ws.views = [{ state: "frozen", ySplit: linhaInicio }];
 
       await downloadWorkbook(workbook, `Contas_a_Pagar_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -208,7 +206,7 @@ export default function ContasPagarClient() {
             title="Exportar a lista filtrada para Excel"
             className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
             {exportando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} className="text-emerald-600" />}
-            {exportando ? "Gerando…" : "Exportar Excel"}
+            {exportando ? "Gerando…" : "Extrair relatório"}
           </button>
           <button onClick={() => sincronizar(true)} disabled={sincronizando || loading}
             className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
