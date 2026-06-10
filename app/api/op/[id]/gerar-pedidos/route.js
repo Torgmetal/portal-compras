@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
+import { resolverCodProjetoPorOp } from "@/lib/omie-pedidos-abertos";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -75,6 +76,12 @@ export async function POST(req, { params }) {
       itens: { where: { vencedor: true } },
     },
   });
+
+  // Resolve o código do projeto Omie da OP uma vez (cacheado). Best-effort:
+  // se não houver projeto cadastrado, o pedido sai sem projeto (não quebra).
+  let nCodProjOP = null;
+  try { nCodProjOP = await resolverCodProjetoPorOp(op.numero); }
+  catch (e) { console.error("[gerar-pedidos] falha ao resolver projeto:", e?.message); }
 
   // Agrupa: { [cotacaoId × isFD]: { cotacao, isFD, linhas[], rmIdsEnvolvidas } }
   const grupos = new Map();
@@ -234,6 +241,7 @@ export async function POST(req, { params }) {
         cCodCateg,
         cCodLocalEstoque,
         cInfAdic: `OP ${op.numero}`,
+        nCodProj: nCodProjOP,
       });
       if (data.error) {
         erroPedido = data.error;

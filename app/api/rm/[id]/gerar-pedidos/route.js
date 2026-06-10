@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
+import { resolverCodProjetoPorOp } from "@/lib/omie-pedidos-abertos";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -34,9 +35,17 @@ export async function POST(req, { params }) {
     where: { id: params.id },
     include: {
       itens: true,
+      op: { select: { numero: true } },
     },
   });
   if (!rm) return NextResponse.json({ error: "RM não encontrada." }, { status: 404 });
+
+  // Projeto Omie da OP vinculada à RM (best-effort; RM Interna pode não ter OP).
+  let nCodProjOP = null;
+  if (rm.op?.numero) {
+    try { nCodProjOP = await resolverCodProjetoPorOp(rm.op.numero); }
+    catch (e) { console.error("[rm gerar-pedidos] falha ao resolver projeto:", e?.message); }
+  }
 
   const itemPorId = new Map();
   for (const item of rm.itens) {
@@ -157,6 +166,7 @@ export async function POST(req, { params }) {
         cCodCateg: categoriaSelecionada,
         cCodLocalEstoque: localSelecionado,
         cInfAdic: `RM Interna ${rm.numero}`,
+        nCodProj: nCodProjOP,
       });
       if (data.error) {
         erroPedido = data.error;
