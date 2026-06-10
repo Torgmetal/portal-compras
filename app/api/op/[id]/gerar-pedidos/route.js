@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { criarPedidoOmie, anexarAoPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp } from "@/lib/omie-pedidos-abertos";
+import { fdPorCategoriaDaOP, rmEhFD, itemEhFD } from "@/lib/faturamento-direto";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,6 +38,10 @@ export async function POST(req, { params }) {
   const op = await prisma.oP.findUnique({
     where: { id: params.id },
     include: {
+      // itens/aditivos da OP p/ o fallback de FD por categoria (RMItem.opItemId
+      // raramente é preenchido — ver lib/faturamento-direto.js)
+      itens: { select: { categoria: true, faturamentoDireto: true } },
+      aditivos: { select: { itens: { select: { categoria: true, faturamentoDireto: true } } } },
       rms: {
         include: {
           itens: {
@@ -50,6 +55,10 @@ export async function POST(req, { params }) {
     },
   });
   if (!op) return NextResponse.json({ error: "OP não encontrada." }, { status: 404 });
+
+  // FD por RM (fallback por categoria, mesma lógica do painel de OPs).
+  const fdPorCategoria = fdPorCategoriaDaOP(op);
+  const fdPorRM = new Map(op.rms.map((rm) => [rm.id, rmEhFD(rm, fdPorCategoria) === true]));
 
   // Mapa global de RMItem por id — inclui itens de todas as RMs da OP.
   // Usado pra resolver itens de cotacoes consolidadas (multi-RM) onde
@@ -96,8 +105,7 @@ export async function POST(req, { params }) {
       const { rmItem, rm } = entry;
       if (rmItem.status === "PEDIDO_GERADO" || rmItem.status === "CANCELADO" || rmItem.status === "ATENDIDO_ESTOQUE") continue;
 
-      const isFD =
-        rmItem.opItem?.faturamentoDireto || rmItem.aditivoItem?.faturamentoDireto || false;
+      const isFD = itemEhFD(rmItem, fdPorRM);
       // Prioridade: codigoOmieEstoque do RMItem (vem do cadastro de estoque) >
       // codigoOmie do OPItem/AditivoItem (cadastrado pelo Comercial) > busca por descricao
       const codigoOmieItem =

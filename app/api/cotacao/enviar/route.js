@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { calcularAbatimentoEstoque } from "@/lib/cotacao-estoque";
+import { mapearFDPorRM, itemEhFD } from "@/lib/faturamento-direto";
 
 const fornecedorSchema = z.object({
   fornecedorId: z.string().optional().nullable(), // ID do cadastro unificado
@@ -106,9 +107,10 @@ export async function POST(req) {
   const rmPrincipal = rmsEnvolvidas.find((r) => r.id === rmIds.find((id) => rmIdsComItem.has(id))) || rmsEnvolvidas[0];
 
   // Deriva faturamento: se ALGUM item cotável é faturamento direto, marca "Cliente".
-  const algumFD = itensCotaveis.some(
-    (it) => it.opItem?.faturamentoDireto || it.aditivoItem?.faturamentoDireto
-  );
+  // Como o vínculo RMItem→OPItem raramente existe (a engenharia aponta só a OP),
+  // usa o fallback por categoria da RM (mesma lógica do painel de OPs).
+  const fdPorRM = await mapearFDPorRM(itensCotaveis.map((it) => it.rmId));
+  const algumFD = itensCotaveis.some((it) => itemEhFD(it, fdPorRM));
   const faturamento = algumFD ? "Cliente" : "Torg";
 
   let cotacoesCriadas = [];

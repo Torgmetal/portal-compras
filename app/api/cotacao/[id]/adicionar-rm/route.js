@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { calcularAbatimentoEstoque } from "@/lib/cotacao-estoque";
+import { mapearFDPorRM, itemEhFD } from "@/lib/faturamento-direto";
 
 // POST — adiciona itens de OUTRAS RMs a uma cotacao ja existente.
 // Util quando o Compras esqueceu de vincular uma RM no envio inicial.
@@ -126,6 +127,16 @@ export async function POST(req, { params }) {
       await tx.cotacao.update({
         where: { id: cotacao.id },
         data: { status: "PENDENTE" },
+      });
+    }
+
+    // Se algum item novo e faturamento direto, a cotacao inteira vira "Cliente"
+    // (mesma regra do enviar: algum FD => Cliente).
+    const fdPorRM = await mapearFDPorRM(itensLiquidos.map((it) => it.rmId));
+    if (cotacao.faturamento !== "Cliente" && itensLiquidos.some((it) => itemEhFD(it, fdPorRM))) {
+      await tx.cotacao.update({
+        where: { id: cotacao.id },
+        data: { faturamento: "Cliente" },
       });
     }
 

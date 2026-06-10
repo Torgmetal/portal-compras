@@ -2,6 +2,7 @@ import MarketingShell from "@/components/MarketingShell";
 import { Lock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { DADOS_TORG } from "@/lib/empresa";
+import { mapearFDPorRM, itemEhFD } from "@/lib/faturamento-direto";
 import CotacaoFornecedorForm from "./CotacaoFornecedorForm";
 
 
@@ -121,14 +122,13 @@ export default async function CotacaoPorToken({ params }) {
   const anexosCotacaoData = JSON.parse(JSON.stringify(anexosCotacao));
 
   // Deriva faturamento: campo da Cotacao OU fallback pelos itens (cotações antigas
-  // criadas antes do fix podem ter faturamento="Torg" mas itens FD).
-  const isFD =
-    cotacao.faturamento === "Cliente" ||
-    (cotacao.itens || []).some(
-      (ci) =>
-        ci.rmItem?.opItem?.faturamentoDireto ||
-        ci.rmItem?.aditivoItem?.faturamentoDireto
-    );
+  // criadas antes do fix podem ter faturamento="Torg" mas itens FD). Como o vínculo
+  // RMItem→OPItem raramente existe, usa também o fallback por categoria da RM.
+  let isFD = cotacao.faturamento === "Cliente";
+  if (!isFD) {
+    const fdPorRM = await mapearFDPorRM((cotacao.itens || []).map((ci) => ci.rmItem?.rmId));
+    isFD = (cotacao.itens || []).some((ci) => itemEhFD(ci.rmItem, fdPorRM));
+  }
 
   // Monta dados de faturamento. Se faturamento direto,
   // mostra dados do cliente da OP (mesmo que incompletos — o painel avisa).
