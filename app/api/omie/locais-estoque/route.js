@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireRole } from "@/lib/session";
 
 const OMIE_LOCAL_URL = "https://app.omie.com.br/api/v1/estoque/local/";
 
@@ -7,6 +8,13 @@ export const maxDuration = 30;
 
 // Lista locais de estoque cadastrados no Omie pra popular dropdown.
 export async function GET() {
+  try {
+    await requireRole(["ADMIN", "COMPRAS"]);
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ error: e.message }, { status });
+  }
+
   try {
     const appKey = process.env.OMIE_APP_KEY;
     const appSecret = process.env.OMIE_APP_SECRET;

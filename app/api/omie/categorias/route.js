@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireRole } from "@/lib/session";
 
 const OMIE_CATEG_URL = "https://app.omie.com.br/api/v1/geral/categorias/";
 
@@ -8,6 +9,13 @@ export const maxDuration = 30;
 // Lista categorias cadastradas no Omie pra popular dropdown.
 // Filtra apenas categorias DESPESA (que fazem sentido em pedido de compra).
 export async function GET() {
+  try {
+    await requireRole(["ADMIN", "COMPRAS"]);
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ error: e.message }, { status });
+  }
+
   try {
     const appKey = process.env.OMIE_APP_KEY;
     const appSecret = process.env.OMIE_APP_SECRET;
