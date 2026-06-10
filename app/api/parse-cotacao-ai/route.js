@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 // Roda em Node — SDK Anthropic precisa
 export const runtime = "nodejs";
 // Permite até 60s pra processar (PDFs grandes podem demorar)
 export const maxDuration = 60;
+
+// Rota pública (portal do fornecedor) que consome créditos Anthropic —
+// rate-limit por IP e cap de payload contra abuso/queima de créditos.
+const limiter = createRateLimiter({ name: "parse-cotacao-ai", maxRequests: 8, windowMs: 60_000 });
+const MAX_B64_LEN = 16 * 1024 * 1024; // ~12MB por anexo
+const MAX_TEXT_LEN = 200_000;         // ~200k chars de texto colado
+// Modelo é FIXO no servidor — nunca aceitar do cliente (evita forçar modelo caro).
+const MODELO_FIXO = "claude-haiku-4-5-20251001";
 
 const SYSTEM_PROMPT = `Você é um assistente de compras de uma siderúrgica (Torg Metal). Seu trabalho é extrair os itens cotados em propostas de fornecedores brasileiros (aço, perfis, chapas, cantoneiras, tubos) e casá-los com os itens de uma RM (Requisição de Materiais).
 
@@ -162,6 +171,14 @@ function sanitizeItens(itens, rmCount) {
 }
 
 export async function POST(request) {
+  const rl = limiter(request);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Muitas requisições. Tente novamente em instantes." },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
@@ -171,13 +188,21 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { pdfBase64, text, imageBase64, imageType, rmItens, model } = body;
+    const { pdfBase64, text, imageBase64, imageType, rmItens } = body;
 
     if (!pdfBase64 && !text && !imageBase64) {
       return NextResponse.json(
         { error: "Forneça pelo menos um campo: pdfBase64, text ou imageBase64" },
         { status: 400 }
       );
+    }
+
+    if (
+      (typeof pdfBase64 === "string" && pdfBase64.length > MAX_B64_LEN) ||
+      (typeof imageBase64 === "string" && imageBase64.length > MAX_B64_LEN) ||
+      (typeof text === "string" && text.length > MAX_TEXT_LEN)
+    ) {
+      return NextResponse.json({ error: "Conteúdo grande demais para processar." }, { status: 413 });
     }
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -226,11 +251,8 @@ export async function POST(request) {
       text: `\nItens da RM (${(rmItens || []).length} no total):\n${rmContext}\n\nExtraia os itens cotados e devolva JSON conforme o schema do system prompt.`,
     });
 
-    // Modelo: Haiku é mais barato e suficiente pra extração estruturada
-    const chosenModel = model || "claude-haiku-4-5-20251001";
-
     const message = await anthropic.messages.create({
-      model: chosenModel,
+      model: MODELO_FIXO,
       max_tokens: 8000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content }],

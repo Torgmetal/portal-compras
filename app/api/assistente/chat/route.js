@@ -5,11 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { getToolsParaUser } from "@/lib/assistente/tools";
 import { executarTool } from "@/lib/assistente/executar-tools";
 import { buildSystemPrompt } from "@/lib/assistente/system-prompt";
+import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 // Tempo máximo para o loop de tool use (Vercel limit)
 export const maxDuration = 60;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Rate-limit por usuário — cada request faz até MAX_TOOL_ROUNDS chamadas
+// Anthropic, então limitar a frequência evita queima de créditos.
+const limiter = createRateLimiter({ name: "assistente-chat", maxRequests: 15, windowMs: 60_000 });
 
 // Modelo padrão — pode ser sobrescrito pela ConfigAssistente no banco
 const MODELO_DEFAULT = "claude-haiku-4-5";
@@ -27,6 +32,15 @@ export async function POST(req) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
   const user = session.user;
+
+  // ─── Rate limit por usuário ───────────────────────────────────
+  const rl = limiter(req, `user:${user.id}`);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Você está enviando mensagens rápido demais. Aguarde um instante." },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
 
   // ─── Body ─────────────────────────────────────────────────────
   let body;
