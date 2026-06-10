@@ -106,6 +106,7 @@ export default function FaturamentoClient() {
       let row = linhaInicio;
       adicionarHeaderTabela(ws, row, ["Obra / Projeto", "OP", "Tipo", "Medição", "NF emitida", "Situação", "Faturado (R$)", "A faturar (R$)"]);
       row++;
+      const dataIni = row;
 
       let somaFat = 0, somaAFat = 0, idx = 0;
       for (const o of obras) {
@@ -136,7 +137,15 @@ export default function FaturamentoClient() {
         }
       }
 
-      adicionarLinhaTotais(ws, row, ["", "", "", "", "", "TOTAL", Number(somaFat.toFixed(2)), Number(somaAFat.toFixed(2))]);
+      const dataFim = row - 1;
+      ws.autoFilter = { from: { row: linhaInicio, column: 1 }, to: { row: dataFim, column: totalColunas } };
+
+      // Totais com SUBTOTAL — corretos e respeitam o filtro.
+      adicionarLinhaTotais(ws, row, [
+        "", "", "", "", "", "TOTAL",
+        { formula: `SUBTOTAL(9,G${dataIni}:G${dataFim})`, result: Number(somaFat.toFixed(2)) },
+        { formula: `SUBTOTAL(9,H${dataIni}:H${dataFim})`, result: Number(somaAFat.toFixed(2)) },
+      ]);
       ws.getCell(row, 7).numFmt = "#,##0.00";
       ws.getCell(row, 8).numFmt = "#,##0.00";
       ws.views = [{ state: "frozen", ySplit: linhaInicio }];

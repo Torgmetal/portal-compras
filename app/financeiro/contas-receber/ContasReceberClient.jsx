@@ -169,6 +169,7 @@ export default function ContasReceberClient() {
       let row = linhaInicio;
       adicionarHeaderTabela(ws, row, ["Vencimento", "Cliente", "Valor (R$)", "Recebido (R$)", "A receber (R$)", "Categoria", "NF", "OS", "Situação"]);
       row++;
+      const dataIni = row;
 
       let somaValor = 0, somaReceb = 0, somaSaldo = 0;
       filtradas.forEach((c, idx) => {
@@ -188,7 +189,17 @@ export default function ContasReceberClient() {
         row++;
       });
 
-      adicionarLinhaTotais(ws, row, ["", "TOTAL", Number(somaValor.toFixed(2)), Number(somaReceb.toFixed(2)), Number(somaSaldo.toFixed(2)), "", "", "", `${filtradas.length} títulos`]);
+      const dataFim = row - 1;
+      ws.autoFilter = { from: { row: linhaInicio, column: 1 }, to: { row: dataFim, column: totalColunas } };
+
+      // Totais com SUBTOTAL — corretos e respeitam o filtro.
+      adicionarLinhaTotais(ws, row, [
+        "", "TOTAL",
+        { formula: `SUBTOTAL(9,C${dataIni}:C${dataFim})`, result: Number(somaValor.toFixed(2)) },
+        { formula: `SUBTOTAL(9,D${dataIni}:D${dataFim})`, result: Number(somaReceb.toFixed(2)) },
+        { formula: `SUBTOTAL(9,E${dataIni}:E${dataFim})`, result: Number(somaSaldo.toFixed(2)) },
+        "", "", "", `${filtradas.length} títulos`,
+      ]);
       [3, 4, 5].forEach((col) => { ws.getCell(row, col).numFmt = "#,##0.00"; });
       ws.views = [{ state: "frozen", ySplit: linhaInicio }];
 

@@ -157,6 +157,7 @@ export default function ContasPagarClient() {
       let row = linhaInicio;
       adicionarHeaderTabela(ws, row, ["Vencimento", "Fornecedor", "Valor (R$)", "Categoria", "NF", "Pedido", "Parc.", "Situação", "Observação"]);
       row++;
+      const dataIni = row;
 
       let soma = 0;
       filtradas.forEach((c, idx) => {
@@ -175,7 +176,12 @@ export default function ContasPagarClient() {
         row++;
       });
 
-      adicionarLinhaTotais(ws, row, ["", "TOTAL", Number(soma.toFixed(2)), "", "", "", "", "", `${filtradas.length} títulos`]);
+      const dataFim = row - 1;
+      // Filtro nas colunas (o usuário pediu pra sempre vir com filtro).
+      ws.autoFilter = { from: { row: linhaInicio, column: 1 }, to: { row: dataFim, column: totalColunas } };
+
+      // Total com SUBTOTAL: soma correta e que respeita o filtro aplicado.
+      adicionarLinhaTotais(ws, row, ["", "TOTAL", { formula: `SUBTOTAL(9,C${dataIni}:C${dataFim})`, result: Number(soma.toFixed(2)) }, "", "", "", "", "", `${filtradas.length} títulos`]);
       ws.getCell(row, 3).numFmt = "#,##0.00";
       ws.views = [{ state: "frozen", ySplit: linhaInicio }];
 
