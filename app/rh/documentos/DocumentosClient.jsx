@@ -475,7 +475,11 @@ export default function DocumentosClient() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <FileText size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-torg-gray text-lg font-medium">Nenhum documento encontrado</p>
-          <p className="text-xs text-torg-gray mt-2">Cadastre documentos para acompanhar validades e renovações.</p>
+          <p className="text-xs text-torg-gray mt-2 mb-4">Cadastre o documento e anexe o arquivo (PDF, imagem ou Word) — ele fica privado e com cópia de backup no SharePoint.</p>
+          <button onClick={abrirNovo}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90">
+            <UploadCloud size={16} /> Subir documento
+          </button>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -576,6 +580,33 @@ export default function DocumentosClient() {
               <button onClick={() => setModalAberto(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
+              {/* Arquivo do documento — em destaque no topo */}
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1.5">Arquivo do documento</label>
+                {arquivoFile ? (
+                  <div className="flex items-center gap-2 px-4 py-3 border border-torg-blue-100 rounded-xl bg-torg-blue-50">
+                    <Paperclip size={16} className="text-torg-blue shrink-0" />
+                    <span className="text-sm text-torg-dark truncate flex-1" title={arquivoFile.name}>{arquivoFile.name}</span>
+                    <span className="text-[10px] text-torg-gray whitespace-nowrap">{(arquivoFile.size / 1024 / 1024).toFixed(1)}MB</span>
+                    {!salvando && <button type="button" onClick={() => setArquivoFile(null)} className="text-gray-400 hover:text-red-500"><X size={15} /></button>}
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-1 px-4 py-5 border-2 border-dashed border-torg-blue-100 rounded-xl cursor-pointer hover:bg-torg-blue-50/50 transition-colors text-center">
+                    <UploadCloud size={22} className="text-torg-blue" />
+                    <span className="text-sm font-medium text-torg-dark">Selecionar arquivo do documento</span>
+                    <span className="text-[11px] text-torg-gray">PDF, imagem ou Word — fica privado e com cópia no SharePoint (ISO)</span>
+                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,application/pdf,image/*" className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) setArquivoFile(f); e.target.value = ""; }} />
+                  </label>
+                )}
+                {uploadPct != null && (
+                  <div className="mt-1.5">
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${uploadPct}%` }} /></div>
+                    <span className="text-[10px] text-torg-gray">Enviando arquivo… {uploadPct}%</span>
+                  </div>
+                )}
+              </div>
+
               {/* Categoria e tipo */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -661,31 +692,6 @@ export default function DocumentosClient() {
                   rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
               </div>
 
-              {/* Arquivo do documento (opcional) */}
-              <div>
-                <label className="block text-xs font-medium text-torg-gray mb-1">Arquivo do documento (PDF, imagem ou Word)</label>
-                {arquivoFile ? (
-                  <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
-                    <Paperclip size={14} className="text-torg-blue shrink-0" />
-                    <span className="text-sm text-torg-dark truncate flex-1" title={arquivoFile.name}>{arquivoFile.name}</span>
-                    <span className="text-[10px] text-torg-gray whitespace-nowrap">{(arquivoFile.size / 1024 / 1024).toFixed(1)}MB</span>
-                    {!salvando && <button type="button" onClick={() => setArquivoFile(null)} className="text-gray-400 hover:text-red-500"><X size={14} /></button>}
-                  </div>
-                ) : (
-                  <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm text-torg-gray">
-                    <UploadCloud size={16} className="text-torg-blue" /> Selecionar arquivo…
-                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,application/pdf,image/*" className="hidden"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) setArquivoFile(f); e.target.value = ""; }} />
-                  </label>
-                )}
-                {uploadPct != null && (
-                  <div className="mt-1.5">
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${uploadPct}%` }} /></div>
-                    <span className="text-[10px] text-torg-gray">Enviando arquivo… {uploadPct}%</span>
-                  </div>
-                )}
-                <p className="text-[10px] text-torg-gray mt-1">Fica privado (só RH/Admin acessam) e uma cópia vai pro SharePoint para backup/ISO.</p>
-              </div>
             </div>
             <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3">
               <button onClick={() => setModalAberto(false)} disabled={salvando}
