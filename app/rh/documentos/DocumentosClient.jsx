@@ -536,7 +536,7 @@ export default function DocumentosClient() {
                         {d.orgaoEmissor && <p className="text-[10px] text-torg-gray">{d.orgaoEmissor}</p>}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${cat.cor}`}>
+                        <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] font-bold ${cat.cor}`}>
                           {cat.label}
                         </span>
                       </td>
@@ -557,7 +557,7 @@ export default function DocumentosClient() {
                       <td className="px-4 py-3 text-xs text-torg-gray tabular-nums">{fmtData(d.dataEmissao)}</td>
                       <td className="px-4 py-3 text-xs text-torg-dark font-medium tabular-nums">{fmtData(d.dataValidade)}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${st.cor}`}>
+                        <span className={`inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] font-bold ${st.cor}`}>
                           {StIcon && <StIcon size={11} />} {st.label}
                         </span>
                       </td>
