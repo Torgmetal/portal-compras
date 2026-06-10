@@ -75,34 +75,44 @@ export async function POST(req) {
   //  - INTERNA: SEMPRE sequencial automatico "RI-NNNN" (ignora o que veio do form).
   //  - ALUGUEL: SEMPRE sequencial automatico "RA-NNNN".
   //  - ENGENHARIA: usa o numero informado (vem do Tekla, ex "T83-001"); fallback RM-NNNN.
+  // Calcula o próximo número auto-sequencial conforme o tipo.
+  // É racy por natureza (max+1 lido em JS), então o create abaixo tem retry
+  // contra colisão de unique — dois cadastros simultâneos não pegam o mesmo nº.
+  async function calcularProximoNumeroAuto() {
+    if (body.tipoRM === "INTERNA") return await proximoNumeroInterno();
+    if (body.tipoRM === "ALUGUEL") return await proximoNumeroAluguel();
+    const ultima = await prisma.rM.findFirst({ orderBy: { createdAt: "desc" }, select: { numero: true } });
+    let proximoNumero = "0001";
+    if (ultima?.numero) {
+      const m = ultima.numero.match(/^(?:RM-)?(\d+)$/);
+      if (m) proximoNumero = String(parseInt(m[1]) + 1).padStart(4, "0");
+    }
+    return `RM-${proximoNumero}`;
+  }
+
   let numeroRM;
-  if (body.tipoRM === "INTERNA") {
-    numeroRM = await proximoNumeroInterno();
-  } else if (body.tipoRM === "ALUGUEL") {
-    numeroRM = await proximoNumeroAluguel();
+  let numeroAutoGerado = false;
+  if (body.tipoRM === "INTERNA" || body.tipoRM === "ALUGUEL") {
+    numeroRM = await calcularProximoNumeroAuto();
+    numeroAutoGerado = true;
   } else {
     numeroRM = (body.numero || "").trim().toUpperCase();
     if (!numeroRM) {
-      const ultima = await prisma.rM.findFirst({ orderBy: { createdAt: "desc" }, select: { numero: true } });
-      let proximoNumero = "0001";
-      if (ultima?.numero) {
-        const m = ultima.numero.match(/^(?:RM-)?(\d+)$/);
-        if (m) proximoNumero = String(parseInt(m[1]) + 1).padStart(4, "0");
+      numeroRM = await calcularProximoNumeroAuto();
+      numeroAutoGerado = true;
+    } else {
+      // Número informado pelo usuário (Tekla): valida unicidade explicitamente.
+      const existe = await prisma.rM.findUnique({ where: { numero: numeroRM } });
+      if (existe) {
+        return NextResponse.json(
+          { error: `Já existe uma RM com o número "${numeroRM}". Use outro número.` },
+          { status: 409 }
+        );
       }
-      numeroRM = `RM-${proximoNumero}`;
-    }
-    // Valida unicidade (so para nao-interna; a interna ja vem livre)
-    const existe = await prisma.rM.findUnique({ where: { numero: numeroRM } });
-    if (existe) {
-      return NextResponse.json(
-        { error: `Já existe uma RM com o número "${numeroRM}". Use outro número.` },
-        { status: 409 }
-      );
     }
   }
 
-  const rm = await prisma.rM.create({
-    data: {
+  const montarDataRM = () => ({
       numero: numeroRM,
       tipoRM: body.tipoRM,
       faturamentoDireto: body.faturamentoDireto,
@@ -148,8 +158,29 @@ export async function POST(req) {
             },
           }
         : {}),
-    },
   });
+
+  let rm;
+  for (let tentativa = 0; ; tentativa++) {
+    try {
+      rm = await prisma.rM.create({ data: montarDataRM() });
+      break;
+    } catch (e) {
+      // Colisão de número (unique P2002): se for auto-gerado, recalcula e
+      // tenta de novo — resolve a corrida de dois cadastros simultâneos.
+      if (e?.code === "P2002" && numeroAutoGerado && tentativa < 5) {
+        numeroRM = await calcularProximoNumeroAuto();
+        continue;
+      }
+      if (e?.code === "P2002") {
+        return NextResponse.json(
+          { error: `Já existe uma RM com o número "${numeroRM}". Use outro número.` },
+          { status: 409 }
+        );
+      }
+      throw e;
+    }
+  }
 
   // Cria EstoqueReserva automatica pra cada item com destinoEstoque=true,
   // opDestinoId definido e codigoOmieEstoque vinculado a um EstoqueItem.
