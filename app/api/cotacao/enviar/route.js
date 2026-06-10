@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { calcularAbatimentoEstoque } from "@/lib/cotacao-estoque";
 
 const fornecedorSchema = z.object({
   fornecedorId: z.string().optional().nullable(), // ID do cadastro unificado
@@ -71,12 +72,23 @@ export async function POST(req) {
     return NextResponse.json({ error: "Nenhum item válido pra cotar." }, { status: 400 });
   }
 
-  const itensCotaveis = itensValidos.filter(
+  let itensCotaveis = itensValidos.filter(
     (it) => it.status === "PENDENTE" || it.status === "EM_COTACAO" || it.status === "COTADO"
   );
   if (itensCotaveis.length === 0) {
     return NextResponse.json(
       { error: "Itens selecionados já viraram pedido ou foram cancelados — não dá pra cotar de novo." },
+      { status: 409 }
+    );
+  }
+
+  // Abate o que a Produção respondeu ter em estoque (consulta em barras):
+  // itens 100% disponíveis saem da cotação; parciais vão com o saldo a comprar.
+  const estoque = await calcularAbatimentoEstoque(itensCotaveis);
+  itensCotaveis = itensCotaveis.filter((it) => (estoque.porItem.get(it.id)?.barrasACotar ?? 1) > 0);
+  if (itensCotaveis.length === 0) {
+    return NextResponse.json(
+      { error: "Todos os itens selecionados estão disponíveis em estoque segundo a consulta respondida — nada a cotar. Use \"Atender estoque\" nos itens para finalizá-los." },
       { status: 409 }
     );
   }
@@ -113,10 +125,17 @@ export async function POST(req) {
           itens: {
             create: itensCotaveis.map((it) => {
               const peso = Number(it.peso) || 0;
+              const ab = estoque.porItem.get(it.id);
+              // Sem resposta de estoque: cota a quantidade cheia (peso em KG p/ aço).
+              if (!ab || ab.barrasDisponiveis <= 0) {
+                return { rmItemId: it.id, precoUnit: 0, qtdCotada: peso > 0 ? peso : it.qtd };
+              }
               return {
                 rmItemId: it.id,
                 precoUnit: 0,
-                qtdCotada: peso > 0 ? peso : it.qtd,
+                qtdCotada: ab.qtdCotada,
+                qtdPecasCotada: ab.barrasACotar,
+                estoqueAbatidoQtd: ab.barrasDisponiveis,
               };
             }),
           },
@@ -166,6 +185,8 @@ export async function POST(req) {
           fornecedores: body.fornecedores.length,
           itens: itensCotaveis.length,
           prazo: body.prazoResposta || null,
+          estoqueAbatidos: estoque.abatidos.length || undefined,
+          estoqueExcluidos: estoque.excluidos.length || undefined,
         },
       },
     });
@@ -265,5 +286,13 @@ export async function POST(req) {
     }
   }));
 
-  return NextResponse.json({ ok: true, cotacoes: cotacoesCriadas, emails: emailResults });
+  return NextResponse.json({
+    ok: true,
+    cotacoes: cotacoesCriadas,
+    emails: emailResults,
+    // Resumo do abatimento por estoque (para a UI avisar o comprador).
+    estoque: (estoque.abatidos.length || estoque.excluidos.length)
+      ? { abatidos: estoque.abatidos, excluidos: estoque.excluidos }
+      : null,
+  });
 }

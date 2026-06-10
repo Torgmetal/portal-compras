@@ -40,7 +40,7 @@ export async function POST(req, { params }) {
     include: {
       rm: { select: { id: true, numero: true, opId: true, op: { select: { numero: true } } } },
       createdBy: { select: { id: true, name: true, email: true } },
-      itens: { select: { id: true, rmItemId: true } },
+      itens: { select: { id: true, rmItemId: true, rmItem: { select: { qtd: true, unidade: true } } } },
     },
   });
   if (!consulta) {
@@ -54,10 +54,29 @@ export async function POST(req, { params }) {
   }
 
   // Valida que todos os itens enviados pertencem à consulta
-  const consultaItemIds = new Set(consulta.itens.map((i) => i.id));
+  const consultaItemMap = new Map(consulta.itens.map((i) => [i.id, i]));
   for (const item of body.itens) {
-    if (!consultaItemIds.has(item.consultaItemId)) {
+    if (!consultaItemMap.has(item.consultaItemId)) {
       return NextResponse.json({ success: false, error: `Item ${item.consultaItemId} não pertence a esta consulta` }, { status: 400 });
+    }
+  }
+
+  // Normaliza a resposta SEMPRE em quantidade de barras/peças (a unidade do
+  // item, nunca KG) — é o que o abatimento da cotação consome depois:
+  //   DISPONIVEL → todas as barras solicitadas; PARCIAL → o informado (obrigatório,
+  //   limitado ao solicitado); INDISPONIVEL → nada.
+  for (const item of body.itens) {
+    const qtdSolicitada = Number(consultaItemMap.get(item.consultaItemId)?.rmItem?.qtd) || 0;
+    if (item.resposta === "DISPONIVEL") {
+      item.qtdDisponivel = qtdSolicitada;
+    } else if (item.resposta === "PARCIAL") {
+      const v = Number(item.qtdDisponivel) || 0;
+      if (v <= 0) {
+        return NextResponse.json({ success: false, error: "Resposta PARCIAL exige a quantidade disponível em barras/peças (maior que zero)." }, { status: 400 });
+      }
+      item.qtdDisponivel = qtdSolicitada > 0 ? Math.min(v, qtdSolicitada) : v;
+    } else {
+      item.qtdDisponivel = null;
     }
   }
 
@@ -122,13 +141,13 @@ export async function POST(req, { params }) {
 
     const itensRows = (consultaCompleta?.itens || []).map((it, i) => {
       const resp = body.itens.find((r) => r.consultaItemId === it.id);
-      const qtdLabel = (it.rmItem?.peso || 0) > 0
-        ? `${Number(it.rmItem.peso).toLocaleString("pt-BR")} KG`
-        : `${Number(it.rmItem?.qtd).toLocaleString("pt-BR")} ${it.rmItem?.unidade}`;
+      // Barras/peças é o primário (é a unidade da resposta); peso em KG é referência.
+      const qtdLabel = `${Number(it.rmItem?.qtd).toLocaleString("pt-BR")} ${it.rmItem?.unidade}`
+        + ((it.rmItem?.peso || 0) > 0 ? ` (≈ ${Number(it.rmItem.peso).toLocaleString("pt-BR")} KG)` : "");
       const bg = i % 2 === 0 ? "#ffffff" : "#f7fafc";
       const statusCor = resp ? corStatus[resp.resposta] || "#718096" : "#718096";
       const statusLabel = resp ? labelStatus[resp.resposta] || "—" : "—";
-      const qtdDisp = resp?.resposta === "PARCIAL" && resp.qtdDisponivel != null ? resp.qtdDisponivel : "";
+      const qtdDisp = resp?.qtdDisponivel != null ? `${resp.qtdDisponivel} ${it.rmItem?.unidade || ""}` : "";
       const obs = resp?.observacao || "";
       return `<tr style="background:${bg};">
         <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#2d3748;font-size:13px;">${it.rmItem?.descricao || "—"}</td>
@@ -204,7 +223,7 @@ export async function POST(req, { params }) {
       details: {
         rmId: consulta.rm.id,
         rmNumero: consulta.rm.numero,
-        respostas: body.itens.map((it) => ({ id: it.consultaItemId, resposta: it.resposta })),
+        respostas: body.itens.map((it) => ({ id: it.consultaItemId, resposta: it.resposta, qtdDisponivel: it.qtdDisponivel ?? null })),
       },
     },
   });

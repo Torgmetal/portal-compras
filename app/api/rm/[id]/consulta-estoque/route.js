@@ -147,7 +147,9 @@ export async function POST(req, { params }) {
     const clienteLabel = rm.op?.cliente ? ` — ${rm.op.cliente}` : "";
 
     const itensRows = rm.itens.map((it, i) => {
-      const qtdLabel = (it.peso || 0) > 0 ? `${Number(it.peso).toLocaleString("pt-BR")} KG` : `${Number(it.qtd).toLocaleString("pt-BR")} ${it.unidade}`;
+      // Barras/peças é o primário (a resposta deve vir nessa unidade); KG é referência.
+      const qtdLabel = `${Number(it.qtd).toLocaleString("pt-BR")} ${it.unidade}`
+        + ((it.peso || 0) > 0 ? ` (≈ ${Number(it.peso).toLocaleString("pt-BR")} KG)` : "");
       const bg = i % 2 === 0 ? "#ffffff" : "#f7fafc";
       return `<tr style="background:${bg};">
         <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#2d3748;font-size:13px;">${it.descricao}</td>
@@ -181,6 +183,7 @@ export async function POST(req, { params }) {
           </table>
 
           <p style="color:#2d3748;font-weight:700;font-size:14px;margin-bottom:8px;">Itens para avaliar:</p>
+          <p style="color:#718096;font-size:12px;margin:0 0 8px 0;">Responda a disponibilidade sempre em <strong>quantidade de barras/peças</strong> (não em KG).</p>
           <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
             <tr style="background:#002945;">
               <th style="padding:10px 12px;text-align:left;color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Descricao</th>

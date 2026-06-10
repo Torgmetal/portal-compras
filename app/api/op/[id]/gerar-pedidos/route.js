@@ -143,11 +143,12 @@ export async function POST(req, { params }) {
       const ipiPct = Number(l.cotItem.ipiPct) || 0;
       const precoBruto = Number(l.cotItem.precoUnit) || 0;
       const precoComIPI = precoBruto * (1 + ipiPct / 100);
-      // Sempre KG: qtdCotada ja vem em KG (setada a partir do peso no envio da cotacao).
-      // Se por algum motivo nao tiver peso, usa qtdCotada como esta.
-      const qtdKg = l.rmItem.peso > 0
-        ? Number(l.rmItem.peso)
-        : Number(l.cotItem.qtdCotada) || 0;
+      // qtdCotada e a quantidade efetiva (em KG p/ aco): ja vem liquida do
+      // abatimento de estoque da consulta e pode ter sido ajustada pelo
+      // fornecedor. Fallback no peso da RM so para cotacoes legadas sem qtdCotada.
+      const qtdKg = Number(l.cotItem.qtdCotada) > 0
+        ? Number(l.cotItem.qtdCotada)
+        : (l.rmItem.peso > 0 ? Number(l.rmItem.peso) : 0);
       return {
         codigo: l.codigoOmieItem || null,
         descricao: l.rmItem.descricao,

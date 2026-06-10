@@ -640,6 +640,11 @@ model CotacaoItem {
   precoUnit    Float
   qtdCotada    Float
   qtdProposta  Float?
+  // Abatimento por estoque (consulta respondida pela Produção/Engenharia em barras):
+  // qtdPecasCotada = nº de barras/peças LÍQUIDO enviado ao fornecedor;
+  // estoqueAbatidoQtd = nº de barras/peças abatidas do estoque. Null = sem abatimento.
+  qtdPecasCotada    Float?
+  estoqueAbatidoQtd Float?
   icmsPct      Float?
   ipiPct       Float?
   observacao   String?

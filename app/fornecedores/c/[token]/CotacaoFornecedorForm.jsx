@@ -37,8 +37,14 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
 
   const [linhas, setLinhas] = useState(() =>
     cotacao.itens.map((it) => {
-      const peso = Number(it.rmItem.peso) || 0;
-      const usaKg = peso > 0;
+      const pesoRm = Number(it.rmItem.peso) || 0;
+      const usaKg = pesoRm > 0;
+      // Abatimento por estoque: quando a consulta de estoque cobriu parte do item,
+      // o fornecedor vê só o LÍQUIDO a comprar (barras e peso proporcionais).
+      const qtdRmTotal = Number(it.rmItem.qtd) || 0;
+      const pecas = it.qtdPecasCotada != null ? Number(it.qtdPecasCotada) : qtdRmTotal;
+      const fator = qtdRmTotal > 0 ? pecas / qtdRmTotal : 1;
+      const peso = usaKg ? Math.round(pesoRm * fator * 100) / 100 : 0;
       return {
         id: it.id,
         descricao: it.rmItem.descricao,
@@ -46,8 +52,8 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         comprimento: it.rmItem.comprimento,
         largura: it.rmItem.largura,
         tratamento: it.rmItem.tratamento,
-        qtdRm: usaKg ? peso : it.rmItem.qtd,
-        qtdPecas: it.rmItem.qtd, // qtd original em peças (chapas, barras, etc)
+        qtdRm: usaKg ? peso : pecas,
+        qtdPecas: pecas, // qtd em peças (chapas, barras, etc) — líquida do estoque
         unidadeOriginal: it.rmItem.unidade, // unidade original (UN, PÇ, etc)
         unidade: usaKg ? "KG" : it.rmItem.unidade,
         pesoTotal: peso,

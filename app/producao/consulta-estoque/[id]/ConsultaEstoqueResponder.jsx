@@ -33,7 +33,10 @@ export default function ConsultaEstoqueResponder({ consulta, userName }) {
     setRespostas((prev) => prev.map((r, i) => (i === idx ? { ...r, [campo]: valor } : r)));
   };
 
-  const todosRespondidos = respostas.every((r) => r.resposta !== null);
+  // PARCIAL exige a quantidade disponível em barras/peças (> 0).
+  const todosRespondidos = respostas.every(
+    (r) => r.resposta !== null && (r.resposta !== "PARCIAL" || Number(r.qtdDisponivel) > 0)
+  );
 
   const enviar = async () => {
     if (!todosRespondidos) return;
@@ -131,14 +134,20 @@ export default function ConsultaEstoqueResponder({ consulta, userName }) {
             <h3 className="font-semibold text-torg-dark text-sm">
               Itens para avaliar ({consulta.itens.length})
             </h3>
+            {!jaRespondida && (
+              <p className="text-xs text-torg-gray mt-1">
+                Responda a disponibilidade sempre em <strong>quantidade de barras/peças</strong> (não em KG).
+                O peso em KG aparece apenas como referência.
+              </p>
+            )}
           </div>
 
           <div className="divide-y divide-gray-50">
             {consulta.itens.map((item, idx) => {
               const resp = respostas[idx];
-              const qtdLabel = (item.rmItem?.peso || 0) > 0
-                ? `${item.rmItem.peso} KG`
-                : `${item.rmItem?.qtd} ${item.rmItem?.unidade}`;
+              // Barras/peças é o primário (é a unidade da resposta); KG é só referência.
+              const qtdLabel = `${item.rmItem?.qtd} ${item.rmItem?.unidade}`;
+              const pesoRef = (item.rmItem?.peso || 0) > 0 ? `≈ ${item.rmItem.peso} KG` : null;
               const detalhesParts = [
                 item.rmItem?.material,
                 item.rmItem?.comprimento && `C: ${item.rmItem.comprimento}`,
@@ -151,7 +160,8 @@ export default function ConsultaEstoqueResponder({ consulta, userName }) {
                     <div>
                       <p className="text-sm font-medium text-torg-dark">{item.rmItem?.descricao}</p>
                       <div className="flex items-center gap-3 mt-1 text-xs text-torg-gray">
-                        <span className="font-medium">{qtdLabel}</span>
+                        <span className="font-medium text-torg-dark">{qtdLabel}</span>
+                        {pesoRef && <span>{pesoRef}</span>}
                         {detalhesParts.length > 0 && (
                           <span>{detalhesParts.join(" · ")}</span>
                         )}
@@ -180,19 +190,30 @@ export default function ConsultaEstoqueResponder({ consulta, userName }) {
                         })}
                       </div>
 
-                      {/* Campo de qtd disponível (aparece quando PARCIAL) */}
+                      {/* DISPONIVEL = todas as barras solicitadas serão consideradas em estoque */}
+                      {resp.resposta === "DISPONIVEL" && (
+                        <p className="text-xs text-emerald-700">
+                          ✓ {item.rmItem?.qtd} {item.rmItem?.unidade} em estoque — esse item não será cotado com fornecedor.
+                        </p>
+                      )}
+
+                      {/* Campo de qtd disponível em BARRAS/peças (aparece quando PARCIAL) */}
                       {resp.resposta === "PARCIAL" && (
                         <div className="flex items-center gap-2">
-                          <label className="text-xs text-torg-gray whitespace-nowrap">Qtd disponível:</label>
+                          <label className="text-xs text-torg-gray whitespace-nowrap">
+                            Qtd disponível <strong>({item.rmItem?.unidade || "barras"})</strong>:
+                          </label>
                           <input
                             type="number"
                             min="0"
-                            step="any"
+                            max={item.rmItem?.qtd || undefined}
+                            step="1"
                             value={resp.qtdDisponivel}
                             onChange={(e) => atualizar(idx, "qtdDisponivel", e.target.value)}
                             className="w-28 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
                             placeholder="0"
                           />
+                          <span className="text-xs text-torg-gray">de {item.rmItem?.qtd} {item.rmItem?.unidade} — em barras/peças, não em KG</span>
                         </div>
                       )}
 
@@ -219,7 +240,7 @@ export default function ConsultaEstoqueResponder({ consulta, userName }) {
                         ) : null;
                       })()}
                       {item.qtdDisponivel != null && (
-                        <span className="text-sm text-torg-gray">Qtd disp.: {item.qtdDisponivel}</span>
+                        <span className="text-sm text-torg-gray">Qtd disp.: {item.qtdDisponivel} {item.rmItem?.unidade}</span>
                       )}
                       {item.observacao && (
                         <span className="text-sm text-torg-gray italic">{item.observacao}</span>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { calcularAbatimentoEstoque } from "@/lib/cotacao-estoque";
 
 // POST — adiciona itens de OUTRAS RMs a uma cotacao ja existente.
 // Util quando o Compras esqueceu de vincular uma RM no envio inicial.
@@ -74,15 +75,32 @@ export async function POST(req, { params }) {
     );
   }
 
+  // Abate o que a Producao respondeu ter em estoque (consulta em barras):
+  // itens 100% disponiveis ficam fora; parciais entram so com o saldo a comprar.
+  const estoque = await calcularAbatimentoEstoque(itensParaCriar);
+  const itensLiquidos = itensParaCriar.filter((it) => (estoque.porItem.get(it.id)?.barrasACotar ?? 1) > 0);
+  if (itensLiquidos.length === 0) {
+    return NextResponse.json(
+      { error: "Todos os itens selecionados estao disponiveis em estoque segundo a consulta respondida — nada a cotar." },
+      { status: 409 }
+    );
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.cotacaoItem.createMany({
-      data: itensParaCriar.map((it) => {
+      data: itensLiquidos.map((it) => {
         const peso = Number(it.peso) || 0;
+        const ab = estoque.porItem.get(it.id);
+        if (!ab || ab.barrasDisponiveis <= 0) {
+          return { cotacaoId: cotacao.id, rmItemId: it.id, precoUnit: 0, qtdCotada: peso > 0 ? peso : it.qtd };
+        }
         return {
           cotacaoId: cotacao.id,
           rmItemId: it.id,
           precoUnit: 0,
-          qtdCotada: peso > 0 ? peso : it.qtd,
+          qtdCotada: ab.qtdCotada,
+          qtdPecasCotada: ab.barrasACotar,
+          estoqueAbatidoQtd: ab.barrasDisponiveis,
         };
       }),
     });
@@ -90,7 +108,7 @@ export async function POST(req, { params }) {
     // Marca itens PENDENTE como EM_COTACAO
     await tx.rMItem.updateMany({
       where: {
-        id: { in: itensParaCriar.map((i) => i.id) },
+        id: { in: itensLiquidos.map((i) => i.id) },
         status: "PENDENTE",
       },
       data: { status: "EM_COTACAO" },
@@ -120,7 +138,9 @@ export async function POST(req, { params }) {
         diff: {
           cotacaoFornecedor: cotacao.fornecedorNome,
           rmsAdicionadas: rms.map((r) => r.numero),
-          itensCriados: itensParaCriar.length,
+          itensCriados: itensLiquidos.length,
+          estoqueAbatidos: estoque.abatidos.length || undefined,
+          estoqueExcluidos: estoque.excluidos.length || undefined,
         },
       },
     });
@@ -128,7 +148,10 @@ export async function POST(req, { params }) {
 
   return NextResponse.json({
     ok: true,
-    itensCriados: itensParaCriar.length,
+    itensCriados: itensLiquidos.length,
     rmsAdicionadas: rms.map((r) => r.numero),
+    estoque: (estoque.abatidos.length || estoque.excluidos.length)
+      ? { abatidos: estoque.abatidos, excluidos: estoque.excluidos }
+      : null,
   });
 }

@@ -277,9 +277,9 @@ function ConsultaCard({ consulta, rmId, onCancelado }) {
                 {(consulta.itens || []).map((item) => {
                   const cfg = item.resposta ? RESPOSTA_CONFIG[item.resposta] : null;
                   const Icon = cfg?.icon;
-                  const qtdLabel = (item.rmItem?.peso || 0) > 0
-                    ? `${item.rmItem.peso} KG`
-                    : `${item.rmItem?.qtd} ${item.rmItem?.unidade}`;
+                  // Barras/peças primário (é a unidade da resposta); KG é referência.
+                  const qtdLabel = `${item.rmItem?.qtd} ${item.rmItem?.unidade}`
+                    + ((item.rmItem?.peso || 0) > 0 ? ` · ≈ ${item.rmItem.peso} KG` : "");
                   return (
                     <tr key={item.id}>
                       <td className="py-2 pr-3 text-torg-dark">{item.rmItem?.descricao}</td>
@@ -294,7 +294,7 @@ function ConsultaCard({ consulta, rmId, onCancelado }) {
                         )}
                       </td>
                       <td className="py-2 pr-3 text-torg-gray">
-                        {item.qtdDisponivel != null ? item.qtdDisponivel : "—"}
+                        {item.qtdDisponivel != null ? `${item.qtdDisponivel} ${item.rmItem?.unidade || ""}` : "—"}
                       </td>
                       <td className="py-2 text-torg-gray text-xs">{item.observacao || "—"}</td>
                     </tr>

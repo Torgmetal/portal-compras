@@ -419,6 +419,7 @@ function reCopiarEmail(cachedData) {
 function ModalLinksGerados({ payload, onClose }) {
   const cotacoes = payload?.cotacoes || [];
   const rmsNumeros = payload?.rmsNumeros || [];
+  const estoque = payload?.estoque || null;
   const [copiado, setCopiado] = useState(null);
   const [emailToast, setEmailToast] = useState(null);
   const [emailsCache, setEmailsCache] = useState({});
@@ -490,6 +491,17 @@ function ModalLinksGerados({ payload, onClose }) {
         </div>
 
         <div className="px-6 py-5 space-y-3">
+          {estoque && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg px-3 py-2.5 space-y-1">
+              <p className="font-semibold text-xs uppercase tracking-wide">Estoque abatido da cotação</p>
+              {estoque.abatidos?.map((a, i) => (
+                <p key={`a${i}`} className="text-xs">• {a.descricao}: {a.barrasDisponiveis} {a.unidade} em estoque — cotado só {a.barrasACotar} {a.unidade}.</p>
+              ))}
+              {estoque.excluidos?.map((e, i) => (
+                <p key={`e${i}`} className="text-xs">• {e.descricao}: {e.barrasDisponiveis} {e.unidade} em estoque (100%) — <strong>fora da cotação</strong>. Use &quot;Atender estoque&quot; no item.</p>
+              ))}
+            </div>
+          )}
           <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-3 text-xs text-torg-dark">
             💡 Cada fornecedor abaixo recebe um link <strong>único</strong> e <strong>privado</strong>.
             Copie o link ou clique em &quot;Email&quot; pra abrir o Outlook com mensagem pré-pronta.
@@ -710,6 +722,7 @@ function ModalEnviarConsolidada({ rms, onClose, onSent, categoriasFornecedor = C
       onSent({
         cotacoes: data.cotacoes || [],
         rmsNumeros: data.cotacoes?.[0]?.rmsVinculadas || rms.map((r) => r.numero),
+        estoque: data.estoque || null,
       });
     } catch (e) {
       setErro(e.message);

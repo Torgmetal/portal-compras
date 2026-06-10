@@ -2603,7 +2603,7 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
-      onSent({ cotacoes: data.cotacoes, emails: data.emails || [] });
+      onSent({ cotacoes: data.cotacoes, emails: data.emails || [], estoque: data.estoque || null });
     } catch (e) {
       setErro(e.message);
       setSalvando(false);
@@ -2790,9 +2790,10 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
 }
 
 function ModalLinksEnvio({ rm, links, onClose }) {
-  // links agora é { cotacoes: [...], emails: [...] }
+  // links agora é { cotacoes: [...], emails: [...], estoque: {abatidos, excluidos} | null }
   const cotacoes = links?.cotacoes || links || [];
   const emailResults = links?.emails || [];
+  const estoque = links?.estoque || null;
   const [copiado, setCopiado] = useState(null);
   const [reenvioStatus, setReenvioStatus] = useState({});
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -2827,6 +2828,22 @@ function ModalLinksEnvio({ rm, links, onClose }) {
   return (
     <Modal titulo={`Cotações criadas (${cotacoes.length})`} onClose={onClose}>
       <div className="px-6 py-5 space-y-3 max-h-[70vh] overflow-y-auto">
+        {/* Abatimento por estoque (consulta respondida pela Produção) */}
+        {estoque && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm rounded-lg px-3 py-2.5 space-y-1">
+            <p className="font-semibold text-xs uppercase tracking-wide">Estoque abatido da cotação</p>
+            {estoque.abatidos?.map((a, i) => (
+              <p key={`a${i}`} className="text-xs">
+                • {a.descricao}: {a.barrasDisponiveis} {a.unidade} em estoque — cotado só {a.barrasACotar} {a.unidade}.
+              </p>
+            ))}
+            {estoque.excluidos?.map((e, i) => (
+              <p key={`e${i}`} className="text-xs">
+                • {e.descricao}: {e.barrasDisponiveis} {e.unidade} em estoque (100%) — <strong>fora da cotação</strong>. Use &quot;Atender estoque&quot; no item.
+              </p>
+            ))}
+          </div>
+        )}
         {/* Status geral */}
         {todosEnviados && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-800">
