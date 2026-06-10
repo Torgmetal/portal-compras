@@ -5,7 +5,7 @@ import EstoqueProducaoClient from "./EstoqueProducaoClient";
 export const metadata = { title: "Workspace Torg — Estoque Matéria-Prima" };
 
 export default async function EstoqueProducaoPage() {
-  await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL"]);
+  await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL", "ENGENHARIA"]);
 
   // Busca apenas itens ativos cuja categoriaLabel contém "matéria-prima" (case insensitive)
   const itens = await prisma.estoqueItem.findMany({

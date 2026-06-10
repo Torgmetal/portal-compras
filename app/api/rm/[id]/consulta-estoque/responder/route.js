@@ -21,7 +21,7 @@ const postSchema = z.object({
 export async function POST(req, { params }) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "PRODUCAO"]);
+    user = await requireRole(["ADMIN", "PRODUCAO", "ENGENHARIA"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });
@@ -149,7 +149,7 @@ export async function POST(req, { params }) {
           <h2 style="color:#006EAB;margin-top:0;">Resposta da Consulta de Estoque</h2>
 
           <p style="color:#4a5568;line-height:1.6;">
-            <strong>${user.name}</strong> (Producao) respondeu a sua consulta de estoque para a
+            <strong>${user.name}</strong> respondeu a sua consulta de estoque para a
             <strong>RM ${consulta.rm.numero}</strong> (${opLabel}).
           </p>
 
@@ -187,7 +187,7 @@ export async function POST(req, { params }) {
           <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0;">
           <p style="color:#a0aec0;font-size:12px;line-height:1.4;">
             Atenciosamente,<br>
-            <strong>Equipe de Producao — Torg Metal</strong>
+            <strong>Equipe Torg Metal</strong>
           </p>
         </div>
       `,

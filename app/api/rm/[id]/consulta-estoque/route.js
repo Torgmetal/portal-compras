@@ -127,17 +127,18 @@ export async function POST(req, { params }) {
     if (body.email) {
       emails = [body.email];
     } else {
-      const producaoUsers = await prisma.user.findMany({
+      // Produção responde as consultas; Engenharia também pode responder.
+      const destinatarios = await prisma.user.findMany({
         where: {
           ativo: true,
           OR: [
             { tipo: "ADMIN" },
-            { modulos: { some: { modulo: "PRODUCAO" } } },
+            { modulos: { some: { modulo: { in: ["PRODUCAO", "ENGENHARIA"] } } } },
           ],
         },
         select: { email: true },
       });
-      emails = producaoUsers.map((u) => u.email).filter(Boolean);
+      emails = destinatarios.map((u) => u.email).filter(Boolean);
     }
 
   if (emails.length > 0) {

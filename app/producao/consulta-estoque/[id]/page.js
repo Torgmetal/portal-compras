@@ -6,7 +6,7 @@ import ConsultaEstoqueResponder from "./ConsultaEstoqueResponder";
 export const metadata = { title: "Workspace Torg — Responder Consulta de Estoque" };
 
 export default async function ConsultaEstoquePage({ params }) {
-  const user = await requireRole(["ADMIN", "PRODUCAO"]);
+  const user = await requireRole(["ADMIN", "PRODUCAO", "ENGENHARIA"]);
 
   const consulta = await prisma.consultaEstoque.findUnique({
     where: { id: params.id },

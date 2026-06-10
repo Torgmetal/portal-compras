@@ -1,13 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, PlusCircle } from "lucide-react";
+import { ClipboardList, PlusCircle, PackageSearch } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/rm", label: "Minhas RMs", icon: ClipboardList, exact: true },
   { href: "/rm/nova", label: "Nova RM", icon: PlusCircle },
+  { href: "/producao/consulta-estoque", label: "Estoque", icon: PackageSearch },
 ];
 
 export default function SidebarRM() {

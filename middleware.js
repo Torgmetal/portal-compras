@@ -66,6 +66,10 @@ export default withAuth(
         if (path.startsWith("/indicadores") && !temModulo("COMPRAS", "COMERCIAL", "RH"))    return false;
         if (path.startsWith("/financeiro") && !temModulo("FINANCEIRO"))  return false;
         if (path.startsWith("/expedicao")  && !temModulo("EXPEDICAO"))   return false;
+        // Consulta de estoque: além da Produção, a Engenharia também acessa
+        // (responde às consultas e vê o estoque de matéria-prima).
+        if (path.startsWith("/producao/consulta-estoque"))
+          return temModulo("PRODUCAO", "ENGENHARIA");
         if (path.startsWith("/producao")   && !temModulo("PRODUCAO"))    return false;
         // /rm aberto para todos os modulos (historico visivel para todos)
         if (path.startsWith("/rm")         && !token)  return false;
