@@ -32,13 +32,16 @@ export async function GET(req) {
     const categoria = searchParams.get("categoria");
     const status = searchParams.get("status"); // VALIDO, VENCENDO_30, VENCENDO_60, VENCIDO
     const vinculo = searchParams.get("vinculo"); // FUNCIONARIO, EMPRESA
+    const funcionarioId = searchParams.get("funcionarioId"); // documentos de um funcionário específico
     const busca = searchParams.get("busca");
 
     const where = { ativo: true };
 
     if (categoria) where.categoria = categoria;
 
-    if (vinculo === "FUNCIONARIO") {
+    if (funcionarioId) {
+      where.funcionarioId = funcionarioId;
+    } else if (vinculo === "FUNCIONARIO") {
       where.funcionarioId = { not: null };
     } else if (vinculo === "EMPRESA") {
       where.funcionarioId = null;

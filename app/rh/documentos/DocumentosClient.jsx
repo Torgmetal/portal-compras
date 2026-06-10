@@ -80,7 +80,7 @@ export default function DocumentosClient() {
   const [busca, setBusca] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
-  const [filtroVinculo, setFiltroVinculo] = useState("");
+  const [filtroVinculo, setFiltroVinculo] = useState("EMPRESA"); // por padrão a lista mostra só docs da empresa; os por-funcionário ficam em cada funcionário (aba CCT)
   const [modalAberto, setModalAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
@@ -134,7 +134,8 @@ export default function DocumentosClient() {
       const params = new URLSearchParams();
       if (filtroCategoria) params.set("categoria", filtroCategoria);
       if (filtroStatus) params.set("status", filtroStatus);
-      if (filtroVinculo) params.set("vinculo", filtroVinculo);
+      // Buscar ignora o filtro de vínculo (procura em empresa + todos os funcionários).
+      if (filtroVinculo && !busca) params.set("vinculo", filtroVinculo);
       if (busca) params.set("busca", busca);
 
       const [dRes, fRes] = await Promise.all([
@@ -433,6 +434,7 @@ export default function DocumentosClient() {
           expandido={complianceExpandido}
           toggleExpandido={toggleExpandido}
           onRecarregar={carregarCompliance}
+          onEnviar={(d) => { setEnviarDoc(d); setEnviarPara(""); setEnviarMsg(""); setEnviarErro(""); setEnviarOk(false); }}
         />
       )}
 
@@ -493,6 +495,13 @@ export default function DocumentosClient() {
           <p className="text-xs text-torg-gray ml-auto"><strong>{documentos.length}</strong> documento{documentos.length !== 1 ? "s" : ""}</p>
         </div>
       </div>
+
+      {filtroVinculo === "EMPRESA" && !busca && (
+        <div className="flex items-start gap-2 px-1 -mt-2 text-[11px] text-torg-gray">
+          <AlertCircle size={13} className="text-torg-blue shrink-0 mt-0.5" />
+          <span>Mostrando só documentos da <strong>empresa</strong>. Os documentos por funcionário ficam dentro de cada funcionário (aba <strong>Funcionários</strong>) — ou busque pelo nome aqui.</span>
+        </div>
+      )}
 
       {/* Tabela */}
       {documentos.length === 0 ? (
@@ -868,7 +877,23 @@ const STATUS_ICON = {
   AUSENTE: { icon: XCircle, cor: "text-red-600", bg: "bg-red-50", label: "Ausente" },
 };
 
-function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFiltro, expandido, toggleExpandido, onRecarregar }) {
+function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFiltro, expandido, toggleExpandido, onRecarregar, onEnviar }) {
+  // Documentos de cada funcionário (carregados sob demanda ao expandir).
+  const [docsByFunc, setDocsByFunc] = useState({});
+  const [loadingDocs, setLoadingDocs] = useState({});
+  const carregarDocsFunc = async (funcId) => {
+    if (docsByFunc[funcId] !== undefined) return; // já carregado
+    setLoadingDocs((p) => ({ ...p, [funcId]: true }));
+    try {
+      const r = await fetch(`/api/rh/documentos?funcionarioId=${funcId}`).then((res) => res.json());
+      setDocsByFunc((p) => ({ ...p, [funcId]: r.data || [] }));
+    } catch {
+      setDocsByFunc((p) => ({ ...p, [funcId]: [] }));
+    } finally {
+      setLoadingDocs((p) => ({ ...p, [funcId]: false }));
+    }
+  };
+
   if (carregando) {
     return (
       <div className="flex items-center justify-center py-20 text-torg-gray">
@@ -996,7 +1021,7 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
             const pendentes = f.itens.filter((i) => i.status !== "OK");
             return (
               <div key={f.funcionario.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <button onClick={() => toggleExpandido(f.funcionario.id)}
+                <button onClick={() => { toggleExpandido(f.funcionario.id); carregarDocsFunc(f.funcionario.id); }}
                   className="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50/50 transition-colors text-left">
                   <ChevronRight size={16} className={`text-torg-gray shrink-0 transition-transform ${aberto ? "rotate-90" : ""}`} />
                   <div className="flex-1 min-w-0">
@@ -1043,7 +1068,9 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                   </div>
                 </button>
                 {aberto && (
-                  <div className="border-t border-gray-100 divide-y divide-gray-50">
+                  <div className="border-t border-gray-100">
+                    {/* Checklist CCT (o que é obrigatório e está faltando/vencido) */}
+                    <div className="divide-y divide-gray-50">
                     {f.itens.map((item) => {
                       const st = STATUS_ICON[item.status];
                       const StIcon = st.icon;
@@ -1065,6 +1092,45 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                         </div>
                       );
                     })}
+                    </div>
+                    {/* Documentos do funcionário, agrupados por categoria */}
+                    <div className="bg-gray-50/40 px-5 py-3 pl-12 border-t border-gray-100">
+                      <p className="text-[10px] font-bold text-torg-gray uppercase tracking-wider mb-2">Documentos do funcionário</p>
+                      {loadingDocs[f.funcionario.id] ? (
+                        <p className="text-xs text-torg-gray flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Carregando…</p>
+                      ) : docsByFunc[f.funcionario.id]?.length ? (
+                        <div className="space-y-2.5">
+                          {CATEGORIAS.map((cat) => {
+                            const ds = docsByFunc[f.funcionario.id].filter((d) => d.categoria === cat.value);
+                            if (!ds.length) return null;
+                            return (
+                              <div key={cat.value}>
+                                <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-[10px] font-bold ${cat.cor}`}>{cat.label} · {ds.length}</span>
+                                <div className="mt-1.5 space-y-1">
+                                  {ds.map((d) => (
+                                    <div key={d.id} className="flex items-center gap-2 text-xs bg-white rounded-lg border border-gray-100 px-3 py-1.5">
+                                      <FileText size={13} className="text-torg-gray shrink-0" />
+                                      <span className="flex-1 min-w-0 truncate text-torg-dark" title={d.nome}>{d.nome}</span>
+                                      <span className="text-[10px] text-torg-gray shrink-0 hidden sm:block">{TIPO_LABEL[d.tipo] || d.tipo}</span>
+                                      {d.temArquivo && (
+                                        <span className="flex items-center gap-0.5 shrink-0">
+                                          <a href={`/api/rh/documentos/${d.id}/download?inline=1`} target="_blank" rel="noopener noreferrer" title="Ver" className="p-1 rounded text-torg-blue hover:bg-torg-blue-50"><Eye size={13} /></a>
+                                          <a href={`/api/rh/documentos/${d.id}/download`} title="Baixar" className="p-1 rounded text-torg-gray hover:bg-gray-100"><Download size={13} /></a>
+                                          {onEnviar && <button onClick={() => onEnviar(d)} title="Enviar por e-mail" className="p-1 rounded text-torg-gray hover:bg-gray-100"><Send size={13} /></button>}
+                                          {d.sharepointUrl && <a href={d.sharepointUrl} target="_blank" rel="noopener noreferrer" title="Abrir no SharePoint" className="p-1 text-emerald-600"><Cloud size={12} /></a>}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-torg-gray">Nenhum documento anexado a este funcionário.</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
