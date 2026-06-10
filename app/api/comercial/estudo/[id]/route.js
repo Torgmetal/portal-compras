@@ -139,8 +139,10 @@ export async function PATCH(req, { params }) {
       },
     });
 
-    // Se status mudou para CONCLUIDO, atualizar valor no Orcamento
-    if (data.status === "CONCLUIDO" && data.valorTotal) {
+    // Se status mudou para CONCLUIDO, atualizar valor no Orcamento.
+    // Usa != null (não truthy) pra que um valorTotal legítimo de 0 também
+    // atualize; campo ausente no PATCH (undefined) é ignorado corretamente.
+    if (data.status === "CONCLUIDO" && data.valorTotal != null) {
       await prisma.orcamento.update({
         where: { id: estudo.orcamentoId },
         data: { valor: data.valorTotal },

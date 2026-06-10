@@ -43,8 +43,10 @@ export async function POST(_req, { params }) {
     data: {
       codigoPedidoOmie: r.codigoPedido || m.codigoPedidoOmie,
       data: r.data || m.data,
-      valorBruto: r.valorBruto || 0,
-      valorLiquido: r.valorLiquido,
+      // Preserva o valor anterior se o Omie voltar falsy (pedido alterado/zerado),
+      // alinhado com valorContratado/valorFaturadoAuto abaixo — não zera medição boa.
+      valorBruto: r.valorBruto != null ? r.valorBruto : m.valorBruto,
+      valorLiquido: r.valorLiquido != null ? r.valorLiquido : m.valorLiquido,
       valorContratado: r.valorContratado != null ? r.valorContratado : m.valorContratado,
       valorFaturadoAuto: r.valorFaturado != null ? r.valorFaturado : m.valorFaturadoAuto,
       status: r.status,

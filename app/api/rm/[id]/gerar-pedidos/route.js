@@ -169,22 +169,33 @@ export async function POST(req, { params }) {
 
     let pedidoOmie = null;
     if (!erroPedido) {
-      pedidoOmie = await prisma.pedidoOmie.create({
-        data: {
-          cotacaoId: cotacao.id,
-          fornecedorNome: cotacao.fornecedorNome,
-          nCodFor: pedidoCriado?.nCodFor_resolvido?.toString() || cotacao.nCodOmie || null,
-          cnpj: cnpjFinal || null,
-          codigoPedido: pedidoCriado?.codigo_pedido?.toString() || null,
-          numeroPedido: pedidoCriado?.numero_pedido?.toString() || null,
-          total,
-          faturamentoDireto: false,
-          status: "CRIADO",
-          observacao: observacaoBase,
-          payload: itensPayload,
-          resposta: pedidoCriado || null,
-          createdById: user.id,
-        },
+      // Persistência local atômica: gravar o PedidoOmie e marcar os RMItem como
+      // PEDIDO_GERADO na MESMA transação. Se o updateMany falhasse isolado (OOM,
+      // timeout) após o pedido já existir no Omie, os itens ficariam "abertos" e
+      // a próxima geração criaria um pedido DUPLICADO no Omie.
+      pedidoOmie = await prisma.$transaction(async (tx) => {
+        const pedido = await tx.pedidoOmie.create({
+          data: {
+            cotacaoId: cotacao.id,
+            fornecedorNome: cotacao.fornecedorNome,
+            nCodFor: pedidoCriado?.nCodFor_resolvido?.toString() || cotacao.nCodOmie || null,
+            cnpj: cnpjFinal || null,
+            codigoPedido: pedidoCriado?.codigo_pedido?.toString() || null,
+            numeroPedido: pedidoCriado?.numero_pedido?.toString() || null,
+            total,
+            faturamentoDireto: false,
+            status: "CRIADO",
+            observacao: observacaoBase,
+            payload: itensPayload,
+            resposta: pedidoCriado || null,
+            createdById: user.id,
+          },
+        });
+        await tx.rMItem.updateMany({
+          where: { id: { in: linhas.map((l) => l.rmItem.id) } },
+          data: { status: "PEDIDO_GERADO", pedidoOmieId: pedido.id },
+        });
+        return pedido;
       });
     } else {
       await prisma.auditLog.create({
@@ -206,11 +217,7 @@ export async function POST(req, { params }) {
 
     let resAnexos = null;
     if (!erroPedido) {
-      await prisma.rMItem.updateMany({
-        where: { id: { in: linhas.map((l) => l.rmItem.id) } },
-        data: { status: "PEDIDO_GERADO", pedidoOmieId: pedidoOmie.id },
-      });
-
+      // Itens já foram marcados como PEDIDO_GERADO dentro da transação acima.
       try {
         const nCodPed = Number(pedidoCriado?.codigo_pedido) || null;
         if (nCodPed) {

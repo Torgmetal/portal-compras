@@ -248,22 +248,33 @@ export async function POST(req, { params }) {
     // Erros nao poluem o historico — ficam apenas no AuditLog pra debug.
     let pedidoOmie = null;
     if (!erroPedido) {
-      pedidoOmie = await prisma.pedidoOmie.create({
-        data: {
-          cotacaoId: cotacao.id,
-          fornecedorNome: cotacao.fornecedorNome,
-          nCodFor: pedidoCriado?.nCodFor_resolvido?.toString() || cotacao.nCodOmie || null,
-          cnpj: cnpjFinal || null,
-          codigoPedido: pedidoCriado?.codigo_pedido?.toString() || null,
-          numeroPedido: pedidoCriado?.numero_pedido?.toString() || null,
-          total,
-          faturamentoDireto: isFD,
-          status: "CRIADO",
-          observacao: observacaoBase,
-          payload: itensPayload,
-          resposta: pedidoCriado || null,
-          createdById: user.id,
-        },
+      // Persistência local atômica: gravar o PedidoOmie e marcar os RMItem como
+      // PEDIDO_GERADO na MESMA transação. Se o updateMany falhasse isolado após o
+      // pedido já existir no Omie, os itens ficariam "abertos" e a próxima geração
+      // criaria um pedido DUPLICADO no Omie.
+      pedidoOmie = await prisma.$transaction(async (tx) => {
+        const pedido = await tx.pedidoOmie.create({
+          data: {
+            cotacaoId: cotacao.id,
+            fornecedorNome: cotacao.fornecedorNome,
+            nCodFor: pedidoCriado?.nCodFor_resolvido?.toString() || cotacao.nCodOmie || null,
+            cnpj: cnpjFinal || null,
+            codigoPedido: pedidoCriado?.codigo_pedido?.toString() || null,
+            numeroPedido: pedidoCriado?.numero_pedido?.toString() || null,
+            total,
+            faturamentoDireto: isFD,
+            status: "CRIADO",
+            observacao: observacaoBase,
+            payload: itensPayload,
+            resposta: pedidoCriado || null,
+            createdById: user.id,
+          },
+        });
+        await tx.rMItem.updateMany({
+          where: { id: { in: linhas.map((l) => l.rmItem.id) } },
+          data: { status: "PEDIDO_GERADO", pedidoOmieId: pedido.id },
+        });
+        return pedido;
       });
     } else {
       // Erro: registra no audit pra rastreabilidade, sem criar PedidoOmie
@@ -287,12 +298,7 @@ export async function POST(req, { params }) {
 
     let resAnexos = null;
     if (!erroPedido) {
-      // Marca os RMItens como PEDIDO_GERADO e vincula ao PedidoOmie
-      await prisma.rMItem.updateMany({
-        where: { id: { in: linhas.map((l) => l.rmItem.id) } },
-        data: { status: "PEDIDO_GERADO", pedidoOmieId: pedidoOmie.id },
-      });
-
+      // Itens já foram marcados como PEDIDO_GERADO dentro da transação acima.
       // Envia anexos pro Omie via API de anexos com URL externa.
       // Inclui: PDFs da cotacao (proposta do fornecedor) + anexos das RMs
       // envolvidas no grupo (drawings, especificacoes, planilha Tekla).

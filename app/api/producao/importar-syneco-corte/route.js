@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { isoWeekString, parseSemana, semanaInicio, semanaFim } from "@/lib/semana";
+import { diaBRT } from "@/lib/data-br";
 
 const schema = z.object({
   opNumero: z.string().min(1, "Informe o número da OP"),
@@ -97,7 +98,7 @@ export async function POST(req) {
         pesoProduzido: mes.pesoProduzido || 0,
         pesoFalta: Math.max(0, (mes.pesoPlanejado || 0) - (mes.pesoProduzido || 0)),
         statusSyneco: mes.status || "—",
-        dataFim: mes.dataFim ? mes.dataFim.toISOString().split("T")[0] : null,
+        dataFim: mes.dataFim ? diaBRT(mes.dataFim) : null,
         encontrada: !!peca,
         statusPortal: peca?.status || null,
       };
@@ -135,12 +136,15 @@ export async function POST(req) {
         alreadyCut++;
       }
 
-      // Agrupar peso por data
+      // Agrupar peso por data — dia-calendário BRT (não UTC), senão corte
+      // do turno noturno cai no dia seguinte e corrompe o realizado diário.
       const dataRef = mes.dataFim || mes.dataInicio;
       if (dataRef) {
-        const dataKey = dataRef.toISOString().split("T")[0];
-        if (!pesosPorData[dataKey]) pesosPorData[dataKey] = 0;
-        pesosPorData[dataKey] += mes.pesoProduzido || 0;
+        const dataKey = diaBRT(dataRef);
+        if (dataKey) {
+          if (!pesosPorData[dataKey]) pesosPorData[dataKey] = 0;
+          pesosPorData[dataKey] += mes.pesoProduzido || 0;
+        }
       }
     }
 
