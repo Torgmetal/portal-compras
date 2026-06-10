@@ -14,6 +14,8 @@ export const maxDuration = 60; // o backup baixa do Blob e sobe pro SharePoint
 const patchSchema = z.object({
   nome: z.string().min(2).optional(),
   tipo: z.string().min(1).optional(),
+  categoria: z.enum(["SAUDE_SEGURANCA", "PESSOAL", "TREINAMENTO", "EMPRESA"]).optional(),
+  funcionarioId: z.string().optional().nullable(),
   descricao: z.string().optional().nullable(),
   dataEmissao: z.string().optional().nullable(),
   dataValidade: z.string().optional().nullable(),
@@ -52,9 +54,10 @@ export async function PATCH(req, { params }) {
   const trocouArquivo = p.arquivoUrl && p.arquivoUrl !== existente.arquivoUrl;
 
   const data = {};
-  for (const k of ["nome", "tipo", "descricao", "orgaoEmissor", "numeroDocumento", "observacao", "arquivoUrl", "arquivoNome", "arquivoTamanho", "arquivoTipo"]) {
+  for (const k of ["nome", "tipo", "categoria", "descricao", "orgaoEmissor", "numeroDocumento", "observacao", "arquivoUrl", "arquivoNome", "arquivoTamanho", "arquivoTipo"]) {
     if (p[k] !== undefined) data[k] = p[k];
   }
+  if (p.funcionarioId !== undefined) data.funcionarioId = p.funcionarioId || null; // vazio = documento da empresa
   if (p.dataEmissao !== undefined) data.dataEmissao = p.dataEmissao ? new Date(p.dataEmissao) : null;
   if (p.dataValidade !== undefined) data.dataValidade = p.dataValidade ? new Date(p.dataValidade) : null;
   if (trocouArquivo) data.sharepointUrl = null; // backup novo será gerado abaixo

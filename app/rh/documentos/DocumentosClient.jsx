@@ -6,7 +6,7 @@ import {
   Users, AlertTriangle, CalendarClock, Download, Upload,
   FileSpreadsheet, CheckCircle2, XCircle, ClipboardCheck,
   ChevronRight, UserX, CircleAlert, BadgeCheck, Factory,
-  Paperclip, Eye, Send, UploadCloud, Cloud,
+  Paperclip, Eye, Send, UploadCloud, Cloud, Pencil,
 } from "lucide-react";
 import { upload } from "@vercel/blob/client";
 
@@ -21,12 +21,12 @@ const catMap = Object.fromEntries(CATEGORIAS.map((c) => [c.value, c]));
 const TIPOS = {
   SAUDE_SEGURANCA: [
     { value: "ASO", label: "ASO" },
+    { value: "FICHA_EPI", label: "Ficha de EPI" },
     { value: "NR_10", label: "NR-10 (Eletricidade)" },
     { value: "NR_12", label: "NR-12 (Máquinas)" },
     { value: "NR_33", label: "NR-33 (Espaço Confinado)" },
     { value: "NR_35", label: "NR-35 (Altura)" },
-    { value: "PPRA", label: "PPRA" },
-    { value: "PCMSO", label: "PCMSO" },
+    { value: "PPRA", label: "PPRA (legado)" },
   ],
   PESSOAL: [
     { value: "CNH", label: "CNH" },
@@ -40,6 +40,10 @@ const TIPOS = {
     { value: "INTEGRACAO", label: "Integração" },
   ],
   EMPRESA: [
+    { value: "PGR", label: "PGR (Gerenciamento de Riscos)" },
+    { value: "PCMSO", label: "PCMSO (Controle Médico)" },
+    { value: "LTCAT", label: "LTCAT" },
+    { value: "ANALISE_AGUA", label: "Análise de Água" },
     { value: "ALVARA", label: "Alvará" },
     { value: "LICENCA_AMBIENTAL", label: "Licença Ambiental" },
     { value: "AVCB", label: "AVCB" },
@@ -100,6 +104,7 @@ export default function DocumentosClient() {
   const [arquivoFile, setArquivoFile] = useState(null);   // arquivo a subir no modal
   const [uploadPct, setUploadPct] = useState(null);        // 0..100 durante upload
   const [aviso, setAviso] = useState("");                  // ex: backup SharePoint falhou
+  const [editandoId, setEditandoId] = useState(null);      // id do doc em edição (null = novo)
   const [enviarDoc, setEnviarDoc] = useState(null);        // doc do modal "Enviar"
   const [enviarPara, setEnviarPara] = useState("");
   const [enviarMsg, setEnviarMsg] = useState("");
@@ -163,6 +168,24 @@ export default function DocumentosClient() {
     setArquivoFile(null);
     setUploadPct(null);
     setAviso("");
+    setEditandoId(null);
+    setModalAberto(true);
+  };
+
+  // Abre o modal para EDITAR um documento existente (corrigir tipo/categoria/
+  // vínculo/validade). O arquivo só é trocado se selecionar um novo.
+  const abrirEditar = (d) => {
+    const isoDate = (v) => (v ? new Date(v).toISOString().slice(0, 10) : "");
+    setForm({
+      nome: d.nome || "", tipo: d.tipo || "", categoria: d.categoria || "SAUDE_SEGURANCA",
+      descricao: d.descricao || "", funcionarioId: d.funcionario?.id || d.funcionarioId || "",
+      dataEmissao: isoDate(d.dataEmissao), dataValidade: isoDate(d.dataValidade),
+      orgaoEmissor: d.orgaoEmissor || "", numeroDocumento: d.numeroDocumento || "", observacao: d.observacao || "",
+    });
+    setArquivoFile(null);
+    setUploadPct(null);
+    setAviso("");
+    setEditandoId(d.id);
     setModalAberto(true);
   };
 
@@ -189,11 +212,10 @@ export default function DocumentosClient() {
         observacao: form.observacao || null,
         ...arquivo,
       };
-      const res = await fetch("/api/rh/documentos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(
+        editandoId ? `/api/rh/documentos/${editandoId}` : "/api/rh/documentos",
+        { method: editandoId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao salvar");
       // Avisa se o documento salvou mas o backup ISO no SharePoint falhou.
@@ -203,6 +225,7 @@ export default function DocumentosClient() {
       setModalAberto(false);
       setArquivoFile(null);
       setUploadPct(null);
+      setEditandoId(null);
       carregar();
     } catch (e) {
       setErro(e.message);
@@ -494,6 +517,7 @@ export default function DocumentosClient() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validade</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Arquivo</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -561,6 +585,15 @@ export default function DocumentosClient() {
                           </div>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center">
+                          <button onClick={() => abrirEditar(d)}
+                            title="Editar registro (tipo, categoria, vínculo, datas…)"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-torg-gray hover:text-torg-dark px-2 py-1 rounded-lg hover:bg-gray-100">
+                            <Pencil size={14} /> Editar
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -576,7 +609,7 @@ export default function DocumentosClient() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !salvando && setModalAberto(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-torg-dark">Novo Documento</h3>
+              <h3 className="text-lg font-bold text-torg-dark">{editandoId ? "Editar Documento" : "Novo Documento"}</h3>
               <button onClick={() => setModalAberto(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
@@ -701,7 +734,7 @@ export default function DocumentosClient() {
               <button onClick={salvar} disabled={salvando || !form.nome || !form.categoria}
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
                 {salvando ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-                {salvando ? "Salvando…" : "Cadastrar"}
+                {salvando ? "Salvando…" : editandoId ? "Salvar alterações" : "Cadastrar"}
               </button>
             </div>
           </div>
