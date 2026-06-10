@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { downloadRhItem } from "@/lib/sharepoint";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { z } from "zod";
@@ -43,14 +44,22 @@ export async function POST(req, { params }) {
     where: { id: params.id },
     include: { funcionario: { select: { nome: true } } },
   });
-  if (!doc?.arquivoUrl) return NextResponse.json({ success: false, error: "Documento sem arquivo" }, { status: 404 });
+  if (!doc?.arquivoUrl && !doc?.sharepointItemId) {
+    return NextResponse.json({ success: false, error: "Documento sem arquivo" }, { status: 404 });
+  }
 
-  try { assertBlobUrlSegura(doc.arquivoUrl); }
-  catch { return NextResponse.json({ success: false, error: "Arquivo inválido" }, { status: 400 }); }
-
-  const r = await fetch(doc.arquivoUrl);
-  if (!r.ok) return NextResponse.json({ success: false, error: "Falha ao buscar o arquivo" }, { status: 502 });
-  const buf = Buffer.from(await r.arrayBuffer());
+  // Importados são lidos direto do SharePoint; os demais, do Blob.
+  let buf;
+  if (doc.arquivoUrl) {
+    try { assertBlobUrlSegura(doc.arquivoUrl); }
+    catch { return NextResponse.json({ success: false, error: "Arquivo inválido" }, { status: 400 }); }
+    const r = await fetch(doc.arquivoUrl);
+    if (!r.ok) return NextResponse.json({ success: false, error: "Falha ao buscar o arquivo" }, { status: 502 });
+    buf = Buffer.from(await r.arrayBuffer());
+  } else {
+    try { ({ buffer: buf } = await downloadRhItem(doc.sharepointItemId)); }
+    catch { return NextResponse.json({ success: false, error: "Falha ao buscar o arquivo no SharePoint" }, { status: 502 }); }
+  }
 
   const quem = doc.funcionario?.nome || "Empresa";
   const subject = `Documento de RH — ${doc.nome}${doc.funcionario ? ` (${doc.funcionario.nome})` : ""}`;

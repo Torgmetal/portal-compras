@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
+import { fetchRhItemResponse } from "@/lib/sharepoint";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,14 +20,21 @@ export async function GET(req, { params }) {
 
   const doc = await prisma.documento.findUnique({
     where: { id: params.id },
-    select: { arquivoUrl: true, arquivoNome: true, arquivoTipo: true },
+    select: { arquivoUrl: true, arquivoNome: true, arquivoTipo: true, sharepointItemId: true },
   });
-  if (!doc?.arquivoUrl) return NextResponse.json({ error: "Documento sem arquivo" }, { status: 404 });
+  if (!doc?.arquivoUrl && !doc?.sharepointItemId) {
+    return NextResponse.json({ error: "Documento sem arquivo" }, { status: 404 });
+  }
 
-  try { assertBlobUrlSegura(doc.arquivoUrl); }
-  catch { return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 }); }
-
-  const res = await fetch(doc.arquivoUrl);
+  // Documentos importados são servidos direto do SharePoint (sem cópia no Blob).
+  let res;
+  if (doc.arquivoUrl) {
+    try { assertBlobUrlSegura(doc.arquivoUrl); }
+    catch { return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 }); }
+    res = await fetch(doc.arquivoUrl);
+  } else {
+    res = await fetchRhItemResponse(doc.sharepointItemId);
+  }
   if (!res.ok || !res.body) return NextResponse.json({ error: "Falha ao buscar arquivo" }, { status: 502 });
 
   const inline = new URL(req.url).searchParams.get("inline") === "1";

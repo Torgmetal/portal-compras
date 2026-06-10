@@ -115,7 +115,7 @@ export async function GET(req) {
 
     // Privacidade: nunca devolver a arquivoUrl crua (Blob público). A tela vê/baixa
     // pelo proxy autenticado /api/rh/documentos/[id]/download.
-    const dataOut = documentos.map(({ arquivoUrl, ...d }) => ({ ...d, temArquivo: !!arquivoUrl }));
+    const dataOut = documentos.map(({ arquivoUrl, sharepointItemId, ...d }) => ({ ...d, temArquivo: !!(arquivoUrl || sharepointItemId) }));
 
     return NextResponse.json({
       success: true,

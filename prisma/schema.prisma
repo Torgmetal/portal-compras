@@ -1005,6 +1005,9 @@ model Documento {
   arquivoTamanho  Int?
   arquivoTipo     String?
   sharepointUrl   String?      // webUrl da cópia no SharePoint (backup ISO)
+  // Quando setado, o arquivo é servido direto do SharePoint (sem cópia no Blob) —
+  // usado pela importação em massa dos documentos de RH já existentes no SP.
+  sharepointItemId String?     @unique
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   funcionario     Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)

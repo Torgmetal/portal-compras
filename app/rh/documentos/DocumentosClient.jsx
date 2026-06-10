@@ -33,6 +33,7 @@ const TIPOS = {
     { value: "PPRA", label: "PPRA (legado)" },
   ],
   PESSOAL: [
+    { value: "ADMISSIONAL", label: "Admissional" },
     { value: "CNH", label: "CNH" },
     { value: "PASSAPORTE", label: "Passaporte" },
     { value: "CERTIDAO", label: "Certidão" },
