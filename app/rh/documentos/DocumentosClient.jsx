@@ -22,6 +22,10 @@ const TIPOS = {
   SAUDE_SEGURANCA: [
     { value: "ASO", label: "ASO" },
     { value: "FICHA_EPI", label: "Ficha de EPI" },
+    { value: "PGR", label: "PGR (Gerenciamento de Riscos)" },
+    { value: "PCMSO", label: "PCMSO (Controle Médico)" },
+    { value: "LTCAT", label: "LTCAT" },
+    { value: "ANALISE_AGUA", label: "Análise de Água" },
     { value: "NR_10", label: "NR-10 (Eletricidade)" },
     { value: "NR_12", label: "NR-12 (Máquinas)" },
     { value: "NR_33", label: "NR-33 (Espaço Confinado)" },
@@ -40,10 +44,6 @@ const TIPOS = {
     { value: "INTEGRACAO", label: "Integração" },
   ],
   EMPRESA: [
-    { value: "PGR", label: "PGR (Gerenciamento de Riscos)" },
-    { value: "PCMSO", label: "PCMSO (Controle Médico)" },
-    { value: "LTCAT", label: "LTCAT" },
-    { value: "ANALISE_AGUA", label: "Análise de Água" },
     { value: "ALVARA", label: "Alvará" },
     { value: "LICENCA_AMBIENTAL", label: "Licença Ambiental" },
     { value: "AVCB", label: "AVCB" },
