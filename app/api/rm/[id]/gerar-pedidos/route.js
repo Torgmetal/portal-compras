@@ -167,6 +167,7 @@ export async function POST(req, { params }) {
         cCodLocalEstoque: localSelecionado,
         cInfAdic: `RM Interna ${rm.numero}`,
         nCodProj: nCodProjOP,
+        prazoPagamento: cotacao.prazoPagamento,
       });
       if (data.error) {
         erroPedido = data.error;

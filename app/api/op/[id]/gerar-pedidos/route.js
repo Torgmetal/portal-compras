@@ -242,6 +242,7 @@ export async function POST(req, { params }) {
         cCodLocalEstoque,
         cInfAdic: `OP ${op.numero}`,
         nCodProj: nCodProjOP,
+        prazoPagamento: cotacao.prazoPagamento,
       });
       if (data.error) {
         erroPedido = data.error;
