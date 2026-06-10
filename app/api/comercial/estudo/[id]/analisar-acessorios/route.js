@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
-import { readFileSync } from "fs";
-import { join } from "path";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -11,14 +9,8 @@ export const maxDuration = 120;
 // Fallback: se ANTHROPIC_API_KEY estiver vazia (processo pai override),
 // ler diretamente do .env.local
 function getAnthropicKey() {
-  const envKey = process.env.ANTHROPIC_API_KEY;
-  if (envKey && envKey.startsWith("sk-ant-")) return envKey;
-  try {
-    const envFile = readFileSync(join(process.cwd(), ".env.local"), "utf-8");
-    const match = envFile.match(/^ANTHROPIC_API_KEY=(.+)$/m);
-    if (match) return match[1].trim();
-  } catch { /* noop */ }
-  return null;
+  const envKey = (process.env.ANTHROPIC_API_KEY || "").trim();
+  return envKey || null;
 }
 
 const MAX_DOCS_POR_LOTE = 5;
