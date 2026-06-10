@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   ArrowUpCircle, RefreshCw, Loader2, AlertCircle, Search,
-  CalendarDays, ChevronDown, ChevronRight, Tag, Building2, ExternalLink, Check, ArrowDownUp,
+  CalendarDays, ChevronDown, ChevronRight, Tag, Building2, ExternalLink, Check, ArrowDownUp, FileSpreadsheet,
 } from "lucide-react";
 
 // Módulo do Omie (tenant Torg). O Omie não expõe API/URL estável para abrir uma
@@ -48,6 +48,7 @@ export default function ContasReceberClient() {
   const [filtroSit, setFiltroSit] = useState(""); // "" | VENCIDA | A VENCER | HOJE
   const [verResumo, setVerResumo] = useState(false);
   const [aVencerPrimeiro, setAVencerPrimeiro] = useState(true); // A VENCER antes dos parciais/vencidas
+  const [exportando, setExportando] = useState(false);
 
   const carregar = async (d1 = de, d2 = ate) => {
     setLoad(true); setErro("");
@@ -134,6 +135,74 @@ export default function ContasReceberClient() {
     return [...map.entries()].map(([k, v]) => ({ k, ...v })).sort((a, b) => b.valor - a.valor).slice(0, 12);
   };
 
+  // Exporta a lista filtrada para Excel, no template ISO 9001 da Torg.
+  const exportarXlsx = async () => {
+    if (!data || filtradas.length === 0) return;
+    setExportando(true);
+    try {
+      const {
+        criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
+        adicionarLinhaTotais, adicionarRodapeISO, downloadWorkbook,
+      } = await import("@/lib/excel-relatorio");
+
+      const totalColunas = 9;
+      const subtitulo = [
+        (de || ate) ? `Período: ${fmtData(de + "T12:00")} a ${fmtData(ate + "T12:00")}` : "Todos em aberto",
+        filtroSit && `Situação: ${filtroSit === "HOJE" ? "Vence hoje" : filtroSit}`,
+        busca.trim() && `Busca: "${busca.trim()}"`,
+      ].filter(Boolean).join("   |   ");
+
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: "Contas a Receber",
+        subtitulo,
+        nomePlanilha: "Contas a Receber",
+        codigoDoc: "REL-FIN-002",
+        totalColunas,
+        kpis: [
+          `Total a receber: ${fmtMoeda(totais.total)} (${totais.qtd} títulos)   |   Vencidas: ${fmtMoeda(totais.vencidas)} (${totais.qtdVencidas})   |   Vence hoje: ${fmtMoeda(totais.venceHoje)} (${totais.qtdVenceHoje})   |   A vencer: ${fmtMoeda(totais.aVencer)} (${totais.qtdAVencer})`,
+        ],
+      });
+
+      const colWidths = [12, 32, 15, 15, 15, 22, 12, 12, 12];
+      colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, ["Vencimento", "Cliente", "Valor (R$)", "Recebido (R$)", "A receber (R$)", "Categoria", "NF", "OS", "Situação"]);
+      row++;
+
+      let somaValor = 0, somaReceb = 0, somaSaldo = 0;
+      filtradas.forEach((c, idx) => {
+        somaValor += c.valor || 0; somaReceb += c.valorRecebido || 0; somaSaldo += c.saldo || 0;
+        const valores = [
+          fmtData(c.vencimento), c.cliente || "—",
+          Number((c.valor || 0).toFixed(2)), Number((c.valorRecebido || 0).toFixed(2)), Number((c.saldo || 0).toFixed(2)),
+          c.categoria || "—", c.nf || "—", c.os || "—",
+          c.situacao + (c.parcial ? " (parcial)" : ""),
+        ];
+        const fontColors = c.situacao === "VENCIDA" ? { 8: "D32F2F" } : {};
+        adicionarLinhaTabela(ws, row, valores, {
+          fillColor: idx % 2 === 1 ? "F8FAFC" : undefined,
+          alinhamento: { 2: "right", 3: "right", 4: "right", 8: "center" }, fontColors, fontSize: 9, rowHeight: 16,
+        });
+        [3, 4, 5].forEach((col) => { ws.getCell(row, col).numFmt = "#,##0.00"; });
+        row++;
+      });
+
+      adicionarLinhaTotais(ws, row, ["", "TOTAL", Number(somaValor.toFixed(2)), Number(somaReceb.toFixed(2)), Number(somaSaldo.toFixed(2)), "", "", "", `${filtradas.length} títulos`]);
+      [3, 4, 5].forEach((col) => { ws.getCell(row, col).numFmt = "#,##0.00"; });
+      row += 2;
+      adicionarRodapeISO(ws, row, totalColunas, { elaboradoPor: "Financeiro" });
+      ws.views = [{ state: "frozen", ySplit: linhaInicio }];
+
+      await downloadWorkbook(workbook, `Contas_a_Receber_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) {
+      console.error("Erro ao exportar:", e);
+      setErro("Erro ao gerar planilha: " + e.message);
+    } finally {
+      setExportando(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
@@ -147,11 +216,19 @@ export default function ContasReceberClient() {
             {data?.ultimoSync && ` Sincronizado ${fmtData(data.ultimoSync)} ${new Date(data.ultimoSync).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" })}.`}
           </p>
         </div>
-        <button onClick={() => sincronizar(true)} disabled={sincronizando || loading}
-          className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
-          {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          {sincronizando ? "Atualizando…" : "Atualizar"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportarXlsx} disabled={exportando || loading || !data || filtradas.length === 0}
+            title="Exportar a lista filtrada para Excel"
+            className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
+            {exportando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} className="text-emerald-600" />}
+            {exportando ? "Gerando…" : "Exportar Excel"}
+          </button>
+          <button onClick={() => sincronizar(true)} disabled={sincronizando || loading}
+            className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
+            {sincronizando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {sincronizando ? "Atualizando…" : "Atualizar"}
+          </button>
+        </div>
       </div>
 
       {/* Presets de período */}
