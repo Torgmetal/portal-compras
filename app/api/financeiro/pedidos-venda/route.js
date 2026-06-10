@@ -81,6 +81,41 @@ export async function GET(req) {
       data.totalFaturadoAvulso = totalAvulso;
     }
 
+    // Anexa o número da NF emitida a cada medição (pedido/OS). O Omie não traz a
+    // NF no ListarPedidos/ListarOS — ela vive no faturamento. As Contas a Receber
+    // que já sincronizamos têm numeroDocFiscal (NF) + numeroOS/numeroPedidoVenda,
+    // então cruzamos por aqui (sem novo pull no Omie).
+    try {
+      const recebiveis = await prismaDirect.contaReceber.findMany({
+        where: {
+          numeroDocFiscal: { not: null },
+          OR: [{ numeroOS: { not: null } }, { numeroPedidoVenda: { not: null } }],
+        },
+        select: { numeroOS: true, numeroPedidoVenda: true, numeroDocFiscal: true },
+      });
+      const nfPorOS = new Map(), nfPorVenda = new Map();
+      const limpaNF = (nf) => String(nf).replace(/^0+/, "") || String(nf);
+      for (const r of recebiveis) {
+        const nf = limpaNF(r.numeroDocFiscal);
+        if (r.numeroOS) {
+          if (!nfPorOS.has(r.numeroOS)) nfPorOS.set(r.numeroOS, new Set());
+          nfPorOS.get(r.numeroOS).add(nf);
+        }
+        if (r.numeroPedidoVenda) {
+          if (!nfPorVenda.has(r.numeroPedidoVenda)) nfPorVenda.set(r.numeroPedidoVenda, new Set());
+          nfPorVenda.get(r.numeroPedidoVenda).add(nf);
+        }
+      }
+      for (const o of (data.obras || [])) {
+        for (const ped of (o.pedidos || [])) {
+          const set = ped.origem === "servico" ? nfPorOS.get(ped.numero) : nfPorVenda.get(ped.numero);
+          ped.nfs = set ? [...set].sort((a, b) => Number(a) - Number(b) || String(a).localeCompare(String(b))) : [];
+        }
+      }
+    } catch (e) {
+      console.error("[pedidos-venda] falha ao anexar NF:", e?.message);
+    }
+
     return NextResponse.json({ ok: true, ...data });
   } catch (e) {
     return NextResponse.json({ error: "Falha ao consultar Omie: " + (e?.message || e) }, { status: 502 });

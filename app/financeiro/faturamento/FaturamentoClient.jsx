@@ -1,6 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import { FileText, RefreshCw, Clock, Search, Loader2, AlertCircle, ArrowUp, ArrowDown, ChevronsUpDown, Landmark, AlertTriangle } from "lucide-react";
+import { FileText, RefreshCw, Clock, Search, Loader2, AlertCircle, ArrowUp, ArrowDown, ChevronsUpDown, Landmark, AlertTriangle, FileSpreadsheet } from "lucide-react";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -16,6 +16,7 @@ export default function FaturamentoClient() {
   // Ordenação: campo + direção. Default = mais a faturar primeiro (igual ao backend).
   const [ordenarPor, setOrdenarPor] = useState("aFaturar");
   const [direcao, setDirecao] = useState("desc");
+  const [exportando, setExportando] = useState(false);
 
   const clicarOrdenar = (campo) => {
     if (ordenarPor === campo) {
@@ -70,6 +71,87 @@ export default function FaturamentoClient() {
 
   const filtrado = soAFaturar || !!busca.trim();
 
+  // Exporta o faturamento por obra (uma linha por medição, com a NF emitida) no
+  // template ISO 9001 da Torg.
+  const exportarXlsx = async () => {
+    if (!data || obras.length === 0) return;
+    setExportando(true);
+    try {
+      const {
+        criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
+        adicionarLinhaTotais, adicionarRodapeISO, downloadWorkbook,
+      } = await import("@/lib/excel-relatorio");
+
+      const totalColunas = 8;
+      const subtitulo = [
+        soAFaturar && "Filtro: só com a faturar",
+        busca.trim() && `Busca: "${busca.trim()}"`,
+        data.atualizadoEm && `Atualizado: ${fmtData(data.atualizadoEm)}`,
+      ].filter(Boolean).join("   |   ");
+
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: "Faturamento por obra",
+        subtitulo,
+        nomePlanilha: "Faturamento",
+        codigoDoc: "REL-FIN-003",
+        totalColunas,
+        kpis: [
+          `Já faturado: ${fmtMoeda(totais.faturado)}   |   A faturar: ${fmtMoeda(totais.aFaturar)}   |   Total contratado: ${fmtMoeda(totais.contratado)}   |   Obras: ${totais.qtd} (${totais.comAtraso} com atraso)`,
+        ],
+      });
+
+      const colWidths = [38, 8, 14, 12, 16, 12, 16, 16];
+      colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, ["Obra / Projeto", "OP", "Tipo", "Medição", "NF emitida", "Situação", "Faturado (R$)", "A faturar (R$)"]);
+      row++;
+
+      let somaFat = 0, somaAFat = 0, idx = 0;
+      for (const o of obras) {
+        const linhas = (o.pedidos && o.pedidos.length > 0)
+          ? o.pedidos.map((p) => ({
+              tipo: p.origem === "servico" ? "Serviço (OS)" : "Venda",
+              medicao: p.numero, nf: (p.nfs || []).join(", "),
+              situacao: p.aFaturar <= 0 ? "Faturado" : p.faturado > 0 ? "Parcial" : "A faturar",
+              faturado: p.faturado || 0, aFaturar: p.aFaturar || 0,
+            }))
+          : [{ tipo: o.faturadoAvulso > 0 ? "NFS-e avulsa" : o.tipo, medicao: "—", nf: "—",
+               situacao: o.aFaturar > 0 ? "A faturar" : "Faturado", faturado: o.faturado || 0, aFaturar: o.aFaturar || 0 }];
+
+        for (const ln of linhas) {
+          somaFat += ln.faturado; somaAFat += ln.aFaturar;
+          adicionarLinhaTabela(ws, row, [
+            o.projeto, o.numeroOp ? `OP-${o.numeroOp}` : "—", ln.tipo, ln.medicao, ln.nf || "—",
+            ln.situacao, Number(ln.faturado.toFixed(2)), Number(ln.aFaturar.toFixed(2)),
+          ], {
+            fillColor: idx % 2 === 1 ? "F8FAFC" : undefined,
+            alinhamento: { 1: "center", 5: "center", 6: "right", 7: "right" },
+            fontColors: ln.situacao === "Faturado" ? { 5: "2E7D32" } : ln.situacao === "Parcial" ? { 5: "F4801F" } : {},
+            fontSize: 9, rowHeight: 16,
+          });
+          ws.getCell(row, 7).numFmt = "#,##0.00";
+          ws.getCell(row, 8).numFmt = "#,##0.00";
+          row++; idx++;
+        }
+      }
+
+      adicionarLinhaTotais(ws, row, ["", "", "", "", "", "TOTAL", Number(somaFat.toFixed(2)), Number(somaAFat.toFixed(2))]);
+      ws.getCell(row, 7).numFmt = "#,##0.00";
+      ws.getCell(row, 8).numFmt = "#,##0.00";
+      row += 2;
+      adicionarRodapeISO(ws, row, totalColunas, { elaboradoPor: "Financeiro" });
+      ws.views = [{ state: "frozen", ySplit: linhaInicio }];
+
+      await downloadWorkbook(workbook, `Faturamento_por_obra_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) {
+      console.error("Erro ao exportar:", e);
+      setErro("Erro ao gerar planilha: " + e.message);
+    } finally {
+      setExportando(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -82,10 +164,18 @@ Vendas de produto + Ordens de Serviço do Omie por obra: quanto já foi faturado
             {data?.atualizadoEm && ` Atualizado ${fmtData(data.atualizadoEm)} ${new Date(data.atualizadoEm).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}.`}
           </p>
         </div>
-        <button onClick={() => carregar(true)} disabled={loading}
-          className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportarXlsx} disabled={exportando || loading || !data || obras.length === 0}
+            title="Exportar o faturamento por obra (com a NF emitida) para Excel"
+            className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
+            {exportando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} className="text-emerald-600" />}
+            {exportando ? "Gerando…" : "Exportar Excel"}
+          </button>
+          <button onClick={() => carregar(true)} disabled={loading}
+            className="px-3 py-2 text-sm border border-gray-300 text-torg-gray rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-50">
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Atualizar
+          </button>
+        </div>
       </div>
 
       {/* KPIs — refletem o filtro atual */}
@@ -404,11 +494,18 @@ function FragmentObra({ obra, aberta, onToggle }) {
         <tr key={ped.numero} className="bg-gray-50/40">
           <td colSpan={5} className="px-4 py-2">
             <div className="pl-6">
-              <div className="text-xs font-semibold text-torg-gray mb-1 flex items-center gap-1.5">
+              <div className="text-xs font-semibold text-torg-gray mb-1 flex items-center gap-1.5 flex-wrap">
                 <span className={`px-1.5 py-0.5 rounded text-[10px] ${ped.origem === "servico" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
                   {ped.origem === "servico" ? "Serviço (OS)" : "Venda"}
                 </span>
-                #{ped.numero} — {ped.parcelas.length} parcela(s) · faturado {fmtMoeda(ped.faturado)} · a faturar {fmtMoeda(ped.aFaturar)}
+                #{ped.numero}
+                {ped.nfs?.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-700 border border-green-200 font-medium"
+                    title={`Nota(s) fiscal(is) emitida(s) para esta ${ped.origem === "servico" ? "OS" : "venda"}`}>
+                    NF {ped.nfs.join(", ")}
+                  </span>
+                )}
+                <span className="text-torg-gray font-normal">— {ped.parcelas.length} parcela(s) · faturado {fmtMoeda(ped.faturado)} · a faturar {fmtMoeda(ped.aFaturar)}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {ped.parcelas.map((pc) => {
