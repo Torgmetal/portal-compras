@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { isBlobUrlSegura } from "@/lib/blob-url";
+import { backupISODocumento } from "@/lib/rh-doc-backup";
 import { z } from "zod";
 
 const docSchema = z.object({
@@ -14,6 +16,11 @@ const docSchema = z.object({
   orgaoEmissor: z.string().optional().nullable(),
   numeroDocumento: z.string().optional().nullable(),
   observacao: z.string().optional().nullable(),
+  // Arquivo (já subiu pro Blob via upload-token; aqui só persiste a referência)
+  arquivoUrl: z.string().url().optional().nullable(),
+  arquivoNome: z.string().optional().nullable(),
+  arquivoTamanho: z.number().int().optional().nullable(),
+  arquivoTipo: z.string().optional().nullable(),
 });
 
 // GET — Lista documentos com filtros
@@ -106,9 +113,13 @@ export async function GET(req) {
       else validos++;
     }
 
+    // Privacidade: nunca devolver a arquivoUrl crua (Blob público). A tela vê/baixa
+    // pelo proxy autenticado /api/rh/documentos/[id]/download.
+    const dataOut = documentos.map(({ arquivoUrl, ...d }) => ({ ...d, temArquivo: !!arquivoUrl }));
+
     return NextResponse.json({
       success: true,
-      data: documentos,
+      data: dataOut,
       stats: { totalDocs, vencidos, vencendo30, vencendo60, validos, semValidade, docsEmpresa, docsFuncionario },
     });
   } catch (e) {
@@ -128,6 +139,12 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
     }
 
+    // Se veio arquivo, a URL precisa ser do nosso Blob (anti-SSRF / não aceitar
+    // link externo arbitrário gravado como documento de RH).
+    if (parsed.data.arquivoUrl && !isBlobUrlSegura(parsed.data.arquivoUrl)) {
+      return NextResponse.json({ success: false, error: "URL de arquivo inválida." }, { status: 400 });
+    }
+
     const data = {
       ...parsed.data,
       dataEmissao: parsed.data.dataEmissao ? new Date(parsed.data.dataEmissao) : null,
@@ -143,11 +160,16 @@ export async function POST(req) {
         action: "CRIAR_DOCUMENTO",
         entity: "Documento",
         entityId: doc.id,
-        diff: { nome: data.nome, tipo: data.tipo, categoria: data.categoria },
+        diff: { nome: data.nome, tipo: data.tipo, categoria: data.categoria, temArquivo: !!doc.arquivoUrl },
       },
     });
 
-    return NextResponse.json({ success: true, data: doc }, { status: 201 });
+    // Backup ISO no SharePoint (com log; não quebra o cadastro se falhar).
+    let backup = null;
+    if (doc.arquivoUrl) backup = await backupISODocumento(doc, user.id);
+
+    const { arquivoUrl, ...docSemUrl } = doc;
+    return NextResponse.json({ success: true, data: { ...docSemUrl, temArquivo: !!arquivoUrl, sharepointUrl: backup?.sharepointUrl || doc.sharepointUrl }, backup }, { status: 201 });
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });

@@ -999,6 +999,12 @@ model Documento {
   numeroDocumento String?
   observacao      String?
   ativo           Boolean      @default(true)
+  // Arquivo anexado (Vercel Blob) + cópia de backup no SharePoint (controle ISO)
+  arquivoUrl      String?      // URL do Blob (privada: só servida via proxy autenticado)
+  arquivoNome     String?
+  arquivoTamanho  Int?
+  arquivoTipo     String?
+  sharepointUrl   String?      // webUrl da cópia no SharePoint (backup ISO)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   funcionario     Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)

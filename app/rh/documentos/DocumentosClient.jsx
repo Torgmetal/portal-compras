@@ -6,7 +6,9 @@ import {
   Users, AlertTriangle, CalendarClock, Download, Upload,
   FileSpreadsheet, CheckCircle2, XCircle, ClipboardCheck,
   ChevronRight, UserX, CircleAlert, BadgeCheck, Factory,
+  Paperclip, Eye, Send, UploadCloud, Cloud,
 } from "lucide-react";
+import { upload } from "@vercel/blob/client";
 
 const CATEGORIAS = [
   { value: "SAUDE_SEGURANCA", label: "Saúde / Segurança", cor: "bg-red-100 text-red-800" },
@@ -94,6 +96,30 @@ export default function DocumentosClient() {
     funcionarioId: "", dataEmissao: "", dataValidade: "",
     orgaoEmissor: "", numeroDocumento: "", observacao: "",
   });
+  // Arquivo / upload / envio
+  const [arquivoFile, setArquivoFile] = useState(null);   // arquivo a subir no modal
+  const [uploadPct, setUploadPct] = useState(null);        // 0..100 durante upload
+  const [aviso, setAviso] = useState("");                  // ex: backup SharePoint falhou
+  const [enviarDoc, setEnviarDoc] = useState(null);        // doc do modal "Enviar"
+  const [enviarPara, setEnviarPara] = useState("");
+  const [enviarMsg, setEnviarMsg] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [enviarErro, setEnviarErro] = useState("");
+  const [enviarOk, setEnviarOk] = useState(false);
+  const [subindoId, setSubindoId] = useState(null);        // upload inline (botão "Subir" na linha)
+  const subirRef = useRef(null);
+  const subirAlvo = useRef(null);
+
+  // Sobe um arquivo DIRETO pro storage (sem passar pela função serverless → >4MB ok).
+  const uploadArquivo = async (file, onPct) => {
+    const safe = String(file.name || "arquivo").replace(/[^\w.\- ]/g, "_").slice(0, 100);
+    const blob = await upload(`rh-docs/${Date.now()}-${safe}`, file, {
+      access: "public",
+      handleUploadUrl: "/api/rh/documentos/upload-token",
+      onUploadProgress: onPct ? (p) => onPct(Math.round(p.percentage)) : undefined,
+    });
+    return { arquivoUrl: blob.url, arquivoNome: file.name, arquivoTamanho: file.size, arquivoTipo: file.type || "application/octet-stream" };
+  };
 
   const carregar = async () => {
     setCarregando(true);
@@ -134,13 +160,23 @@ export default function DocumentosClient() {
       funcionarioId: "", dataEmissao: "", dataValidade: "",
       orgaoEmissor: "", numeroDocumento: "", observacao: "",
     });
+    setArquivoFile(null);
+    setUploadPct(null);
+    setAviso("");
     setModalAberto(true);
   };
 
   const salvar = async () => {
     setSalvando(true);
     setErro("");
+    setAviso("");
     try {
+      // Se anexou arquivo, sobe primeiro (direto pro storage) e inclui no body.
+      let arquivo = {};
+      if (arquivoFile) {
+        setUploadPct(0);
+        arquivo = await uploadArquivo(arquivoFile, setUploadPct);
+      }
       const body = {
         ...form,
         tipo: form.tipo || "OUTRO",
@@ -151,6 +187,7 @@ export default function DocumentosClient() {
         orgaoEmissor: form.orgaoEmissor || null,
         numeroDocumento: form.numeroDocumento || null,
         observacao: form.observacao || null,
+        ...arquivo,
       };
       const res = await fetch("/api/rh/documentos", {
         method: "POST",
@@ -159,12 +196,64 @@ export default function DocumentosClient() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao salvar");
+      // Avisa se o documento salvou mas o backup ISO no SharePoint falhou.
+      if (arquivoFile && data.backup && !data.backup.ok) {
+        setAviso(`Documento salvo, mas a cópia de backup no SharePoint falhou (${data.backup.erro}). O arquivo está no portal; o backup pode ser refeito reenviando.`);
+      }
       setModalAberto(false);
+      setArquivoFile(null);
+      setUploadPct(null);
       carregar();
     } catch (e) {
       setErro(e.message);
     } finally {
       setSalvando(false);
+    }
+  };
+
+  // Sobe arquivo para um documento JÁ existente (botão "Subir" na linha) → PATCH.
+  const subirInline = async (doc, file) => {
+    setSubindoId(doc.id);
+    setAviso("");
+    try {
+      const arquivo = await uploadArquivo(file);
+      const res = await fetch(`/api/rh/documentos/${doc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(arquivo),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao anexar");
+      if (data.backup && !data.backup.ok) {
+        setAviso(`Arquivo anexado, mas o backup no SharePoint falhou (${data.backup.erro}).`);
+      }
+      carregar();
+    } catch (e) {
+      setAviso("Falha ao subir arquivo: " + e.message);
+    } finally {
+      setSubindoId(null);
+    }
+  };
+
+  // Envia o documento por e-mail (anexo).
+  const enviarDocumento = async () => {
+    setEnviando(true);
+    setEnviarErro("");
+    setEnviarOk(false);
+    try {
+      const res = await fetch(`/api/rh/documentos/${enviarDoc.id}/enviar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ para: enviarPara, mensagem: enviarMsg || null }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Falha ao enviar");
+      setEnviarOk(true);
+      setTimeout(() => { setEnviarDoc(null); setEnviarPara(""); setEnviarMsg(""); setEnviarOk(false); }, 1200);
+    } catch (e) {
+      setEnviarErro(e.message);
+    } finally {
+      setEnviando(false);
     }
   };
 
@@ -400,6 +489,7 @@ export default function DocumentosClient() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emissão</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validade</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Arquivo</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -442,6 +532,30 @@ export default function DocumentosClient() {
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${st.cor}`}>
                           {StIcon && <StIcon size={11} />} {st.label}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {d.temArquivo ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <a href={`/api/rh/documentos/${d.id}/download?inline=1`} target="_blank" rel="noopener noreferrer"
+                              title="Ver" className="p-1.5 rounded-lg text-torg-blue hover:bg-torg-blue-50"><Eye size={15} /></a>
+                            <a href={`/api/rh/documentos/${d.id}/download`}
+                              title="Baixar" className="p-1.5 rounded-lg text-torg-gray hover:bg-gray-100"><Download size={15} /></a>
+                            <button onClick={() => { setEnviarDoc(d); setEnviarPara(""); setEnviarMsg(""); setEnviarErro(""); setEnviarOk(false); }}
+                              title="Enviar por e-mail" className="p-1.5 rounded-lg text-torg-gray hover:bg-gray-100"><Send size={15} /></button>
+                            {d.sharepointUrl
+                              ? <a href={d.sharepointUrl} target="_blank" rel="noopener noreferrer" title="Cópia de backup no SharePoint (ISO)" className="p-1.5 text-emerald-600"><Cloud size={14} /></a>
+                              : <span title="Sem backup no SharePoint ainda" className="p-1.5 text-gray-300"><Cloud size={14} /></span>}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center">
+                            <button onClick={() => { subirAlvo.current = d; subirRef.current?.click(); }}
+                              disabled={subindoId === d.id}
+                              className="inline-flex items-center gap-1.5 text-xs font-medium text-torg-blue hover:text-torg-dark px-2 py-1 rounded-lg hover:bg-torg-blue-50 disabled:opacity-50">
+                              {subindoId === d.id ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />}
+                              {subindoId === d.id ? "Subindo…" : "Subir"}
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -546,6 +660,32 @@ export default function DocumentosClient() {
                 <textarea value={form.observacao || ""} onChange={(e) => setForm({ ...form, observacao: e.target.value })}
                   rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
               </div>
+
+              {/* Arquivo do documento (opcional) */}
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">Arquivo do documento (PDF, imagem ou Word)</label>
+                {arquivoFile ? (
+                  <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
+                    <Paperclip size={14} className="text-torg-blue shrink-0" />
+                    <span className="text-sm text-torg-dark truncate flex-1" title={arquivoFile.name}>{arquivoFile.name}</span>
+                    <span className="text-[10px] text-torg-gray whitespace-nowrap">{(arquivoFile.size / 1024 / 1024).toFixed(1)}MB</span>
+                    {!salvando && <button type="button" onClick={() => setArquivoFile(null)} className="text-gray-400 hover:text-red-500"><X size={14} /></button>}
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm text-torg-gray">
+                    <UploadCloud size={16} className="text-torg-blue" /> Selecionar arquivo…
+                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,application/pdf,image/*" className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) setArquivoFile(f); e.target.value = ""; }} />
+                  </label>
+                )}
+                {uploadPct != null && (
+                  <div className="mt-1.5">
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${uploadPct}%` }} /></div>
+                    <span className="text-[10px] text-torg-gray">Enviando arquivo… {uploadPct}%</span>
+                  </div>
+                )}
+                <p className="text-[10px] text-torg-gray mt-1">Fica privado (só RH/Admin acessam) e uma cópia vai pro SharePoint para backup/ISO.</p>
+              </div>
             </div>
             <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3">
               <button onClick={() => setModalAberto(false)} disabled={salvando}
@@ -556,6 +696,53 @@ export default function DocumentosClient() {
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
                 {salvando ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
                 {salvando ? "Salvando…" : "Cadastrar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Input oculto para o botão "Subir" das linhas */}
+      <input ref={subirRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,application/pdf,image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; const d = subirAlvo.current; if (f && d) subirInline(d, f); e.target.value = ""; }} />
+
+      {/* Aviso (ex: backup SharePoint falhou) */}
+      {aviso && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-md bg-amber-50 border border-amber-200 rounded-xl shadow-lg p-3 flex items-start gap-2">
+          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+          <span className="text-xs text-torg-dark flex-1">{aviso}</span>
+          <button onClick={() => setAviso("")} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+        </div>
+      )}
+
+      {/* Modal Enviar por e-mail */}
+      {enviarDoc && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !enviando && setEnviarDoc(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-base font-bold text-torg-dark flex items-center gap-2"><Send size={16} className="text-torg-blue" /> Enviar documento</h3>
+              <button onClick={() => setEnviarDoc(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-torg-gray"><strong className="text-torg-dark">{enviarDoc.nome}</strong>{enviarDoc.funcionario ? ` — ${enviarDoc.funcionario.nome}` : ""} será anexado ao e-mail.</p>
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">Para (e-mail)</label>
+                <input type="text" value={enviarPara} onChange={(e) => setEnviarPara(e.target.value)} placeholder="email@exemplo.com (vários: vírgula)"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">Mensagem (opcional)</label>
+                <textarea value={enviarMsg} onChange={(e) => setEnviarMsg(e.target.value)} rows={3}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
+              </div>
+              {enviarErro && <p className="text-xs text-red-600">{enviarErro}</p>}
+              {enviarOk && <p className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 size={13} /> Enviado!</p>}
+            </div>
+            <div className="p-5 border-t border-gray-100 flex justify-end gap-2">
+              <button onClick={() => setEnviarDoc(null)} disabled={enviando} className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+              <button onClick={enviarDocumento} disabled={enviando || !enviarPara.trim()}
+                className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
+                {enviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} {enviando ? "Enviando…" : "Enviar"}
               </button>
             </div>
           </div>
