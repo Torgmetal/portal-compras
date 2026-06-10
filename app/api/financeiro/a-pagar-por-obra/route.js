@@ -104,18 +104,16 @@ export async function GET() {
       ...o,
       meses: [...o.meses.values()].sort((a, b) => a.chave.localeCompare(b.chave)),
     }))
-    .sort((a, b) => {
-      // "(sem obra)" sempre por último; resto por maior valor a pagar
-      if (a.codProj === null) return 1;
-      if (b.codProj === null) return -1;
-      return b.total - a.total;
-    });
+    // Mantém só OBRAS REAIS da Torg: precisa ter número de OP > 0. Isso exclui
+    // os buckets genéricos do Omie (OP-000 "GERAL ...", "OP-X") e o "(sem obra)".
+    .filter((o) => o.numeroOp && parseInt(o.numeroOp, 10) > 0)
+    .sort((a, b) => b.total - a.total);
 
   const totais = {
     total: obras.reduce((s, o) => s + o.total, 0),
     vencido: obras.reduce((s, o) => s + o.vencido, 0),
-    qtd: rows.length,
-    obras: obras.filter((o) => o.codProj !== null).length,
+    qtd: obras.reduce((s, o) => s + o.qtd, 0),
+    obras: obras.length,
   };
 
   return NextResponse.json({
