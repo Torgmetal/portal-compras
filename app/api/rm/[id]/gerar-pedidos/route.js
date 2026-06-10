@@ -129,6 +129,7 @@ export async function POST(req, { params }) {
       temIPI ? "Preço unitário inclui IPI" : null,
       totalProposta > 0 && Math.abs(totalCalculado - totalProposta) > 0.01
         ? `Preços ajustados pro total bater com proposta (R$ ${totalProposta.toFixed(2)})` : null,
+      cotacao.numeroProposta ? `Proposta forn.: ${cotacao.numeroProposta}` : null,
       cotacao.observacao || null,
     ].filter(Boolean).join(" | ");
 

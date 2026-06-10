@@ -63,7 +63,14 @@ export default async function MateriaisPage() {
       for (const rm of op.rms) {
         for (const it of rm.itens) {
           const ped = it.pedidoOmie;
-          const pedidoRecebido = ped?.statusEntrega === "RECEBIDO" || !!ped?.recebidoEm;
+          // "Recebido" = qualquer forma de entrega registrada. O sync do Omie grava
+          // statusEntrega "ENTREGUE"/"ATRASADO" + dataEntregaReal; o recebimento
+          // manual grava "RECEBIDO"/recebidoEm. dataEntregaReal é a fonte de verdade
+          // (mesma usada nas telas de cronograma/entregas).
+          const pedidoRecebido =
+            !!ped?.dataEntregaReal ||
+            !!ped?.recebidoEm ||
+            ["RECEBIDO", "ENTREGUE", "ATRASADO"].includes(ped?.statusEntrega);
           const pedidoRevertido = ped?.status === "REVERTIDO";
 
           let st;

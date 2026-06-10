@@ -196,6 +196,7 @@ export async function POST(req, { params }) {
       isFD ? "FATURAMENTO DIRETO — encerrar sem contas a pagar" : null,
       temIPI ? "Preço unitário inclui IPI (para bater total com NF do fornecedor)" : null,
       totalAjustado ? `Preços ajustados pro total bater com proposta do fornecedor (R$ ${totalProposta.toFixed(2)})` : null,
+      cotacao.numeroProposta ? `Proposta forn.: ${cotacao.numeroProposta}` : null,
       cotacao.observacao || null,
     ]
       .filter(Boolean)
