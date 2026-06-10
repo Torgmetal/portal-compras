@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { isBlobUrlSegura } from "@/lib/blob-url";
 
 // ── GET /api/comercial/estudo/[id]/documentos ── Lista documentos ──
 
@@ -28,7 +29,7 @@ const criarDocSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   tipo: z.string().min(1, "Tipo é obrigatório"),
   tamanho: z.number().optional(),
-  blobUrl: z.string().url("URL inválida"),
+  blobUrl: z.string().url("URL inválida").refine(isBlobUrlSegura, "blobUrl deve ser do armazenamento Vercel Blob"),
   categoria: z.string().optional(),
   observacao: z.string().optional(),
 });

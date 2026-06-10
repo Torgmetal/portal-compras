@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
 import { matchItensComOmie } from "@/lib/match-omie";
+import { assertBlobUrlSegura } from "@/lib/blob-url";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -95,6 +96,7 @@ function extractJsonFromResponse(text) {
 
 // Baixa um arquivo do Blob e converte para base64
 async function fetchBlobAsBase64(url) {
+  assertBlobUrlSegura(url); // SSRF: só aceita URLs do Vercel Blob
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Falha ao baixar ${url}: ${res.status}`);
   const buffer = await res.arrayBuffer();

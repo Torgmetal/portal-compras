@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { convertDwgToPdf } from "@/lib/dwg-converter";
 import { put } from "@vercel/blob";
+import { assertBlobUrlSegura } from "@/lib/blob-url";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // DWG grande pode demorar
@@ -83,7 +84,8 @@ export async function POST(req, { params }) {
       });
     }
 
-    // 1. Baixar o DWG do Vercel Blob
+    // 1. Baixar o DWG do Vercel Blob (SSRF: valida host antes do fetch)
+    assertBlobUrlSegura(doc.blobUrl);
     const dwgRes = await fetch(doc.blobUrl);
     if (!dwgRes.ok) {
       throw new Error(`Falha ao baixar DWG do Blob: HTTP ${dwgRes.status}`);
