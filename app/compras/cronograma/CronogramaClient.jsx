@@ -7,8 +7,9 @@ import {
   CheckCircle2, CalendarDays, Truck, Filter, RefreshCw,
   ChevronDown, ChevronRight, ExternalLink, List, LayoutGrid,
   FileText, MapPin, Wrench, Mail, Send, X,
-  CalendarClock, History,
+  CalendarClock, History, Trash2,
 } from "lucide-react";
+import ConfirmModal from "@/components/admin/ConfirmModal";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -52,6 +53,8 @@ export default function CronogramaClient() {
   const [modalCobrar, setModalCobrar] = useState(null); // pedido obj ou null
   const [modalPrazo, setModalPrazo] = useState(null); // pedido obj ou null
   const [ajustandoOmie, setAjustandoOmie] = useState(null); // pedidoId durante ajuste
+  const [modalExcluir, setModalExcluir] = useState(null); // pedido obj ou null
+  const [excluindo, setExcluindo] = useState(false);
 
   // Filtro por tipo de RM — separa entregas de materiais (OP) vs consumíveis
   const pedidos = useMemo(
@@ -181,6 +184,26 @@ export default function CronogramaClient() {
       alert("Falha: " + e.message);
     } finally {
       setRegistrando(null);
+    }
+  };
+
+  // Exclui um pedido (ex.: registro criado só para teste). O backend libera os
+  // itens da RM, desmarca vencedores e bloqueia se houver recebimento de NF.
+  const excluirPedido = async () => {
+    if (!modalExcluir) return;
+    setExcluindo(true);
+    try {
+      const res = await fetch(`/api/pedido-omie/${modalExcluir.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Erro ao excluir");
+      setPedidosTodos((prev) => prev.filter((p) => p.id !== modalExcluir.id));
+      setExpandido(null);
+      setModalExcluir(null);
+      if (data.avisoOmie) alert(data.avisoOmie);
+    } catch (e) {
+      alert("Falha ao excluir: " + e.message);
+    } finally {
+      setExcluindo(false);
     }
   };
 
@@ -466,6 +489,7 @@ export default function CronogramaClient() {
           onAtualizarPrazo={setModalPrazo}
           onAjustarOmie={ajustarOmie}
           ajustandoOmie={ajustandoOmie}
+          onExcluir={setModalExcluir}
         />
       ) : (
         <TabelaView
@@ -476,8 +500,21 @@ export default function CronogramaClient() {
           registrando={registrando}
           onCobrar={setModalCobrar}
           onAtualizarPrazo={setModalPrazo}
+          onExcluir={setModalExcluir}
         />
       )}
+
+      {/* Modal de confirmação de exclusão */}
+      <ConfirmModal
+        open={!!modalExcluir}
+        onClose={() => !excluindo && setModalExcluir(null)}
+        onConfirm={excluirPedido}
+        loading={excluindo}
+        variant="destrutivo"
+        labelConfirmar="Excluir pedido"
+        titulo={`Excluir pedido #${modalExcluir?.numero || ""}?`}
+        mensagem={`O pedido de ${modalExcluir?.fornecedor || "—"} (${fmtMoeda(modalExcluir?.total)}) será apagado do portal e sai da aba de entregas. Os itens da RM voltam para COTADO e os vencedores da cotação são desmarcados. Se o pedido existir no Omie, a exclusão aqui NÃO cancela lá — cancele manualmente. Pedidos com recebimento de NF não podem ser excluídos.`}
+      />
 
       {/* Modal de cobrança */}
       {modalCobrar && (
@@ -501,7 +538,7 @@ export default function CronogramaClient() {
 
 /* ─── Kanban View ────────────────────────────────────────────────── */
 
-function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onAjustarOmie, ajustandoOmie }) {
+function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onAjustarOmie, ajustandoOmie, onExcluir }) {
   const colunas = filtroStatus
     ? KANBAN_ORDER.filter((k) => k === filtroStatus)
     : KANBAN_ORDER;
@@ -548,6 +585,7 @@ function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEn
                     onAtualizarPrazo={onAtualizarPrazo}
                     onAjustarOmie={onAjustarOmie}
                     ajustandoOmie={ajustandoOmie === p.id}
+                    onExcluir={onExcluir}
                   />
                 ))
               )}
@@ -561,7 +599,7 @@ function KanbanView({ grupos, filtroStatus, expandido, setExpandido, registrarEn
 
 /* ─── Pedido Card (Kanban) ───────────────────────────────────────── */
 
-function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onAjustarOmie, ajustandoOmie }) {
+function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onAjustarOmie, ajustandoOmie, onExcluir }) {
   const p = pedido;
   const dias = diasAte(p.prazoEntregaPrevisto);
   const diasLabel = dias !== null
@@ -760,6 +798,15 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
                 Ajustar Omie
               </button>
             )}
+            {!p.temRecebimento && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onExcluir(p); }}
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 bg-gray-100 text-torg-gray rounded-lg hover:bg-red-100 hover:text-red-700 font-medium"
+                title="Excluir este pedido do portal (ex.: registro de teste)"
+              >
+                <Trash2 size={10} /> Excluir
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -769,7 +816,7 @@ function PedidoCard({ pedido, cfg, isExpanded, onToggle, onRegistrarEntrega, reg
 
 /* ─── Tabela View ────────────────────────────────────────────────── */
 
-function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo }) {
+function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir }) {
   if (pedidos.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
@@ -822,6 +869,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
                   registrando={registrando === p.id}
                   onCobrar={onCobrar}
                   onAtualizarPrazo={onAtualizarPrazo}
+                  onExcluir={onExcluir}
                 />
               );
             })}
@@ -832,7 +880,7 @@ function TabelaView({ pedidos, expandido, setExpandido, registrarEntrega, regist
   );
 }
 
-function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo }) {
+function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRegistrarEntrega, registrando, onCobrar, onAtualizarPrazo, onExcluir }) {
   const diasColor = p.statusEntrega === "ATRASADO" ? "text-red-600 font-semibold"
     : p.statusEntrega === "PROXIMO" ? "text-amber-600 font-medium"
     : "text-torg-gray";
@@ -998,6 +1046,15 @@ function TabelaRow({ pedido: p, cfg, dias, diasLabel, isExpanded, onToggle, onRe
                   className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium"
                 >
                   <Mail size={12} /> Cobrar fornecedor
+                </button>
+              )}
+              {!p.temRecebimento && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onExcluir(p); }}
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 bg-gray-100 text-torg-gray rounded-lg hover:bg-red-100 hover:text-red-700 font-medium"
+                  title="Excluir este pedido do portal (ex.: registro de teste)"
+                >
+                  <Trash2 size={12} /> Excluir
                 </button>
               )}
             </div>
