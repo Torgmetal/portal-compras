@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { escapeHtml } from "@/lib/html";
 import { criarCompromissosDaTarefa } from "@/lib/compromissos";
 
 // Mapeamento setor da tarefa → modulo do sistema (para buscar usuarios)
@@ -92,7 +93,7 @@ export async function POST(req, { params }) {
         <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
           <tr>
             <td style="padding: 8px 0; color: #576D7E; font-weight: 600; width: 120px;">Tarefa:</td>
-            <td style="padding: 8px 0; color: #002945; font-weight: 700;">${tarefa.titulo}</td>
+            <td style="padding: 8px 0; color: #002945; font-weight: 700;">${escapeHtml(tarefa.titulo)}</td>
           </tr>
           <tr>
             <td style="padding: 8px 0; color: #576D7E; font-weight: 600;">Setor:</td>
@@ -104,15 +105,15 @@ export async function POST(req, { params }) {
           </tr>
           ${opInfo ? `<tr>
             <td style="padding: 8px 0; color: #576D7E; font-weight: 600;">OP:</td>
-            <td style="padding: 8px 0; color: #006EAB; font-family: monospace; font-weight: 600;">${opInfo}${tarefa.op?.cliente ? ` — ${tarefa.op.cliente}` : ""}</td>
+            <td style="padding: 8px 0; color: #006EAB; font-family: monospace; font-weight: 600;">${escapeHtml(opInfo)}${tarefa.op?.cliente ? ` — ${escapeHtml(tarefa.op.cliente)}` : ""}</td>
           </tr>` : ""}
           ${tarefa.responsavel ? `<tr>
             <td style="padding: 8px 0; color: #576D7E; font-weight: 600;">Responsável:</td>
-            <td style="padding: 8px 0; color: #002945;">${tarefa.responsavel}</td>
+            <td style="padding: 8px 0; color: #002945;">${escapeHtml(tarefa.responsavel)}</td>
           </tr>` : ""}
           ${tarefa.observacao ? `<tr>
             <td style="padding: 8px 0; color: #576D7E; font-weight: 600;">Observação:</td>
-            <td style="padding: 8px 0; color: #002945;">${tarefa.observacao}</td>
+            <td style="padding: 8px 0; color: #002945;">${escapeHtml(tarefa.observacao)}</td>
           </tr>` : ""}
           <tr>
             <td style="padding: 8px 0; color: #576D7E; font-weight: 600;">Semana:</td>
@@ -121,7 +122,7 @@ export async function POST(req, { params }) {
         </table>
         <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 12px; color: #576D7E; margin: 0;">
-            Lembrete enviado por <strong>${user.name || "Planejamento"}</strong> via Workspace Torg.
+            Lembrete enviado por <strong>${escapeHtml(user.name || "Planejamento")}</strong> via Workspace Torg.
           </p>
         </div>
       </div>

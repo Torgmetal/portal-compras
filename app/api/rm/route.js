@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/session";
 import { notificarEvento } from "@/lib/email";
 import { criarNotificacao } from "@/lib/notificacoes";
 import { proximoNumeroInterno, proximoNumeroAluguel } from "@/lib/rm-numero";
+import { escapeHtml } from "@/lib/html";
 
 const itemSchema = z.object({
   opItemId: z.string().nullable().optional(),
@@ -267,17 +268,17 @@ export async function POST(req) {
     subject: `[Compras] Nova RM ${rm.numero}${opVinculada ? ` — OP ${opVinculada.numero}` : ""}`,
     html: `
       <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #0a3a5c;">Nova RM criada: ${rm.numero}</h2>
+        <h2 style="color: #0a3a5c;">Nova RM criada: ${escapeHtml(rm.numero)}</h2>
         <p style="color: #4a5568;">
-          ${user.name || user.email} acabou de criar uma nova RM.
+          ${escapeHtml(user.name || user.email)} acabou de criar uma nova RM.
         </p>
         <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
-          <tr><td style="padding: 6px 0; color: #718096;">Número</td><td style="padding: 6px 0;"><strong>${rm.numero}</strong></td></tr>
-          <tr><td style="padding: 6px 0; color: #718096;">Tipo</td><td style="padding: 6px 0;">${body.tipoRM}</td></tr>
-          ${opVinculada ? `<tr><td style="padding: 6px 0; color: #718096;">OP</td><td style="padding: 6px 0;"><strong>${opVinculada.numero}</strong> — ${opVinculada.cliente}</td></tr>` : ""}
-          <tr><td style="padding: 6px 0; color: #718096;">Descrição</td><td style="padding: 6px 0;">${body.descricao}</td></tr>
+          <tr><td style="padding: 6px 0; color: #718096;">Número</td><td style="padding: 6px 0;"><strong>${escapeHtml(rm.numero)}</strong></td></tr>
+          <tr><td style="padding: 6px 0; color: #718096;">Tipo</td><td style="padding: 6px 0;">${escapeHtml(body.tipoRM)}</td></tr>
+          ${opVinculada ? `<tr><td style="padding: 6px 0; color: #718096;">OP</td><td style="padding: 6px 0;"><strong>${escapeHtml(opVinculada.numero)}</strong> — ${escapeHtml(opVinculada.cliente)}</td></tr>` : ""}
+          <tr><td style="padding: 6px 0; color: #718096;">Descrição</td><td style="padding: 6px 0;">${escapeHtml(body.descricao)}</td></tr>
           <tr><td style="padding: 6px 0; color: #718096;">Itens</td><td style="padding: 6px 0;">${body.itens.length}</td></tr>
-          <tr><td style="padding: 6px 0; color: #718096;">Criada por</td><td style="padding: 6px 0;">${user.name || user.email}</td></tr>
+          <tr><td style="padding: 6px 0; color: #718096;">Criada por</td><td style="padding: 6px 0;">${escapeHtml(user.name || user.email)}</td></tr>
         </table>
         <p style="margin-top: 24px;">
           <a href="${linkRM}" style="background: #1976d2; color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: 600;">

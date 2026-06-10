@@ -6,6 +6,7 @@ import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
 import { notificarEvento } from "@/lib/email";
 import { criarNotificacao } from "@/lib/notificacoes";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { escapeHtml, limparTextoCurto } from "@/lib/html";
 
 const postLimiter = createRateLimiter({ name: "cotacao-submeter-post", maxRequests: 10, windowMs: 60000 });
 
@@ -145,7 +146,7 @@ export async function POST(req, { params }) {
         observacao: obsCombinada,
         cnpj: cnpjLimpo || cotacao.cnpj,
         nCodOmie: nCodOmieResolvido || cotacao.nCodOmie,
-        fornecedorNome: body.razaoSocial ? body.razaoSocial.trim().toUpperCase() : cotacao.fornecedorNome,
+        fornecedorNome: body.razaoSocial ? limparTextoCurto(body.razaoSocial, 120).toUpperCase() : cotacao.fornecedorNome,
         ...(eRevisao ? { numeroRevisao: { increment: 1 } } : {}),
       },
     });
@@ -255,6 +256,8 @@ export async function POST(req, { params }) {
         },
       });
 
+      const nomeFornEsc = escapeHtml(cotacao.fornecedorNome);
+      const rotuloRMsEsc = escapeHtml(rotuloRMs);
       await notificarEvento({
         evento: "COTACAO_RESPONDIDA",
         subject: `[Compras] ${eRevisao ? "Revisão de" : "Nova"} proposta — ${cotacao.fornecedorNome} (${rotuloRMs})`,
@@ -264,11 +267,11 @@ export async function POST(req, { params }) {
               ${eRevisao ? "Revisão de proposta recebida" : "Nova proposta recebida"}
             </h2>
             <p style="color: #4a5568;">
-              <strong>${cotacao.fornecedorNome}</strong> ${eRevisao ? "atualizou" : "enviou"} a proposta de cotação.
+              <strong>${nomeFornEsc}</strong> ${eRevisao ? "atualizou" : "enviou"} a proposta de cotação.
             </p>
             <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
-              <tr><td style="padding: 6px 0; color: #718096;">Fornecedor</td><td style="padding: 6px 0;"><strong>${cotacao.fornecedorNome}</strong></td></tr>
-              <tr><td style="padding: 6px 0; color: #718096;">RM(s)</td><td style="padding: 6px 0;"><strong>${rotuloRMs}</strong></td></tr>
+              <tr><td style="padding: 6px 0; color: #718096;">Fornecedor</td><td style="padding: 6px 0;"><strong>${nomeFornEsc}</strong></td></tr>
+              <tr><td style="padding: 6px 0; color: #718096;">RM(s)</td><td style="padding: 6px 0;"><strong>${rotuloRMsEsc}</strong></td></tr>
               <tr><td style="padding: 6px 0; color: #718096;">Total da proposta</td><td style="padding: 6px 0;"><strong>${totalFmt}</strong></td></tr>
               <tr><td style="padding: 6px 0; color: #718096;">Itens preenchidos</td><td style="padding: 6px 0;">${itensValidos.length}</td></tr>
               ${eRevisao ? `<tr><td style="padding: 6px 0; color: #718096;">Revisão</td><td style="padding: 6px 0;"><strong>#${cotacao.numeroRevisao + 1}</strong></td></tr>` : ""}

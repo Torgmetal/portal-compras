@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { escapeHtml } from "@/lib/html";
 import { z } from "zod";
 
 const DEPT_LABEL = {
@@ -133,7 +134,7 @@ export async function POST(req, { params }) {
     : "🟡 Em andamento";
 
   const fmtData = (d) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
-  const mensagemExtra = mensagem ? `<p style="margin:16px 0 0;padding:12px;background:#FEF3C7;border-radius:6px;color:#92400E;font-size:13px;"><strong>Mensagem do Planejamento:</strong><br/>${mensagem.replace(/\n/g, "<br/>")}</p>` : "";
+  const mensagemExtra = mensagem ? `<p style="margin:16px 0 0;padding:12px;background:#FEF3C7;border-radius:6px;color:#92400E;font-size:13px;"><strong>Mensagem do Planejamento:</strong><br/>${escapeHtml(mensagem).replace(/\n/g, "<br/>")}</p>` : "";
 
   const subject = atrasada
     ? `⚠️ [Atraso] ${tarefa.nome} — ${opLabel}`
@@ -149,15 +150,15 @@ export async function POST(req, { params }) {
         <table style="width:100%;font-size:14px;border-collapse:collapse;">
           <tr>
             <td style="padding:8px 0;color:#576D7E;font-weight:600;width:130px;">Atividade:</td>
-            <td style="padding:8px 0;color:#002945;font-weight:700;">${tarefa.nome}</td>
+            <td style="padding:8px 0;color:#002945;font-weight:700;">${escapeHtml(tarefa.nome)}</td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#576D7E;font-weight:600;">OP:</td>
-            <td style="padding:8px 0;color:#006EAB;font-family:monospace;font-weight:600;">${opLabel}</td>
+            <td style="padding:8px 0;color:#006EAB;font-family:monospace;font-weight:600;">${escapeHtml(opLabel)}</td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#576D7E;font-weight:600;">Departamento:</td>
-            <td style="padding:8px 0;color:#002945;">${dept}</td>
+            <td style="padding:8px 0;color:#002945;">${escapeHtml(dept)}</td>
           </tr>
           <tr>
             <td style="padding:8px 0;color:#576D7E;font-weight:600;">Status:</td>
