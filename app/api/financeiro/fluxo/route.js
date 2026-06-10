@@ -18,7 +18,7 @@ const schema = z.object({
 export async function POST(req) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
+    user = await requireRole(["ADMIN", "FINANCEIRO", "COMERCIAL"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
