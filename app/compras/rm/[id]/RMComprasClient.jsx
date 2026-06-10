@@ -1565,7 +1565,15 @@ function ModalVincularRM({ cotacao, outrasRMs, onClose }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
-      alert(`✓ ${data.itensCriados} itens adicionados (RMs: ${data.rmsAdicionadas.join(", ")})`);
+      let msg = `✓ ${data.itensCriados} itens adicionados (RMs: ${data.rmsAdicionadas.join(", ")})`;
+      if (data.estoque) {
+        const partes = [
+          ...(data.estoque.abatidos || []).map((a) => `${a.descricao}: ${a.barrasDisponiveis} ${a.unidade} em estoque, cotado só ${a.barrasACotar} ${a.unidade}`),
+          ...(data.estoque.excluidos || []).map((e2) => `${e2.descricao}: 100% em estoque — FORA da cotação (use "Atender estoque")`),
+        ];
+        if (partes.length) msg += `\n\nEstoque abatido:\n• ${partes.join("\n• ")}`;
+      }
+      alert(msg);
       onClose();
       router.refresh();
     } catch (e) {

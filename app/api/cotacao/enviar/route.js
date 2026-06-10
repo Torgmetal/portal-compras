@@ -94,9 +94,16 @@ export async function POST(req) {
   }
 
   const prazo = body.prazoResposta ? new Date(body.prazoResposta) : null;
-  // RM principal (1ª da lista — a Cotacao guarda só uma referência direta de RM,
-  // as demais ficam vinculadas via os CotacaoItens que apontam pra rmItemId delas).
-  const rmPrincipal = rms.find((r) => r.id === rmIds[0]) || rms[0];
+
+  // Só as RMs que ainda têm item na cotação após o abatimento: uma RM cujos
+  // itens foram todos cobertos pelo estoque não pode virar EM_COTACAO, nem
+  // ganhar registro de Envio, nem ser a RM principal.
+  const rmIdsComItem = new Set(itensCotaveis.map((it) => it.rmId));
+  const rmsEnvolvidas = rms.filter((r) => rmIdsComItem.has(r.id));
+
+  // RM principal (1ª da lista COM itens — a Cotacao guarda só uma referência
+  // direta de RM, as demais ficam vinculadas via os CotacaoItens).
+  const rmPrincipal = rmsEnvolvidas.find((r) => r.id === rmIds.find((id) => rmIdsComItem.has(id))) || rmsEnvolvidas[0];
 
   // Deriva faturamento: se ALGUM item cotável é faturamento direto, marca "Cliente".
   const algumFD = itensCotaveis.some(
@@ -141,8 +148,8 @@ export async function POST(req) {
           },
         },
       });
-      // Registra envio em todas as RMs envolvidas (paralelo por RM)
-      await Promise.all(rms.map((rm) =>
+      // Registra envio nas RMs que de fato têm itens na cotação (paralelo por RM)
+      await Promise.all(rmsEnvolvidas.map((rm) =>
         tx.envio.create({
           data: { rmId: rm.id, fornecedorNome: f.nome.trim().toUpperCase(), fornecedorEmail: f.email },
         })
@@ -152,7 +159,7 @@ export async function POST(req) {
         token: cot.token,
         fornecedorNome: f.nome.trim().toUpperCase(),
         fornecedorEmail: f.email,
-        rmsVinculadas: rms.map((r) => r.numero),
+        rmsVinculadas: rmsEnvolvidas.map((r) => r.numero),
       };
     }));
 
@@ -166,7 +173,7 @@ export async function POST(req) {
     });
 
     // Atualiza status das RMs que estavam ABERTA para EM_COTACAO (batch)
-    const rmIdsAberta = rms.filter((rm) => rm.status === "ABERTA").map((rm) => rm.id);
+    const rmIdsAberta = rmsEnvolvidas.filter((rm) => rm.status === "ABERTA").map((rm) => rm.id);
     if (rmIdsAberta.length > 0) {
       await tx.rM.updateMany({
         where: { id: { in: rmIdsAberta } },
@@ -181,7 +188,7 @@ export async function POST(req) {
         entity: "RM",
         entityId: rmPrincipal.id,
         diff: {
-          rmsVinculadas: rms.map((r) => r.numero),
+          rmsVinculadas: rmsEnvolvidas.map((r) => r.numero),
           fornecedores: body.fornecedores.length,
           itens: itensCotaveis.length,
           prazo: body.prazoResposta || null,
@@ -194,7 +201,7 @@ export async function POST(req) {
 
   // --- Envio automático de emails via Resend (best-effort, não bloqueia) ---
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL || "workspace.torg.com.br"}`;
-  const numerosRMs = rms.map((r) => r.numero).filter(Boolean);
+  const numerosRMs = rmsEnvolvidas.map((r) => r.numero).filter(Boolean);
   const rotuloRMs = numerosRMs.length === 1
     ? `RM ${numerosRMs[0]}`
     : `RMs ${numerosRMs.join(", ")}`;

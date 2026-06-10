@@ -209,7 +209,12 @@ export default function ConsultaEstoqueResponder({ consulta, userName }) {
                             max={item.rmItem?.qtd || undefined}
                             step="1"
                             value={resp.qtdDisponivel}
-                            onChange={(e) => atualizar(idx, "qtdDisponivel", e.target.value)}
+                            onChange={(e) => {
+                              // Limita ao solicitado: acima disso é "Disponível", não "Parcial".
+                              const max = Number(item.rmItem?.qtd) || 0;
+                              const v = e.target.value;
+                              atualizar(idx, "qtdDisponivel", v !== "" && max > 0 && Number(v) > max ? String(max) : v);
+                            }}
                             className="w-28 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
                             placeholder="0"
                           />
@@ -258,7 +263,12 @@ export default function ConsultaEstoqueResponder({ consulta, userName }) {
               <p className="text-xs text-torg-gray">
                 {todosRespondidos
                   ? "Todos os itens foram avaliados. Confirme para notificar o setor de Compras."
-                  : `Faltam ${respostas.filter((r) => !r.resposta).length} iten(s) para avaliar.`}
+                  : (() => {
+                      const semResposta = respostas.filter((r) => !r.resposta).length;
+                      const parcialSemQtd = respostas.filter((r) => r.resposta === "PARCIAL" && !(Number(r.qtdDisponivel) > 0)).length;
+                      if (semResposta > 0) return `Faltam ${semResposta} iten(s) para avaliar.`;
+                      return `Informe a quantidade disponível (em barras/peças) de ${parcialSemQtd} item(ns) parcial(is).`;
+                    })()}
               </p>
               <button
                 onClick={enviar}

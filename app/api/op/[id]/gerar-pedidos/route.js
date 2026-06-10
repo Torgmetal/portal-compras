@@ -143,12 +143,21 @@ export async function POST(req, { params }) {
       const ipiPct = Number(l.cotItem.ipiPct) || 0;
       const precoBruto = Number(l.cotItem.precoUnit) || 0;
       const precoComIPI = precoBruto * (1 + ipiPct / 100);
-      // qtdCotada e a quantidade efetiva (em KG p/ aco): ja vem liquida do
-      // abatimento de estoque da consulta e pode ter sido ajustada pelo
-      // fornecedor. Fallback no peso da RM so para cotacoes legadas sem qtdCotada.
-      const qtdKg = Number(l.cotItem.qtdCotada) > 0
-        ? Number(l.cotItem.qtdCotada)
-        : (l.rmItem.peso > 0 ? Number(l.rmItem.peso) : 0);
+      // Itens com abatimento de estoque (qtdPecasCotada setado): usa a qtdCotada
+      // liquida; se o fornecedor zerou a qtd, reconstroi o liquido pela proporcao
+      // de barras. Itens sem abatimento (incl. cotacoes legadas): comportamento
+      // original — peso cheio da RM, com fallback na qtdCotada.
+      let qtdKg;
+      if (l.cotItem.qtdPecasCotada != null) {
+        const pesoRm = Number(l.rmItem.peso) || 0;
+        const qtdRm = Number(l.rmItem.qtd) || 0;
+        const pesoLiquido = pesoRm > 0 && qtdRm > 0
+          ? Math.round((pesoRm * Number(l.cotItem.qtdPecasCotada) / qtdRm) * 100) / 100
+          : Number(l.cotItem.qtdPecasCotada);
+        qtdKg = Number(l.cotItem.qtdCotada) > 0 ? Number(l.cotItem.qtdCotada) : pesoLiquido;
+      } else {
+        qtdKg = l.rmItem.peso > 0 ? Number(l.rmItem.peso) : Number(l.cotItem.qtdCotada) || 0;
+      }
       return {
         codigo: l.codigoOmieItem || null,
         descricao: l.rmItem.descricao,

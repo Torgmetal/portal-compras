@@ -128,6 +128,10 @@ export async function POST(req, { params }) {
             qtdCotada: it.qtdCotada,
             icmsPct: it.icmsPct ?? null,
             ipiPct: it.ipiPct ?? null,
+            // A qtd digitada manualmente passa a mandar — limpa o snapshot do
+            // abatimento de estoque para nao ficar contraditorio/orfao.
+            qtdPecasCotada: null,
+            estoqueAbatidoQtd: null,
           },
         });
       } else {
