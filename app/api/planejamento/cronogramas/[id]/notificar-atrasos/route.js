@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { gerarTokenForte } from "@/lib/token";
 
 // Mapeamento departamento do cronograma → modulo(s) do sistema
 const DEPT_TO_MODULOS = {
@@ -191,6 +192,7 @@ export async function POST(req, { params }) {
     const cobranca = await prisma.cronogramaCobranca.create({
       data: {
         cronogramaId: id,
+        token: gerarTokenForte(),
         departamento: dept,
         emailsEnviados: destinatarios,
         tarefaIds,

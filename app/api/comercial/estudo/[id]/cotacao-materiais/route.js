@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
+import { gerarTokenForte } from "@/lib/token";
 import { z } from "zod";
 
 function escapeHtml(str) {
@@ -123,6 +124,7 @@ export async function POST(req, { params }) {
         data: {
           estudoId: id,
           tipo,
+          token: gerarTokenForte(),
           fornecedorId: forn.id,
           fornecedorNome: forn.nome.trim().toUpperCase(),
           fornecedorEmail: forn.email,

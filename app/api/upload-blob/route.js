@@ -20,8 +20,8 @@ const MAX_SIZE = 50 * 1024 * 1024;
 const EXTENSOES_PERMITIDAS = [
   // Documentos
   "pdf", "xlsx", "xls", "csv", "doc", "docx", "txt",
-  // Imagens
-  "png", "jpg", "jpeg", "gif", "webp", "svg",
+  // Imagens (sem SVG — pode conter <script> e o blob é servido publicamente)
+  "png", "jpg", "jpeg", "gif", "webp",
   // CAD
   "dwg", "dxf", "step", "stp", "iges", "igs",
   // Compactados
@@ -43,7 +43,6 @@ const MIME_TYPES_PERMITIDOS = new Set([
   "image/jpeg",
   "image/gif",
   "image/webp",
-  "image/svg+xml",
   // CAD (quando o browser identifica corretamente)
   "application/acad",
   "application/x-acad",
