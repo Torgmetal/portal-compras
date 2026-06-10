@@ -580,9 +580,71 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
                 <Activity size={16} className="text-torg-orange" />
                 Syneco — {SETOR_LABELS[setorSelecionado]} — {fmtData(dataSelecionada)}
               </h3>
-              <span className="text-xs text-torg-gray">
-                {setorData.count} apontamento{setorData.count !== 1 ? "s" : ""}
-              </span>
+              <div className="flex items-center gap-3">
+                {apontSetor.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const dataFmt = dataSelecionada.toISOString().slice(0, 10);
+                      const setorLabel = SETOR_LABELS[setorSelecionado] || setorSelecionado;
+
+                      // Resumo
+                      const resumo = [
+                        ["Relatório de Produção Diária — Syneco"],
+                        [],
+                        ["Setor", setorLabel],
+                        ["Data", fmtData(dataSelecionada)],
+                        ["Apontamentos", apontSetor.length],
+                        [],
+                        ["Realizado dia (kg)", Number(setorData.totalKg.toFixed(1))],
+                        ["Realizado dia (ton)", Number((setorData.totalKg / 1000).toFixed(3))],
+                        ["Meta dia (ton)", Number((metaDiaria / 1000).toFixed(2))],
+                        ["% Meta dia", metaDiaria > 0 ? `${pctDia.toFixed(1)}%` : "—"],
+                        [],
+                        ["Acumulado mês (ton)", Number((realizadoMes.kg / 1000).toFixed(1))],
+                        ["Meta mês (ton)", Number((metaMensal / 1000).toFixed(1))],
+                        ["% Meta mês", metaMensal > 0 ? `${pctMes.toFixed(1)}%` : "—"],
+                        ["Peças dia", Math.round(setorData.totalUn)],
+                        ["Peças mês", Math.round(realizadoMes.un)],
+                        [],
+                      ];
+
+                      // Detalhe dos apontamentos
+                      const header = ["Hora", "Obra", "Item", "Operação", "Máquina", "Operador", "Peso (kg)", "Qtd", "Status"];
+                      const rows = apontSetor.map((a) => [
+                        new Date(a.dataInicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                        a.obra || "",
+                        a.descricaoItem || "",
+                        a.operacao || "",
+                        a.maquina || "",
+                        a.operador || "",
+                        a.produzidoKg || 0,
+                        a.produzidoUn || 0,
+                        a.status || "",
+                      ]);
+
+                      const wsData = [...resumo, header, ...rows];
+                      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+                      // Larguras de coluna
+                      ws["!cols"] = [
+                        { wch: 22 }, { wch: 12 }, { wch: 30 }, { wch: 18 },
+                        { wch: 18 }, { wch: 22 }, { wch: 12 }, { wch: 8 }, { wch: 14 },
+                      ];
+
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Produção Dia");
+                      XLSX.writeFile(wb, `producao_${setorLabel.toLowerCase()}_${dataFmt}.xlsx`);
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-medium text-torg-blue hover:text-torg-dark transition-colors px-2 py-1 rounded-md hover:bg-gray-50"
+                  >
+                    <Download size={14} />
+                    Exportar
+                  </button>
+                )}
+                <span className="text-xs text-torg-gray">
+                  {setorData.count} apontamento{setorData.count !== 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
 
             {/* Cards: meta diária vs realizado + acumulado mês */}
