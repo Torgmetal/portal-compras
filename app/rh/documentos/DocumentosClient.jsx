@@ -878,22 +878,6 @@ const STATUS_ICON = {
 };
 
 function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFiltro, expandido, toggleExpandido, onRecarregar, onEnviar }) {
-  // Documentos de cada funcionário (carregados sob demanda ao expandir).
-  const [docsByFunc, setDocsByFunc] = useState({});
-  const [loadingDocs, setLoadingDocs] = useState({});
-  const carregarDocsFunc = async (funcId) => {
-    if (docsByFunc[funcId] !== undefined) return; // já carregado
-    setLoadingDocs((p) => ({ ...p, [funcId]: true }));
-    try {
-      const r = await fetch(`/api/rh/documentos?funcionarioId=${funcId}`).then((res) => res.json());
-      setDocsByFunc((p) => ({ ...p, [funcId]: r.data || [] }));
-    } catch {
-      setDocsByFunc((p) => ({ ...p, [funcId]: [] }));
-    } finally {
-      setLoadingDocs((p) => ({ ...p, [funcId]: false }));
-    }
-  };
-
   if (carregando) {
     return (
       <div className="flex items-center justify-center py-20 text-torg-gray">
@@ -1021,7 +1005,7 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
             const pendentes = f.itens.filter((i) => i.status !== "OK");
             return (
               <div key={f.funcionario.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <button onClick={() => { toggleExpandido(f.funcionario.id); carregarDocsFunc(f.funcionario.id); }}
+                <button onClick={() => toggleExpandido(f.funcionario.id)}
                   className="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50/50 transition-colors text-left">
                   <ChevronRight size={16} className={`text-torg-gray shrink-0 transition-transform ${aberto ? "rotate-90" : ""}`} />
                   <div className="flex-1 min-w-0">
@@ -1045,6 +1029,11 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                   </div>
                   {/* Badges resumo */}
                   <div className="flex items-center gap-1 shrink-0">
+                    {f.documentos?.length > 0 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-torg-blue-50 text-torg-blue" title="Documentos anexados — clique para ver">
+                        <Paperclip size={10} /> {f.documentos.length}
+                      </span>
+                    )}
                     {f.ausentes > 0 && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
                         <XCircle size={10} /> {f.ausentes}
@@ -1095,13 +1084,11 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                     </div>
                     {/* Documentos do funcionário, agrupados por categoria */}
                     <div className="bg-gray-50/40 px-5 py-3 pl-12 border-t border-gray-100">
-                      <p className="text-[10px] font-bold text-torg-gray uppercase tracking-wider mb-2">Documentos do funcionário</p>
-                      {loadingDocs[f.funcionario.id] ? (
-                        <p className="text-xs text-torg-gray flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Carregando…</p>
-                      ) : docsByFunc[f.funcionario.id]?.length ? (
+                      <p className="text-[10px] font-bold text-torg-gray uppercase tracking-wider mb-2">Documentos do funcionário{f.documentos?.length ? ` (${f.documentos.length})` : ""}</p>
+                      {f.documentos?.length ? (
                         <div className="space-y-2.5">
                           {CATEGORIAS.map((cat) => {
-                            const ds = docsByFunc[f.funcionario.id].filter((d) => d.categoria === cat.value);
+                            const ds = f.documentos.filter((d) => d.categoria === cat.value);
                             if (!ds.length) return null;
                             return (
                               <div key={cat.value}>

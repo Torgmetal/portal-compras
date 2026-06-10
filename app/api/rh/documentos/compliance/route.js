@@ -74,7 +74,9 @@ export async function GET() {
           select: {
             id: true, tipo: true, nome: true, categoria: true,
             dataEmissao: true, dataValidade: true, ativo: true,
+            arquivoUrl: true, sharepointItemId: true, sharepointUrl: true,
           },
+          orderBy: { nome: "asc" },
         },
       },
       orderBy: { nome: "asc" },
@@ -136,6 +138,12 @@ export async function GET() {
         vencendo,
         percentual: totalRegras > 0 ? Math.round((ok / totalRegras) * 100) : 100,
         itens,
+        documentos: func.documentos.map((d) => ({
+          id: d.id, nome: d.nome, tipo: d.tipo, categoria: d.categoria,
+          dataValidade: d.dataValidade,
+          temArquivo: !!(d.arquivoUrl || d.sharepointItemId),
+          sharepointUrl: d.sharepointUrl,
+        })),
       });
     }
 
