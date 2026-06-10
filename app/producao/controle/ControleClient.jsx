@@ -584,7 +584,7 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
                 {apontSetor.length > 0 && (
                   <button
                     onClick={() => {
-                      const dataFmt = dataSelecionada.toISOString().slice(0, 10);
+                      const dataFmt = dataSelecionada; // já é string "YYYY-MM-DD"
                       const setorLabel = SETOR_LABELS[setorSelecionado] || setorSelecionado;
 
                       // Resumo
