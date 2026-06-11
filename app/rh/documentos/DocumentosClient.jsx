@@ -1067,15 +1067,15 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                     </div>
                     <p className="text-[10px] text-torg-gray">{f.funcionario.setor}{f.funcionario.cargo ? ` · ${f.funcionario.cargo}` : ""}</p>
                   </div>
-                  {/* Barra de progresso mini */}
+                  {/* Barra de progresso mini — larguras fixas pra alinhar entre as linhas */}
                   <div className="hidden sm:flex items-center gap-2 shrink-0">
                     <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full transition-all ${pctBg(f.percentual)}`} style={{ width: `${f.percentual}%` }} />
                     </div>
-                    <span className={`text-xs font-bold tabular-nums ${pctCor(f.percentual)}`}>{f.percentual}%</span>
+                    <span className={`w-10 text-right text-xs font-bold tabular-nums ${pctCor(f.percentual)}`}>{f.percentual}%</span>
                   </div>
-                  {/* Badges resumo */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  {/* Badges resumo — coluna de largura fixa alinhada à direita */}
+                  <div className="flex items-center gap-1 shrink-0 sm:w-40 sm:justify-end">
                     {f.documentos?.length > 0 && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-torg-blue-50 text-torg-blue" title="Documentos anexados — clique para ver">
                         <Paperclip size={10} /> {f.documentos.length}
