@@ -145,7 +145,8 @@ export default async function PainelServicosRM({ tipo, verArquivadas }) {
                   return (
                     <tr key={rm.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <Link href={`/compras/rm/${rm.id}`} className="font-mono font-semibold text-torg-blue hover:underline">
+                        {/* ?painel= mantém o item certo ativo no menu dentro do detalhe da RM */}
+                        <Link href={`/compras/rm/${rm.id}?painel=${ehAluguel ? "aluguel" : "montagem"}`} className="font-mono font-semibold text-torg-blue hover:underline">
                           {rm.numero}
                         </Link>
                       </td>

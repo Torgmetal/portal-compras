@@ -62,6 +62,11 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
   const [modalPedidoDireto, setModalPedidoDireto] = useState(false);
   // ALUGUEL e MONTAGEM não passam por cotação — o pedido Omie sai direto
   const ehServicoDireto = rm.tipoRM === "MONTAGEM" || rm.tipoRM === "ALUGUEL";
+  // Painel de origem por tipo — voltar/redirecionar sem cair em RMs Materiais
+  const painelLista =
+    rm.tipoRM === "ALUGUEL" ? "/compras/aluguel" :
+    rm.tipoRM === "MONTAGEM" ? "/compras/montagem" :
+    rm.tipoRM === "INTERNA" ? "/compras/consumiveis" : "/compras";
   const [modalEditarCategorias, setModalEditarCategorias] = useState(false);
   // Quando o usuario clica "Re-cotar Sem Proposta", o modal abre ja filtrando
   // os itens. Reseta pro modo normal ao fechar.
@@ -126,7 +131,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
         }
         throw new Error(data.error || "Erro ao excluir");
       }
-      router.push("/compras");
+      router.push(painelLista);
     } catch (e) {
       setErroExcluir(e.message);
       setExcluindo(false);
@@ -576,7 +581,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
         <ModalEncerrarRM
           rm={rm}
           onClose={() => setModalEncerrarRM(false)}
-          onSaved={() => { router.refresh(); router.push("/compras"); }}
+          onSaved={() => { router.refresh(); router.push(painelLista); }}
         />
       )}
       {modalEditarCategorias && (

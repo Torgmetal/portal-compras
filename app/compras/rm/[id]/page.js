@@ -250,7 +250,10 @@ export default async function RMComprasDetail({ params }) {
 
   return (
     <div className="space-y-6 max-w-7xl">
-      <Link href={rm.tipoRM === "INTERNA" ? "/compras/consumiveis" : "/compras"} className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
+      <Link
+        href={{ INTERNA: "/compras/consumiveis", ALUGUEL: "/compras/aluguel", MONTAGEM: "/compras/montagem" }[rm.tipoRM] || "/compras"}
+        className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1"
+      >
         <ArrowLeft size={14} /> Voltar pro Painel
       </Link>
       <RMComprasClient
