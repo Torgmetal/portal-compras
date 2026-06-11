@@ -21,7 +21,11 @@ const SYSTEM_PROMPT = `Você é um analista comercial da Torg Metal (estruturas 
 
 EXTRAIA (quando presente no documento — não invente; na dúvida, use null):
 
-- escopo: resumo objetivo do escopo de fornecimento — o que está INCLUÍDO (fabricação, montagem, pintura, transporte...) e o que está EXCLUÍDO. Texto corrido ou tópicos, em português.
+- escopo: resumo CURTO do fornecimento (2-4 frases, em português) — o que é a obra e o que a Torg vai entregar. NÃO liste inclusões/exclusões aqui.
+- escopoIncluso: array de strings — itens que ESTÃO incluídos no fornecimento (fabricação, montagem, pintura, transporte, projetos, ART...). Frases curtas, um item por string.
+- escopoExcluso: array de strings — itens EXPRESSAMENTE excluídos / por conta do cliente (fundações, energia, andaimes, chumbadores...). Frases curtas.
+- resumoPesos: array de {descricao, qtd, pesoKg} — quando a proposta tiver tabela/lista de itens com pesos (estrutura, telhas, acessórios), traga o resumo por grupo. Números em kg. SEM valores em R$. [] se não houver.
+- dataEntregaAcordada: prazo de entrega acordado, como data "YYYY-MM-DD" se houver data explícita, senão null (se a proposta só diz "60 dias", deixe null e cite o prazo em pontosAtencao).
 - padraoPintura: o esquema de pintura definido (primer/intermediário/acabamento, produtos, demãos, espessuras em µm, cor, norma). null se a proposta não definir.
 - inspecao: requisitos de inspeção, ensaios, normas de qualidade, ITPs, visitas de inspetor do cliente, liberação de romaneio etc.
 - entregaEndereco: endereço ou local de ENTREGA da obra (cidade/UF no mínimo). Atenção: NÃO é o endereço fiscal do cliente.
@@ -35,7 +39,7 @@ REGRAS
 - Não invente nada: só o que está escrito no documento.
 - Valores e percentuais: transcreva como estão.
 - Responda APENAS com um JSON válido envolvido em <json></json>, no formato:
-<json>{"escopo": "...", "padraoPintura": null, "inspecao": null, "entregaEndereco": null, "frete": null, "pedidoCompraCliente": null, "notaRetorno": null, "faturamentoObs": null, "pontosAtencao": ["..."]}</json>`;
+<json>{"escopo": "...", "escopoIncluso": ["..."], "escopoExcluso": ["..."], "resumoPesos": [{"descricao": "...", "qtd": 0, "pesoKg": 0}], "dataEntregaAcordada": null, "padraoPintura": null, "inspecao": null, "entregaEndereco": null, "frete": null, "pedidoCompraCliente": null, "notaRetorno": null, "faturamentoObs": null, "pontosAtencao": ["..."]}</json>`;
 
 function extractJsonFromResponse(text) {
   const tagged = text.match(/<json>([\s\S]*?)<\/json>/i);
@@ -100,8 +104,20 @@ export async function POST(req, { params }) {
 
     // Sanitização leve
     const str = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+    const strArr = (v, maxItens, maxLen) => Array.isArray(v)
+      ? v.filter((s) => typeof s === "string" && s.trim()).map((s) => s.trim().slice(0, maxLen)).slice(0, maxItens)
+      : [];
     const out = {
       escopo:              str(dados.escopo, 20000),
+      escopoIncluso:       strArr(dados.escopoIncluso, 40, 300),
+      escopoExcluso:       strArr(dados.escopoExcluso, 40, 300),
+      resumoPesos:         Array.isArray(dados.resumoPesos)
+        ? dados.resumoPesos
+            .filter((p) => p && typeof p.descricao === "string" && p.descricao.trim())
+            .map((p) => ({ descricao: p.descricao.trim().slice(0, 200), qtd: Number(p.qtd) || null, pesoKg: Number(p.pesoKg) || null }))
+            .slice(0, 60)
+        : [],
+      dataEntregaAcordada: /^\d{4}-\d{2}-\d{2}$/.test(String(dados.dataEntregaAcordada || "")) ? dados.dataEntregaAcordada : null,
       padraoPintura:       str(dados.padraoPintura, 5000),
       inspecao:            str(dados.inspecao, 5000),
       entregaEndereco:     str(dados.entregaEndereco, 2000),

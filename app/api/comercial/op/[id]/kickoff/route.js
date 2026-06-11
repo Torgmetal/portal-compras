@@ -20,8 +20,14 @@ const putSchema = z.object({
   notaRetornoObs:      z.string().max(2000).optional().nullable(),
   fiscalObservacao:    z.string().max(5000).optional().nullable(),
   escopo:              z.string().max(20000).optional().nullable(),
+  escopoIncluso:       z.string().max(10000).optional().nullable(),
+  escopoExcluso:       z.string().max(10000).optional().nullable(),
   pontosAtencao:       z.string().max(10000).optional().nullable(),
   observacoes:         z.string().max(5000).optional().nullable(),
+  dataEntregaAcordada: z.string().optional().nullable(),
+  cronograma:          z.array(z.object({ fase: z.string().max(120), data: z.string().max(10).nullable().optional(), obs: z.string().max(300).optional().nullable() })).max(30).optional().nullable(),
+  prioridades:         z.array(z.object({ ordem: z.number().int().min(1).max(99), descricao: z.string().max(300), data: z.string().max(10).nullable().optional() })).max(30).optional().nullable(),
+  pesoResumo:          z.array(z.object({ descricao: z.string().max(200), qtd: z.number().nullable().optional(), pesoKg: z.number().nullable().optional() })).max(60).optional().nullable(),
   propostaPdfUrl:      z.string().url().optional().nullable(),
   propostaPdfNome:     z.string().max(300).optional().nullable(),
   extraidoIA:          z.any().optional(),
@@ -64,6 +70,10 @@ export async function GET(req, { params }) {
               itensPintura: {
                 select: { etapa: true, tipoPintura: true, descricao: true, demaos: true, espessuraMicra: true, cor: true, norma: true, metodoAplicacao: true, tintaProduto: { select: { nome: true, fabricante: true } } },
               },
+              // Lista de materiais da planilha comercial (resumo de pesos, sem R$)
+              itensPerso: {
+                select: { tipoMaterial: true, descricao: true, quantidade: true, pesoTotal: true },
+              },
             },
           },
         },
@@ -93,12 +103,50 @@ export async function GET(req, { params }) {
     pinturaSugerida = partes.join("\n") || null;
   }
 
+  // Resumo de pesos sugerido (agrupado por tipo de material — sem valores R$)
+  let pesoResumoSugerido = null;
+  if (estudo?.itensPerso?.length) {
+    const porTipo = new Map();
+    for (const it of estudo.itensPerso) {
+      const k = String(it.tipoMaterial || "OUTRO");
+      const cur = porTipo.get(k) || { descricao: k.replace(/_/g, " "), qtd: 0, pesoKg: 0 };
+      cur.qtd += Number(it.quantidade) || 0;
+      cur.pesoKg += Number(it.pesoTotal) || 0;
+      porTipo.set(k, cur);
+    }
+    pesoResumoSugerido = [...porTipo.values()]
+      .map((r) => ({ ...r, pesoKg: Math.round(r.pesoKg * 100) / 100 }))
+      .sort((a, b) => b.pesoKg - a.pesoKg);
+  }
+
+  // Orçamentos candidatos a vínculo (quando a OP ainda não tem nenhum):
+  // primeiro os do mesmo cliente, depois os demais fechados sem OP.
+  let orcamentosCandidatos = [];
+  if (!op.orcamentos?.length) {
+    const cands = await prisma.orcamento.findMany({
+      where: { opId: null, status: { in: ["FECHADA", "EM_NEGOCIACAO"] } },
+      select: { id: true, numero: true, cliente: true, obra: true, status: true },
+      orderBy: { createdAt: "desc" },
+      take: 60,
+    });
+    const cli = (op.cliente || "").toLowerCase();
+    orcamentosCandidatos = cands
+      .sort((a, b) => {
+        const am = (a.cliente || "").toLowerCase().includes(cli) || cli.includes((a.cliente || "").toLowerCase()) ? 0 : 1;
+        const bm = (b.cliente || "").toLowerCase().includes(cli) || cli.includes((b.cliente || "").toLowerCase()) ? 0 : 1;
+        return am - bm;
+      })
+      .slice(0, 25);
+  }
+
   const { kickoff, orcamentos, ...opData } = op;
   return NextResponse.json({
     op: opData,
     kickoff,
+    orcamentosCandidatos,
     sugestoes: {
       pintura: pinturaSugerida,
+      pesoResumo: pesoResumoSugerido,
       orcamento: op.orcamentos?.[0] ? {
         numero: op.orcamentos[0].numero,
         responsavel: op.orcamentos[0].responsavel,
@@ -135,13 +183,16 @@ export async function PUT(req, { params }) {
 
   const data = {};
   for (const k of ["pedidoCompraCliente", "entregaEndereco", "frete", "padraoPintura", "inspecao",
-    "notaRetornoObs", "fiscalObservacao", "escopo", "pontosAtencao", "observacoes",
-    "propostaPdfUrl", "propostaPdfNome"]) {
+    "notaRetornoObs", "fiscalObservacao", "escopo", "escopoIncluso", "escopoExcluso",
+    "pontosAtencao", "observacoes", "propostaPdfUrl", "propostaPdfNome"]) {
     if (body[k] !== undefined) data[k] = body[k] || null;
   }
   if (body.notaRetorno !== undefined) data.notaRetorno = body.notaRetorno;
   if (body.extraidoIA !== undefined) data.extraidoIA = body.extraidoIA;
-  for (const k of ["kickoffComercialEm", "kickoffSetoresEm"]) {
+  for (const k of ["cronograma", "prioridades", "pesoResumo"]) {
+    if (body[k] !== undefined) data[k] = body[k] ?? null;
+  }
+  for (const k of ["kickoffComercialEm", "kickoffSetoresEm", "dataEntregaAcordada"]) {
     if (body[k] !== undefined) data[k] = body[k] ? new Date(body[k]) : null;
   }
 

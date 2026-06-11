@@ -354,9 +354,18 @@ model OPKickOff {
   notaRetornoObs      String?
   fiscalObservacao    String?   // como será o faturamento (complementa a tabela de linhas FD)
   // Conteúdo
-  escopo              String?
+  escopo              String?   // resumo curto do fornecimento
+  escopoIncluso       String?   // um item por linha (lista do que ESTÁ incluído)
+  escopoExcluso       String?   // um item por linha (lista do que NÃO está)
   pontosAtencao       String?   // um por linha
   observacoes         String?
+  // Cronograma prévio acordado com o cliente (marcos por setor/fase)
+  dataEntregaAcordada DateTime?
+  cronograma          Json?     // [{fase, data:"YYYY-MM-DD", obs}]
+  // Prioridades de fase/peça/entrega (opcional — só obras que têm)
+  prioridades         Json?     // [{ordem, descricao, data:"YYYY-MM-DD"|null}]
+  // Resumo de pesos da planilha comercial (sem valores em R$)
+  pesoResumo          Json?     // [{descricao, qtd, pesoKg}]
   // Proposta (PDF) + extração IA
   propostaPdfUrl      String?
   propostaPdfNome     String?
