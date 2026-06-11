@@ -2197,6 +2197,9 @@ model CronogramaTarefa {
   motivoBloqueio      String?                 // Ex: "Aguardando assinatura do aditivo"
   observacao          String?
   dataRealizacao      DateTime?
+  // Execução REAL — não altera as datas previstas/base; o atraso é derivado
+  dataInicioReal      DateTime?
+  dataFimReal         DateTime?
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
   registros           CronogramaRegistro[]

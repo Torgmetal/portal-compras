@@ -1874,6 +1874,8 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
   const [pct, setPct] = useState(tarefa.percentualRealizado);
   const [obs, setObs] = useState(tarefa.observacao || "");
   const [dataExec, setDataExec] = useState(tarefa.dataRealizacao ? new Date(tarefa.dataRealizacao).toISOString().split("T")[0] : "");
+  const [inicioReal, setInicioReal] = useState(tarefa.dataInicioReal ? new Date(tarefa.dataInicioReal).toISOString().split("T")[0] : "");
+  const [fimReal, setFimReal] = useState(tarefa.dataFimReal ? new Date(tarefa.dataFimReal).toISOString().split("T")[0] : "");
   const [justificativa, setJustificativa] = useState("");
   const [pesoPlan, setPesoPlan] = useState(tarefa.qtdePlanejada || 0);
   const [pesoReal, setPesoReal] = useState(tarefa.qtdeRealizada || 0);
@@ -1901,6 +1903,16 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
   const concluida = t.percentualRealizado >= 100;
   const indent = Math.max(0, t.outlineLevel - 2);
 
+  // Atraso REAL vs fim previsto (a data base do cronograma NÃO muda):
+  // concluída → término real (ou data executada) vs previsto; em andamento → hoje vs previsto.
+  const fimPrev = t.dataFimPrevista ? new Date(t.dataFimPrevista) : null;
+  const fimEfetivo = t.dataFimReal
+    ? new Date(t.dataFimReal)
+    : (concluida ? (t.dataRealizacao ? new Date(t.dataRealizacao) : null) : now);
+  const atrasoDias = fimPrev && fimEfetivo && fimEfetivo > fimPrev
+    ? Math.ceil((fimEfetivo - fimPrev) / 86400000)
+    : 0;
+
   // Verifica se esta tarefa esta bloqueada (tem antecessora nao concluida)
   const antecessorasIncompletas = (t.antecessoraIds || []).filter((aid) => {
     const ant = (allTarefas || []).find((x) => x.id === aid);
@@ -1920,6 +1932,9 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
         percentualRealizado: pct,
         observacao: obs || null,
         dataRealizacao: dataExec ? new Date(dataExec + "T12:00:00Z").toISOString() : null,
+        // Execução real — NÃO altera previsto/base; o atraso é derivado
+        dataInicioReal: inicioReal ? new Date(inicioReal + "T12:00:00Z").toISOString() : null,
+        dataFimReal: fimReal ? new Date(fimReal + "T12:00:00Z").toISOString() : null,
       };
       if (editNome !== t.nome) body.nome = editNome;
       if (justificativa.trim()) body.justificativa = justificativa.trim();
@@ -1998,6 +2013,8 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
     setPct(t.percentualRealizado);
     setObs(t.observacao || "");
     setDataExec(t.dataRealizacao ? new Date(t.dataRealizacao).toISOString().split("T")[0] : "");
+    setInicioReal(t.dataInicioReal ? new Date(t.dataInicioReal).toISOString().split("T")[0] : "");
+    setFimReal(t.dataFimReal ? new Date(t.dataFimReal).toISOString().split("T")[0] : "");
     setJustificativa("");
     setPesoPlan(t.qtdePlanejada || 0);
     setPesoReal(t.qtdeRealizada || 0);
@@ -2075,6 +2092,18 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
               </span>
             )}
           </span>
+
+          {(t.dataInicioReal || t.dataFimReal) && (
+            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded whitespace-nowrap" title="Execução real (a data prevista não muda)">
+              Real: {t.dataInicioReal ? fmtData(t.dataInicioReal) : "…"} — {t.dataFimReal ? fmtData(t.dataFimReal) : "em andamento"}
+            </span>
+          )}
+          {!t.isSummary && atrasoDias > 0 && (
+            <span className="text-[9px] text-white bg-red-500 px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap"
+              title={`${t.dataFimReal ? "Terminou" : concluida ? "Terminou" : "Está"} ${atrasoDias} dia(s) após o fim previsto (${fmtData(t.dataFimPrevista)})`}>
+              +{atrasoDias}d atraso
+            </span>
+          )}
 
           {!readOnly && !editing ? (
             <button
@@ -2205,18 +2234,36 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
-              <Calendar size={11} className="text-torg-gray" />
-              <span className="text-[10px] text-torg-gray whitespace-nowrap">Data executado:</span>
+              <Calendar size={11} className="text-emerald-600" />
+              <span className="text-[10px] text-torg-gray whitespace-nowrap font-medium">Início real:</span>
               <input
                 type="date"
-                value={dataExec}
-                onChange={(e) => setDataExec(e.target.value)}
-                className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white"
+                value={inicioReal}
+                onChange={(e) => setInicioReal(e.target.value)}
+                className="text-[10px] px-1.5 py-0.5 border border-emerald-200 rounded bg-white"
               />
+              {inicioReal && (
+                <button onClick={() => setInicioReal("")} className="text-[9px] text-red-400 hover:text-red-600">limpar</button>
+              )}
             </div>
-            {dataExec && (
-              <button onClick={() => setDataExec("")} className="text-[9px] text-red-400 hover:text-red-600">limpar</button>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-torg-gray whitespace-nowrap font-medium">Término real:</span>
+              <input
+                type="date"
+                value={fimReal}
+                onChange={(e) => { setFimReal(e.target.value); setDataExec(e.target.value); }}
+                className="text-[10px] px-1.5 py-0.5 border border-emerald-200 rounded bg-white"
+              />
+              {fimReal && (
+                <button onClick={() => { setFimReal(""); setDataExec(""); }} className="text-[9px] text-red-400 hover:text-red-600">limpar</button>
+              )}
+            </div>
+            {fimReal && editFim && fimReal > editFim && (
+              <span className="text-[9px] text-white bg-red-500 px-1.5 py-0.5 rounded-full font-semibold">
+                +{Math.ceil((new Date(fimReal + "T12:00:00") - new Date(editFim + "T12:00:00")) / 86400000)}d após o previsto
+              </span>
             )}
+            <span className="text-[9px] text-torg-gray italic">as datas previstas não mudam — o atraso fica registrado</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">

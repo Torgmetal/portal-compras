@@ -9,6 +9,9 @@ const patchSchema = z.object({
   percentualRealizado: z.number().min(0).max(100).optional(),
   observacao: z.string().max(500).nullable().optional(),
   dataRealizacao: z.string().datetime().nullable().optional(),
+  // Execução REAL — não altera previsto/base (o atraso é derivado na tela)
+  dataInicioReal: z.string().datetime().nullable().optional(),
+  dataFimReal: z.string().datetime().nullable().optional(),
   dataInicioPrevista: z.string().datetime().nullable().optional(),
   dataFimPrevista: z.string().datetime().nullable().optional(),
   dataLiberacao: z.string().datetime().nullable().optional(),
@@ -122,6 +125,15 @@ export async function PATCH(req, { params }) {
   }
   if (parsed.data.dataRealizacao !== undefined) {
     data.dataRealizacao = parsed.data.dataRealizacao ? new Date(parsed.data.dataRealizacao) : null;
+  }
+  if (parsed.data.dataInicioReal !== undefined) {
+    data.dataInicioReal = parsed.data.dataInicioReal ? new Date(parsed.data.dataInicioReal) : null;
+  }
+  if (parsed.data.dataFimReal !== undefined) {
+    data.dataFimReal = parsed.data.dataFimReal ? new Date(parsed.data.dataFimReal) : null;
+    // Mantém dataRealizacao em sincronia (consumida pelo recálculo de
+    // antecessoras e pela exportação) quando o término real é informado.
+    if (parsed.data.dataRealizacao === undefined) data.dataRealizacao = data.dataFimReal;
   }
   if (parsed.data.dataInicioPrevista !== undefined) {
     const novo = parsed.data.dataInicioPrevista ? new Date(parsed.data.dataInicioPrevista) : null;
