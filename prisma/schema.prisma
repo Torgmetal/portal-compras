@@ -2372,6 +2372,7 @@ enum TipoRM {
   ENGENHARIA
   INTERNA
   ALUGUEL
+  MONTAGEM
 }
 
 enum RMItemStatus {

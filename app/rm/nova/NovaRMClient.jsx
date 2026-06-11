@@ -6,7 +6,7 @@ import { fmtOP } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, AlertCircle, AlertTriangle, CheckCircle2,
   Trash2, Upload, FileSpreadsheet, X, RailSymbol, Building2, Plus, Search, Package,
-  Forklift,
+  Forklift, Hammer,
 } from "lucide-react";
 import {
   labelCategoria,
@@ -43,6 +43,13 @@ const TIPOS_RM = [
     icon: Forklift,
     cor: "torg-orange",
   },
+  {
+    codigo: "MONTAGEM",
+    label: "Medição de Montagem",
+    desc: "Valor informado pelo solicitante — sem cotação; vira pedido Omie direto no extrato da obra.",
+    icon: Hammer,
+    cor: "torg-blue",
+  },
 ];
 
 export default function NovaRMClient({ ops, userSetor, userModulos = [], userTipo }) {
@@ -67,19 +74,20 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
 
   const ehInterna = tipoRM === "INTERNA";
   const ehAluguel = tipoRM === "ALUGUEL";
-  const ehAutoNum = ehInterna || ehAluguel;
+  const ehMontagem = tipoRM === "MONTAGEM";
+  const ehAutoNum = ehInterna || ehAluguel || ehMontagem;
 
   // Busca o próximo número sequencial quando muda para Interna ou Aluguel
   useEffect(() => {
     if (!ehAutoNum) return;
     let ativo = true;
-    const tipo = ehAluguel ? "ALUGUEL" : "INTERNA";
+    const tipo = ehAluguel ? "ALUGUEL" : ehMontagem ? "MONTAGEM" : "INTERNA";
     fetch(`/api/rm/proximo-numero?tipo=${tipo}`)
       .then((r) => r.json())
       .then((d) => { if (ativo && d.numero) setProximoNumInterna(d.numero); })
       .catch(() => {});
     return () => { ativo = false; };
-  }, [ehAutoNum, ehAluguel]);
+  }, [ehAutoNum, ehAluguel, ehMontagem]);
 
   // Adiciona um produto do Omie como item manual da RM
   const adicionarProdutoOmie = (p) => {
@@ -139,7 +147,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
   const op = useMemo(() => ops.find((o) => o.id === opSelecionada), [ops, opSelecionada]);
   const categoriasOpDisponiveis = useMemo(() => (op ? categoriasUnicasOP(op) : []), [op]);
 
-  const precisaOP = tipoRM === "ENGENHARIA" || tipoRM === "ALUGUEL";
+  const precisaOP = tipoRM === "ENGENHARIA" || tipoRM === "ALUGUEL" || tipoRM === "MONTAGEM";
   const precisaCategorias = tipoRM === "ENGENHARIA";
 
   const toggleCategoria = (cat) => {
@@ -226,6 +234,13 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
     const itensValidos = itensImportados.filter((it) => it.descricao && it.descricao.trim());
     if (itensValidos.length === 0) {
       return setErro("Adicione ao menos um item — pela planilha ou manualmente.");
+    }
+    // Validação específica de Montagem: valor da medição obrigatório
+    if (ehMontagem) {
+      for (let i = 0; i < itensValidos.length; i++) {
+        const it = itensValidos[i];
+        if (!it.valorTotal || Number(it.valorTotal) <= 0) return setErro(`Item ${i + 1}: informe o valor da medição.`);
+      }
     }
     // Validação específica de Aluguel: diária e dias obrigatórios
     if (ehAluguel) {
@@ -642,6 +657,82 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
               <span className="text-sm font-medium text-torg-dark">{itensImportados.length} {itensImportados.length === 1 ? "equipamento" : "equipamentos"}</span>
               <span className="text-sm font-bold text-torg-dark">
                 Total: {fmtMoeda(itensImportados.reduce((s, it) => s + (Number(it.valorDiaria) || 0) * (Number(it.qtdDias) || 0) * (Number(it.qtd) || 1), 0))}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+      ) : ehMontagem ? (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+              <Hammer size={20} className="text-torg-blue" /> Medições de montagem
+            </h3>
+            <p className="text-sm text-torg-gray mt-1">
+              Descreva o que está sendo medido e informe o valor — sem cotação; Compras gera o pedido Omie direto para o extrato da obra.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setItensImportados((prev) => [
+                ...prev,
+                { descricao: "", qtd: 1, unidade: "VB", valorTotal: "", manual: true },
+              ]);
+            }}
+            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+          >
+            <Plus size={16} /> Adicionar medição
+          </button>
+        </div>
+
+        {itensImportados.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
+            <Hammer size={36} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-torg-gray text-sm">Nenhuma medição adicionada</p>
+            <p className="text-xs text-gray-400 mt-1">Ex.: "Medição 02 — montagem da cobertura galpão A"</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {itensImportados.map((it, i) => (
+              <div key={i} className="border border-gray-200 rounded-lg p-4 flex items-start gap-3 flex-wrap">
+                <div className="flex-1 min-w-[260px]">
+                  <label className="block text-xs font-medium text-torg-gray mb-1">Descrição da medição *</label>
+                  <input
+                    type="text"
+                    value={it.descricao}
+                    onChange={(e) => setItensImportados((prev) => prev.map((x, xi) => (xi === i ? { ...x, descricao: e.target.value } : x)))}
+                    placeholder="Ex.: Medição 02 — montagem da cobertura galpão A"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
+                  />
+                </div>
+                <div className="w-44">
+                  <label className="block text-xs font-medium text-torg-gray mb-1">Valor da medição (R$) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={it.valorTotal}
+                    onChange={(e) => setItensImportados((prev) => prev.map((x, xi) => (xi === i ? { ...x, valorTotal: e.target.value } : x)))}
+                    placeholder="0,00"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg text-right focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setItensImportados((prev) => prev.filter((_, xi) => xi !== i))}
+                  className="mt-6 text-gray-300 hover:text-red-500"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            {/* Totalizador */}
+            <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-medium text-torg-dark">{itensImportados.length} {itensImportados.length === 1 ? "medição" : "medições"}</span>
+              <span className="text-sm font-bold text-torg-dark">
+                Total: {fmtMoeda(itensImportados.reduce((s, it) => s + (Number(it.valorTotal) || 0), 0))}
               </span>
             </div>
           </div>

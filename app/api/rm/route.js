@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { notificarEvento } from "@/lib/email";
 import { criarNotificacao } from "@/lib/notificacoes";
-import { proximoNumeroInterno, proximoNumeroAluguel } from "@/lib/rm-numero";
+import { proximoNumeroInterno, proximoNumeroAluguel, proximoNumeroMontagem } from "@/lib/rm-numero";
 import { escapeHtml } from "@/lib/html";
 
 const itemSchema = z.object({
@@ -43,7 +43,7 @@ const anexoSchema = z.object({
 
 const schema = z.object({
   numero: z.string().optional().nullable(),
-  tipoRM: z.enum(["ENGENHARIA", "INTERNA", "ALUGUEL"]).default("ENGENHARIA"),
+  tipoRM: z.enum(["ENGENHARIA", "INTERNA", "ALUGUEL", "MONTAGEM"]).default("ENGENHARIA"),
   opId: z.string().nullable().optional(),
   categoriasOP: z.array(z.string()).default([]),
   tipo: z.string().default("Material"),
@@ -82,6 +82,7 @@ export async function POST(req) {
   async function calcularProximoNumeroAuto() {
     if (body.tipoRM === "INTERNA") return await proximoNumeroInterno();
     if (body.tipoRM === "ALUGUEL") return await proximoNumeroAluguel();
+    if (body.tipoRM === "MONTAGEM") return await proximoNumeroMontagem();
     const ultima = await prisma.rM.findFirst({ orderBy: { createdAt: "desc" }, select: { numero: true } });
     let proximoNumero = "0001";
     if (ultima?.numero) {
@@ -93,7 +94,7 @@ export async function POST(req) {
 
   let numeroRM;
   let numeroAutoGerado = false;
-  if (body.tipoRM === "INTERNA" || body.tipoRM === "ALUGUEL") {
+  if (body.tipoRM === "INTERNA" || body.tipoRM === "ALUGUEL" || body.tipoRM === "MONTAGEM") {
     numeroRM = await calcularProximoNumeroAuto();
     numeroAutoGerado = true;
   } else {
@@ -110,6 +111,18 @@ export async function POST(req) {
           { status: 409 }
         );
       }
+    }
+  }
+
+  // MONTAGEM: medição com valor informado pelo solicitante — OP obrigatória
+  // e todo item precisa de valor (> 0); não passa por cotação.
+  if (body.tipoRM === "MONTAGEM") {
+    if (!body.opId) {
+      return NextResponse.json({ error: "RM de Montagem exige uma OP vinculada (o valor cai no extrato da obra)." }, { status: 400 });
+    }
+    const semValor = (body.itens || []).find((it) => !(Number(it.valorTotal) > 0));
+    if (semValor) {
+      return NextResponse.json({ error: `Informe o valor da medição em todos os itens (item "${semValor.descricao || "?"}" sem valor).` }, { status: 400 });
     }
   }
 

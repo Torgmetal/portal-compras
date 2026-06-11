@@ -21,6 +21,8 @@ const STATUS_LABELS = {
 const TIPO_RM_LABELS = {
   ENGENHARIA: { label: "Engenharia", className: "bg-torg-blue-50 text-torg-blue" },
   INTERNA:    { label: "Interna",    className: "bg-gray-100 text-gray-700" },
+  ALUGUEL:    { label: "Aluguel",    className: "bg-orange-50 text-orange-700" },
+  MONTAGEM:   { label: "Medição de Montagem", className: "bg-emerald-50 text-emerald-700" },
 };
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
@@ -148,7 +150,9 @@ export default async function RMDetail({ params }) {
                   <td className="px-3 py-1.5 text-torg-gray">{it.unidade}</td>
                   <td className="px-3 py-1.5 text-torg-gray text-xs">{it.comprimento || "—"}</td>
                   <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums">
-                    {it.peso ? Number(it.peso).toFixed(2) : "—"}
+                    {it.valorTotal
+                      ? Number(it.valorTotal).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                      : it.peso ? Number(it.peso).toFixed(2) : "—"}
                   </td>
                 </tr>
               ))}
