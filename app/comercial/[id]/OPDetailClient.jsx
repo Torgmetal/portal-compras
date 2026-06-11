@@ -1,9 +1,10 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck,
+  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
@@ -223,6 +224,12 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                 <Clock size={14} /> Ajustar Prazo
               </button>
             )}
+            <Link
+              href={`/comercial/${op.id}/kickoff`}
+              className="px-3.5 py-2 bg-white border border-torg-orange/40 text-torg-orange text-xs rounded-lg hover:bg-orange-50 font-medium flex items-center gap-1.5"
+            >
+              <Rocket size={14} /> Kick Off
+            </Link>
             <div className="flex-1" />
             {encerradaOuCancelada ? (
               <button

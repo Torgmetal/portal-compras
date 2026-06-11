@@ -131,6 +131,7 @@ model OP {
   medicoes             OPMedicao[]
   receitas             OPReceita[]
   orcamentos           Orcamento[]          @relation("OrcamentoOP")
+  kickoff              OPKickOff?
   pecasConjunto        PecaConjunto[]
   pedidosOmieAvulsos   PedidoOmie[]
   planejamentosCarga   PlanejamentoCarga[]
@@ -331,6 +332,44 @@ model OPReceita {
 
   @@index([opId])
   @@index([categoria])
+}
+
+// Kick Off da OP — documento de alinhamento divulgado aos setores no início
+// do contrato (1 por OP). Pré-preenchido com dados da OP/estudo; campos que
+// não existem no banco (entrega, inspeção, pedido do cliente) são manuais ou
+// extraídos do PDF da proposta via IA.
+model OPKickOff {
+  id                  String    @id @default(cuid())
+  opId                String    @unique
+  // Pedido do cliente
+  pedidoCompraCliente String?
+  // Entrega
+  entregaEndereco     String?   // endereço de ENTREGA da obra (≠ endereço fiscal)
+  frete               String?   // "TORG" (CIF, por nossa conta) | "CLIENTE" (FOB)
+  // Técnica
+  padraoPintura       String?
+  inspecao            String?
+  // Fiscal
+  notaRetorno         Boolean   @default(false)
+  notaRetornoObs      String?
+  fiscalObservacao    String?   // como será o faturamento (complementa a tabela de linhas FD)
+  // Conteúdo
+  escopo              String?
+  pontosAtencao       String?   // um por linha
+  observacoes         String?
+  // Proposta (PDF) + extração IA
+  propostaPdfUrl      String?
+  propostaPdfNome     String?
+  extraidoIA          Json?
+  // Reuniões e divulgação
+  kickoffComercialEm  DateTime?
+  kickoffSetoresEm    DateTime?
+  enviadoPara         String?
+  enviadoEm           DateTime?
+  createdById         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  op                  OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
 }
 
 model OPItem {
