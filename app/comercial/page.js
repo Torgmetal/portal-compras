@@ -100,19 +100,20 @@ export default async function ComercialHome({ searchParams }) {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1">
+          {/* Abas Ativas/Finalizadas como controle segmentado, na mesma altura do botão */}
+          <div className="inline-flex bg-gray-100 rounded-lg p-1">
             <Link
               href="/comercial"
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-                !verFinalizadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+              className={`inline-flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                !verFinalizadas ? "bg-white text-torg-blue shadow-sm" : "text-torg-gray hover:text-torg-dark"
               }`}
             >
               Ativas ({totalAtivas})
             </Link>
             <Link
               href="/comercial?finalizadas=1"
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
-                verFinalizadas ? "bg-torg-blue text-white" : "bg-white border border-gray-300 text-torg-gray hover:bg-gray-50"
+              className={`inline-flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                verFinalizadas ? "bg-white text-torg-blue shadow-sm" : "text-torg-gray hover:text-torg-dark"
               }`}
             >
               Finalizadas ({totalFinalizadas})
@@ -120,9 +121,9 @@ export default async function ComercialHome({ searchParams }) {
           </div>
           <Link
             href="/comercial/nova"
-            className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium"
           >
-            <PlusCircle size={18} /> Nova OP
+            <PlusCircle size={16} /> Nova OP
           </Link>
         </div>
       </div>
