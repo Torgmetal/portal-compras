@@ -787,10 +787,10 @@ export default function KickoffClient({ opId }) {
   );
 }
 
-/* ─── Modal: enviar por e-mail com seleção de setores ───────────────────── */
+/* ─── Modal: enviar por e-mail — seleção POR PESSOA, agrupada por setor ──── */
 function ModalEnviarSetores({ opId, tipo, enviadoPara, onSalvarAntes, onClose }) {
   const [setores, setSetores] = useState(null);
-  const [marcados, setMarcados] = useState(() => new Set(tipo === "FISCAL" ? ["FINANCEIRO"] : []));
+  const [marcados, setMarcados] = useState(new Set()); // e-mails individuais
   const [extras, setExtras] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -799,21 +799,33 @@ function ModalEnviarSetores({ opId, tipo, enviadoPara, onSalvarAntes, onClose })
   useEffect(() => {
     fetch("/api/comercial/kickoff-destinatarios")
       .then((r) => r.json())
-      .then((j) => setSetores(j.setores || []))
+      .then((j) => {
+        const lista = j.setores || [];
+        setSetores(lista);
+        // Envio fiscal: pré-marca o pessoal do Financeiro
+        if (tipo === "FISCAL") {
+          const fin = lista.find((s) => s.modulo === "FINANCEIRO");
+          if (fin) setMarcados(new Set(fin.emails.map((e) => e.email)));
+        }
+      })
       .catch(() => setSetores([]));
-  }, []);
+  }, [tipo]);
 
-  const toggle = (m) => setMarcados((p) => {
+  const toggleEmail = (email) => setMarcados((p) => {
     const n = new Set(p);
-    if (n.has(m)) n.delete(m); else n.add(m);
+    if (n.has(email)) n.delete(email); else n.add(email);
+    return n;
+  });
+  // Checkbox do setor: marca/desmarca todo o grupo
+  const toggleSetor = (s) => setMarcados((p) => {
+    const n = new Set(p);
+    const todosMarcados = s.emails.every((e) => n.has(e.email));
+    s.emails.forEach((e) => (todosMarcados ? n.delete(e.email) : n.add(e.email)));
     return n;
   });
 
   const emailsSelecionados = () => {
-    const out = new Set();
-    for (const s of setores || []) {
-      if (marcados.has(s.modulo)) s.emails.forEach((e) => out.add(e.email));
-    }
+    const out = new Set(marcados);
     extras.split(/[,;]/).map((s) => s.trim()).filter(Boolean).forEach((e) => out.add(e));
     return [...out];
   };
@@ -852,30 +864,50 @@ function ModalEnviarSetores({ opId, tipo, enviadoPara, onSalvarAntes, onClose })
         ) : (
           <>
             <div>
-              <p className="text-xs font-medium text-torg-gray mb-2">Selecione os setores (e-mails dos usuários de cada módulo):</p>
+              <p className="text-xs font-medium text-torg-gray mb-2">Selecione quem recebe (cadastro da Torg — marque a pessoa, ou o setor para marcar todos):</p>
               {!setores ? (
-                <p className="text-sm text-torg-gray flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Carregando setores…</p>
+                <p className="text-sm text-torg-gray flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Carregando cadastro…</p>
               ) : setores.length === 0 ? (
-                <p className="text-sm text-torg-gray">Nenhum setor com e-mail — use o campo de e-mails abaixo.</p>
+                <p className="text-sm text-torg-gray">Nenhum usuário com e-mail — use o campo de e-mails abaixo.</p>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                  {setores.map((s) => (
-                    <label key={s.modulo} className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-sm cursor-pointer transition-colors ${
-                      marcados.has(s.modulo) ? "border-torg-blue bg-torg-blue-50 text-torg-blue font-medium" : "border-gray-200 text-torg-dark hover:bg-gray-50"
-                    }`}>
-                      <input type="checkbox" checked={marcados.has(s.modulo)} onChange={() => toggle(s.modulo)}
-                        className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
-                      <span className="flex-1 truncate">{s.label}</span>
-                      <span className="text-[10px] text-torg-gray">{s.emails.length}</span>
-                    </label>
-                  ))}
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {setores.map((s) => {
+                    const todos = s.emails.length > 0 && s.emails.every((e) => marcados.has(e.email));
+                    const algum = s.emails.some((e) => marcados.has(e.email));
+                    return (
+                      <div key={s.modulo} className="border border-gray-100 rounded-lg overflow-hidden">
+                        <label className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer text-sm font-semibold transition-colors ${
+                          todos ? "bg-torg-blue-50 text-torg-blue" : algum ? "bg-sky-50/60 text-torg-dark" : "bg-gray-50/60 text-torg-dark hover:bg-gray-50"
+                        }`}>
+                          <input type="checkbox" checked={todos}
+                            ref={(el) => { if (el) el.indeterminate = algum && !todos; }}
+                            onChange={() => toggleSetor(s)}
+                            className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+                          <span className="flex-1">{s.label}</span>
+                          <span className="text-[10px] text-torg-gray font-normal">{s.emails.filter((e) => marcados.has(e.email)).length}/{s.emails.length}</span>
+                        </label>
+                        <div className="px-3 py-1.5 flex flex-wrap gap-1.5">
+                          {s.emails.map((e) => (
+                            <label key={e.email} title={e.email}
+                              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs cursor-pointer transition-colors ${
+                                marcados.has(e.email) ? "border-torg-blue bg-torg-blue-50 text-torg-blue font-medium" : "border-gray-200 text-torg-gray hover:bg-gray-50"
+                              }`}>
+                              <input type="checkbox" checked={marcados.has(e.email)} onChange={() => toggleEmail(e.email)} className="sr-only" />
+                              {marcados.has(e.email) ? <CheckCircle2 size={12} /> : <Plus size={12} />}
+                              {e.nome || e.email}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-torg-gray mb-1">Outros e-mails (opcional, separe por vírgula)</label>
+              <label className="block text-xs font-medium text-torg-gray mb-1">E-mails de fora do cadastro (opcional, separe por vírgula)</label>
               <input type="text" value={extras} onChange={(e) => setExtras(e.target.value)}
-                placeholder={enviadoPara || "fulano@torg.com.br…"}
+                placeholder={enviadoPara || "fulano@cliente.com.br…"}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 outline-none" />
             </div>
             <div>
