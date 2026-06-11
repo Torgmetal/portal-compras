@@ -460,24 +460,28 @@ export default function DocumentosClient() {
 
       {/* ═══════ ABA DOCUMENTOS ═══════ */}
       {abaAtiva === "documentos" && (<>
-      {/* KPI Cards de alertas */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-        <KpiCard label="Total" valor={stats.totalDocs || 0} cor="bg-white" textCor="text-torg-dark" />
-        <KpiCard label="Válidos" valor={stats.validos || 0} cor="bg-emerald-50" textCor="text-emerald-700"
-          onClick={() => setFiltroStatus(filtroStatus === "VALIDO" ? "" : "VALIDO")}
-          ativo={filtroStatus === "VALIDO"} />
-        <KpiCard label="Vence em 30d" valor={stats.vencendo30 || 0} cor="bg-orange-50" textCor="text-orange-700"
-          destaque={stats.vencendo30 > 0}
-          onClick={() => setFiltroStatus(filtroStatus === "VENCENDO_30" ? "" : "VENCENDO_30")}
-          ativo={filtroStatus === "VENCENDO_30"} />
-        <KpiCard label="Vence em 60d" valor={stats.vencendo60 || 0} cor="bg-yellow-50" textCor="text-yellow-700"
-          onClick={() => setFiltroStatus(filtroStatus === "VENCENDO_60" ? "" : "VENCENDO_60")}
-          ativo={filtroStatus === "VENCENDO_60"} />
+      {/* KPI Cards de alertas — clicar filtra a tabela mostrando quais são os documentos.
+          A contagem inclui docs de empresa E de funcionário, então o clique também
+          limpa o filtro de vínculo (default "EMPRESA"); desligar volta ao padrão. */}
+      <div className="grid grid-cols-2 gap-3 max-w-xl">
         <KpiCard label="Vencidos" valor={stats.vencidos || 0} cor="bg-red-50" textCor="text-red-600"
           destaque={stats.vencidos > 0}
-          onClick={() => setFiltroStatus(filtroStatus === "VENCIDO" ? "" : "VENCIDO")}
+          hint={filtroStatus === "VENCIDO" ? "Mostrando abaixo — clique para fechar" : "Clique para ver quais são"}
+          onClick={() => {
+            const novo = filtroStatus === "VENCIDO" ? "" : "VENCIDO";
+            setFiltroStatus(novo);
+            setFiltroVinculo(novo ? "" : "EMPRESA");
+          }}
           ativo={filtroStatus === "VENCIDO"} />
-        <KpiCard label="Sem validade" valor={stats.semValidade || 0} cor="bg-gray-50" textCor="text-torg-gray" />
+        <KpiCard label="Vencem em 30 dias" valor={stats.vencendo30 || 0} cor="bg-orange-50" textCor="text-orange-700"
+          destaque={stats.vencendo30 > 0}
+          hint={filtroStatus === "VENCENDO_30" ? "Mostrando abaixo — clique para fechar" : "Clique para ver quais são"}
+          onClick={() => {
+            const novo = filtroStatus === "VENCENDO_30" ? "" : "VENCENDO_30";
+            setFiltroStatus(novo);
+            setFiltroVinculo(novo ? "" : "EMPRESA");
+          }}
+          ativo={filtroStatus === "VENCENDO_30"} />
       </div>
 
       {/* Filtros */}
@@ -1177,12 +1181,13 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
   );
 }
 
-function KpiCard({ label, valor, cor, textCor, destaque, onClick, ativo }) {
+function KpiCard({ label, valor, cor, textCor, destaque, onClick, ativo, hint }) {
   return (
     <button onClick={onClick} disabled={!onClick}
       className={`rounded-xl p-3 text-center transition-all ${cor} ${ativo ? "ring-2 ring-torg-blue shadow-md" : ""} ${onClick ? "cursor-pointer hover:shadow-md" : ""} ${destaque ? "animate-pulse-subtle" : ""}`}>
       <p className={`text-2xl font-extrabold ${textCor}`}>{valor}</p>
       <p className="text-[10px] text-torg-gray uppercase tracking-wider mt-1">{label}</p>
+      {hint && <p className="text-[10px] text-torg-gray/70 mt-0.5">{hint}</p>}
     </button>
   );
 }
