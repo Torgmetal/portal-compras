@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   CheckCircle2, Loader2, AlertCircle, Search, CalendarDays,
-  Building2, Tag, FileSpreadsheet, RefreshCw,
+  Building2, Tag, FileSpreadsheet, RefreshCw, ChevronDown, ChevronRight,
 } from "lucide-react";
 
 const fmtMoeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -35,6 +35,7 @@ export default function ContasPagasClient() {
   const [ate, setAte] = useState(hojeR.ate);
   const [presetAtivo, setPreset] = useState("hoje");
   const [busca, setBusca] = useState("");
+  const [verResumo, setVerResumo] = useState(false);
   const [exportando, setExportando] = useState(false);
 
   const carregar = async (d1 = de, d2 = ate) => {
@@ -72,6 +73,17 @@ export default function ContasPagasClient() {
     qtd: filtradas.length,
     fornecedores: new Set(filtradas.map((r) => r.fornecedorNome).filter(Boolean)).size,
   }), [filtradas]);
+
+  // Agrupa os pagamentos visíveis por campo (mesmo padrão de Contas a Pagar).
+  const resumoPor = (campo) => {
+    const map = new Map();
+    for (const r of filtradas) {
+      const k = r[campo] || "(sem)";
+      const cur = map.get(k) || { valor: 0, qtd: 0 };
+      cur.valor += r.valor || 0; cur.qtd++; map.set(k, cur);
+    }
+    return [...map.entries()].map(([k, v]) => ({ k, ...v })).sort((a, b) => b.valor - a.valor).slice(0, 12);
+  };
 
   const exportar = async () => {
     if (!filtradas.length || exportando) return;
@@ -194,6 +206,10 @@ export default function ContasPagasClient() {
             className="pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-64 focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
           />
         </div>
+        <button onClick={() => setVerResumo((v) => !v)}
+          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1.5">
+          {verResumo ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Resumos por categoria/fornecedor
+        </button>
       </div>
 
       {/* KPIs */}
@@ -211,6 +227,14 @@ export default function ContasPagasClient() {
             <p className="text-[11px] text-torg-gray uppercase tracking-wider font-semibold">Fornecedores distintos</p>
             <p className="text-2xl font-extrabold text-torg-dark tabular-nums mt-1">{totaisVisiveis.fornecedores}</p>
           </div>
+        </div>
+      )}
+
+      {/* Resumos por categoria/fornecedor */}
+      {!loading && !erro && data && verResumo && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <ResumoCard titulo="Por categoria" icone={Tag} itens={resumoPor("categoriaNome")} />
+          <ResumoCard titulo="Por fornecedor" icone={Building2} itens={resumoPor("fornecedorNome")} />
         </div>
       )}
 
@@ -281,6 +305,29 @@ export default function ContasPagasClient() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* Card de resumo agregado (mesmo padrão da tela de Contas a Pagar). */
+function ResumoCard({ titulo, icone: Icon, itens }) {
+  const max = Math.max(...itens.map((i) => i.valor), 1);
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <p className="text-sm font-semibold text-torg-dark flex items-center gap-1.5 mb-3"><Icon size={14} className="text-emerald-600" /> {titulo}</p>
+      <div className="space-y-1.5">
+        {itens.map((i) => (
+          <div key={i.k} className="flex items-center gap-2 text-xs">
+            <span className="flex-1 min-w-0 truncate text-torg-dark" title={i.k}>{i.k}</span>
+            <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
+              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(i.valor / max) * 100}%` }} />
+            </div>
+            <span className="tabular-nums font-semibold text-torg-dark w-24 text-right">{fmtMoeda(i.valor)}</span>
+            <span className="text-gray-400 w-8 text-right">{i.qtd}</span>
+          </div>
+        ))}
+        {itens.length === 0 && <p className="text-xs text-torg-gray">Sem dados no filtro.</p>}
+      </div>
     </div>
   );
 }
