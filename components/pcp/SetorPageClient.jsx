@@ -31,6 +31,7 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [filtro, setFiltro] = useState("");
+  const [filtroMaquina, setFiltroMaquina] = useState(""); // "" = todas
   const [dias, setDias] = useState(7);
 
   const carregar = useCallback(async () => {
@@ -74,9 +75,37 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
   if (!data) return null;
 
   const { kgHoje, kgDiario, produzindoAgora, operadores, maquinas, pecasNoSetor, apontamentos } = data;
+  const emProducaoAgora = data.emProducaoAgora || [];
+  const produzidoHoje = data.produzidoHoje || [];
 
-  // Filtra apontamentos pelo texto
+  const ehCorte = setor === "Corte";
+  const labelAgora = ehCorte ? "Em corte agora" : "Em produção agora";
+  const labelHoje = ehCorte ? "Cortado hoje" : "Produzido hoje";
+
+  // Seletor de máquinas — união de todas as fontes, com kg de hoje por máquina
+  const kgHojeMaq = new Map();
+  for (const a of produzidoHoje) {
+    if (!a.maquina) continue;
+    kgHojeMaq.set(a.maquina, (kgHojeMaq.get(a.maquina) || 0) + (a.produzidoKg || 0));
+  }
+  const listaMaquinas = [...new Set([
+    ...produzindoAgora.map((m) => m.maquina),
+    ...emProducaoAgora.map((m) => m.maquina),
+    ...produzidoHoje.map((m) => m.maquina),
+    ...apontamentos.map((a) => a.maquina),
+  ].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+  const byMaquina = (x) => !filtroMaquina || x.maquina === filtroMaquina;
+
+  const emProducaoFiltrado = emProducaoAgora.filter(byMaquina);
+  const hojeFiltrado = produzidoHoje.filter(byMaquina);
+  const bancadasFiltradas = produzindoAgora.filter(byMaquina);
+  const totalHojeUn = hojeFiltrado.reduce((s, a) => s + (a.produzidoUn || 0), 0);
+  const totalHojeKg = hojeFiltrado.reduce((s, a) => s + (a.produzidoKg || 0), 0);
+
+  // Filtra apontamentos pelo texto + máquina
   const apontFiltrados = apontamentos.filter((a) => {
+    if (!byMaquina(a)) return false;
     if (!filtro) return true;
     const q = filtro.toLowerCase();
     return (
@@ -134,23 +163,145 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
         <KpiCard icon={Package} label="Peças no setor" value={pecasNoSetor.length} cor={corHex} />
       </div>
 
+      {/* Seletor de máquinas — filtra as seções abaixo */}
+      {listaMaquinas.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-1.5 flex-wrap">
+          <Cpu size={14} className="text-torg-gray mr-1" />
+          <button
+            onClick={() => setFiltroMaquina("")}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+              !filtroMaquina ? "text-white" : "bg-gray-100 text-torg-gray hover:bg-gray-200"
+            }`}
+            style={!filtroMaquina ? { background: corHex } : undefined}
+          >
+            Todas as máquinas
+          </button>
+          {listaMaquinas.map((m) => {
+            const kg = kgHojeMaq.get(m) || 0;
+            const ativa = filtroMaquina === m;
+            return (
+              <button
+                key={m}
+                onClick={() => setFiltroMaquina(ativa ? "" : m)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  ativa ? "text-white" : "bg-gray-100 text-torg-gray hover:bg-gray-200"
+                }`}
+                style={ativa ? { background: corHex } : undefined}
+                title={kg > 0 ? `${fmtKg(kg)} hoje` : "Sem produção hoje"}
+              >
+                {m}{kg > 0 && <span className={ativa ? "opacity-80" : "text-torg-dark"}> · {fmtKg(kg)}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Em produção AGORA (status Produzindo no Syneco) */}
+      {emProducaoFiltrado.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-green-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-green-100 bg-green-50/50 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <h3 className="text-base font-semibold text-torg-dark">{labelAgora} ({emProducaoFiltrado.length})</h3>
+            <span className="text-xs text-torg-gray ml-auto">status “Produzindo” no Syneco</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
+              <thead className="bg-gray-50/60">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Máquina</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Peça</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Obra / OP</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Operador</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Prod. / Plan.</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Saldo</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Desde</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {emProducaoFiltrado.map((a) => (
+                  <tr key={a.id} className="hover:bg-green-50/30">
+                    <td className="px-3 py-2 text-xs font-mono font-bold" style={{ color: corHex }}>{a.maquina || "—"}</td>
+                    <td className="px-3 py-2 text-xs text-torg-dark max-w-[220px] truncate" title={a.descricaoItem || ""}>{a.descricaoItem || "—"}</td>
+                    <td className="px-3 py-2 text-xs font-medium text-torg-blue whitespace-nowrap">{a.obra || "—"}{a.opSka ? ` · ${a.opSka}` : ""}</td>
+                    <td className="px-3 py-2 text-xs text-torg-dark">{a.operador || "—"}</td>
+                    <td className="px-3 py-2 text-right text-xs tabular-nums">{a.produzidoUn} / {a.planejadoUn}</td>
+                    <td className="px-3 py-2 text-right text-xs tabular-nums font-medium">{a.saldoUn}</td>
+                    <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap">{fmtDataHora(a.dataInicio)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Produzido / cortado HOJE */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3 flex-wrap">
+          <h3 className="text-base font-semibold text-torg-dark">{labelHoje}{filtroMaquina ? ` — ${filtroMaquina}` : ""}</h3>
+          <span className="text-xs text-torg-gray">
+            <strong className="text-torg-dark">{totalHojeUn.toLocaleString("pt-BR")}</strong> un ·{" "}
+            <strong className="text-torg-dark">{fmtKg(totalHojeKg)}</strong>
+            {hojeFiltrado.length > 0 && <> · {hojeFiltrado.length} apontamento{hojeFiltrado.length !== 1 ? "s" : ""}</>}
+          </span>
+        </div>
+        {hojeFiltrado.length === 0 ? (
+          <p className="px-6 py-8 text-sm text-torg-gray text-center">
+            Nada finalizado hoje{filtroMaquina ? ` na ${filtroMaquina}` : ""} até agora.
+          </p>
+        ) : (
+          <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+            <table className="w-full text-sm min-w-[750px]">
+              <thead className="bg-gray-50/60 sticky top-0">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Hora</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Máquina</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Peça</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Obra / OP</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Operador</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Un</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">KG</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {hojeFiltrado.map((a) => (
+                  <tr key={a.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 text-xs text-torg-gray whitespace-nowrap tabular-nums">
+                      {a.dataFim ? new Date(a.dataFim).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-xs font-mono text-torg-gray whitespace-nowrap">{a.maquina || "—"}</td>
+                    <td className="px-3 py-2 text-xs text-torg-dark max-w-[220px] truncate" title={a.descricaoItem || ""}>{a.descricaoItem || "—"}</td>
+                    <td className="px-3 py-2 text-xs font-medium text-torg-blue whitespace-nowrap">{a.obra || "—"}{a.opSka ? ` · ${a.opSka}` : ""}</td>
+                    <td className="px-3 py-2 text-xs text-torg-dark">{a.operador || "—"}</td>
+                    <td className="px-3 py-2 text-xs"><StatusBadge status={a.status} /></td>
+                    <td className="px-3 py-2 text-right text-xs tabular-nums">{a.produzidoUn || "—"}</td>
+                    <td className="px-3 py-2 text-right text-xs tabular-nums font-medium">{fmtKg(a.produzidoKg)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Bancadas / Máquinas do setor */}
-      {produzindoAgora.length > 0 && (
+      {bancadasFiltradas.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2 flex-wrap">
             <Cpu size={16} style={{ color: corHex }} />
             <h3 className="text-base font-semibold text-torg-dark">Bancadas — {titulo}</h3>
             <span className="ml-auto flex items-center gap-2 text-xs flex-wrap">
               <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                {produzindoAgora.filter((m) => m.status === "Finalizada Parcial").length} em andamento
+                {bancadasFiltradas.filter((m) => m.status === "Finalizada Parcial").length} em andamento
               </span>
               <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-                {produzindoAgora.filter((m) => m.status === "Finalizado" || m.status === "Finalizado Total").length} finalizadas
+                {bancadasFiltradas.filter((m) => m.status === "Finalizado" || m.status === "Finalizado Total").length} finalizadas
               </span>
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-4">
-            {produzindoAgora.map((m, i) => {
+            {bancadasFiltradas.map((m, i) => {
               const isProduzindo = m.status === "Produzindo";
               return (
                 <div

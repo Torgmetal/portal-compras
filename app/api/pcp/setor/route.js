@@ -36,8 +36,11 @@ export async function GET(req) {
 
   const inicio = new Date();
   inicio.setDate(inicio.getDate() - dias);
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+  // "Hoje" no fuso da fábrica (America/Sao_Paulo) — o Syneco grava o dia
+  // como 00:00 BRT (= 03:00Z); meia-noite UTC pegaria a noite de ontem.
+  const hojeBRT = new Date(
+    new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }) + "T03:00:00Z"
+  );
 
   // Status de PecaConjunto correspondente ao setor
   const statusMap = {
@@ -47,7 +50,7 @@ export async function GET(req) {
   const setorNorm = setor.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z]/g, "");
   const statusPeca = statusMap[setorNorm] || null;
 
-  const [apontamentosRaw, maquinasRaw, pecasNoSetor, kgDiario, maquinasUltimo] = await Promise.all([
+  const [apontamentosRaw, maquinasRaw, pecasNoSetor, kgDiario, maquinasUltimo, emProducaoRaw, hojeRaw] = await Promise.all([
     // Apontamentos recentes (via MesOrdem)
     prisma.mesOrdem.findMany({
       where: {
@@ -118,6 +121,33 @@ export async function GET(req) {
         AND maquina IS NOT NULL AND maquina != '' AND maquina != '---'
       ORDER BY maquina, "dataInicio" DESC
     `,
+
+    // Itens com status "Produzindo" AGORA no Syneco (em corte/produção neste momento)
+    prisma.mesOrdem.findMany({
+      where: { setor: { contains: setor, mode: "insensitive" }, status: "Produzindo" },
+      select: {
+        id: true, obra: true, op: true, descItem: true, maquina: true, operador: true,
+        planejadoUn: true, produzidoUn: true, saldoUn: true,
+        pesoPlanejado: true, pesoProduzido: true, dataInicio: true, updatedAt: true,
+      },
+      orderBy: [{ maquina: "asc" }, { dataInicio: "desc" }],
+      take: 100,
+    }),
+
+    // Finalizados HOJE (dataFim de hoje no fuso da fábrica)
+    prisma.mesOrdem.findMany({
+      where: {
+        setor: { contains: setor, mode: "insensitive" },
+        dataFim: { gte: hojeBRT },
+        pesoProduzido: { gt: 0 },
+      },
+      select: {
+        id: true, obra: true, op: true, descItem: true, maquina: true, operador: true,
+        status: true, produzidoUn: true, pesoProduzido: true, dataFim: true,
+      },
+      orderBy: { dataFim: "desc" },
+      take: 400,
+    }),
   ]);
 
   // Normaliza apontamentos pra manter compatibilidade do front
@@ -161,10 +191,27 @@ export async function GET(req) {
   }
   const operadores = [...operadoresMap.values()].sort((a, b) => b.kg - a.kg);
 
-  // KG hoje
+  // KG hoje (fuso da fábrica)
   const kgHoje = apontamentos
-    .filter((a) => new Date(a.dataInicio) >= hoje)
+    .filter((a) => new Date(a.dataInicio) >= hojeBRT)
     .reduce((s, a) => s + (a.produzidoKg || 0), 0);
+
+  // Em produção AGORA (status Produzindo no Syneco)
+  const emProducaoAgora = emProducaoRaw.map((a) => ({
+    id: a.id, obra: a.obra, opSka: a.op, descricaoItem: a.descItem,
+    maquina: a.maquina, operador: a.operador,
+    planejadoUn: a.planejadoUn || 0, produzidoUn: a.produzidoUn || 0, saldoUn: a.saldoUn || 0,
+    pesoPlanejado: a.pesoPlanejado || 0, produzidoKg: a.pesoProduzido || 0,
+    dataInicio: a.dataInicio, atualizadoEm: a.updatedAt,
+  }));
+
+  // Produzido HOJE (finalizados com dataFim de hoje)
+  const produzidoHoje = hojeRaw.map((a) => ({
+    id: a.id, obra: a.obra, opSka: a.op, descricaoItem: a.descItem,
+    maquina: a.maquina, operador: a.operador, status: a.status,
+    produzidoUn: a.produzidoUn || 0, produzidoKg: a.pesoProduzido || 0,
+    dataFim: a.dataFim,
+  }));
 
   // Normaliza resultado $queryRaw de máquinas
   const todasMaquinas = maquinasUltimo
@@ -194,6 +241,8 @@ export async function GET(req) {
       apontamentos: r.apontamentos,
     })),
     produzindoAgora: todasMaquinas,
+    emProducaoAgora,
+    produzidoHoje,
     operadores,
   });
   } catch (e) {

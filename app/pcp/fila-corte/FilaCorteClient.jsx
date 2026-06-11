@@ -164,6 +164,9 @@ export default function FilaCorteClient({ pecasIniciais }) {
           <Link href="/producao/programacao/corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
             Liberar peças →
           </Link>
+          <Link href="/pcp/corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1">
+            <Scissors size={13} /> Corte ao vivo (Syneco)
+          </Link>
           <Link href="/pcp/pmp" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1">
             <Target size={13} /> Ver PMP
           </Link>
