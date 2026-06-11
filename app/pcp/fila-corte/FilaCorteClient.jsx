@@ -28,10 +28,16 @@ const fmtKg = (v) => {
 };
 const isoHoje = () => new Date().toISOString().split("T")[0];
 
-// Coluna do kanban em que a peça está (derivado — sem status novo no pipeline)
+// Peça cortada: conclusão manual OU baixa total no Syneco (Importar Syneco)
+const pecaCortada = (p) => !!p.corteConcluidoEm || (Number(p.qte) > 0 && Number(p.qteProduzida) >= Number(p.qte));
+// Real fim: manual tem precedência; senão a data de produção do Syneco
+const fimReal = (p) => p.corteConcluidoEm || p.dataProducao;
+
+// Coluna do kanban em que a peça está (derivado — sem status novo no
+// pipeline). Em corte/Cortada andam SOZINHAS conforme o Syneco dá baixa.
 function colunaDa(p) {
-  if (p.corteConcluidoEm) return "CORTADA";
-  if (p.corteIniciadoEm) return "EM_CORTE";
+  if (pecaCortada(p)) return "CORTADA";
+  if (p.corteIniciadoEm || Number(p.qteProduzida) > 0) return "EM_CORTE";
   if (p.corteDataMetaInicio) return "PROGRAMADA";
   return "FILA";
 }
@@ -64,7 +70,7 @@ export default function FilaCorteClient({ pecasIniciais }) {
   const cols = useMemo(() => {
     const c = { FILA: [], PROGRAMADA: [], EM_CORTE: [], CORTADA: [] };
     for (const p of filtradas) c[colunaDa(p)].push(p);
-    c.CORTADA.sort((a, b) => new Date(b.corteConcluidoEm) - new Date(a.corteConcluidoEm));
+    c.CORTADA.sort((a, b) => new Date(fimReal(b) || 0) - new Date(fimReal(a) || 0));
     return c;
   }, [filtradas]);
 
@@ -76,13 +82,13 @@ export default function FilaCorteClient({ pecasIniciais }) {
 
   const somaKg = (arr) => arr.reduce((s, p) => s + (Number(p.pesoTotalKg) || 0), 0);
   const atrasadas = useMemo(
-    () => filtradas.filter((p) => !p.corteConcluidoEm && p.corteDataMetaFim && diaUTC(p.corteDataMetaFim) < hoje).length,
+    () => filtradas.filter((p) => !pecaCortada(p) && p.corteDataMetaFim && diaUTC(p.corteDataMetaFim) < hoje).length,
     [filtradas, hoje]
   );
   const noPrazo30d = useMemo(() => {
-    const conc = filtradas.filter((p) => p.corteConcluidoEm && p.corteDataMetaFim);
+    const conc = filtradas.filter((p) => pecaCortada(p) && fimReal(p) && p.corteDataMetaFim);
     if (conc.length === 0) return null;
-    const ok = conc.filter((p) => diaUTC(p.corteConcluidoEm) <= diaUTC(p.corteDataMetaFim)).length;
+    const ok = conc.filter((p) => diaUTC(fimReal(p)) <= diaUTC(p.corteDataMetaFim)).length;
     return Math.round((ok / conc.length) * 100);
   }, [filtradas]);
 
@@ -161,7 +167,7 @@ export default function FilaCorteClient({ pecasIniciais }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/producao/programacao/corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
+          <Link href="/pcp/pecas-corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
             Liberar peças →
           </Link>
           <Link href="/pcp/corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1">
@@ -276,13 +282,17 @@ export default function FilaCorteClient({ pecasIniciais }) {
         </Coluna>
 
         <Coluna titulo="Em corte" cor="border-t-amber-500" lista={cols.EM_CORTE} sel={sel} onToggleColuna={toggleColuna}
-          vazio="Nada em corte agora.">
+          vazio="Nada em corte agora — o Syneco move pra cá quando começa a dar baixa.">
           {(p) => {
-            const atrasoFim = difDias(hoje, diaUTC(p.corteDataMetaFim));
+            const atrasoFim = p.corteDataMetaFim ? difDias(hoje, diaUTC(p.corteDataMetaFim)) : 0;
             return (
               <CardPeca key={p.id} p={p} sel={sel} onToggle={toggle}>
                 <span className="text-[10px] text-torg-gray inline-flex items-center gap-1">
-                  <Clock size={11} /> Início real {fmtData(p.corteIniciadoEm)} · meta fim {fmtData(p.corteDataMetaFim)}
+                  <Clock size={11} />
+                  {Number(p.qteProduzida) > 0
+                    ? <>Syneco: <strong className="text-torg-dark">{p.qteProduzida}/{p.qte}</strong> baixadas</>
+                    : <>Início real {fmtData(p.corteIniciadoEm)}</>}
+                  {p.corteDataMetaFim && <> · meta fim {fmtData(p.corteDataMetaFim)}</>}
                 </span>
                 {atrasoFim > 0 && <span className="text-[10px] font-bold text-red-600">+{atrasoFim}d de atraso</span>}
               </CardPeca>
@@ -291,18 +301,22 @@ export default function FilaCorteClient({ pecasIniciais }) {
         </Coluna>
 
         <Coluna titulo="Cortadas" cor="border-t-emerald-500" lista={cols.CORTADA} sel={sel}
-          vazio="Nenhuma peça concluída nos últimos 30 dias.">
+          vazio="Nenhuma peça cortada nos últimos 30 dias.">
           {(p) => {
-            const atraso = difDias(diaUTC(p.corteConcluidoEm), diaUTC(p.corteDataMetaFim));
+            const fim = fimReal(p);
+            const viaSyneco = !p.corteConcluidoEm;
+            const atraso = fim && p.corteDataMetaFim ? difDias(diaUTC(fim), diaUTC(p.corteDataMetaFim)) : null;
             return (
               <CardPeca key={p.id} p={p}>
                 <span className="text-[10px] text-torg-gray">
-                  Real {fmtData(p.corteIniciadoEm)} → {fmtData(p.corteConcluidoEm)} · meta era {fmtData(p.corteDataMetaFim)}
+                  Cortada em {fmtData(fim)}
+                  {viaSyneco && <span className="ml-1 px-1 py-px rounded bg-emerald-50 text-emerald-700 font-semibold">Syneco</span>}
+                  {p.corteDataMetaFim && <> · meta era {fmtData(p.corteDataMetaFim)}</>}
                 </span>
-                {p.corteDataMetaFim && (atraso > 0
+                {p.corteDataMetaFim && atraso != null && (atraso > 0
                   ? <span className="text-[10px] font-bold text-red-600">+{atraso}d além da meta</span>
                   : <span className="text-[10px] font-semibold text-emerald-600">✓ no prazo</span>)}
-                {p.status === "CORTE" && (
+                {p.corteConcluidoEm && p.status === "CORTE" && (
                   <button onClick={() => agir({ acao: "reabrir", ids: [p.id] }, "reaberta(s)")} disabled={agindo}
                     className="ml-auto text-[10px] text-torg-gray hover:text-torg-dark inline-flex items-center gap-0.5">
                     <Undo2 size={11} /> Reabrir

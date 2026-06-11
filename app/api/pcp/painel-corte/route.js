@@ -48,11 +48,13 @@ export async function GET() {
           _sum: { pesoTotalKg: true },
         }),
 
-        // Tudo que está no corte e não foi concluído no kanban
+        // Tudo que está no corte e não foi concluído no kanban (a baixa do
+        // Syneco — qteProduzida >= qte — é filtrada em JS: Prisma não compara
+        // coluna com coluna no where)
         prisma.pecaConjunto.findMany({
           where: { status: "CORTE", corteConcluidoEm: null },
           select: {
-            maquina: true, qte: true, pesoTotalKg: true, opNumero: true,
+            maquina: true, qte: true, qteProduzida: true, pesoTotalKg: true, opNumero: true,
             corteDataMetaInicio: true, corteDataMetaFim: true, corteIniciadoEm: true,
           },
         }),
@@ -89,10 +91,10 @@ export async function GET() {
           take: 400,
         }),
 
-        // Carteira por obra — kg ainda não cortado (PENDENTE + CORTE aberto)
+        // Pendentes (aguardando liberação) por obra — a parte da fila entra em JS
         prisma.pecaConjunto.groupBy({
           by: ["opNumero"],
-          where: { OR: [{ status: "PENDENTE" }, { status: "CORTE", corteConcluidoEm: null }] },
+          where: { status: "PENDENTE" },
           _count: { id: true },
           _sum: { pesoTotalKg: true },
         }),
@@ -125,21 +127,24 @@ export async function GET() {
       kg: pendentes.reduce((s, p) => s + (p._sum.pesoTotalKg || 0), 0),
     };
 
+    // Peça com baixa total no Syneco conta como cortada — sai da fila/carteira
+    const filaAberta = naFilaCorte.filter((p) => !(Number(p.qte) > 0 && Number(p.qteProduzida) >= Number(p.qte)));
+
     const hojeUTC = Date.UTC(ano, mesNum - 1, diaHoje);
     const fimMeta = (p) => (p.corteDataMetaFim ? new Date(p.corteDataMetaFim).getTime() : null);
     const grupo = (filtro) => {
-      const arr = naFilaCorte.filter(filtro);
+      const arr = filaAberta.filter(filtro);
       return { pecas: arr.length, kg: somar(arr, "pesoTotalKg") };
     };
     const funilFila = {
-      semProgramacao: grupo((p) => !p.corteDataMetaInicio),
-      programadas: grupo((p) => p.corteDataMetaInicio && !p.corteIniciadoEm),
-      emCorte: grupo((p) => p.corteIniciadoEm),
+      semProgramacao: grupo((p) => !p.corteDataMetaInicio && !p.corteIniciadoEm && !(Number(p.qteProduzida) > 0)),
+      programadas: grupo((p) => p.corteDataMetaInicio && !p.corteIniciadoEm && !(Number(p.qteProduzida) > 0)),
+      emCorte: grupo((p) => p.corteIniciadoEm || Number(p.qteProduzida) > 0),
       atrasadas: grupo((p) => fimMeta(p) != null && fimMeta(p) < hojeUTC),
     };
     const carteiraTotal = {
-      pecas: pendenteTotal.pecas + naFilaCorte.length,
-      kg: pendenteTotal.kg + somar(naFilaCorte, "pesoTotalKg"),
+      pecas: pendenteTotal.pecas + filaAberta.length,
+      kg: pendenteTotal.kg + somar(filaAberta, "pesoTotalKg"),
     };
 
     // ── Carga por máquina: backlog ÷ capacidade média ───────────
@@ -147,7 +152,7 @@ export async function GET() {
       capacidadeRaw.map((c) => [c.maquina, { kgDia: Number(c.kg) / Math.max(1, Number(c.dias)), dias: Number(c.dias) }])
     );
     const backlogPorMaquina = new Map();
-    for (const p of naFilaCorte) {
+    for (const p of filaAberta) {
       const key = p.maquina || "SEM_MAQUINA";
       const acc = backlogPorMaquina.get(key) || { pecas: 0, kg: 0 };
       acc.pecas += 1;
@@ -171,18 +176,27 @@ export async function GET() {
     }).sort((a, b) => b.backlogKg - a.backlogKg);
     const semMaquina = backlogPorMaquina.get("SEM_MAQUINA") || { pecas: 0, kg: 0 };
 
-    // ── Carteira por obra (top kg não cortado) ──────────────────
+    // ── Carteira por obra (top kg não cortado) — pendentes + fila aberta ──
+    const abertoPorObra = new Map();
+    for (const c of carteiraPorOp) {
+      abertoPorObra.set(c.opNumero, { pecas: c._count.id, kg: c._sum.pesoTotalKg || 0 });
+    }
+    for (const p of filaAberta) {
+      const acc = abertoPorObra.get(p.opNumero) || { pecas: 0, kg: 0 };
+      acc.pecas += 1;
+      acc.kg += Number(p.pesoTotalKg) || 0;
+      abertoPorObra.set(p.opNumero, acc);
+    }
     const totalObraMap = new Map(totalPorOp.map((t) => [t.opNumero, t._sum.pesoTotalKg || 0]));
-    const obras = carteiraPorOp
-      .map((c) => {
-        const total = totalObraMap.get(c.opNumero) || 0;
-        const aberto = c._sum.pesoTotalKg || 0;
+    const obras = [...abertoPorObra.entries()]
+      .map(([opNumero, aberto]) => {
+        const total = totalObraMap.get(opNumero) || 0;
         return {
-          opNumero: c.opNumero,
-          pecasAbertas: c._count.id,
-          kgAberto: aberto,
+          opNumero,
+          pecasAbertas: aberto.pecas,
+          kgAberto: aberto.kg,
           kgTotal: total,
-          pctAvancado: total > 0 ? Math.round(((total - aberto) / total) * 100) : 0,
+          pctAvancado: total > 0 ? Math.round(((total - aberto.kg) / total) * 100) : 0,
         };
       })
       .sort((a, b) => b.kgAberto - a.kgAberto)

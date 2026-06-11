@@ -11,9 +11,9 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 const menu = [
   // O acompanhamento ao vivo do corte (Syneco) vive dentro do Painel —
   // a página /pcp/corte segue existindo, linkada por lá ("detalhes").
-  { href: "/pcp",              label: "Painel do Corte",  icon: LayoutDashboard, exact: true },
+  { href: "/pcp",              label: "Painel",           icon: LayoutDashboard, exact: true },
   { href: "/pcp/pmp",          label: "PMP",              icon: Target },
-  { href: "/producao/programacao/corte", label: "Peças / Corte", icon: Package },
+  { href: "/pcp/pecas-corte",  label: "Peças / Corte",    icon: Package },
   { href: "/pcp/fila-corte",   label: "Fila de Corte",    icon: ListOrdered },
   { href: "/pcp/maquinas",     label: "Máquinas",         icon: Cpu },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },

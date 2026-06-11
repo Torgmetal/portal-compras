@@ -50,6 +50,9 @@ function fmtDate(iso) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
 }
 
+// Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
+const normObra = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
+
 export default function PmpClient() {
   const [semana, setSemana] = useState(() => getMonday(new Date()));
   const [dados, setDados] = useState(null);
@@ -88,6 +91,15 @@ export default function PmpClient() {
           map[key].dias[idx] = m.metaPecas;
           if (m.observacao) map[key].obs = m.observacao;
         }
+      }
+      // Obras que o Syneco CORTOU na semana mas não têm meta → linha visível
+      // mesmo assim (o realizado de cada OP aparece; a meta pode ser digitada)
+      const normsComMeta = new Set(
+        Object.values(map).filter((l) => l.setor === "CORTE").map((l) => normObra(l.opNumero))
+      );
+      for (const [norm, obraOriginal] of Object.entries(data.realizadoCorteObras || {})) {
+        if (normsComMeta.has(norm)) continue;
+        map[`${obraOriginal}|CORTE`] = { opNumero: obraOriginal, setor: "CORTE", dias: [0, 0, 0, 0, 0], obs: "" };
       }
       setLinhas(Object.values(map));
       setDirty(false);
@@ -280,9 +292,9 @@ export default function PmpClient() {
     return { pecas, pesoKg };
   };
 
-  // ── Realizado de CORTE por dia (peças concluídas na fila de corte) ──
+  // ── Realizado de CORTE por dia (apontamentos do Syneco, por obra) ──
   const getRealCorteDia = (opNumero, dataIso) =>
-    dados?.realizadoCorteDia?.[`${dataIso}|${opNumero}`]?.pecas || 0;
+    dados?.realizadoCorteDia?.[`${dataIso}|${normObra(opNumero)}`]?.pecas || 0;
 
   // ── Dias da semana com datas ────────────────────────────────
   const diasComData = DIAS_SEMANA.map((label, i) => ({

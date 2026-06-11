@@ -132,14 +132,14 @@ export default function PCPDashboardClient() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-            <Scissors size={26} className="text-torg-blue" /> PCP — Painel do Corte
+            <Scissors size={26} className="text-torg-blue" /> Painel PCP
           </h2>
           <p className="text-xs text-torg-gray mt-0.5">
             Meta × necessidade × produzido · estoque pra liberação · fila de prioridades · carga por máquina · Syneco ao vivo.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Link href="/producao/programacao/corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
+          <Link href="/pcp/pecas-corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
             Liberar peças
           </Link>
           <Link href="/pcp/fila-corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1">
@@ -214,7 +214,7 @@ export default function PCPDashboardClient() {
         <p className="text-xs font-bold text-torg-dark uppercase tracking-wide mb-3">Fluxo do corte</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <EtapaFunil
-            titulo="Aguardando liberação" icon={Boxes} href="/producao/programacao/corte"
+            titulo="Aguardando liberação" icon={Boxes} href="/pcp/pecas-corte"
             pecas={carteira.pendente.pecas} kg={carteira.pendente.kg}
             extra={
               carteira.pendente.porEstoque.length > 0 && (
@@ -299,7 +299,7 @@ export default function PCPDashboardClient() {
             <AlertTriangle size={13} className="shrink-0" />
             <span>
               <strong>{semMaquina.pecas} peça(s) · {fmtKg(semMaquina.kg)}</strong> na fila <strong>sem máquina definida</strong> — atribua na tela{" "}
-              <Link href="/producao/programacao/corte" className="underline hover:text-amber-900">Peças / Corte</Link> pra entrar na carga.
+              <Link href="/pcp/pecas-corte" className="underline hover:text-amber-900">Peças / Corte</Link> pra entrar na carga.
             </span>
           </div>
         )}

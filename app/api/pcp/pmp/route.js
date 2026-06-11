@@ -4,6 +4,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { diaBRT } from "@/lib/data-br";
+
+// Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
+const normObra = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
 
 const PIPELINE = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 
@@ -54,19 +58,28 @@ export async function GET(req) {
     };
   }
 
-  // 3) Realizado de CORTE por dia — peças concluídas no kanban da fila de
-  // corte dentro da semana (real × estimado da programação)
-  const cortadas = await prisma.pecaConjunto.findMany({
-    where: { corteConcluidoEm: { gte: seg, lte: dom } },
-    select: { opNumero: true, qte: true, pesoTotalKg: true, corteConcluidoEm: true },
+  // 3) Realizado de CORTE por dia — apontamentos do Syneco (MesOrdem) na
+  // semana, por obra. Chave com obra normalizada porque o Syneco usa
+  // "T60B"/"T85" e o PMP usa o opNumero do portal ("T60B"/"085").
+  const cortadasSemana = await prisma.mesOrdem.findMany({
+    where: {
+      setor: { contains: "Corte", mode: "insensitive" },
+      pesoProduzido: { gt: 0 },
+      dataFim: { gte: seg, lte: dom },
+    },
+    select: { obra: true, produzidoUn: true, pesoProduzido: true, dataFim: true },
   });
-  const realizadoCorteDia = {}; // "YYYY-MM-DD|op" → { pecas, pesoKg }
-  for (const p of cortadas) {
-    const dia = p.corteConcluidoEm.toISOString().split("T")[0];
-    const key = `${dia}|${p.opNumero}`;
+  const realizadoCorteDia = {}; // "YYYY-MM-DD|obraNorm" → { pecas, pesoKg }
+  const realizadoCorteObras = {}; // obraNorm → nome original no Syneco
+  for (const a of cortadasSemana) {
+    const dia = diaBRT(a.dataFim); // dia-calendário BRT (turno noturno não vaza pro dia seguinte)
+    if (!dia) continue;
+    const norm = normObra(a.obra);
+    const key = `${dia}|${norm}`;
     if (!realizadoCorteDia[key]) realizadoCorteDia[key] = { pecas: 0, pesoKg: 0 };
-    realizadoCorteDia[key].pecas += p.qte || 1;
-    realizadoCorteDia[key].pesoKg += p.pesoTotalKg || 0;
+    realizadoCorteDia[key].pecas += a.produzidoUn || 0;
+    realizadoCorteDia[key].pesoKg += a.pesoProduzido || 0;
+    if (!realizadoCorteObras[norm]) realizadoCorteObras[norm] = a.obra;
   }
 
   // 4) OPs ativas (para dropdown)
@@ -81,6 +94,7 @@ export async function GET(req) {
     metas,
     realizado,
     realizadoCorteDia,
+    realizadoCorteObras,
     ops,
   });
 }

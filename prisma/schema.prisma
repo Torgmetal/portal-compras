@@ -141,7 +141,6 @@ model OP {
   revisoes             Revisao[]
   romaneios            Romaneio[]
   tarefasPlanejamento  TarefaPlanejamento[]
-  pmpMetas             PmpMeta[]             @relation("PmpMetaOP")
 
   @@index([numero])
   @@index([status])
@@ -2537,7 +2536,8 @@ model PmpMeta {
   observacao  String?
   criadoPorId String
   criadoPor   User     @relation("PmpMetaCriador", fields: [criadoPorId], references: [id])
-  op          OP       @relation("PmpMetaOP", fields: [opNumero], references: [numero])
+  // opNumero é string livre (sem FK): obras do Syneco/LPC (ex.: T60B) podem
+  // não estar cadastradas como OP no portal e mesmo assim ter meta no PMP.
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
