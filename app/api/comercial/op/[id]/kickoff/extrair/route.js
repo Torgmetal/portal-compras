@@ -41,6 +41,7 @@ EXTRAIA (quando presente no documento — não invente; na dúvida, use null):
 REGRAS
 - Não invente nada: só o que está escrito no documento.
 - Valores e percentuais: transcreva como estão.
+- NÃO extraia "pontos de atenção" — esse campo é de preenchimento interno do comercial.
 - Responda APENAS com um JSON válido envolvido em <json></json>, no formato:
 <json>{"escopo": "...", "escopoIncluso": ["..."], "escopoExcluso": ["..."], "resumoPesos": [{"descricao": "...", "qtd": 0, "pesoKg": 0}], "dataEntregaAcordada": null, "tipoFaturamento": null, "faturamentoEventos": [{"descricao": "Entrada", "percentual": 10, "valor": null, "prazoPagamento": null, "medicao": null, "obsNF": null}], "retencaoContratual": null, "segurosObrigatorios": null, "padraoPintura": null, "inspecao": null, "entregaEndereco": null, "frete": null, "pedidoCompraCliente": null, "notaRetorno": null, "faturamentoObs": null}</json>`;
 
@@ -110,14 +111,27 @@ export async function POST(req, { params }) {
     const strArr = (v, maxItens, maxLen) => Array.isArray(v)
       ? v.filter((s) => typeof s === "string" && s.trim()).map((s) => s.trim().slice(0, maxLen)).slice(0, maxItens)
       : [];
+    // Escopo é só o RESUMO: derruba à força qualquer linha que pareça item de
+    // lista (incluso/excluso têm campos próprios) e corta em 400 chars.
+    const limparEscopo = (v) => {
+      if (typeof v !== "string") return null;
+      const semListas = v
+        .split("\n")
+        .filter((l) => !/^\s*([-•*▪◦✓✔✅🚫❌➤›]|\d+[.)])\s/u.test(l) && !/^\s*(inclu[íi]do|exclu[íi]do|inclus|exclus)/i.test(l.trim()))
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+      return semListas ? semListas.slice(0, 400) : null;
+    };
     const out = {
-      escopo:              str(dados.escopo, 600),
+      escopo:              limparEscopo(dados.escopo),
       escopoIncluso:       strArr(dados.escopoIncluso, 40, 300),
       escopoExcluso:       strArr(dados.escopoExcluso, 40, 300),
-      // Linhas "TOTAL/SUBTOTAL" ficam fora — o total é calculado na tela
+      // Qualquer linha com "total" no nome fica fora ("TOTAL", "Peso Total",
+      // "Total Geral"...) — o total é calculado na tela
       resumoPesos:         Array.isArray(dados.resumoPesos)
         ? dados.resumoPesos
-            .filter((p) => p && typeof p.descricao === "string" && p.descricao.trim() && !/^(sub)?\s*total/i.test(p.descricao.trim()))
+            .filter((p) => p && typeof p.descricao === "string" && p.descricao.trim() && !/\btotal\b/i.test(p.descricao))
             .map((p) => ({ descricao: p.descricao.trim().slice(0, 200), qtd: Number(p.qtd) || null, pesoKg: Number(p.pesoKg) || null }))
             .slice(0, 60)
         : [],

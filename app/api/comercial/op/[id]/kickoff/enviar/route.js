@@ -89,6 +89,72 @@ export async function POST(req, { params }) {
   const esc = escapeHtml;
   const linhas = (s) => String(s || "").split("\n").map((x) => x.trim()).filter(Boolean).map(esc);
   const obraLabel = `${esc(op.cliente)}${op.obra ? ` · ${esc(op.obra)}` : ""}`;
+  const baseUrl = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
+  // Banner padrão da divulgação (logo Torg + abertura animada) — usado nos
+  // DOIS comunicados para manter a identidade da marca.
+  const banner = (subtituloTipo) => `
+      <div style="background:#002945;border-radius:12px 12px 0 0;padding:26px 28px 20px 28px;text-align:center;">
+        <img src="${baseUrl}/torg-logo-white.png" width="150" alt="Torg Metal" style="display:block;margin:0 auto 10px auto;max-width:150px;height:auto;">
+        <p style="margin:0;font-size:30px;line-height:1;">🚀🏗️</p>
+        <p style="margin:8px 0 0 0;color:#fff;font-size:24px;font-weight:800;letter-spacing:0.5px;">NOVA OBRA CONFIRMADA!</p>
+        <p style="margin:6px 0 0 0;color:#F4801F;font-size:18px;font-weight:700;">OP ${esc(op.numero)} — ${obraLabel}</p>
+        <p style="margin:10px 0 0 0;color:#90cdf4;font-size:13px;">${subtituloTipo}</p>
+      </div>`;
+
+  // Gantt em tabela (compatível com clientes de e-mail): barra por fase e
+  // marco ◆ para prioridades, posicionados por largura percentual.
+  function ganttEmail() {
+    const todas = (Array.isArray(k.cronograma) ? k.cronograma : [])
+      .filter((c) => c?.fase && c?.data)
+      .sort((a, b) => String(a.data).localeCompare(String(b.data)));
+    if (todas.length < 2) return "";
+    const entrega = k.dataEntregaAcordada ? k.dataEntregaAcordada.toISOString().slice(0, 10) : null;
+    const iniStr = todas[0].data;
+    const fimStr = entrega && entrega > todas[todas.length - 1].data ? entrega : todas[todas.length - 1].data;
+    const t0 = new Date(iniStr + "T00:00:00").getTime();
+    const t1 = new Date(fimStr + "T23:59:59").getTime();
+    const span = Math.max(t1 - t0, 1);
+    const pct = (d) => Math.min(98, Math.max(0, ((new Date(d + "T12:00:00").getTime() - t0) / span) * 100));
+
+    let linhasG = "";
+    let prevPct = 0;
+    for (const c of todas) {
+      const ehMarco = String(c.fase).startsWith("★");
+      const x = pct(c.data);
+      if (ehMarco) {
+        linhasG += `
+        <tr>
+          <td style="width:220px;padding:3px 8px 3px 0;font-size:11px;color:#92400e;font-weight:700;text-align:right;white-space:nowrap;overflow:hidden;">${esc(String(c.fase).slice(0, 38))}</td>
+          <td style="padding:3px 0;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              ${x > 0 ? `<td style="width:${x.toFixed(1)}%;font-size:1px;">&nbsp;</td>` : ""}
+              <td style="font-size:13px;color:#d69e2e;white-space:nowrap;">◆ <span style="font-size:10px;color:#92400e;font-weight:700;">${fmtDataStr(c.data)}</span></td>
+            </tr></table>
+          </td>
+        </tr>`;
+      } else {
+        const ini = prevPct;
+        const w = Math.max(pct(c.data) - ini, 3);
+        linhasG += `
+        <tr>
+          <td style="width:220px;padding:3px 8px 3px 0;font-size:11px;color:#2d3748;font-weight:600;text-align:right;white-space:nowrap;overflow:hidden;">${esc(String(c.fase).slice(0, 38))}</td>
+          <td style="padding:3px 0;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+              ${ini > 0 ? `<td style="width:${ini.toFixed(1)}%;font-size:1px;">&nbsp;</td>` : ""}
+              <td style="width:${w.toFixed(1)}%;background:#006EAB;border-radius:4px;font-size:1px;height:14px;">&nbsp;</td>
+              <td style="padding-left:5px;font-size:10px;color:#4a5568;font-weight:600;white-space:nowrap;">${fmtDataStr(c.data)}</td>
+            </tr></table>
+          </td>
+        </tr>`;
+        prevPct = pct(c.data);
+      }
+    }
+    return `
+      <p style="margin:18px 0 6px 0;color:#006EAB;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Linha do tempo (Gantt)</p>
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#fbfdff;">${linhasG}</table>
+      <p style="margin:4px 0 0 0;color:#a0aec0;font-size:11px;">▬ fase &nbsp;·&nbsp; ◆ prioridade &nbsp;·&nbsp; período: ${fmtDataStr(iniStr)} → ${fmtDataStr(fimStr)}</p>`;
+  }
 
   let subject, html;
 
@@ -96,7 +162,6 @@ export async function POST(req, { params }) {
     // ── Divulgação animada de início de obra ──────────────────────────────
     const incluso = linhas(k.escopoIncluso);
     const excluso = linhas(k.escopoExcluso);
-    const pontos = linhas(k.pontosAtencao);
     const cron = Array.isArray(k.cronograma) ? k.cronograma.filter((c) => c?.fase) : [];
     const prios = Array.isArray(k.prioridades) ? k.prioridades.filter((p) => p?.descricao) : [];
     const pesos = Array.isArray(k.pesoResumo) ? k.pesoResumo.filter((p) => p?.descricao) : [];
@@ -141,12 +206,7 @@ export async function POST(req, { params }) {
     subject = `🚀 Nova obra na área! Kick Off — OP ${op.numero} · ${op.cliente}`;
     html = `
     <div style="font-family:-apple-system,system-ui,sans-serif;max-width:720px;margin:0 auto;color:#2d3748;">
-      <div style="background:#002945;border-radius:12px 12px 0 0;padding:28px 28px 22px 28px;text-align:center;">
-        <p style="margin:0;font-size:34px;">🚀🏗️</p>
-        <p style="margin:8px 0 0 0;color:#fff;font-size:24px;font-weight:800;letter-spacing:0.5px;">NOVA OBRA CONFIRMADA!</p>
-        <p style="margin:6px 0 0 0;color:#F4801F;font-size:18px;font-weight:700;">OP ${esc(op.numero)} — ${obraLabel}</p>
-        <p style="margin:10px 0 0 0;color:#90cdf4;font-size:13px;">É hora do kick off — bora fazer acontecer, time! 💪</p>
-      </div>
+      ${banner("É hora do kick off — bora fazer acontecer, time! 💪")}
       <div style="border:1px solid #e2e8f0;border-top:0;border-radius:0 0 12px 12px;padding:22px 28px;">
         ${body.mensagem ? `<div style="background:#fff8f1;border-left:4px solid #F4801F;padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:14px;"><p style="margin:0;font-size:14px;color:#2d3748;white-space:pre-wrap;">${esc(body.mensagem)}</p></div>` : ""}
 
@@ -165,14 +225,10 @@ export async function POST(req, { params }) {
         `) : ""}
         ${pesos.length ? secao("Resumo de pesos", pesosHtml) : ""}
         ${cron.length ? secao("Cronograma prévio — datas-limite por fase", cronHtml) : ""}
+        ${ganttEmail()}
         ${prios.length ? secao("Prioridades de fase/peça/entrega", priosHtml) : ""}
         ${k.padraoPintura ? secao("Padrão de pintura", paragrafo(esc(k.padraoPintura))) : ""}
         ${k.inspecao ? secao("Inspeção", paragrafo(esc(k.inspecao))) : ""}
-        ${pontos.length ? `
-        <div style="background:#fff5f5;border:1px solid #feb2b2;border-radius:8px;padding:12px 16px;margin:18px 0 0 0;">
-          <p style="margin:0 0 4px 0;color:#c53030;font-size:13px;font-weight:700;text-transform:uppercase;">⚠ Pontos de atenção</p>
-          ${listaHtml(pontos, "#742a2a", "•")}
-        </div>` : ""}
         ${k.observacoes ? secao("Observações", paragrafo(esc(k.observacoes))) : ""}
 
         <div style="background:#ebf8ff;border-radius:8px;padding:12px 16px;margin:20px 0 0 0;text-align:center;">
@@ -195,13 +251,10 @@ export async function POST(req, { params }) {
         </td>
       </tr>`).join("");
 
-    subject = `Kick Off (fiscal) — OP ${op.numero} · ${op.cliente}`;
+    subject = `🚀 Nova obra na área! Kick Off fiscal — OP ${op.numero} · ${op.cliente}`;
     html = `
     <div style="font-family:-apple-system,system-ui,sans-serif;max-width:720px;margin:0 auto;color:#2d3748;">
-      <div style="background:#002945;border-radius:10px 10px 0 0;padding:18px 24px;">
-        <p style="margin:0;color:#fff;font-size:20px;font-weight:800;">KICK OFF — FISCAL & FINANCEIRO</p>
-        <p style="margin:4px 0 0 0;color:#90cdf4;font-size:14px;">OP ${esc(op.numero)} · ${obraLabel}</p>
-      </div>
+      ${banner("É hora do kick off — comunicado fiscal & financeiro da obra 💼")}
       <div style="border:1px solid #e2e8f0;border-top:0;border-radius:0 0 10px 10px;padding:20px 24px;">
         ${body.mensagem ? `<div style="background:#ebf8ff;border-left:4px solid #006EAB;padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:14px;"><p style="margin:0;font-size:14px;color:#2d3748;white-space:pre-wrap;">${esc(body.mensagem)}</p></div>` : ""}
 
@@ -270,7 +323,6 @@ export async function POST(req, { params }) {
 
   // Envio individual: cada destinatário ganha um token de ACEITE próprio e o
   // e-mail leva o botão "Li e estou de acordo" com o link único.
-  const baseUrl = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
   const resultados = [];
   for (const email of emails) {
     const token = randomUUID();

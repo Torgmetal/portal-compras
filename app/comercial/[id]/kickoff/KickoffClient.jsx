@@ -163,9 +163,10 @@ export default function KickoffClient({ opId }) {
   const setPeso = (i, campo, v) => set("pesoResumo", form.pesoResumo.map((p, idx) => (idx === i ? { ...p, [campo]: v } : p)));
   const addPeso = () => set("pesoResumo", [...form.pesoResumo, { descricao: "", qtd: "", pesoKg: "" }]);
   const rmPeso = (i) => set("pesoResumo", form.pesoResumo.filter((_, idx) => idx !== i));
-  // Ignora linhas "TOTAL/SUBTOTAL" no somatório (evita duplicar o peso orçado)
+  // Ignora qualquer linha com "total" no nome ("TOTAL", "Peso Total", "Total
+  // Geral"...) no somatório — evita duplicar o peso orçado
   const pesoTotal = (form?.pesoResumo || [])
-    .filter((p) => !/^(sub)?\s*total/i.test(String(p.descricao || "").trim()))
+    .filter((p) => !/\btotal\b/i.test(String(p.descricao || "")))
     .reduce((s, p) => s + (Number(p.pesoKg) || 0), 0);
 
   // ── Vincular orçamento (habilita pintura + pesos do estudo) ──────────────
@@ -900,46 +901,93 @@ function ModalEnviarSetores({ opId, tipo, enviadoPara, onSalvarAntes, onClose })
   );
 }
 
-/* Gantt simples: barras na linha do tempo entre a primeira fase e a entrega. */
+/* Gantt: barras por fase na linha do tempo + prioridades (★) como MARCOS
+   (losango âmbar). Eixo de datas com gridlines em quartis. */
 function Gantt({ cronograma, entrega }) {
-  const fases = (cronograma || []).filter((c) => c.fase?.trim() && c.data).sort((a, b) => a.data.localeCompare(b.data));
-  if (fases.length < 2) return null;
-  const inicio = new Date().toISOString().slice(0, 10) < fases[0].data ? new Date().toISOString().slice(0, 10) : fases[0].data;
-  const fim = entrega && entrega > fases[fases.length - 1].data ? entrega : fases[fases.length - 1].data;
+  const todas = (cronograma || []).filter((c) => c.fase?.trim() && c.data).sort((a, b) => a.data.localeCompare(b.data));
+  if (todas.length < 2) return null;
+  const fases = todas.filter((f) => !f.fase.startsWith("★"));
+  const marcos = todas.filter((f) => f.fase.startsWith("★"));
+
+  const hojeStr = new Date().toISOString().slice(0, 10);
+  const inicio = hojeStr < todas[0].data ? hojeStr : todas[0].data;
+  const fim = entrega && entrega > todas[todas.length - 1].data ? entrega : todas[todas.length - 1].data;
   const t0 = new Date(inicio + "T00:00:00").getTime();
   const t1 = new Date(fim + "T23:59:59").getTime();
   const span = Math.max(t1 - t0, 1);
   const pct = (d) => Math.min(100, Math.max(0, ((new Date(d + "T12:00:00").getTime() - t0) / span) * 100));
-  const fmtCurta = (s) => { const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}` : s; };
+  const fmtCurta = (s) => { const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}` : s; };
+  const dataEmPct = (p) => { const d = new Date(t0 + span * (p / 100)); return fmtCurta(d.toISOString().slice(0, 10)); };
+  const hojePct = pct(hojeStr);
+  const gridlines = [0, 25, 50, 75, 100];
 
   return (
     <div className="mt-4 border-t border-gray-100 pt-3 print:break-inside-avoid">
-      <p className="text-xs font-semibold text-torg-gray uppercase tracking-wide mb-2">Gantt — linha do tempo</p>
-      <div className="space-y-1">
-        {fases.map((f, i) => {
-          const inicioBarra = i === 0 ? 0 : pct(fases[i - 1].data);
-          const fimBarra = pct(f.data);
-          const prio = f.fase.startsWith("★");
-          return (
-            <div key={i} className="flex items-center gap-2 text-[11px]">
-              <span className="w-56 truncate text-torg-dark shrink-0 text-right pr-1" title={f.fase}>{f.fase}</span>
-              <div className="flex-1 h-5 bg-gray-50 rounded relative overflow-hidden">
-                <div
-                  className={`absolute top-0.5 bottom-0.5 rounded ${prio ? "bg-amber-400" : "bg-torg-blue/70"}`}
-                  style={{ left: `${Math.min(inicioBarra, fimBarra)}%`, width: `${Math.max(Math.abs(fimBarra - inicioBarra), 1.5)}%` }}
-                />
-                <span className="absolute top-0 bottom-0 flex items-center text-[10px] text-torg-gray font-medium tabular-nums"
-                  style={{ left: `${Math.min(fimBarra + 1, 88)}%` }}>
-                  {fmtCurta(f.data)}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+      <p className="text-xs font-semibold text-torg-gray uppercase tracking-wide mb-2">Gantt — linha do tempo até a entrega</p>
+      <div className="flex">
+        <div className="w-52 shrink-0" />
+        <div className="flex-1 relative h-5">
+          {gridlines.map((g) => (
+            <span key={g} className="absolute text-[10px] text-torg-gray tabular-nums" style={{ left: `${g}%`, transform: g === 100 ? "translateX(-100%)" : g === 0 ? "none" : "translateX(-50%)" }}>
+              {dataEmPct(g)}
+            </span>
+          ))}
+        </div>
       </div>
-      <div className="flex justify-between text-[10px] text-torg-gray mt-1 pl-58" style={{ paddingLeft: "14.5rem" }}>
-        <span>{fmtCurta(inicio)}</span>
-        <span>{fmtCurta(fim)}{entrega ? " (entrega)" : ""}</span>
+      <div className="relative">
+        {/* Gridlines verticais + linha de HOJE */}
+        <div className="absolute inset-0 flex pointer-events-none" style={{ marginLeft: "13rem" }}>
+          <div className="relative flex-1">
+            {gridlines.map((g) => (
+              <div key={g} className="absolute top-0 bottom-0 w-px bg-gray-100" style={{ left: `${g}%` }} />
+            ))}
+            {hojePct > 0 && hojePct < 100 && (
+              <div className="absolute top-0 bottom-0 w-px bg-red-400" style={{ left: `${hojePct}%` }} title="Hoje" />
+            )}
+          </div>
+        </div>
+        <div className="space-y-1.5 relative">
+          {fases.map((f, i) => {
+            const ini = i === 0 ? 0 : pct(fases[i - 1].data);
+            const fimB = pct(f.data);
+            const w = Math.max(fimB - ini, 2);
+            return (
+              <div key={`f${i}`} className="flex items-center gap-2 text-[11px]">
+                <span className="w-52 truncate text-torg-dark shrink-0 text-right pr-2 font-medium" title={f.fase}>{f.fase}</span>
+                <div className="flex-1 h-6 relative">
+                  <div className="absolute top-1 bottom-1 rounded-md bg-torg-blue shadow-sm flex items-center justify-end pr-1.5"
+                    style={{ left: `${ini}%`, width: `${w}%` }}>
+                    {w > 12 && <span className="text-[9px] text-white font-semibold tabular-nums">{fmtCurta(f.data)}</span>}
+                  </div>
+                  {w <= 12 && (
+                    <span className="absolute top-0 bottom-0 flex items-center text-[10px] text-torg-gray tabular-nums" style={{ left: `${Math.min(fimB + 1.5, 90)}%` }}>
+                      {fmtCurta(f.data)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {marcos.map((m, i) => {
+            const x = pct(m.data);
+            return (
+              <div key={`m${i}`} className="flex items-center gap-2 text-[11px]">
+                <span className="w-52 truncate text-amber-700 shrink-0 text-right pr-2 font-semibold" title={m.fase}>{m.fase.replace(/^★\s*/, "★ ")}</span>
+                <div className="flex-1 h-6 relative">
+                  <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-amber-400 border-2 border-amber-600 rotate-45 shadow-sm" style={{ left: `${x}%` }} />
+                  <span className="absolute top-0 bottom-0 flex items-center text-[10px] text-amber-700 font-semibold tabular-nums" style={{ left: `${Math.min(x + 2, 90)}%` }}>
+                    {fmtCurta(m.data)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex items-center gap-4 mt-2 text-[10px] text-torg-gray" style={{ marginLeft: "13rem" }}>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-2 rounded bg-torg-blue inline-block" /> fase</span>
+        <span className="inline-flex items-center gap-1"><span className="w-2 h-2 bg-amber-400 border border-amber-600 rotate-45 inline-block" /> prioridade (marco)</span>
+        <span className="inline-flex items-center gap-1"><span className="w-px h-3 bg-red-400 inline-block" /> hoje</span>
       </div>
     </div>
   );
