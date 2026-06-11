@@ -1926,6 +1926,11 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
       alert("Justificativa obrigatória para alterar datas após validação do cronograma.");
       return;
     }
+    // Tarefa bloqueada por antecessoras pendentes: avisa antes de registrar progresso
+    if (bloqueada && (pct > t.percentualRealizado || inicioReal)) {
+      const nomes = antecessorasIncompletas.map((aid) => (allTarefas || []).find((x) => x.id === aid)?.nome || "?").join(", ");
+      if (!confirm(`⚠ Esta atividade está BLOQUEADA — aguardando: ${nomes}.\n\nRegistrar progresso/início mesmo assim?`)) return;
+    }
     setSaving(true);
     try {
       const body = {
@@ -2051,11 +2056,21 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
             </span>
           )}
           {t.isSummary && <span className="text-[9px] text-torg-gray bg-gray-100 px-1 rounded">grupo</span>}
-          {!editing && bloqueada && (
-            <span className="text-[9px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 font-semibold" title={`Aguardando: ${antecessorasIncompletas.map((aid) => { const ant = (allTarefas || []).find((x) => x.id === aid); return ant?.nome || "?"; }).join(", ")}`}>
-              <Lock size={8} /> Bloqueada
-            </span>
-          )}
+          {!editing && bloqueada && (() => {
+            const nomes = antecessorasIncompletas.map((aid) => {
+              const ant = (allTarefas || []).find((x) => x.id === aid);
+              return ant?.nome || "?";
+            });
+            const visiveis = nomes.slice(0, 2).join(", ");
+            const extra = nomes.length > 2 ? ` +${nomes.length - 2}` : "";
+            return (
+              <span className="text-[9px] text-white bg-amber-500 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 font-semibold max-w-[340px]"
+                title={`Não é possível executar esta atividade — aguardando: ${nomes.join(", ")}`}>
+                <Lock size={9} className="shrink-0" />
+                <span className="truncate">Não pode iniciar — aguardando: {visiveis}{extra}</span>
+              </span>
+            );
+          })()}
           {!editing && t.antecessoraIds?.length > 0 && (
             <span className={`text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 ${bloqueada ? "text-amber-600 bg-amber-50" : "text-purple-600 bg-purple-50"}`} title={`Depende de: ${t.antecessoraIds.map((aid) => { const ant = (allTarefas || []).find((x) => x.id === aid); return ant?.nome || aid.slice(0, 6); }).join(", ")}`}>
               <Link2 size={8} /> {t.antecessoraIds.length} antecessora{t.antecessoraIds.length > 1 ? "s" : ""}
@@ -2164,6 +2179,28 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
 
       {!readOnly && editing && (
         <div className="mt-2 space-y-2 bg-gray-50/50 rounded-lg p-2.5 border border-gray-100">
+          {/* Aviso de bloqueio: as antecessoras pendentes impedem a execução */}
+          {bloqueada && (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg px-2.5 py-2">
+              <p className="text-[10px] font-bold text-amber-800 flex items-center gap-1">
+                <Lock size={10} /> Esta atividade NÃO pode ser executada ainda — aguardando:
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {antecessorasIncompletas.map((aid) => {
+                  const ant = (allTarefas || []).find((x) => x.id === aid);
+                  if (!ant) return null;
+                  return (
+                    <li key={aid} className="text-[10px] text-amber-800 flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-amber-500 shrink-0" />
+                      <span className="font-medium">{DEPT_LABEL[ant.departamento] || ant.departamento || "—"}:</span>
+                      <span className="truncate">{ant.nome}</span>
+                      <span className="text-amber-600 tabular-nums shrink-0">({Math.round(ant.percentualRealizado)}%)</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <input
               value={obs}
@@ -3717,7 +3754,7 @@ function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, comp
             className={`flex items-center gap-1.5 text-[10px] px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-50 text-torg-gray ${compact ? "w-auto" : "w-full max-w-xs"}`}
           >
             <Link2 size={10} className="text-purple-400" />
-            {compact ? "Antecessoras" : "+ Adicionar antecessora..."}
+            {compact ? "Antecessoras" : (selecionadas.length > 0 ? "+ Adicionar outra antecessora..." : "+ Adicionar antecessora (pode mais de uma)...")}
             {selecionadas.length > 0 && !compact && (
               <span className="ml-auto text-[9px] text-purple-600 font-semibold">{selecionadas.length}</span>
             )}
