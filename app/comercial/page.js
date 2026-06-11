@@ -57,6 +57,8 @@ export default async function ComercialHome({ searchParams }) {
         itens: { select: { valorVerba: true } },
         aditivos: { include: { itens: { select: { valorVerba: true } } } },
         _count: { select: { rms: true } },
+        // Medição mais recente (nº do pedido de venda no Omie) — exibida na tabela
+        medicoes: { select: { numeroPedidoOmie: true }, orderBy: { createdAt: "desc" }, take: 1 },
       },
       take: 200,
       orderBy: { createdAt: "desc" },
@@ -154,7 +156,7 @@ export default async function ComercialHome({ searchParams }) {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Obra</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fim previsto</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">RMs</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Medição</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-3 py-3 w-10"></th>
                 </tr>
@@ -173,7 +175,9 @@ export default async function ComercialHome({ searchParams }) {
                       <td className="px-6 py-3 text-torg-gray max-w-[180px] truncate" title={op.obra || ""}>{op.obra || "—"}</td>
                       <td className="px-6 py-3 text-torg-gray whitespace-nowrap">{fmtData(op.dataInicio)}</td>
                       <td className="px-6 py-3 text-torg-gray whitespace-nowrap">{fmtData(op.dataFimPrevista)}</td>
-                      <td className="px-6 py-3 text-center text-torg-gray">{op._count.rms}</td>
+                      <td className="px-6 py-3 text-center text-torg-gray font-mono whitespace-nowrap">
+                        {op.medicoes?.[0]?.numeroPedidoOmie || "—"}
+                      </td>
                       <td className="px-6 py-3 whitespace-nowrap">
                         <span className={`inline-block text-xs text-center px-3 py-1 rounded-full font-medium ${s.className}`}>
                           {s.label}
