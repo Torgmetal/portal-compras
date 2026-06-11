@@ -232,6 +232,9 @@ export default function PmpClient() {
     try {
       const metas = [];
       for (const l of linhas) {
+        // Linhas automáticas (Fila de Corte) são derivadas — não regrava,
+        // senão o peso calculado seria zerado. Ajuste é na própria fila.
+        if (l.obs?.startsWith("[auto]")) continue;
         for (let d = 0; d < 5; d++) {
           metas.push({
             data: addDays(semana, d),
@@ -243,6 +246,7 @@ export default function PmpClient() {
           });
         }
       }
+      if (metas.length === 0) { setDirty(false); setSalvando(false); return; }
       const res = await fetch("/api/pcp/pmp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -275,6 +279,10 @@ export default function PmpClient() {
     }
     return { pecas, pesoKg };
   };
+
+  // ── Realizado de CORTE por dia (peças concluídas na fila de corte) ──
+  const getRealCorteDia = (opNumero, dataIso) =>
+    dados?.realizadoCorteDia?.[`${dataIso}|${opNumero}`]?.pecas || 0;
 
   // ── Dias da semana com datas ────────────────────────────────
   const diasComData = DIAS_SEMANA.map((label, i) => ({
@@ -440,7 +448,13 @@ export default function PmpClient() {
               <tbody className="divide-y divide-gray-50">
                 {linhas.map((l, idx) => {
                   const totalMeta = l.dias.reduce((s, v) => s + v, 0);
-                  const real = getRealizadoSetor(l.opNumero, l.setor);
+                  const ehCorte = l.setor === "CORTE";
+                  // CORTE: real da SEMANA = peças concluídas na fila de corte
+                  // (real × estimado da programação); demais setores: snapshot do pipeline
+                  const realCorteSemana = ehCorte
+                    ? diasComData.reduce((s, d) => s + getRealCorteDia(l.opNumero, d.data), 0)
+                    : 0;
+                  const real = ehCorte ? { pecas: realCorteSemana } : getRealizadoSetor(l.opNumero, l.setor);
                   const pct = totalMeta > 0 ? Math.round((real.pecas / totalMeta) * 100) : 0;
                   const pctColor = pct >= 100 ? "text-emerald-600 bg-emerald-50" : pct >= 60 ? "text-yellow-600 bg-yellow-50" : "text-red-600 bg-red-50";
 
@@ -451,8 +465,14 @@ export default function PmpClient() {
                         <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${SETOR_COLOR[l.setor]}`}>
                           {SETOR_LABEL[l.setor]}
                         </span>
+                        {ehCorte && l.obs?.startsWith("[auto]") && (
+                          <span className="block text-[9px] text-torg-gray mt-0.5" title="Metas geradas pela programação da Fila de Corte">auto · fila</span>
+                        )}
                       </td>
-                      {l.dias.map((v, d) => (
+                      {l.dias.map((v, d) => {
+                        const realDia = ehCorte ? getRealCorteDia(l.opNumero, diasComData[d].data) : null;
+                        const autoFila = ehCorte && l.obs?.startsWith("[auto]");
+                        return (
                         <td key={d} className="px-1 py-1.5 text-center">
                           <input
                             type="number"
@@ -460,10 +480,18 @@ export default function PmpClient() {
                             value={v || ""}
                             onChange={(e) => editarCelula(idx, d, e.target.value)}
                             placeholder="—"
-                            className="w-14 text-center px-1 py-1 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-torg-blue focus:border-torg-blue tabular-nums"
+                            disabled={autoFila}
+                            title={autoFila ? "Meta automática da Fila de Corte — ajuste programando as peças" : undefined}
+                            className="w-14 text-center px-1 py-1 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-torg-blue focus:border-torg-blue tabular-nums disabled:bg-gray-50 disabled:text-torg-dark disabled:font-semibold"
                           />
+                          {ehCorte && (realDia > 0 || v > 0) && (
+                            <div className={`text-[9px] mt-0.5 font-semibold tabular-nums ${realDia >= v && v > 0 ? "text-emerald-600" : realDia > 0 ? "text-amber-600" : "text-gray-400"}`}>
+                              real {realDia}
+                            </div>
+                          )}
                         </td>
-                      ))}
+                        );
+                      })}
                       <td className="px-3 py-2 text-center font-bold text-torg-dark bg-blue-50/30 tabular-nums">
                         {totalMeta}
                       </td>
@@ -476,9 +504,11 @@ export default function PmpClient() {
                         </span>
                       </td>
                       <td className="px-2 py-2">
-                        <button onClick={() => removerLinha(idx)} className="text-gray-300 hover:text-red-500">
-                          <Trash2 size={13} />
-                        </button>
+                        {!(ehCorte && l.obs?.startsWith("[auto]")) && (
+                          <button onClick={() => removerLinha(idx)} className="text-gray-300 hover:text-red-500">
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

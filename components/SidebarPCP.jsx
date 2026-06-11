@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Cpu, Wrench, Flame,
-  Wind, Paintbrush, Package, Target,
+  Wind, Paintbrush, Package, Target, ListOrdered,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -12,6 +12,7 @@ const menu = [
   { href: "/pcp",              label: "Dashboard",        icon: LayoutDashboard, exact: true },
   { href: "/pcp/pmp",          label: "PMP",              icon: Target },
   { href: "/producao/programacao/corte", label: "Peças / Corte", icon: Package },
+  { href: "/pcp/fila-corte",   label: "Fila de Corte",    icon: ListOrdered },
   { href: "/pcp/maquinas",     label: "Máquinas",         icon: Cpu },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
   { href: "/pcp/solda",        label: "Solda",            icon: Flame },

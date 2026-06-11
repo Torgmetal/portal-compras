@@ -54,7 +54,22 @@ export async function GET(req) {
     };
   }
 
-  // 3) OPs ativas (para dropdown)
+  // 3) Realizado de CORTE por dia — peças concluídas no kanban da fila de
+  // corte dentro da semana (real × estimado da programação)
+  const cortadas = await prisma.pecaConjunto.findMany({
+    where: { corteConcluidoEm: { gte: seg, lte: dom } },
+    select: { opNumero: true, qte: true, pesoTotalKg: true, corteConcluidoEm: true },
+  });
+  const realizadoCorteDia = {}; // "YYYY-MM-DD|op" → { pecas, pesoKg }
+  for (const p of cortadas) {
+    const dia = p.corteConcluidoEm.toISOString().split("T")[0];
+    const key = `${dia}|${p.opNumero}`;
+    if (!realizadoCorteDia[key]) realizadoCorteDia[key] = { pecas: 0, pesoKg: 0 };
+    realizadoCorteDia[key].pecas += p.qte || 1;
+    realizadoCorteDia[key].pesoKg += p.pesoTotalKg || 0;
+  }
+
+  // 4) OPs ativas (para dropdown)
   const ops = await prisma.oP.findMany({
     where: { status: { in: ["ABERTA", "EM_EXECUCAO"] } },
     select: { numero: true, cliente: true, obra: true },
@@ -65,6 +80,7 @@ export async function GET(req) {
     semana: { inicio: seg.toISOString().split("T")[0], fim: dom.toISOString().split("T")[0] },
     metas,
     realizado,
+    realizadoCorteDia,
     ops,
   });
 }

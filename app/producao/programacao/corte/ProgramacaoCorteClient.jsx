@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
@@ -762,6 +763,13 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
+          <Link
+            href="/pcp/fila-corte"
+            className="px-3 py-1.5 border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5"
+            title="Peças liberadas entram na fila de corte — programe metas e acompanhe o kanban"
+          >
+            <ClipboardList size={14} /> Fila de Corte →
+          </Link>
           <button
             onClick={() => setModalImport(true)}
             className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
