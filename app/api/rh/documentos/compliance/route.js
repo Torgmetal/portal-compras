@@ -67,6 +67,7 @@ export async function GET() {
         id: true,
         nome: true,
         matricula: true,
+        tipoContrato: true,
         setor: { select: { id: true, nome: true } },
         cargo: { select: { nome: true } },
         documentos: {
@@ -97,8 +98,12 @@ export async function GET() {
 
     for (const func of funcionarios) {
       const setorNome = func.setor?.nome || "";
-      const regras = regrasParaFuncionario(setorNome);
-      const producao = isSetorProducao(setorNome);
+      // Terceiros (PJ — qualquer contrato não-CLT) e Diretoria não têm
+      // exigência de documentos da CCT: ficam conformes por dispensa.
+      const ehDiretoria = setorNome.trim().toLowerCase() === "diretoria";
+      const dispensado = func.tipoContrato !== "CLT" || ehDiretoria;
+      const regras = dispensado ? [] : regrasParaFuncionario(setorNome);
+      const producao = !dispensado && isSetorProducao(setorNome);
       const itens = [];
 
       for (const regra of regras) {
@@ -130,6 +135,8 @@ export async function GET() {
           setor: setorNome,
           cargo: func.cargo?.nome || "",
           producao,
+          dispensado,
+          motivoDispensa: dispensado ? (ehDiretoria ? "Diretoria" : "Terceiro (PJ)") : null,
         },
         totalRegras,
         ok,

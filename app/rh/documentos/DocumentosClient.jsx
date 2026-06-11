@@ -1058,6 +1058,12 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                           <Factory size={9} /> Produção
                         </span>
                       )}
+                      {f.funcionario.dispensado && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-gray-100 text-torg-gray"
+                          title={`Sem exigência de documentos da CCT — ${f.funcionario.motivoDispensa}`}>
+                          <BadgeCheck size={9} /> CCT dispensada · {f.funcionario.motivoDispensa}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[10px] text-torg-gray">{f.funcionario.setor}{f.funcionario.cargo ? ` · ${f.funcionario.cargo}` : ""}</p>
                   </div>
@@ -1099,6 +1105,16 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                 </button>
                 {aberto && (
                   <div className="border-t border-gray-100">
+                    {/* Dispensados (PJ / Diretoria): sem checklist CCT */}
+                    {f.funcionario.dispensado && (
+                      <div className="px-5 py-3 pl-12 flex items-center gap-2 bg-emerald-50/40">
+                        <BadgeCheck size={14} className="text-emerald-600 shrink-0" />
+                        <p className="text-xs text-torg-gray">
+                          <strong className="text-torg-dark">{f.funcionario.motivoDispensa}</strong> — sem exigência de
+                          documentos da CCT. Considerado <strong className="text-emerald-700">conforme</strong>.
+                        </p>
+                      </div>
+                    )}
                     {/* Checklist CCT (o que é obrigatório e está faltando/vencido) */}
                     <div className="divide-y divide-gray-50">
                     {f.itens.map((item) => {
