@@ -38,7 +38,11 @@ export default function KickoffClient({ opId }) {
   const [vinculando, setVinculando] = useState(false);
   const [orcSelecionado, setOrcSelecionado] = useState("");
   const [modalEnviar, setModalEnviar] = useState(null); // null | "GERAL" | "FISCAL"
-  const fileRef = useRef(null);
+  const fileComercialRef = useRef(null);
+  const fileTecnicaRef = useRef(null);
+  const plpRef = useRef(null);
+  const itpRef = useRef(null);
+  const [anexoSubindo, setAnexoSubindo] = useState(""); // "" | "plp" | "itp"
 
   const set = (campo, valor) => setForm((p) => ({ ...p, [campo]: valor }));
 
@@ -71,6 +75,16 @@ export default function KickoffClient({ opId }) {
         pesoResumo: Array.isArray(k.pesoResumo) && k.pesoResumo.length ? k.pesoResumo : (j.sugestoes?.pesoResumo || []),
         propostaPdfUrl: k.propostaPdfUrl || null,
         propostaPdfNome: k.propostaPdfNome || null,
+        propostaTecnicaPdfUrl: k.propostaTecnicaPdfUrl || null,
+        propostaTecnicaPdfNome: k.propostaTecnicaPdfNome || null,
+        pinturaPlpUrl: k.pinturaPlpUrl || null,
+        pinturaPlpNome: k.pinturaPlpNome || null,
+        inspecaoArquivoUrl: k.inspecaoArquivoUrl || null,
+        inspecaoArquivoNome: k.inspecaoArquivoNome || null,
+        tipoFaturamento: k.tipoFaturamento || "",
+        faturamentoEventos: Array.isArray(k.faturamentoEventos) ? k.faturamentoEventos : [],
+        retencaoContratual: k.retencaoContratual || "",
+        segurosObrigatorios: k.segurosObrigatorios || "",
         kickoffComercialEm: toInputDate(k.kickoffComercialEm),
         kickoffSetoresEm: toInputDate(k.kickoffSetoresEm),
       });
@@ -87,6 +101,14 @@ export default function KickoffClient({ opId }) {
         cronograma: form.cronograma.filter((c) => c.fase?.trim()),
         prioridades: form.temPrioridades ? form.prioridades.filter((p) => p.descricao?.trim()).map((p, i) => ({ ...p, ordem: i + 1 })) : [],
         pesoResumo: form.pesoResumo.filter((p) => p.descricao?.trim()).map((p) => ({ descricao: p.descricao, qtd: p.qtd === "" || p.qtd == null ? null : Number(p.qtd), pesoKg: p.pesoKg === "" || p.pesoKg == null ? null : Number(p.pesoKg) })),
+        faturamentoEventos: (form.faturamentoEventos || []).filter((ev) => ev.descricao?.trim()).map((ev) => ({
+          descricao: ev.descricao,
+          percentual: ev.percentual === "" || ev.percentual == null ? null : Number(ev.percentual),
+          valor: ev.valor === "" || ev.valor == null ? null : Number(ev.valor),
+          prazoPagamento: ev.prazoPagamento || null,
+          medicao: ev.medicao || null,
+          obsNF: ev.obsNF || null,
+        })),
       };
       delete body.temPrioridades;
       const res = await fetch(`/api/comercial/op/${opId}/kickoff`, {
@@ -103,6 +125,7 @@ export default function KickoffClient({ opId }) {
   };
 
   // ── Cronograma: gerar prévia distribuindo as fases até a entrega ─────────
+  // Prioridades com data definida entram como marcos (★) no cronograma.
   const gerarCronograma = () => {
     if (!form.dataEntregaAcordada) { alert("Defina a data de entrega acordada primeiro."); return; }
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
@@ -113,6 +136,12 @@ export default function KickoffClient({ opId }) {
       const d = new Date(hoje.getTime() + totalMs * pct);
       return { fase, data: d.toISOString().slice(0, 10), obs: "" };
     });
+    if (form.temPrioridades) {
+      for (const p of form.prioridades.filter((x) => x.descricao?.trim() && x.data)) {
+        linhas.push({ fase: `★ Prioridade: ${p.descricao}`, data: p.data, obs: "" });
+      }
+    }
+    linhas.sort((a, b) => (a.data || "").localeCompare(b.data || ""));
     if (form.cronograma.length && !confirm("Substituir o cronograma atual pela prévia gerada?")) return;
     set("cronograma", linhas);
   };
@@ -125,11 +154,19 @@ export default function KickoffClient({ opId }) {
   const addPrio = () => set("prioridades", [...form.prioridades, { ordem: form.prioridades.length + 1, descricao: "", data: "" }]);
   const rmPrio = (i) => set("prioridades", form.prioridades.filter((_, idx) => idx !== i));
 
+  // ── Eventos de faturamento (aba fiscal) ──────────────────────────────────
+  const setEvento = (i, campo, v) => set("faturamentoEventos", (form.faturamentoEventos || []).map((ev, idx) => (idx === i ? { ...ev, [campo]: v } : ev)));
+  const addEvento = () => set("faturamentoEventos", [...(form.faturamentoEventos || []), { descricao: "", percentual: "", valor: "", prazoPagamento: "", medicao: "", obsNF: "" }]);
+  const rmEvento = (i) => set("faturamentoEventos", (form.faturamentoEventos || []).filter((_, idx) => idx !== i));
+
   // ── Resumo de pesos ──────────────────────────────────────────────────────
   const setPeso = (i, campo, v) => set("pesoResumo", form.pesoResumo.map((p, idx) => (idx === i ? { ...p, [campo]: v } : p)));
   const addPeso = () => set("pesoResumo", [...form.pesoResumo, { descricao: "", qtd: "", pesoKg: "" }]);
   const rmPeso = (i) => set("pesoResumo", form.pesoResumo.filter((_, idx) => idx !== i));
-  const pesoTotal = (form?.pesoResumo || []).reduce((s, p) => s + (Number(p.pesoKg) || 0), 0);
+  // Ignora linhas "TOTAL/SUBTOTAL" no somatório (evita duplicar o peso orçado)
+  const pesoTotal = (form?.pesoResumo || [])
+    .filter((p) => !/^(sub)?\s*total/i.test(String(p.descricao || "").trim()))
+    .reduce((s, p) => s + (Number(p.pesoKg) || 0), 0);
 
   // ── Vincular orçamento (habilita pintura + pesos do estudo) ──────────────
   const vincularOrcamento = async () => {
@@ -148,8 +185,23 @@ export default function KickoffClient({ opId }) {
     finally { setVinculando(false); }
   };
 
-  // ── PDF + IA ─────────────────────────────────────────────────────────────
-  const onPdf = async (file) => {
+  // ── Upload simples de anexo (PLP / documento de inspeção) ────────────────
+  const onAnexo = async (file, campoUrl, campoNome, slot) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { alert("Arquivo acima de 10MB — reduza."); return; }
+    setAnexoSubindo(slot);
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const up = await fetch("/api/upload-blob", { method: "POST", body: fd });
+      const upJ = await up.json();
+      if (!up.ok) throw new Error(upJ.error || "Falha no upload");
+      setForm((p) => ({ ...p, [campoUrl]: upJ.url, [campoNome]: upJ.nomeArquivo }));
+    } catch (e) { alert("Falha no upload: " + e.message); }
+    finally { setAnexoSubindo(""); }
+  };
+
+  // ── PDF da proposta (comercial ou técnica) + IA ──────────────────────────
+  const onPdf = async (file, slot = "comercial") => {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) { alert("PDF acima de 10MB — reduza o arquivo."); return; }
     setAvisoIA(""); setPdfSubindo(true);
@@ -158,7 +210,9 @@ export default function KickoffClient({ opId }) {
       const up = await fetch("/api/upload-blob", { method: "POST", body: fd });
       const upJ = await up.json();
       if (!up.ok) throw new Error(upJ.error || "Falha no upload");
-      setForm((p) => ({ ...p, propostaPdfUrl: upJ.url, propostaPdfNome: upJ.nomeArquivo }));
+      setForm((p) => slot === "tecnica"
+        ? ({ ...p, propostaTecnicaPdfUrl: upJ.url, propostaTecnicaPdfNome: upJ.nomeArquivo })
+        : ({ ...p, propostaPdfUrl: upJ.url, propostaPdfNome: upJ.nomeArquivo }));
       setPdfSubindo(false);
 
       setExtraindo(true);
@@ -196,17 +250,17 @@ export default function KickoffClient({ opId }) {
       fill("entregaEndereco", d.entregaEndereco);
       fill("pedidoCompraCliente", d.pedidoCompraCliente);
       fill("fiscalObservacao", d.faturamentoObs);
+      fill("tipoFaturamento", d.tipoFaturamento);
+      fill("retencaoContratual", d.retencaoContratual);
+      fill("segurosObrigatorios", d.segurosObrigatorios);
       if (d.escopoIncluso?.length && !String(p.escopoIncluso || "").trim()) { n.escopoIncluso = d.escopoIncluso.join("\n"); preenchidos.push("escopo incluído"); }
       if (d.escopoExcluso?.length && !String(p.escopoExcluso || "").trim()) { n.escopoExcluso = d.escopoExcluso.join("\n"); preenchidos.push("escopo excluído"); }
       if (d.resumoPesos?.length && !(p.pesoResumo || []).some((x) => x.descricao?.trim())) { n.pesoResumo = d.resumoPesos; preenchidos.push("resumo de pesos"); }
+      if (d.faturamentoEventos?.length && !(p.faturamentoEventos || []).some((x) => x.descricao?.trim())) { n.faturamentoEventos = d.faturamentoEventos; preenchidos.push("eventos de faturamento"); }
       if (d.dataEntregaAcordada && !p.dataEntregaAcordada) { n.dataEntregaAcordada = d.dataEntregaAcordada; preenchidos.push("data de entrega"); }
       if (d.frete && !p.frete) { n.frete = d.frete; preenchidos.push("frete"); }
       if (d.notaRetorno === true && !p.notaRetorno) { n.notaRetorno = true; preenchidos.push("notaRetorno"); }
-      if (d.pontosAtencao?.length) {
-        const atuais = new Set(String(p.pontosAtencao || "").split("\n").map((s) => s.trim()).filter(Boolean));
-        const novos = d.pontosAtencao.filter((pt) => !atuais.has(pt));
-        if (novos.length) { n.pontosAtencao = [...atuais, ...novos].join("\n"); preenchidos.push(`${novos.length} ponto(s) de atenção`); }
-      }
+      // Pontos de atenção: nota livre do comercial — a IA não preenche.
       return n;
     });
     setAvisoIA(preenchidos.length
@@ -303,30 +357,41 @@ export default function KickoffClient({ opId }) {
           </div>
         )}
 
-        {/* Proposta PDF + IA */}
+        {/* Propostas PDF (comercial + técnica) + IA */}
         <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 print:hidden">
-          <p className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-2">
-            <Sparkles size={15} className="text-torg-orange" /> Proposta comercial (PDF) + extração automática
+          <p className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-3">
+            <Sparkles size={15} className="text-torg-orange" /> Propostas (PDF) + extração automática
           </p>
-          <div className="flex items-center gap-3 flex-wrap">
-            {form.propostaPdfUrl ? (
-              <a href={form.propostaPdfUrl} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-torg-blue hover:underline">
-                <FileText size={15} /> {form.propostaPdfNome || "proposta.pdf"}
-              </a>
-            ) : (
-              <span className="text-sm text-torg-gray">Nenhuma proposta anexada ainda.</span>
-            )}
-            <button onClick={() => fileRef.current?.click()} disabled={pdfSubindo || extraindo}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-torg-blue-100 text-torg-blue rounded-lg hover:bg-torg-blue-50 disabled:opacity-50">
-              {pdfSubindo ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-              {form.propostaPdfUrl ? "Trocar PDF" : "Subir PDF da proposta"}
-            </button>
-            {extraindo && <span className="inline-flex items-center gap-1.5 text-sm text-torg-orange"><Loader2 size={14} className="animate-spin" /> Lendo a proposta com IA…</span>}
-            <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onPdf(f); e.target.value = ""; }} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { slot: "comercial", titulo: "Proposta comercial", url: form.propostaPdfUrl, nome: form.propostaPdfNome, ref: fileComercialRef },
+              { slot: "tecnica", titulo: "Proposta técnica", url: form.propostaTecnicaPdfUrl, nome: form.propostaTecnicaPdfNome, ref: fileTecnicaRef },
+            ].map((s) => (
+              <div key={s.slot} className="border border-gray-100 rounded-lg p-3">
+                <p className="text-xs font-semibold text-torg-gray uppercase tracking-wide mb-1.5">{s.titulo}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {s.url ? (
+                    <a href={s.url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm text-torg-blue hover:underline min-w-0">
+                      <FileText size={14} className="shrink-0" /> <span className="truncate max-w-[180px]">{s.nome || "proposta.pdf"}</span>
+                    </a>
+                  ) : (
+                    <span className="text-xs text-torg-gray">Não anexada.</span>
+                  )}
+                  <button onClick={() => s.ref.current?.click()} disabled={pdfSubindo || extraindo}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-torg-blue-100 text-torg-blue rounded-lg hover:bg-torg-blue-50 disabled:opacity-50">
+                    {pdfSubindo ? <Loader2 size={13} className="animate-spin" /> : <UploadCloud size={13} />}
+                    {s.url ? "Trocar" : "Subir PDF"}
+                  </button>
+                  <input ref={s.ref} type="file" accept=".pdf,application/pdf" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) onPdf(f, s.slot); e.target.value = ""; }} />
+                </div>
+              </div>
+            ))}
           </div>
+          {extraindo && <p className="inline-flex items-center gap-1.5 text-sm text-torg-orange mt-2"><Loader2 size={14} className="animate-spin" /> Lendo a proposta com IA…</p>}
           {avisoIA && <p className="text-xs text-torg-gray mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{avisoIA}</p>}
+          <p className="text-[11px] text-torg-gray mt-2">Cada PDF subido passa pela IA e preenche só os campos ainda vazios — sempre revise.</p>
         </div>
 
         {/* Dados do cliente */}
@@ -339,9 +404,10 @@ export default function KickoffClient({ opId }) {
           </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-torg-gray mb-1">Nº do pedido de compra do cliente</label>
+              <label className="block text-xs font-medium text-torg-gray mb-1">Nº do pedido de compra / contrato do cliente</label>
               <input type="text" value={form.pedidoCompraCliente} onChange={(e) => set("pedidoCompraCliente", e.target.value)}
                 placeholder="Ex.: PC-2026-00123" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none" />
+              <p className="text-[10px] text-torg-gray mt-0.5">Nem sempre existe no ato do kick off — pode preencher depois e reenviar a divulgação.</p>
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-gray mb-1">Data de entrega acordada com o cliente</label>
@@ -464,6 +530,9 @@ export default function KickoffClient({ opId }) {
             </table>
           )}
           <button onClick={addCron} className="inline-flex items-center gap-1 text-xs text-torg-blue hover:underline mt-2 print:hidden"><Plus size={13} /> Adicionar fase</button>
+
+          {/* Gantt — visão das fases na linha do tempo */}
+          <Gantt cronograma={form.cronograma} entrega={form.dataEntregaAcordada} />
         </Secao>
 
         {/* Prioridades (opcional) */}
@@ -515,18 +584,24 @@ export default function KickoffClient({ opId }) {
           <textarea value={form.padraoPintura} onChange={(e) => set("padraoPintura", e.target.value)} rows={4}
             placeholder="Esquema (primer/acabamento), produtos, demãos, espessuras (µm), cor, norma…"
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none font-mono" />
+          <AnexoRow label="PLP (Plano de Pintura)" url={form.pinturaPlpUrl} nome={form.pinturaPlpNome}
+            subindo={anexoSubindo === "plp"} inputRef={plpRef}
+            onPick={(f) => onAnexo(f, "pinturaPlpUrl", "pinturaPlpNome", "plp")} />
         </Secao>
 
         {/* Inspeção */}
-        <Secao icone={SearchCheck} titulo="Inspeção">
+        <Secao icone={SearchCheck} titulo="Inspeção" subtitulo="Resumo curto + documento completo anexado (ITP/plano de inspeção).">
           <textarea value={form.inspecao} onChange={(e) => set("inspecao", e.target.value)} rows={3}
-            placeholder="Requisitos de inspeção/ensaios, ITP, inspetor do cliente, liberações…"
+            placeholder="Resumo dos requisitos (ensaios, inspetor do cliente, liberações)…"
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none" />
+          <AnexoRow label="Documento de inspeção (ITP)" url={form.inspecaoArquivoUrl} nome={form.inspecaoArquivoNome}
+            subindo={anexoSubindo === "itp"} inputRef={itpRef}
+            onPick={(f) => onAnexo(f, "inspecaoArquivoUrl", "inspecaoArquivoNome", "itp")} />
         </Secao>
 
-        {/* Pontos de atenção */}
-        <Secao icone={AlertTriangle} titulo="Pontos de atenção" subtitulo="Um por linha — é o que os setores PRECISAM saber.">
-          <textarea value={form.pontosAtencao} onChange={(e) => set("pontosAtencao", e.target.value)} rows={5}
+        {/* Pontos de atenção — nota livre do comercial (a IA não preenche) */}
+        <Secao icone={AlertTriangle} titulo="Pontos de atenção" subtitulo="Nota livre do comercial — um ponto por linha (a extração da proposta não mexe aqui).">
+          <textarea value={form.pontosAtencao} onChange={(e) => set("pontosAtencao", e.target.value)} rows={4}
             placeholder={"Multa por atraso de 0,5%/dia\nCliente fornece os chumbadores\nMontagem só aos fins de semana…"}
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none" />
           {pontosList.length > 0 && (
@@ -610,11 +685,85 @@ export default function KickoffClient({ opId }) {
                 className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 outline-none" />
             )}
           </div>
-          <label className="block text-xs font-medium text-torg-gray mb-1">Como será o faturamento (medições, eventos, impostos, condição de pagamento…)</label>
-          <textarea value={form.fiscalObservacao} onChange={(e) => set("fiscalObservacao", e.target.value)} rows={4}
+        </Secao>
+
+        <Secao icone={Receipt} titulo="Como será o faturamento" subtitulo="Em linhas, não em texto — eventos com %, valor, prazo de pagamento, medição e observação da NF.">
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-torg-gray mb-1">Tipo de faturamento (definido na proposta)</label>
+            <input type="text" value={form.tipoFaturamento} onChange={(e) => set("tipoFaturamento", e.target.value)}
+              placeholder="Ex.: por medições mensais · por eventos · 30/60/90…"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 outline-none" />
+          </div>
+
+          <p className="text-xs font-medium text-torg-gray mb-1.5">Eventos de faturamento</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[760px]">
+              <thead>
+                <tr className="text-left text-xs text-torg-gray border-b border-gray-100">
+                  <th className="pb-1.5">Evento</th>
+                  <th className="pb-1.5 w-16 text-right">%</th>
+                  <th className="pb-1.5 w-32 text-right">Valor (R$)</th>
+                  <th className="pb-1.5 w-36">Prazo pgto.</th>
+                  <th className="pb-1.5 w-28">Medição (Omie)</th>
+                  <th className="pb-1.5">Obs. na NF</th>
+                  <th className="pb-1.5 w-8 print:hidden"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {(form.faturamentoEventos || []).map((ev, i) => (
+                  <tr key={i}>
+                    <td className="py-1 pr-2"><input type="text" value={ev.descricao || ""} onChange={(e) => setEvento(i, "descricao", e.target.value)} placeholder="Entrada, Medição 1…" className="w-full px-2 py-1 text-sm border border-gray-200 rounded font-medium print:border-0" /></td>
+                    <td className="py-1 pr-2"><input type="number" value={ev.percentual ?? ""} onChange={(e) => setEvento(i, "percentual", e.target.value)} className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-right print:border-0" /></td>
+                    <td className="py-1 pr-2"><input type="number" value={ev.valor ?? ""} onChange={(e) => setEvento(i, "valor", e.target.value)} className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-right print:border-0" /></td>
+                    <td className="py-1 pr-2"><input type="text" value={ev.prazoPagamento || ""} onChange={(e) => setEvento(i, "prazoPagamento", e.target.value)} placeholder="28 dias após NF" className="w-full px-2 py-1 text-sm border border-gray-200 rounded print:border-0" /></td>
+                    <td className="py-1 pr-2"><input type="text" value={ev.medicao || ""} onChange={(e) => setEvento(i, "medicao", e.target.value)} placeholder="233/1" className="w-full px-2 py-1 text-sm border border-gray-200 rounded text-center print:border-0" /></td>
+                    <td className="py-1 pr-2"><input type="text" value={ev.obsNF || ""} onChange={(e) => setEvento(i, "obsNF", e.target.value)} className="w-full px-2 py-1 text-sm border border-gray-200 rounded print:border-0" /></td>
+                    <td className="py-1 print:hidden"><button onClick={() => rmEvento(i)} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button onClick={addEvento} className="inline-flex items-center gap-1 text-xs text-torg-blue hover:underline mt-1.5 print:hidden"><Plus size={13} /> Adicionar evento</button>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1">Retenção contratual</label>
+              <input type="text" value={form.retencaoContratual} onChange={(e) => set("retencaoContratual", e.target.value)}
+                placeholder="Ex.: 5% — liberação após entrega/CND (vazio = sem retenção)"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1">Seguros obrigatórios</label>
+              <input type="text" value={form.segurosObrigatorios} onChange={(e) => set("segurosObrigatorios", e.target.value)}
+                placeholder="Ex.: seguro garantia 10%, RC, riscos de engenharia…"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 outline-none" />
+            </div>
+          </div>
+
+          <label className="block text-xs font-medium text-torg-gray mb-1 mt-3">Observações complementares</label>
+          <textarea value={form.fiscalObservacao} onChange={(e) => set("fiscalObservacao", e.target.value)} rows={2}
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none" />
         </Secao>
       </div>
+
+      {/* Aceites dos setores */}
+      {data.kickoff?.aceites?.length > 0 && (
+        <Secao icone={CheckCircle2} titulo="Registro de aceites" subtitulo="Quem confirmou estar de acordo com as informações divulgadas.">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {data.kickoff.aceites.map((a) => (
+              <div key={a.id} className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border ${
+                a.aceitoEm ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-gray-50 border-gray-200 text-torg-gray"
+              }`}>
+                {a.aceitoEm ? <CheckCircle2 size={14} className="text-emerald-600 shrink-0" /> : <Loader2 size={14} className="shrink-0 text-gray-400" />}
+                <span className="flex-1 truncate" title={a.email}>{a.email}</span>
+                <span className="text-[10px] shrink-0 uppercase">{a.tipo === "FISCAL" ? "fiscal" : "geral"}</span>
+                <span className="text-[11px] shrink-0">{a.aceitoEm ? new Date(a.aceitoEm).toLocaleDateString("pt-BR") : "pendente"}</span>
+              </div>
+            ))}
+          </div>
+        </Secao>
+      )}
 
       {/* Rodapé salvar */}
       <div className="flex items-center justify-end gap-2 print:hidden">
@@ -747,6 +896,74 @@ function ModalEnviarSetores({ opId, tipo, enviadoPara, onSalvarAntes, onClose })
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/* Gantt simples: barras na linha do tempo entre a primeira fase e a entrega. */
+function Gantt({ cronograma, entrega }) {
+  const fases = (cronograma || []).filter((c) => c.fase?.trim() && c.data).sort((a, b) => a.data.localeCompare(b.data));
+  if (fases.length < 2) return null;
+  const inicio = new Date().toISOString().slice(0, 10) < fases[0].data ? new Date().toISOString().slice(0, 10) : fases[0].data;
+  const fim = entrega && entrega > fases[fases.length - 1].data ? entrega : fases[fases.length - 1].data;
+  const t0 = new Date(inicio + "T00:00:00").getTime();
+  const t1 = new Date(fim + "T23:59:59").getTime();
+  const span = Math.max(t1 - t0, 1);
+  const pct = (d) => Math.min(100, Math.max(0, ((new Date(d + "T12:00:00").getTime() - t0) / span) * 100));
+  const fmtCurta = (s) => { const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}` : s; };
+
+  return (
+    <div className="mt-4 border-t border-gray-100 pt-3 print:break-inside-avoid">
+      <p className="text-xs font-semibold text-torg-gray uppercase tracking-wide mb-2">Gantt — linha do tempo</p>
+      <div className="space-y-1">
+        {fases.map((f, i) => {
+          const inicioBarra = i === 0 ? 0 : pct(fases[i - 1].data);
+          const fimBarra = pct(f.data);
+          const prio = f.fase.startsWith("★");
+          return (
+            <div key={i} className="flex items-center gap-2 text-[11px]">
+              <span className="w-56 truncate text-torg-dark shrink-0 text-right pr-1" title={f.fase}>{f.fase}</span>
+              <div className="flex-1 h-5 bg-gray-50 rounded relative overflow-hidden">
+                <div
+                  className={`absolute top-0.5 bottom-0.5 rounded ${prio ? "bg-amber-400" : "bg-torg-blue/70"}`}
+                  style={{ left: `${Math.min(inicioBarra, fimBarra)}%`, width: `${Math.max(Math.abs(fimBarra - inicioBarra), 1.5)}%` }}
+                />
+                <span className="absolute top-0 bottom-0 flex items-center text-[10px] text-torg-gray font-medium tabular-nums"
+                  style={{ left: `${Math.min(fimBarra + 1, 88)}%` }}>
+                  {fmtCurta(f.data)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-[10px] text-torg-gray mt-1 pl-58" style={{ paddingLeft: "14.5rem" }}>
+        <span>{fmtCurta(inicio)}</span>
+        <span>{fmtCurta(fim)}{entrega ? " (entrega)" : ""}</span>
+      </div>
+    </div>
+  );
+}
+
+/* Linha de anexo (PLP / ITP): link + botão subir/trocar. */
+function AnexoRow({ label, url, nome, subindo, inputRef, onPick }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap mt-2 pt-2 border-t border-gray-50">
+      <span className="text-xs font-medium text-torg-gray">{label}:</span>
+      {url ? (
+        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-torg-blue hover:underline min-w-0">
+          <FileText size={14} className="shrink-0" /> <span className="truncate max-w-[220px]">{nome || "arquivo"}</span>
+        </a>
+      ) : (
+        <span className="text-xs text-torg-gray">não anexado</span>
+      )}
+      <button onClick={() => inputRef.current?.click()} disabled={subindo}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs border border-torg-blue-100 text-torg-blue rounded-lg hover:bg-torg-blue-50 disabled:opacity-50 print:hidden">
+        {subindo ? <Loader2 size={12} className="animate-spin" /> : <UploadCloud size={12} />}
+        {url ? "Trocar" : "Subir arquivo"}
+      </button>
+      <input ref={inputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,application/pdf" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = ""; }} />
     </div>
   );
 }

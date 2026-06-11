@@ -21,25 +21,28 @@ const SYSTEM_PROMPT = `Você é um analista comercial da Torg Metal (estruturas 
 
 EXTRAIA (quando presente no documento — não invente; na dúvida, use null):
 
-- escopo: resumo CURTO do fornecimento (2-4 frases, em português) — o que é a obra e o que a Torg vai entregar. NÃO liste inclusões/exclusões aqui.
+- escopo: resumo MUITO CURTO do fornecimento (2-3 frases, máx. 400 caracteres) — só o que é a obra e o que a Torg entrega. PROIBIDO listar inclusões/exclusões aqui (elas têm campos próprios) e PROIBIDO usar bullets/tópicos.
 - escopoIncluso: array de strings — itens que ESTÃO incluídos no fornecimento (fabricação, montagem, pintura, transporte, projetos, ART...). Frases curtas, um item por string.
 - escopoExcluso: array de strings — itens EXPRESSAMENTE excluídos / por conta do cliente (fundações, energia, andaimes, chumbadores...). Frases curtas.
-- resumoPesos: array de {descricao, qtd, pesoKg} — quando a proposta tiver tabela/lista de itens com pesos (estrutura, telhas, acessórios), traga o resumo por grupo. Números em kg. SEM valores em R$. [] se não houver.
-- dataEntregaAcordada: prazo de entrega acordado, como data "YYYY-MM-DD" se houver data explícita, senão null (se a proposta só diz "60 dias", deixe null e cite o prazo em pontosAtencao).
+- resumoPesos: array de {descricao, qtd, pesoKg} — quando a proposta tiver tabela/lista de itens com pesos (estrutura, telhas, acessórios), traga o resumo por grupo. NUNCA inclua linha de "TOTAL" (o total é calculado). Números em kg. SEM valores em R$. [] se não houver.
+- dataEntregaAcordada: prazo de entrega acordado, como data "YYYY-MM-DD" se houver data explícita, senão null.
+- tipoFaturamento: como a proposta define o faturamento (ex.: "por medições mensais", "por eventos", "30/60/90"...). null se não disser.
+- faturamentoEventos: array de {descricao, percentual, valor, prazoPagamento, medicao, obsNF} — os eventos/parcelas de faturamento da proposta (ex.: {descricao: "Entrada", percentual: 10, valor: 150000, prazoPagamento: "28 dias após NF", medicao: null, obsNF: null}). Valores em número (sem R$ no texto). [] se não houver.
+- retencaoContratual: retenção contratual se houver (ex.: "5% — liberação após entrega/CND"). null se não houver menção.
+- segurosObrigatorios: seguros exigidos (garantia, RC, riscos de engenharia...). null se não houver menção.
 - padraoPintura: o esquema de pintura definido (primer/intermediário/acabamento, produtos, demãos, espessuras em µm, cor, norma). null se a proposta não definir.
 - inspecao: requisitos de inspeção, ensaios, normas de qualidade, ITPs, visitas de inspetor do cliente, liberação de romaneio etc.
 - entregaEndereco: endereço ou local de ENTREGA da obra (cidade/UF no mínimo). Atenção: NÃO é o endereço fiscal do cliente.
 - frete: "TORG" se o frete é por conta da Torg (CIF/incluso), "CLIENTE" se por conta do cliente (FOB/retirada), null se não especificado.
 - pedidoCompraCliente: número do pedido de compra/ordem de compra do CLIENTE, se citado.
 - notaRetorno: true se houver menção a nota de retorno / remessa para industrialização / material do cliente que retorna; false se claramente não há; null se não dá para saber.
-- faturamentoObs: condições de faturamento relevantes (medições, eventos de faturamento com percentuais, faturamento direto de materiais, impostos destacados, retenções, condição de pagamento).
-- pontosAtencao: array de strings — riscos e condições que os setores PRECISAM saber: exclusões importantes, multas, prazos críticos, retenções contratuais, garantias, condições de aceite, fornecimento pelo cliente, limitações de acesso à obra, janelas de montagem, exigências de documentação (ART, DDS, NRs), etc. Um item por string, frases curtas.
+- faturamentoObs: observações complementares de faturamento que não couberam nos eventos (impostos destacados, condições especiais). Curto.
 
 REGRAS
 - Não invente nada: só o que está escrito no documento.
 - Valores e percentuais: transcreva como estão.
 - Responda APENAS com um JSON válido envolvido em <json></json>, no formato:
-<json>{"escopo": "...", "escopoIncluso": ["..."], "escopoExcluso": ["..."], "resumoPesos": [{"descricao": "...", "qtd": 0, "pesoKg": 0}], "dataEntregaAcordada": null, "padraoPintura": null, "inspecao": null, "entregaEndereco": null, "frete": null, "pedidoCompraCliente": null, "notaRetorno": null, "faturamentoObs": null, "pontosAtencao": ["..."]}</json>`;
+<json>{"escopo": "...", "escopoIncluso": ["..."], "escopoExcluso": ["..."], "resumoPesos": [{"descricao": "...", "qtd": 0, "pesoKg": 0}], "dataEntregaAcordada": null, "tipoFaturamento": null, "faturamentoEventos": [{"descricao": "Entrada", "percentual": 10, "valor": null, "prazoPagamento": null, "medicao": null, "obsNF": null}], "retencaoContratual": null, "segurosObrigatorios": null, "padraoPintura": null, "inspecao": null, "entregaEndereco": null, "frete": null, "pedidoCompraCliente": null, "notaRetorno": null, "faturamentoObs": null}</json>`;
 
 function extractJsonFromResponse(text) {
   const tagged = text.match(/<json>([\s\S]*?)<\/json>/i);
@@ -108,16 +111,33 @@ export async function POST(req, { params }) {
       ? v.filter((s) => typeof s === "string" && s.trim()).map((s) => s.trim().slice(0, maxLen)).slice(0, maxItens)
       : [];
     const out = {
-      escopo:              str(dados.escopo, 20000),
+      escopo:              str(dados.escopo, 600),
       escopoIncluso:       strArr(dados.escopoIncluso, 40, 300),
       escopoExcluso:       strArr(dados.escopoExcluso, 40, 300),
+      // Linhas "TOTAL/SUBTOTAL" ficam fora — o total é calculado na tela
       resumoPesos:         Array.isArray(dados.resumoPesos)
         ? dados.resumoPesos
-            .filter((p) => p && typeof p.descricao === "string" && p.descricao.trim())
+            .filter((p) => p && typeof p.descricao === "string" && p.descricao.trim() && !/^(sub)?\s*total/i.test(p.descricao.trim()))
             .map((p) => ({ descricao: p.descricao.trim().slice(0, 200), qtd: Number(p.qtd) || null, pesoKg: Number(p.pesoKg) || null }))
             .slice(0, 60)
         : [],
       dataEntregaAcordada: /^\d{4}-\d{2}-\d{2}$/.test(String(dados.dataEntregaAcordada || "")) ? dados.dataEntregaAcordada : null,
+      tipoFaturamento:     str(dados.tipoFaturamento, 500),
+      faturamentoEventos:  Array.isArray(dados.faturamentoEventos)
+        ? dados.faturamentoEventos
+            .filter((e2) => e2 && typeof e2.descricao === "string" && e2.descricao.trim())
+            .map((e2) => ({
+              descricao: e2.descricao.trim().slice(0, 200),
+              percentual: Number(e2.percentual) || null,
+              valor: Number(e2.valor) || null,
+              prazoPagamento: typeof e2.prazoPagamento === "string" ? e2.prazoPagamento.trim().slice(0, 120) || null : null,
+              medicao: typeof e2.medicao === "string" ? e2.medicao.trim().slice(0, 80) || null : null,
+              obsNF: typeof e2.obsNF === "string" ? e2.obsNF.trim().slice(0, 500) || null : null,
+            }))
+            .slice(0, 40)
+        : [],
+      retencaoContratual:  str(dados.retencaoContratual, 500),
+      segurosObrigatorios: str(dados.segurosObrigatorios, 1000),
       padraoPintura:       str(dados.padraoPintura, 5000),
       inspecao:            str(dados.inspecao, 5000),
       entregaEndereco:     str(dados.entregaEndereco, 2000),
@@ -125,9 +145,6 @@ export async function POST(req, { params }) {
       pedidoCompraCliente: str(dados.pedidoCompraCliente, 200),
       notaRetorno:         typeof dados.notaRetorno === "boolean" ? dados.notaRetorno : null,
       faturamentoObs:      str(dados.faturamentoObs, 5000),
-      pontosAtencao:       Array.isArray(dados.pontosAtencao)
-        ? dados.pontosAtencao.filter((p) => typeof p === "string" && p.trim()).map((p) => p.trim().slice(0, 500)).slice(0, 40)
-        : [],
     };
 
     await prisma.auditLog.create({

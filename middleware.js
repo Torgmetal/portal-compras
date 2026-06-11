@@ -46,7 +46,10 @@ export default withAuth(
           path.startsWith("/api/producao/pecas/sync-lpc-sharepoint") ||
           // Resposta de cobranca de cronograma — publico via token
           path.startsWith("/planejamento/cronogramas/resposta/") ||
-          path.startsWith("/api/planejamento/cronogramas/cobranca/")
+          path.startsWith("/api/planejamento/cronogramas/cobranca/") ||
+          // Aceite do Kick Off pelos setores — publico via token unico
+          path.startsWith("/kickoff/aceite/") ||
+          path.startsWith("/api/kickoff/aceite/")
         ) {
           return true;
         }

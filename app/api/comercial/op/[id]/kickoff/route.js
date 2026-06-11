@@ -30,6 +30,23 @@ const putSchema = z.object({
   pesoResumo:          z.array(z.object({ descricao: z.string().max(200), qtd: z.number().nullable().optional(), pesoKg: z.number().nullable().optional() })).max(60).optional().nullable(),
   propostaPdfUrl:      z.string().url().optional().nullable(),
   propostaPdfNome:     z.string().max(300).optional().nullable(),
+  propostaTecnicaPdfUrl:  z.string().url().optional().nullable(),
+  propostaTecnicaPdfNome: z.string().max(300).optional().nullable(),
+  pinturaPlpUrl:       z.string().url().optional().nullable(),
+  pinturaPlpNome:      z.string().max(300).optional().nullable(),
+  inspecaoArquivoUrl:  z.string().url().optional().nullable(),
+  inspecaoArquivoNome: z.string().max(300).optional().nullable(),
+  tipoFaturamento:     z.string().max(500).optional().nullable(),
+  faturamentoEventos:  z.array(z.object({
+    descricao:      z.string().max(200),
+    percentual:     z.number().min(0).max(100).nullable().optional(),
+    valor:          z.number().min(0).nullable().optional(),
+    prazoPagamento: z.string().max(120).nullable().optional(),
+    medicao:        z.string().max(80).nullable().optional(),
+    obsNF:          z.string().max(500).nullable().optional(),
+  })).max(40).optional().nullable(),
+  retencaoContratual:  z.string().max(500).optional().nullable(),
+  segurosObrigatorios: z.string().max(1000).optional().nullable(),
   extraidoIA:          z.any().optional(),
   kickoffComercialEm:  z.string().optional().nullable(),
   kickoffSetoresEm:    z.string().optional().nullable(),
@@ -57,7 +74,7 @@ export async function GET(req, { params }) {
       aditivos: {
         select: { numero: true, itens: { select: { id: true, descricao: true, categoria: true, valorVerba: true, faturamentoDireto: true } } },
       },
-      kickoff: true,
+      kickoff: { include: { aceites: { orderBy: { enviadoEm: "desc" }, take: 100 } } },
       // Orçamento/estudo vinculado (quando existir) — fonte da pintura e escopo
       orcamentos: {
         select: {
@@ -177,19 +194,24 @@ export async function PUT(req, { params }) {
   const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 
-  if (body.propostaPdfUrl && !isBlobUrlSegura(body.propostaPdfUrl)) {
-    return NextResponse.json({ error: "URL do PDF inválida." }, { status: 400 });
+  for (const campo of ["propostaPdfUrl", "propostaTecnicaPdfUrl", "pinturaPlpUrl", "inspecaoArquivoUrl"]) {
+    if (body[campo] && !isBlobUrlSegura(body[campo])) {
+      return NextResponse.json({ error: `URL de arquivo inválida (${campo}).` }, { status: 400 });
+    }
   }
 
   const data = {};
   for (const k of ["pedidoCompraCliente", "entregaEndereco", "frete", "padraoPintura", "inspecao",
     "notaRetornoObs", "fiscalObservacao", "escopo", "escopoIncluso", "escopoExcluso",
-    "pontosAtencao", "observacoes", "propostaPdfUrl", "propostaPdfNome"]) {
+    "pontosAtencao", "observacoes", "propostaPdfUrl", "propostaPdfNome",
+    "propostaTecnicaPdfUrl", "propostaTecnicaPdfNome", "pinturaPlpUrl", "pinturaPlpNome",
+    "inspecaoArquivoUrl", "inspecaoArquivoNome", "tipoFaturamento",
+    "retencaoContratual", "segurosObrigatorios"]) {
     if (body[k] !== undefined) data[k] = body[k] || null;
   }
   if (body.notaRetorno !== undefined) data.notaRetorno = body.notaRetorno;
   if (body.extraidoIA !== undefined) data.extraidoIA = body.extraidoIA;
-  for (const k of ["cronograma", "prioridades", "pesoResumo"]) {
+  for (const k of ["cronograma", "prioridades", "pesoResumo", "faturamentoEventos"]) {
     if (body[k] !== undefined) data[k] = body[k] ?? null;
   }
   for (const k of ["kickoffComercialEm", "kickoffSetoresEm", "dataEntregaAcordada"]) {

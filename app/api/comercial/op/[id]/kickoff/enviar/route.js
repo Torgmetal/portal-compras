@@ -6,6 +6,7 @@
 // Sem valores em R$ em nenhum dos dois.
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
@@ -27,6 +28,19 @@ const fmtDataStr = (s) => {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : (s || "—");
 };
 const fmtKg = (v) => (v != null ? `${Number(v).toLocaleString("pt-BR")} kg` : "—");
+const fmtMoeda = (v) => (v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—");
+
+// Bloco do botão de ACEITE — link único por destinatário; registra que o setor
+// está de acordo com as informações divulgadas.
+function blocoAceite(url) {
+  return `
+    <div style="text-align:center;margin:24px 0 8px 0;">
+      <a href="${url}" style="display:inline-block;background:#059669;color:#fff;padding:13px 30px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;">
+        ✅ Li e estou de acordo
+      </a>
+      <p style="margin:8px 0 0 0;color:#718096;font-size:12px;">Clique para registrar seu aceite às informações deste kick off.</p>
+    </div>`;
+}
 
 function secao(titulo, conteudoHtml) {
   if (!conteudoHtml) return "";
@@ -164,6 +178,7 @@ export async function POST(req, { params }) {
         <div style="background:#ebf8ff;border-radius:8px;padding:12px 16px;margin:20px 0 0 0;text-align:center;">
           <p style="margin:0;color:#2b6cb0;font-size:13px;">Dúvidas sobre a obra? Fala com o comercial. Kick off ${k.kickoffSetoresEm ? `com os setores em <strong>${fmtData(k.kickoffSetoresEm)}</strong>` : "a agendar"}.</p>
         </div>
+        __ACEITE__
         <hr style="border:0;border-top:1px solid #e2e8f0;margin:18px 0 10px 0;">
         <p style="margin:0;color:#a0aec0;font-size:12px;">Enviado por ${esc(user.name)} — Workspace Torg (uso interno). Sem valores comerciais neste comunicado.</p>
       </div>
@@ -205,7 +220,36 @@ export async function POST(req, { params }) {
           <p style="margin:0;font-size:14px;color:#2d3748;"><strong>Nota de retorno:</strong> ${k.notaRetorno ? "SIM — NECESSÁRIA" : "não é necessária"}${k.notaRetorno && k.notaRetornoObs ? ` — ${esc(k.notaRetornoObs)}` : ""}</p>
         </div>
 
-        ${k.fiscalObservacao ? `${secao("Como será o faturamento", paragrafo(esc(k.fiscalObservacao)))}` : ""}
+        ${k.tipoFaturamento ? secao("Tipo de faturamento (definido na proposta)", paragrafo(esc(k.tipoFaturamento))) : ""}
+
+        ${Array.isArray(k.faturamentoEventos) && k.faturamentoEventos.length ? `
+        <p style="margin:18px 0 6px 0;color:#006EAB;font-size:13px;font-weight:700;text-transform:uppercase;">Eventos de faturamento</p>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+          <tr style="background:#002945;">
+            <th style="padding:8px 10px;text-align:left;color:#fff;font-size:11px;text-transform:uppercase;">Evento</th>
+            <th style="padding:8px 10px;text-align:right;color:#fff;font-size:11px;text-transform:uppercase;">%</th>
+            <th style="padding:8px 10px;text-align:right;color:#fff;font-size:11px;text-transform:uppercase;">Valor</th>
+            <th style="padding:8px 10px;text-align:left;color:#fff;font-size:11px;text-transform:uppercase;">Prazo pgto.</th>
+            <th style="padding:8px 10px;text-align:center;color:#fff;font-size:11px;text-transform:uppercase;">Medição</th>
+            <th style="padding:8px 10px;text-align:left;color:#fff;font-size:11px;text-transform:uppercase;">Obs. NF</th>
+          </tr>
+          ${k.faturamentoEventos.map((ev, i) => `
+          <tr style="background:${i % 2 ? "#f7fafc" : "#fff"};">
+            <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#2d3748;font-weight:600;">${esc(ev.descricao || "—")}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#2d3748;text-align:right;">${ev.percentual != null ? `${ev.percentual}%` : "—"}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#2d3748;text-align:right;white-space:nowrap;">${fmtMoeda(ev.valor)}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#4a5568;">${esc(ev.prazoPagamento || "—")}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#4a5568;text-align:center;">${esc(ev.medicao || "—")}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#718096;">${esc(ev.obsNF || "—")}</td>
+          </tr>`).join("")}
+        </table>` : ""}
+
+        ${k.retencaoContratual ? `
+        <div style="background:#fff5f5;border:1px solid #feb2b2;border-radius:8px;padding:10px 14px;margin:12px 0;">
+          <p style="margin:0;font-size:14px;color:#742a2a;"><strong>⚠ Retenção contratual:</strong> ${esc(k.retencaoContratual)}</p>
+        </div>` : ""}
+        ${k.segurosObrigatorios ? secao("Seguros obrigatórios", paragrafo(esc(k.segurosObrigatorios))) : ""}
+        ${k.fiscalObservacao ? `${secao("Observações de faturamento", paragrafo(esc(k.fiscalObservacao)))}` : ""}
 
         <p style="margin:18px 0 6px 0;color:#006EAB;font-size:13px;font-weight:700;text-transform:uppercase;">Faturamento por linha do pedido</p>
         <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
@@ -217,22 +261,36 @@ export async function POST(req, { params }) {
           ${linhasItens}
         </table>
 
+        __ACEITE__
         <hr style="border:0;border-top:1px solid #e2e8f0;margin:20px 0 12px 0;">
         <p style="margin:0;color:#a0aec0;font-size:12px;">Enviado por ${esc(user.name)} — Workspace Torg (uso interno).</p>
       </div>
     </div>`;
   }
 
-  const result = await sendEmail({
-    to: emails,
-    cc: user.email,
-    replyTo: user.email,
-    subject,
-    html,
-    text: `Kick Off da OP ${op.numero} — ${op.cliente}. Acesse o portal para ver o documento completo.`,
-  });
-  if (!result.ok) {
-    return NextResponse.json({ error: result.error || "Falha ao enviar e-mail" }, { status: 502 });
+  // Envio individual: cada destinatário ganha um token de ACEITE próprio e o
+  // e-mail leva o botão "Li e estou de acordo" com o link único.
+  const baseUrl = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  const resultados = [];
+  for (const email of emails) {
+    const token = randomUUID();
+    await prisma.kickoffAceite.create({
+      data: { kickoffId: k.id, tipo: body.tipo, email, token },
+    });
+    const htmlFinal = html.replace("__ACEITE__", blocoAceite(`${baseUrl}/kickoff/aceite/${token}`));
+    const r = await sendEmail({
+      to: email,
+      replyTo: user.email,
+      subject,
+      html: htmlFinal,
+      text: `Kick Off da OP ${op.numero} — ${op.cliente}. Confirme seu aceite: ${baseUrl}/kickoff/aceite/${token}`,
+    });
+    resultados.push({ email, ok: r.ok, error: r.error || null });
+  }
+
+  const falhas = resultados.filter((r) => !r.ok);
+  if (falhas.length === emails.length) {
+    return NextResponse.json({ error: "Nenhum e-mail foi enviado: " + (falhas[0]?.error || "falha no envio") }, { status: 502 });
   }
 
   await prisma.oPKickOff.update({
@@ -240,8 +298,8 @@ export async function POST(req, { params }) {
     data: { enviadoPara: emails.join(", "), enviadoEm: new Date() },
   });
   await prisma.auditLog.create({
-    data: { userId: user.id, action: "ENVIAR_KICKOFF", entity: "OPKickOff", entityId: k.id, diff: { opNumero: op.numero, tipo: body.tipo, para: emails } },
+    data: { userId: user.id, action: "ENVIAR_KICKOFF", entity: "OPKickOff", entityId: k.id, diff: { opNumero: op.numero, tipo: body.tipo, para: emails, falhas: falhas.map((f) => f.email) } },
   }).catch(() => {});
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, enviados: resultados.filter((r) => r.ok).length, falhas: falhas.map((f) => f.email) });
 }

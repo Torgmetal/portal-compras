@@ -366,10 +366,23 @@ model OPKickOff {
   prioridades         Json?     // [{ordem, descricao, data:"YYYY-MM-DD"|null}]
   // Resumo de pesos da planilha comercial (sem valores em R$)
   pesoResumo          Json?     // [{descricao, qtd, pesoKg}]
-  // Proposta (PDF) + extração IA
-  propostaPdfUrl      String?
+  // Propostas (PDF) + extração IA — comercial e técnica
+  propostaPdfUrl      String?   // proposta COMERCIAL
   propostaPdfNome     String?
+  propostaTecnicaPdfUrl  String?
+  propostaTecnicaPdfNome String?
   extraidoIA          Json?
+  // Anexos técnicos: PLP (plano de pintura) e documento de inspeção (ITP)
+  pinturaPlpUrl       String?
+  pinturaPlpNome      String?
+  inspecaoArquivoUrl  String?
+  inspecaoArquivoNome String?
+  // Fiscal estruturado
+  tipoFaturamento     String?   // como definido na proposta (medições, eventos, à vista...)
+  faturamentoEventos  Json?     // [{descricao, percentual, valor, prazoPagamento, medicao, obsNF}]
+  retencaoContratual  String?   // ex: "5% — liberação após CND"
+  segurosObrigatorios String?
+  aceites             KickoffAceite[]
   // Reuniões e divulgação
   kickoffComercialEm  DateTime?
   kickoffSetoresEm    DateTime?
@@ -379,6 +392,21 @@ model OPKickOff {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   op                  OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+}
+
+// Aceite dos setores ao Kick Off divulgado — cada destinatário recebe um link
+// único por e-mail e confirma que está de acordo com as informações.
+model KickoffAceite {
+  id        String    @id @default(cuid())
+  kickoffId String
+  tipo      String    @default("GERAL") // GERAL | FISCAL
+  email     String
+  token     String    @unique
+  enviadoEm DateTime  @default(now())
+  aceitoEm  DateTime?
+  kickoff   OPKickOff @relation(fields: [kickoffId], references: [id], onDelete: Cascade)
+
+  @@index([kickoffId])
 }
 
 model OPItem {
