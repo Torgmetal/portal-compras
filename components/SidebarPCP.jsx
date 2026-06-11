@@ -3,17 +3,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Cpu, Wrench, Flame,
-  Wind, Paintbrush, Package, Target, ListOrdered, Scissors,
+  Wind, Paintbrush, Package, Target, ListOrdered,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
-  { href: "/pcp",              label: "Dashboard",        icon: LayoutDashboard, exact: true },
+  // O acompanhamento ao vivo do corte (Syneco) vive dentro do Painel —
+  // a página /pcp/corte segue existindo, linkada por lá ("detalhes").
+  { href: "/pcp",              label: "Painel do Corte",  icon: LayoutDashboard, exact: true },
   { href: "/pcp/pmp",          label: "PMP",              icon: Target },
   { href: "/producao/programacao/corte", label: "Peças / Corte", icon: Package },
   { href: "/pcp/fila-corte",   label: "Fila de Corte",    icon: ListOrdered },
-  { href: "/pcp/corte",        label: "Corte (ao vivo)",  icon: Scissors },
   { href: "/pcp/maquinas",     label: "Máquinas",         icon: Cpu },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
   { href: "/pcp/solda",        label: "Solda",            icon: Flame },

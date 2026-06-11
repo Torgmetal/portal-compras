@@ -1,45 +1,39 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import {
-  LayoutDashboard, Loader2, AlertCircle, RefreshCw, Weight,
-  Package, Cpu, Users, TrendingUp, ChevronRight, Activity,
-  Scissors, Sparkles,
-} from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
-} from "recharts";
-import { FLUXO_VISUAL, corSetor, normSetor } from "@/lib/setores";
-import { fmtOP, fmtKg, fmtNum } from "@/lib/utils";
+  Loader2, AlertCircle, RefreshCw, Target, Scissors, Pencil, Check, X,
+  Package, ListOrdered, CalendarRange, TrendingUp, Boxes, Factory,
+  AlertTriangle, ChevronRight, Cpu,
+} from "lucide-react";
+import { fmtOP, fmtKg } from "@/lib/utils";
+import { MAQUINA_LABEL } from "@/lib/maquina-corte";
 
-const STATUS_ORDEM = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
-const STATUS_CORES = {
-  PENDENTE: "#94a3b8", CORTE: "#b91c1c", MONTAGEM: "#1d4ed8", SOLDA: "#c2410c",
-  ACABAMENTO: "#7e22ce", JATO: "#0e7490", PINTURA: "#15803d", EXPEDIDO: "#0f766e",
-};
-const STATUS_LABELS = {
-  PENDENTE: "Pendente", CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
-  ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDIDO: "Expedido",
-};
+const fmtTon = (kg) => `${((Number(kg) || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
+const fmtHora = (d) => (d ? new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—");
 
-const PERIODOS = [
-  { key: "semana", label: "Semana" },
-  { key: "mes", label: "Mês atual" },
-  { key: "mesAnterior", label: "Mês anterior" },
-];
+const ESTOQUE_LABEL = {
+  DISPONIVEL: { label: "Disponível", cor: "text-emerald-700 bg-emerald-50" },
+  PARCIAL: { label: "Parcial", cor: "text-amber-700 bg-amber-50" },
+  INDISPONIVEL: { label: "Indisponível", cor: "text-red-700 bg-red-50" },
+  NAO_CONFERIDO: { label: "Não conferido", cor: "text-gray-600 bg-gray-100" },
+};
 
 export default function PCPDashboardClient() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
-  const [periodo, setPeriodo] = useState("semana");
+  const [filtroObra, setFiltroObra] = useState("");
+  // edição da meta
+  const [editandoMeta, setEditandoMeta] = useState(false);
+  const [metaTon, setMetaTon] = useState("");
+  const [salvandoMeta, setSalvandoMeta] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro("");
     try {
-      const res = await fetch(`/api/pcp/dashboard?periodo=${periodo}`);
+      const res = await fetch("/api/pcp/painel-corte");
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erro ao carregar");
       setData(json);
@@ -48,19 +42,74 @@ export default function PCPDashboardClient() {
     } finally {
       setLoading(false);
     }
-  }, [periodo]);
+  }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  const salvarMeta = async () => {
+    const ton = Number(String(metaTon).replace(",", "."));
+    if (!(ton > 0)) return;
+    setSalvandoMeta(true);
+    try {
+      const res = await fetch("/api/pcp/painel-corte", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metaKg: Math.round(ton * 1000) }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao salvar meta");
+      setData((prev) => prev && {
+        ...prev,
+        meta: { kgMes: json.metaKg },
+        mes: { ...prev.mes, pctMeta: json.metaKg > 0 ? Math.round((prev.mes.cortadoKg / json.metaKg) * 100) : 0 },
+      });
+      setEditandoMeta(false);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSalvandoMeta(false);
+    }
+  };
+
+  // ── Syneco filtrado por obra ──────────────────────────────────
+  const obrasSyneco = useMemo(() => {
+    if (!data) return [];
+    const s = new Set([
+      ...data.syneco.emCorteAgora.map((a) => a.obra),
+      ...data.syneco.cortadoHoje.map((a) => a.obra),
+    ].filter(Boolean));
+    return [...s].sort();
+  }, [data]);
+  const agoraFiltrado = useMemo(
+    () => (data ? data.syneco.emCorteAgora.filter((a) => !filtroObra || a.obra === filtroObra) : []),
+    [data, filtroObra]
+  );
+  const hojeFiltrado = useMemo(
+    () => (data ? data.syneco.cortadoHoje.filter((a) => !filtroObra || a.obra === filtroObra) : []),
+    [data, filtroObra]
+  );
+  const hojeTotais = useMemo(() => {
+    const porMaq = new Map();
+    for (const a of hojeFiltrado) {
+      const acc = porMaq.get(a.maquina) || { un: 0, kg: 0 };
+      acc.un += a.un; acc.kg += a.kg;
+      porMaq.set(a.maquina, acc);
+    }
+    return {
+      un: hojeFiltrado.reduce((s, a) => s + a.un, 0),
+      kg: hojeFiltrado.reduce((s, a) => s + a.kg, 0),
+      porMaquina: [...porMaq.entries()].sort((a, b) => b[1].kg - a[1].kg),
+    };
+  }, [hojeFiltrado]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 size={28} className="animate-spin text-torg-blue" />
-        <span className="ml-3 text-sm text-torg-gray">Carregando dashboard PCP...</span>
+        <span className="ml-3 text-sm text-torg-gray">Carregando painel do corte...</span>
       </div>
     );
   }
-
   if (erro) {
     return (
       <div className="max-w-xl mx-auto mt-12 bg-red-50 border border-red-200 rounded-xl p-6 text-center">
@@ -72,332 +121,320 @@ export default function PCPDashboardClient() {
       </div>
     );
   }
-
   if (!data) return null;
 
-  const { kgPorSetor, pipeline, tendencia, maquinasAtivas, ops, totalPecasAtivas, metasSemana } = data;
-
-  // KPI totais
-  const totalHoje = kgPorSetor.hoje.reduce((s, r) => s + (r._sum.produzidoKg || 0), 0);
-  const totalSemana = kgPorSetor.semana.reduce((s, r) => s + (r._sum.produzidoKg || 0), 0);
-  const totalMes = kgPorSetor.mes.reduce((s, r) => s + (r._sum.produzidoKg || 0), 0);
-
-  // Pipeline pra gráfico pizza
-  const pipelineData = STATUS_ORDEM
-    .map((s) => {
-      const item = pipeline.find((p) => p.status === s);
-      return item ? { name: STATUS_LABELS[s], value: item._count, kg: item._sum.pesoTotalKg || 0, fill: STATUS_CORES[s] } : null;
-    })
-    .filter(Boolean);
-
-  // KG por setor do período selecionado pra gráfico de barras
-  const fontePeriodo = periodo === "mesAnterior" ? kgPorSetor.mesAnterior
-    : periodo === "mes" ? kgPorSetor.mes
-    : kgPorSetor.semana;
-  const setorPeriodoData = FLUXO_VISUAL.map((setor) => {
-    const norm = normSetor(setor);
-    const item = (fontePeriodo || []).find((r) => normSetor(r.setor) === norm);
-    return {
-      setor,
-      kg: item?._sum.produzidoKg || 0,
-      fill: corSetor(setor).hex,
-    };
-  }).filter((s) => s.kg > 0);
-
-  const labelPeriodo = periodo === "mesAnterior" ? "mês anterior"
-    : periodo === "mes" ? "este mês" : "esta semana";
-
-  // Meta vs Realizado da semana agrupado por setor
-  const metasPorSetor = {};
-  for (const m of metasSemana) {
-    if (!metasPorSetor[m.setor]) metasPorSetor[m.setor] = { setor: m.setor, meta: 0, realizado: 0 };
-    metasPorSetor[m.setor].meta += m.pesoMetaKg || 0;
-    metasPorSetor[m.setor].realizado += m.pesoRealizadoKg || 0;
-  }
-  const metasArr = Object.values(metasPorSetor).filter((m) => m.meta > 0 || m.realizado > 0);
+  const { meta, mes, carteira, cargaMaquinas, semMaquina, obras } = data;
+  const projetaAcima = mes.projecaoKg >= meta.kgMes;
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="space-y-5 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-            <LayoutDashboard size={28} className="text-torg-blue" />
-            Dashboard PCP
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
+            <Scissors size={26} className="text-torg-blue" /> PCP — Painel do Corte
           </h2>
-          <p className="text-sm text-torg-gray mt-1">
-            Visão consolidada do chão de fábrica — dados do Syneco em tempo real.
+          <p className="text-xs text-torg-gray mt-0.5">
+            Meta × necessidade × produzido · estoque pra liberação · fila de prioridades · carga por máquina · Syneco ao vivo.
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-            {PERIODOS.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setPeriodo(p.key)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                  periodo === p.key
-                    ? "bg-white text-torg-blue shadow-sm"
-                    : "text-torg-gray hover:text-torg-dark"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={carregar}
-            className="px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
-          >
-            <RefreshCw size={14} /> Atualizar
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/producao/programacao/corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
+            Liberar peças
+          </Link>
+          <Link href="/pcp/fila-corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1">
+            <ListOrdered size={13} /> Fila de Corte
+          </Link>
+          <button onClick={carregar} className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-1.5">
+            <RefreshCw size={13} /> Atualizar
           </button>
         </div>
       </div>
 
-      {/* KPIs principais */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <KpiCard icon={Weight} label="Produzido hoje" value={fmtKg(totalHoje)} cor="bg-torg-blue" />
-        <KpiCard icon={TrendingUp} label="Produzido semana" value={fmtKg(totalSemana)} cor="bg-torg-blue-700" />
-        <KpiCard icon={Activity} label="Produzido mês" value={fmtKg(totalMes)} cor="bg-emerald-600" />
-        <KpiCard icon={Package} label="Peças ativas" value={fmtNum(totalPecasAtivas)} cor="bg-torg-orange" />
+      {/* ── 1. O mês: meta × cortado × projeção × carteira ─────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Meta (editável) */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-torg-gray uppercase tracking-wider flex items-center gap-1"><Target size={11} /> Meta do mês</p>
+            {!editandoMeta && (
+              <button onClick={() => { setMetaTon(String(meta.kgMes / 1000)); setEditandoMeta(true); }}
+                className="p-1 text-gray-300 hover:text-torg-blue rounded" title="Editar meta">
+                <Pencil size={12} />
+              </button>
+            )}
+          </div>
+          {editandoMeta ? (
+            <div className="flex items-center gap-1 mt-1">
+              <input type="number" value={metaTon} onChange={(e) => setMetaTon(e.target.value)} autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") salvarMeta(); if (e.key === "Escape") setEditandoMeta(false); }}
+                className="w-20 px-2 py-1 text-sm border border-torg-blue rounded-lg tabular-nums" />
+              <span className="text-xs text-torg-gray">t</span>
+              <button onClick={salvarMeta} disabled={salvandoMeta} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
+                {salvandoMeta ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              </button>
+              <button onClick={() => setEditandoMeta(false)} className="p-1 text-torg-gray hover:bg-gray-100 rounded"><X size={14} /></button>
+            </div>
+          ) : (
+            <p className="text-2xl font-extrabold text-torg-dark mt-0.5">{fmtTon(meta.kgMes)}</p>
+          )}
+          <p className="text-[10px] text-torg-gray mt-0.5">por mês</p>
+        </div>
+
+        {/* Cortado no mês */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <p className="text-[10px] text-torg-gray uppercase tracking-wider flex items-center gap-1"><Scissors size={11} /> Cortado no mês</p>
+          <p className="text-2xl font-extrabold text-torg-dark mt-0.5">{fmtTon(mes.cortadoKg)}</p>
+          <div className="mt-1.5 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full ${mes.pctMeta >= 100 ? "bg-emerald-500" : "bg-torg-blue"}`}
+              style={{ width: `${Math.min(100, mes.pctMeta)}%` }} />
+          </div>
+          <p className="text-[10px] text-torg-gray mt-1"><strong className="text-torg-dark">{mes.pctMeta}%</strong> da meta · dia {mes.diaHoje}/{mes.diasNoMes}</p>
+        </div>
+
+        {/* Projeção */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <p className="text-[10px] text-torg-gray uppercase tracking-wider flex items-center gap-1"><TrendingUp size={11} /> Projeção do mês</p>
+          <p className={`text-2xl font-extrabold mt-0.5 ${projetaAcima ? "text-emerald-600" : "text-red-600"}`}>{fmtTon(mes.projecaoKg)}</p>
+          <p className="text-[10px] text-torg-gray mt-0.5">
+            no ritmo atual — {projetaAcima ? "bate a meta" : `faltariam ${fmtTon(meta.kgMes - mes.projecaoKg)}`}
+          </p>
+        </div>
+
+        {/* Carteira */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <p className="text-[10px] text-torg-gray uppercase tracking-wider flex items-center gap-1"><Package size={11} /> Carteira a cortar</p>
+          <p className="text-2xl font-extrabold text-torg-dark mt-0.5">{fmtTon(carteira.total.kg)}</p>
+          <p className="text-[10px] text-torg-gray mt-0.5">{carteira.total.pecas} peças subidas e ainda não cortadas</p>
+        </div>
       </div>
 
-      {/* Máquinas ativas */}
-      {maquinasAtivas.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-            <Cpu size={18} className="text-torg-blue" />
-            <h3 className="text-lg font-semibold text-torg-dark">Setores produzindo agora</h3>
-            <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-              {maquinasAtivas.length} em produção
+      {/* ── 2. Funil: liberação → fila → programado → em corte ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <p className="text-xs font-bold text-torg-dark uppercase tracking-wide mb-3">Fluxo do corte</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <EtapaFunil
+            titulo="Aguardando liberação" icon={Boxes} href="/producao/programacao/corte"
+            pecas={carteira.pendente.pecas} kg={carteira.pendente.kg}
+            extra={
+              carteira.pendente.porEstoque.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {carteira.pendente.porEstoque.map((e) => (
+                    <span key={e.statusEstoque} className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${ESTOQUE_LABEL[e.statusEstoque].cor}`}>
+                      {ESTOQUE_LABEL[e.statusEstoque].label}: {e.pecas}
+                    </span>
+                  ))}
+                </div>
+              )
+            }
+          />
+          <EtapaFunil titulo="Na fila (sem programação)" icon={ListOrdered} href="/pcp/fila-corte"
+            pecas={carteira.fila.semProgramacao.pecas} kg={carteira.fila.semProgramacao.kg} />
+          <EtapaFunil titulo="Programado" icon={CalendarRange} href="/pcp/fila-corte"
+            pecas={carteira.fila.programadas.pecas} kg={carteira.fila.programadas.kg} />
+          <EtapaFunil titulo="Em corte" icon={Scissors} href="/pcp/fila-corte"
+            pecas={carteira.fila.emCorte.pecas} kg={carteira.fila.emCorte.kg}
+            extra={
+              carteira.fila.atrasadas.pecas > 0 && (
+                <span className="inline-flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">
+                  <AlertTriangle size={9} /> {carteira.fila.atrasadas.pecas} atrasada(s) vs meta
+                </span>
+              )
+            }
+          />
+        </div>
+      </div>
+
+      {/* ── 3. Carga por máquina ─────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+          <Cpu size={15} className="text-torg-blue" />
+          <h3 className="text-sm font-bold text-torg-dark">Carga por máquina</h3>
+          <span className="text-[10px] text-torg-gray ml-auto">backlog na fila ÷ capacidade média dos últimos 30 dias</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="bg-gray-50/60">
+              <tr>
+                <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Máquina</th>
+                <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Backlog</th>
+                <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Capacidade média</th>
+                <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase w-[34%]">Carga (dias de trabalho)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {cargaMaquinas.length === 0 && semMaquina.pecas === 0 && (
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-torg-gray">Fila de corte vazia.</td></tr>
+              )}
+              {cargaMaquinas.map((m) => {
+                const cor = m.diasCarga == null ? "bg-gray-300" : m.diasCarga <= 3 ? "bg-emerald-500" : m.diasCarga <= 7 ? "bg-amber-500" : "bg-red-500";
+                const pct = m.diasCarga == null ? 0 : Math.min(100, (m.diasCarga / 10) * 100);
+                return (
+                  <tr key={m.maquina} className="hover:bg-gray-50">
+                    <td className="px-4 py-2.5 font-semibold text-torg-dark">{MAQUINA_LABEL[m.maquina] || m.maquina}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-torg-dark">
+                      {m.backlogPecas} pç · <strong>{fmtKg(m.backlogKg)}</strong>
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-torg-gray">
+                      {m.capacidadeKgDia ? `${fmtKg(m.capacidadeKgDia)}/dia` : <span className="text-[10px] italic">sem histórico 30d</span>}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${cor}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs font-bold tabular-nums text-torg-dark w-14 text-right">
+                          {m.diasCarga != null ? `${m.diasCarga.toLocaleString("pt-BR")} d` : "—"}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {semMaquina.pecas > 0 && (
+          <div className="px-5 py-2.5 border-t border-amber-100 bg-amber-50/60 flex items-center gap-2 text-xs text-amber-800">
+            <AlertTriangle size={13} className="shrink-0" />
+            <span>
+              <strong>{semMaquina.pecas} peça(s) · {fmtKg(semMaquina.kg)}</strong> na fila <strong>sem máquina definida</strong> — atribua na tela{" "}
+              <Link href="/producao/programacao/corte" className="underline hover:text-amber-900">Peças / Corte</Link> pra entrar na carga.
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[700px]">
-              <thead className="bg-gray-50/60">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Setor</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Máquina</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">OP</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Peça</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Operador</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">KG</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {maquinasAtivas.map((m, i) => {
-                  const c = corSetor(m.setor);
-                  return (
-                    <tr key={i} className="hover:bg-gray-50">
-                      <td className="px-4 py-2">
-                        <Link href={`/pcp/${(m.setor || "").toLowerCase()}`}>
-                          <span className={`text-xs px-2 py-0.5 rounded border ${c.bg} ${c.text} ${c.border} cursor-pointer hover:opacity-75 transition-opacity`}>
-                            {m.setor || "—"}
-                          </span>
-                        </Link>
-                      </td>
-                      <td className="px-4 py-2 font-mono text-xs text-torg-dark">{m.maquina || "—"}</td>
-                      <td className="px-4 py-2 text-xs font-medium text-torg-blue">{m.obra || "—"}</td>
-                      <td className="px-4 py-2 text-xs text-torg-gray max-w-[250px] truncate" title={m.descricaoItem || m.opSka || ""}>{m.descricaoItem || m.opSka || "—"}</td>
-                      <td className="px-4 py-2 text-xs text-torg-dark">{m.operador || "—"}</td>
-                      <td className="px-4 py-2 text-right text-xs tabular-nums font-medium">{fmtKg(m.produzidoKg)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Gráficos: KG por setor hoje + Pipeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* KG por setor hoje */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-semibold text-torg-dark mb-4">KG produzido {labelPeriodo} por setor</h3>
-          {setorPeriodoData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={setorPeriodoData} layout="vertical" margin={{ left: 10, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(1)}t`} />
-                <YAxis type="category" dataKey="setor" tick={{ fontSize: 11 }} width={80} />
-                <Tooltip
-                  formatter={(v) => [fmtKg(v), "Produzido"]}
-                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                />
-                <Bar dataKey="kg" radius={[0, 4, 4, 0]}>
-                  {setorPeriodoData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+      {/* ── 4. Necessidade por obra + 5. Syneco ao vivo ─────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+        {/* Necessidade por obra */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+            <Factory size={15} className="text-torg-blue" />
+            <h3 className="text-sm font-bold text-torg-dark">Necessidade por obra</h3>
+            <span className="text-[10px] text-torg-gray ml-auto">kg que ainda falta cortar de cada obra</span>
+          </div>
+          {obras.length === 0 ? (
+            <p className="px-5 py-8 text-sm text-torg-gray text-center">Nenhuma obra com peças em aberto.</p>
           ) : (
-            <p className="text-sm text-torg-gray text-center py-8">Sem produção registrada {labelPeriodo}.</p>
+            <div className="divide-y divide-gray-50">
+              {obras.map((o) => (
+                <div key={o.opNumero} className="px-5 py-2.5 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-torg-dark font-mono">{fmtOP(o.opNumero)}
+                      {o.cliente && <span className="font-sans font-normal text-xs text-torg-gray ml-2">{o.cliente}</span>}
+                      {!o.cliente && <span className="font-sans font-normal text-[10px] text-amber-600 ml-2" title="Obra sem OP cadastrada no portal">sem cadastro</span>}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[180px]">
+                        <div className="h-full rounded-full bg-torg-blue" style={{ width: `${o.pctAvancado}%` }} />
+                      </div>
+                      <span className="text-[10px] text-torg-gray tabular-nums">{o.pctAvancado}% avançado</span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-bold text-torg-dark tabular-nums">{fmtKg(o.kgAberto)}</p>
+                    <p className="text-[10px] text-torg-gray tabular-nums">{o.pecasAbertas} pç em aberto</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Pipeline de peças */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-semibold text-torg-dark mb-4">Pipeline de peças</h3>
-          {pipelineData.length > 0 ? (
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <ResponsiveContainer width="100%" height={220} className="sm:!w-1/2">
-                <PieChart>
-                  <Pie
-                    data={pipelineData}
-                    cx="50%" cy="50%"
-                    innerRadius={50} outerRadius={85}
-                    dataKey="value"
-                    paddingAngle={2}
-                  >
-                    {pipelineData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v, name, props) => [`${v} peças (${fmtKg(props.payload.kg)})`, name]}
-                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-1.5">
-                {pipelineData.map((p) => (
-                  <div key={p.name} className="flex items-center gap-2 text-xs">
-                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: p.fill }} />
-                    <span className="text-torg-gray flex-1">{p.name}</span>
-                    <span className="font-medium text-torg-dark tabular-nums">{p.value}</span>
+        {/* Syneco ao vivo (corte) */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <h3 className="text-sm font-bold text-torg-dark">Syneco · Corte</h3>
+            <div className="ml-auto flex items-center gap-2">
+              <select value={filtroObra} onChange={(e) => setFiltroObra(e.target.value)}
+                className="px-2 py-1 text-[11px] border border-gray-200 rounded-lg bg-white">
+                <option value="">Todas as obras</option>
+                {obrasSyneco.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <Link href="/pcp/corte" className="text-[10px] text-torg-blue hover:underline inline-flex items-center">
+                detalhes <ChevronRight size={11} />
+              </Link>
+            </div>
+          </div>
+
+          {/* Em corte agora */}
+          <div className="px-5 py-2.5 bg-green-50/40 border-b border-green-100">
+            <p className="text-[10px] font-bold text-torg-gray uppercase tracking-wider mb-1.5">Em corte agora ({agoraFiltrado.length})</p>
+            {agoraFiltrado.length === 0 ? (
+              <p className="text-xs text-torg-gray italic pb-1">Nenhuma máquina produzindo{filtroObra ? ` na obra ${filtroObra}` : ""} neste momento.</p>
+            ) : (
+              <div className="space-y-1 pb-1">
+                {agoraFiltrado.map((a) => (
+                  <div key={a.id} className="flex items-center gap-2 text-xs">
+                    <span className="font-mono font-bold text-torg-blue whitespace-nowrap">{a.maquina}</span>
+                    <span className="text-torg-dark truncate flex-1" title={a.peca}>{a.peca}</span>
+                    <span className="text-torg-gray whitespace-nowrap">{a.obra}</span>
+                    <span className="text-torg-gray tabular-nums whitespace-nowrap">{a.produzidoUn}/{a.planejadoUn} un</span>
                   </div>
                 ))}
               </div>
-            </div>
-          ) : (
-            <p className="text-sm text-torg-gray text-center py-8">Sem peças cadastradas.</p>
-          )}
-        </div>
-      </div>
-
-      {/* Tendência 14 dias */}
-      {tendencia.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-semibold text-torg-dark mb-4">
-            {periodo === "mesAnterior" ? "Produção diária — mês anterior (kg)"
-              : periodo === "mes" ? "Produção diária — mês atual (kg)"
-              : "Produção diária — últimos 14 dias (kg)"}
-          </h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={tendencia} margin={{ left: 10, right: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis
-                dataKey="dia"
-                tick={{ fontSize: 10 }}
-                tickFormatter={(v) => { const d = new Date(v + "T12:00:00"); return `${d.getDate()}/${d.getMonth() + 1}`; }}
-              />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(1)}t`} />
-              <Tooltip
-                labelFormatter={(v) => new Date(v + "T12:00:00").toLocaleDateString("pt-BR")}
-                formatter={(v) => [fmtKg(v)]}
-                contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              />
-              <Area type="monotone" dataKey="total" stroke="#006EAB" fill="#006EAB" fillOpacity={0.15} strokeWidth={2} name="Total" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Meta vs Realizado da semana */}
-      {metasArr.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-sm font-semibold text-torg-dark mb-4">
-            {periodo === "mesAnterior" ? "Meta vs Realizado — mês anterior"
-              : periodo === "mes" ? "Meta vs Realizado — mês atual"
-              : "Meta vs Realizado — semana atual"}
-          </h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={metasArr} margin={{ left: 10, right: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="setor" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(1)}t`} />
-              <Tooltip formatter={(v) => [fmtKg(v)]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="meta" fill="#94a3b8" name="Meta" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="realizado" fill="#006EAB" name="Realizado" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* OPs ativas com progresso */}
-      {ops.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-torg-dark">Progresso das OPs ativas</h3>
-            <p className="text-xs text-torg-gray mt-0.5">Peças expedidas vs total de peças por OP.</p>
+            )}
           </div>
-          <div className="divide-y divide-gray-50">
-            {ops.filter((o) => o.totalPecas > 0).slice(0, 15).map((op) => (
-              <div key={op.numero} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50">
-                <div className="w-20 shrink-0">
-                  <span className="font-mono text-sm font-bold text-torg-blue">{fmtOP(op.numero)}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-torg-dark truncate">{op.cliente}{op.obra ? ` — ${op.obra}` : ""}</p>
-                  <div className="mt-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-torg-blue rounded-full transition-all"
-                      style={{ width: `${op.pctConcluido}%` }}
-                    />
+
+          {/* Cortado hoje */}
+          <div className="px-5 py-2.5">
+            <p className="text-[10px] font-bold text-torg-gray uppercase tracking-wider mb-1.5">
+              Cortado hoje — <span className="text-torg-dark">{hojeTotais.un.toLocaleString("pt-BR")} un · {fmtKg(hojeTotais.kg)}</span>
+            </p>
+            {hojeTotais.porMaquina.length === 0 ? (
+              <p className="text-xs text-torg-gray italic">Nada finalizado hoje{filtroObra ? ` na obra ${filtroObra}` : ""} até agora.</p>
+            ) : (
+              <div className="space-y-1">
+                {hojeTotais.porMaquina.map(([maq, v]) => (
+                  <div key={maq || "—"} className="flex items-center gap-2 text-xs">
+                    <span className="font-mono text-torg-dark w-40 truncate">{maq || "—"}</span>
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-torg-blue"
+                        style={{ width: `${hojeTotais.kg > 0 ? Math.max(3, (v.kg / hojeTotais.kg) * 100) : 0}%` }} />
+                    </div>
+                    <span className="text-torg-gray tabular-nums whitespace-nowrap">{v.un} un · {fmtKg(v.kg)}</span>
                   </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="text-sm font-bold text-torg-dark">{op.pctConcluido}%</span>
-                  <p className="text-[10px] text-torg-gray">{op.pecasExpedidas}/{op.totalPecas} peças</p>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
+            {hojeFiltrado.length > 0 && (
+              <details className="mt-2">
+                <summary className="text-[10px] text-torg-blue cursor-pointer hover:underline">
+                  ver os {hojeFiltrado.length} apontamentos de hoje
+                </summary>
+                <div className="mt-1.5 max-h-56 overflow-y-auto space-y-0.5">
+                  {hojeFiltrado.map((a) => (
+                    <div key={a.id} className="flex items-center gap-2 text-[11px] py-0.5 border-b border-gray-50 last:border-0">
+                      <span className="text-torg-gray tabular-nums">{fmtHora(a.hora)}</span>
+                      <span className="font-mono text-torg-gray whitespace-nowrap">{a.maquina}</span>
+                      <span className="text-torg-dark truncate flex-1" title={a.peca}>{a.peca}</span>
+                      <span className="text-torg-gray">{a.obra}</span>
+                      <span className="text-torg-gray tabular-nums whitespace-nowrap">{a.un} un · {fmtKg(a.kg)}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
           </div>
         </div>
-      )}
-
-      {/* Links rápidos pros setores */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-        {[
-          { href: "/pcp/corte", label: "Corte", icon: Scissors },
-          { href: "/pcp/montagem", label: "Montagem", icon: Package },
-          { href: "/pcp/solda", label: "Solda", icon: Activity },
-          { href: "/pcp/acabamento", label: "Acabamento", icon: Sparkles },
-          { href: "/pcp/jato", label: "Jato", icon: Activity },
-          { href: "/pcp/pintura", label: "Pintura", icon: Activity },
-          { href: "/pcp/maquinas", label: "Máquinas", icon: Cpu },
-        ].map((s) => {
-          const Icon = s.icon;
-          return (
-            <Link
-              key={s.href}
-              href={s.href}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-torg-blue-200 hover:shadow transition-all flex items-center gap-3 group"
-            >
-              <Icon size={18} className="text-torg-gray group-hover:text-torg-blue" />
-              <span className="text-sm font-medium text-torg-dark group-hover:text-torg-blue">{s.label}</span>
-              <ChevronRight size={14} className="ml-auto text-gray-300 group-hover:text-torg-blue" />
-            </Link>
-          );
-        })}
       </div>
     </div>
   );
 }
 
-function KpiCard({ icon: Icon, label, value, cor }) {
+function EtapaFunil({ titulo, icon: Icon, href, pecas, kg, extra }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
-      <div className={`${cor} p-2.5 rounded-lg`}>
-        <Icon size={20} className="text-white" />
-      </div>
-      <div>
-        <p className="text-xs text-torg-gray">{label}</p>
-        <p className="text-xl font-extrabold text-torg-dark tabular-nums">{value}</p>
-      </div>
-    </div>
+    <Link href={href} className="border border-gray-100 rounded-lg p-3 hover:border-torg-blue-200 hover:shadow-sm transition-all block">
+      <p className="text-[10px] text-torg-gray uppercase tracking-wider flex items-center gap-1">
+        <Icon size={11} /> {titulo}
+      </p>
+      <p className="text-lg font-extrabold text-torg-dark mt-1 tabular-nums">
+        {pecas} <span className="text-xs font-semibold text-torg-gray">pç</span>
+        <span className="text-sm font-bold text-torg-gray ml-2">{fmtKg(kg)}</span>
+      </p>
+      {extra}
+    </Link>
   );
 }

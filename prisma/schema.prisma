@@ -1228,6 +1228,13 @@ model ConfigEstoque {
   locaisOmie     Json?
 }
 
+// Parâmetros do PCP (chave-valor) — ex.: meta_corte_kg_mes = "250000"
+model PcpParametro {
+  chave     String   @id
+  valor     String
+  updatedAt DateTime @updatedAt
+}
+
 model EstoqueItem {
   id               String                @id @default(cuid())
   codigoOmie       String                @unique
