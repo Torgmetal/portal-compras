@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { fmtOP } from "@/lib/utils";
 import { requireRole } from "@/lib/session";
-import { PlusCircle, FolderKanban, Activity, AlertTriangle, DollarSign } from "lucide-react";
+import { PlusCircle, FolderKanban } from "lucide-react";
 import OPRowActions from "./OPRowActions";
 
 // Sempre busca dados frescos do banco
@@ -33,14 +33,14 @@ export default async function ComercialHome({ searchParams }) {
   const verFinalizadas = searchParams?.finalizadas === "1";
 
   // Duas queries paralelas:
-  // 1. KPI (leve, sem _count): busca todos pra calcular totais/verba corretamente
+  // 1. Contagem (leve): busca todas pra calcular os totais das abas Ativas/Finalizadas
   // 2. Tabela (completo, filtrado + paginado): só as OPs da aba atual
   const whereTabela = verFinalizadas
     ? { OR: [{ status: { in: ["ENCERRADA", "CANCELADA"] } }, { dataFimReal: { not: null } }] }
     : { status: { notIn: ["ENCERRADA", "CANCELADA"] }, dataFimReal: null };
 
   const [opsKpiRaw, opsTabelaRaw] = await Promise.all([
-    // Query leve: apenas campos necessários para KPI + cálculo de status
+    // Query leve: apenas campos necessários para o cálculo de status
     prisma.oP.findMany({
       select: {
         id: true,
@@ -48,8 +48,6 @@ export default async function ComercialHome({ searchParams }) {
         dataInicio: true,
         dataFimPrevista: true,
         dataFimReal: true,
-        itens: { select: { valorVerba: true } },
-        aditivos: { include: { itens: { select: { valorVerba: true } } } },
       },
     }),
     // Query completa: filtrada pela aba atual, máx 200 OPs
@@ -65,28 +63,8 @@ export default async function ComercialHome({ searchParams }) {
     }),
   ]);
 
-  // KPIs calculados sobre todas as OPs (query leve)
-  const opsKpiComStatus = opsKpiRaw.map((op) => {
-    const verbaBase = op.itens.reduce((s, i) => s + i.valorVerba, 0);
-    const verbaAditivos = op.aditivos.reduce(
-      (s, a) => s + a.itens.reduce((ss, i) => ss + i.valorVerba, 0),
-      0
-    );
-    return { ...op, verbaTotal: verbaBase + verbaAditivos, statusCalc: calcStatus(op) };
-  });
-
-  const kpis = opsKpiComStatus.reduce(
-    (acc, op) => {
-      acc.total += 1;
-      if (op.statusCalc === "EM_EXECUCAO") acc.emExecucao += 1;
-      if (op.statusCalc === "ATRASADA") acc.atrasadas += 1;
-      if (op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA") {
-        acc.verbaAtiva += op.verbaTotal;
-      }
-      return acc;
-    },
-    { total: 0, emExecucao: 0, atrasadas: 0, verbaAtiva: 0 }
-  );
+  // Status calculado sobre todas as OPs (query leve) — alimenta as contagens das abas
+  const opsKpiComStatus = opsKpiRaw.map((op) => ({ ...op, statusCalc: calcStatus(op) }));
 
   const totalAtivas = opsKpiComStatus.filter(
     (op) => op.statusCalc !== "ENCERRADA" && op.statusCalc !== "CANCELADA"
@@ -103,18 +81,10 @@ export default async function ComercialHome({ searchParams }) {
       );
       return { ...op, verbaTotal: verbaBase + verbaAditivos, statusCalc: calcStatus(op) };
     })
+    // Nº da OP decrescente (mais recente primeiro)
     .sort((a, b) =>
-      (a.numero || "").localeCompare(b.numero || "", undefined, { numeric: true, sensitivity: "base" })
+      (b.numero || "").localeCompare(a.numero || "", undefined, { numeric: true, sensitivity: "base" })
     );
-
-  // Variável mantida por compat com o JSX abaixo (usada apenas na checagem de vazio)
-  const opsComTotaisRaw = opsKpiComStatus;
-
-  const cards = [
-    { label: "Total OPs",    value: kpis.total,                 color: "bg-torg-blue",     Icon: FolderKanban },
-    { label: "Em execução",  value: kpis.emExecucao,            color: "bg-torg-orange",   Icon: Activity },
-    { label: "Atrasadas",    value: kpis.atrasadas,             color: "bg-red-500",       Icon: AlertTriangle },
-  ];
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -154,22 +124,6 @@ export default async function ComercialHome({ searchParams }) {
           </Link>
         </div>
       </div>
-
-      {!verFinalizadas && opsComTotaisRaw.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          {cards.map((c) => (
-            <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
-              <div className={`${c.color} p-2.5 rounded-lg`}>
-                <c.Icon size={20} className="text-white" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-torg-gray truncate">{c.label}</p>
-                <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate">{c.value}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {opsComTotais.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
