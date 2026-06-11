@@ -6,8 +6,9 @@ import {
   Users, AlertTriangle, CalendarClock, Download, Upload,
   FileSpreadsheet, CheckCircle2, XCircle, ClipboardCheck,
   ChevronRight, UserX, CircleAlert, BadgeCheck, Factory,
-  Paperclip, Eye, Send, UploadCloud, Cloud, Pencil,
+  Paperclip, Eye, Send, UploadCloud, Cloud, Pencil, Trash2,
 } from "lucide-react";
+import ConfirmModal from "@/components/admin/ConfirmModal";
 import { upload } from "@vercel/blob/client";
 
 const CATEGORIAS = [
@@ -107,6 +108,8 @@ export default function DocumentosClient() {
   const [aviso, setAviso] = useState("");                  // ex: backup SharePoint falhou
   const [editandoId, setEditandoId] = useState(null);      // id do doc em edição (null = novo)
   const [enviarDoc, setEnviarDoc] = useState(null);        // doc do modal "Enviar"
+  const [docExcluir, setDocExcluir] = useState(null);      // doc do modal "Excluir"
+  const [excluindo, setExcluindo] = useState(false);
   const [enviarPara, setEnviarPara] = useState("");
   const [enviarMsg, setEnviarMsg] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -257,6 +260,23 @@ export default function DocumentosClient() {
       setAviso("Falha ao subir arquivo: " + e.message);
     } finally {
       setSubindoId(null);
+    }
+  };
+
+  // Exclui (soft delete) — some das listagens/CCT; a cópia ISO no SharePoint fica.
+  const excluirDoc = async () => {
+    if (!docExcluir) return;
+    setExcluindo(true);
+    try {
+      const res = await fetch(`/api/rh/documentos/${docExcluir.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Erro ao excluir");
+      setDocumentos((prev) => prev.filter((d) => d.id !== docExcluir.id));
+      setDocExcluir(null);
+    } catch (e) {
+      alert("Falha ao excluir: " + e.message);
+    } finally {
+      setExcluindo(false);
     }
   };
 
@@ -602,6 +622,11 @@ export default function DocumentosClient() {
                             className="inline-flex items-center gap-1.5 text-xs font-medium text-torg-gray hover:text-torg-dark px-2 py-1 rounded-lg hover:bg-gray-100">
                             <Pencil size={14} /> Editar
                           </button>
+                          <button onClick={() => setDocExcluir(d)}
+                            title="Excluir documento (a cópia de backup no SharePoint é preservada)"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-torg-gray hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50">
+                            <Trash2 size={14} /> Excluir
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -765,6 +790,18 @@ export default function DocumentosClient() {
       )}
 
       {/* Modal Enviar por e-mail */}
+      {/* Confirmação de exclusão */}
+      <ConfirmModal
+        open={!!docExcluir}
+        onClose={() => !excluindo && setDocExcluir(null)}
+        onConfirm={excluirDoc}
+        loading={excluindo}
+        variant="destrutivo"
+        labelConfirmar="Excluir documento"
+        titulo={`Excluir "${docExcluir?.nome || ""}"?`}
+        mensagem={`O documento sai das listagens e do CCT${docExcluir?.funcionario ? ` (vínculo: ${docExcluir.funcionario.nome})` : ""}. A cópia de backup no SharePoint é preservada para a ISO — só o registro no portal é desativado.`}
+      />
+
       {enviarDoc && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !enviando && setEnviarDoc(null)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
