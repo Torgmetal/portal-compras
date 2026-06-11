@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import {
   Users, Building2, Briefcase, UserPlus, Cake, CalendarDays,
-  Loader2, AlertCircle, DollarSign, TrendingUp,
+  Loader2, AlertCircle, DollarSign,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -93,32 +93,6 @@ export default function RHDashboardClient() {
                   </div>
                 );
               })}
-            </div>
-          )}
-        </div>
-
-        {/* Custo por Setor */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h3 className="text-sm font-bold text-torg-dark mb-4 flex items-center gap-2">
-            <TrendingUp size={16} className="text-emerald-600" /> Custo Mensal por Setor
-          </h3>
-          {data.custoPorSetor.length === 0 ? (
-            <p className="text-sm text-torg-gray">Nenhum dado disponível</p>
-          ) : (
-            <div className="space-y-2">
-              {data.custoPorSetor.map((s) => (
-                <div key={s.setorId} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                  <div>
-                    <span className="text-sm font-medium text-torg-dark">{s.nome}</span>
-                    <span className="text-[10px] text-torg-gray ml-2">{s.qtdFuncionarios} func.</span>
-                  </div>
-                  <span className="text-sm font-bold text-torg-dark tabular-nums">{fmtMoeda(s.custoMensal)}</span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                <span className="text-sm font-bold text-torg-dark">Total</span>
-                <span className="text-sm font-extrabold text-torg-blue tabular-nums">{fmtMoeda(data.custoTotal)}</span>
-              </div>
             </div>
           )}
         </div>
