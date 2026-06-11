@@ -59,7 +59,9 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
   const [modalEditarItem, setModalEditarItem] = useState(null);
   const [modalEncerrarRM, setModalEncerrarRM] = useState(false);
   const [modalEnviarCot, setModalEnviarCot] = useState(false);
-  const [modalPedidoMontagem, setModalPedidoMontagem] = useState(false);
+  const [modalPedidoDireto, setModalPedidoDireto] = useState(false);
+  // ALUGUEL e MONTAGEM não passam por cotação — o pedido Omie sai direto
+  const ehServicoDireto = rm.tipoRM === "MONTAGEM" || rm.tipoRM === "ALUGUEL";
   const [modalEditarCategorias, setModalEditarCategorias] = useState(false);
   // Quando o usuario clica "Re-cotar Sem Proposta", o modal abre ja filtrando
   // os itens. Reseta pro modo normal ao fechar.
@@ -280,14 +282,14 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
         {/* Ações — 3 grupos: Próximas ações | Vínculo | Destrutivas */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2 mt-4 pt-4 border-t border-gray-100">
           {/* Grupo 1: Próximas ações (cotação / fechar pedido) */}
-          {rm.tipoRM === "MONTAGEM" ? (
+          {ehServicoDireto ? (
             <button
-              onClick={() => setModalPedidoMontagem(true)}
+              onClick={() => setModalPedidoDireto(true)}
               disabled={rm.status === "PEDIDO_GERADO" || rm.status === "CANCELADA"}
               className="h-9 px-3.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Medição de montagem: sem cotação — gera o pedido direto no Omie com o valor informado pelo solicitante"
+              title={`${rm.tipoRM === "ALUGUEL" ? "Aluguel de equipamentos" : "Medição de montagem"}: sem cotação — gera o pedido direto no Omie com o valor informado pelo solicitante`}
             >
-              <Package size={15} /> Gerar pedido Omie (montagem)
+              <Package size={15} /> Gerar pedido Omie ({rm.tipoRM === "ALUGUEL" ? "aluguel" : "montagem"})
             </button>
           ) : (
           <button
@@ -298,7 +300,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
             <Mail size={15} /> Enviar Cotação
           </button>
           )}
-          {qtdSemPropostaRm > 0 && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA" && (
+          {!ehServicoDireto && qtdSemPropostaRm > 0 && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA" && (
             <button
               onClick={() => { setPreSelecionarMode("sem-proposta"); setModalEnviarCot(true); }}
               className="h-9 px-3.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 inline-flex items-center gap-1.5"
@@ -501,9 +503,17 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
         <PedidosGerados pedidos={pedidos} rmId={rm.id} onRevertido={() => router.refresh()} isAdmin={isAdmin} userRole={userRole} />
       )}
 
-      {/* Cotações */}
+      {/* Cotações — ALUGUEL/MONTAGEM não passam por cotação */}
       {rm.cotacoes.length > 0 ? (
         <CotacoesList rm={rm} outrasRMs={outrasRMs} />
+      ) : ehServicoDireto ? (
+        <div className="bg-emerald-50/60 border border-emerald-100 rounded-lg p-4 text-sm text-torg-dark">
+          <p className="font-medium">Sem cotação — pedido direto no Omie</p>
+          <p className="text-torg-gray text-xs mt-1">
+            {rm.tipoRM === "ALUGUEL" ? "Aluguel de equipamentos" : "Medição de montagem"}: registre e use o botão
+            &quot;Gerar pedido Omie&quot; acima — o custo entra direto no extrato da OP.
+          </p>
+        </div>
       ) : (
         <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-4 text-sm text-torg-dark">
           <p className="font-medium">Nenhuma cotação enviada ainda</p>
@@ -514,11 +524,11 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
       )}
 
       {/* Modais */}
-      {modalPedidoMontagem && (
-        <ModalPedidoMontagem
+      {modalPedidoDireto && (
+        <ModalPedidoDireto
           rm={rm}
-          onClose={() => setModalPedidoMontagem(false)}
-          onGerado={() => { setModalPedidoMontagem(false); router.refresh(); }}
+          onClose={() => setModalPedidoDireto(false)}
+          onGerado={() => { setModalPedidoDireto(false); router.refresh(); }}
         />
       )}
       {modalEnviarCot && (
@@ -3705,11 +3715,12 @@ function FornecedoresPicker({
   );
 }
 
-/* ─── Modal: gerar pedido Omie direto de uma RM de MONTAGEM (sem cotação) ──
-   O solicitante já informou o valor de cada medição; aqui o Compras só
-   escolhe fornecedor/categoria e dispara — o pedido nasce vinculado à OP
-   e o custo cai no extrato da obra. */
-function ModalPedidoMontagem({ rm, onClose, onGerado }) {
+/* ─── Modal: gerar pedido Omie direto de RM de MONTAGEM ou ALUGUEL ──
+   Sem cotação: o solicitante já informou o valor (medição ou diária × dias);
+   aqui o Compras só escolhe fornecedor/categoria e dispara — o pedido nasce
+   vinculado à OP e o custo cai no extrato da obra. */
+function ModalPedidoDireto({ rm, onClose, onGerado }) {
+  const ehAluguel = rm.tipoRM === "ALUGUEL";
   const [fornecedores, setFornecedores] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [locais, setLocais] = useState([]);
@@ -3738,16 +3749,24 @@ function ModalPedidoMontagem({ rm, onClose, onGerado }) {
   };
 
   const itensPendentes = (rm.itens || []).filter((it) => !["PEDIDO_GERADO", "CANCELADO", "ATENDIDO_ESTOQUE"].includes(it.status) && !it.canceladoEm);
-  const total = itensPendentes.reduce((s, it) => s + (Number(it.valorTotal) || 0), 0);
+  // Valor do item: montagem usa valorTotal; aluguel tem fallback diária × dias
+  // (× qtd de unidades) para registros antigos sem valorTotal preenchido
+  const valorItem = (it) => {
+    const unit = Number(it.valorTotal) > 0
+      ? Number(it.valorTotal)
+      : (Number(it.valorDiaria) || 0) * (Number(it.qtdDias) || 0);
+    return unit * (Number(it.qtd) || 1);
+  };
+  const total = itensPendentes.reduce((s, it) => s + valorItem(it), 0);
 
   const gerar = async () => {
     setErro("");
-    if (!fornecedorNome.trim()) return setErro("Informe o fornecedor (montador).");
+    if (!fornecedorNome.trim()) return setErro(`Informe o fornecedor (${ehAluguel ? "locador" : "montador"}).`);
     if (!categoria) return setErro("Escolha a Categoria de Compra.");
     setGerando(true);
     try {
       const f = (fornecedores || []).find((x) => x.id === fornecedorId);
-      const res = await fetch(`/api/rm/${rm.id}/gerar-pedido-montagem`, {
+      const res = await fetch(`/api/rm/${rm.id}/gerar-pedido-direto`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3773,7 +3792,7 @@ function ModalPedidoMontagem({ rm, onClose, onGerado }) {
   };
 
   return (
-    <Modal titulo="Gerar pedido Omie — Medição de Montagem" onClose={onClose}>
+    <Modal titulo={`Gerar pedido Omie — ${ehAluguel ? "Aluguel de Equipamentos" : "Medição de Montagem"}`} onClose={onClose}>
       <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
         {erro && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
@@ -3781,20 +3800,27 @@ function ModalPedidoMontagem({ rm, onClose, onGerado }) {
           </div>
         )}
 
-        {/* Resumo das medições (valores informados pelo solicitante) */}
+        {/* Resumo dos itens (valores informados pelo solicitante) */}
         <div className="border border-gray-100 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50/60">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Medição</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{ehAluguel ? "Equipamento" : "Medição"}</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {itensPendentes.map((it) => (
                 <tr key={it.id}>
-                  <td className="px-3 py-1.5 text-torg-dark">{it.descricao}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums font-medium">{fmtMoeda(it.valorTotal)}</td>
+                  <td className="px-3 py-1.5 text-torg-dark">
+                    {it.descricao}
+                    {ehAluguel && Number(it.valorDiaria) > 0 && Number(it.qtdDias) > 0 && (
+                      <span className="block text-[11px] text-torg-gray">
+                        {fmtMoeda(it.valorDiaria)}/dia × {it.qtdDias} dia{it.qtdDias > 1 ? "s" : ""}{Number(it.qtd) > 1 ? ` × ${it.qtd} un` : ""}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 text-right tabular-nums font-medium">{fmtMoeda(valorItem(it))}</td>
                 </tr>
               ))}
               <tr className="bg-gray-50/60">
@@ -3807,7 +3833,7 @@ function ModalPedidoMontagem({ rm, onClose, onGerado }) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-torg-gray mb-1">Fornecedor (montador) — do cadastro</label>
+            <label className="block text-xs font-medium text-torg-gray mb-1">Fornecedor ({ehAluguel ? "locador" : "montador"}) — do cadastro</label>
             <select value={fornecedorId} onChange={(e) => escolherFornecedor(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
               <option value="">— Escolher do Vendor List (ou preencha abaixo) —</option>
@@ -3849,7 +3875,7 @@ function ModalPedidoMontagem({ rm, onClose, onGerado }) {
           <div>
             <label className="block text-xs font-medium text-torg-gray mb-1">Código do serviço no Omie</label>
             <input type="text" value={codigoServicoOmie} onChange={(e) => setCodigoServicoOmie(e.target.value)}
-              placeholder="Ex.: SERV-MONT (recomendado)"
+              placeholder={ehAluguel ? "Ex.: SERV-ALUG (recomendado)" : "Ex.: SERV-MONT (recomendado)"}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg" />
             <p className="text-[10px] text-torg-gray mt-0.5">Sem ele, o Omie tenta achar o item pela descrição — pode falhar.</p>
           </div>

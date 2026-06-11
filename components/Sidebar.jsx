@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { BarChart3, PlusCircle, FolderKanban, Bell, Building2, Boxes, Layers, Truck, ClipboardList, RailSymbol, ShoppingCart, Forklift } from "lucide-react";
+import { BarChart3, PlusCircle, FolderKanban, Bell, Building2, Boxes, Layers, Truck, ClipboardList, RailSymbol, ShoppingCart, Forklift, Hammer } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -10,7 +10,8 @@ const menu = [
   { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban },
   { href: "/compras", label: "RMs Materiais", icon: RailSymbol, exact: true, matchAlso: "/compras/rm/" },
   { href: "/compras/consumiveis", label: "RMs Consumíveis", icon: ShoppingCart },
-  { href: "/compras/servicos", label: "Aluguel & Montagem", icon: Forklift },
+  { href: "/compras/aluguel", label: "Aluguel de Equipamentos", icon: Forklift },
+  { href: "/compras/montagem", label: "Medição de Montagem", icon: Hammer },
   { href: "/compras/nova-rm", label: "Nova RM", icon: PlusCircle },
   { href: "/compras/cronograma", label: "Entregas", icon: Truck },
   { href: "/compras/saldo-materiais", label: "Saldo Materiais", icon: ClipboardList },

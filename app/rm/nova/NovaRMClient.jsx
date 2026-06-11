@@ -39,7 +39,7 @@ const TIPOS_RM = [
   {
     codigo: "ALUGUEL",
     label: "Aluguel de Equipamentos",
-    desc: "Locação de equipamentos com diária, quantidade de dias e OP obrigatória.",
+    desc: "Diária × dias com OP obrigatória — sem cotação; vira pedido Omie direto no extrato da obra.",
     icon: Forklift,
     cor: "torg-orange",
   },

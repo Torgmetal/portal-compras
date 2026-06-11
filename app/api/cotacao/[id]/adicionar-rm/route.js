@@ -55,6 +55,15 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Alguma RM nao foi encontrada." }, { status: 404 });
   }
 
+  // ALUGUEL e MONTAGEM não passam por cotação — o pedido Omie sai direto
+  const rmSemCotacao = rms.find((r) => ["ALUGUEL", "MONTAGEM"].includes(r.tipoRM));
+  if (rmSemCotacao) {
+    return NextResponse.json(
+      { error: `RM ${rmSemCotacao.numero} é de ${rmSemCotacao.tipoRM === "ALUGUEL" ? "aluguel" : "montagem"} — não passa por cotação. Gere o pedido Omie direto na tela da RM.` },
+      { status: 400 }
+    );
+  }
+
   // Coleta itens cotaveis (PENDENTE/EM_COTACAO/COTADO) das RMs
   let novosItens = rms.flatMap((r) => r.itens).filter(
     (it) => ["PENDENTE", "EM_COTACAO", "COTADO"].includes(it.status)

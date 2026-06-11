@@ -132,6 +132,8 @@ export default async function RMComprasDetail({ params }) {
     where: {
       id: { not: rm.id },
       status: { in: ["ABERTA", "EM_COTACAO", "COTADA"] },
+      // ALUGUEL e MONTAGEM não passam por cotação — não podem ser vinculadas
+      tipoRM: { notIn: ["ALUGUEL", "MONTAGEM"] },
     },
     orderBy: { numero: "asc" },
     include: {

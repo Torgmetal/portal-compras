@@ -1,7 +1,8 @@
-// POST /api/rm/[id]/gerar-pedido-montagem
+// POST /api/rm/[id]/gerar-pedido-direto
 // Gera o pedido de compra no Omie DIRETO de uma RM de MONTAGEM (medição com
-// valor informado pelo solicitante) — sem cotação. O pedido nasce vinculado à
-// OP (PedidoOmie.opId) para o custo aparecer no extrato/controle da obra.
+// valor informado pelo solicitante) ou de ALUGUEL (diária × dias) — sem
+// cotação. O pedido nasce vinculado à OP (PedidoOmie.opId) para o custo
+// aparecer no extrato/controle da obra.
 //
 // Body: { fornecedorNome, cnpj?, nCodOmie?, categoria, localEstoque?,
 //         codigoServicoOmie?, prazoPagamento?, observacao? }
@@ -16,7 +17,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const schema = z.object({
-  fornecedorNome: z.string().min(2, "Informe o fornecedor (montador)"),
+  fornecedorNome: z.string().min(2, "Informe o fornecedor"),
   cnpj: z.string().optional().nullable(),
   nCodOmie: z.string().optional().nullable(),
   categoria: z.string().min(1, "Categoria de Compra é obrigatória"),
@@ -27,6 +28,16 @@ const schema = z.object({
   prazoPagamento: z.string().optional().nullable(),
   observacao: z.string().max(1000).optional().nullable(),
 });
+
+// Valor unitário do item: montagem usa valorTotal; aluguel tem fallback
+// diária × dias para registros antigos sem valorTotal preenchido.
+function valorUnitItem(it) {
+  if (Number(it.valorTotal) > 0) return Number(it.valorTotal);
+  if (Number(it.valorDiaria) > 0 && Number(it.qtdDias) > 0) {
+    return Number(it.valorDiaria) * Number(it.qtdDias);
+  }
+  return 0;
+}
 
 export async function POST(req, { params }) {
   let user;
@@ -54,29 +65,32 @@ export async function POST(req, { params }) {
     },
   });
   if (!rm) return NextResponse.json({ error: "RM não encontrada" }, { status: 404 });
-  if (rm.tipoRM !== "MONTAGEM") {
-    return NextResponse.json({ error: "Esta rota é só para RM de Montagem (medição com valor informado)." }, { status: 400 });
+  if (!["MONTAGEM", "ALUGUEL"].includes(rm.tipoRM)) {
+    return NextResponse.json({ error: "Esta rota é só para RM de Montagem ou Aluguel (valor informado pelo solicitante, sem cotação)." }, { status: 400 });
   }
-  if (!rm.op) return NextResponse.json({ error: "RM de Montagem sem OP vinculada." }, { status: 400 });
+  const ehAluguel = rm.tipoRM === "ALUGUEL";
+  const rotulo = ehAluguel ? "Aluguel de equipamentos" : "Medição de montagem";
+  if (!rm.op) return NextResponse.json({ error: `RM de ${ehAluguel ? "Aluguel" : "Montagem"} sem OP vinculada.` }, { status: 400 });
 
   const itensPendentes = rm.itens.filter((it) => !["PEDIDO_GERADO", "CANCELADO", "ATENDIDO_ESTOQUE"].includes(it.status));
   if (itensPendentes.length === 0) {
     return NextResponse.json({ error: "Todos os itens desta RM já viraram pedido (ou foram cancelados)." }, { status: 409 });
   }
-  const semValor = itensPendentes.find((it) => !(Number(it.valorTotal) > 0));
+  const semValor = itensPendentes.find((it) => !(valorUnitItem(it) > 0));
   if (semValor) {
-    return NextResponse.json({ error: `Item "${semValor.descricao}" sem valor de medição — edite a RM antes de gerar.` }, { status: 400 });
+    return NextResponse.json({ error: `Item "${semValor.descricao}" sem valor — edite a RM antes de gerar.` }, { status: 400 });
   }
 
-  // Itens do pedido: 1 linha por medição, qtd 1, preço = valor informado.
+  // Itens do pedido: 1 linha por item, preço = valor informado (montagem:
+  // medição com qtd 1; aluguel: diária × dias por unidade, × qtd de unidades).
   const itensOmie = itensPendentes.map((it) => ({
     codigo: (body.codigoServicoOmie || "").trim() || it.codigoOmieEstoque || null,
     descricao: it.descricao,
     unidade: it.unidade || "UN",
-    qtd: 1,
-    precoUnit: Math.round(Number(it.valorTotal) * 100) / 100,
+    qtd: Number(it.qtd) || 1,
+    precoUnit: Math.round(valorUnitItem(it) * 100) / 100,
   }));
-  const total = itensOmie.reduce((s, it) => s + it.precoUnit, 0);
+  const total = itensOmie.reduce((s, it) => s + it.precoUnit * it.qtd, 0);
 
   // Projeto da OP no Omie (best-effort — não bloqueia)
   let nCodProj = null;
@@ -84,10 +98,10 @@ export async function POST(req, { params }) {
 
   const resultado = await criarPedidoOmie({
     itens: itensOmie,
-    observacao: `Medição de montagem — RM ${rm.numero} — OP ${rm.op.numero}`,
+    observacao: `${rotulo} — RM ${rm.numero} — OP ${rm.op.numero}`,
     nCodFor,
     cnpjFornecedor: cnpjLimpo || null,
-    cNumPedido: `MT-${rm.numero}`,
+    cNumPedido: `${ehAluguel ? "AL" : "MT"}-${rm.numero}`,
     cCodCateg: body.categoria,
     cCodLocalEstoque: body.localEstoque || null,
     nCodProj,
@@ -99,7 +113,7 @@ export async function POST(req, { params }) {
   if (resultado.error) {
     await prisma.auditLog.create({
       data: {
-        userId: user.id, action: "gerar_pedido_montagem_erro", entity: "RM", entityId: rm.id,
+        userId: user.id, action: ehAluguel ? "gerar_pedido_aluguel_erro" : "gerar_pedido_montagem_erro", entity: "RM", entityId: rm.id,
         diff: { rmNumero: rm.numero, erro: String(resultado.error).slice(0, 400) },
       },
     }).catch(() => {});
@@ -121,11 +135,11 @@ export async function POST(req, { params }) {
         codigoPedido: resultado.codigo_pedido ? String(resultado.codigo_pedido) : null,
         numeroPedido: resultado.numero_pedido ? String(resultado.numero_pedido) : null,
         total: Math.round(total * 100) / 100,
-        faturamentoDireto: false,
+        faturamentoDireto: rm.faturamentoDireto || false,
         status: "CRIADO",
         criadoManualmente: true,
-        categoriaItem: "MONTAGEM",
-        observacao: body.observacao || `Medição de montagem — RM ${rm.numero}`,
+        categoriaItem: rm.tipoRM,
+        observacao: body.observacao || `${rotulo} — RM ${rm.numero}`,
         itensDetalhes: itensOmie.map((it) => ({ descricao: it.descricao, qtd: it.qtd, unidade: it.unidade, valorUnit: it.precoUnit })),
         payload: itensOmie,
         createdById: user.id,
@@ -145,7 +159,7 @@ export async function POST(req, { params }) {
 
     await tx.auditLog.create({
       data: {
-        userId: user.id, action: "gerar_pedido_montagem", entity: "PedidoOmie", entityId: pedido.id,
+        userId: user.id, action: ehAluguel ? "gerar_pedido_aluguel" : "gerar_pedido_montagem", entity: "PedidoOmie", entityId: pedido.id,
         diff: {
           rmNumero: rm.numero, opNumero: rm.op.numero, fornecedor: body.fornecedorNome,
           total, itens: itensOmie.length, numeroPedido: resultado.numero_pedido || null,

@@ -164,7 +164,9 @@ export default async function RMDetail({ params }) {
       <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-4 text-sm text-torg-dark">
         <p className="font-medium">Próximos passos</p>
         <p className="text-torg-gray text-xs mt-1">
-          A RM agora vai aparecer pro time de Compras pra cotação com fornecedores e geração do pedido no Omie.
+          {["ALUGUEL", "MONTAGEM"].includes(rm.tipoRM)
+            ? "Sem cotação: o time de Compras gera o pedido direto no Omie com os valores informados, e o custo entra no extrato da obra."
+            : "A RM agora vai aparecer pro time de Compras pra cotação com fornecedores e geração do pedido no Omie."}
         </p>
       </div>
     </div>
