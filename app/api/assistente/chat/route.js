@@ -123,28 +123,26 @@ export async function POST(req) {
     // a pergunta se mostrou complexa — escala pro Sonnet no restante.
     if (!modeloForcado && rodada >= 3 && modelo === MODELO_SIMPLES) modelo = MODELO_COMPLEXO;
 
-    const response = await anthropic.messages.create({
-      model:      modelo,
-      max_tokens: modelo === MODELO_COMPLEXO ? 4096 : 1500,
-      system:     systemPrompt,
-      tools,
-      messages,
-    });
-
-    // Claude terminou — resposta de texto
-    if (response.stop_reason === "end_turn") {
-      const textoBlock = response.content.find((b) => b.type === "text");
-      respostaFinal = textoBlock?.text || "Desculpe, não consegui gerar uma resposta.";
+    let response;
+    try {
+      response = await anthropic.messages.create({
+        model:      modelo,
+        max_tokens: modelo === MODELO_COMPLEXO ? 8192 : 4096,
+        system:     systemPrompt,
+        tools,
+        messages,
+      });
+    } catch (e) {
+      console.error("[assistente] erro Anthropic:", e?.status, e?.message);
+      respostaFinal = "Tive um problema técnico ao falar com a IA. Tente de novo em instantes. 🙏";
       break;
     }
 
-    // Claude quer usar ferramentas
-    if (response.stop_reason === "tool_use") {
-      // Adiciona a resposta do assistente (com os blocos tool_use) ao histórico
+    // Se há chamadas de ferramenta, executa — independente do stop_reason
+    // (o modelo pode emitir tool_use e ainda assim bater max_tokens).
+    const toolBlocks = response.content.filter((b) => b.type === "tool_use");
+    if (toolBlocks.length > 0) {
       messages.push({ role: "assistant", content: response.content });
-
-      // Executa cada tool call em paralelo
-      const toolBlocks = response.content.filter((b) => b.type === "tool_use");
       const resultados = await Promise.all(
         toolBlocks.map(async (block) => {
           const resultado = await executarTool(block.name, block.input, user);
@@ -158,14 +156,16 @@ export async function POST(req) {
           };
         })
       );
-
-      // Adiciona os resultados como mensagem do usuário
       messages.push({ role: "user", content: resultados });
       continue;
     }
 
-    // Outro stop_reason inesperado
-    respostaFinal = "Não consegui processar sua solicitação. Tente novamente.";
+    // Sem ferramentas → resposta de texto (end_turn, max_tokens, etc.)
+    const textoBlock = response.content.find((b) => b.type === "text");
+    respostaFinal = textoBlock?.text?.trim() || "Desculpe, não consegui gerar uma resposta agora.";
+    if (response.stop_reason === "max_tokens") {
+      respostaFinal += "\n\n_(A resposta ficou longa e foi cortada. Se quiser, posso detalhar uma parte específica ou gerar uma planilha com tudo.)_";
+    }
     break;
   }
 
