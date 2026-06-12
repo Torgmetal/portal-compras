@@ -298,8 +298,8 @@ export default function PCPDashboardClient() {
           <div className="px-5 py-2.5 border-t border-amber-100 bg-amber-50/60 flex items-center gap-2 text-xs text-amber-800">
             <AlertTriangle size={13} className="shrink-0" />
             <span>
-              <strong>{semMaquina.pecas} peça(s) · {fmtKg(semMaquina.kg)}</strong> na fila <strong>sem máquina definida</strong> — atribua na tela{" "}
-              <Link href="/pcp/pecas-corte" className="underline hover:text-amber-900">Peças / Corte</Link> pra entrar na carga.
+              <strong>{semMaquina.pecas} peça(s) · {fmtKg(semMaquina.kg)}</strong> na fila <strong>sem máquina definida</strong> — atribua um laser na tela{" "}
+              <Link href="/pcp/pecas-corte" className="underline hover:text-amber-900">Peças / Corte</Link> pra entrar na carga, ou marque como <strong>conjunto</strong> (não corta, vai pra montagem).
             </span>
           </div>
         )}

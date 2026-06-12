@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import {
   Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download, Upload,
   Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList,
-  ArrowRight, X, Trash2, Factory, PackageSearch, AlertTriangle, XCircle,
+  ArrowRight, X, Trash2, Factory, PackageSearch, AlertTriangle, XCircle, Layers,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import {
@@ -53,6 +53,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [selecionados, setSelecionados] = useState(new Set());
   const [liberando, setLiberando] = useState(false);
   const [revertendo, setRevertendo] = useState(false);
+  const [marcandoConjunto, setMarcandoConjunto] = useState(false);
   const [expandido, setExpandido] = useState(new Set(Object.keys(MAQUINAS)));
   const [reclassificando, setReclassificando] = useState(false);
 
@@ -299,6 +300,30 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       alert("Erro ao reverter: " + e.message);
     } finally {
       setRevertendo(false);
+    }
+  }
+
+  // Atribuir como CONJUNTO — peça não é cortada, começa na montagem.
+  async function marcarConjunto(ids) {
+    const lista = ids || [...selecionados];
+    if (lista.length === 0) return;
+    setMarcandoConjunto(true);
+    try {
+      const res = await fetch("/api/producao/pecas/marcar-conjunto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: lista }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      // Saem da tela de corte (status MONTAGEM) — removo da lista local
+      const set = new Set(lista);
+      setPecas((prev) => prev.filter((p) => !set.has(p.id)));
+      setSelecionados(new Set());
+    } catch (e) {
+      alert("Erro ao marcar como conjunto: " + e.message);
+    } finally {
+      setMarcandoConjunto(false);
     }
   }
 
@@ -1344,17 +1369,41 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
               {expandido.has("SEM_MAQUINA") ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </div>
           </button>
-          {expandido.has("SEM_MAQUINA") && (
+          {expandido.has("SEM_MAQUINA") && (() => {
+            const semMaq = porMaquina["SEM_MAQUINA"];
+            const selSemMaq = semMaq.filter((p) => selecionados.has(p.id));
+            const todosSemMaq = semMaq.length > 0 && semMaq.every((p) => selecionados.has(p.id));
+            return (
             <div className="border-t border-gray-100">
-              <div className="px-4 py-2 bg-orange-50/50 border-b border-gray-100">
-                <p className="text-[11px] text-orange-700">
-                  Essas peças não foram classificadas automaticamente. Atribua a máquina manualmente usando o dropdown.
+              <div className="px-4 py-2.5 bg-orange-50/50 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+                <p className="text-[11px] text-orange-700 flex-1 min-w-[260px]">
+                  Não classificadas automaticamente. Atribua um <strong>laser</strong> (dropdown) — ou marque como{" "}
+                  <strong>conjunto</strong>: a peça não é cortada e já começa na <strong>montagem</strong>.
                 </p>
+                {selSemMaq.length > 0 && (
+                  <button
+                    onClick={() => marcarConjunto(selSemMaq.map((p) => p.id))}
+                    disabled={marcandoConjunto}
+                    className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {marcandoConjunto ? <Loader2 size={13} className="animate-spin" /> : <Layers size={13} />}
+                    Atribuir como Conjunto ({selSemMaq.length}) → Montagem
+                  </button>
+                )}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50/60">
                     <tr>
+                      <th className="px-3 py-2 w-8">
+                        <input type="checkbox" checked={todosSemMaq}
+                          onChange={() => setSelecionados((prev) => {
+                            const n = new Set(prev);
+                            if (todosSemMaq) semMaq.forEach((p) => n.delete(p.id));
+                            else semMaq.forEach((p) => n.add(p.id));
+                            return n;
+                          })} />
+                      </th>
                       <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">OP</th>
                       <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Marca</th>
                       <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Descrição</th>
@@ -1366,8 +1415,11 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {porMaquina["SEM_MAQUINA"].map((p) => (
-                      <tr key={p.id} className="hover:bg-gray-50">
+                    {semMaq.map((p) => (
+                      <tr key={p.id} className={`hover:bg-gray-50 ${selecionados.has(p.id) ? "bg-torg-blue-50/40" : ""}`}>
+                        <td className="px-3 py-1.5">
+                          <input type="checkbox" checked={selecionados.has(p.id)} onChange={() => toggleSelecionado(p.id)} />
+                        </td>
                         <td className="px-3 py-1.5 text-xs font-mono text-torg-blue">{fmtOP(p.opNumero)}</td>
                         <td className="px-3 py-1.5 text-xs font-semibold text-torg-dark font-mono">{p.marca}</td>
                         <td className="px-3 py-1.5 text-xs text-torg-gray max-w-[200px] truncate" title={p.descricao}>{p.descricao || "—"}</td>
@@ -1375,17 +1427,25 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                         <td className="px-3 py-1.5 text-right text-xs tabular-nums">{p.qte}</td>
                         <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray">{fmtMm(p.comprimentoMm)}</td>
                         <td className="px-3 py-1.5 text-right text-xs tabular-nums font-medium">{fmtKg(p.pesoTotalKg)}</td>
-                        <td className="px-3 py-1.5">
+                        <td className="px-3 py-1.5 flex items-center gap-1.5">
                           <select
                             value=""
                             onChange={(e) => atualizarMaquina(p.id, e.target.value)}
                             className="text-[11px] font-medium rounded-md border border-orange-200 px-2 py-1 bg-orange-50 text-orange-600 focus:ring-1 focus:ring-torg-blue"
                           >
-                            <option value="">Selecionar...</option>
+                            <option value="">Laser...</option>
                             {Object.entries(MAQUINA_LABEL).map(([k, v]) => (
                               <option key={k} value={k}>{v}</option>
                             ))}
                           </select>
+                          <button
+                            onClick={() => marcarConjunto([p.id])}
+                            disabled={marcandoConjunto}
+                            title="Não corta — começa na montagem"
+                            className="text-[11px] text-torg-blue hover:bg-torg-blue-50 border border-torg-blue-200 rounded-md px-2 py-1 font-medium disabled:opacity-50"
+                          >
+                            Conjunto
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1393,7 +1453,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                 </table>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 

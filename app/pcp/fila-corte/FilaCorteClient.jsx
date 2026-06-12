@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   ListOrdered, CalendarRange, Scissors, CheckCircle2, Loader2, AlertCircle,
   Play, Check, Undo2, X, ArrowUp, ArrowDown, ChevronsUp, Search, Target,
-  Clock, Package,
+  Clock, Package, Layers,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
@@ -129,6 +129,29 @@ export default function FilaCorteClient({ pecasIniciais }) {
     if (ok) setModalProgramar(false);
   };
 
+  // Marcar como conjunto — não corta, vai pra montagem (sai da fila de corte)
+  const marcarConjunto = async () => {
+    setAgindo(true); setErro(""); setAvisos([]); setOkMsg("");
+    try {
+      const ids = [...sel];
+      const res = await fetch("/api/producao/pecas/marcar-conjunto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      const set = new Set(ids);
+      setPecas((prev) => prev.filter((p) => !set.has(p.id))); // saem da fila (status MONTAGEM)
+      setSel(new Set());
+      if (data.atualizados > 0) setOkMsg(`${data.atualizados} peça(s) viraram conjunto → Montagem.`);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setAgindo(false);
+    }
+  };
+
   // Reordenar dentro da fila (só sem filtros — a ordem é da fila inteira)
   const reordenar = (id, modo) => {
     const fila = pecas.filter((p) => colunaDa(p) === "FILA");
@@ -223,6 +246,11 @@ export default function FilaCorteClient({ pecasIniciais }) {
             <button onClick={() => agir({ acao: "desprogramar", ids: [...sel] }, "devolvida(s) à fila")} disabled={agindo}
               className="px-3 py-1.5 border border-gray-200 text-torg-gray text-xs rounded-lg hover:bg-gray-50 disabled:opacity-50">
               Desprogramar
+            </button>
+            <button onClick={marcarConjunto} disabled={agindo}
+              title="Não corta — vira conjunto e começa na montagem (sai da fila)"
+              className="px-3 py-1.5 border border-torg-blue-200 text-torg-blue text-xs font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1 disabled:opacity-50">
+              <Layers size={13} /> Marcar conjunto
             </button>
             <button onClick={() => setSel(new Set())} className="p-1.5 text-torg-gray hover:bg-gray-100 rounded-lg" title="Limpar seleção">
               <X size={14} />
