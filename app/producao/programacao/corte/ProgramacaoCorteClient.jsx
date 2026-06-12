@@ -6,7 +6,7 @@ import {
   Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download, Upload,
   Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList,
   ArrowRight, X, Trash2, Factory, PackageSearch, AlertTriangle, XCircle, Layers,
-  Cloud, FileDown,
+  Cloud, FileDown, FolderSearch, Folder, ArrowLeft,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import {
@@ -2238,6 +2238,10 @@ function ModalImportarSharepoint({ onClose, onImportado }) {
   const [obrasPorOp, setObrasPorOp] = useState({}); // pasta → { carregando, obras, erro }
   const [importando, setImportando] = useState(null); // `${pasta}|${obra}`
   const [resultados, setResultados] = useState({});   // obra → resultado
+  const [base, setBase] = useState("");               // caminho base das OPs
+  const [browser, setBrowser] = useState(null);       // { opPasta } navegador aberto
+  const [nav, setNav] = useState(null);               // { carregando, atual, pastas, lpcs, erro }
+  const [salvando, setSalvando] = useState(false);
 
   // 1) lista as pastas de OP
   const listar = async () => {
@@ -2246,26 +2250,57 @@ function ModalImportarSharepoint({ onClose, onImportado }) {
       const res = await fetch("/api/producao/pecas/importar-lpc-revisao");
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Falha ao listar as OPs");
-      setOps(data.ops || []);
+      setOps(data.ops || []); setBase(data.base || "");
     } catch (e) { setErro(e.message); }
     finally { setCarregandoOps(false); }
   };
   useEffect(() => { listar(); }, []);
 
-  // 2) busca os LPC de uma OP (ao expandir)
-  const abrirOp = async (pasta) => {
-    if (aberta === pasta) { setAberta(null); return; }
+  // 2) busca os LPC de uma OP (ao expandir) — recarrega se forçado
+  const abrirOp = async (pasta, forcar = false) => {
+    if (!forcar && aberta === pasta) { setAberta(null); return; }
     setAberta(pasta);
-    if (obrasPorOp[pasta]?.obras) return; // já carregado
+    if (!forcar && obrasPorOp[pasta]?.obras) return; // já carregado
     setObrasPorOp((p) => ({ ...p, [pasta]: { carregando: true } }));
     try {
       const res = await fetch(`/api/producao/pecas/importar-lpc-revisao?op=${encodeURIComponent(pasta)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Falha ao buscar os LPC");
-      setObrasPorOp((p) => ({ ...p, [pasta]: { obras: data.obras || [] } }));
+      setObrasPorOp((p) => ({ ...p, [pasta]: { obras: data.obras || [], pastaSalva: data.pastaSalva || null } }));
     } catch (e) {
       setObrasPorOp((p) => ({ ...p, [pasta]: { erro: e.message } }));
     }
+  };
+
+  // ── Navegador de pastas ──────────────────────────────────────────────
+  const navegar = async (path) => {
+    setNav({ carregando: true, atual: path });
+    try {
+      const res = await fetch(`/api/producao/pecas/importar-lpc-revisao?browse=${encodeURIComponent(path)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha ao abrir a pasta");
+      setNav({ atual: data.atual, pastas: data.pastas || [], lpcs: data.lpcs || [] });
+    } catch (e) { setNav({ atual: path, erro: e.message }); }
+  };
+  const abrirBrowser = (opPasta) => {
+    setBrowser({ opPasta, raiz: `${base}/${opPasta}` });
+    navegar(`${base}/${opPasta}`);
+  };
+  const salvarPastaAtual = async () => {
+    if (!browser || !nav?.atual) return;
+    setSalvando(true);
+    try {
+      const res = await fetch("/api/producao/pecas/importar-lpc-revisao", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "salvar-pasta", opPasta: browser.opPasta, pastaPath: nav.atual }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Falha ao salvar");
+      setOps((prev) => prev.map((o) => o.pasta === browser.opPasta ? { ...o, pastaSalva: nav.atual } : o));
+      const op = browser.opPasta;
+      setBrowser(null); setNav(null);
+      await abrirOp(op, true); // recarrega os LPC da pasta salva
+    } catch (e) { setNav((n) => ({ ...n, erro: e.message })); }
+    finally { setSalvando(false); }
   };
 
   // 3) importa uma obra
@@ -2327,7 +2362,74 @@ function ModalImportarSharepoint({ onClose, onImportado }) {
             </div>
           )}
 
-          {carregandoOps && !ops ? (
+          {browser ? (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={() => { setBrowser(null); setNav(null); }} className="text-xs text-torg-blue hover:underline inline-flex items-center gap-1">
+                  <ArrowLeft size={13} /> Voltar às OPs
+                </button>
+                <span className="text-sm font-semibold text-torg-dark truncate">{browser.opPasta}</span>
+              </div>
+              <p className="text-[11px] text-torg-gray mb-2">
+                Navegue até a pasta que contém os LPC desta OP e clique em <strong>Usar esta pasta</strong>. Fica salvo — os próximos imports vão direto nela.
+              </p>
+              {/* caminho atual + subir */}
+              <div className="flex items-center gap-2 mb-2 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                <Cloud size={13} className="text-torg-gray shrink-0" />
+                <span className="text-[11px] font-mono text-torg-gray flex-1 truncate" title={nav?.atual}>
+                  …/{(nav?.atual || browser.raiz).split("/").slice(-1)[0]}
+                </span>
+                {nav?.atual && nav.atual !== browser.raiz && (
+                  <button onClick={() => navegar(nav.atual.split("/").slice(0, -1).join("/"))}
+                    className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-0.5"><ChevronUp size={12} /> subir</button>
+                )}
+              </div>
+
+              {nav?.carregando ? (
+                <div className="py-8 text-center"><Loader2 size={20} className="animate-spin text-torg-blue mx-auto" /></div>
+              ) : nav?.erro ? (
+                <p className="text-xs text-red-600 py-3">{nav.erro}</p>
+              ) : (
+                <div className="space-y-1">
+                  {(nav?.pastas || []).map((sub) => (
+                    <button key={sub.path} onClick={() => navegar(sub.path)}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-gray-50 text-left">
+                      <Folder size={14} className="text-amber-500 shrink-0" />
+                      <span className="text-sm text-torg-dark truncate">{sub.nome}</span>
+                      <ChevronDown size={13} className="text-torg-gray ml-auto -rotate-90 shrink-0" />
+                    </button>
+                  ))}
+                  {(nav?.pastas || []).length === 0 && <p className="text-[11px] text-torg-gray px-2 py-1">Sem subpastas aqui.</p>}
+
+                  {/* LPC encontrados nesta pasta */}
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    {(nav?.lpcs || []).length > 0 ? (
+                      <>
+                        <p className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide mb-1">{nav.lpcs.length} lista(s) LPC aqui</p>
+                        <div className="flex flex-wrap gap-1">
+                          {nav.lpcs.slice(0, 12).map((l) => (
+                            <span key={l.obra} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">{l.obra} {fmtR(l.rev)}</span>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-torg-gray">Nenhum LPC diretamente nesta pasta — desça até a pasta certa.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 flex justify-end gap-2">
+                <button onClick={() => { setBrowser(null); setNav(null); }} className="px-3 py-1.5 text-xs text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+                <button onClick={salvarPastaAtual} disabled={salvando || !(nav?.lpcs || []).length}
+                  title={!(nav?.lpcs || []).length ? "Esta pasta não tem LPC — navegue até a pasta com as listas" : ""}
+                  className="px-3 py-1.5 bg-torg-blue text-white text-xs font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1.5 disabled:opacity-50">
+                  {salvando ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                  Usar esta pasta
+                </button>
+              </div>
+            </div>
+          ) : carregandoOps && !ops ? (
             <div className="py-10 text-center"><Loader2 size={22} className="animate-spin text-torg-blue mx-auto" /><p className="text-sm text-torg-gray mt-2">Listando as OPs…</p></div>
           ) : opsFiltradas.length === 0 ? (
             <div className="py-10 text-center"><Cloud size={30} className="mx-auto text-gray-300 mb-2" /><p className="text-sm text-torg-gray">Nenhuma OP encontrada.</p></div>
@@ -2347,6 +2449,17 @@ function ModalImportarSharepoint({ onClose, onImportado }) {
 
                     {isOpen && (
                       <div className="border-t border-gray-100 bg-gray-50/40 px-3 py-2">
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
+                          <span className="text-[11px] text-torg-gray flex-1 truncate">
+                            {(det?.pastaSalva ?? op.pastaSalva)
+                              ? <>Pasta salva: <span className="font-mono text-torg-dark" title={det?.pastaSalva ?? op.pastaSalva}>…/{(det?.pastaSalva ?? op.pastaSalva).split("/").slice(-1)[0]}</span></>
+                              : "Sem pasta salva — usando a busca automática."}
+                          </span>
+                          <button onClick={() => abrirBrowser(op.pasta)}
+                            className="text-[11px] text-torg-blue border border-torg-blue-200 rounded-md px-2 py-1 font-medium hover:bg-torg-blue-50 inline-flex items-center gap-1">
+                            <FolderSearch size={12} /> Procurar pasta
+                          </button>
+                        </div>
                         {det?.carregando ? (
                           <p className="text-xs text-torg-gray py-2 inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Buscando os LPC…</p>
                         ) : det?.erro ? (

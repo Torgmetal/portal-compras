@@ -1,10 +1,16 @@
 // GET  /api/producao/pecas/importar-lpc-revisao            → lista as pastas de OP (nível 1)
-// GET  ?op=<pasta da OP>                                   → busca os LPC dessa OP (por obra, rev mais alta)
-// POST { pasta, obra, permitirDowngrade? }                 → importa a revisão dessa obra (merge, preserva progresso)
+// GET  ?browse=<path>                                      → navega uma pasta (subpastas + LPC)
+// GET  ?op=<pasta da OP>                                   → LPC dessa OP (da pasta salva, ou busca)
+// POST { acao:"salvar-pasta", opPasta, pastaPath }         → salva o caminho da pasta de LPC da OP
+// POST { acao:"remover-pasta", opPasta }                   → remove o caminho salvo
+// POST { pasta, obra, permitirDowngrade? }                 → importa a revisão da obra (merge)
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { listarPastasOp, buscarLpcDaOp, baixarLpcRows, resolveServidorDriveId } from "@/lib/sharepoint-lpc";
+import {
+  listarPastasOp, buscarLpcDaOp, baixarLpcRows, resolveServidorDriveId,
+  navegarPasta, lpcsDaPasta,
+} from "@/lib/sharepoint-lpc";
 import { parseLPC } from "@/lib/parse-lpc";
 import { importarLpcMerge } from "@/lib/importar-lpc-merge";
 import { z } from "zod";
@@ -18,27 +24,51 @@ function statusDo(e) {
   return e.status || 500;
 }
 
+// Resolve os LPC de uma OP: usa a pasta salva (1 listagem, sem ambiguidade) ou,
+// se não houver, cai na busca automática.
+async function lpcDaOp(driveId, opPasta) {
+  const salva = await prisma.opLpcPasta.findUnique({ where: { opPasta } });
+  if (salva) return { obras: await lpcsDaPasta(driveId, salva.pastaPath), pastaSalva: salva.pastaPath };
+  return { obras: await buscarLpcDaOp(driveId, opPasta), pastaSalva: null };
+}
+
 export async function GET(req) {
   try { await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: statusDo(e) }); }
 
-  const opPasta = (new URL(req.url).searchParams.get("op") || "").trim();
+  const sp = new URL(req.url).searchParams;
+  const opPasta = (sp.get("op") || "").trim();
+  const browse = (sp.get("browse") || "").trim();
 
-  // Sem ?op → só lista as pastas de OP (rápido: 1 request ao Graph).
-  if (!opPasta) {
+  // Navegar uma pasta (navegador de pastas).
+  if (browse) {
     try {
-      const { ops, base } = await listarPastasOp();
-      return NextResponse.json({ base, ops });
+      const driveId = await resolveServidorDriveId();
+      if (!driveId) return NextResponse.json({ error: "Drive SERVIDOR não resolvido." }, { status: 503 });
+      const nav = await navegarPasta(driveId, browse);
+      return NextResponse.json(nav);
     } catch (e) {
       return NextResponse.json({ error: e.message }, { status: statusDo(e) });
     }
   }
 
-  // Com ?op → busca os LPC dessa OP e cruza com a revisão carregada.
+  // Sem ?op → lista as pastas de OP + marca quais têm caminho salvo.
+  if (!opPasta) {
+    try {
+      const { ops, base } = await listarPastasOp();
+      const salvas = await prisma.opLpcPasta.findMany({ where: { opPasta: { in: ops.map((o) => o.pasta) } } });
+      const mapa = new Map(salvas.map((s) => [s.opPasta, s.pastaPath]));
+      return NextResponse.json({ base, ops: ops.map((o) => ({ ...o, pastaSalva: mapa.get(o.pasta) || null })) });
+    } catch (e) {
+      return NextResponse.json({ error: e.message }, { status: statusDo(e) });
+    }
+  }
+
+  // Com ?op → LPC dessa OP (da pasta salva ou da busca) cruzados com a rev carregada.
   try {
     const driveId = await resolveServidorDriveId();
     if (!driveId) return NextResponse.json({ error: "Drive SERVIDOR não resolvido." }, { status: 503 });
-    const achados = await buscarLpcDaOp(driveId, opPasta);
+    const { obras: achados, pastaSalva } = await lpcDaOp(driveId, opPasta);
     const carregadas = achados.length
       ? await prisma.lpcRevisao.findMany({ where: { opNumero: { in: achados.map((a) => a.obra) } } })
       : [];
@@ -51,13 +81,13 @@ export async function GET(req) {
         novidade: !at || a.rev > at.revisao,
       };
     });
-    return NextResponse.json({ pasta: opPasta, obras });
+    return NextResponse.json({ pasta: opPasta, pastaSalva, obras });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: statusDo(e) });
   }
 }
 
-const schema = z.object({
+const importSchema = z.object({
   pasta: z.string().min(1, "Informe a pasta da OP"),
   obra: z.string().min(1, "Informe a obra"),
   permitirDowngrade: z.boolean().optional(),
@@ -68,8 +98,32 @@ export async function POST(req) {
   try { user = await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: statusDo(e) }); }
 
+  let raw;
+  try { raw = await req.json(); }
+  catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
+
+  // ── Salvar / remover o caminho da pasta de LPC da OP ──────────────────
+  if (raw.acao === "salvar-pasta") {
+    const opPasta = String(raw.opPasta || "").trim();
+    const pastaPath = String(raw.pastaPath || "").trim();
+    if (!opPasta || !pastaPath) return NextResponse.json({ error: "Informe a OP e a pasta." }, { status: 400 });
+    await prisma.opLpcPasta.upsert({
+      where: { opPasta },
+      create: { opPasta, pastaPath, salvoPorId: user.id },
+      update: { pastaPath, salvoEm: new Date(), salvoPorId: user.id },
+    });
+    await prisma.auditLog.create({ data: { userId: user.id, action: "SALVAR_PASTA_LPC", entity: "OpLpcPasta", entityId: opPasta, diff: { pastaPath } } }).catch(() => {});
+    return NextResponse.json({ ok: true, pastaPath });
+  }
+  if (raw.acao === "remover-pasta") {
+    const opPasta = String(raw.opPasta || "").trim();
+    await prisma.opLpcPasta.deleteMany({ where: { opPasta } });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── Importar a revisão de uma obra ────────────────────────────────────
   let body;
-  try { body = schema.parse(await req.json()); }
+  try { body = importSchema.parse(raw); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
   const obra = body.obra.trim().toUpperCase();
@@ -78,7 +132,7 @@ export async function POST(req) {
   try {
     driveId = await resolveServidorDriveId();
     if (!driveId) return NextResponse.json({ error: "Drive SERVIDOR não resolvido." }, { status: 503 });
-    achados = await buscarLpcDaOp(driveId, body.pasta);
+    achados = (await lpcDaOp(driveId, body.pasta)).obras;
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: statusDo(e) });
   }
