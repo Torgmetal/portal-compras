@@ -18,8 +18,16 @@
  *   2. Copiar mes-sync-package.json para C:\MesSync\package.json
  *   3. Criar C:\MesSync\.env com as variáveis abaixo
  *   4. npm install
- *   5. Testar: node mes-sync-agent.js
- *   6. Agendar via Task Scheduler a cada 1 hora
+ *   5. Testar: node mes-sync-agent.js --so-apontamentos
+ *   6. Rodar continuamente (RECOMENDADO): node mes-sync-agent.js --loop
+ *      → apontamentos a cada 10 min + ordens a cada 60 min, num processo só.
+ *      Mantenha o processo vivo via Task Scheduler (gatilho "Ao iniciar o
+ *      sistema", "Reiniciar em caso de falha") ou um serviço (nssm).
+ *      ALTERNATIVA sem processo fixo: duas tarefas one-shot no Task Scheduler —
+ *        a cada 10 min:  node mes-sync-agent.js --so-apontamentos
+ *        a cada 60 min:  node mes-sync-agent.js --so-ordens
+ *      NUNCA agende o run completo (apontamentos+ordens) a cada 10 min: o
+ *      snapshot de ordens (3 anos) estoura a memória da compute do Neon.
  *
  * VARIÁVEIS DO .env
  *   SKA_API_URL=http://192.168.0.190:1000
@@ -27,14 +35,18 @@
  *   SKA_PASS=...
  *   PORTAL_API_URL=https://workspace.torg.com.br
  *   PORTAL_API_KEY=...   (mesma MES_SYNC_API_KEY do portal — NUNCA commitar o valor)
- *   SYNC_DIAS_ATRAS=2    (janela dos apontamentos)
+ *   SYNC_DIAS_ATRAS=2          (janela dos apontamentos)
+ *   APONT_INTERVAL_MIN=10      (loop: intervalo dos apontamentos, em min)
+ *   ORDENS_INTERVAL_MIN=60     (loop: intervalo das ordens, em min)
  *
  * USO
- *   node mes-sync-agent.js                          → apontamentos (2 dias) + ordens (3 anos)
+ *   node mes-sync-agent.js --loop                   → LOOP: apontamentos 10min + ordens 60min
+ *   node mes-sync-agent.js --loop --so-apontamentos → LOOP só de apontamentos (10 min)
+ *   node mes-sync-agent.js                          → 1x: apontamentos (2 dias) + ordens (3 anos)
  *   node mes-sync-agent.js --apont-dias 15          → apontamentos dos últimos 15 dias (backfill)
  *   node mes-sync-agent.js --apont-start 2026-06-01 → apontamentos desde 01/06 (backfill de buraco)
- *   node mes-sync-agent.js --so-apontamentos        → só o sync de apontamentos
- *   node mes-sync-agent.js --so-ordens              → só o snapshot de ordens
+ *   node mes-sync-agent.js --so-apontamentos        → 1x: só o sync de apontamentos
+ *   node mes-sync-agent.js --so-ordens              → 1x: só o snapshot de ordens
  *   node mes-sync-agent.js --start 2025-01-01       → ordens: snapshot desde 01/01/2025
  *   node mes-sync-agent.js --anos 2                 → ordens: snapshot dos últimos 2 anos
  */
@@ -59,6 +71,9 @@ const ARG_APONT_DIAS  = getArg("apont-dias");   // apontamentos
 const ARG_APONT_START = getArg("apont-start");  // apontamentos (backfill)
 const SO_APONTAMENTOS = temFlag("so-apontamentos");
 const SO_ORDENS       = temFlag("so-ordens");
+const LOOP            = temFlag("loop");          // roda continuamente (auto-agenda)
+const APONT_INTERVAL_MIN  = parseInt(process.env.APONT_INTERVAL_MIN  || "10", 10); // apontamentos a cada N min
+const ORDENS_INTERVAL_MIN = parseInt(process.env.ORDENS_INTERVAL_MIN || "60", 10); // ordens a cada M min
 
 const SKA_API_URL    = (process.env.SKA_API_URL    || "http://192.168.0.190:1000").replace(/\/$/, "");
 const SKA_USER       = process.env.SKA_USER;
@@ -351,9 +366,9 @@ async function syncOrdens(token) {
   log(`Ordens OK: ${res.processados} processadas`);
 }
 
-// ─── Main: roda os dois fluxos (apontamentos primeiro — é o dado do dia) ───────
-async function main() {
-  log("=== Início sync MES (apontamentos 242 + ordens 150) ===");
+// ─── Um ciclo: login + apontamentos (sempre) + ordens (quando pedido) ──────────
+// Não chama process.exit — devolve o nº de fluxos com erro (para o loop seguir).
+async function rodarCiclo(comOrdens) {
   const t0 = Date.now();
   let falhas = 0;
 
@@ -361,8 +376,8 @@ async function main() {
   try {
     token = await skaLogin();
   } catch (err) {
-    log(`ERRO FATAL (login SKA): ${err.message}`);
-    process.exit(1);
+    log(`ERRO (login SKA): ${err.message}`);
+    return 1; // sem token não dá pra fazer nada neste ciclo
   }
 
   if (!SO_ORDENS) {
@@ -370,15 +385,50 @@ async function main() {
     catch (err) { falhas++; log(`ERRO no sync de APONTAMENTOS: ${err.message}`); }
   }
 
-  if (!SO_APONTAMENTOS) {
+  if (comOrdens && !SO_APONTAMENTOS) {
     try { await syncOrdens(token); }
     catch (err) { falhas++; log(`ERRO no sync de ORDENS: ${err.message}`); }
   }
 
   log(`${"─".repeat(60)}`);
-  log(`Sync concluído em ${((Date.now()-t0)/1000).toFixed(1)}s${falhas ? ` — ${falhas} fluxo(s) com ERRO` : ""}`);
+  log(`Ciclo concluído em ${((Date.now()-t0)/1000).toFixed(1)}s${falhas ? ` — ${falhas} fluxo(s) com ERRO` : ""}`);
+  return falhas;
+}
+
+// ─── Execução única (Task Scheduler one-shot) ──────────────────────────────────
+async function rodarUmaVez() {
+  log("=== Início sync MES (execução única: apontamentos 242 + ordens 150) ===");
+  const falhas = await rodarCiclo(true);
   log("=== Fim sync MES ===\n");
   if (falhas > 0) process.exit(1);
 }
 
-main();
+// ─── Loop contínuo: apontamentos a cada N min, ordens a cada M min ─────────────
+// Roda como processo único. Apontamentos é leve (dataset 242, janela curta);
+// ordens é pesado (snapshot 3 anos, dataset 150) — por isso intervalo maior,
+// senão a compute do Neon estoura de memória.
+async function rodarEmLoop() {
+  const apontMs  = Math.max(APONT_INTERVAL_MIN, 1) * 60000;
+  const ordensMs = Math.max(ORDENS_INTERVAL_MIN, 1) * 60000;
+  const fazOrdens = !SO_APONTAMENTOS;
+  log(`=== Agente MES em LOOP — apontamentos a cada ${APONT_INTERVAL_MIN}min` +
+      `${fazOrdens ? `, ordens a cada ${ORDENS_INTERVAL_MIN}min` : " (só apontamentos)"} ===`);
+
+  let proxOrdens = 0; // 0 = roda ordens já na primeira volta
+  // Loop infinito — erros de um ciclo nunca derrubam o processo.
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const t = Date.now();
+    const comOrdens = fazOrdens && t >= proxOrdens;
+    try { await rodarCiclo(comOrdens); }
+    catch (err) { log(`ERRO inesperado no ciclo: ${err.message}`); }
+    if (comOrdens) proxOrdens = Date.now() + ordensMs;
+
+    const espera = Math.max(apontMs - (Date.now() - t), 5000);
+    log(`Próximo ciclo de apontamentos em ~${(espera / 60000).toFixed(1)}min.\n`);
+    await sleep(espera);
+  }
+}
+
+if (LOOP) rodarEmLoop();
+else rodarUmaVez();
