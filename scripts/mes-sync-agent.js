@@ -35,7 +35,9 @@
  *   SKA_PASS=...
  *   PORTAL_API_URL=https://workspace.torg.com.br
  *   PORTAL_API_KEY=...   (mesma MES_SYNC_API_KEY do portal — NUNCA commitar o valor)
- *   SYNC_DIAS_ATRAS=2          (janela dos apontamentos)
+ *   SYNC_DIAS_ATRAS=2          (janela dos apontamentos, em dias)
+ *   ORDENS_DIAS_ATRAS=60       (janela do snapshot de ordens, em dias — use após o
+ *                               backfill; sem ela o padrão é 3 anos, p/ carga inicial)
  *   APONT_INTERVAL_MIN=10      (loop: intervalo dos apontamentos, em min)
  *   ORDENS_INTERVAL_MIN=60     (loop: intervalo das ordens, em min)
  *
@@ -342,13 +344,20 @@ async function enviarOrdens(ordens, dataInicio, dataFim) {
 async function syncOrdens(token) {
   log("── Sync ORDENS (dataset 150 — snapshot) ──");
   const hoje = new Date(); hoje.setHours(23, 59, 59, 0);
+  // Prioridade da janela: --start > --anos > ORDENS_DIAS_ATRAS (env) > 3 anos.
+  // Com o histórico já carregado, o dia a dia só precisa de poucos dias: as OPs
+  // ativas recentes seguem atualizando; as antigas mantêm o estado já sincronizado.
   let inicio;
   if (ARG_START) {
     inicio = new Date(ARG_START + "T00:00:00");
     if (isNaN(inicio.getTime())) throw new Error(`--start inválido: "${ARG_START}". Use YYYY-MM-DD`);
+  } else if (ARG_ANOS) {
+    inicio = new Date(hoje); inicio.setFullYear(inicio.getFullYear() - parseInt(ARG_ANOS, 10)); inicio.setHours(0, 0, 0, 0);
+  } else if (process.env.ORDENS_DIAS_ATRAS) {
+    const dias = parseInt(process.env.ORDENS_DIAS_ATRAS, 10) || 60;
+    inicio = new Date(hoje.getTime() - dias * DIA_MS); inicio.setHours(0, 0, 0, 0);
   } else {
-    const anos = ARG_ANOS ? parseInt(ARG_ANOS, 10) : 3;
-    inicio = new Date(hoje); inicio.setFullYear(inicio.getFullYear() - anos); inicio.setHours(0,0,0,0);
+    inicio = new Date(hoje); inicio.setFullYear(inicio.getFullYear() - 3); inicio.setHours(0, 0, 0, 0);
   }
   log(`Período (snapshot): ${fmtData(inicio)} → ${fmtData(hoje)}`);
 
