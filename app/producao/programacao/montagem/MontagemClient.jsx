@@ -19,8 +19,10 @@ const STATUS_LABEL = {
 };
 
 const PRONTIDAO_LABEL = {
-  PRONTO: "Pronto — 100% cortado",
-  LIBERAVEL: "Pode montar — ≥ metade cortada",
+  PRONTO: "Montagem total — 100% cortado",
+  LIBERAVEL: "Montagem parcial liberada — ≥ metade",
+  NAO_MONTAGEM: "Não dá montagem — corte abaixo da metade",
+  PODE_MONTAR: "Pode montar (100% ou ≥ metade)",
   PARCIAL: "Aguardando corte",
   PENDENTE: "Sem corte",
   MONTADO: "Conjuntos montados",
@@ -128,7 +130,9 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
       if (filtroProntidao === "MONTADO") {
         if (c.status !== "MONTAGEM") return false;
       } else if (filtroProntidao === "PODE_MONTAR") {
-        if (!c.prontidao.podeLiberar) return false; // 100% ou ≥ metade
+        if (!c.prontidao.podeLiberar) return false; // 100% ou ≥ metade (card de KPI)
+      } else if (filtroProntidao === "NAO_MONTAGEM") {
+        if (c.prontidao.podeLiberar) return false; // abaixo da metade / sem corte
       } else if (filtroProntidao && c.prontidao.categoria !== filtroProntidao) return false;
       if (busca) {
         const q = busca.toLowerCase();
@@ -423,13 +427,8 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
         >
           <option value="">Todos status</option>
-          <option value="CORTE">Corte (aguardando)</option>
+          <option value="CORTE">Aguardando montagem (no corte)</option>
           <option value="MONTAGEM">Em montagem</option>
-          <option value="SOLDA">Solda</option>
-          <option value="ACABAMENTO">Acabamento</option>
-          <option value="JATO">Jato</option>
-          <option value="PINTURA">Pintura</option>
-          <option value="EXPEDIDO">Expedido</option>
         </select>
         <select
           value={filtroProntidao}
@@ -437,12 +436,9 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
         >
           <option value="">Situação</option>
-          <option value="PODE_MONTAR">Pode montar (100% ou ≥ metade)</option>
-          <option value="PRONTO">Pronto — 100% cortado</option>
-          <option value="LIBERAVEL">≥ metade cortada</option>
-          <option value="PARCIAL">Aguardando corte</option>
-          <option value="PENDENTE">Sem corte</option>
-          <option value="MONTADO">Conjuntos montados</option>
+          <option value="PRONTO">Montagem total — 100% cortado</option>
+          <option value="LIBERAVEL">Montagem parcial liberada — ≥ metade</option>
+          <option value="NAO_MONTAGEM">Não dá montagem — corte abaixo da metade</option>
         </select>
         <div className="flex items-center gap-1 flex-1 min-w-[180px]">
           <Search size={12} className="text-torg-gray ml-2" />
