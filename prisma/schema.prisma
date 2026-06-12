@@ -1241,6 +1241,15 @@ model LpcRevisao {
   @@index([revisao])
 }
 
+// Caminho salvo da pasta de LPC de cada OP no SharePoint. Definido navegando
+// uma vez (evita a busca automática pegar o arquivo/pasta errado).
+model OpLpcPasta {
+  opPasta    String   @id // nome da pasta da OP ("OP-067 - Danpower …")
+  pastaPath  String       // caminho relativo do folder onde ficam os LPC
+  salvoEm    DateTime @default(now())
+  salvoPorId String?
+}
+
 // Parâmetros do PCP (chave-valor) — ex.: meta_corte_kg_mes = "250000"
 model PcpParametro {
   chave     String   @id

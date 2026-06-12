@@ -2381,7 +2381,9 @@ function ModalImportarSharepoint({ onClose, onImportado }) {
                                         <span className="text-red-600">−{r.removidas?.length || 0}</span>
                                         <span>{r.mantidas || 0} mantidas</span>
                                         <span className="text-torg-dark font-medium">{r.totalNovo} marcas</span>
-                                        {!r.opEncontrada && <span className="text-amber-600">OP não cadastrada</span>}
+                                        {r.opEncontrada
+                                          ? <span className="text-emerald-700 font-medium">↳ OP {r.opCadastrada}</span>
+                                          : <span className="text-amber-600">OP não cadastrada no comercial</span>}
                                       </div>
                                       {r.conflitos?.length > 0 && (
                                         <div className="mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 text-amber-800">
