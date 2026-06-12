@@ -1,6 +1,5 @@
 "use client";
 import { useState, useMemo, useRef } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
@@ -44,7 +43,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const router = useRouter();
   const [pecas, setPecas] = useState(pecasIniciais);
   const [filtroOp, setFiltroOp] = useState("");
-  const [menuAcoes, setMenuAcoes] = useState(false); // dropdown único de ações do header
   const [filtroStatus, setFiltroStatus] = useState("PENDENTE");
   const [filtroMaquina, setFiltroMaquina] = useState("");
   const [filtroAtendimento, setFiltroAtendimento] = useState("");
@@ -787,50 +785,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           <p className="text-xs text-torg-gray mt-0.5">
             Verifique a classificação automática das peças por máquina e libere para produção.
           </p>
-        </div>
-        <div className="flex gap-2 items-center">
-          <Link
-            href="/pcp/fila-corte"
-            className="px-3 py-1.5 border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5"
-            title="Peças liberadas entram na fila de corte — programe metas e acompanhe o kanban"
-          >
-            <ClipboardList size={14} /> Fila de Corte →
-          </Link>
-          {/* Ações agrupadas num único menu — o fluxo será refeito; sem paredão de botões */}
-          <div className="relative">
-            <button
-              onClick={() => setMenuAcoes((v) => !v)}
-              className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
-            >
-              Ações <ChevronDown size={14} className={`transition-transform ${menuAcoes ? "rotate-180" : ""}`} />
-            </button>
-            {menuAcoes && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setMenuAcoes(false)} />
-                <div className="absolute right-0 mt-1 w-56 bg-white rounded-xl border border-gray-100 shadow-lg z-40 py-1.5 text-sm">
-                  <ItemMenu icon={Upload} onClick={() => { setMenuAcoes(false); setModalImport(true); }}>Importar LE</ItemMenu>
-                  <ItemMenu icon={Upload} onClick={() => { setMenuAcoes(false); setModalImportLPC(true); }}>Importar LPC</ItemMenu>
-                  <ItemMenu icon={Factory} onClick={() => { setMenuAcoes(false); abrirModalSyneco(); }}>Importar Syneco</ItemMenu>
-                  <ItemMenu icon={PackageSearch} disabled={conferindoEstoque || !filtroOp}
-                    title={!filtroOp ? "Selecione uma OP para conferir" : ""}
-                    onClick={() => { setMenuAcoes(false); conferirEstoque(); }}>Conferir Estoque</ItemMenu>
-                  <div className="my-1 border-t border-gray-100" />
-                  <ItemMenu icon={ClipboardList} onClick={() => { setMenuAcoes(false); exportarListaMaterial(); }}>Lista de Material</ItemMenu>
-                  <ItemMenu icon={FileSpreadsheet} onClick={() => { setMenuAcoes(false); exportarProgramaCorte(); }}>Programa de Corte</ItemMenu>
-                  {isAdmin && (
-                    <>
-                      <div className="my-1 border-t border-gray-100" />
-                      <ItemMenu icon={RefreshCw} disabled={reclassificando}
-                        onClick={() => { setMenuAcoes(false); reclassificarMaquinas(); }}>Reclassificar máquinas</ItemMenu>
-                      {opsComPecas.length > 0 && (
-                        <ItemMenu icon={Trash2} destrutivo onClick={() => { setMenuAcoes(false); setModalExcluirLote(true); }}>Excluir em lote</ItemMenu>
-                      )}
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
         </div>
       </div>
 
@@ -2241,22 +2195,5 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
         </div>
       </div>
     </div>
-  );
-}
-
-/* Item do menu "Ações" do header */
-function ItemMenu({ icon: Icon, onClick, disabled, destrutivo, title, children }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`w-full px-3 py-2 flex items-center gap-2.5 text-left text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-        destrutivo ? "text-red-600 hover:bg-red-50" : "text-torg-dark hover:bg-torg-blue-50"
-      }`}
-    >
-      <Icon size={14} className={destrutivo ? "text-red-400" : "text-torg-gray"} />
-      {children}
-    </button>
   );
 }
