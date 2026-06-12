@@ -3,6 +3,7 @@ import { StoreProvider } from "@/lib/store";
 import Toast from "@/components/Toast";
 import NextAuthProvider from "@/components/SessionProvider";
 import TorguinhoChat from "@/components/TorguinhoChat";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata = {
   title: "Workspace Torg",
@@ -20,6 +21,7 @@ export default function RootLayout({ children }) {
             <TorguinhoChat />
           </StoreProvider>
         </NextAuthProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
