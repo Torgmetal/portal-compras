@@ -786,6 +786,14 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
             Verifique a classificação automática das peças por máquina e libere para produção.
           </p>
         </div>
+        {isAdmin && opsComPecas.length > 0 && (
+          <button
+            onClick={() => setModalExcluirLote(true)}
+            className="px-3 py-1.5 text-red-600 border border-red-200 text-xs rounded-lg hover:bg-red-50 font-medium flex items-center gap-1.5"
+          >
+            <Trash2 size={14} /> Excluir peças por OP
+          </button>
+        )}
       </div>
 
       {/* KPIs resumo */}
