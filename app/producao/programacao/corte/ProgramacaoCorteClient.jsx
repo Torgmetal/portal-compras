@@ -588,8 +588,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   }
 
   // Prepara pecas com auto-classificação para peças sem maquina
-  function prepararPecas() {
-    const base = filtroOp ? pecasFiltradas : pecas;
+  function prepararPecas(baseCustom) {
+    const base = baseCustom || (filtroOp ? pecasFiltradas : pecas);
     return base.map((p) => {
       if (p.maquina) return p;
       if (!p.descricao) return p;
@@ -599,91 +599,94 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   }
 
   // --- BOTAO 1: Lista de Material ---
-  function exportarListaMaterial() {
-    const pecasComMaq = prepararPecas();
+  // Lista de Material (pendentes) — padrão TORG (logo/KPIs/totais).
+  // Material que SERÁ usado: só peças aguardando liberação (PENDENTE).
+  async function exportarListaMaterial() {
+    const basePendentes = (filtroOp ? pecasFiltradas : pecas).filter((p) => p.status === "PENDENTE");
+    const pecasComMaq = prepararPecas(basePendentes);
     if (pecasComMaq.length === 0) {
-      alert("Nenhuma peça com perfil reconhecido para gerar lista de material.");
+      alert("Nenhuma peça pendente com perfil reconhecido para gerar a lista de material.");
       return;
     }
 
-    const wb = XLSX.utils.book_new();
-    const opLabel = filtroOp ? `OP ${filtroOp}` : "Todas OPs";
-    const agora = `${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
-
-    // Agrupar por maquina → perfil → totais
+    const opLabel = filtroOp ? `OP-${filtroOp}` : "Todas as OPs";
     const resumo = calcularResumoBarras(pecasComMaq);
 
-    const rows = [];
-    rows.push(["LISTA DE MATERIAL PARA CORTE"]);
-    rows.push([`${opLabel} — Gerado em ${agora}`]);
-    rows.push([]);
-    rows.push(["Máquina", "Perfil", "Tipo", "Qte Peças", "Comprimento Total (m)", "Barra Padrão (m)", "Barra Útil (m)", "Barras Necessárias", "Peso Estimado (kg)"]);
-
-    let totalBarrasGeral = 0;
-    let totalPecasGeral = 0;
-    let totalPesoGeral = 0;
-
+    // Monta as linhas: máquina → perfil (barras) + chapas do Laser Chapa
+    const linhas = [];
+    let totalBarras = 0, totalPcs = 0, totalPeso = 0;
     for (const [maq, dados] of Object.entries(resumo)) {
       const perfis = Object.entries(dados.perfis).sort((a, b) => a[0].localeCompare(b[0]));
       for (const [perfil, pf] of perfis) {
-        const compTotalM = (pf.compTotalMm / 1000);
-        const barraM = (pf.comprimentoBarraMm / 1000);
-        // Estimar peso: peso medio por mm * comprimento total
         const pesoEstimado = pecasComMaq
           .filter((p) => p.maquina === maq && p.descricao === perfil)
           .reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
-
-        const barraUtilM = pf.barraUtilMm ? (pf.barraUtilMm / 1000).toFixed(2) : barraM.toFixed(0);
-        rows.push([
+        linhas.push([
           MAQUINA_LABEL[maq] || maq,
           perfil,
           pf.tipo,
           pf.qte,
-          compTotalM.toFixed(1),
-          barraM.toFixed(0),
-          barraUtilM,
+          Number((pf.compTotalMm / 1000).toFixed(1)),
+          Number((pf.comprimentoBarraMm / 1000).toFixed(0)),
+          pf.barraUtilMm ? Number((pf.barraUtilMm / 1000).toFixed(2)) : Number((pf.comprimentoBarraMm / 1000).toFixed(0)),
           pf.barras,
-          pesoEstimado.toFixed(1),
+          Number(pesoEstimado.toFixed(1)),
         ]);
-        totalBarrasGeral += pf.barras;
-        totalPecasGeral += pf.qte;
-        totalPesoGeral += pesoEstimado;
+        totalBarras += pf.barras; totalPcs += pf.qte; totalPeso += pesoEstimado;
       }
-
-      // Chapas desta maquina (se Laser Chapa)
+      // Chapas desta máquina (Laser Chapa não usa barras)
       if (maq === "LASER_CHAPA") {
-        const chapas = pecasComMaq.filter((p) => p.maquina === "LASER_CHAPA");
-        // Agrupar chapas por descricao
         const chapasPorDesc = {};
-        for (const ch of chapas) {
+        for (const ch of pecasComMaq.filter((p) => p.maquina === "LASER_CHAPA")) {
           const desc = ch.descricao || "Chapa";
           if (!chapasPorDesc[desc]) chapasPorDesc[desc] = { qte: 0, peso: 0 };
           chapasPorDesc[desc].qte += ch.qte || 1;
           chapasPorDesc[desc].peso += ch.pesoTotalKg || 0;
         }
         for (const [desc, info] of Object.entries(chapasPorDesc)) {
-          rows.push(["Laser Chapa", desc, "CH", info.qte, "—", "—", "—", info.qte, info.peso.toFixed(1)]);
-          totalPecasGeral += info.qte;
-          totalBarrasGeral += info.qte;
-          totalPesoGeral += info.peso;
+          linhas.push(["Laser Chapa", desc, "CH", info.qte, "", "", "", info.qte, Number(info.peso.toFixed(1))]);
+          totalPcs += info.qte; totalBarras += info.qte; totalPeso += info.peso;
         }
       }
     }
 
-    rows.push([]);
-    rows.push(["TOTAL", "", "", totalPecasGeral, "", "", "", totalBarrasGeral, totalPesoGeral.toFixed(1)]);
+    const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+      titulo: "Lista de Material para Corte",
+      subtitulo: `${opLabel} — peças pendentes (aguardando liberação)`,
+      kpis: [
+        `Peças: ${totalPcs}  |  Barras/Chapas: ${totalBarras}  |  Peso estimado: ${(totalPeso / 1000).toFixed(1)} t`,
+      ],
+      totalColunas: 9,
+      nomePlanilha: "Lista de Material",
+      codigoDoc: "REL-PRD-004",
+    });
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [
-      { wch: 18 }, { wch: 22 }, { wch: 6 }, { wch: 10 },
-      { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 16 },
+    ws.columns = [
+      { width: 18 }, { width: 24 }, { width: 8 }, { width: 10 },
+      { width: 16 }, { width: 14 }, { width: 13 }, { width: 14 }, { width: 14 },
     ];
-    XLSX.utils.book_append_sheet(wb, ws, "Lista de Material");
 
-    const fileName = filtroOp
-      ? `Lista_Material_OP${filtroOp}_${new Date().toISOString().slice(0, 10)}.xlsx`
-      : `Lista_Material_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+    let row = linhaInicio;
+    adicionarHeaderTabela(ws, row, ["Máquina", "Perfil", "Tipo", "Qte Peças", "Comp. Total (m)", "Barra Padrão (m)", "Barra Útil (m)", "Barras Necess.", "Peso Est. (kg)"]);
+    row++;
+    const primeiraLinhaDados = row;
+    for (const l of linhas) {
+      adicionarLinhaTabela(ws, row, l, {
+        alinhamento: { 3: "center", 4: "right", 5: "right", 6: "right", 7: "right", 8: "right", 9: "right" },
+      });
+      row++;
+    }
+    const ultimaLinhaDados = row - 1;
+    adicionarLinhaTotais(ws, row, [
+      "TOTAL", "", "",
+      { formula: `SUM(D${primeiraLinhaDados}:D${ultimaLinhaDados})` },
+      "", "", "",
+      { formula: `SUM(H${primeiraLinhaDados}:H${ultimaLinhaDados})` },
+      { formula: `SUM(I${primeiraLinhaDados}:I${ultimaLinhaDados})` },
+    ]);
+
+    const nomeArquivo = `Torg_Lista_Material_${filtroOp ? `OP-${filtroOp}` : "Todas"}_${new Date().toISOString().split("T")[0]}.xlsx`;
+    await downloadWorkbook(workbook, nomeArquivo);
   }
 
   // --- BOTAO 2: Programa de Corte ---
@@ -931,6 +934,13 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={exportarListaMaterial}
+            className="px-3 py-1.5 border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5"
+            title="Material das peças PENDENTES (aguardando liberação) — barras/chapas por máquina, padrão TORG"
+          >
+            <ClipboardList size={14} /> Lista de Material
+          </button>
           <button
             onClick={() => setModalSharepoint(true)}
             className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
