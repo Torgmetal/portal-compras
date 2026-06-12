@@ -40,6 +40,15 @@ const fmtMm = (v) => {
   return `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mm`;
 };
 
+// OP-mãe (comercial) e PARTE a partir da obra/sublista do LPC:
+//   "T82A" → OP-mãe "82", parte "A";  "T82" → OP "82", parte "—".
+//   Usa op.numero ("082") quando vier vinculado.
+const opMaeNumero = (p) => {
+  const raw = p.op?.numero || (String(p.opNumero || "").match(/\d+/) || [])[0] || "";
+  return raw ? String(parseInt(raw, 10)) : "";
+};
+const parteDe = (p) => String(p.opNumero || "").replace(/^T?\d+/i, "").toUpperCase() || "—";
+
 export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole }) {
   const router = useRouter();
   const [pecas, setPecas] = useState(pecasIniciais);
@@ -73,15 +82,34 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const isAdmin = userRole === "ADMIN";
 
   // OPs disponiveis
+  // sublistas (T82A…) — usado pelo modal de exclusão por OP
   const opsComPecas = useMemo(() => {
     const set = new Set(pecas.map((p) => p.opNumero));
     return [...set].sort();
   }, [pecas]);
 
+  // OPs-mãe com peças (agrupa as sublistas T82A/T82B sob a OP-82) — filtro/seletor
+  const opsMae = useMemo(() => {
+    const map = new Map(); // key "82" → { key, cliente, marcas, pendentes, pesoPendente, partes:Set }
+    for (const p of pecas) {
+      const key = opMaeNumero(p);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, { key, cliente: p.op?.cliente || "", marcas: 0, pendentes: 0, pesoPendente: 0, partes: new Set() });
+      const o = map.get(key);
+      o.marcas++;
+      o.partes.add(parteDe(p));
+      if (!o.cliente && p.op?.cliente) o.cliente = p.op.cliente;
+      if (p.status === "PENDENTE") { o.pendentes++; o.pesoPendente += p.pesoTotalKg || 0; }
+    }
+    return [...map.values()]
+      .map((o) => ({ ...o, partes: [...o.partes].sort() }))
+      .sort((a, b) => Number(a.key) - Number(b.key));
+  }, [pecas]);
+
   // Filtrar pecas
   const pecasFiltradas = useMemo(() => {
     return pecas.filter((p) => {
-      if (filtroOp && p.opNumero !== filtroOp) return false;
+      if (filtroOp && opMaeNumero(p) !== filtroOp) return false;
       if (filtroStatus && p.status !== filtroStatus) return false;
       if (filtroTipo === "CONJUNTO" && p.tipoPeca !== "CONJUNTO") return false;
       if (filtroTipo === "CROQUI" && p.tipoPeca !== "CROQUI") return false;
@@ -117,6 +145,21 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       map[k].push(p);
     }
     return map;
+  }, [pecasFiltradas]);
+
+  // Agrupar por PARTE (A/B/C) — vista quando uma OP-mãe está selecionada.
+  // Prioridade = ordem da parte (A→B→C); dentro da parte, sequência pelo item.
+  const porParte = useMemo(() => {
+    const map = new Map();
+    for (const p of pecasFiltradas) {
+      const k = parteDe(p);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(p);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => (a.item ?? 1e9) - (b.item ?? 1e9) || a.marca.localeCompare(b.marca, undefined, { numeric: true }));
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])); // [parte, peças][]
   }, [pecasFiltradas]);
 
   // Resumo de barras
@@ -164,46 +207,49 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
     }
   };
 
-  // Liberar para corte — salva maquina + muda status
-  async function liberarSelecionados() {
-    if (selecionados.size === 0) return;
+  // Enviar para as máquinas (= liberar p/ corte): grava máquina + status CORTE.
+  // Só envia peças PENDENTE COM máquina (sem máquina = conjunto, vai por outra ação).
+  async function enviarParaMaquinas(idsAlvo) {
+    const ids = (idsAlvo || [...selecionados]).filter((id) => {
+      const p = pecas.find((x) => x.id === id);
+      return p && p.status === "PENDENTE";
+    });
+    if (ids.length === 0) return;
     setLiberando(true);
     try {
-      // Montar mapa de id → maquina (incluindo auto-classificação para peças sem maquina)
       const maquinasMap = {};
-      for (const id of selecionados) {
+      const semMaq = [];
+      for (const id of ids) {
         const p = pecas.find((x) => x.id === id);
-        if (!p) continue;
         let maq = p.maquina;
-        if (!maq && p.descricao) {
-          maq = classificarMaquina(p.descricao, p.pesoUnitKg, p.comprimentoMm);
-        }
-        if (maq) maquinasMap[id] = maq;
+        if (!maq && p.descricao) maq = classificarMaquina(p.descricao, p.pesoUnitKg, p.comprimentoMm);
+        if (maq) maquinasMap[id] = maq; else semMaq.push(p.marca);
       }
-
+      const enviaveis = ids.filter((id) => maquinasMap[id]);
+      if (enviaveis.length === 0) {
+        alert("Nenhuma peça com máquina definida na seleção. Defina o laser (ou marque como conjunto) antes de enviar.");
+        return;
+      }
       const res = await fetch("/api/producao/pecas/liberar-corte", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [...selecionados], maquinas: maquinasMap }),
+        body: JSON.stringify({ ids: enviaveis, maquinas: maquinasMap }),
       });
       let data;
       try { data = await res.json(); } catch { throw new Error(`Erro ${res.status}`); }
       if (!res.ok) throw new Error(data.error || "Erro");
 
-      // Update otimista — atualiza status E maquina
-      setPecas((prev) =>
-        prev.map((p) => {
-          if (!selecionados.has(p.id) || p.status !== "PENDENTE") return p;
-          return { ...p, status: "CORTE", maquina: maquinasMap[p.id] || p.maquina };
-        })
-      );
+      const set = new Set(enviaveis);
+      setPecas((prev) => prev.map((p) => (set.has(p.id) && p.status === "PENDENTE" ? { ...p, status: "CORTE", maquina: maquinasMap[p.id] || p.maquina } : p)));
       setSelecionados(new Set());
+      if (semMaq.length > 0) alert(`Enviadas ${enviaveis.length}. Ficaram de fora ${semMaq.length} sem máquina (defina o laser ou marque como conjunto): ${semMaq.slice(0, 8).join(", ")}${semMaq.length > 8 ? "…" : ""}`);
     } catch (e) {
-      alert("Erro ao liberar: " + e.message);
+      alert("Erro ao enviar: " + e.message);
     } finally {
       setLiberando(false);
     }
   }
+  const liberarSelecionados = () => enviarParaMaquinas();
 
   // Liberar todas as pendentes de uma maquina especifica
   async function liberarMaquina(maq) {
@@ -1005,7 +1051,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
         >
           <option value="">Todas as OPs</option>
-          {opsComPecas.map((op) => <option key={op} value={op}>OP {op}</option>)}
+          {opsMae.map((op) => <option key={op.key} value={op.key}>OP-{op.key}{op.cliente ? ` · ${op.cliente}` : ""}</option>)}
         </select>
         <select
           value={filtroStatus}
@@ -1082,8 +1128,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                 disabled={liberando}
                 className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
               >
-                {liberando ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
-                Liberar para Corte
+                {liberando ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
+                Enviar para as máquinas
               </button>
             )}
             {filtroStatus === "CORTE" && (
@@ -1100,181 +1146,119 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
         )}
       </div>
 
-      {/* Resultado vazio */}
-      {pecasFiltradas.length === 0 && (
+      {/* Conteúdo: sem OP → seletor de OPs; com OP → por parte (A/B/C) */}
+      {!filtroOp ? (
+        opsMae.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 text-center py-10">
+            <Package size={32} className="mx-auto text-gray-300 mb-2" />
+            <p className="text-sm text-torg-gray">Nenhuma peça importada. Use “Buscar lista (SharePoint)” acima.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <p className="text-sm font-semibold text-torg-dark mb-1">Escolha a OP para programar</p>
+            <p className="text-xs text-torg-gray mb-4">Avalie por parte (A/B/C) e envie para as máquinas com critério — nada é solto de uma vez.</p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {opsMae.map((op) => (
+                <button key={op.key} onClick={() => { setFiltroOp(op.key); setSelecionados(new Set()); }}
+                  className="text-left border border-gray-100 rounded-xl p-4 hover:border-torg-blue-200 hover:shadow-sm transition-all">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-torg-blue text-lg">OP-{op.key}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-torg-gray">{op.partes.length} parte(s)</span>
+                  </div>
+                  {op.cliente && <p className="text-xs text-torg-gray truncate">{op.cliente}</p>}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {op.partes.map((pt) => <span key={pt} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue">{pt}</span>)}
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-gray-50 flex items-center justify-between text-xs">
+                    <span className="text-torg-gray">{op.marcas} marcas</span>
+                    <span className="text-orange-700 font-semibold">{op.pendentes} a enviar · {fmtKg(op.pesoPendente)}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      ) : pecasFiltradas.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 text-center py-10">
           <Package size={32} className="mx-auto text-gray-300 mb-2" />
-          <p className="text-sm text-torg-gray">
-            {pecas.length === 0
-              ? "Nenhuma peça importada. Use os botões Importar LE ou Importar LPC acima."
-              : "Nenhuma peça no filtro selecionado."}
-          </p>
+          <p className="text-sm text-torg-gray">Nenhuma peça no filtro selecionado desta OP.</p>
         </div>
-      )}
-
-      {/* Seções por máquina */}
-      {Object.entries(MAQUINA_LABEL).map(([maq, label]) => {
-        const pecasMaq = porMaquina[maq] || [];
-        if (pecasMaq.length === 0) return null;
-        const isExpanded = expandido.has(maq);
-        const cor = MAQUINA_COR[maq];
-        const pesoTotal = pecasMaq.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
-        const qtdTotal = pecasMaq.reduce((s, p) => s + (p.qte || 1), 0);
-        const todosSelecionados = pecasMaq.every((p) => selecionados.has(p.id));
-
-        // Barras desta maquina
-        const barrasMaq = resumoBarras[maq];
-        const perfis = barrasMaq ? Object.entries(barrasMaq.perfis).sort((a, b) => a[0].localeCompare(b[0])) : [];
-        const totalBarras = perfis.reduce((s, [, pf]) => s + pf.barras, 0);
-
-        return (
-          <div key={maq} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            {/* Header da maquina */}
-            <button
-              onClick={() => toggleExpandido(maq)}
-              className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors hover:bg-gray-50`}
-            >
-              <span className={`w-3 h-3 rounded-full ${cor.dot}`} />
-              <span className={`text-sm font-bold ${cor.text}`}>{label}</span>
-              <div className="flex items-center gap-3 ml-auto text-[11px] text-torg-gray">
-                <span>{pecasMaq.length} marca{pecasMaq.length > 1 ? "s" : ""}</span>
-                <span>{qtdTotal} pç</span>
-                <span>{fmtKg(pesoTotal)}</span>
-                {totalBarras > 0 && <span className="font-semibold text-torg-dark">{totalBarras} barra{totalBarras > 1 ? "s" : ""}</span>}
-                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </div>
-            </button>
-
-            {isExpanded && (
-              <div className="border-t border-gray-100">
-                {/* Resumo de barras por perfil */}
-                {perfis.length > 0 && (
-                  <div className="px-4 py-2.5 bg-gray-50/60 border-b border-gray-100">
-                    <p className="text-[10px] font-semibold text-torg-dark uppercase tracking-wide mb-1.5">Barras necessárias</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {perfis.map(([perfil, pf]) => (
-                        <div key={perfil} className={`${cor.bg} rounded px-2 py-1 text-[11px]`}>
-                          <span className="font-mono font-semibold">{perfil}</span>
-                          <span className="text-torg-gray ml-1.5">{pf.qte} pç</span>
-                          <span className="text-torg-gray mx-1">·</span>
-                          <span className="text-torg-gray">{(pf.compTotalMm / 1000).toFixed(1)}m</span>
-                          <span className="text-torg-gray mx-1">→</span>
-                          <span className="font-semibold">{pf.barras} barra{pf.barras > 1 ? "s" : ""}</span>
-                          {pf.perdaMm > 0 && (
-                            <span className="text-torg-gray ml-1 text-[10px]" title={`Barra ${(pf.comprimentoBarraMm/1000).toFixed(0)}m → Útil: ${(pf.barraUtilMm/1000).toFixed(2)}m (perda ${pf.perdaMm}mm)`}>
-                              (útil: {(pf.barraUtilMm / 1000).toFixed(2)}m)
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+      ) : (
+        <div className="space-y-3">
+          {porParte.map(([parte, pcs]) => {
+            const pendentesParte = pcs.filter((p) => p.status === "PENDENTE");
+            const selDaParte = pcs.filter((p) => selecionados.has(p.id) && p.status === "PENDENTE");
+            const pesoParte = pcs.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+            const todosPendSel = pendentesParte.length > 0 && pendentesParte.every((p) => selecionados.has(p.id));
+            return (
+              <div key={parte} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap bg-gray-50/40">
+                  <span className="text-sm font-extrabold text-torg-dark">Parte {parte}</span>
+                  <span className="text-[11px] text-torg-gray">{pcs.length} marcas · {fmtKg(pesoParte)}</span>
+                  {pendentesParte.length > 0
+                    ? <span className="text-[11px] text-orange-700 font-medium">{pendentesParte.length} a enviar</span>
+                    : <span className="text-[11px] text-emerald-700 font-medium">tudo enviado</span>}
+                  <div className="ml-auto flex items-center gap-2">
+                    {pendentesParte.length > 0 && (
+                      <button onClick={() => setSelecionados((prev) => { const n = new Set(prev); if (todosPendSel) pendentesParte.forEach((p) => n.delete(p.id)); else pendentesParte.forEach((p) => n.add(p.id)); return n; })}
+                        className="text-[11px] text-torg-blue hover:underline">{todosPendSel ? "limpar" : "selecionar pendentes"}</button>
+                    )}
+                    <button onClick={() => enviarParaMaquinas(selDaParte.length ? selDaParte.map((p) => p.id) : pendentesParte.map((p) => p.id))}
+                      disabled={liberando || pendentesParte.length === 0}
+                      className="px-3 py-1.5 bg-torg-blue text-white text-xs font-medium rounded-lg hover:bg-torg-blue-700 inline-flex items-center gap-1.5 disabled:opacity-50">
+                      {liberando ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
+                      Enviar para as máquinas{selDaParte.length ? ` (${selDaParte.length})` : ""}
+                    </button>
                   </div>
-                )}
-
-                {/* Tabela de pecas */}
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50/60">
                       <tr>
-                        <th className="px-3 py-2 w-8">
-                          <input
-                            type="checkbox"
-                            checked={todosSelecionados && pecasMaq.length > 0}
-                            onChange={() => selecionarTodosMaquina(maq)}
-                            className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
-                          />
-                        </th>
-                        <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">OP</th>
+                        <th className="px-3 py-2 w-8"></th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Marca</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Descrição</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Material</th>
                         <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Qte</th>
                         <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Comp.</th>
-                        <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso unit.</th>
-                        <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso total</th>
-                        <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Produzido</th>
-                        <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Falta</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Máquina</th>
-                        <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Estoque</th>
-                        <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {pecasMaq.map((p) => {
-                        const perfil = parsePerfil(p.descricao);
-                        const prod = p.qteProduzida || 0;
-                        const total = p.qte || 1;
-                        const falta = Math.max(0, total - prod);
+                      {pcs.map((p) => {
+                        const semMaq = !p.maquina;
                         return (
-                          <tr key={p.id} className={`hover:bg-gray-50 ${selecionados.has(p.id) ? "bg-torg-blue-50/30" : ""} ${prod >= total && prod > 0 ? "bg-emerald-50/30" : prod > 0 ? "bg-yellow-50/20" : ""}`}>
+                          <tr key={p.id} className={`hover:bg-gray-50 ${selecionados.has(p.id) ? "bg-torg-blue-50/40" : ""}`}>
                             <td className="px-3 py-1.5">
-                              <input
-                                type="checkbox"
-                                checked={selecionados.has(p.id)}
-                                onChange={() => toggleSelecionado(p.id)}
-                                className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
-                              />
+                              {p.status === "PENDENTE" && <input type="checkbox" checked={selecionados.has(p.id)} onChange={() => toggleSelecionado(p.id)} />}
                             </td>
-                            <td className="px-3 py-1.5 text-xs font-mono text-torg-blue whitespace-nowrap">{fmtOP(p.opNumero)}</td>
-                            <td className="px-3 py-1.5 whitespace-nowrap">
-                              <span className="text-xs font-semibold text-torg-dark font-mono">{p.marca}</span>
-                              {p.tipoPeca === "CROQUI" && <span className="ml-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">CR</span>}
+                            <td className="px-3 py-1.5 font-mono text-xs font-semibold text-torg-dark whitespace-nowrap">{p.marca}
+                              {p.tipoPeca && <span className="ml-1 text-[9px] px-1 py-px rounded bg-amber-50 text-amber-700">{p.tipoPeca === "CONJUNTO" ? "CONJ" : "CR"}</span>}
                             </td>
-                            <td className="px-3 py-1.5 text-xs text-torg-gray max-w-[200px] truncate" title={p.descricao}>
-                              {p.descricao || "—"}
+                            <td className="px-3 py-1.5 text-xs text-torg-gray max-w-[180px] truncate" title={p.descricao}>{p.descricao || "—"}</td>
+                            <td className="px-3 py-1.5 text-xs text-torg-gray">{p.material || "—"}</td>
+                            <td className="px-3 py-1.5 text-right text-xs tabular-nums">{p.qte}</td>
+                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray">{fmtMm(p.comprimentoMm)}</td>
+                            <td className="px-3 py-1.5 text-right text-xs tabular-nums font-medium">{fmtKg(p.pesoTotalKg)}</td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <select value={p.maquina || ""} onChange={(e) => atualizarMaquina(p.id, e.target.value)}
+                                  className={`text-[11px] font-medium rounded-md border px-2 py-1 ${semMaq ? "border-orange-200 bg-orange-50 text-orange-600" : "border-gray-200 bg-white text-torg-dark"}`}>
+                                  <option value="">{semMaq ? "Sem laser…" : "—"}</option>
+                                  {Object.entries(MAQUINA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                                </select>
+                                {semMaq && (p.status === "PENDENTE" || p.status === "CORTE") && (
+                                  <button onClick={() => marcarConjunto([p.id])} disabled={marcandoConjunto} title="Não corta — começa na montagem"
+                                    className="text-[10px] text-torg-blue border border-torg-blue-200 rounded px-1.5 py-1 hover:bg-torg-blue-50 disabled:opacity-50">Conjunto</button>
+                                )}
+                              </div>
                             </td>
-                            <td className="px-3 py-1.5 text-xs text-torg-gray whitespace-nowrap">{p.material || "—"}</td>
-                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark whitespace-nowrap">{p.qte}</td>
-                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray whitespace-nowrap">{fmtMm(p.comprimentoMm)}</td>
-                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray whitespace-nowrap">{fmtKg(p.pesoUnitKg)}</td>
-                            <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-dark font-medium whitespace-nowrap">{fmtKg(p.pesoTotalKg)}</td>
-                            <td className={`px-3 py-1.5 text-right text-xs tabular-nums font-semibold whitespace-nowrap ${prod >= total && prod > 0 ? "text-emerald-600" : prod > 0 ? "text-orange-600" : "text-gray-400"}`}>
-                              {prod > 0 ? prod : "—"}
-                            </td>
-                            <td className={`px-3 py-1.5 text-right text-xs tabular-nums font-semibold whitespace-nowrap ${falta === 0 ? "text-emerald-600" : "text-orange-600"}`}>
-                              {prod > 0 ? (falta === 0 ? "✓" : falta) : "—"}
-                            </td>
-                            <td className="px-3 py-1.5 whitespace-nowrap">
-                              <select
-                                value={p.maquina || ""}
-                                onChange={(e) => atualizarMaquina(p.id, e.target.value)}
-                                className={`text-[11px] font-medium rounded-md border-0 px-2 py-1 focus:ring-1 focus:ring-torg-blue ${
-                                  p.maquina ? (MAQUINA_COR[p.maquina]?.bg || "bg-gray-50") + " " + (MAQUINA_COR[p.maquina]?.text || "text-gray-600") : "bg-gray-50 text-gray-400"
-                                }`}
-                              >
-                                <option value="">—</option>
-                                {Object.entries(MAQUINA_LABEL).map(([k, v]) => (
-                                  <option key={k} value={k}>{v}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="px-3 py-1.5 text-center whitespace-nowrap">
-                              {p.statusEstoque === "DISPONIVEL" ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                                  <CheckCircle2 size={9} /> OK
-                                </span>
-                              ) : p.statusEstoque === "PARCIAL" ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                                  <AlertTriangle size={9} /> Parcial
-                                </span>
-                              ) : p.statusEstoque === "INDISPONIVEL" ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">
-                                  <XCircle size={9} /> Falta
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-gray-300">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-1.5 text-center whitespace-nowrap">
-                              {p.status === "CORTE" ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                                  <CheckCircle2 size={10} /> Liberado
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                                  Pendente
-                                </span>
-                              )}
+                            <td className="px-3 py-1.5">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${p.status === "PENDENTE" ? "bg-orange-50 text-orange-700" : p.status === "CORTE" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
+                                {STATUS_LABEL[p.status] || p.status}
+                              </span>
                             </td>
                           </tr>
                         );
@@ -1282,152 +1266,9 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                     </tbody>
                   </table>
                 </div>
-
-                {/* Footer da maquina */}
-                <div className="px-4 py-3 bg-gray-50/60 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
-                  <span className="text-[11px] text-torg-gray">
-                    {pecasMaq.filter((p) => p.status === "PENDENTE").length} pendente{pecasMaq.filter((p) => p.status === "PENDENTE").length !== 1 ? "s" : ""} · {pecasMaq.filter((p) => p.status === "CORTE").length} liberada{pecasMaq.filter((p) => p.status === "CORTE").length !== 1 ? "s" : ""}
-                  </span>
-                  <div className="flex gap-2">
-                    {selecionados.size > 0 && pecasMaq.some((p) => selecionados.has(p.id)) && filtroStatus === "PENDENTE" && (
-                      <button
-                        onClick={liberarSelecionados}
-                        disabled={liberando}
-                        className="px-3 py-1.5 bg-emerald-100 text-emerald-700 text-xs rounded-lg hover:bg-emerald-200 font-medium flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        {liberando ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                        Liberar {pecasMaq.filter((p) => selecionados.has(p.id)).length} selecionadas
-                      </button>
-                    )}
-                    {filtroStatus === "PENDENTE" && pecasMaq.some((p) => p.status === "PENDENTE") && (
-                      <button
-                        onClick={() => liberarMaquina(maq)}
-                        disabled={liberando}
-                        className={`px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5 disabled:opacity-50`}
-                      >
-                        {liberando ? <Loader2 size={12} className="animate-spin" /> : <ArrowRight size={12} />}
-                        Liberar {label} para Produção
-                      </button>
-                    )}
-                    {filtroStatus === "CORTE" && pecasMaq.some((p) => p.status === "CORTE") && selecionados.size > 0 && (
-                      <button
-                        onClick={reverterSelecionados}
-                        disabled={revertendo}
-                        className="px-3 py-1.5 bg-orange-100 text-orange-700 text-xs rounded-lg hover:bg-orange-200 font-medium flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        {revertendo ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
-                        Reverter selecionadas
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
-            )}
-          </div>
-        );
-      })}
-
-      {/* Secao sem maquina */}
-      {(porMaquina["SEM_MAQUINA"] || []).length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <button
-            onClick={() => toggleExpandido("SEM_MAQUINA")}
-            className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50"
-          >
-            <span className="w-3 h-3 rounded-full bg-gray-300" />
-            <span className="text-sm font-bold text-gray-500">Sem Máquina Atribuída</span>
-            <div className="flex items-center gap-3 ml-auto text-[11px] text-torg-gray">
-              <span>{porMaquina["SEM_MAQUINA"].length} peça{porMaquina["SEM_MAQUINA"].length > 1 ? "s" : ""}</span>
-              <AlertCircle size={13} className="text-orange-400" />
-              {expandido.has("SEM_MAQUINA") ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </div>
-          </button>
-          {expandido.has("SEM_MAQUINA") && (() => {
-            const semMaq = porMaquina["SEM_MAQUINA"];
-            const selSemMaq = semMaq.filter((p) => selecionados.has(p.id));
-            const todosSemMaq = semMaq.length > 0 && semMaq.every((p) => selecionados.has(p.id));
-            return (
-            <div className="border-t border-gray-100">
-              <div className="px-4 py-2.5 bg-orange-50/50 border-b border-gray-100 flex items-center gap-2 flex-wrap">
-                <p className="text-[11px] text-orange-700 flex-1 min-w-[260px]">
-                  Não classificadas automaticamente. Atribua um <strong>laser</strong> (dropdown) — ou marque como{" "}
-                  <strong>conjunto</strong>: a peça não é cortada e já começa na <strong>montagem</strong>.
-                </p>
-                {selSemMaq.length > 0 && (
-                  <button
-                    onClick={() => marcarConjunto(selSemMaq.map((p) => p.id))}
-                    disabled={marcandoConjunto}
-                    className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                    {marcandoConjunto ? <Loader2 size={13} className="animate-spin" /> : <Layers size={13} />}
-                    Atribuir como Conjunto ({selSemMaq.length}) → Montagem
-                  </button>
-                )}
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50/60">
-                    <tr>
-                      <th className="px-3 py-2 w-8">
-                        <input type="checkbox" checked={todosSemMaq}
-                          onChange={() => setSelecionados((prev) => {
-                            const n = new Set(prev);
-                            if (todosSemMaq) semMaq.forEach((p) => n.delete(p.id));
-                            else semMaq.forEach((p) => n.add(p.id));
-                            return n;
-                          })} />
-                      </th>
-                      <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">OP</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Marca</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Descrição</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Material</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Qte</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Comp.</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Máquina</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {semMaq.map((p) => (
-                      <tr key={p.id} className={`hover:bg-gray-50 ${selecionados.has(p.id) ? "bg-torg-blue-50/40" : ""}`}>
-                        <td className="px-3 py-1.5">
-                          <input type="checkbox" checked={selecionados.has(p.id)} onChange={() => toggleSelecionado(p.id)} />
-                        </td>
-                        <td className="px-3 py-1.5 text-xs font-mono text-torg-blue">{fmtOP(p.opNumero)}</td>
-                        <td className="px-3 py-1.5 text-xs font-semibold text-torg-dark font-mono">{p.marca}</td>
-                        <td className="px-3 py-1.5 text-xs text-torg-gray max-w-[200px] truncate" title={p.descricao}>{p.descricao || "—"}</td>
-                        <td className="px-3 py-1.5 text-xs text-torg-gray">{p.material || "—"}</td>
-                        <td className="px-3 py-1.5 text-right text-xs tabular-nums">{p.qte}</td>
-                        <td className="px-3 py-1.5 text-right text-xs tabular-nums text-torg-gray">{fmtMm(p.comprimentoMm)}</td>
-                        <td className="px-3 py-1.5 text-right text-xs tabular-nums font-medium">{fmtKg(p.pesoTotalKg)}</td>
-                        <td className="px-3 py-1.5 flex items-center gap-1.5">
-                          <select
-                            value=""
-                            onChange={(e) => atualizarMaquina(p.id, e.target.value)}
-                            className="text-[11px] font-medium rounded-md border border-orange-200 px-2 py-1 bg-orange-50 text-orange-600 focus:ring-1 focus:ring-torg-blue"
-                          >
-                            <option value="">Laser...</option>
-                            {Object.entries(MAQUINA_LABEL).map(([k, v]) => (
-                              <option key={k} value={k}>{v}</option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => marcarConjunto([p.id])}
-                            disabled={marcandoConjunto}
-                            title="Não corta — começa na montagem"
-                            className="text-[11px] text-torg-blue hover:bg-torg-blue-50 border border-torg-blue-200 rounded-md px-2 py-1 font-medium disabled:opacity-50"
-                          >
-                            Conjunto
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
             );
-          })()}
+          })}
         </div>
       )}
 
