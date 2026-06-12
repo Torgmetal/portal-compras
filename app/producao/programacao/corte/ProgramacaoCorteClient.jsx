@@ -44,6 +44,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const router = useRouter();
   const [pecas, setPecas] = useState(pecasIniciais);
   const [filtroOp, setFiltroOp] = useState("");
+  const [menuAcoes, setMenuAcoes] = useState(false); // dropdown único de ações do header
   const [filtroStatus, setFiltroStatus] = useState("PENDENTE");
   const [filtroMaquina, setFiltroMaquina] = useState("");
   const [filtroAtendimento, setFiltroAtendimento] = useState("");
@@ -762,7 +763,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
             Verifique a classificação automática das peças por máquina e libere para produção.
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
+        <div className="flex gap-2 items-center">
           <Link
             href="/pcp/fila-corte"
             className="px-3 py-1.5 border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5"
@@ -770,63 +771,41 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           >
             <ClipboardList size={14} /> Fila de Corte →
           </Link>
-          <button
-            onClick={() => setModalImport(true)}
-            className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
-          >
-            <Upload size={14} /> Importar LE
-          </button>
-          <button
-            onClick={() => setModalImportLPC(true)}
-            className="px-3 py-1.5 bg-torg-dark text-white text-xs rounded-lg hover:bg-torg-dark/90 font-medium flex items-center gap-1.5"
-          >
-            <Upload size={14} /> Importar LPC
-          </button>
-          <button
-            onClick={abrirModalSyneco}
-            className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium flex items-center gap-1.5"
-          >
-            <Factory size={14} /> Importar Syneco
-          </button>
-          <button
-            onClick={conferirEstoque}
-            disabled={conferindoEstoque || !filtroOp}
-            className="px-3 py-1.5 bg-amber-500 text-white text-xs rounded-lg hover:bg-amber-600 font-medium flex items-center gap-1.5 disabled:opacity-50"
-            title={!filtroOp ? "Selecione uma OP para conferir" : ""}
-          >
-            {conferindoEstoque ? <Loader2 size={14} className="animate-spin" /> : <PackageSearch size={14} />}
-            Conferir Estoque
-          </button>
-          <button
-            onClick={exportarListaMaterial}
-            className="px-3 py-1.5 bg-gray-100 text-torg-dark text-xs rounded-lg hover:bg-gray-200 font-medium flex items-center gap-1.5"
-          >
-            <ClipboardList size={14} /> Lista de Material
-          </button>
-          <button
-            onClick={exportarProgramaCorte}
-            className="px-3 py-1.5 bg-gray-100 text-torg-dark text-xs rounded-lg hover:bg-gray-200 font-medium flex items-center gap-1.5"
-          >
-            <FileSpreadsheet size={14} /> Programa de Corte
-          </button>
-          {isAdmin && (
+          {/* Ações agrupadas num único menu — o fluxo será refeito; sem paredão de botões */}
+          <div className="relative">
             <button
-              onClick={reclassificarMaquinas}
-              disabled={reclassificando}
-              className="px-3 py-1.5 bg-gray-100 text-torg-dark text-xs rounded-lg hover:bg-gray-200 font-medium flex items-center gap-1.5 disabled:opacity-50"
+              onClick={() => setMenuAcoes((v) => !v)}
+              className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
             >
-              {reclassificando ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              Reclassificar
+              Ações <ChevronDown size={14} className={`transition-transform ${menuAcoes ? "rotate-180" : ""}`} />
             </button>
-          )}
-          {isAdmin && opsComPecas.length > 0 && (
-            <button
-              onClick={() => setModalExcluirLote(true)}
-              className="px-3 py-1.5 bg-red-50 text-red-600 text-xs rounded-lg hover:bg-red-100 font-medium flex items-center gap-1.5 border border-red-200"
-            >
-              <Trash2 size={14} /> Excluir em Lote
-            </button>
-          )}
+            {menuAcoes && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setMenuAcoes(false)} />
+                <div className="absolute right-0 mt-1 w-56 bg-white rounded-xl border border-gray-100 shadow-lg z-40 py-1.5 text-sm">
+                  <ItemMenu icon={Upload} onClick={() => { setMenuAcoes(false); setModalImport(true); }}>Importar LE</ItemMenu>
+                  <ItemMenu icon={Upload} onClick={() => { setMenuAcoes(false); setModalImportLPC(true); }}>Importar LPC</ItemMenu>
+                  <ItemMenu icon={Factory} onClick={() => { setMenuAcoes(false); abrirModalSyneco(); }}>Importar Syneco</ItemMenu>
+                  <ItemMenu icon={PackageSearch} disabled={conferindoEstoque || !filtroOp}
+                    title={!filtroOp ? "Selecione uma OP para conferir" : ""}
+                    onClick={() => { setMenuAcoes(false); conferirEstoque(); }}>Conferir Estoque</ItemMenu>
+                  <div className="my-1 border-t border-gray-100" />
+                  <ItemMenu icon={ClipboardList} onClick={() => { setMenuAcoes(false); exportarListaMaterial(); }}>Lista de Material</ItemMenu>
+                  <ItemMenu icon={FileSpreadsheet} onClick={() => { setMenuAcoes(false); exportarProgramaCorte(); }}>Programa de Corte</ItemMenu>
+                  {isAdmin && (
+                    <>
+                      <div className="my-1 border-t border-gray-100" />
+                      <ItemMenu icon={RefreshCw} disabled={reclassificando}
+                        onClick={() => { setMenuAcoes(false); reclassificarMaquinas(); }}>Reclassificar máquinas</ItemMenu>
+                      {opsComPecas.length > 0 && (
+                        <ItemMenu icon={Trash2} destrutivo onClick={() => { setMenuAcoes(false); setModalExcluirLote(true); }}>Excluir em lote</ItemMenu>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -2201,5 +2180,22 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/* Item do menu "Ações" do header */
+function ItemMenu({ icon: Icon, onClick, disabled, destrutivo, title, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`w-full px-3 py-2 flex items-center gap-2.5 text-left text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+        destrutivo ? "text-red-600 hover:bg-red-50" : "text-torg-dark hover:bg-torg-blue-50"
+      }`}
+    >
+      <Icon size={14} className={destrutivo ? "text-red-400" : "text-torg-gray"} />
+      {children}
+    </button>
   );
 }

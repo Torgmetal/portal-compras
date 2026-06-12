@@ -23,7 +23,7 @@ const difDias = (a, b) => Math.round((a - b) / 86400000);
 const fmtData = (v) => (v ? new Date(v).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" }) : "—");
 const fmtKg = (v) => {
   const kg = Number(v) || 0;
-  if (kg >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
+  if (kg >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ton`;
   return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 };
 const isoHoje = () => new Date().toISOString().split("T")[0];

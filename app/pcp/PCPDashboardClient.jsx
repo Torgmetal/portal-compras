@@ -9,7 +9,7 @@ import {
 import { fmtOP, fmtKg } from "@/lib/utils";
 import { MAQUINA_LABEL } from "@/lib/maquina-corte";
 
-const fmtTon = (kg) => `${((Number(kg) || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
+const fmtTon = (kg) => `${((Number(kg) || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ton`;
 const fmtHora = (d) => (d ? new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—");
 
 const ESTOQUE_LABEL = {
@@ -169,7 +169,7 @@ export default function PCPDashboardClient() {
               <input type="number" value={metaTon} onChange={(e) => setMetaTon(e.target.value)} autoFocus
                 onKeyDown={(e) => { if (e.key === "Enter") salvarMeta(); if (e.key === "Escape") setEditandoMeta(false); }}
                 className="w-20 px-2 py-1 text-sm border border-torg-blue rounded-lg tabular-nums" />
-              <span className="text-xs text-torg-gray">t</span>
+              <span className="text-xs text-torg-gray">ton</span>
               <button onClick={salvarMeta} disabled={salvandoMeta} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
                 {salvandoMeta ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               </button>

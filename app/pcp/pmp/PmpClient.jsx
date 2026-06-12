@@ -1,108 +1,48 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import {
-  CalendarDays, ChevronLeft, ChevronRight, Save, Loader2,
-  Plus, Trash2, Target, TrendingUp, Factory, AlertCircle,
-  Upload, Download,
+  CalendarDays, ChevronLeft, ChevronRight, Loader2, AlertCircle,
+  Target, RefreshCw, Scissors, TrendingUp,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
-import * as XLSX from "xlsx";
 
-const SETORES = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
-const SETOR_LABEL = {
-  CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
-  ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDIDO: "Expedição",
-};
-const SETOR_COLOR = {
-  CORTE: "bg-yellow-100 text-yellow-800",
-  MONTAGEM: "bg-blue-100 text-blue-800",
-  SOLDA: "bg-orange-100 text-orange-800",
-  ACABAMENTO: "bg-purple-100 text-purple-800",
-  JATO: "bg-cyan-100 text-cyan-800",
-  PINTURA: "bg-pink-100 text-pink-800",
-  EXPEDIDO: "bg-emerald-100 text-emerald-800",
-};
-
-const DIAS_SEMANA = ["Seg", "Ter", "Qua", "Qui", "Sex"];
-
+// ── helpers de data/format ───────────────────────────────────────
 function getMonday(d) {
   const dt = new Date(d);
   const day = dt.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  dt.setUTCDate(dt.getUTCDate() + diff);
+  dt.setUTCDate(dt.getUTCDate() + (day === 0 ? -6 : 1 - day));
   return dt.toISOString().split("T")[0];
 }
-
-function getDiaDaSemana(isoDate) {
-  const d = new Date(isoDate + "T00:00:00Z");
-  const dia = d.getUTCDay();
-  return dia >= 1 && dia <= 5 ? dia - 1 : null; // 0=seg..4=sex, null=fim de semana
-}
-
 function addDays(iso, n) {
   const d = new Date(iso + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().split("T")[0];
 }
-
-function fmtDate(iso) {
-  const d = new Date(iso + "T00:00:00Z");
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
-}
+const fmtDia = (iso) =>
+  new Date(iso + "T00:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
+const fmtTon = (kg) => `${((Number(kg) || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ton`;
+const fmtNum = (n) => Number(n || 0).toLocaleString("pt-BR");
 
 // Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
 const normObra = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
+
+// Seg–Sáb: a fábrica corta aos sábados — domingo fica de fora
+const DIAS_SEMANA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 export default function PmpClient() {
   const [semana, setSemana] = useState(() => getMonday(new Date()));
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState(null);
 
-  // Linhas editáveis: array de { opNumero, setor, dias: [pç,pç,pç,pç,pç], pesoTotal }
-  const [linhas, setLinhas] = useState([]);
-  const [dirty, setDirty] = useState(false);
-
-  // Nova linha
-  const [novaOp, setNovaOp] = useState("");
-  const [novoSetor, setNovoSetor] = useState("CORTE");
-
-  // Import
-  const fileRef = useRef(null);
-
-  // ── Buscar dados ────────────────────────────────────────────
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro(null);
     try {
       const res = await fetch(`/api/pcp/pmp?semana=${semana}`);
       if (!res.ok) throw new Error(`Erro ${res.status}`);
-      const data = await res.json();
-      setDados(data);
-
-      // Montar linhas a partir das metas existentes
-      const map = {}; // key = "opNumero|setor" → { dias: [5] }
-      for (const m of data.metas) {
-        const key = `${m.opNumero}|${m.setor}`;
-        if (!map[key]) map[key] = { opNumero: m.opNumero, setor: m.setor, dias: [0, 0, 0, 0, 0], obs: "" };
-        const idx = getDiaDaSemana(m.data.split("T")[0]);
-        if (idx !== null) {
-          map[key].dias[idx] = m.metaPecas;
-          if (m.observacao) map[key].obs = m.observacao;
-        }
-      }
-      // Obras que o Syneco CORTOU na semana mas não têm meta → linha visível
-      // mesmo assim (o realizado de cada OP aparece; a meta pode ser digitada)
-      const normsComMeta = new Set(
-        Object.values(map).filter((l) => l.setor === "CORTE").map((l) => normObra(l.opNumero))
-      );
-      for (const [norm, obraOriginal] of Object.entries(data.realizadoCorteObras || {})) {
-        if (normsComMeta.has(norm)) continue;
-        map[`${obraOriginal}|CORTE`] = { opNumero: obraOriginal, setor: "CORTE", dias: [0, 0, 0, 0, 0], obs: "" };
-      }
-      setLinhas(Object.values(map));
-      setDirty(false);
+      setDados(await res.json());
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -112,198 +52,65 @@ export default function PmpClient() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // ── Navegar semanas ─────────────────────────────────────────
-  const semanaAnterior = () => setSemana(addDays(semana, -7));
-  const semanaSeguinte = () => setSemana(addDays(semana, 7));
-  const semanaAtual = () => setSemana(getMonday(new Date()));
+  const hojeIso = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const dias = useMemo(
+    () => DIAS_SEMANA.map((label, i) => ({ label, data: addDays(semana, i) })),
+    [semana]
+  );
 
-  // ── Editar célula ───────────────────────────────────────────
-  const editarCelula = (linhaIdx, diaIdx, valor) => {
-    setLinhas((prev) => {
-      const next = [...prev];
-      next[linhaIdx] = { ...next[linhaIdx], dias: [...next[linhaIdx].dias] };
-      next[linhaIdx].dias[diaIdx] = Math.max(0, parseInt(valor) || 0);
-      return next;
-    });
-    setDirty(true);
-  };
+  // ── Monta o quadro: obras = metas de CORTE da semana ∪ realizado Syneco ──
+  const quadro = useMemo(() => {
+    if (!dados) return { linhas: [], totalDia: [], resumo: { metaPc: 0, metaKg: 0, realPc: 0, realKg: 0 } };
 
-  // ── Adicionar linha ─────────────────────────────────────────
-  const adicionarLinha = () => {
-    if (!novaOp) return;
-    const existe = linhas.some((l) => l.opNumero === novaOp && l.setor === novoSetor);
-    if (existe) return;
-    setLinhas((prev) => [...prev, { opNumero: novaOp, setor: novoSetor, dias: [0, 0, 0, 0, 0], obs: "" }]);
-    setDirty(true);
-  };
-
-  // ── Remover linha ───────────────────────────────────────────
-  const removerLinha = (idx) => {
-    setLinhas((prev) => prev.filter((_, i) => i !== idx));
-    setDirty(true);
-  };
-
-  // ── Importar planilha ────────────────────────────────────────
-  const importarPlanilha = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const wb = XLSX.read(evt.target.result, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-        // Encontrar header (primeira linha que contém "OP" e "Setor")
-        let headerIdx = -1;
-        for (let i = 0; i < Math.min(rows.length, 10); i++) {
-          const row = (rows[i] || []).map((c) => String(c || "").trim().toUpperCase());
-          if (row.includes("OP") && row.includes("SETOR")) {
-            headerIdx = i;
-            break;
-          }
-        }
-        if (headerIdx === -1) {
-          alert("Planilha sem cabeçalho válido. A primeira linha deve conter: OP | Setor | Seg | Ter | Qua | Qui | Sex");
-          return;
-        }
-
-        const header = (rows[headerIdx] || []).map((c) => String(c || "").trim().toUpperCase());
-        const colOP = header.indexOf("OP");
-        const colSetor = header.indexOf("SETOR");
-        const colSeg = header.findIndex((h) => h === "SEG" || h === "SEGUNDA");
-        const colTer = header.findIndex((h) => h === "TER" || h === "TERCA" || h === "TERÇA");
-        const colQua = header.findIndex((h) => h === "QUA" || h === "QUARTA");
-        const colQui = header.findIndex((h) => h === "QUI" || h === "QUINTA");
-        const colSex = header.findIndex((h) => h === "SEX" || h === "SEXTA");
-
-        // Se não encontrou dias individuais, tenta pegar colunas 2-6 como dias
-        const colsDias = [colSeg, colTer, colQua, colQui, colSex];
-        const temDias = colsDias.every((c) => c >= 0);
-        const diasCols = temDias ? colsDias : [2, 3, 4, 5, 6];
-
-        const opsValidas = new Set((dados?.ops || []).map((o) => o.numero));
-        const novasLinhas = [];
-        let ignoradas = 0;
-
-        for (let i = headerIdx + 1; i < rows.length; i++) {
-          const row = rows[i];
-          if (!row || !row[colOP]) continue;
-
-          const opStr = String(row[colOP]).trim().replace(/^OP\s*/i, "");
-          const setorStr = String(row[colSetor] || "").trim().toUpperCase();
-
-          if (!opStr || !SETORES.includes(setorStr)) { ignoradas++; continue; }
-          if (!opsValidas.has(opStr)) { ignoradas++; continue; }
-
-          // Verificar duplicata com linhas existentes
-          const jaExiste = linhas.some((l) => l.opNumero === opStr && l.setor === setorStr);
-          const jaNova = novasLinhas.some((l) => l.opNumero === opStr && l.setor === setorStr);
-          if (jaExiste || jaNova) { ignoradas++; continue; }
-
-          const dias = diasCols.map((c) => Math.max(0, parseInt(row[c]) || 0));
-          novasLinhas.push({ opNumero: opStr, setor: setorStr, dias, obs: "" });
-        }
-
-        if (novasLinhas.length === 0) {
-          alert(`Nenhuma linha válida encontrada.${ignoradas > 0 ? ` ${ignoradas} linha(s) ignorada(s) (OP não encontrada ou setor inválido).` : ""}`);
-          return;
-        }
-
-        setLinhas((prev) => [...prev, ...novasLinhas]);
-        setDirty(true);
-        const msg = `${novasLinhas.length} linha(s) importada(s) com sucesso!`;
-        alert(ignoradas > 0 ? `${msg}\n${ignoradas} linha(s) ignorada(s).` : msg);
-      } catch (err) {
-        alert("Erro ao ler a planilha: " + err.message);
-      }
+    const porObra = new Map(); // norm → { obra, metaDia: {iso: pc}, metaKg, ... }
+    const garantir = (norm, nomeObra) => {
+      if (!porObra.has(norm)) porObra.set(norm, { obra: nomeObra, metaDia: {}, metaKgDia: {}, metaPc: 0, metaKg: 0 });
+      return porObra.get(norm);
     };
-    reader.readAsArrayBuffer(file);
-    // Limpar input para permitir reimportar mesmo arquivo
-    e.target.value = "";
-  };
 
-  // ── Baixar modelo de planilha ──────────────────────────────
-  const baixarModelo = () => {
-    const header = ["OP", "Setor", "Seg", "Ter", "Qua", "Qui", "Sex"];
-    const exemplo = [
-      ["82", "CORTE", 10, 15, 12, 8, 20],
-      ["82", "SOLDA", 5, 10, 8, 6, 12],
-      ["83", "MONTAGEM", 20, 20, 20, 20, 20],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet([header, ...exemplo]);
-    ws["!cols"] = [{ wch: 10 }, { wch: 14 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "PMP");
-    XLSX.writeFile(wb, "modelo-pmp.xlsx");
-  };
-
-  // ── Salvar ──────────────────────────────────────────────────
-  const salvar = async () => {
-    setSalvando(true);
-    try {
-      const metas = [];
-      for (const l of linhas) {
-        // Linhas automáticas (Fila de Corte) são derivadas — não regrava,
-        // senão o peso calculado seria zerado. Ajuste é na própria fila.
-        if (l.obs?.startsWith("[auto]")) continue;
-        for (let d = 0; d < 5; d++) {
-          metas.push({
-            data: addDays(semana, d),
-            setor: l.setor,
-            opNumero: l.opNumero,
-            metaPecas: l.dias[d],
-            metaPesoKg: 0, // TODO: calcular pelo peso médio da peça
-            observacao: l.obs || null,
-          });
-        }
-      }
-      if (metas.length === 0) { setDirty(false); setSalvando(false); return; }
-      const res = await fetch("/api/pcp/pmp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metas }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Erro ${res.status}`);
-      }
-      setDirty(false);
-    } catch (e) {
-      alert("Erro ao salvar: " + e.message);
-    } finally {
-      setSalvando(false);
+    for (const m of dados.metas || []) {
+      if (m.setor !== "CORTE") continue;
+      const o = garantir(normObra(m.opNumero), m.opNumero);
+      const dia = m.data.split("T")[0];
+      o.metaDia[dia] = (o.metaDia[dia] || 0) + m.metaPecas;
+      o.metaKgDia[dia] = (o.metaKgDia[dia] || 0) + (m.metaPesoKg || 0);
+      o.metaPc += m.metaPecas;
+      o.metaKg += m.metaPesoKg || 0;
     }
-  };
-
-  // ── Calcular realizado por OP+setor ─────────────────────────
-  const getRealizadoSetor = (opNumero, setor) => {
-    if (!dados?.realizado?.[opNumero]) return { pecas: 0, pesoKg: 0 };
-    // Realizado = peças que já passaram por este setor (status >= setor no pipeline)
-    const idxSetor = SETORES.indexOf(setor);
-    let pecas = 0, pesoKg = 0;
-    for (const [status, val] of Object.entries(dados.realizado[opNumero])) {
-      const idxStatus = SETORES.indexOf(status);
-      if (idxStatus >= idxSetor) {
-        pecas += val.pecas;
-        pesoKg += val.pesoKg;
-      }
+    for (const [norm, nomeObra] of Object.entries(dados.realizadoCorteObras || {})) {
+      garantir(norm, nomeObra);
     }
-    return { pecas, pesoKg };
-  };
 
-  // ── Realizado de CORTE por dia (apontamentos do Syneco, por obra) ──
-  const getRealCorteDia = (opNumero, dataIso) =>
-    dados?.realizadoCorteDia?.[`${dataIso}|${normObra(opNumero)}`]?.pecas || 0;
+    const getReal = (norm, dia) => dados.realizadoCorteDia?.[`${dia}|${norm}`] || { pecas: 0, pesoKg: 0 };
 
-  // ── Dias da semana com datas ────────────────────────────────
-  const diasComData = DIAS_SEMANA.map((label, i) => ({
-    label,
-    data: addDays(semana, i),
-    fmt: fmtDate(addDays(semana, i)),
-  }));
+    const linhas = [...porObra.entries()].map(([norm, o]) => {
+      const celulas = dias.map(({ data }) => ({
+        dia: data,
+        meta: o.metaDia[data] || 0,
+        real: getReal(norm, data).pecas,
+        realKg: getReal(norm, data).pesoKg,
+      }));
+      const realPc = celulas.reduce((s, c) => s + c.real, 0);
+      const realKg = celulas.reduce((s, c) => s + c.realKg, 0);
+      return { norm, obra: o.obra, celulas, metaPc: o.metaPc, metaKg: o.metaKg, realPc, realKg };
+    }).sort((a, b) => (b.metaPc + b.realPc) - (a.metaPc + a.realPc));
 
-  // ── Render ──────────────────────────────────────────────────
+    const totalDia = dias.map(({ data }, i) => ({
+      dia: data,
+      meta: linhas.reduce((s, l) => s + l.celulas[i].meta, 0),
+      real: linhas.reduce((s, l) => s + l.celulas[i].real, 0),
+    }));
+    const resumo = {
+      metaPc: linhas.reduce((s, l) => s + l.metaPc, 0),
+      metaKg: linhas.reduce((s, l) => s + l.metaKg, 0),
+      realPc: linhas.reduce((s, l) => s + l.realPc, 0),
+      realKg: linhas.reduce((s, l) => s + l.realKg, 0),
+    };
+    return { linhas, totalDia, resumo };
+  }, [dados, dias]);
+
+  const pctSemana = quadro.resumo.metaPc > 0 ? Math.round((quadro.resumo.realPc / quadro.resumo.metaPc) * 100) : null;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -312,7 +119,6 @@ export default function PmpClient() {
       </div>
     );
   }
-
   if (erro) {
     return (
       <div className="text-center py-16">
@@ -328,215 +134,165 @@ export default function PmpClient() {
   return (
     <div className="space-y-4 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-            <Target size={24} className="text-torg-blue" /> PMP — Plano Mestre de Produção
+            <Target size={24} className="text-torg-blue" /> PMP — Corte
           </h2>
           <p className="text-xs text-torg-gray mt-0.5">
-            Defina metas diárias por OP e setor. A visão semanal totaliza automaticamente.
+            As metas nascem da programação da <Link href="/pcp/fila-corte" className="text-torg-blue hover:underline font-medium">Fila de Corte</Link>;
+            o realizado vem dos apontamentos do Syneco.
           </p>
         </div>
-        <button
-          onClick={salvar}
-          disabled={salvando || !dirty}
-          className="px-4 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-semibold text-sm flex items-center gap-2 disabled:opacity-50 shadow-sm"
-        >
-          {salvando ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Salvar
+        <button onClick={carregar} className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-1.5">
+          <RefreshCw size={13} /> Atualizar
         </button>
       </div>
 
-      {/* Navegação da semana */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center justify-between">
-        <button onClick={semanaAnterior} className="p-2 hover:bg-gray-100 rounded-lg">
-          <ChevronLeft size={18} />
-        </button>
-        <div className="flex items-center gap-3">
-          <CalendarDays size={18} className="text-torg-blue" />
-          <span className="text-sm font-semibold text-torg-dark">
-            Semana de {fmtDate(semana)} a {fmtDate(addDays(semana, 4))}
-          </span>
-          <button
-            onClick={semanaAtual}
-            className="px-2 py-0.5 text-[10px] bg-torg-blue-50 text-torg-blue rounded font-medium hover:bg-torg-blue-100"
-          >
-            Hoje
+      {/* Navegação da semana + resumo */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center justify-between">
+          <button onClick={() => setSemana(addDays(semana, -7))} className="p-2 hover:bg-gray-100 rounded-lg">
+            <ChevronLeft size={18} />
+          </button>
+          <div className="text-center">
+            <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5 justify-center">
+              <CalendarDays size={15} className="text-torg-blue" /> {fmtDia(semana)} – {fmtDia(addDays(semana, 5))}
+            </p>
+            <button onClick={() => setSemana(getMonday(new Date()))} className="text-[10px] text-torg-blue hover:underline">
+              ir para a semana atual
+            </button>
+          </div>
+          <button onClick={() => setSemana(addDays(semana, 7))} className="p-2 hover:bg-gray-100 rounded-lg">
+            <ChevronRight size={18} />
           </button>
         </div>
-        <button onClick={semanaSeguinte} className="p-2 hover:bg-gray-100 rounded-lg">
-          <ChevronRight size={18} />
-        </button>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3.5 flex items-center gap-3">
+          <div className="bg-torg-blue p-2 rounded-lg"><Target size={18} className="text-white" /></div>
+          <div>
+            <p className="text-[10px] text-torg-gray uppercase tracking-wider">Meta da semana</p>
+            <p className="text-lg font-extrabold text-torg-dark leading-tight">{fmtNum(quadro.resumo.metaPc)} pç</p>
+            <p className="text-[10px] text-torg-gray">{fmtTon(quadro.resumo.metaKg)}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3.5 flex items-center gap-3">
+          <div className="bg-emerald-600 p-2 rounded-lg"><Scissors size={18} className="text-white" /></div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-torg-gray uppercase tracking-wider">Realizado (Syneco)</p>
+            <p className="text-lg font-extrabold text-torg-dark leading-tight">
+              {fmtNum(quadro.resumo.realPc)} pç
+              {pctSemana != null && (
+                <span className={`ml-2 text-xs font-bold ${pctSemana >= 100 ? "text-emerald-600" : pctSemana >= 60 ? "text-amber-600" : "text-red-600"}`}>
+                  {pctSemana}% da meta
+                </span>
+              )}
+            </p>
+            <p className="text-[10px] text-torg-gray">{fmtTon(quadro.resumo.realKg)}</p>
+          </div>
+        </div>
       </div>
 
-      {/* Adicionar linha + importar */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
-        <Plus size={14} className="text-torg-gray" />
-        <select
-          value={novaOp}
-          onChange={(e) => setNovaOp(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white min-w-[140px]"
-        >
-          <option value="">Selecionar OP...</option>
-          {dados?.ops?.map((op) => (
-            <option key={op.numero} value={op.numero}>
-              OP {op.numero} — {op.cliente}
-            </option>
-          ))}
-        </select>
-        <select
-          value={novoSetor}
-          onChange={(e) => setNovoSetor(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
-        >
-          {SETORES.map((s) => (
-            <option key={s} value={s}>{SETOR_LABEL[s]}</option>
-          ))}
-        </select>
-        <button
-          onClick={adicionarLinha}
-          disabled={!novaOp}
-          className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-medium disabled:opacity-50"
-        >
-          Adicionar meta
-        </button>
-
-        <div className="h-5 w-px bg-gray-200 mx-1" />
-
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".xlsx,.xls"
-          onChange={importarPlanilha}
-          className="hidden"
-        />
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
-        >
-          <Upload size={13} /> Importar planilha
-        </button>
-        <button
-          onClick={baixarModelo}
-          className="px-3 py-1.5 border border-gray-300 text-torg-gray text-xs rounded-lg hover:bg-gray-50 font-medium flex items-center gap-1.5"
-        >
-          <Download size={13} /> Baixar modelo
-        </button>
-      </div>
-
-      {/* Tabela principal */}
-      {linhas.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 text-center py-12">
-          <Factory size={40} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-torg-gray">Nenhuma meta definida para esta semana.</p>
-          <p className="text-xs text-gray-400 mt-1">Use o seletor acima para adicionar uma OP + setor.</p>
+      {/* Quadro meta × realizado */}
+      {quadro.linhas.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 text-center py-14">
+          <TrendingUp size={40} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-sm text-torg-gray">Nada programado nem cortado nesta semana.</p>
+          <p className="text-xs text-gray-400 mt-1">
+            Programe peças na <Link href="/pcp/fila-corte" className="text-torg-blue hover:underline">Fila de Corte</Link> — as metas aparecem aqui automaticamente.
+          </p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50/60">
-                <tr>
-                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase w-20">OP</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase w-24">Setor</th>
-                  {diasComData.map((d) => (
-                    <th key={d.data} className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase w-16">
+            <table className="w-full text-sm min-w-[760px]">
+              <thead>
+                <tr className="bg-gray-50/60 border-b border-gray-100">
+                  <th className="px-4 py-2.5 text-left text-[10px] font-medium text-gray-500 uppercase">Obra</th>
+                  {dias.map((d) => (
+                    <th key={d.data} className={`px-2 py-2 text-center text-[10px] font-medium uppercase w-[88px] ${d.data === hojeIso ? "bg-torg-blue-50/60 text-torg-blue rounded-t" : "text-gray-500"}`}>
                       <div>{d.label}</div>
-                      <div className="text-[9px] font-normal text-gray-400">{d.fmt}</div>
+                      <div className="text-[9px] font-normal opacity-70">{fmtDia(d.data)}</div>
                     </th>
                   ))}
-                  <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase bg-blue-50 w-16">
-                    Total
-                  </th>
-                  <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase bg-emerald-50 w-20">
-                    Realizado
-                  </th>
-                  <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase bg-gray-50 w-12">
-                    %
-                  </th>
-                  <th className="px-2 py-2 w-8"></th>
+                  <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase bg-gray-50 w-28">Semana</th>
+                </tr>
+                <tr className="border-b border-gray-100">
+                  <th></th>
+                  {dias.map((d) => (
+                    <th key={d.data} className={`pb-1.5 text-center text-[8px] font-medium uppercase tracking-wider text-gray-400 ${d.data === hojeIso ? "bg-torg-blue-50/60" : ""}`}>
+                      meta · real
+                    </th>
+                  ))}
+                  <th className="pb-1.5 text-center text-[8px] font-medium uppercase tracking-wider text-gray-400 bg-gray-50">real / meta</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {linhas.map((l, idx) => {
-                  const totalMeta = l.dias.reduce((s, v) => s + v, 0);
-                  const ehCorte = l.setor === "CORTE";
-                  // CORTE: real da SEMANA = peças concluídas na fila de corte
-                  // (real × estimado da programação); demais setores: snapshot do pipeline
-                  const realCorteSemana = ehCorte
-                    ? diasComData.reduce((s, d) => s + getRealCorteDia(l.opNumero, d.data), 0)
-                    : 0;
-                  const real = ehCorte ? { pecas: realCorteSemana } : getRealizadoSetor(l.opNumero, l.setor);
-                  const pct = totalMeta > 0 ? Math.round((real.pecas / totalMeta) * 100) : 0;
-                  const pctColor = pct >= 100 ? "text-emerald-600 bg-emerald-50" : pct >= 60 ? "text-yellow-600 bg-yellow-50" : "text-red-600 bg-red-50";
-
+                {quadro.linhas.map((l) => {
+                  const pct = l.metaPc > 0 ? Math.round((l.realPc / l.metaPc) * 100) : null;
                   return (
-                    <tr key={`${l.opNumero}-${l.setor}`} className="hover:bg-gray-50/50">
-                      <td className="px-3 py-2 font-mono text-torg-blue font-medium">{fmtOP(l.opNumero)}</td>
-                      <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${SETOR_COLOR[l.setor]}`}>
-                          {SETOR_LABEL[l.setor]}
-                        </span>
-                        {ehCorte && l.obs?.startsWith("[auto]") && (
-                          <span className="block text-[9px] text-torg-gray mt-0.5" title="Metas geradas pela programação da Fila de Corte">auto · fila</span>
-                        )}
+                    <tr key={l.norm} className="hover:bg-gray-50/50">
+                      <td className="px-4 py-2.5">
+                        <span className="font-mono font-bold text-torg-blue">{fmtOP(l.obra)}</span>
+                        {l.metaKg > 0 && <span className="block text-[10px] text-torg-gray">{fmtTon(l.metaKg)} programadas</span>}
                       </td>
-                      {l.dias.map((v, d) => {
-                        const realDia = ehCorte ? getRealCorteDia(l.opNumero, diasComData[d].data) : null;
-                        const autoFila = ehCorte && l.obs?.startsWith("[auto]");
-                        return (
-                        <td key={d} className="px-1 py-1.5 text-center">
-                          <input
-                            type="number"
-                            min={0}
-                            value={v || ""}
-                            onChange={(e) => editarCelula(idx, d, e.target.value)}
-                            placeholder="—"
-                            disabled={autoFila}
-                            title={autoFila ? "Meta automática da Fila de Corte — ajuste programando as peças" : undefined}
-                            className="w-14 text-center px-1 py-1 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-torg-blue focus:border-torg-blue tabular-nums disabled:bg-gray-50 disabled:text-torg-dark disabled:font-semibold"
-                          />
-                          {ehCorte && (realDia > 0 || v > 0) && (
-                            <div className={`text-[9px] mt-0.5 font-semibold tabular-nums ${realDia >= v && v > 0 ? "text-emerald-600" : realDia > 0 ? "text-amber-600" : "text-gray-400"}`}>
-                              real {realDia}
-                            </div>
-                          )}
+                      {l.celulas.map((c) => (
+                        <td key={c.dia} className={`px-2 py-2 text-center ${c.dia === hojeIso ? "bg-torg-blue-50/40" : ""}`}>
+                          <CelulaDia meta={c.meta} real={c.real} realKg={c.realKg} />
                         </td>
-                        );
-                      })}
-                      <td className="px-3 py-2 text-center font-bold text-torg-dark bg-blue-50/30 tabular-nums">
-                        {totalMeta}
-                      </td>
-                      <td className="px-3 py-2 text-center font-bold tabular-nums bg-emerald-50/30">
-                        {real.pecas}
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${pctColor}`}>
-                          {totalMeta > 0 ? `${pct}%` : "—"}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2">
-                        {!(ehCorte && l.obs?.startsWith("[auto]")) && (
-                          <button onClick={() => removerLinha(idx)} className="text-gray-300 hover:text-red-500">
-                            <Trash2 size={13} />
-                          </button>
+                      ))}
+                      <td className="px-3 py-2 text-center bg-gray-50/50">
+                        <p className="text-sm font-extrabold tabular-nums text-torg-dark">
+                          {fmtNum(l.realPc)}<span className="text-torg-gray font-semibold text-xs"> / {fmtNum(l.metaPc)}</span>
+                        </p>
+                        {pct != null ? (
+                          <span className={`inline-block mt-0.5 px-1.5 py-px rounded text-[10px] font-bold ${
+                            pct >= 100 ? "bg-emerald-50 text-emerald-700" : pct >= 60 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-600"
+                          }`}>{pct}%</span>
+                        ) : (
+                          <span className="inline-block mt-0.5 px-1.5 py-px rounded text-[10px] font-medium bg-gray-100 text-torg-gray" title="Sem meta programada — programe na Fila de Corte">sem meta</span>
                         )}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-200 bg-gray-50/70">
+                  <td className="px-4 py-2.5 text-xs font-bold text-torg-dark uppercase">Total do dia</td>
+                  {quadro.totalDia.map((t) => (
+                    <td key={t.dia} className={`px-2 py-2 text-center ${t.dia === hojeIso ? "bg-torg-blue-50/60" : ""}`}>
+                      <CelulaDia meta={t.meta} real={t.real} forte />
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-center bg-gray-100/80">
+                    <p className="text-sm font-extrabold tabular-nums text-torg-dark">
+                      {fmtNum(quadro.resumo.realPc)}<span className="text-torg-gray font-semibold text-xs"> / {fmtNum(quadro.resumo.metaPc)}</span>
+                    </p>
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {dirty && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-xs text-amber-700 flex items-center gap-2">
-          <AlertCircle size={14} />
-          Alterações não salvas. Clique em <strong>Salvar</strong> para confirmar.
-        </div>
-      )}
+// Célula do dia: meta em cima (discreta), realizado embaixo (protagonista)
+function CelulaDia({ meta, real, realKg, forte }) {
+  if (!meta && !real) return <span className="text-gray-300">—</span>;
+  const corReal = real === 0
+    ? "text-gray-300"
+    : meta > 0
+      ? real >= meta ? "text-emerald-600" : "text-amber-600"
+      : "text-torg-dark";
+  return (
+    <div title={realKg ? `${Number(realKg).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg cortados` : undefined}>
+      <p className={`text-[10px] tabular-nums ${meta > 0 ? "text-torg-gray" : "text-gray-300"}`}>{meta > 0 ? fmtNum(meta) : "—"}</p>
+      <p className={`${forte ? "text-base" : "text-sm"} font-extrabold tabular-nums leading-tight ${corReal}`}>{real > 0 ? fmtNum(real) : "—"}</p>
     </div>
   );
 }
