@@ -57,6 +57,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [filtroMaquina, setFiltroMaquina] = useState("");
   const [filtroAtendimento, setFiltroAtendimento] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroMaterial, setFiltroMaterial] = useState("");
+  const [filtroParte, setFiltroParte] = useState("");
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
   const [liberando, setLiberando] = useState(false);
@@ -114,6 +116,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       if (filtroTipo === "CONJUNTO" && p.tipoPeca !== "CONJUNTO") return false;
       if (filtroTipo === "CROQUI" && p.tipoPeca !== "CROQUI") return false;
       if (filtroTipo === "PECA" && p.tipoPeca != null) return false;
+      if (filtroMaterial && (p.material || "") !== filtroMaterial) return false;
+      if (filtroParte && parteDe(p) !== filtroParte) return false;
       if (filtroMaquina && (p.maquina || "SEM_MAQUINA") !== filtroMaquina) return false;
       if (filtroAtendimento) {
         const prod = p.qteProduzida || 0;
@@ -132,7 +136,28 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       }
       return true;
     });
-  }, [pecas, filtroOp, filtroStatus, filtroTipo, filtroMaquina, filtroAtendimento, busca]);
+  }, [pecas, filtroOp, filtroStatus, filtroTipo, filtroMaterial, filtroParte, filtroMaquina, filtroAtendimento, busca]);
+
+  // Opções dos filtros novos (materiais existentes; partes da OP selecionada)
+  const materiais = useMemo(
+    () => [...new Set(pecas.map((p) => p.material).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    [pecas]
+  );
+  const partesDisponiveis = useMemo(() => {
+    const base = filtroOp ? pecas.filter((p) => opMaeNumero(p) === filtroOp) : pecas;
+    return [...new Set(base.map(parteDe))].sort();
+  }, [pecas, filtroOp]);
+
+  // Seleção em lote: marca/desmarca todas as PENDENTES atualmente filtradas
+  const selecionarPendentesFiltrados = () => {
+    const ids = pecasFiltradas.filter((p) => p.status === "PENDENTE").map((p) => p.id);
+    setSelecionados((prev) => {
+      const todos = ids.length > 0 && ids.every((id) => prev.has(id));
+      const n = new Set(prev);
+      if (todos) ids.forEach((id) => n.delete(id)); else ids.forEach((id) => n.add(id));
+      return n;
+    });
+  };
 
   // Agrupar por maquina
   const porMaquina = useMemo(() => {
@@ -1093,6 +1118,22 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           <option value="PECA">Avulsas</option>
         </select>
         <select
+          value={filtroParte}
+          onChange={(e) => { setFiltroParte(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Todas as partes</option>
+          {partesDisponiveis.map((pt) => <option key={pt} value={pt}>Parte {pt}</option>)}
+        </select>
+        <select
+          value={filtroMaterial}
+          onChange={(e) => { setFiltroMaterial(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+        >
+          <option value="">Todos materiais</option>
+          {materiais.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select
           value={filtroMaquina}
           onChange={(e) => { setFiltroMaquina(e.target.value); setSelecionados(new Set()); }}
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
@@ -1122,15 +1163,22 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           />
         </div>
         <button
+          onClick={selecionarPendentesFiltrados}
+          className="px-3 py-1.5 border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5"
+          title="Marca/desmarca todas as peças pendentes do filtro atual"
+        >
+          <CheckCircle2 size={13} /> Selecionar pendentes
+        </button>
+        <button
           onClick={exportarRelatorio}
           className="px-3 py-1.5 bg-torg-blue/10 text-torg-blue text-xs rounded-lg hover:bg-torg-blue/20 font-medium flex items-center gap-1.5"
           title="Exportar pecas filtradas para Excel"
         >
           <Download size={13} /> Exportar
         </button>
-        {(filtroOp || filtroTipo || filtroMaquina || filtroAtendimento || busca) && (
+        {(filtroOp || filtroTipo || filtroMaterial || filtroParte || filtroMaquina || filtroAtendimento || busca) && (
           <button
-            onClick={() => { setFiltroOp(""); setFiltroTipo(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
+            onClick={() => { setFiltroOp(""); setFiltroTipo(""); setFiltroMaterial(""); setFiltroParte(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
             className="text-xs text-torg-gray hover:text-torg-dark"
           >
             limpar
