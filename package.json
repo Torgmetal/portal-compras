@@ -17,6 +17,7 @@
     "@byteink/mppjs": "^0.1.5",
     "@prisma/client": "^6.19.3",
     "@vercel/blob": "^2.3.3",
+    "@vercel/speed-insights": "^2.0.0",
     "bcryptjs": "^3.0.3",
     "c12": "^4.0.0-beta.4",
     "exceljs": "^4.4.0",
