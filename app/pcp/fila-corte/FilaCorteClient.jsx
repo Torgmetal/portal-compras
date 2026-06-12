@@ -1,9 +1,8 @@
 "use client";
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import {
   ListOrdered, CalendarRange, Scissors, CheckCircle2, Loader2, AlertCircle,
-  Play, Check, Undo2, X, ArrowUp, ArrowDown, ChevronsUp, Search, Target,
+  Play, Check, Undo2, X, ArrowUp, ArrowDown, ChevronsUp, Search,
   Clock, Package, Layers,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
@@ -180,26 +179,13 @@ export default function FilaCorteClient({ pecasIniciais }) {
   // ── render ───────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-            <Scissors size={26} className="text-torg-blue" /> Fila de Corte
-          </h2>
-          <p className="text-xs text-torg-gray mt-0.5">
-            Peças liberadas entram na fila → programe a meta de início/fim (alimenta o PMP) → acompanhe o real × estimado.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/pcp/pecas-corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
-            Liberar peças →
-          </Link>
-          <Link href="/pcp/corte" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1">
-            <Scissors size={13} /> Corte ao vivo (Syneco)
-          </Link>
-          <Link href="/pcp/pmp" className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 inline-flex items-center gap-1">
-            <Target size={13} /> Ver PMP
-          </Link>
-        </div>
+      <div>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
+          <Scissors size={26} className="text-torg-blue" /> Fila de Corte
+        </h2>
+        <p className="text-xs text-torg-gray mt-0.5">
+          Peças liberadas entram na fila → programe a meta de início/fim (alimenta o PMP) → acompanhe o real × estimado.
+        </p>
       </div>
 
       {/* KPIs */}
