@@ -148,7 +148,8 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   }, [pecasFiltradas]);
 
   // Agrupar por PARTE (A/B/C) — vista quando uma OP-mãe está selecionada.
-  // Prioridade = ordem da parte (A→B→C); dentro da parte, sequência pelo item.
+  // Dentro da parte: peças com prioridade MARCADA vêm primeiro (1, 2, 3…),
+  // depois o resto pela sequência do item. A prioridade é manual e opcional.
   const porParte = useMemo(() => {
     const map = new Map();
     for (const p of pecasFiltradas) {
@@ -157,7 +158,11 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       map.get(k).push(p);
     }
     for (const arr of map.values()) {
-      arr.sort((a, b) => (a.item ?? 1e9) - (b.item ?? 1e9) || a.marca.localeCompare(b.marca, undefined, { numeric: true }));
+      arr.sort((a, b) =>
+        (a.prioridade ?? 1e9) - (b.prioridade ?? 1e9) ||
+        (a.item ?? 1e9) - (b.item ?? 1e9) ||
+        a.marca.localeCompare(b.marca, undefined, { numeric: true })
+      );
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])); // [parte, peças][]
   }, [pecasFiltradas]);
@@ -393,6 +398,22 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   }
 
   // Atualizar maquina individual
+  // Prioridade manual (vazia = sem prioridade). Marcada quando precisar.
+  async function atualizarPrioridade(id, valor) {
+    const prioridade = valor === "" || valor == null ? null : Math.max(1, parseInt(valor, 10) || 0) || null;
+    setPecas((prev) => prev.map((p) => (p.id === id ? { ...p, prioridade } : p))); // otimista
+    try {
+      const res = await fetch(`/api/producao/pecas/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prioridade }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Erro");
+    } catch (e) {
+      alert("Erro ao salvar prioridade: " + e.message);
+    }
+  }
+
   async function atualizarMaquina(id, novaMaquina) {
     try {
       const res = await fetch(`/api/producao/pecas/${id}`, {
@@ -1216,6 +1237,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                     <thead className="bg-gray-50/60">
                       <tr>
                         <th className="px-3 py-2 w-8"></th>
+                        <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase w-14" title="Prioridade manual — preencha quando precisar furar a fila">Prior.</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Marca</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Descrição</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Material</th>
@@ -1233,6 +1255,12 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                           <tr key={p.id} className={`hover:bg-gray-50 ${selecionados.has(p.id) ? "bg-torg-blue-50/40" : ""}`}>
                             <td className="px-3 py-1.5">
                               {p.status === "PENDENTE" && <input type="checkbox" checked={selecionados.has(p.id)} onChange={() => toggleSelecionado(p.id)} />}
+                            </td>
+                            <td className="px-2 py-1.5 text-center">
+                              <input type="number" min="1" value={p.prioridade ?? ""} placeholder="—"
+                                onChange={(e) => atualizarPrioridade(p.id, e.target.value)}
+                                title="Prioridade manual (deixe vazio se não precisar)"
+                                className={`w-11 text-center text-xs px-1 py-1 border rounded tabular-nums ${p.prioridade ? "border-torg-blue bg-torg-blue-50 text-torg-blue font-bold" : "border-gray-200 text-torg-gray"}`} />
                             </td>
                             <td className="px-3 py-1.5 font-mono text-xs font-semibold text-torg-dark whitespace-nowrap">{p.marca}
                               {p.tipoPeca && <span className="ml-1 text-[9px] px-1 py-px rounded bg-amber-50 text-amber-700">{p.tipoPeca === "CONJUNTO" ? "CONJ" : "CR"}</span>}
