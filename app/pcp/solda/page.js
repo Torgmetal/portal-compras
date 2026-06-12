@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PcpSetor() {
   await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
-  const { pecas, apontamentos, apontamentosProximo } =
+  const { pecas, apontamentos, apontamentosProximo, furos } =
     await buscarConjuntosComApontamento("SOLDA", "Solda", "Acabamento");
 
   return (
@@ -17,6 +17,7 @@ export default async function PcpSetor() {
       pecasIniciais={JSON.parse(JSON.stringify(pecas))}
       apontamentos={JSON.parse(JSON.stringify(apontamentos))}
       apontamentosProximo={JSON.parse(JSON.stringify(apontamentosProximo))}
+      furos={JSON.parse(JSON.stringify(furos))}
       setorAtual="SOLDA"
       setorAnterior="MONTAGEM"
       setorProximo="ACABAMENTO"

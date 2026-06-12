@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ProgramacaoSetor() {
   await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL"]);
-  const { pecas, apontamentos, apontamentosProximo } =
+  const { pecas, apontamentos, apontamentosProximo, furos } =
     await buscarConjuntosComApontamento("JATO", "Jato", "Pintura");
 
   return (
@@ -14,6 +14,7 @@ export default async function ProgramacaoSetor() {
       pecasIniciais={JSON.parse(JSON.stringify(pecas))}
       apontamentos={JSON.parse(JSON.stringify(apontamentos))}
       apontamentosProximo={JSON.parse(JSON.stringify(apontamentosProximo))}
+      furos={JSON.parse(JSON.stringify(furos))}
       setorAtual="JATO"
       setorAnterior="ACABAMENTO"
       setorProximo="PINTURA"

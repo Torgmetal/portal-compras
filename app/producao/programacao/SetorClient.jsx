@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import {
   Filter, Search, CheckCircle2, Download, Loader2,
-  ArrowRight, X, Package, Undo2,
+  ArrowRight, X, Package, Undo2, AlertTriangle,
   Flame, Sparkles, Wind, Paintbrush, Truck,
 } from "lucide-react";
 
@@ -61,6 +61,8 @@ export default function SetorClient({
   // apontamento do Syneco: { [marca]: { produzido, planejado, dataFim } }
   apontamentos = {},
   apontamentosProximo = {},
+  // furo de lançamento: { [marca]: { apontado, gargalos: [{ setor, produzido }] } }
+  furos = {},
 }) {
   const Icon = ICON_MAP[setorAtual] || Package;
   const [pecas, setPecas] = useState(pecasIniciais);
@@ -124,6 +126,9 @@ export default function SetorClient({
   const totalNoSetor = noSetor.length;
   const pesoNoSetor = useMemo(() => noSetor.reduce((s, p) => s + (p.pesoTotalKg || 0), 0), [noSetor]);
   const pesoFiltradas = useMemo(() => filtradas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0), [filtradas]);
+
+  // Furos de lançamento (apontado aqui > setor anterior no Syneco) ainda no setor
+  const comFuro = useMemo(() => noSetor.filter((p) => furos[p.marca]), [noSetor, furos]);
 
   // Seleção
   const toggleSelecionado = (id) => {
@@ -356,6 +361,31 @@ export default function SetorClient({
         )}
       </div>
 
+      {/* Alerta de furo de lançamento no Syneco */}
+      {comFuro.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2.5">
+          <AlertTriangle size={16} className="text-red-600 mt-0.5 shrink-0" />
+          <div className="text-xs text-red-800 space-y-1">
+            <p className="font-semibold">
+              Furo de apontamento no Syneco — {comFuro.length} conjunto{comFuro.length > 1 ? "s" : ""} com mais
+              unidades apontadas em {labelAtual.toLowerCase()} do que nos setores anteriores
+            </p>
+            {comFuro.map((p) => {
+              const f = furos[p.marca];
+              return (
+                <p key={p.id} className="tabular-nums">
+                  <span className="font-mono font-bold">{p.marca}</span>
+                  {" — "}{labelAtual} {f.apontado}, mas {f.gargalos.map((g) => `${g.setor} tem ${g.produzido}`).join(" · ")}
+                </p>
+              );
+            })}
+            <p className="text-red-600">
+              Ajuste os lançamentos no Syneco (término não apontado ou lançado no setor errado) — o portal reflete na próxima sincronização.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Vazio */}
       {filtradas.length === 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 text-center py-10">
@@ -392,6 +422,7 @@ export default function SetorClient({
                   const apont = apontamentos[p.marca];
                   const total = totalDe(p);
                   const adiantada = p.status !== setorAtual;
+                  const furo = furos[p.marca];
 
                   return (
                     <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${isSelected ? "bg-blue-50/40" : ""}`}>
@@ -408,13 +439,19 @@ export default function SetorClient({
                       <td className="px-3 py-2.5 font-mono text-xs text-torg-blue">{fmtOP(p.opNumero)}</td>
                       <td className="px-3 py-2.5 font-mono font-bold text-torg-dark">
                         {p.marca}
-                        {adiantada && (
+                        {furo && (
+                          <span className="ml-1.5 text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 inline-flex items-center gap-1"
+                            title={`Apontadas ${furo.apontado} unidades em ${labelAtual.toLowerCase()}, mas ${furo.gargalos.map((g) => `${g.setor} tem ${g.produzido}`).join(" · ")} — ajustar os lançamentos no Syneco`}>
+                            <AlertTriangle size={9} /> furo de apontamento
+                          </span>
+                        )}
+                        {!furo && adiantada && (
                           <span className="ml-1.5 text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700"
                             title={`O Syneco já apontou unidades neste setor, mas o conjunto ainda não foi liberado de ${STATUS_LABEL[p.status] || p.status} no portal`}>
                             adiantado · {STATUS_LABEL[p.status] || p.status}
                           </span>
                         )}
-                        {!adiantada && concluiuSetor(p) && (
+                        {!furo && !adiantada && concluiuSetor(p) && (
                           <span className="ml-1.5 text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700"
                             title={`Apontamento de ${labelAtual.toLowerCase()} concluído — pronto para ${labelProximo.toLowerCase()}`}>
                             pronto → {labelProximo}
