@@ -14,7 +14,7 @@ const menu = [
   { href: "/pcp",              label: "Painel",           icon: LayoutDashboard, exact: true },
   { href: "/pcp/pmp",          label: "PMP",              icon: Target },
   { href: "/pcp/pecas-corte",  label: "Programação",      icon: Package },
-  { href: "/pcp/fila-corte",   label: "Fila de Corte",    icon: ListOrdered },
+  { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
   { href: "/pcp/maquinas",     label: "Máquinas",         icon: Cpu },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
   { href: "/pcp/solda",        label: "Solda",            icon: Flame },
