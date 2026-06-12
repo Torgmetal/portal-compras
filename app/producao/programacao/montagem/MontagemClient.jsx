@@ -421,15 +421,8 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
           <option value="">Todas as OPs</option>
           {opsDisponiveis.map((op) => <option key={op} value={op}>OP {op}</option>)}
         </select>
-        <select
-          value={filtroStatus}
-          onChange={(e) => { setFiltroStatus(e.target.value); setSelecionados(new Set()); }}
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
-        >
-          <option value="">Todos status</option>
-          <option value="CORTE">Aguardando montagem (no corte)</option>
-          <option value="MONTAGEM">Em montagem</option>
-        </select>
+        {/* sem seletor de setor: a aba já é o setor — os cards acima alternam
+            entre Aguardando (corte) e Em montagem */}
         <select
           value={filtroProntidao}
           onChange={(e) => { setFiltroProntidao(e.target.value); setSelecionados(new Set()); }}
