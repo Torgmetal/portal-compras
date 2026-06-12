@@ -1,11 +1,12 @@
 "use client";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import {
   Zap, ChevronDown, ChevronUp, Filter, Search, CheckCircle2, Download, Upload,
   Package, Loader2, AlertCircle, RefreshCw, Undo2, FileSpreadsheet, ClipboardList,
   ArrowRight, X, Trash2, Factory, PackageSearch, AlertTriangle, XCircle, Layers,
+  Cloud, FileDown,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import {
@@ -58,6 +59,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   // Modais de importacao
   const [modalImport, setModalImport] = useState(false);
   const [modalImportLPC, setModalImportLPC] = useState(false);
+  const [modalSharepoint, setModalSharepoint] = useState(false);
   const [modalExcluirLote, setModalExcluirLote] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -786,14 +788,23 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
             Verifique a classificação automática das peças por máquina e libere para produção.
           </p>
         </div>
-        {isAdmin && opsComPecas.length > 0 && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setModalExcluirLote(true)}
-            className="px-3 py-1.5 text-red-600 border border-red-200 text-xs rounded-lg hover:bg-red-50 font-medium flex items-center gap-1.5"
+            onClick={() => setModalSharepoint(true)}
+            className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5"
+            title="Busca a lista (LPC) da pasta da OP no SharePoint — pega a revisão mais recente"
           >
-            <Trash2 size={14} /> Excluir peças por OP
+            <Cloud size={14} /> Buscar lista (SharePoint)
           </button>
-        )}
+          {isAdmin && opsComPecas.length > 0 && (
+            <button
+              onClick={() => setModalExcluirLote(true)}
+              className="px-3 py-1.5 text-red-600 border border-red-200 text-xs rounded-lg hover:bg-red-50 font-medium flex items-center gap-1.5"
+            >
+              <Trash2 size={14} /> Excluir peças por OP
+            </button>
+          )}
+        </div>
       </div>
 
       {/* KPIs resumo */}
@@ -1695,6 +1706,13 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
         />
       )}
 
+      {modalSharepoint && (
+        <ModalImportarSharepoint
+          onClose={() => setModalSharepoint(false)}
+          onImportado={() => router.refresh()}
+        />
+      )}
+
       <ConfirmModal
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
@@ -2200,6 +2218,158 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
           <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">
             {resultado ? "Fechar" : "Cancelar"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Modal: buscar/importar a lista (LPC) da pasta da OP no SharePoint ──────
+   Varre o SharePoint, mostra a revisão disponível × a carregada, e importa
+   por OP mesclando (preserva o que já andou; avisa conflitos). */
+function ModalImportarSharepoint({ onClose, onImportado }) {
+  const [lista, setLista] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState("");
+  const [pasta, setPasta] = useState("");
+  const [importando, setImportando] = useState(null); // obra em importação
+  const [resultados, setResultados] = useState({});   // obra → resultado
+
+  const varrer = async () => {
+    setCarregando(true); setErro("");
+    try {
+      const res = await fetch("/api/producao/pecas/importar-lpc-revisao");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha ao varrer o SharePoint");
+      setLista(data.lista || []);
+      setPasta(data.pastaVarrida || "");
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregando(false);
+    }
+  };
+  useEffect(() => { varrer(); }, []);
+
+  const importar = async (obra, permitirDowngrade = false) => {
+    setImportando(obra); setErro("");
+    try {
+      const res = await fetch("/api/producao/pecas/importar-lpc-revisao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ obra, permitirDowngrade }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // Revisão menor que a carregada: confirma e reenvia forçando.
+        if (data.downgrade && !permitirDowngrade) {
+          if (confirm(`O SharePoint tem R${String(data.revDisponivel).padStart(2, "0")}, abaixo da carregada R${String(data.revAtual).padStart(2, "0")}.\n\nRebaixar mesmo assim?`)) {
+            return await importar(obra, true);
+          }
+          return; // cancelado
+        }
+        throw new Error(data.error || "Falha ao importar");
+      }
+      setResultados((prev) => ({ ...prev, [obra]: data }));
+      // atualiza a linha (revAtual passa a ser a importada)
+      setLista((prev) => prev.map((x) => x.obra === obra ? { ...x, revAtual: data.revisao, novidade: false } : x));
+      onImportado?.();
+    } catch (e) {
+      setErro(`${obra}: ${e.message}`);
+    } finally {
+      setImportando(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !importando && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[88vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+          <Cloud size={18} className="text-torg-blue" />
+          <h3 className="font-semibold text-torg-dark">Buscar lista (LPC) do SharePoint</h3>
+          <button onClick={() => varrer()} disabled={carregando} className="ml-auto text-xs text-torg-blue hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+            <RefreshCw size={12} className={carregando ? "animate-spin" : ""} /> Atualizar
+          </button>
+          <button onClick={onClose} disabled={!!importando} className="text-torg-gray hover:text-torg-dark ml-2"><X size={18} /></button>
+        </div>
+
+        <div className="px-5 py-4 overflow-y-auto">
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-3 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" /> <span>{erro}</span>
+            </div>
+          )}
+          {pasta && <p className="text-[11px] text-torg-gray mb-3">Pasta varrida: <span className="font-mono">{pasta}</span></p>}
+
+          {carregando && !lista ? (
+            <div className="py-10 text-center"><Loader2 size={22} className="animate-spin text-torg-blue mx-auto" /><p className="text-sm text-torg-gray mt-2">Varrendo o SharePoint…</p></div>
+          ) : !lista || lista.length === 0 ? (
+            <div className="py-10 text-center">
+              <Cloud size={32} className="mx-auto text-gray-300 mb-2" />
+              <p className="text-sm text-torg-gray">Nenhum LPC encontrado nas pastas das OPs.</p>
+              <p className="text-[11px] text-torg-gray mt-1">Esperado: <span className="font-mono">{"{OP}/…/Lista de Liberação/T..-LPC_R0X.xlsx"}</span></p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {lista.map((x) => {
+                const r = resultados[x.obra];
+                return (
+                  <div key={x.obra} className="border border-gray-100 rounded-lg p-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="font-mono font-bold text-torg-dark">{x.obra}</span>
+                      <span className="text-[11px] text-torg-gray font-mono truncate max-w-[240px]" title={x.arquivo}>{x.arquivo}</span>
+                      <span className="text-xs text-torg-gray">
+                        {x.revAtual == null
+                          ? <>nova obra · <strong className="text-torg-dark">R{String(x.revDisponivel).padStart(2, "0")}</strong></>
+                          : <>R{String(x.revAtual).padStart(2, "0")} → <strong className={x.novidade ? "text-emerald-600" : "text-torg-dark"}>R{String(x.revDisponivel).padStart(2, "0")}</strong></>}
+                      </span>
+                      {x.novidade && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">revisão nova</span>}
+                      <button
+                        onClick={() => importar(x.obra)}
+                        disabled={!!importando}
+                        className="ml-auto px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {importando === x.obra ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+                        {x.revAtual == null ? "Importar" : x.novidade ? "Atualizar revisão" : "Reimportar"}
+                      </button>
+                    </div>
+
+                    {r && (
+                      <div className="mt-2 pt-2 border-t border-gray-50 text-[11px] space-y-1">
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-torg-gray">
+                          <span className="text-emerald-700">+{r.adicionadas?.length || 0} adicionadas</span>
+                          <span className="text-red-600">−{r.removidas?.length || 0} removidas</span>
+                          <span>{r.mantidas || 0} mantidas</span>
+                          <span className="text-torg-dark font-medium">total {r.totalNovo} marcas</span>
+                          {!r.opEncontrada && <span className="text-amber-600">OP não cadastrada no portal</span>}
+                        </div>
+                        {r.conflitos?.length > 0 && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 text-amber-800">
+                            <p className="font-semibold flex items-center gap-1"><AlertTriangle size={11} /> {r.conflitos.length} conflito(s) — peças já em produção, decida manualmente:</p>
+                            <ul className="mt-0.5 space-y-0.5">
+                              {r.conflitos.slice(0, 8).map((c) => (
+                                <li key={c.marca} className="font-mono">
+                                  {c.marca} — {c.tipo === "REMOVIDA_PRODUZIDA"
+                                    ? `saiu da revisão mas já passou por ${c.status}${c.qteProduzida ? ` (${c.qteProduzida} baixadas)` : ""}`
+                                    : `qtd ${c.de}→${c.para} mas já em ${c.status}`} <span className="text-amber-600">(mantida)</span>
+                                </li>
+                              ))}
+                              {r.conflitos.length > 8 && <li className="text-amber-600">+{r.conflitos.length - 8} mais…</li>}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-torg-gray">
+          <span>Mescla por marca: adiciona novas, remove as que saíram (só se não produzidas), mantém o resto. Conflitos ficam para você decidir.</span>
+          <button onClick={onClose} disabled={!!importando} className="px-3 py-1.5 text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">Fechar</button>
         </div>
       </div>
     </div>

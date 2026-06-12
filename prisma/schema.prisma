@@ -1227,6 +1227,20 @@ model ConfigEstoque {
   locaisOmie     Json?
 }
 
+// Revisão da LPC carregada por OP (do SharePoint). O arquivo mantém o nome e
+// muda só o sufixo de revisão (T78A-LPC_R00 → R01). Sem FK em OP: obras do
+// SharePoint podem não estar cadastradas como OP no portal.
+model LpcRevisao {
+  opNumero       String   @id
+  revisao        Int      @default(0)
+  arquivo        String?
+  itens          Int      @default(0)
+  importadoEm    DateTime @default(now())
+  importadoPorId String?
+
+  @@index([revisao])
+}
+
 // Parâmetros do PCP (chave-valor) — ex.: meta_corte_kg_mes = "250000"
 model PcpParametro {
   chave     String   @id
