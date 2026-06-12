@@ -24,8 +24,20 @@ export async function GET(req) {
   const inicioMes = new Date(ano, mes - 1, 1);
   const fimMes = new Date(ano, mes, 0, 23, 59, 59);
 
+  // Croqui só aparece no corte — da montagem em diante o volume rastreado é o
+  // conjunto (ou a peça avulsa, que é volume próprio).
+  const SETORES_POS_CORTE = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
+  const semCroquiPosCorte = {
+    OR: [
+      { status: { notIn: SETORES_POS_CORTE } },
+      { tipoPeca: "CONJUNTO" },
+      { tipoPeca: null },
+    ],
+  };
+
   const statusAgg = await prisma.pecaConjunto.groupBy({
     by: ["status"],
+    where: semCroquiPosCorte,
     _count: true,
     _sum: { pesoTotalKg: true, qte: true },
   });
@@ -35,8 +47,10 @@ export async function GET(req) {
   const alertasPorStatus = await prisma.pecaConjunto.groupBy({
     by: ["status"],
     where: {
-      status: { notIn: ["PENDENTE", "EXPEDIDO"] },
-      atualizadoEm: { lt: umDiaAtras },
+      AND: [
+        semCroquiPosCorte,
+        { status: { notIn: ["PENDENTE", "EXPEDIDO"] }, atualizadoEm: { lt: umDiaAtras } },
+      ],
     },
     _count: true,
     _sum: { qte: true },
@@ -55,7 +69,12 @@ export async function GET(req) {
   let pecas = [];
   if (setor) {
     pecas = await prisma.pecaConjunto.findMany({
-      where: { status: setor },
+      where: {
+        status: setor,
+        ...(SETORES_POS_CORTE.includes(setor)
+          ? { OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] }
+          : {}),
+      },
       select: {
         id: true, opNumero: true, marca: true, descricao: true,
         qte: true, pesoUnitKg: true, pesoTotalKg: true, status: true,
