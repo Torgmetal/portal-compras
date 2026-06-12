@@ -48,6 +48,12 @@ const opMaeNumero = (p) => {
   return raw ? String(parseInt(raw, 10)) : "";
 };
 const parteDe = (p) => String(p.opNumero || "").replace(/^T?\d+/i, "").toUpperCase() || "—";
+// Tipo de perfil = letras iniciais da descrição/perfil: "CH9.50X113"→"CH",
+// "W200X26.6"→"W", "L1.1/2X1/8"→"L", "TUBO250X150"→"TUBO".
+const tipoPerfil = (p) => {
+  const s = p.descricao || p.perfil || "";
+  return (String(s).match(/^[A-Za-zÀ-ÿ]+/) || [""])[0].toUpperCase() || "—";
+};
 
 export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole }) {
   const router = useRouter();
@@ -57,7 +63,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [filtroMaquina, setFiltroMaquina] = useState("");
   const [filtroAtendimento, setFiltroAtendimento] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
-  const [filtroDescricao, setFiltroDescricao] = useState("");
+  const [filtroPerfil, setFiltroPerfil] = useState("");
   const [filtroParte, setFiltroParte] = useState("");
   const [prioBulk, setPrioBulk] = useState(""); // prioridade a aplicar na seleção
   const [busca, setBusca] = useState("");
@@ -117,7 +123,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       if (filtroTipo === "CONJUNTO" && p.tipoPeca !== "CONJUNTO") return false;
       if (filtroTipo === "CROQUI" && p.tipoPeca !== "CROQUI") return false;
       if (filtroTipo === "PECA" && p.tipoPeca != null) return false;
-      if (filtroDescricao && (p.descricao || "") !== filtroDescricao) return false;
+      if (filtroPerfil && tipoPerfil(p) !== filtroPerfil) return false;
       if (filtroParte && parteDe(p) !== filtroParte) return false;
       if (filtroMaquina && (p.maquina || "SEM_MAQUINA") !== filtroMaquina) return false;
       if (filtroAtendimento) {
@@ -137,11 +143,11 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       }
       return true;
     });
-  }, [pecas, filtroOp, filtroStatus, filtroTipo, filtroDescricao, filtroParte, filtroMaquina, filtroAtendimento, busca]);
+  }, [pecas, filtroOp, filtroStatus, filtroTipo, filtroPerfil, filtroParte, filtroMaquina, filtroAtendimento, busca]);
 
-  // Opções dos filtros novos (descrições existentes; partes da OP selecionada)
-  const descricoes = useMemo(
-    () => [...new Set(pecas.map((p) => p.descricao).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+  // Opções dos filtros novos (tipos de perfil existentes; partes da OP selecionada)
+  const perfis = useMemo(
+    () => [...new Set(pecas.map(tipoPerfil).filter((x) => x && x !== "—"))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
     [pecas]
   );
   const partesDisponiveis = useMemo(() => {
@@ -1149,12 +1155,13 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           {partesDisponiveis.map((pt) => <option key={pt} value={pt}>Parte {pt}</option>)}
         </select>
         <select
-          value={filtroDescricao}
-          onChange={(e) => { setFiltroDescricao(e.target.value); setSelecionados(new Set()); }}
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white max-w-[180px]"
+          value={filtroPerfil}
+          onChange={(e) => { setFiltroPerfil(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+          title="Tipo de perfil (CH = chapa, W = perfil W, L = cantoneira, TUBO…)"
         >
-          <option value="">Todas as descrições</option>
-          {descricoes.map((d) => <option key={d} value={d}>{d}</option>)}
+          <option value="">Todos os perfis</option>
+          {perfis.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
         <select
           value={filtroMaquina}
@@ -1199,9 +1206,9 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
         >
           <Download size={13} /> Exportar
         </button>
-        {(filtroOp || filtroTipo || filtroDescricao || filtroParte || filtroMaquina || filtroAtendimento || busca) && (
+        {(filtroOp || filtroTipo || filtroPerfil || filtroParte || filtroMaquina || filtroAtendimento || busca) && (
           <button
-            onClick={() => { setFiltroOp(""); setFiltroTipo(""); setFiltroDescricao(""); setFiltroParte(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
+            onClick={() => { setFiltroOp(""); setFiltroTipo(""); setFiltroPerfil(""); setFiltroParte(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
             className="text-xs text-torg-gray hover:text-torg-dark"
           >
             limpar
@@ -1329,7 +1336,13 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50/60">
                       <tr>
-                        <th className="px-3 py-2 w-8"></th>
+                        <th className="px-3 py-2 w-8">
+                          {pendentesParte.length > 0 && (
+                            <input type="checkbox" checked={todosPendSel}
+                              onChange={() => setSelecionados((prev) => { const n = new Set(prev); if (todosPendSel) pendentesParte.forEach((x) => n.delete(x.id)); else pendentesParte.forEach((x) => n.add(x.id)); return n; })}
+                              title="Selecionar todas as pendentes desta parte" />
+                          )}
+                        </th>
                         <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase w-14" title="Prioridade — selecione as peças e defina em lote acima">Prior.</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Marca</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Descrição</th>
