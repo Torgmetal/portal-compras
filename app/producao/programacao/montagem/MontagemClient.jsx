@@ -19,9 +19,10 @@ const STATUS_LABEL = {
 };
 
 const PRONTIDAO_LABEL = {
-  PRONTO: "Liberados para montagem",
-  PARCIAL: "Conjunto liberado para montagem parcial",
-  PENDENTE: "Aguardando peças",
+  PRONTO: "Pronto — 100% cortado",
+  LIBERAVEL: "Pode montar — ≥ metade cortada",
+  PARCIAL: "Aguardando corte",
+  PENDENTE: "Sem corte",
   MONTADO: "Conjuntos montados",
 };
 
@@ -39,13 +40,23 @@ const fmtMm = (v) => {
   return `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mm`;
 };
 
-// Verifica se todos os croquis de um conjunto estão atendidos (cortados)
+// Prontidão do conjunto para MONTAGEM (regra do Vitor):
+//   PRONTO    = todos os croquis 100% cortados
+//   LIBERAVEL = todos os croquis com PELO MENOS METADE cortada — a montagem
+//               pode começar antes de terminar todos os cortes
+//   PARCIAL   = tem corte feito, mas algum croqui abaixo da metade
+//   PENDENTE  = nada cortado
+// podeLiberar = PRONTO ou LIBERAVEL.
 function calcularProntidao(conjunto) {
   const croquis = conjunto.conjuntoCroquis || [];
-  if (croquis.length === 0) return { pronto: false, total: 0, atendidos: 0, pct: 0, itens: [], categoria: "PENDENTE" };
+  if (croquis.length === 0) {
+    return { pronto: false, liberavel: false, podeLiberar: false, total: 0, atendidos: 0, pct: 0, itens: [], categoria: "PENDENTE" };
+  }
 
   let total = 0;
   let atendidos = 0;
+  let comMetade = 0;
+  let comAlgo = 0;
   const itens = [];
 
   for (const rel of croquis) {
@@ -54,8 +65,11 @@ function calcularProntidao(conjunto) {
     const necessario = (c.qte || 1);
     const produzido = c.qteProduzida || 0;
     const ok = produzido >= necessario;
+    const metade = produzido >= necessario / 2; // pelo menos metade cortada
     total++;
     if (ok) atendidos++;
+    if (metade) comMetade++;
+    if (produzido > 0) comAlgo++;
     itens.push({
       marca: c.marca,
       descricao: c.descricao,
@@ -64,6 +78,7 @@ function calcularProntidao(conjunto) {
       qteProduzida: produzido,
       falta: Math.max(0, necessario - produzido),
       ok,
+      metade,
       status: c.status,
       maquina: c.maquina,
       comprimentoMm: c.comprimentoMm,
@@ -73,8 +88,10 @@ function calcularProntidao(conjunto) {
 
   const pct = total > 0 ? Math.round((atendidos / total) * 100) : 0;
   const pronto = atendidos === total && total > 0;
-  const categoria = pronto ? "PRONTO" : atendidos > 0 ? "PARCIAL" : "PENDENTE";
-  return { pronto, total, atendidos, pct, itens, categoria };
+  const liberavel = !pronto && total > 0 && comMetade === total;
+  const podeLiberar = pronto || liberavel;
+  const categoria = pronto ? "PRONTO" : liberavel ? "LIBERAVEL" : comAlgo > 0 ? "PARCIAL" : "PENDENTE";
+  return { pronto, liberavel, podeLiberar, total, atendidos, pct, itens, categoria };
 }
 
 export default function MontagemClient({ conjuntosIniciais, userRole }) {
@@ -110,6 +127,8 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
       if (filtroStatus && c.status !== filtroStatus) return false;
       if (filtroProntidao === "MONTADO") {
         if (c.status !== "MONTAGEM") return false;
+      } else if (filtroProntidao === "PODE_MONTAR") {
+        if (!c.prontidao.podeLiberar) return false; // 100% ou ≥ metade
       } else if (filtroProntidao && c.prontidao.categoria !== filtroProntidao) return false;
       if (busca) {
         const q = busca.toLowerCase();
@@ -126,7 +145,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
 
   // Contadores
   const totalAguardando = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "CORTE").length, [conjuntosEnriquecidos]);
-  const totalProntos = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "CORTE" && c.prontidao.pronto).length, [conjuntosEnriquecidos]);
+  const totalProntos = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "CORTE" && c.prontidao.podeLiberar).length, [conjuntosEnriquecidos]);
   const totalEmMontagem = useMemo(() => conjuntosEnriquecidos.filter((c) => c.status === "MONTAGEM").length, [conjuntosEnriquecidos]);
 
   // Peso total dos conjuntos filtrados
@@ -151,7 +170,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
   };
   const selecionarTodos = () => {
     if (filtroStatus === "CORTE") {
-      const prontos = filtrados.filter((c) => c.prontidao.pronto && c.status === "CORTE");
+      const prontos = filtrados.filter((c) => c.prontidao.podeLiberar && c.status === "CORTE");
       if (prontos.every((c) => selecionados.has(c.id))) {
         setSelecionados(new Set());
       } else {
@@ -271,7 +290,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
         "",
         `${prontidao.atendidos}/${prontidao.total}`,
         faltam,
-        prontidao.pronto ? "Pronto" : `${prontidao.pct}%`,
+        prontidao.pronto ? "Pronto" : prontidao.liberavel ? "Pode montar" : `${prontidao.pct}%`,
         STATUS_LABEL[c.status] || c.status,
       ], {
         fillColor,
@@ -362,12 +381,12 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
           <p className="text-[10px] opacity-70">conjuntos no corte</p>
         </button>
         <button
-          onClick={() => { setFiltroStatus("CORTE"); setFiltroProntidao("PRONTO"); setSelecionados(new Set()); }}
-          className={`rounded-xl p-3 text-left transition-all bg-emerald-50 text-emerald-700 ${filtroProntidao === "PRONTO" ? "ring-2 ring-offset-1 ring-emerald-400" : ""}`}
+          onClick={() => { setFiltroStatus("CORTE"); setFiltroProntidao("PODE_MONTAR"); setSelecionados(new Set()); }}
+          className={`rounded-xl p-3 text-left transition-all bg-emerald-50 text-emerald-700 ${filtroProntidao === "PODE_MONTAR" ? "ring-2 ring-offset-1 ring-emerald-400" : ""}`}
         >
           <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Prontos p/ montar</p>
           <p className="text-2xl font-extrabold tabular-nums">{totalProntos}</p>
-          <p className="text-[10px] opacity-70">croquis 100% cortados</p>
+          <p className="text-[10px] opacity-70">100% ou ≥ metade cortados</p>
         </button>
         <button
           onClick={() => { setFiltroStatus("MONTAGEM"); setFiltroProntidao(""); setSelecionados(new Set()); }}
@@ -418,9 +437,11 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
         >
           <option value="">Situação</option>
-          <option value="PRONTO">Liberados para montagem</option>
-          <option value="PARCIAL">Conjunto liberado para montagem parcial</option>
-          <option value="PENDENTE">Aguardando peças</option>
+          <option value="PODE_MONTAR">Pode montar (100% ou ≥ metade)</option>
+          <option value="PRONTO">Pronto — 100% cortado</option>
+          <option value="LIBERAVEL">≥ metade cortada</option>
+          <option value="PARCIAL">Aguardando corte</option>
+          <option value="PENDENTE">Sem corte</option>
           <option value="MONTADO">Conjuntos montados</option>
         </select>
         <div className="flex items-center gap-1 flex-1 min-w-[180px]">
@@ -484,12 +505,12 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
         <span className="text-[11px] text-torg-gray">
           {filtrados.length} conjunto{filtrados.length !== 1 ? "s" : ""} · {fmtKg(pesoFiltrados)}
         </span>
-        {filtroStatus === "CORTE" && filtrados.filter((c) => c.prontidao.pronto).length > 0 && (
+        {filtroStatus === "CORTE" && filtrados.filter((c) => c.prontidao.podeLiberar).length > 0 && (
           <button
             onClick={selecionarTodos}
             className="text-[11px] text-torg-blue hover:underline font-medium"
           >
-            Selecionar todos os prontos ({filtrados.filter((c) => c.prontidao.pronto).length})
+            Selecionar todos que podem montar ({filtrados.filter((c) => c.prontidao.podeLiberar).length})
           </button>
         )}
         {filtroStatus === "MONTAGEM" && filtrados.length > 0 && (
@@ -522,7 +543,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
             const isExpanded = expandidos.has(c.id);
             const isSelected = selecionados.has(c.id);
             const pesoTotal = c.pesoTotalKg || 0;
-            const podeSelecionar = filtroStatus === "CORTE" ? prontidao.pronto : c.status === "MONTAGEM";
+            const podeSelecionar = filtroStatus === "CORTE" ? prontidao.podeLiberar : c.status === "MONTAGEM";
 
             return (
               <div key={c.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all ${
@@ -562,6 +583,11 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                               <CheckCircle2 size={10} /> Pronto
                             </span>
+                          ) : prontidao.liberavel ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700"
+                              title="Todos os croquis com pelo menos metade cortada — a montagem pode começar">
+                              <CheckCircle2 size={10} /> Pode montar · ≥ ½
+                            </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                               <AlertCircle size={10} /> {prontidao.atendidos}/{prontidao.total} croquis
@@ -581,7 +607,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
                       {/* Barra de progresso */}
                       <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all ${prontidao.pct === 100 ? "bg-emerald-500" : prontidao.pct > 0 ? "bg-amber-400" : "bg-gray-300"}`}
+                          className={`h-full rounded-full transition-all ${prontidao.pct === 100 ? "bg-emerald-500" : prontidao.liberavel ? "bg-cyan-500" : prontidao.pct > 0 ? "bg-amber-400" : "bg-gray-300"}`}
                           style={{ width: `${prontidao.pct}%` }}
                         />
                       </div>
@@ -636,6 +662,11 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
                                 {item.ok ? (
                                   <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                                     <CheckCircle2 size={9} /> OK
+                                  </span>
+                                ) : item.metade ? (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-cyan-100 text-cyan-700"
+                                    title="Pelo menos metade cortada — suficiente pra liberar a montagem">
+                                    ≥ ½
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">
