@@ -61,9 +61,11 @@ export async function POST(req) {
       }, { status: 404 });
     }
 
-    // Buscar PecaConjunto desta OP
+    // Buscar PecaConjunto desta OP — SÓ as importadas via LPC (regra do Vitor:
+    // apontamentos do Syneco sem peça correspondente na LPC são ignorados;
+    // nada é criado/baixado a partir do Syneco sozinho)
     const pecas = await prisma.pecaConjunto.findMany({
-      where: { opNumero },
+      where: { opNumero, fonte: "LPC_IMPORT" },
       select: { id: true, marca: true, descricao: true, status: true, pesoTotalKg: true, qte: true },
     });
     const pecasPorMarca = Object.fromEntries(pecas.map(p => [p.marca, p]));
