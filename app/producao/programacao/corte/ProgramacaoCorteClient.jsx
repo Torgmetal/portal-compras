@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
@@ -45,7 +45,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [pecas, setPecas] = useState(pecasIniciais);
   const [filtroOp, setFiltroOp] = useState("");
   const [menuAcoes, setMenuAcoes] = useState(false); // dropdown único de ações do header
-  const [origem, setOrigem] = useState("PORTAL"); // PORTAL = peças subidas | SYNECO = programação no Syneco
   const [filtroStatus, setFiltroStatus] = useState("PENDENTE");
   const [filtroMaquina, setFiltroMaquina] = useState("");
   const [filtroAtendimento, setFiltroAtendimento] = useState("");
@@ -810,29 +809,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
         </div>
       </div>
 
-      {/* Origem: peças subidas no portal × programação do Syneco */}
-      <div className="inline-flex bg-gray-100 rounded-lg p-1">
-        <button
-          onClick={() => setOrigem("PORTAL")}
-          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            origem === "PORTAL" ? "bg-white text-torg-blue shadow-sm" : "text-torg-gray hover:text-torg-dark"
-          }`}
-        >
-          Peças subidas ({pecas.length})
-        </button>
-        <button
-          onClick={() => setOrigem("SYNECO")}
-          className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${
-            origem === "SYNECO" ? "bg-white text-emerald-700 shadow-sm" : "text-torg-gray hover:text-torg-dark"
-          }`}
-        >
-          Programadas no Syneco
-        </button>
-      </div>
-
-      {origem === "SYNECO" && <SynecoProgramadasView pecas={pecas} />}
-
-      {origem === "PORTAL" && (<>
       {/* KPIs resumo */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <button
@@ -1420,7 +1396,6 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           )}
         </div>
       )}
-      </>)}
 
       {/* --- Modais --- */}
       {modalImport && (
@@ -2222,230 +2197,5 @@ function ItemMenu({ icon: Icon, onClick, disabled, destrutivo, title, children }
       <Icon size={14} className={destrutivo ? "text-red-400" : "text-torg-gray"} />
       {children}
     </button>
-  );
-}
-
-/* ─── Programação do Syneco (ordens de corte abertas), cruzada com o portal ──
-   Resumo por obra carregado on-demand; escolhendo a obra, lista os itens e
-   marca quem tem peça correspondente subida no portal (match igual ao do
-   Importar Syneco: item ↔ marca, com tolerância de sufixo). */
-const normObraSyneco = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
-
-function SynecoProgramadasView({ pecas }) {
-  const [resumo, setResumo] = useState(null);
-  const [itens, setItens] = useState(null);
-  const [obraSel, setObraSel] = useState("");
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState("");
-  const [buscaSyn, setBuscaSyn] = useState("");
-
-  useEffect(() => {
-    setCarregando(true);
-    fetch("/api/pcp/syneco-corte")
-      .then((r) => r.json())
-      .then((d) => { if (d.error) throw new Error(d.error); setResumo(d.resumo || []); })
-      .catch((e) => setErro(e.message))
-      .finally(() => setCarregando(false));
-  }, []);
-
-  const escolherObra = (obra) => {
-    setObraSel(obra);
-    setItens(null);
-    if (!obra) return;
-    setCarregando(true);
-    setErro("");
-    fetch(`/api/pcp/syneco-corte?obra=${encodeURIComponent(obra)}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.error) throw new Error(d.error); setItens(d.itens || []); })
-      .catch((e) => setErro(e.message))
-      .finally(() => setCarregando(false));
-  };
-
-  // Peças do portal agrupadas por obra normalizada (pro cruzamento)
-  const pecasPorObra = useMemo(() => {
-    const m = new Map();
-    for (const p of pecas) {
-      const norm = normObraSyneco(p.opNumero);
-      if (!m.has(norm)) m.set(norm, { exatas: new Set(), marcas: [] });
-      m.get(norm).exatas.add(p.marca);
-      m.get(norm).marcas.push(p.marca);
-    }
-    return m;
-  }, [pecas]);
-
-  const temNoPortal = (item) => {
-    const grupo = pecasPorObra.get(normObraSyneco(item.obra));
-    if (!grupo) return false;
-    if (grupo.exatas.has(item.item)) return true;
-    return grupo.marcas.some((mk) => item.item.endsWith(mk) || mk.endsWith(item.item));
-  };
-
-  const itensFiltrados = (itens || []).filter((it) => {
-    if (!buscaSyn) return true;
-    const q = buscaSyn.toUpperCase();
-    return `${it.item} ${it.descItem || ""} ${it.maquina || ""}`.toUpperCase().includes(q);
-  });
-  const semPortal = (itens || []).filter((it) => !temNoPortal(it));
-
-  const ST_SYN = {
-    "Não Inicializada": "bg-gray-100 text-gray-600",
-    "Produzindo": "bg-green-100 text-green-700",
-    "Finalizada Parcial": "bg-amber-100 text-amber-700",
-  };
-
-  if (carregando && !resumo) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center">
-        <Loader2 size={22} className="animate-spin text-torg-blue mx-auto" />
-        <p className="text-sm text-torg-gray mt-2">Carregando programação do Syneco...</p>
-      </div>
-    );
-  }
-  if (erro) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center text-sm text-red-600">
-        <AlertCircle size={20} className="mx-auto mb-2" /> {erro}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {/* Seletor de obra + busca */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
-        <Factory size={15} className="text-emerald-600" />
-        <select
-          value={obraSel}
-          onChange={(e) => escolherObra(e.target.value)}
-          className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white min-w-[220px]"
-        >
-          <option value="">— Resumo de todas as obras ({(resumo || []).length}) —</option>
-          {(resumo || []).map((r) => (
-            <option key={r.obra} value={r.obra}>
-              {r.obra} — {r.itens} itens · {fmtKg(r.pesoPlanejado)}
-            </option>
-          ))}
-        </select>
-        {obraSel && (
-          <div className="relative">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-torg-gray" />
-            <input value={buscaSyn} onChange={(e) => setBuscaSyn(e.target.value)} placeholder="Buscar item, perfil…"
-              className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg w-48" />
-          </div>
-        )}
-        <span className="text-[10px] text-torg-gray ml-auto">
-          ordens de corte abertas no Syneco (não inicializadas, produzindo ou parciais)
-        </span>
-      </div>
-
-      {/* Resumo por obra */}
-      {!obraSel && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[700px]">
-              <thead className="bg-gray-50/60 border-b border-gray-100">
-                <tr>
-                  <th className="px-4 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Obra</th>
-                  <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Itens abertos</th>
-                  <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Saldo (un)</th>
-                  <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso planejado</th>
-                  <th className="px-4 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peças no portal</th>
-                  <th className="px-4 py-2"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {(resumo || []).map((r) => {
-                  const noPortal = pecasPorObra.get(normObraSyneco(r.obra))?.marcas.length || 0;
-                  return (
-                    <tr key={r.obra} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-mono font-bold text-torg-dark">{r.obra}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{r.itens}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{Math.round(r.saldoUn)}</td>
-                      <td className="px-4 py-2 text-right tabular-nums font-medium">{fmtKg(r.pesoPlanejado)}</td>
-                      <td className="px-4 py-2 text-right">
-                        {noPortal > 0 ? (
-                          <span className="text-xs text-emerald-700 font-semibold tabular-nums">{noPortal} pç</span>
-                        ) : (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold">nada subido</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <button onClick={() => escolherObra(r.obra)} className="text-xs text-torg-blue hover:underline inline-flex items-center gap-0.5">
-                          ver itens <ArrowRight size={12} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Itens da obra escolhida */}
-      {obraSel && (carregando ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center">
-          <Loader2 size={20} className="animate-spin text-torg-blue mx-auto" />
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2 flex-wrap text-xs">
-            <span className="font-bold text-torg-dark">{obraSel}</span>
-            <span className="text-torg-gray">{(itens || []).length} itens abertos</span>
-            {semPortal.length > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold">
-                <AlertTriangle size={11} /> {semPortal.length} sem peça correspondente no portal
-              </span>
-            )}
-            {semPortal.length === 0 && (itens || []).length > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">
-                <CheckCircle2 size={11} /> tudo casado com o portal
-              </span>
-            )}
-          </div>
-          <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
-            <table className="w-full text-sm min-w-[800px]">
-              <thead className="bg-gray-50/60 sticky top-0">
-                <tr>
-                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Item</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Perfil</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Máquina</th>
-                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Prod. / Plan.</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Saldo</th>
-                  <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso plan.</th>
-                  <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Portal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {itensFiltrados.map((it) => (
-                  <tr key={it.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-1.5 font-mono text-xs font-semibold text-torg-dark">{it.item}</td>
-                    <td className="px-3 py-1.5 text-xs text-torg-gray">{it.descItem || "—"}</td>
-                    <td className="px-3 py-1.5 text-xs font-mono text-torg-gray">{it.maquina === "---" ? "—" : it.maquina || "—"}</td>
-                    <td className="px-3 py-1.5">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${ST_SYN[it.status] || "bg-gray-50 text-gray-500"}`}>
-                        {it.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-xs tabular-nums">{Math.round(it.produzidoUn)} / {Math.round(it.planejadoUn)}</td>
-                    <td className="px-3 py-1.5 text-right text-xs tabular-nums font-medium">{Math.round(it.saldoUn)}</td>
-                    <td className="px-3 py-1.5 text-right text-xs tabular-nums">{fmtKg(it.pesoPlanejado)}</td>
-                    <td className="px-3 py-1.5 text-center">
-                      {temNoPortal(it) ? (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold">✓ subida</span>
-                      ) : (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold">não subida</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
