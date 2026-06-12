@@ -965,7 +965,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           onClick={() => setFiltroStatus("PENDENTE")}
           className={`rounded-xl p-3 text-left transition-all bg-orange-50 text-orange-700 ${filtroStatus === "PENDENTE" ? "ring-2 ring-offset-1 ring-orange-400" : ""}`}
         >
-          <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Pendentes</p>
+          <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">Importação</p>
           <p className="text-2xl font-extrabold tabular-nums">{totalPendentes}</p>
           <p className="text-[10px] opacity-70">aguardando liberação</p>
         </button>
