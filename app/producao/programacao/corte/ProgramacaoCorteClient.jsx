@@ -65,6 +65,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroPerfil, setFiltroPerfil] = useState("");
   const [filtroParte, setFiltroParte] = useState("");
+  const [filtroPrioridade, setFiltroPrioridade] = useState(""); // "", "COM", "SEM" ou "1","2"…
   const [prioBulk, setPrioBulk] = useState(""); // prioridade a aplicar na seleção
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
@@ -125,6 +126,9 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       if (filtroTipo === "PECA" && p.tipoPeca != null) return false;
       if (filtroPerfil && tipoPerfil(p) !== filtroPerfil) return false;
       if (filtroParte && parteDe(p) !== filtroParte) return false;
+      if (filtroPrioridade === "COM" && p.prioridade == null) return false;
+      if (filtroPrioridade === "SEM" && p.prioridade != null) return false;
+      if (filtroPrioridade && !["COM", "SEM"].includes(filtroPrioridade) && String(p.prioridade ?? "") !== filtroPrioridade) return false;
       if (filtroMaquina && (p.maquina || "SEM_MAQUINA") !== filtroMaquina) return false;
       if (filtroAtendimento) {
         const prod = p.qteProduzida || 0;
@@ -143,11 +147,16 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       }
       return true;
     });
-  }, [pecas, filtroOp, filtroStatus, filtroTipo, filtroPerfil, filtroParte, filtroMaquina, filtroAtendimento, busca]);
+  }, [pecas, filtroOp, filtroStatus, filtroTipo, filtroPerfil, filtroParte, filtroPrioridade, filtroMaquina, filtroAtendimento, busca]);
 
   // Opções dos filtros novos (tipos de perfil existentes; partes da OP selecionada)
   const perfis = useMemo(
     () => [...new Set(pecas.map(tipoPerfil).filter((x) => x && x !== "—"))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    [pecas]
+  );
+  // Prioridades distintas existentes (para o dropdown)
+  const prioridades = useMemo(
+    () => [...new Set(pecas.map((p) => p.prioridade).filter((x) => x != null))].sort((a, b) => a - b),
     [pecas]
   );
   const partesDisponiveis = useMemo(() => {
@@ -793,12 +802,22 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   // Exportar relatorio no padrao ISO
   async function exportarRelatorio() {
     const filtrosAtivos = [
-      filtroOp ? `OP ${filtroOp}` : null,
+      filtroOp ? `OP-${filtroOp}` : null,
+      filtroParte ? `Parte ${filtroParte}` : null,
+      filtroPerfil ? `Perfil ${filtroPerfil}` : null,
+      filtroPrioridade === "COM" ? "Com prioridade" : filtroPrioridade === "SEM" ? "Sem prioridade" : filtroPrioridade ? `Prioridade ${filtroPrioridade}` : null,
       filtroStatus ? STATUS_LABEL[filtroStatus] : null,
       filtroMaquina ? (MAQUINA_LABEL[filtroMaquina] || filtroMaquina) : null,
       filtroAtendimento === "COMPLETO" ? "Completo" : filtroAtendimento === "PARCIAL" ? "Parcial" : filtroAtendimento === "PENDENTE" ? "Pendente" : null,
     ].filter(Boolean);
     const tituloFiltro = filtrosAtivos.length > 0 ? filtrosAtivos.join(" · ") : "Todas as OPs";
+    // Ordena o export por parte → prioridade → item (igual à tela)
+    const pecasExport = [...pecasFiltradas].sort((a, b) =>
+      parteDe(a).localeCompare(parteDe(b)) ||
+      (a.prioridade ?? 1e9) - (b.prioridade ?? 1e9) ||
+      (a.item ?? 1e9) - (b.item ?? 1e9) ||
+      a.marca.localeCompare(b.marca, undefined, { numeric: true })
+    );
 
     const totalPecas = pecasFiltradas.reduce((s, p) => s + (p.qte || 1), 0);
     const totalProd = pecasFiltradas.reduce((s, p) => s + (p.qteProduzida || 0), 0);
@@ -811,7 +830,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       kpis: [
         `Total: ${totalPecas} pc  |  Produzido: ${totalProd} pc (${pctGeral}%)  |  Peso: ${(totalPeso / 1000).toFixed(1)} t`,
       ],
-      totalColunas: 14,
+      totalColunas: 16,
       nomePlanilha: "Corte",
       codigoDoc: "REL-PRD-003",
     });
@@ -820,16 +839,16 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       { width: 8 }, { width: 14 }, { width: 24 }, { width: 14 },
       { width: 7 }, { width: 11 }, { width: 11 }, { width: 11 },
       { width: 10 }, { width: 8 }, { width: 10 }, { width: 16 },
-      { width: 12 }, { width: 12 },
+      { width: 12 }, { width: 12 }, { width: 8 }, { width: 9 },
     ];
 
     let row = linhaInicio;
-    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Comp.", "Peso Unit.", "Peso Total", "Produzido", "Falta", "% Atend.", "Maquina", "Status", "Data Prod."];
+    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Comp.", "Peso Unit.", "Peso Total", "Produzido", "Falta", "% Atend.", "Maquina", "Status", "Data Prod.", "Parte", "Prior."];
     adicionarHeaderTabela(ws, row, headers);
     row++;
     const primeiraLinhaDados = row;
 
-    for (const p of pecasFiltradas) {
+    for (const p of pecasExport) {
       const prod = p.qteProduzida || 0;
       const total = p.qte || 1;
       const falta = Math.max(0, total - prod);
@@ -855,10 +874,12 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
         p.maquina ? (MAQUINA_LABEL[p.maquina] || p.maquina) : "",
         STATUS_LABEL[p.status] || p.status,
         p.dataProducao ? new Date(p.dataProducao).toLocaleDateString("pt-BR") : "",
+        parteDe(p),
+        p.prioridade ?? "",
       ], {
         fillColor,
         fontColors,
-        alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right", 9: "right", 10: "right" },
+        alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right", 9: "right", 10: "right", 15: "center", 16: "center" },
       });
       ws.getCell(row, 2).font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
       ws.getCell(row, 9).font = { name: "Arial", size: 9, bold: true, color: { argb: fontColors[8] } };
@@ -876,7 +897,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       { formula: `SUM(I${primeiraLinhaDados}:I${ultimaLinhaDados})` },
       { formula: `SUM(J${primeiraLinhaDados}:J${ultimaLinhaDados})` },
       { formula: `IF(E${row}=0,"0%",ROUND(I${row}/E${row}*100,0)&"%")` },
-      "", "", "",
+      "", "", "", "", "",
     ]);
     row++;
 
@@ -1155,6 +1176,17 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           {partesDisponiveis.map((pt) => <option key={pt} value={pt}>Parte {pt}</option>)}
         </select>
         <select
+          value={filtroPrioridade}
+          onChange={(e) => { setFiltroPrioridade(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+          title="Filtrar pela prioridade marcada"
+        >
+          <option value="">Toda prioridade</option>
+          <option value="COM">Com prioridade</option>
+          <option value="SEM">Sem prioridade</option>
+          {prioridades.map((n) => <option key={n} value={String(n)}>Prioridade {n}</option>)}
+        </select>
+        <select
           value={filtroPerfil}
           onChange={(e) => { setFiltroPerfil(e.target.value); setSelecionados(new Set()); }}
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
@@ -1206,9 +1238,9 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
         >
           <Download size={13} /> Exportar
         </button>
-        {(filtroOp || filtroTipo || filtroPerfil || filtroParte || filtroMaquina || filtroAtendimento || busca) && (
+        {(filtroOp || filtroTipo || filtroPerfil || filtroParte || filtroPrioridade || filtroMaquina || filtroAtendimento || busca) && (
           <button
-            onClick={() => { setFiltroOp(""); setFiltroTipo(""); setFiltroPerfil(""); setFiltroParte(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
+            onClick={() => { setFiltroOp(""); setFiltroTipo(""); setFiltroPerfil(""); setFiltroParte(""); setFiltroPrioridade(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
             className="text-xs text-torg-gray hover:text-torg-dark"
           >
             limpar
