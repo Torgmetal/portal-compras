@@ -48,6 +48,8 @@ const fmtKg = (v) => {
 export default function SetorClient({
   pecasIniciais, setorAtual, setorAnterior, setorProximo,
   titulo, iconColor = "text-torg-blue", codigoDoc = "REL-PRD-005",
+  // apontamento do Syneco NESTE setor: { [marca]: { produzido, planejado, dataFim } }
+  apontamentos = {},
 }) {
   const Icon = ICON_MAP[setorAtual] || Package;
   const [pecas, setPecas] = useState(pecasIniciais);
@@ -68,10 +70,12 @@ export default function SetorClient({
     return [...set].sort();
   }, [pecas]);
 
-  // Filtrar
+  // Filtrar — inclui ADIANTADOS: conjuntos com apontamento Syneco > 0 neste
+  // setor mesmo que o status (pipeline) ainda esteja num setor anterior
   const filtradas = useMemo(() => {
     return pecas.filter((p) => {
-      if (p.status !== setorAtual) return false;
+      const adiantada = p.status !== setorAtual && (apontamentos[p.marca]?.produzido || 0) > 0;
+      if (p.status !== setorAtual && !adiantada) return false;
       if (filtroOp && p.opNumero !== filtroOp) return false;
       if (busca) {
         const q = busca.toLowerCase();
@@ -84,7 +88,10 @@ export default function SetorClient({
       }
       return true;
     });
-  }, [pecas, filtroOp, busca, setorAtual]);
+  }, [pecas, filtroOp, busca, setorAtual, apontamentos]);
+
+  // Só quem está NESTE setor pode ser selecionado/movido (adiantados não)
+  const selecionaveis = useMemo(() => filtradas.filter((p) => p.status === setorAtual), [filtradas, setorAtual]);
 
   // Contadores
   const totalNoSetor = useMemo(() => pecas.filter((p) => p.status === setorAtual).length, [pecas, setorAtual]);
@@ -109,10 +116,10 @@ export default function SetorClient({
     });
   };
   const selecionarTodos = () => {
-    if (filtradas.every((p) => selecionados.has(p.id))) {
+    if (selecionaveis.length > 0 && selecionaveis.every((p) => selecionados.has(p.id))) {
       setSelecionados(new Set());
     } else {
-      setSelecionados(new Set(filtradas.map((p) => p.id)));
+      setSelecionados(new Set(selecionaveis.map((p) => p.id)));
     }
   };
 
@@ -322,9 +329,9 @@ export default function SetorClient({
         <span className="text-[11px] text-torg-gray">
           {filtradas.length} conjunto{filtradas.length !== 1 ? "s" : ""} · {fmtKg(pesoFiltradas)}
         </span>
-        {filtradas.length > 0 && (
+        {selecionaveis.length > 0 && (
           <button onClick={selecionarTodos} className="text-[11px] text-torg-blue hover:underline font-medium">
-            {filtradas.every((p) => selecionados.has(p.id)) ? "Desmarcar todos" : `Selecionar todos (${filtradas.length})`}
+            {selecionaveis.every((p) => selecionados.has(p.id)) ? "Desmarcar todos" : `Selecionar todos (${selecionaveis.length})`}
           </button>
         )}
       </div>
@@ -355,6 +362,7 @@ export default function SetorClient({
                   <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Material</th>
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Qte</th>
                   <th className="px-3 py-2 text-right text-[10px] font-medium text-gray-500 uppercase">Peso</th>
+                  <th className="px-3 py-2 text-center text-[10px] font-medium text-gray-500 uppercase" title="Unidades apontadas neste setor no Syneco">Apontado (Syneco)</th>
                   <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Cliente</th>
                   {/* Expand toggle for conjuntos */}
                   <th className="px-3 py-2 w-8"></th>
@@ -366,24 +374,48 @@ export default function SetorClient({
                   const isExpanded = expandidos.has(p.id);
                   const croquis = p.conjuntoCroquis || [];
                   const hasCroquis = croquis.length > 0;
+                  const apont = apontamentos[p.marca];
+                  const adiantada = p.status !== setorAtual;
 
                   return (
                     <Fragment key={p.id}>
                       <tr className={`hover:bg-gray-50 transition-colors ${isSelected ? "bg-blue-50/40" : ""}`}>
                         <td className="px-3 py-2.5">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelecionado(p.id)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
+                          {!adiantada && (
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelecionado(p.id)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          )}
                         </td>
                         <td className="px-3 py-2.5 font-mono text-xs text-torg-blue">{fmtOP(p.opNumero)}</td>
-                        <td className="px-3 py-2.5 font-mono font-bold text-torg-dark">{p.marca}</td>
+                        <td className="px-3 py-2.5 font-mono font-bold text-torg-dark">
+                          {p.marca}
+                          {adiantada && (
+                            <span className="ml-1.5 text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700"
+                              title={`Unidades já apontadas neste setor, mas o conjunto ainda está em ${STATUS_LABEL[p.status] || p.status}`}>
+                              à frente · {STATUS_LABEL[p.status] || p.status}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-3 py-2.5 text-torg-gray max-w-[200px] truncate">{p.descricao || "—"}</td>
                         <td className="px-3 py-2.5 text-torg-gray">{p.material || "—"}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums font-medium">{p.qte || 1}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums text-torg-gray">{fmtKg(p.pesoTotalKg)}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          {apont ? (
+                            <span className={`tabular-nums font-semibold ${
+                              apont.planejado > 0 && apont.produzido >= apont.planejado ? "text-emerald-600"
+                                : apont.produzido > 0 ? "text-amber-600" : "text-gray-400"
+                            }`}>
+                              {apont.produzido}/{apont.planejado || p.qte || 1}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2.5 text-torg-gray text-[11px] truncate max-w-[120px]">{p.op?.cliente || "—"}</td>
                         <td className="px-3 py-2.5">
                           {hasCroquis && (
@@ -407,7 +439,7 @@ export default function SetorClient({
                             <td className="px-3 py-1.5 text-right text-[11px] tabular-nums text-gray-400">
                               {cr.qteProduzida || 0}/{cr.qte || 1}
                             </td>
-                            <td colSpan={2} className="px-3 py-1.5">
+                            <td colSpan={3} className="px-3 py-1.5">
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                                 cr.status === "CORTE" || cr.status === "MONTAGEM" || cr.status === "SOLDA" || cr.status === "ACABAMENTO"
                                   ? "bg-blue-100 text-blue-700"

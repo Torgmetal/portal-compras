@@ -1,28 +1,17 @@
-import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { buscarConjuntosComApontamento } from "@/lib/conjuntos-setor";
 import SetorClient from "../SetorClient";
 export const metadata = { title: "Workspace Torg — Programação · Acabamento" };
+export const dynamic = "force-dynamic";
 
-export default async function ProgramacaoAcabamento() {
+export default async function ProgramacaoSetor() {
   await requireRole(["ADMIN", "PRODUCAO", "COMERCIAL"]);
-
-  const pecas = await prisma.pecaConjunto.findMany({
-    where: { tipoPeca: "CONJUNTO", status: { in: ["ACABAMENTO", "JATO"] } },
-    orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
-    include: {
-      op: { select: { id: true, numero: true, cliente: true, obra: true } },
-      conjuntoCroquis: {
-        include: {
-          croqui: { select: { id: true, marca: true, descricao: true, qte: true, qteProduzida: true, status: true } },
-        },
-      },
-    },
-    take: 3000,
-  });
+  const { pecas, apontamentos } = await buscarConjuntosComApontamento(["ACABAMENTO", "JATO"], "Acabamento");
 
   return (
     <SetorClient
       pecasIniciais={JSON.parse(JSON.stringify(pecas))}
+      apontamentos={JSON.parse(JSON.stringify(apontamentos))}
       setorAtual="ACABAMENTO"
       setorAnterior="SOLDA"
       setorProximo="JATO"
