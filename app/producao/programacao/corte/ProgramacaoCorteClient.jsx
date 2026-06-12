@@ -2224,62 +2224,80 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
   );
 }
 
+
 /* ─── Modal: buscar/importar a lista (LPC) da pasta da OP no SharePoint ──────
-   Varre o SharePoint, mostra a revisão disponível × a carregada, e importa
-   por OP mesclando (preserva o que já andou; avisa conflitos). */
+   Você escolhe a OP (as finalizadas ficam de fora) → busca rápida (server-side)
+   dos LPC dela por obra/revisão → importa mesclando (preserva o progresso;
+   avisa conflitos). Não varre a árvore inteira (era lento e estourava). */
 function ModalImportarSharepoint({ onClose, onImportado }) {
-  const [lista, setLista] = useState(null);
-  const [carregando, setCarregando] = useState(true);
+  const [ops, setOps] = useState(null);
+  const [carregandoOps, setCarregandoOps] = useState(true);
   const [erro, setErro] = useState("");
-  const [pasta, setPasta] = useState("");
-  const [importando, setImportando] = useState(null); // obra em importação
+  const [busca, setBusca] = useState("");
+  const [aberta, setAberta] = useState(null);       // pasta da OP expandida
+  const [obrasPorOp, setObrasPorOp] = useState({}); // pasta → { carregando, obras, erro }
+  const [importando, setImportando] = useState(null); // `${pasta}|${obra}`
   const [resultados, setResultados] = useState({});   // obra → resultado
 
-  const varrer = async () => {
-    setCarregando(true); setErro("");
+  // 1) lista as pastas de OP
+  const listar = async () => {
+    setCarregandoOps(true); setErro("");
     try {
       const res = await fetch("/api/producao/pecas/importar-lpc-revisao");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Falha ao varrer o SharePoint");
-      setLista(data.lista || []);
-      setPasta(data.pastaVarrida || "");
+      if (!res.ok) throw new Error(data.error || "Falha ao listar as OPs");
+      setOps(data.ops || []);
+    } catch (e) { setErro(e.message); }
+    finally { setCarregandoOps(false); }
+  };
+  useEffect(() => { listar(); }, []);
+
+  // 2) busca os LPC de uma OP (ao expandir)
+  const abrirOp = async (pasta) => {
+    if (aberta === pasta) { setAberta(null); return; }
+    setAberta(pasta);
+    if (obrasPorOp[pasta]?.obras) return; // já carregado
+    setObrasPorOp((p) => ({ ...p, [pasta]: { carregando: true } }));
+    try {
+      const res = await fetch(`/api/producao/pecas/importar-lpc-revisao?op=${encodeURIComponent(pasta)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha ao buscar os LPC");
+      setObrasPorOp((p) => ({ ...p, [pasta]: { obras: data.obras || [] } }));
     } catch (e) {
-      setErro(e.message);
-    } finally {
-      setCarregando(false);
+      setObrasPorOp((p) => ({ ...p, [pasta]: { erro: e.message } }));
     }
   };
-  useEffect(() => { varrer(); }, []);
 
-  const importar = async (obra, permitirDowngrade = false) => {
-    setImportando(obra); setErro("");
+  // 3) importa uma obra
+  const importar = async (pasta, obra, permitirDowngrade = false) => {
+    setImportando(`${pasta}|${obra}`); setErro("");
     try {
       const res = await fetch("/api/producao/pecas/importar-lpc-revisao", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ obra, permitirDowngrade }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pasta, obra, permitirDowngrade }),
       });
       const data = await res.json();
       if (!res.ok) {
-        // Revisão menor que a carregada: confirma e reenvia forçando.
         if (data.downgrade && !permitirDowngrade) {
           if (confirm(`O SharePoint tem R${String(data.revDisponivel).padStart(2, "0")}, abaixo da carregada R${String(data.revAtual).padStart(2, "0")}.\n\nRebaixar mesmo assim?`)) {
-            return await importar(obra, true);
+            return await importar(pasta, obra, true);
           }
-          return; // cancelado
+          return;
         }
         throw new Error(data.error || "Falha ao importar");
       }
       setResultados((prev) => ({ ...prev, [obra]: data }));
-      // atualiza a linha (revAtual passa a ser a importada)
-      setLista((prev) => prev.map((x) => x.obra === obra ? { ...x, revAtual: data.revisao, novidade: false } : x));
+      setObrasPorOp((p) => ({
+        ...p,
+        [pasta]: { obras: (p[pasta]?.obras || []).map((o) => o.obra === obra ? { ...o, revAtual: data.revisao, novidade: false } : o) },
+      }));
       onImportado?.();
-    } catch (e) {
-      setErro(`${obra}: ${e.message}`);
-    } finally {
-      setImportando(null);
-    }
+    } catch (e) { setErro(`${obra}: ${e.message}`); }
+    finally { setImportando(null); }
   };
+
+  const opsFiltradas = (ops || []).filter((o) => !busca || o.pasta.toLowerCase().includes(busca.toLowerCase()));
+  const fmtR = (n) => `R${String(n).padStart(2, "0")}`;
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !importando && onClose()}>
@@ -2287,75 +2305,100 @@ function ModalImportarSharepoint({ onClose, onImportado }) {
         <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
           <Cloud size={18} className="text-torg-blue" />
           <h3 className="font-semibold text-torg-dark">Buscar lista (LPC) do SharePoint</h3>
-          <button onClick={() => varrer()} disabled={carregando} className="ml-auto text-xs text-torg-blue hover:underline disabled:opacity-50 inline-flex items-center gap-1">
-            <RefreshCw size={12} className={carregando ? "animate-spin" : ""} /> Atualizar
+          <button onClick={listar} disabled={carregandoOps} className="ml-auto text-xs text-torg-blue hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+            <RefreshCw size={12} className={carregandoOps ? "animate-spin" : ""} /> Atualizar
           </button>
           <button onClick={onClose} disabled={!!importando} className="text-torg-gray hover:text-torg-dark ml-2"><X size={18} /></button>
         </div>
 
-        <div className="px-5 py-4 overflow-y-auto">
+        <div className="px-5 py-3 border-b border-gray-50">
+          <div className="relative">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-torg-gray" />
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Filtrar OP… (as finalizadas não aparecem)"
+              className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg" />
+          </div>
+          <p className="text-[11px] text-torg-gray mt-1.5">Escolha a OP que quer subir — abra para ver as listas (por obra/revisão) e importe só o que precisar.</p>
+        </div>
+
+        <div className="px-5 py-3 overflow-y-auto">
           {erro && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-3 flex items-start gap-2">
               <AlertCircle size={14} className="mt-0.5 shrink-0" /> <span>{erro}</span>
             </div>
           )}
-          {pasta && <p className="text-[11px] text-torg-gray mb-3">Pasta varrida: <span className="font-mono">{pasta}</span></p>}
 
-          {carregando && !lista ? (
-            <div className="py-10 text-center"><Loader2 size={22} className="animate-spin text-torg-blue mx-auto" /><p className="text-sm text-torg-gray mt-2">Varrendo o SharePoint…</p></div>
-          ) : !lista || lista.length === 0 ? (
-            <div className="py-10 text-center">
-              <Cloud size={32} className="mx-auto text-gray-300 mb-2" />
-              <p className="text-sm text-torg-gray">Nenhum LPC encontrado nas pastas das OPs.</p>
-              <p className="text-[11px] text-torg-gray mt-1">Esperado: <span className="font-mono">{"{OP}/…/Lista de Liberação/T..-LPC_R0X.xlsx"}</span></p>
-            </div>
+          {carregandoOps && !ops ? (
+            <div className="py-10 text-center"><Loader2 size={22} className="animate-spin text-torg-blue mx-auto" /><p className="text-sm text-torg-gray mt-2">Listando as OPs…</p></div>
+          ) : opsFiltradas.length === 0 ? (
+            <div className="py-10 text-center"><Cloud size={30} className="mx-auto text-gray-300 mb-2" /><p className="text-sm text-torg-gray">Nenhuma OP encontrada.</p></div>
           ) : (
-            <div className="space-y-2">
-              {lista.map((x) => {
-                const r = resultados[x.obra];
+            <div className="space-y-1.5">
+              {opsFiltradas.map((op) => {
+                const det = obrasPorOp[op.pasta];
+                const isOpen = aberta === op.pasta;
                 return (
-                  <div key={x.obra} className="border border-gray-100 rounded-lg p-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-mono font-bold text-torg-dark">{x.obra}</span>
-                      <span className="text-[11px] text-torg-gray font-mono truncate max-w-[240px]" title={x.arquivo}>{x.arquivo}</span>
-                      <span className="text-xs text-torg-gray">
-                        {x.revAtual == null
-                          ? <>nova obra · <strong className="text-torg-dark">R{String(x.revDisponivel).padStart(2, "0")}</strong></>
-                          : <>R{String(x.revAtual).padStart(2, "0")} → <strong className={x.novidade ? "text-emerald-600" : "text-torg-dark"}>R{String(x.revDisponivel).padStart(2, "0")}</strong></>}
-                      </span>
-                      {x.novidade && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">revisão nova</span>}
-                      <button
-                        onClick={() => importar(x.obra)}
-                        disabled={!!importando}
-                        className="ml-auto px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        {importando === x.obra ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
-                        {x.revAtual == null ? "Importar" : x.novidade ? "Atualizar revisão" : "Reimportar"}
-                      </button>
-                    </div>
+                  <div key={op.pasta} className="border border-gray-100 rounded-lg overflow-hidden">
+                    <button onClick={() => abrirOp(op.pasta)} className="w-full px-3 py-2.5 flex items-center gap-2 hover:bg-gray-50 text-left">
+                      {isOpen ? <ChevronUp size={15} className="text-torg-gray shrink-0" /> : <ChevronDown size={15} className="text-torg-gray shrink-0" />}
+                      <span className="text-sm font-medium text-torg-dark truncate">{op.pasta}</span>
+                      {det?.carregando && <Loader2 size={13} className="animate-spin text-torg-blue ml-auto shrink-0" />}
+                      {det?.obras && <span className="ml-auto text-[11px] text-torg-gray shrink-0">{det.obras.length} lista(s)</span>}
+                    </button>
 
-                    {r && (
-                      <div className="mt-2 pt-2 border-t border-gray-50 text-[11px] space-y-1">
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-torg-gray">
-                          <span className="text-emerald-700">+{r.adicionadas?.length || 0} adicionadas</span>
-                          <span className="text-red-600">−{r.removidas?.length || 0} removidas</span>
-                          <span>{r.mantidas || 0} mantidas</span>
-                          <span className="text-torg-dark font-medium">total {r.totalNovo} marcas</span>
-                          {!r.opEncontrada && <span className="text-amber-600">OP não cadastrada no portal</span>}
-                        </div>
-                        {r.conflitos?.length > 0 && (
-                          <div className="bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 text-amber-800">
-                            <p className="font-semibold flex items-center gap-1"><AlertTriangle size={11} /> {r.conflitos.length} conflito(s) — peças já em produção, decida manualmente:</p>
-                            <ul className="mt-0.5 space-y-0.5">
-                              {r.conflitos.slice(0, 8).map((c) => (
-                                <li key={c.marca} className="font-mono">
-                                  {c.marca} — {c.tipo === "REMOVIDA_PRODUZIDA"
-                                    ? `saiu da revisão mas já passou por ${c.status}${c.qteProduzida ? ` (${c.qteProduzida} baixadas)` : ""}`
-                                    : `qtd ${c.de}→${c.para} mas já em ${c.status}`} <span className="text-amber-600">(mantida)</span>
-                                </li>
-                              ))}
-                              {r.conflitos.length > 8 && <li className="text-amber-600">+{r.conflitos.length - 8} mais…</li>}
-                            </ul>
+                    {isOpen && (
+                      <div className="border-t border-gray-100 bg-gray-50/40 px-3 py-2">
+                        {det?.carregando ? (
+                          <p className="text-xs text-torg-gray py-2 inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Buscando os LPC…</p>
+                        ) : det?.erro ? (
+                          <p className="text-xs text-red-600 py-2">{det.erro}</p>
+                        ) : !det?.obras || det.obras.length === 0 ? (
+                          <p className="text-xs text-torg-gray py-2">Nenhum LPC nesta OP.</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {det.obras.map((o) => {
+                              const r = resultados[o.obra];
+                              const imp = importando === `${op.pasta}|${o.obra}`;
+                              return (
+                                <div key={o.obra} className="bg-white border border-gray-100 rounded-md px-3 py-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-mono font-bold text-torg-dark text-sm">{o.obra}</span>
+                                    <span className="text-[11px] text-torg-gray font-mono truncate max-w-[180px]" title={o.arquivo}>{o.arquivo}</span>
+                                    <span className="text-xs text-torg-gray">
+                                      {o.revAtual == null ? <>nova · <strong className="text-torg-dark">{fmtR(o.revDisponivel)}</strong></>
+                                        : <>{fmtR(o.revAtual)} → <strong className={o.novidade ? "text-emerald-600" : "text-torg-dark"}>{fmtR(o.revDisponivel)}</strong></>}
+                                    </span>
+                                    {o.novidade && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">nova</span>}
+                                    <button onClick={() => importar(op.pasta, o.obra)} disabled={!!importando}
+                                      className="ml-auto px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1.5 disabled:opacity-50">
+                                      {imp ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+                                      {o.revAtual == null ? "Importar" : o.novidade ? "Atualizar" : "Reimportar"}
+                                    </button>
+                                  </div>
+                                  {r && (
+                                    <div className="mt-1.5 pt-1.5 border-t border-gray-50 text-[11px]">
+                                      <div className="flex flex-wrap gap-x-3 text-torg-gray">
+                                        <span className="text-emerald-700">+{r.adicionadas?.length || 0}</span>
+                                        <span className="text-red-600">−{r.removidas?.length || 0}</span>
+                                        <span>{r.mantidas || 0} mantidas</span>
+                                        <span className="text-torg-dark font-medium">{r.totalNovo} marcas</span>
+                                        {!r.opEncontrada && <span className="text-amber-600">OP não cadastrada</span>}
+                                      </div>
+                                      {r.conflitos?.length > 0 && (
+                                        <div className="mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 text-amber-800">
+                                          <p className="font-semibold flex items-center gap-1"><AlertTriangle size={11} /> {r.conflitos.length} conflito(s) — peça já em produção (mantida, decida):</p>
+                                          <ul className="mt-0.5">
+                                            {r.conflitos.slice(0, 6).map((c) => (
+                                              <li key={c.marca} className="font-mono">{c.marca} — {c.tipo === "REMOVIDA_PRODUZIDA" ? `saiu da revisão, já em ${c.status}` : `qtd ${c.de}→${c.para}, já em ${c.status}`}</li>
+                                            ))}
+                                            {r.conflitos.length > 6 && <li className="text-amber-600">+{r.conflitos.length - 6} mais…</li>}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -2368,7 +2411,7 @@ function ModalImportarSharepoint({ onClose, onImportado }) {
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-torg-gray">
-          <span>Mescla por marca: adiciona novas, remove as que saíram (só se não produzidas), mantém o resto. Conflitos ficam para você decidir.</span>
+          <span>Importa mesclando: adiciona novas, remove as que saíram (só se não produzidas), mantém o resto. Conflitos ficam para você decidir.</span>
           <button onClick={onClose} disabled={!!importando} className="px-3 py-1.5 text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">Fechar</button>
         </div>
       </div>

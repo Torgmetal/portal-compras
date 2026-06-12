@@ -1,12 +1,10 @@
-// GET  /api/producao/pecas/importar-lpc-revisao            → varre o SharePoint
-//        e lista, por obra, a revisão disponível × a carregada no portal.
-//      ?op=OP-078  restringe a uma subpasta (mais rápido).
-// POST /api/producao/pecas/importar-lpc-revisao { obra }   → importa a revisão
-//        MAIS ALTA dessa obra, mesclando e preservando o progresso (avisa conflitos).
+// GET  /api/producao/pecas/importar-lpc-revisao            → lista as pastas de OP (nível 1)
+// GET  ?op=<pasta da OP>                                   → busca os LPC dessa OP (por obra, rev mais alta)
+// POST { pasta, obra, permitirDowngrade? }                 → importa a revisão dessa obra (merge, preserva progresso)
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { scanLpcPorObra, baixarLpcRows } from "@/lib/sharepoint-lpc";
+import { listarPastasOp, buscarLpcDaOp, baixarLpcRows, resolveServidorDriveId } from "@/lib/sharepoint-lpc";
 import { parseLPC } from "@/lib/parse-lpc";
 import { importarLpcMerge } from "@/lib/importar-lpc-merge";
 import { z } from "zod";
@@ -21,44 +19,48 @@ function statusDo(e) {
 }
 
 export async function GET(req) {
-  let user;
-  try { user = await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]); }
+  try { await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: statusDo(e) }); }
 
-  const { searchParams } = new URL(req.url);
-  const opFiltro = (searchParams.get("op") || "").trim();
-  const obraFiltro = (searchParams.get("obra") || "").trim();
+  const opPasta = (new URL(req.url).searchParams.get("op") || "").trim();
 
-  let scan;
-  try { scan = await scanLpcPorObra({ opFiltro, obraFiltro }); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: statusDo(e) }); }
+  // Sem ?op → só lista as pastas de OP (rápido: 1 request ao Graph).
+  if (!opPasta) {
+    try {
+      const { ops, base } = await listarPastasOp();
+      return NextResponse.json({ base, ops });
+    } catch (e) {
+      return NextResponse.json({ error: e.message }, { status: statusDo(e) });
+    }
+  }
 
-  // Revisões já carregadas no portal (para mostrar atual × disponível)
-  const carregadas = await prisma.lpcRevisao.findMany({
-    where: scan.lista.length ? { opNumero: { in: scan.lista.map((x) => x.obra) } } : undefined,
-  });
-  const atualPorObra = new Map(carregadas.map((c) => [c.opNumero, c]));
-
-  const lista = scan.lista.map((x) => {
-    const atual = atualPorObra.get(x.obra);
-    return {
-      obra: x.obra,
-      revDisponivel: x.rev,
-      arquivo: x.nome,
-      pasta: x.pasta,
-      modificado: x.modificado,
-      revAtual: atual ? atual.revisao : null,
-      itensAtual: atual ? atual.itens : null,
-      novidade: !atual || x.rev > atual.revisao, // tem revisão nova p/ importar
-    };
-  });
-
-  return NextResponse.json({ pastaVarrida: scan.pastaVarrida, totalXlsx: scan.totalXlsx, lista });
+  // Com ?op → busca os LPC dessa OP e cruza com a revisão carregada.
+  try {
+    const driveId = await resolveServidorDriveId();
+    if (!driveId) return NextResponse.json({ error: "Drive SERVIDOR não resolvido." }, { status: 503 });
+    const achados = await buscarLpcDaOp(driveId, opPasta);
+    const carregadas = achados.length
+      ? await prisma.lpcRevisao.findMany({ where: { opNumero: { in: achados.map((a) => a.obra) } } })
+      : [];
+    const atual = new Map(carregadas.map((c) => [c.opNumero, c]));
+    const obras = achados.map((a) => {
+      const at = atual.get(a.obra);
+      return {
+        obra: a.obra, revDisponivel: a.rev, arquivo: a.nome,
+        revAtual: at ? at.revisao : null, itensAtual: at ? at.itens : null,
+        novidade: !at || a.rev > at.revisao,
+      };
+    });
+    return NextResponse.json({ pasta: opPasta, obras });
+  } catch (e) {
+    return NextResponse.json({ error: e.message }, { status: statusDo(e) });
+  }
 }
 
 const schema = z.object({
+  pasta: z.string().min(1, "Informe a pasta da OP"),
   obra: z.string().min(1, "Informe a obra"),
-  permitirDowngrade: z.boolean().optional(), // confirma reimportar revisão menor que a carregada
+  permitirDowngrade: z.boolean().optional(),
 });
 
 export async function POST(req) {
@@ -72,27 +74,30 @@ export async function POST(req) {
 
   const obra = body.obra.trim().toUpperCase();
 
-  let scan;
-  try { scan = await scanLpcPorObra({ obraFiltro: obra }); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: statusDo(e) }); }
-
-  const item = scan.lista.find((x) => x.obra === obra);
-  if (!item) {
-    return NextResponse.json({ error: `Nenhum LPC encontrado para ${obra} no SharePoint (pasta ${scan.pastaVarrida}).` }, { status: 404 });
+  let driveId, achados;
+  try {
+    driveId = await resolveServidorDriveId();
+    if (!driveId) return NextResponse.json({ error: "Drive SERVIDOR não resolvido." }, { status: 503 });
+    achados = await buscarLpcDaOp(driveId, body.pasta);
+  } catch (e) {
+    return NextResponse.json({ error: e.message }, { status: statusDo(e) });
   }
 
-  // Guarda anti-downgrade: não rebaixa a revisão carregada sem confirmação explícita.
+  const item = achados.find((a) => a.obra === obra);
+  if (!item) return NextResponse.json({ error: `Nenhum LPC da obra ${obra} encontrado na pasta ${body.pasta}.` }, { status: 404 });
+
+  // Guarda anti-downgrade: não rebaixa a revisão carregada sem confirmação.
   const atual = await prisma.lpcRevisao.findUnique({ where: { opNumero: obra } });
   if (atual && item.rev < atual.revisao && !body.permitirDowngrade) {
     return NextResponse.json({
-      error: `O SharePoint tem R${String(item.rev).padStart(2, "0")}, abaixo da revisão carregada R${String(atual.revisao).padStart(2, "0")}. Confirme se realmente quer rebaixar.`,
+      error: `O SharePoint tem R${String(item.rev).padStart(2, "0")}, abaixo da carregada R${String(atual.revisao).padStart(2, "0")}.`,
       downgrade: true, revDisponivel: item.rev, revAtual: atual.revisao,
     }, { status: 409 });
   }
 
   let parsed;
   try {
-    const rows = await baixarLpcRows(scan.driveId, item.id);
+    const rows = await baixarLpcRows(driveId, item.id);
     parsed = parseLPC(rows);
     if (parsed.erro) throw new Error(parsed.erro);
   } catch (e) {
