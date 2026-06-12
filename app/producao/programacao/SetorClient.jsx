@@ -447,8 +447,8 @@ export default function SetorClient({
                         )}
                         {!furo && adiantada && (
                           <span className="ml-1.5 text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700"
-                            title={`O Syneco já apontou unidades neste setor, mas o conjunto ainda não foi liberado de ${STATUS_LABEL[p.status] || p.status} no portal`}>
-                            adiantado · {STATUS_LABEL[p.status] || p.status}
+                            title={`A fábrica já apontou unidades deste conjunto em ${labelAtual.toLowerCase()} no Syneco, mas no portal o lote ainda está em ${STATUS_LABEL[p.status] || p.status} (o setor anterior não terminou o lote inteiro). Nada a corrigir — as unidades andam em paralelo.`}>
+                            fábrica adiantada · portal: {STATUS_LABEL[p.status] || p.status}
                           </span>
                         )}
                         {!furo && !adiantada && concluiuSetor(p) && (
