@@ -281,6 +281,25 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   }
   const liberarSelecionados = () => enviarParaMaquinas();
 
+  // Atribuir a máquina (laser) a todas as peças selecionadas de uma vez.
+  async function atribuirMaquinaLote(maquina) {
+    const ids = [...selecionados];
+    if (ids.length === 0 || !maquina) return;
+    try {
+      const res = await fetch("/api/producao/pecas/atribuir-maquina", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, maquina }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      const set = new Set(ids);
+      setPecas((prev) => prev.map((p) => (set.has(p.id) ? { ...p, maquina } : p)));
+    } catch (e) {
+      alert("Erro ao atribuir máquina: " + e.message);
+    }
+  }
+
   // Liberar todas as pendentes de uma maquina especifica
   async function liberarMaquina(maq) {
     const pecasMaq = porMaquina[maq]?.filter((p) => p.status === "PENDENTE") || [];
@@ -1187,10 +1206,20 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
 
         {/* Acoes em lote */}
         {selecionados.size > 0 && (
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
             <span className="text-[11px] text-torg-gray font-medium">
               {selecionados.size} selecionada{selecionados.size > 1 ? "s" : ""}
             </span>
+            {/* Indicar a máquina (laser) da seleção de uma vez */}
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) atribuirMaquinaLote(e.target.value); e.target.value = ""; }}
+              className="px-2 py-1.5 border border-torg-blue-200 rounded-lg text-xs bg-white text-torg-blue font-medium"
+              title="Definir a máquina de todas as peças selecionadas"
+            >
+              <option value="">Atribuir máquina…</option>
+              {Object.entries(MAQUINA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
             {filtroStatus === "PENDENTE" && (
               <button
                 onClick={liberarSelecionados}
