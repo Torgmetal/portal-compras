@@ -59,6 +59,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroDescricao, setFiltroDescricao] = useState("");
   const [filtroParte, setFiltroParte] = useState("");
+  const [prioBulk, setPrioBulk] = useState(""); // prioridade a aplicar na seleção
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
   const [liberando, setLiberando] = useState(false);
@@ -442,15 +443,18 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   }
 
   // Atualizar maquina individual
-  // Prioridade manual (vazia = sem prioridade). Marcada quando precisar.
-  async function atualizarPrioridade(id, valor) {
+  // Prioridade manual em lote: define (ou limpa) a prioridade da seleção.
+  async function atribuirPrioridadeLote(valor) {
+    const ids = [...selecionados];
+    if (ids.length === 0) return;
     const prioridade = valor === "" || valor == null ? null : Math.max(1, parseInt(valor, 10) || 0) || null;
-    setPecas((prev) => prev.map((p) => (p.id === id ? { ...p, prioridade } : p))); // otimista
+    const set = new Set(ids);
+    setPecas((prev) => prev.map((p) => (set.has(p.id) ? { ...p, prioridade } : p))); // otimista
     try {
-      const res = await fetch(`/api/producao/pecas/${id}`, {
-        method: "PATCH",
+      const res = await fetch("/api/producao/pecas/atribuir-prioridade", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prioridade }),
+        body: JSON.stringify({ ids, prioridade }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Erro");
     } catch (e) {
@@ -1210,6 +1214,18 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
             <span className="text-[11px] text-torg-gray font-medium">
               {selecionados.size} selecionada{selecionados.size > 1 ? "s" : ""}
             </span>
+            {/* Prioridade da seleção de uma vez */}
+            <div className="flex items-center gap-1 border border-torg-blue-200 rounded-lg pl-2 pr-1 py-0.5 bg-white">
+              <span className="text-[11px] text-torg-gray">Prior.</span>
+              <input type="number" min="1" value={prioBulk}
+                onChange={(e) => setPrioBulk(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && prioBulk) { atribuirPrioridadeLote(prioBulk); setPrioBulk(""); } }}
+                placeholder="nº" className="w-12 text-center text-xs px-1 py-1 border-0 focus:ring-0 focus:outline-none tabular-nums" />
+              <button onClick={() => { if (prioBulk) { atribuirPrioridadeLote(prioBulk); setPrioBulk(""); } }} disabled={!prioBulk}
+                className="px-2 py-1 bg-torg-blue text-white text-[11px] rounded-md font-medium disabled:opacity-40">definir</button>
+              <button onClick={() => atribuirPrioridadeLote("")} title="Tirar a prioridade das selecionadas"
+                className="px-1.5 py-1 text-[11px] text-torg-gray hover:text-torg-dark">limpar</button>
+            </div>
             {/* Indicar a máquina (laser) da seleção de uma vez */}
             <select
               value=""
@@ -1314,7 +1330,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                     <thead className="bg-gray-50/60">
                       <tr>
                         <th className="px-3 py-2 w-8"></th>
-                        <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase w-14" title="Prioridade manual — preencha quando precisar furar a fila">Prior.</th>
+                        <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase w-14" title="Prioridade — selecione as peças e defina em lote acima">Prior.</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Marca</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Descrição</th>
                         <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Material</th>
@@ -1334,10 +1350,9 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                               {p.status === "PENDENTE" && <input type="checkbox" checked={selecionados.has(p.id)} onChange={() => toggleSelecionado(p.id)} />}
                             </td>
                             <td className="px-2 py-1.5 text-center">
-                              <input type="number" min="1" value={p.prioridade ?? ""} placeholder="—"
-                                onChange={(e) => atualizarPrioridade(p.id, e.target.value)}
-                                title="Prioridade manual (deixe vazio se não precisar)"
-                                className={`w-11 text-center text-xs px-1 py-1 border rounded tabular-nums ${p.prioridade ? "border-torg-blue bg-torg-blue-50 text-torg-blue font-bold" : "border-gray-200 text-torg-gray"}`} />
+                              {p.prioridade
+                                ? <span className="inline-block min-w-[20px] text-xs font-bold tabular-nums text-torg-blue bg-torg-blue-50 border border-torg-blue-200 rounded px-1.5 py-0.5">{p.prioridade}</span>
+                                : <span className="text-xs text-gray-300">—</span>}
                             </td>
                             <td className="px-3 py-1.5 font-mono text-xs font-semibold text-torg-dark whitespace-nowrap">{p.marca}
                               {p.tipoPeca && <span className="ml-1 text-[9px] px-1 py-px rounded bg-amber-50 text-amber-700">{p.tipoPeca === "CONJUNTO" ? "CONJ" : "CR"}</span>}
