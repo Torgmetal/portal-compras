@@ -23,6 +23,11 @@ const fmtDia = (iso) =>
   new Date(iso + "T00:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
 const fmtTon = (kg) => `${((Number(kg) || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ton`;
 const fmtNum = (n) => Number(n || 0).toLocaleString("pt-BR");
+// Peso compacto pra célula: >= 1 ton mostra em ton, senão em kg
+const fmtPesoCell = (kg) =>
+  kg >= 1000
+    ? `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ton`
+    : `${Math.round(kg).toLocaleString("pt-BR")} kg`;
 
 // Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
 const normObra = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
@@ -86,19 +91,21 @@ export default function PmpClient() {
     const linhas = [...porObra.entries()].map(([norm, o]) => {
       const celulas = dias.map(({ data }) => ({
         dia: data,
-        meta: o.metaDia[data] || 0,
-        real: getReal(norm, data).pecas,
+        metaKg: o.metaKgDia[data] || 0,
+        metaPc: o.metaDia[data] || 0,
         realKg: getReal(norm, data).pesoKg,
+        realPc: getReal(norm, data).pecas,
       }));
-      const realPc = celulas.reduce((s, c) => s + c.real, 0);
+      const realPc = celulas.reduce((s, c) => s + c.realPc, 0);
       const realKg = celulas.reduce((s, c) => s + c.realKg, 0);
       return { norm, obra: o.obra, celulas, metaPc: o.metaPc, metaKg: o.metaKg, realPc, realKg };
-    }).sort((a, b) => (b.metaPc + b.realPc) - (a.metaPc + a.realPc));
+    }).sort((a, b) => (b.metaKg + b.realKg) - (a.metaKg + a.realKg));
 
     const totalDia = dias.map(({ data }, i) => ({
       dia: data,
-      meta: linhas.reduce((s, l) => s + l.celulas[i].meta, 0),
-      real: linhas.reduce((s, l) => s + l.celulas[i].real, 0),
+      metaKg: linhas.reduce((s, l) => s + l.celulas[i].metaKg, 0),
+      realKg: linhas.reduce((s, l) => s + l.celulas[i].realKg, 0),
+      realPc: linhas.reduce((s, l) => s + l.celulas[i].realPc, 0),
     }));
     const resumo = {
       metaPc: linhas.reduce((s, l) => s + l.metaPc, 0),
@@ -109,7 +116,7 @@ export default function PmpClient() {
     return { linhas, totalDia, resumo };
   }, [dados, dias]);
 
-  const pctSemana = quadro.resumo.metaPc > 0 ? Math.round((quadro.resumo.realPc / quadro.resumo.metaPc) * 100) : null;
+  const pctSemana = quadro.resumo.metaKg > 0 ? Math.round((quadro.resumo.realKg / quadro.resumo.metaKg) * 100) : null;
 
   if (loading) {
     return (
@@ -172,8 +179,8 @@ export default function PmpClient() {
           <div className="bg-torg-blue p-2 rounded-lg"><Target size={18} className="text-white" /></div>
           <div>
             <p className="text-[10px] text-torg-gray uppercase tracking-wider">Meta da semana</p>
-            <p className="text-lg font-extrabold text-torg-dark leading-tight">{fmtNum(quadro.resumo.metaPc)} pç</p>
-            <p className="text-[10px] text-torg-gray">{fmtTon(quadro.resumo.metaKg)}</p>
+            <p className="text-lg font-extrabold text-torg-dark leading-tight">{fmtTon(quadro.resumo.metaKg)}</p>
+            <p className="text-[10px] text-torg-gray">{fmtNum(quadro.resumo.metaPc)} peças programadas</p>
           </div>
         </div>
 
@@ -182,14 +189,14 @@ export default function PmpClient() {
           <div className="flex-1 min-w-0">
             <p className="text-[10px] text-torg-gray uppercase tracking-wider">Realizado (Syneco)</p>
             <p className="text-lg font-extrabold text-torg-dark leading-tight">
-              {fmtNum(quadro.resumo.realPc)} pç
+              {fmtTon(quadro.resumo.realKg)}
               {pctSemana != null && (
                 <span className={`ml-2 text-xs font-bold ${pctSemana >= 100 ? "text-emerald-600" : pctSemana >= 60 ? "text-amber-600" : "text-red-600"}`}>
                   {pctSemana}% da meta
                 </span>
               )}
             </p>
-            <p className="text-[10px] text-torg-gray">{fmtTon(quadro.resumo.realKg)}</p>
+            <p className="text-[10px] text-torg-gray">{fmtNum(quadro.resumo.realPc)} peças cortadas</p>
           </div>
         </div>
       </div>
@@ -230,21 +237,20 @@ export default function PmpClient() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {quadro.linhas.map((l) => {
-                  const pct = l.metaPc > 0 ? Math.round((l.realPc / l.metaPc) * 100) : null;
+                  const pct = l.metaKg > 0 ? Math.round((l.realKg / l.metaKg) * 100) : null;
                   return (
                     <tr key={l.norm} className="hover:bg-gray-50/50">
                       <td className="px-4 py-2.5">
                         <span className="font-mono font-bold text-torg-blue">{fmtOP(l.obra)}</span>
-                        {l.metaKg > 0 && <span className="block text-[10px] text-torg-gray">{fmtTon(l.metaKg)} programadas</span>}
                       </td>
                       {l.celulas.map((c) => (
                         <td key={c.dia} className={`px-2 py-2 text-center ${c.dia === hojeIso ? "bg-torg-blue-50/40" : ""}`}>
-                          <CelulaDia meta={c.meta} real={c.real} realKg={c.realKg} />
+                          <CelulaDia metaKg={c.metaKg} realKg={c.realKg} realPc={c.realPc} />
                         </td>
                       ))}
                       <td className="px-3 py-2 text-center bg-gray-50/50">
-                        <p className="text-sm font-extrabold tabular-nums text-torg-dark">
-                          {fmtNum(l.realPc)}<span className="text-torg-gray font-semibold text-xs"> / {fmtNum(l.metaPc)}</span>
+                        <p className="text-sm font-extrabold tabular-nums text-torg-dark whitespace-nowrap">
+                          {fmtTon(l.realKg)}<span className="text-torg-gray font-semibold text-xs"> / {fmtTon(l.metaKg)}</span>
                         </p>
                         {pct != null ? (
                           <span className={`inline-block mt-0.5 px-1.5 py-px rounded text-[10px] font-bold ${
@@ -263,12 +269,12 @@ export default function PmpClient() {
                   <td className="px-4 py-2.5 text-xs font-bold text-torg-dark uppercase">Total do dia</td>
                   {quadro.totalDia.map((t) => (
                     <td key={t.dia} className={`px-2 py-2 text-center ${t.dia === hojeIso ? "bg-torg-blue-50/60" : ""}`}>
-                      <CelulaDia meta={t.meta} real={t.real} forte />
+                      <CelulaDia metaKg={t.metaKg} realKg={t.realKg} realPc={t.realPc} forte />
                     </td>
                   ))}
                   <td className="px-3 py-2 text-center bg-gray-100/80">
-                    <p className="text-sm font-extrabold tabular-nums text-torg-dark">
-                      {fmtNum(quadro.resumo.realPc)}<span className="text-torg-gray font-semibold text-xs"> / {fmtNum(quadro.resumo.metaPc)}</span>
+                    <p className="text-sm font-extrabold tabular-nums text-torg-dark whitespace-nowrap">
+                      {fmtTon(quadro.resumo.realKg)}<span className="text-torg-gray font-semibold text-xs"> / {fmtTon(quadro.resumo.metaKg)}</span>
                     </p>
                   </td>
                 </tr>
@@ -281,18 +287,23 @@ export default function PmpClient() {
   );
 }
 
-// Célula do dia: meta em cima (discreta), realizado embaixo (protagonista)
-function CelulaDia({ meta, real, realKg, forte }) {
-  if (!meta && !real) return <span className="text-gray-300">—</span>;
-  const corReal = real === 0
+// Célula do dia em PESO: meta em cima (discreta), realizado embaixo
+// (protagonista, colorido pela aderência). Peças ficam no tooltip.
+function CelulaDia({ metaKg, realKg, realPc, forte }) {
+  if (!metaKg && !realKg) return <span className="text-gray-300">—</span>;
+  const corReal = !realKg
     ? "text-gray-300"
-    : meta > 0
-      ? real >= meta ? "text-emerald-600" : "text-amber-600"
+    : metaKg > 0
+      ? realKg >= metaKg * 0.999 ? "text-emerald-600" : "text-amber-600"
       : "text-torg-dark";
   return (
-    <div title={realKg ? `${Number(realKg).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg cortados` : undefined}>
-      <p className={`text-[10px] tabular-nums ${meta > 0 ? "text-torg-gray" : "text-gray-300"}`}>{meta > 0 ? fmtNum(meta) : "—"}</p>
-      <p className={`${forte ? "text-base" : "text-sm"} font-extrabold tabular-nums leading-tight ${corReal}`}>{real > 0 ? fmtNum(real) : "—"}</p>
+    <div title={realPc > 0 ? `${fmtNum(realPc)} peça(s) cortada(s)` : undefined}>
+      <p className={`text-[10px] tabular-nums whitespace-nowrap ${metaKg > 0 ? "text-torg-gray" : "text-gray-300"}`}>
+        {metaKg > 0 ? fmtPesoCell(metaKg) : "—"}
+      </p>
+      <p className={`${forte ? "text-sm" : "text-xs"} font-extrabold tabular-nums leading-tight whitespace-nowrap ${corReal}`}>
+        {realKg > 0 ? fmtPesoCell(realKg) : "—"}
+      </p>
     </div>
   );
 }
