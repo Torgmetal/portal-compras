@@ -16,14 +16,24 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Anthropic, então limitar a frequência evita queima de créditos.
 const limiter = createRateLimiter({ name: "assistente-chat", maxRequests: 15, windowMs: 60_000 });
 
-// Modelo padrão — pode ser sobrescrito pela ConfigAssistente no banco
-const MODELO_DEFAULT = "claude-haiku-4-5";
+// Modelos: Haiku no geral (barato); Sonnet quando a pergunta é complexa /
+// cruza módulos (melhor raciocínio multi-etapa).
+const MODELO_SIMPLES = "claude-haiku-4-5";
+const MODELO_COMPLEXO = "claude-sonnet-4-6";
 
 // Máximo de mensagens do histórico enviadas ao Claude (controle de custo)
 const MAX_HISTORICO = 20;
 
-// Máximo de rodadas de tool use por pergunta (evita loops infinitos)
-const MAX_TOOL_ROUNDS = 5;
+// Máximo de rodadas de tool use por pergunta (evita loops infinitos).
+// Perguntas que cruzam módulos precisam de várias rodadas encadeadas.
+const MAX_TOOL_ROUNDS = 10;
+
+// Heurística: a pergunta exige raciocínio multi-etapa / cruzamento de módulos?
+function perguntaComplexa(texto) {
+  const t = String(texto || "").toLowerCase();
+  if (t.length > 160) return true;
+  return /\b(cada|todos|todas|quais|liste|listar|relat[óo]rio|cruz|atras|atrasad|pendent|faltam?|por (projeto|obra|cliente|fornecedor|categoria|setor)|agrup|compar|soma|somat|total de|m[ée]dia)\b/.test(t);
+}
 
 export async function POST(req) {
   // ─── Auth ─────────────────────────────────────────────────────
@@ -67,7 +77,10 @@ export async function POST(req) {
     configDb = await prisma.configAssistente.findFirst();
   } catch { /* usa defaults se banco indisponível */ }
 
-  const modelo = configDb?.modelo || MODELO_DEFAULT;
+  // Modelo: respeita override explícito do admin; senão escolhe pela pergunta.
+  const ultimaPergunta = [...historico].reverse().find((m) => m.role === "user")?.content || "";
+  const modeloForcado = configDb?.modelo || null;
+  let modelo = modeloForcado || (perguntaComplexa(ultimaPergunta) ? MODELO_COMPLEXO : MODELO_SIMPLES);
 
   // ─── Ferramentas disponíveis para este usuário ─────────────────
   const tools = getToolsParaUser(user);
@@ -81,9 +94,13 @@ export async function POST(req) {
   while (rodada < MAX_TOOL_ROUNDS) {
     rodada++;
 
+    // Se já passou de 2 rodadas de ferramenta e o admin não forçou modelo,
+    // a pergunta se mostrou complexa — escala pro Sonnet no restante.
+    if (!modeloForcado && rodada >= 3 && modelo === MODELO_SIMPLES) modelo = MODELO_COMPLEXO;
+
     const response = await anthropic.messages.create({
       model:      modelo,
-      max_tokens: 1024,
+      max_tokens: modelo === MODELO_COMPLEXO ? 4096 : 1500,
       system:     systemPrompt,
       tools,
       messages,
@@ -105,7 +122,7 @@ export async function POST(req) {
       const toolBlocks = response.content.filter((b) => b.type === "tool_use");
       const resultados = await Promise.all(
         toolBlocks.map(async (block) => {
-          const resultado = await executarTool(block.name, block.input);
+          const resultado = await executarTool(block.name, block.input, user);
           return {
             type:        "tool_result",
             tool_use_id: block.id,
