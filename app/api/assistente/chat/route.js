@@ -64,6 +64,8 @@ export async function POST(req) {
   if (!Array.isArray(mensagens) || mensagens.length === 0) {
     return NextResponse.json({ error: "Campo 'mensagens' obrigatório" }, { status: 400 });
   }
+  // Anexos da mensagem atual: [{ tipo, nome, conteudo?, base64?, mime? }]
+  const anexos = Array.isArray(body.anexos) ? body.anexos : [];
 
   // Limita histórico enviado ao Claude
   const historico = mensagens.slice(-MAX_HISTORICO).map((m) => ({
@@ -80,14 +82,37 @@ export async function POST(req) {
   // Modelo: respeita override explícito do admin; senão escolhe pela pergunta.
   const ultimaPergunta = [...historico].reverse().find((m) => m.role === "user")?.content || "";
   const modeloForcado = configDb?.modelo || null;
-  let modelo = modeloForcado || (perguntaComplexa(ultimaPergunta) ? MODELO_COMPLEXO : MODELO_SIMPLES);
+  // Anexos (ler/transformar arquivos, visão) exigem o modelo mais capaz.
+  let modelo = modeloForcado || ((perguntaComplexa(ultimaPergunta) || anexos.length) ? MODELO_COMPLEXO : MODELO_SIMPLES);
 
   // ─── Ferramentas disponíveis para este usuário ─────────────────
   const tools = getToolsParaUser(user);
   const systemPrompt = buildSystemPrompt(user, configDb?.instrucaoExtra);
 
-  // ─── Loop de tool use ──────────────────────────────────────────
+  // ─── Injeta os anexos na última mensagem do usuário ────────────
   let messages = [...historico];
+  if (anexos.length && messages.length) {
+    const ultima = messages[messages.length - 1];
+    if (ultima?.role === "user") {
+      const textuais = anexos.filter((a) => a.tipo !== "imagem" && a.conteudo);
+      const imagens = anexos.filter((a) => a.tipo === "imagem" && a.base64);
+      const ctxTexto = textuais
+        .map((a) => `\n\n[Arquivo anexado pelo usuário: ${a.nome}${a.truncado ? " (conteúdo truncado)" : ""}]\n${a.conteudo}`)
+        .join("");
+      if (imagens.length) {
+        const blocks = [{ type: "text", text: String(ultima.content || "") + ctxTexto }];
+        for (const img of imagens) {
+          blocks.push({ type: "image", source: { type: "base64", media_type: img.mime || "image/png", data: img.base64 } });
+        }
+        ultima.content = blocks;
+      } else {
+        ultima.content = String(ultima.content || "") + ctxTexto;
+      }
+    }
+  }
+
+  // ─── Loop de tool use ──────────────────────────────────────────
+  const arquivosGerados = []; // planilhas geradas pelo agente, devolvidas ao front
   let rodada = 0;
   let respostaFinal = null;
 
@@ -123,6 +148,9 @@ export async function POST(req) {
       const resultados = await Promise.all(
         toolBlocks.map(async (block) => {
           const resultado = await executarTool(block.name, block.input, user);
+          if (block.name === "gerar_planilha" && resultado?.url) {
+            arquivosGerados.push({ nome: resultado.nome, url: resultado.url });
+          }
           return {
             type:        "tool_result",
             tool_use_id: block.id,
@@ -145,5 +173,5 @@ export async function POST(req) {
     respostaFinal = "Atingi o limite de consultas para esta resposta. Tente uma pergunta mais específica.";
   }
 
-  return NextResponse.json({ resposta: respostaFinal });
+  return NextResponse.json({ resposta: respostaFinal, arquivos: arquivosGerados });
 }

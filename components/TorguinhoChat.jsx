@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Send, Loader2, MessageCircle, ChevronDown } from "lucide-react";
+import { X, Send, Loader2, MessageCircle, ChevronDown, Paperclip, Download, FileSpreadsheet, FileText, Image as ImageIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { fraseDoDia } from "@/lib/torguinho-frases";
 
@@ -73,9 +73,40 @@ function Bolha({ msg }) {
         ) : (
           <MensagemTexto texto={msg.content} />
         )}
+
+        {/* Anexos enviados pelo usuário */}
+        {isUser && Array.isArray(msg.anexos) && msg.anexos.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {msg.anexos.map((a, i) => (
+              <span key={i} className="inline-flex items-center gap-1 text-[11px] bg-white/20 rounded-md px-1.5 py-0.5">
+                <IconeAnexo tipo={a.tipo} /> <span className="truncate max-w-[140px]">{a.nome}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Planilhas geradas pelo Torguinho (download) */}
+        {!isUser && Array.isArray(msg.arquivos) && msg.arquivos.length > 0 && (
+          <div className="mt-2 space-y-1.5">
+            {msg.arquivos.map((a, i) => (
+              <a key={i} href={a.url} download target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs bg-green-50 text-green-700 border border-green-200 rounded-lg px-2.5 py-2 hover:bg-green-100 transition-colors">
+                <FileSpreadsheet size={15} className="shrink-0" />
+                <span className="flex-1 truncate font-medium">{a.nome}</span>
+                <Download size={14} className="shrink-0" />
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+function IconeAnexo({ tipo }) {
+  if (tipo === "imagem") return <ImageIcon size={11} />;
+  if (tipo === "tabela") return <FileSpreadsheet size={11} />;
+  return <FileText size={11} />;
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -87,9 +118,12 @@ export default function TorguinhoChat() {
   const [carregando, setCarregando] = useState(false);
   const [iniciado,   setIniciado]   = useState(false);
   const [config,     setConfig]     = useState(null); // null = ainda carregando
+  const [anexos,     setAnexos]     = useState([]);   // anexos da mensagem atual
+  const [anexando,   setAnexando]   = useState(false);
 
   const fimRef   = useRef(null);
   const inputRef = useRef(null);
+  const fileRef  = useRef(null);
 
   // Carrega config ao montar
   useEffect(() => {
@@ -135,13 +169,40 @@ export default function TorguinhoChat() {
 
   const nome = user?.name?.split(" ")[0] || "colega";
 
+  // Upload de um anexo → backend processa (texto/tabela/imagem) e devolve o payload.
+  async function onAnexar(e) {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = "";
+    if (!file || anexando) return;
+    if (anexos.length >= 4) return;
+    setAnexando(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/assistente/anexo", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha no anexo");
+      setAnexos((prev) => [...prev, data]);
+    } catch (err) {
+      setMensagens((prev) => [...prev, { role: "assistant", content: `Não consegui ler esse anexo: _${err.message}_` }]);
+    } finally {
+      setAnexando(false);
+    }
+  }
+
   async function enviar() {
     const texto = input.trim();
-    if (!texto || carregando) return;
+    if ((!texto && anexos.length === 0) || carregando) return;
 
-    const novasMensagens = [...mensagens, { role: "user", content: texto }];
+    const anexosAtuais = anexos;
+    const metaAnexos = anexosAtuais.map((a) => ({ nome: a.nome, tipo: a.tipo }));
+    const novasMensagens = [
+      ...mensagens,
+      { role: "user", content: texto || "(arquivo anexado)", anexos: metaAnexos },
+    ];
     setMensagens(novasMensagens);
     setInput("");
+    setAnexos([]);
     setCarregando(true);
 
     try {
@@ -153,7 +214,7 @@ export default function TorguinhoChat() {
       const res = await fetch("/api/assistente/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mensagens: historico }),
+        body: JSON.stringify({ mensagens: historico, anexos: anexosAtuais }),
       });
 
       const data = await res.json();
@@ -162,7 +223,7 @@ export default function TorguinhoChat() {
         throw new Error(data.error || "Erro ao obter resposta");
       }
 
-      setMensagens((prev) => [...prev, { role: "assistant", content: data.resposta }]);
+      setMensagens((prev) => [...prev, { role: "assistant", content: data.resposta, arquivos: data.arquivos }]);
     } catch (e) {
       setMensagens((prev) => [
         ...prev,
@@ -251,7 +312,41 @@ export default function TorguinhoChat() {
 
           {/* Input */}
           <div className="px-3 py-3 border-t border-gray-200 bg-white shrink-0">
+            {/* Chips dos anexos da mensagem atual */}
+            {(anexos.length > 0 || anexando) && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {anexos.map((a, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 text-[11px] bg-torg-blue-50 text-torg-blue border border-torg-blue-100 rounded-md pl-1.5 pr-1 py-0.5">
+                    <IconeAnexo tipo={a.tipo} />
+                    <span className="truncate max-w-[120px]">{a.nome}</span>
+                    <button onClick={() => setAnexos((prev) => prev.filter((_, j) => j !== i))} className="hover:bg-torg-blue/10 rounded p-0.5">
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+                {anexando && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-gray-400">
+                    <Loader2 size={11} className="animate-spin" /> lendo arquivo…
+                  </span>
+                )}
+              </div>
+            )}
             <div className="flex gap-2 items-end">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv,.pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,image/*"
+                onChange={onAnexar}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={carregando || anexando || anexos.length >= 4}
+                title="Anexar planilha, PDF ou imagem"
+                className="p-2.5 rounded-xl border border-gray-200 text-torg-gray hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+              >
+                <Paperclip size={16} />
+              </button>
               <textarea
                 ref={inputRef}
                 value={input}
@@ -265,7 +360,7 @@ export default function TorguinhoChat() {
               />
               <button
                 onClick={enviar}
-                disabled={!input.trim() || carregando}
+                disabled={(!input.trim() && anexos.length === 0) || carregando}
                 className="p-2.5 rounded-xl bg-torg-blue text-white hover:bg-torg-blue/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
               >
                 {carregando ? (
@@ -276,7 +371,7 @@ export default function TorguinhoChat() {
               </button>
             </div>
             <p className="text-center text-xs text-gray-400 mt-1.5">
-              Enter para enviar · Shift+Enter para nova linha
+              Anexe planilha, PDF ou imagem · Enter envia
             </p>
           </div>
         </div>
