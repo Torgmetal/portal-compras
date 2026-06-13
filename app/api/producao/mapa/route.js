@@ -45,19 +45,21 @@ export async function GET(req) {
     _sum: { pesoTotalKg: true, qte: true },
   });
 
-  // Contagem de peças com mais de 1 dia no setor (para alertas no mapa)
+  // Peças paradas há mais de 1 dia (alerta no mapa). Conta CONJUNTOS/avulsas
+  // DISTINTOS — não soma o qte dos croquis (senão um croqui de qte 403 viraria
+  // "403 paradas" e o corte inflava pra milhares). Croqui não entra no alerta.
   const umDiaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const conjOuAvulsa = { OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] };
   const alertasPorStatus = await prisma.pecaConjunto.groupBy({
     by: ["status"],
     where: {
       AND: [
         apenasLpc,
-        semCroquiPosCorte,
+        conjOuAvulsa,
         { status: { notIn: ["PENDENTE", "EXPEDIDO"] }, atualizadoEm: { lt: umDiaAtras } },
       ],
     },
     _count: true,
-    _sum: { qte: true },
   });
 
   const metas = await prisma.meta.findMany({
@@ -92,10 +94,10 @@ export async function GET(req) {
     });
   }
 
-  // Mapear alertas por status
+  // Mapear alertas por status — qtd = nº de conjuntos/avulsas distintos parados
   const alertasMap = {};
   for (const a of alertasPorStatus) {
-    alertasMap[a.status] = { count: a._count, qtd: a._sum.qte || 0 };
+    alertasMap[a.status] = { count: a._count, qtd: a._count };
   }
 
   return NextResponse.json({

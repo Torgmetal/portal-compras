@@ -59,9 +59,10 @@ export default async function PainelProducao() {
 
     listarFurosApontamento(),
 
-    // Peças paradas >1 dia no setor (conjuntos/avulsas, fora de pendente/expedido)
+    // Peças paradas >1 dia no setor (conjuntos/avulsas LPC, fora de pendente/expedido)
     prisma.pecaConjunto.count({
       where: {
+        fonte: "LPC_IMPORT",
         status: { notIn: ["PENDENTE", "EXPEDIDO"] },
         atualizadoEm: { lt: umDiaAtras },
         OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }],
