@@ -261,19 +261,19 @@ export default function SetorClient({
       titulo: "Apontamentos a corrigir",
       subtitulo: "Conjuntos com apontamento fora de ordem no Syneco",
       kpis: [`${furados.length} conjunto(s) com inconsistência na cadeia de apontamento`],
-      totalColunas: 10,
+      totalColunas: 11,
       nomePlanilha: "Correcoes",
       codigoDoc: "REL-PRD-009",
     });
 
     ws.columns = [
-      { width: 8 }, { width: 12 }, { width: 26 }, { width: 18 },
+      { width: 8 }, { width: 12 }, { width: 26 }, { width: 18 }, { width: 9 },
       { width: 11 }, { width: 9 }, { width: 12 }, { width: 9 }, { width: 9 }, { width: 30 },
     ];
 
     let row = linhaInicio;
     adicionarHeaderTabela(ws, row, [
-      "OP", "Marca", "Descrição", "Cliente",
+      "OP", "Marca", "Descrição", "Cliente", "Total LPC",
       "Montagem", "Solda", "Acabamento", "Jato", "Pintura", "Inconsistência",
     ]);
     row++;
@@ -286,10 +286,11 @@ export default function SetorClient({
         p.marca,
         p.descricao || "",
         p.op?.cliente || "",
+        p.qte || 0,
         ...SETORES_REL.map((s) => (c[s] == null ? "—" : c[s])),
         f.resumo || "",
       ], {
-        alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right" },
+        alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right", 9: "right" },
       });
       ws.getCell(row, 2).font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
       row++;
