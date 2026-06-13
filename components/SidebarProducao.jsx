@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Activity, ClipboardList, FileText, Package, Boxes, Factory, Map,
+  Activity, FileText, Package, Factory, Map,
   PackageSearch, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, ListOrdered,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
@@ -21,8 +21,6 @@ const menu = [
   { href: "/producao/programacao/jato", label: "Jato", icon: Wind },
   { href: "/producao/programacao/pintura", label: "Pintura", icon: Paintbrush },
   { href: "/producao/programacao/expedicao", label: "Expedição", icon: Truck },
-  { href: "/producao/controle", label: "Controle de Produção", icon: ClipboardList },
-  { href: "/producao/controle-op", label: "Produção por OP", icon: Boxes },
   { href: "/producao/consulta-estoque", label: "Estoque", icon: PackageSearch },
   { href: "/producao/romaneios", label: "Romaneios", icon: FileText },
   { href: "/producao/mes", label: "Rastreabilidade Syneco", icon: Factory },
