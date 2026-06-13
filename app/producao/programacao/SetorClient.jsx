@@ -127,8 +127,8 @@ export default function SetorClient({
   const pesoNoSetor = useMemo(() => noSetor.reduce((s, p) => s + (p.pesoTotalKg || 0), 0), [noSetor]);
   const pesoFiltradas = useMemo(() => filtradas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0), [filtradas]);
 
-  // Furos de lançamento (apontado aqui > setor anterior no Syneco) ainda no setor
-  const comFuro = useMemo(() => noSetor.filter((p) => furos[p.marca]), [noSetor, furos]);
+  // Conjuntos com furo de apontamento (cadeia inconsistente no Syneco) visíveis nesta aba
+  const furados = useMemo(() => pecas.filter((p) => furos[p.marca]), [pecas, furos]);
 
   // Seleção
   const toggleSelecionado = (id) => {
@@ -252,6 +252,53 @@ export default function SetorClient({
     await downloadWorkbook(workbook, nome);
   }
 
+  // Relatório dos conjuntos com furo de apontamento — para a fábrica corrigir
+  // os lançamentos no Syneco. Mostra a cadeia inteira (Montagem→Pintura).
+  const SETORES_REL = ["Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+  async function exportarFuros() {
+    if (furados.length === 0) return;
+    const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+      titulo: "Apontamentos a corrigir",
+      subtitulo: "Conjuntos com apontamento fora de ordem no Syneco",
+      kpis: [`${furados.length} conjunto(s) com inconsistência na cadeia de apontamento`],
+      totalColunas: 10,
+      nomePlanilha: "Correcoes",
+      codigoDoc: "REL-PRD-009",
+    });
+
+    ws.columns = [
+      { width: 8 }, { width: 12 }, { width: 26 }, { width: 18 },
+      { width: 11 }, { width: 9 }, { width: 12 }, { width: 9 }, { width: 9 }, { width: 30 },
+    ];
+
+    let row = linhaInicio;
+    adicionarHeaderTabela(ws, row, [
+      "OP", "Marca", "Descrição", "Cliente",
+      "Montagem", "Solda", "Acabamento", "Jato", "Pintura", "Inconsistência",
+    ]);
+    row++;
+
+    for (const p of furados) {
+      const f = furos[p.marca];
+      const c = f.cadeia || {};
+      adicionarLinhaTabela(ws, row, [
+        fmtOP(p.opNumero),
+        p.marca,
+        p.descricao || "",
+        p.op?.cliente || "",
+        ...SETORES_REL.map((s) => (c[s] == null ? "—" : c[s])),
+        f.resumo || "",
+      ], {
+        alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right", 8: "right" },
+      });
+      ws.getCell(row, 2).font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
+      row++;
+    }
+
+    const nome = `Torg_Apontamentos_Corrigir_${new Date().toISOString().split("T")[0]}.xlsx`;
+    await downloadWorkbook(workbook, nome);
+  }
+
   return (
     <div className="space-y-4 max-w-7xl">
       {/* Header */}
@@ -361,27 +408,34 @@ export default function SetorClient({
         )}
       </div>
 
-      {/* Alerta de furo de lançamento no Syneco */}
-      {comFuro.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2.5">
-          <AlertTriangle size={16} className="text-red-600 mt-0.5 shrink-0" />
-          <div className="text-xs text-red-800 space-y-1">
-            <p className="font-semibold">
-              Furo de apontamento no Syneco — {comFuro.length} conjunto{comFuro.length > 1 ? "s" : ""} com mais
-              unidades apontadas em {labelAtual.toLowerCase()} do que nos setores anteriores
-            </p>
-            {comFuro.map((p) => {
-              const f = furos[p.marca];
-              return (
-                <p key={p.id} className="tabular-nums">
-                  <span className="font-mono font-bold">{p.marca}</span>
-                  {" — "}{labelAtual} {f.apontado}, mas {f.gargalos.map((g) => `${g.setor} tem ${g.produzido}`).join(" · ")}
+      {/* Alerta de falha de apontamento no Syneco (cadeia fora de ordem) */}
+      {furados.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle size={16} className="text-red-600 mt-0.5 shrink-0" />
+            <div className="text-xs text-red-800 space-y-1 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-semibold">
+                  Falha de apontamento no Syneco — {furados.length} conjunto{furados.length > 1 ? "s" : ""} com
+                  apontamento fora de ordem
                 </p>
-              );
-            })}
-            <p className="text-red-600">
-              Ajuste os lançamentos no Syneco (término não apontado ou lançado no setor errado) — o portal reflete na próxima sincronização.
-            </p>
+                <button
+                  onClick={exportarFuros}
+                  className="px-2.5 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-1.5 shrink-0"
+                >
+                  <Download size={12} /> Exportar correções
+                </button>
+              </div>
+              {furados.map((p) => (
+                <p key={p.id} className="tabular-nums">
+                  <span className="font-mono font-bold">{p.marca}</span> — {furos[p.marca].resumo}
+                </p>
+              ))}
+              <p className="text-red-600">
+                Uma unidade não chega a um setor sem passar pelos anteriores — ajuste os lançamentos no Syneco
+                (término não apontado ou lançado no setor errado) e o portal reflete na próxima sincronização.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -441,14 +495,8 @@ export default function SetorClient({
                         {p.marca}
                         {furo && (
                           <span className="ml-1.5 text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 inline-flex items-center gap-1"
-                            title={`Apontadas ${furo.apontado} unidades em ${labelAtual.toLowerCase()}, mas ${furo.gargalos.map((g) => `${g.setor} tem ${g.produzido}`).join(" · ")} — ajustar os lançamentos no Syneco`}>
+                            title={`Apontamento fora de ordem: ${furo.resumo}. Uma unidade não chega a um setor sem passar pelos anteriores — ajustar no Syneco.`}>
                             <AlertTriangle size={9} /> furo de apontamento
-                          </span>
-                        )}
-                        {!furo && adiantada && (
-                          <span className="ml-1.5 text-[9px] font-sans font-semibold px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700"
-                            title={`As unidades do lote andam uma a uma: ${apontamentos[p.marca]?.produzido || 0} já apontadas em ${labelAtual.toLowerCase()} — o restante do lote ainda tem trabalho em ${STATUS_LABEL[p.status] || p.status}. Fluxo normal, nada a corrigir.`}>
-                            restante em {STATUS_LABEL[p.status] || p.status}
                           </span>
                         )}
                         {!furo && !adiantada && concluiuSetor(p) && (
