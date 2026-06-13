@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { resumoCorteAtivo, croquiConsumido } from "@/lib/conjuntos-setor";
 
 export async function GET(req) {
   try {
@@ -45,6 +46,14 @@ export async function GET(req) {
     _sum: { pesoTotalKg: true, qte: true },
   });
 
+  // Corte: descontar croquis já consumidos (conjunto subiu pra montagem → virou
+  // o conjunto). Sobrescreve a linha CORTE do groupBy com o corte ativo.
+  const corteAtivo = await resumoCorteAtivo();
+  const idxCorte = statusAgg.findIndex((s) => s.status === "CORTE");
+  const linhaCorte = { status: "CORTE", _count: corteAtivo.count, _sum: { qte: corteAtivo.qte, pesoTotalKg: corteAtivo.kg } };
+  if (idxCorte >= 0) statusAgg[idxCorte] = linhaCorte;
+  else if (corteAtivo.count > 0) statusAgg.push(linhaCorte);
+
   // Peças paradas há mais de 1 dia (alerta no mapa). Conta CONJUNTOS/avulsas
   // DISTINTOS — não soma o qte dos croquis (senão um croqui de qte 403 viraria
   // "403 paradas" e o corte inflava pra milhares). Croqui não entra no alerta.
@@ -88,10 +97,19 @@ export async function GET(req) {
         fluxoEspecial: true, dataPrevista: true, atualizadoEm: true,
         ultimoSetor: true, dataProducao: true,
         op: { select: { numero: true, cliente: true, obra: true } },
+        ...(setor === "CORTE"
+          ? { croquiConjuntos: { select: { conjunto: { select: { status: true } } } } }
+          : {}),
       },
       orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
       take: 1000,
     });
+    // No corte, esconder croquis já consumidos (conjunto subiu pra montagem)
+    if (setor === "CORTE") {
+      pecas = pecas
+        .filter((p) => !croquiConsumido((p.croquiConjuntos || []).map((x) => x.conjunto)))
+        .map(({ croquiConjuntos, ...p }) => p);
+    }
   }
 
   // Mapear alertas por status — qtd = nº de conjuntos/avulsas distintos parados

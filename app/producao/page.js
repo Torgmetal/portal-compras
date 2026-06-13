@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { isoWeekString } from "@/lib/semana";
-import { listarFurosApontamento } from "@/lib/conjuntos-setor";
+import { listarFurosApontamento, resumoCorteAtivo } from "@/lib/conjuntos-setor";
 import PainelProducaoClient from "./PainelProducaoClient";
 
 export const metadata = { title: "Workspace Torg — Painel de Produção" };
@@ -27,7 +27,7 @@ export default async function PainelProducao() {
 
   const umDiaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const [pipeRaw, metas, synHojeRaw, synMesRaw, synSemanaRaw, furos, paradas] = await Promise.all([
+  const [pipeRaw, metas, synHojeRaw, synMesRaw, synSemanaRaw, furos, paradas, corteAtivo] = await Promise.all([
     // Pipeline das peças (conjuntos + avulsas; croqui só conta no corte)
     prisma.pecaConjunto.groupBy({ by: ["status", "tipoPeca"], _count: true, _sum: { pesoTotalKg: true } }),
 
@@ -68,6 +68,8 @@ export default async function PainelProducao() {
         OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }],
       },
     }),
+
+    resumoCorteAtivo(),
   ]);
 
   // ── Pipeline (aplica regra croqui só no corte) ──
@@ -79,6 +81,8 @@ export default async function PainelProducao() {
     pipe[r.status].pecas += r._count;
     pipe[r.status].kg += r._sum.pesoTotalKg || 0;
   }
+  // Corte: só croquis ainda não consumidos (conjunto subiu pra montagem → baixa)
+  pipe.CORTE = { pecas: corteAtivo.count, kg: corteAtivo.kg };
 
   // ── Syneco por setor (hoje/mês) + meta ──
   const setores = SETORES_SYNECO.map((s) => {
