@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import {
-  Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, MapPin,
+  Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, ChevronRight, MapPin,
   AlertTriangle, Clock, Download,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
@@ -206,133 +206,69 @@ export default function MapaProducaoClient() {
         </div>
 
         <div className="p-4 bg-slate-50">
-          <svg viewBox="0 0 1200 600" className="w-full h-auto" style={{ minHeight: 260 }}>
-            <defs>
-              <pattern id="gridMap" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,0,0,0.04)" strokeWidth="0.5" />
-              </pattern>
-              <marker id="arrowMap" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
-                <path d="M0,0 L8,4 L0,8 Z" fill="#94a3b8" />
-              </marker>
-            </defs>
-            <rect width="1200" height="600" fill="url(#gridMap)" />
-
-            {/* Galpão 01 — Produção */}
-            <rect x={15} y={5} width={850} height={450} fill="white" stroke="#cbd5e1" strokeWidth={1.5} rx={6} />
-            <text x={435} y={230} textAnchor="middle" fill="rgba(0,0,0,0.05)" fontSize={16} fontWeight="bold" letterSpacing={3}>
-              GALPÃO 01 — PRODUÇÃO
-            </text>
-
-            {/* Galpão 02 — Pintura */}
-            <rect x={880} y={5} width={300} height={450} fill="white" stroke="#cbd5e1" strokeWidth={1.5} rx={6} />
-            <text x={1030} y={200} textAnchor="middle" fill="rgba(0,0,0,0.05)" fontSize={13} fontWeight="bold" letterSpacing={3}>
-              GALPÃO 02
-            </text>
-
-            {/* Sector areas */}
-            {AREAS.map((area) => {
-              const r = area.rects[0];
-              const d = getSetorData(area.statusKey);
-              const meta = getMeta(area.statusKey);
-              const realizado = getRealizado(area.statusKey);
-              const isSelected = setorSelecionado === area.statusKey;
+          <div className="flex flex-wrap items-stretch gap-2.5">
+            {FLOW_ORDER.map((key, i) => {
+              const area = AREAS.find((a) => a.statusKey === key);
+              const d = getSetorData(key);
+              const meta = getMeta(key);
+              const realizado = getRealizado(key);
               const metaKg = meta?.valorMensal || 0;
-              const aderencia = metaKg > 0 ? Math.min((realizado / metaKg) * 100, 100) : 0;
-              const cx = r.x + r.w / 2;
-              const cy = r.y + r.h / 2;
-              const isWide = r.w > 500;
-              const isSmall = r.h < 130;
-              const barW = isWide ? 160 : isSmall ? 80 : 120;
+              const aderencia = metaKg > 0 ? Math.min((realizado / metaKg) * 100, 100) : null;
               const alertaQtd = d.alertas?.qtd || 0;
+              const isSelected = setorSelecionado === key;
 
               return (
-                <g key={area.id}>
-                  <rect
-                    x={r.x} y={r.y} width={r.w} height={r.h}
-                    fill={area.fill}
-                    stroke={area.stroke}
-                    strokeWidth={isSelected ? 2.5 : 1.2}
-                    rx={4}
-                    className="cursor-pointer transition-all duration-200"
-                    onClick={() => handleSelectSetor(area.statusKey)}
-                  />
-
-                  {/* Sector name */}
-                  <text
-                    x={r.x + 12} y={r.y + 18}
-                    fill={area.stroke} fontSize={11} fontWeight="700"
-                    letterSpacing={0.8} className="pointer-events-none uppercase"
+                <Fragment key={key}>
+                  <button
+                    onClick={() => handleSelectSetor(key)}
+                    className="relative flex-1 min-w-[150px] text-left rounded-xl border-2 p-3.5 transition-shadow hover:shadow-md"
+                    style={{
+                      borderColor: area.stroke,
+                      backgroundColor: area.fill,
+                      boxShadow: isSelected ? `0 0 0 3px ${area.stroke}55` : undefined,
+                    }}
                   >
-                    {area.label}
-                  </text>
-
-                  {/* Badge de alerta — peças paradas >1 dia */}
-                  {alertaQtd > 0 && (
-                    <g className="pointer-events-none">
-                      <circle
-                        cx={r.x + r.w - 16} cy={r.y + 16} r={14}
-                        fill="#dc2626" stroke="white" strokeWidth={2}
-                      />
-                      <text
-                        x={r.x + r.w - 16} y={r.y + 20}
-                        textAnchor="middle" fill="white" fontSize={10} fontWeight="800"
+                    {alertaQtd > 0 && (
+                      <span
+                        className="absolute -top-2.5 -right-2.5 min-w-[24px] h-6 px-1.5 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center border-2 border-white shadow"
+                        title={`${alertaQtd} parada(s) há mais de 1 dia`}
                       >
                         {alertaQtd > 99 ? "99+" : alertaQtd}
-                      </text>
-                    </g>
+                      </span>
+                    )}
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{ color: area.stroke }}>
+                      {area.label}
+                    </p>
+                    {d.qtd > 0 ? (
+                      <>
+                        <p className="text-3xl font-extrabold text-torg-dark leading-none mt-2 tabular-nums">
+                          {d.qtd.toLocaleString("pt-BR")}
+                        </p>
+                        <p className="text-[11px] text-torg-gray mt-1">peças · {fmtPeso(d.pesoKg)}</p>
+                        {aderencia != null && (
+                          <div className="mt-2.5">
+                            <div className="h-2 rounded-full bg-white/80 overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${aderencia}%`, backgroundColor: area.stroke }} />
+                            </div>
+                            <p className="text-[10px] font-semibold mt-1" style={{ color: area.stroke }}>
+                              {aderencia.toFixed(0)}% da meta
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-400 mt-3">sem peças</p>
+                    )}
+                  </button>
+                  {i < FLOW_ORDER.length - 1 && (
+                    <div className="hidden sm:flex items-center self-center text-gray-300 shrink-0">
+                      <ChevronRight size={20} />
+                    </div>
                   )}
-
-                  {/* Piece data */}
-                  {d.qtd > 0 ? (
-                    <g className="pointer-events-none">
-                      <text x={cx} y={cy - (isSmall ? 6 : 14)} textAnchor="middle" fill="#1e293b" fontSize={isSmall ? 18 : 24} fontWeight="800">
-                        {d.qtd.toLocaleString("pt-BR")}
-                      </text>
-                      <text x={cx} y={cy + (isSmall ? 8 : 4)} textAnchor="middle" fill="#64748b" fontSize={isSmall ? 9 : 10}>
-                        peças · {fmtPeso(d.pesoKg)}
-                      </text>
-
-                      {metaKg > 0 && (
-                        <>
-                          <rect x={cx - barW / 2} y={cy + (isSmall ? 16 : 14)} width={barW} height={5} rx={2.5} fill="#e2e8f0" />
-                          <rect
-                            x={cx - barW / 2} y={cy + (isSmall ? 16 : 14)}
-                            width={Math.min(aderencia / 100, 1) * barW} height={5} rx={2.5}
-                            fill={area.stroke}
-                          />
-                          <text x={cx} y={cy + (isSmall ? 30 : 32)} textAnchor="middle" fill={area.stroke} fontSize={isSmall ? 10 : 12} fontWeight="700">
-                            {aderencia.toFixed(0)}%
-                          </text>
-                        </>
-                      )}
-                    </g>
-                  ) : (
-                    <text x={cx} y={cy + 4} textAnchor="middle" fill="#94a3b8" fontSize={10} className="pointer-events-none">
-                      sem peças
-                    </text>
-                  )}
-
-                  {isSelected && (
-                    <rect x={r.x} y={r.y} width={r.w} height={r.h} fill="none" stroke={area.stroke} strokeWidth={3} rx={4} className="pointer-events-none" />
-                  )}
-                </g>
+                </Fragment>
               );
             })}
-
-            {/* Flow arrows */}
-            <path d="M435,97 L435,113" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={445} y={108} fill="#94a3b8" fontSize={8} fontWeight="600">①</text>
-            <path d="M300,237 L300,253" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={310} y={248} fill="#94a3b8" fontSize={8} fontWeight="600">②</text>
-            <path d="M427,350 L438,350" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={433} y={342} fill="#94a3b8" fontSize={8} fontWeight="600">③</text>
-            <path d="M640,442 L640,468" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={650} y={458} fill="#94a3b8" fontSize={8} fontWeight="600">④</text>
-            <path d="M842,525 L1030,525 L1030,447" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={930} y={518} fill="#94a3b8" fontSize={8} fontWeight="600">⑤</text>
-            <path d="M1030,233 L1030,217" fill="none" stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#arrowMap)" />
-            <text x={1040} y={228} fill="#94a3b8" fontSize={8} fontWeight="600">⑥</text>
-          </svg>
+          </div>
         </div>
 
         {/* Legend */}
