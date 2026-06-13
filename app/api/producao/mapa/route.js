@@ -34,10 +34,13 @@ export async function GET(req) {
       { tipoPeca: null },
     ],
   };
+  // Só obras cuja LPC foi importada (regra do Vitor) — OPs sem LPC no portal
+  // não entram no mapa.
+  const apenasLpc = { fonte: "LPC_IMPORT" };
 
   const statusAgg = await prisma.pecaConjunto.groupBy({
     by: ["status"],
-    where: semCroquiPosCorte,
+    where: { AND: [apenasLpc, semCroquiPosCorte] },
     _count: true,
     _sum: { pesoTotalKg: true, qte: true },
   });
@@ -48,6 +51,7 @@ export async function GET(req) {
     by: ["status"],
     where: {
       AND: [
+        apenasLpc,
         semCroquiPosCorte,
         { status: { notIn: ["PENDENTE", "EXPEDIDO"] }, atualizadoEm: { lt: umDiaAtras } },
       ],
@@ -71,6 +75,7 @@ export async function GET(req) {
     pecas = await prisma.pecaConjunto.findMany({
       where: {
         status: setor,
+        fonte: "LPC_IMPORT",
         ...(SETORES_POS_CORTE.includes(setor)
           ? { OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] }
           : {}),
