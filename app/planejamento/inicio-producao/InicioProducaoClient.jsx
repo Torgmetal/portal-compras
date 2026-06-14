@@ -36,7 +36,7 @@ function prazoPreview(o, hhStr) {
   let throughputDias, fonte;
   if (hh > 0) { throughputDias = ((o.pesoKg / 1000) * hh) / (25 * 8.8); fonte = "informado"; }
   else { throughputDias = o.prazo.throughputDias; fonte = "benchmark"; }
-  const estimadoDias = Math.max(Math.ceil(throughputDias || 0), leadChain);
+  const estimadoDias = Math.max(1, Math.ceil(throughputDias || 0));
   return {
     throughputDias: throughputDias != null ? Math.round(throughputDias * 10) / 10 : null,
     leadChain, estimadoDias, fonte, janela,
@@ -247,23 +247,21 @@ export default function InicioProducaoClient({ obrasIniciais, lead = {}, capacid
                     <span className="font-medium text-torg-dark tabular-nums">{Math.round(o.pesoKg).toLocaleString("pt-BR")} kg</span>
                   </div>
                   <div>
-                    <span className="text-torg-gray">Esforço</span><br />
-                    <span className="font-medium text-torg-dark tabular-nums">{pz.throughputDias != null ? `${pz.throughputDias} d` : "—"}</span>
+                    <span className="text-torg-gray">Estimado (esforço)</span><br />
+                    <span className="font-medium text-torg-dark tabular-nums">{pz.estimadoDias} d úteis</span>
                   </div>
                   <div>
-                    <span className="text-torg-gray">Lead-time (fluxo)</span><br />
-                    <span className="font-medium text-torg-dark tabular-nums">{pz.leadChain} d</span>
+                    <span className="text-torg-gray">Janela do cronograma</span><br />
+                    <span className="font-medium text-torg-dark tabular-nums">{pz.janela != null ? `${pz.janela} d úteis` : "—"}</span>
                   </div>
                   <div>
-                    <span className="text-torg-gray">Estimado {pz.janela != null ? "/ janela" : ""}</span><br />
-                    <span className="font-medium text-torg-dark tabular-nums">
-                      {pz.estimadoDias} d{pz.janela != null ? ` / ${pz.janela} d` : ""}
-                    </span>
+                    <span className="text-torg-gray">Fluxo típico (c/ fila)</span><br />
+                    <span className="text-torg-gray tabular-nums" title="Tempo médio que a peça leva atravessando os setores no histórico, incluindo fila — só referência, não entra no prazo">~{pz.leadChain} d · ref.</span>
                   </div>
                 </div>
                 {pz.fonte === "benchmark" && (
                   <p className="text-[10px] text-torg-gray mt-1.5">
-                    Sem HH/ton informado — esforço estimado pela capacidade real do Syneco{isAdmin ? ". Informe a produtividade acima para usar o cálculo do comercial." : ""}; lead-time = medianas medidas por setor (abertura → próximo).
+                    Sem HH/ton informado — esforço estimado pela capacidade real do Syneco{isAdmin ? ". Informe a produtividade acima para usar o cálculo do comercial." : ""}.
                   </p>
                 )}
               </div>
