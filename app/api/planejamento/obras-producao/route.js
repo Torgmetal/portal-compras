@@ -91,7 +91,7 @@ export async function GET() {
       let situacao = "SEM_DATA";
       if (data) {
         if (concluido) situacao = "CONCLUIDO";
-        else if (data < hoje && !apontado) situacao = "ATRASADO";
+        else if (data < hoje) situacao = "ATRASADO"; // passou da data e NÃO concluiu (mesmo em andamento)
         else if (apontado) situacao = "EM_ANDAMENTO";
         else situacao = "A_INICIAR";
       } else if (concluido) {

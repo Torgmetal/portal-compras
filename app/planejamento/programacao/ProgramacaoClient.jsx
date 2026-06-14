@@ -217,7 +217,7 @@ export default function ProgramacaoClient() {
             </table>
           </div>
           <div className="px-4 py-2 bg-gray-50/60 border-t border-gray-50 flex items-center gap-4 text-[10px] text-torg-gray flex-wrap">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> atrasado (passou da data sem apontar)</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> atrasado (passou da data sem concluir)</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-600" /> em andamento</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> concluído</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300" /> a iniciar</span>
