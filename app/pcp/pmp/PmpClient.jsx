@@ -21,13 +21,10 @@ function addDays(iso, n) {
 }
 const fmtDia = (iso) =>
   new Date(iso + "T00:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" });
-const fmtTon = (kg) => `${((Number(kg) || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ton`;
+const fmtKg = (kg) => `${Math.round(Number(kg) || 0).toLocaleString("pt-BR")} kg`;
 const fmtNum = (n) => Number(n || 0).toLocaleString("pt-BR");
-// Peso compacto pra célula: >= 1 ton mostra em ton, senão em kg
-const fmtPesoCell = (kg) =>
-  kg >= 1000
-    ? `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ton`
-    : `${Math.round(kg).toLocaleString("pt-BR")} kg`;
+// Peso da célula sempre em kg (número real, sem converter para tonelada)
+const fmtPesoCell = (kg) => `${Math.round(kg).toLocaleString("pt-BR")} kg`;
 
 // Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
 const normObra = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
@@ -179,7 +176,7 @@ export default function PmpClient() {
           <div className="bg-torg-blue p-2 rounded-lg"><Target size={18} className="text-white" /></div>
           <div>
             <p className="text-[10px] text-torg-gray uppercase tracking-wider">Meta da semana</p>
-            <p className="text-lg font-extrabold text-torg-dark leading-tight">{fmtTon(quadro.resumo.metaKg)}</p>
+            <p className="text-lg font-extrabold text-torg-dark leading-tight">{fmtKg(quadro.resumo.metaKg)}</p>
             <p className="text-[10px] text-torg-gray">{fmtNum(quadro.resumo.metaPc)} peças programadas</p>
           </div>
         </div>
@@ -189,7 +186,7 @@ export default function PmpClient() {
           <div className="flex-1 min-w-0">
             <p className="text-[10px] text-torg-gray uppercase tracking-wider">Realizado (Syneco)</p>
             <p className="text-lg font-extrabold text-torg-dark leading-tight">
-              {fmtTon(quadro.resumo.realKg)}
+              {fmtKg(quadro.resumo.realKg)}
               {pctSemana != null && (
                 <span className={`ml-2 text-xs font-bold ${pctSemana >= 100 ? "text-emerald-600" : pctSemana >= 60 ? "text-amber-600" : "text-red-600"}`}>
                   {pctSemana}% da meta
@@ -250,7 +247,7 @@ export default function PmpClient() {
                       ))}
                       <td className="px-3 py-2 text-center bg-gray-50/50">
                         <p className="text-sm font-extrabold tabular-nums text-torg-dark whitespace-nowrap">
-                          {fmtTon(l.realKg)}<span className="text-torg-gray font-semibold text-xs"> / {fmtTon(l.metaKg)}</span>
+                          {fmtKg(l.realKg)}<span className="text-torg-gray font-semibold text-xs"> / {fmtKg(l.metaKg)}</span>
                         </p>
                         {pct != null ? (
                           <span className={`inline-block mt-0.5 px-1.5 py-px rounded text-[10px] font-bold ${
@@ -274,7 +271,7 @@ export default function PmpClient() {
                   ))}
                   <td className="px-3 py-2 text-center bg-gray-100/80">
                     <p className="text-sm font-extrabold tabular-nums text-torg-dark whitespace-nowrap">
-                      {fmtTon(quadro.resumo.realKg)}<span className="text-torg-gray font-semibold text-xs"> / {fmtTon(quadro.resumo.metaKg)}</span>
+                      {fmtKg(quadro.resumo.realKg)}<span className="text-torg-gray font-semibold text-xs"> / {fmtKg(quadro.resumo.metaKg)}</span>
                     </p>
                   </td>
                 </tr>

@@ -30,7 +30,6 @@ const fmtKg = (v) => {
   if (v == null) return "—";
   const kg = Number(v);
   if (kg === 0) return "0 kg";
-  if (kg >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
   return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
 };
 
@@ -207,7 +206,7 @@ export default function SetorClient({
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `Programacao de ${labelAtual}`,
       subtitulo: tituloFiltro,
-      kpis: [`Total: ${filtradas.length} conjuntos (${totalPecas} pc)  |  Peso: ${(totalPeso / 1000).toFixed(1)} t`],
+      kpis: [`Total: ${filtradas.length} conjuntos (${totalPecas} pc)  |  Peso: ${Math.round(totalPeso).toLocaleString("pt-BR")} kg`],
       totalColunas: 8,
       nomePlanilha: labelAtual,
       codigoDoc,

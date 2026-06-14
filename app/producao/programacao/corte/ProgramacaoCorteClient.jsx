@@ -30,7 +30,6 @@ const fmtKg = (v) => {
   if (v == null) return "—";
   const kg = Number(v);
   if (kg === 0) return "0 kg";
-  if (kg >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
   return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
 };
 
@@ -634,7 +633,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       titulo: "Lista de Material para Corte",
       subtitulo: `${opLabel} — peças pendentes (aguardando liberação)`,
       kpis: [
-        `Peças: ${totalPcs}  |  Barras/Chapas: ${totalBarras}  |  Peso estimado: ${(totalPeso / 1000).toFixed(1)} t`,
+        `Peças: ${totalPcs}  |  Barras/Chapas: ${totalBarras}  |  Peso estimado: ${Math.round(totalPeso).toLocaleString("pt-BR")} kg`,
       ],
       totalColunas: 9,
       nomePlanilha: "Lista de Material",
@@ -811,7 +810,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       titulo: "Programacao de Corte",
       subtitulo: tituloFiltro,
       kpis: [
-        `Total: ${totalPecas} pc  |  Produzido: ${totalProd} pc (${pctGeral}%)  |  Peso: ${(totalPeso / 1000).toFixed(1)} t`,
+        `Total: ${totalPecas} pc  |  Produzido: ${totalProd} pc (${pctGeral}%)  |  Peso: ${Math.round(totalPeso).toLocaleString("pt-BR")} kg`,
       ],
       totalColunas: 16,
       nomePlanilha: "Corte",

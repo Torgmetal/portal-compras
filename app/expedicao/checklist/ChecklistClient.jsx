@@ -15,7 +15,6 @@ const fmtKg = (v) =>
 const fmtPesoCompacto = (v) => {
   if (v == null || v === 0) return "0";
   const kg = Number(v);
-  if (Math.abs(kg) >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}t`;
   return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 };
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");

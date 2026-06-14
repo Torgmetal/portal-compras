@@ -27,7 +27,6 @@ const STATUS_COR = {
 
 const fmtKg = (v) => {
   if (!v) return "0 kg";
-  if (v >= 1000) return `${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
   return `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 };
 

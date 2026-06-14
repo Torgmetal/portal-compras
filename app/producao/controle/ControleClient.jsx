@@ -536,8 +536,8 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
       {/* KPIs da semana */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Meta semana", value: `${(kpisSemana.pesoMeta / 1000).toFixed(1)} ton`, icon: Target, color: "text-torg-blue" },
-          { label: "Realizado", value: `${(kpisSemana.pesoReal / 1000).toFixed(1)} ton`, icon: Weight, color: kpisSemana.aderencia >= 80 ? "text-emerald-600" : "text-amber-600" },
+          { label: "Meta semana", value: `${Math.round(kpisSemana.pesoMeta).toLocaleString("pt-BR")} kg`, icon: Target, color: "text-torg-blue" },
+          { label: "Realizado", value: `${Math.round(kpisSemana.pesoReal).toLocaleString("pt-BR")} kg`, icon: Weight, color: kpisSemana.aderencia >= 80 ? "text-emerald-600" : "text-amber-600" },
           { label: "Peças plan.", value: kpisSemana.totalPecas, icon: ClipboardList, color: "text-torg-dark" },
           { label: "Concluídas", value: `${kpisSemana.concluidas}/${kpisSemana.totalPecas}`, icon: Check, color: "text-emerald-600" },
         ].map((kpi) => (
@@ -653,13 +653,13 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <div className="border border-gray-100 rounded-lg p-3">
                 <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1">Realizado hoje</p>
                 <p className="text-xl font-extrabold text-torg-dark tabular-nums">
-                  {(setorData.totalKg / 1000).toFixed(2)}
-                  <span className="text-sm font-normal text-torg-gray ml-1">ton</span>
+                  {Math.round(setorData.totalKg).toLocaleString("pt-BR")}
+                  <span className="text-sm font-normal text-torg-gray ml-1">kg</span>
                 </p>
                 {metaDiaria > 0 && (
                   <div className="mt-2">
                     <div className="flex justify-between text-[10px] text-torg-gray mb-0.5">
-                      <span>Meta dia: {(metaDiaria / 1000).toFixed(2)} ton</span>
+                      <span>Meta dia: {Math.round(metaDiaria).toLocaleString("pt-BR")} kg</span>
                       <span className={pctDia >= 80 ? "text-emerald-600 font-semibold" : "text-amber-600 font-semibold"}>
                         {pctDia.toFixed(0)}%
                       </span>
@@ -678,13 +678,13 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <div className="border border-gray-100 rounded-lg p-3">
                 <p className="text-[10px] text-torg-gray uppercase tracking-wide mb-1">Acumulado mês</p>
                 <p className="text-xl font-extrabold text-torg-dark tabular-nums">
-                  {(realizadoMes.kg / 1000).toFixed(1)}
-                  <span className="text-sm font-normal text-torg-gray ml-1">ton</span>
+                  {Math.round(realizadoMes.kg).toLocaleString("pt-BR")}
+                  <span className="text-sm font-normal text-torg-gray ml-1">kg</span>
                 </p>
                 {metaMensal > 0 && (
                   <div className="mt-2">
                     <div className="flex justify-between text-[10px] text-torg-gray mb-0.5">
-                      <span>Meta mês: {(metaMensal / 1000).toFixed(1)} ton</span>
+                      <span>Meta mês: {Math.round(metaMensal).toLocaleString("pt-BR")} kg</span>
                       <span className={pctMes >= 60 ? "text-emerald-600 font-semibold" : "text-amber-600 font-semibold"}>
                         {pctMes.toFixed(0)}%
                       </span>

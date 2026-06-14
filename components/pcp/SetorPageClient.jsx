@@ -348,7 +348,7 @@ export default function SetorPageClient({ setor, titulo, iconName, corHex }) {
                   tick={{ fontSize: 10 }}
                   tickFormatter={(v) => { const d = new Date(v + "T12:00:00"); return `${d.getDate()}/${d.getMonth() + 1}`; }}
                 />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(1)}t`} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v).toLocaleString("pt-BR")}`} />
                 <Tooltip
                   labelFormatter={(v) => new Date(v + "T12:00:00").toLocaleDateString("pt-BR")}
                   formatter={(v) => [fmtKg(v), "Produzido"]}

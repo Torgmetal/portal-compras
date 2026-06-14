@@ -24,7 +24,6 @@ const FLOW_ORDER = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "JATO", "PINTURA",
 
 const fmtPeso = (kg) => {
   if (!kg) return "0 kg";
-  if (Math.abs(kg) >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
   return `${Math.round(kg).toLocaleString("pt-BR")} kg`;
 };
 

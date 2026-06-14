@@ -9,7 +9,6 @@ import {
 
 const fmtKg = (v) => {
   const kg = Number(v) || 0;
-  if (kg >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
   return `${Math.round(kg).toLocaleString("pt-BR")} kg`;
 };
 const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0);

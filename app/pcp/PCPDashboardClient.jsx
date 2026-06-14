@@ -9,7 +9,6 @@ import {
 import { fmtOP, fmtKg } from "@/lib/utils";
 import { MAQUINA_LABEL } from "@/lib/maquina-corte";
 
-const fmtTon = (kg) => `${((Number(kg) || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ton`;
 const fmtHora = (d) => (d ? new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—");
 
 const ESTOQUE_LABEL = {
@@ -24,9 +23,9 @@ export default function PCPDashboardClient() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [filtroObra, setFiltroObra] = useState("");
-  // edição da meta
+  // edição da meta (em kg)
   const [editandoMeta, setEditandoMeta] = useState(false);
-  const [metaTon, setMetaTon] = useState("");
+  const [metaKgInput, setMetaKgInput] = useState("");
   const [salvandoMeta, setSalvandoMeta] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -47,14 +46,14 @@ export default function PCPDashboardClient() {
   useEffect(() => { carregar(); }, [carregar]);
 
   const salvarMeta = async () => {
-    const ton = Number(String(metaTon).replace(",", "."));
-    if (!(ton > 0)) return;
+    const kg = Number(String(metaKgInput).replace(/\./g, "").replace(",", "."));
+    if (!(kg > 0)) return;
     setSalvandoMeta(true);
     try {
       const res = await fetch("/api/pcp/painel-corte", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metaKg: Math.round(ton * 1000) }),
+        body: JSON.stringify({ metaKg: Math.round(kg) }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erro ao salvar meta");
@@ -158,7 +157,7 @@ export default function PCPDashboardClient() {
           <div className="flex items-center justify-between">
             <p className="text-[10px] text-torg-gray uppercase tracking-wider flex items-center gap-1"><Target size={11} /> Meta do mês</p>
             {!editandoMeta && (
-              <button onClick={() => { setMetaTon(String(meta.kgMes / 1000)); setEditandoMeta(true); }}
+              <button onClick={() => { setMetaKgInput(String(Math.round(meta.kgMes))); setEditandoMeta(true); }}
                 className="p-1 text-gray-300 hover:text-torg-blue rounded" title="Editar meta">
                 <Pencil size={12} />
               </button>
@@ -166,17 +165,17 @@ export default function PCPDashboardClient() {
           </div>
           {editandoMeta ? (
             <div className="flex items-center gap-1 mt-1">
-              <input type="number" value={metaTon} onChange={(e) => setMetaTon(e.target.value)} autoFocus
+              <input type="number" value={metaKgInput} onChange={(e) => setMetaKgInput(e.target.value)} autoFocus
                 onKeyDown={(e) => { if (e.key === "Enter") salvarMeta(); if (e.key === "Escape") setEditandoMeta(false); }}
-                className="w-20 px-2 py-1 text-sm border border-torg-blue rounded-lg tabular-nums" />
-              <span className="text-xs text-torg-gray">ton</span>
+                className="w-28 px-2 py-1 text-sm border border-torg-blue rounded-lg tabular-nums" />
+              <span className="text-xs text-torg-gray">kg</span>
               <button onClick={salvarMeta} disabled={salvandoMeta} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded">
                 {salvandoMeta ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               </button>
               <button onClick={() => setEditandoMeta(false)} className="p-1 text-torg-gray hover:bg-gray-100 rounded"><X size={14} /></button>
             </div>
           ) : (
-            <p className="text-2xl font-extrabold text-torg-dark mt-0.5">{fmtTon(meta.kgMes)}</p>
+            <p className="text-2xl font-extrabold text-torg-dark mt-0.5">{fmtKg(meta.kgMes)}</p>
           )}
           <p className="text-[10px] text-torg-gray mt-0.5">por mês</p>
         </div>
@@ -184,7 +183,7 @@ export default function PCPDashboardClient() {
         {/* Cortado no mês */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-[10px] text-torg-gray uppercase tracking-wider flex items-center gap-1"><Scissors size={11} /> Cortado no mês</p>
-          <p className="text-2xl font-extrabold text-torg-dark mt-0.5">{fmtTon(mes.cortadoKg)}</p>
+          <p className="text-2xl font-extrabold text-torg-dark mt-0.5">{fmtKg(mes.cortadoKg)}</p>
           <div className="mt-1.5 h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${mes.pctMeta >= 100 ? "bg-emerald-500" : "bg-torg-blue"}`}
               style={{ width: `${Math.min(100, mes.pctMeta)}%` }} />
@@ -195,16 +194,16 @@ export default function PCPDashboardClient() {
         {/* Projeção */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-[10px] text-torg-gray uppercase tracking-wider flex items-center gap-1"><TrendingUp size={11} /> Projeção do mês</p>
-          <p className={`text-2xl font-extrabold mt-0.5 ${projetaAcima ? "text-emerald-600" : "text-red-600"}`}>{fmtTon(mes.projecaoKg)}</p>
+          <p className={`text-2xl font-extrabold mt-0.5 ${projetaAcima ? "text-emerald-600" : "text-red-600"}`}>{fmtKg(mes.projecaoKg)}</p>
           <p className="text-[10px] text-torg-gray mt-0.5">
-            no ritmo atual — {projetaAcima ? "bate a meta" : `faltariam ${fmtTon(meta.kgMes - mes.projecaoKg)}`}
+            no ritmo atual — {projetaAcima ? "bate a meta" : `faltariam ${fmtKg(meta.kgMes - mes.projecaoKg)}`}
           </p>
         </div>
 
         {/* Carteira */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <p className="text-[10px] text-torg-gray uppercase tracking-wider flex items-center gap-1"><Package size={11} /> Carteira a cortar</p>
-          <p className="text-2xl font-extrabold text-torg-dark mt-0.5">{fmtTon(carteira.total.kg)}</p>
+          <p className="text-2xl font-extrabold text-torg-dark mt-0.5">{fmtKg(carteira.total.kg)}</p>
           <p className="text-[10px] text-torg-gray mt-0.5">{carteira.total.pecas} peças subidas e ainda não cortadas</p>
         </div>
       </div>

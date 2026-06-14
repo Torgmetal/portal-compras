@@ -41,7 +41,6 @@ const fmtKg = (v) => {
   if (v == null) return "—";
   const kg = Number(v);
   if (kg === 0) return "0 kg";
-  if (kg >= 1000) return `${(kg / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} t`;
   return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
 };
 
@@ -166,7 +165,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
       titulo: "Controle de Peças",
       subtitulo: tituloFiltro,
       kpis: [
-        `Total: ${totalPecas} pç  |  Produzido: ${totalProd} pç (${pctGeral}%)  |  Peso: ${(totalPeso / 1000).toFixed(1)} t`,
+        `Total: ${totalPecas} pç  |  Produzido: ${totalProd} pç (${pctGeral}%)  |  Peso: ${Math.round(totalPeso).toLocaleString("pt-BR")} kg`,
       ],
       totalColunas: 14,
       nomePlanilha: "Peças",
