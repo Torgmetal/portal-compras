@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X,
-  FileText, CheckCircle2, Lock, BookCheck,
+  FileText, CheckCircle2, Lock, BookCheck, FileDown,
 } from "lucide-react";
 import { FONTE_LABEL, ESTADO_DATABOOK } from "@/lib/databook-secoes";
 import { STATUS_COR } from "@/lib/qualidade-status";
@@ -118,7 +118,12 @@ export default function DataBookDetalheClient({ id }) {
               {data.obra ? `${data.obra} · ` : ""}<span className="inline-flex items-center gap-1"><Weight size={11} /> {fmtKg(data.pesoTotalKg)}</span>{data.pecas ? ` · ${data.pecas} peças` : ""}
             </p>
           </div>
-          <div className="text-right shrink-0">
+          <div className="text-right shrink-0 flex items-center gap-2">
+            <a href={`/api/qualidade/data-books/${id}/pdf?inline=1`} target="_blank" rel="noreferrer"
+              title="Gerar e baixar o PDF do data book (rascunho se ainda incompleto)"
+              className="text-[12px] font-semibold text-violet-700 border border-violet-300 rounded-lg px-3 py-1.5 hover:bg-violet-50 inline-flex items-center gap-1.5">
+              <FileDown size={13} /> Baixar PDF
+            </a>
             {data.status === "EMITIDO" ? (
               <span className="text-[11px] px-2 py-1 rounded-full font-bold bg-emerald-100 text-emerald-700 inline-flex items-center gap-1"><CheckCircle2 size={12} /> Emitido</span>
             ) : (
