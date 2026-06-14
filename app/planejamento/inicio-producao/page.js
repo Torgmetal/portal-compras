@@ -13,7 +13,8 @@ export const metadata = { title: "Workspace Torg — Planejamento · Início de 
 export const dynamic = "force-dynamic";
 
 export default async function InicioProducaoPage() {
-  await requireRole(["ADMIN", "PLANEJAMENTO", "COMERCIAL"]);
+  const user = await requireRole(["ADMIN", "PLANEJAMENTO", "COMERCIAL"]);
+  const isAdmin = user.tipo === "ADMIN";
 
   const [lpcAgg, cronogramas, tarefas, ops, orcamentos, estudos, solicitacoes, lead, capKgDia] =
     await Promise.all([
@@ -79,17 +80,23 @@ export default async function InicioProducaoPage() {
     const dig = digitosObra(a.opNumero);
     const crono = cronoPorDig[dig] || null;
     const op = opPorDig[dig] || null;
-    const hh = hhPorDig[dig] ?? null;
+    const solic = solicMap.get(a.opNumero) || null;
+    const hhComercial = hhPorDig[dig] ?? null;
+    const hhManual = solic?.hhPorTonManual ?? null;
+    const hhEfetivo = hhManual ?? hhComercial;
     const pesoKg = a._sum.pesoTotalKg || 0;
     const janelaDiasUteis = crono ? diasUteis(crono.fabInicio, crono.fabFim) : null;
-    const prazo = calcularPrazo({ pesoKg, hhPorTon: hh, lead, capKgDia, janelaDiasUteis });
+    const prazo = calcularPrazo({ pesoKg, hhPorTon: hhEfetivo, lead, capKgDia, janelaDiasUteis });
     return {
       opNumero: a.opNumero,
       opId: op?.id || null,
       cronogramaId: crono?.cronogramaId || null,
       conjuntos: a._count.id,
       pesoKg,
-      hhPorTon: hh,
+      hhPorTon: hhEfetivo,
+      hhComercial,
+      hhManual,
+      hhFonte: hhManual != null ? "manual" : hhComercial != null ? "comercial" : null,
       cliente: op?.cliente || crono?.cliente || null,
       obra: op?.obra || crono?.obra || null,
       titulo: crono?.titulo || null,
@@ -97,7 +104,7 @@ export default async function InicioProducaoPage() {
       fabFim: crono?.fabFim || null,
       expFim: crono?.expFim || null,
       prazo,
-      solicitacao: solicMap.get(a.opNumero) || null,
+      solicitacao: solic,
     };
   }).sort((x, y) => x.opNumero.localeCompare(y.opNumero));
 
@@ -105,6 +112,7 @@ export default async function InicioProducaoPage() {
     <InicioProducaoClient
       obrasIniciais={JSON.parse(JSON.stringify(obras))}
       lead={lead}
+      isAdmin={isAdmin}
     />
   );
 }

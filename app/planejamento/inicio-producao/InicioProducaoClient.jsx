@@ -9,8 +9,27 @@ import {
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const toInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 const hojeIso = () => new Date().toISOString().slice(0, 10);
+const parseHH = (s) => parseFloat(String(s ?? "").replace(",", ".")) || 0;
 
-export default function InicioProducaoClient({ obrasIniciais }) {
+// Recalcula o prazo ao vivo conforme o HH/ton é editado (espelha lib/prazo-producao;
+// throughput por HH quando informado, senão mantém o benchmark do servidor).
+function prazoPreview(o, hhStr) {
+  const hh = parseHH(hhStr);
+  const leadChain = o.prazo.leadChain;
+  const janela = o.prazo.janelaDiasUteis;
+  let throughputDias, fonte;
+  if (hh > 0) { throughputDias = ((o.pesoKg / 1000) * hh) / (25 * 8.8); fonte = "informado"; }
+  else { throughputDias = o.prazo.throughputDias; fonte = "benchmark"; }
+  const estimadoDias = Math.max(Math.ceil(throughputDias || 0), leadChain);
+  return {
+    throughputDias: throughputDias != null ? Math.round(throughputDias * 10) / 10 : null,
+    leadChain, estimadoDias, fonte, janela,
+    cabe: janela != null ? estimadoDias <= janela : null,
+    faltam: janela != null ? Math.max(0, estimadoDias - janela) : null,
+  };
+}
+
+export default function InicioProducaoClient({ obrasIniciais, lead = {}, isAdmin = false }) {
   const [obras, setObras] = useState(obrasIniciais);
   const [busca, setBusca] = useState("");
   const [salvando, setSalvando] = useState(null);
@@ -22,6 +41,7 @@ export default function InicioProducaoClient({ obrasIniciais }) {
       r[o.opNumero] = {
         datasSetor: { ...(s?.datasSetor || {}) },
         dataEntrega: s?.dataEntrega ? toInput(s.dataEntrega) : toInput(o.expFim),
+        hhPorTon: o.hhManual != null ? String(o.hhManual) : (o.hhComercial != null ? String(o.hhComercial) : ""),
         prioridade: s?.prioridade || "MEDIA",
         observacao: s?.observacao || "",
       };
@@ -79,6 +99,7 @@ export default function InicioProducaoClient({ obrasIniciais }) {
         body: JSON.stringify({
           opNumero: o.opNumero, opId: o.opId, cronogramaId: o.cronogramaId,
           dataEntrega: d.dataEntrega || null, datasSetor,
+          hhPorTonManual: parseHH(d.hhPorTon) || null,
           prioridade: d.prioridade, observacao: d.observacao || null,
         }),
       });
@@ -133,6 +154,7 @@ export default function InicioProducaoClient({ obrasIniciais }) {
         const d = rascunhos[o.opNumero];
         const st = o.solicitacao ? STATUS_SOLIC[o.solicitacao.status] || STATUS_SOLIC.SOLICITADA : null;
         const salvandoEsta = salvando === o.opNumero;
+        const pz = prazoPreview(o, d.hhPorTon);
         return (
           <div key={o.opNumero} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Cabeçalho do card */}
@@ -156,41 +178,63 @@ export default function InicioProducaoClient({ obrasIniciais }) {
             <div className="p-4 space-y-3">
               {/* Validação de prazo */}
               <div className={`rounded-lg border p-3 ${
-                o.prazo.cabe === false ? "bg-red-50 border-red-200"
-                  : o.prazo.cabe === true ? "bg-emerald-50 border-emerald-200"
+                pz.cabe === false ? "bg-red-50 border-red-200"
+                  : pz.cabe === true ? "bg-emerald-50 border-emerald-200"
                   : "bg-gray-50 border-gray-200"
               }`}>
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <span className="text-[11px] font-semibold text-torg-dark uppercase tracking-wide flex items-center gap-1.5">
                     <Gauge size={13} className="text-torg-blue" /> Validação de prazo
                   </span>
-                  {o.prazo.cabe === true && <span className="text-[11px] font-semibold text-emerald-700">✓ cabe na janela do cronograma</span>}
-                  {o.prazo.cabe === false && <span className="text-[11px] font-semibold text-red-700">⚠ não cabe — faltam {o.prazo.faltamDias} dias úteis</span>}
-                  {o.prazo.cabe == null && <span className="text-[11px] text-torg-gray">sem cronograma para comparar</span>}
+                  {pz.cabe === true && <span className="text-[11px] font-semibold text-emerald-700">✓ cabe na janela do cronograma</span>}
+                  {pz.cabe === false && <span className="text-[11px] font-semibold text-red-700">⚠ não cabe — faltam {pz.faltam} dias úteis</span>}
+                  {pz.cabe == null && <span className="text-[11px] text-torg-gray">sem cronograma para comparar</span>}
                 </div>
+
+                {/* Produtividade (HH/ton) — ADM edita; demais veem */}
+                <div className="flex items-center gap-2 mt-2 text-[11px]">
+                  <span className="text-torg-gray">Produtividade:</span>
+                  {isAdmin ? (
+                    <input
+                      type="number" step="0.1" min="0" value={d.hhPorTon}
+                      onChange={(e) => setCampo(o.opNumero, "hhPorTon", e.target.value)}
+                      placeholder="HH/ton"
+                      className="w-24 px-1.5 py-1 border border-gray-300 rounded-lg tabular-nums"
+                    />
+                  ) : (
+                    <span className="font-medium text-torg-dark tabular-nums">{d.hhPorTon || "—"}</span>
+                  )}
+                  <span className="text-torg-gray">HH/ton</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    pz.fonte === "informado" ? "bg-torg-blue-50 text-torg-blue" : "bg-gray-100 text-torg-gray"
+                  }`}>
+                    {pz.fonte === "informado" ? (o.hhFonte === "comercial" && parseHH(d.hhPorTon) === o.hhComercial ? "do comercial" : "informado no planejamento") : "benchmark (Syneco)"}
+                  </span>
+                </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-[11px]">
                   <div>
                     <span className="text-torg-gray">Peso ({o.conjuntos} conj.)</span><br />
                     <span className="font-medium text-torg-dark tabular-nums">{Math.round(o.pesoKg).toLocaleString("pt-BR")} kg</span>
                   </div>
                   <div>
-                    <span className="text-torg-gray">Esforço {o.prazo.fonteThroughput === "comercial" ? `(${o.hhPorTon} HH/t)` : "(benchmark)"}</span><br />
-                    <span className="font-medium text-torg-dark tabular-nums">{o.prazo.throughputDias != null ? `${o.prazo.throughputDias} d` : "—"}</span>
+                    <span className="text-torg-gray">Esforço</span><br />
+                    <span className="font-medium text-torg-dark tabular-nums">{pz.throughputDias != null ? `${pz.throughputDias} d` : "—"}</span>
                   </div>
                   <div>
                     <span className="text-torg-gray">Lead-time (fluxo)</span><br />
-                    <span className="font-medium text-torg-dark tabular-nums">{o.prazo.leadChain} d</span>
+                    <span className="font-medium text-torg-dark tabular-nums">{pz.leadChain} d</span>
                   </div>
                   <div>
-                    <span className="text-torg-gray">Estimado {o.prazo.janelaDiasUteis != null ? "/ janela" : ""}</span><br />
+                    <span className="text-torg-gray">Estimado {pz.janela != null ? "/ janela" : ""}</span><br />
                     <span className="font-medium text-torg-dark tabular-nums">
-                      {o.prazo.estimadoDias} d{o.prazo.janelaDiasUteis != null ? ` / ${o.prazo.janelaDiasUteis} d` : ""}
+                      {pz.estimadoDias} d{pz.janela != null ? ` / ${pz.janela} d` : ""}
                     </span>
                   </div>
                 </div>
-                {o.prazo.fonteThroughput === "benchmark" && (
+                {pz.fonte === "benchmark" && (
                   <p className="text-[10px] text-torg-gray mt-1.5">
-                    Sem HH/ton do comercial nesta obra — esforço estimado pela capacidade real do Syneco; lead-time = medianas medidas por setor (abertura → próximo).
+                    Sem HH/ton informado — esforço estimado pela capacidade real do Syneco{isAdmin ? ". Informe a produtividade acima para usar o cálculo do comercial." : ""}; lead-time = medianas medidas por setor (abertura → próximo).
                   </p>
                 )}
               </div>

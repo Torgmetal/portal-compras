@@ -2446,6 +2446,7 @@ model SolicitacaoProducao {
   cronogramaId   String?
   dataEntrega    DateTime? @db.Date
   datasSetor     Json      @default("{}")
+  hhPorTonManual Float?    // produtividade informada no Planejamento (sobrepõe o comercial)
   prioridade     String    @default("MEDIA") // ALTA | MEDIA | BAIXA
   status         String    @default("SOLICITADA") // SOLICITADA | EM_PRODUCAO | ATRASADA | CONCLUIDA
   liberadoLpcLe  Boolean   @default(false)
