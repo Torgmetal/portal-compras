@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw, AlertTriangle, Clock, ChevronDown, ChevronUp, ArrowRight,
-  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck,
+  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, CalendarClock,
 } from "lucide-react";
+import { fmtOP } from "@/lib/utils";
+import { SETORES_SOLICITACAO, SETOR_LABEL_SOLIC, STATUS_SOLIC } from "@/lib/solicitacao-producao-const";
 
 const fmtKg = (v) => {
   const kg = Number(v) || 0;
@@ -24,7 +26,7 @@ const FLUXO = [
   { status: "EXPEDIDO", label: "Expedido", href: "/producao/programacao/expedicao", icon: Truck, cor: "text-emerald-600" },
 ];
 
-export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setores, semanas, furos, paradas }) {
+export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setores, semanas, furos, paradas, solicitacoes = [] }) {
   const router = useRouter();
   const [verFuros, setVerFuros] = useState(false);
 
@@ -76,6 +78,60 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
           })}
         </div>
       </section>
+
+      {/* Solicitações de produção (Planejamento) */}
+      {solicitacoes.length > 0 && (
+        <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2">
+            <CalendarClock size={15} className="text-torg-blue" />
+            <h3 className="text-sm font-bold text-torg-dark">Solicitações de produção</h3>
+            <span className="text-[11px] text-torg-gray">datas necessárias definidas pelo Planejamento</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[820px]">
+              <thead className="bg-gray-50/60">
+                <tr>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Obra</th>
+                  {SETORES_SOLICITACAO.map((s) => (
+                    <th key={s} className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">{SETOR_LABEL_SOLIC[s]}</th>
+                  ))}
+                  <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Entrega</th>
+                  <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {solicitacoes.map((sol) => {
+                  const st = STATUS_SOLIC[sol.status] || STATUS_SOLIC.SOLICITADA;
+                  const ds = sol.datasSetor || {};
+                  return (
+                    <tr key={sol.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        <span className="font-mono font-bold text-torg-blue">{fmtOP(sol.opNumero)}</span>
+                        {sol.cliente && <span className="text-torg-gray ml-1.5">{sol.cliente}</span>}
+                      </td>
+                      {SETORES_SOLICITACAO.map((s) => {
+                        const v = ds[s];
+                        const atrasada = v && v < hoje;
+                        return (
+                          <td key={s} className={`px-2 py-2 text-center tabular-nums ${atrasada ? "text-red-600 font-semibold" : v ? "text-torg-dark" : "text-gray-300"}`}>
+                            {v ? new Date(v + "T12:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}
+                          </td>
+                        );
+                      })}
+                      <td className="px-2 py-2 text-center tabular-nums text-torg-dark">
+                        {sol.dataEntrega ? new Date(sol.dataEntrega).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.cor}`}>{st.label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Alertas */}
       {(furos.length > 0 || paradas > 0) && (

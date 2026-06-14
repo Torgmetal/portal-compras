@@ -2432,6 +2432,29 @@ enum NotificacaoTipo {
   RM_CRIADA
   COTACAO_RESPONDIDA
   CONSULTA_ESTOQUE
+  SOLICITACAO_PRODUCAO
+}
+
+// Solicitação de início de produção criada pelo Planejamento a partir das datas
+// do cronograma (necessidade do cliente) — uma por obra. As datas necessárias
+// por setor ficam em `datasSetor` (JSON { CORTE: "YYYY-MM-DD", ... }). Vai para
+// PCP/Produção (notificação) e aparece no PMP para acompanhamento.
+model SolicitacaoProducao {
+  id             String    @id @default(cuid())
+  opNumero       String    @unique
+  opId           String?
+  cronogramaId   String?
+  dataEntrega    DateTime? @db.Date
+  datasSetor     Json      @default("{}")
+  prioridade     String    @default("MEDIA") // ALTA | MEDIA | BAIXA
+  status         String    @default("SOLICITADA") // SOLICITADA | EM_PRODUCAO | ATRASADA | CONCLUIDA
+  liberadoLpcLe  Boolean   @default(false)
+  observacao     String?
+  criadoPorId    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([opNumero])
 }
 
 enum StatusOrcamento {

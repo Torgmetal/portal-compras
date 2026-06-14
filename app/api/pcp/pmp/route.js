@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { diaBRT } from "@/lib/data-br";
+import { carregarSolicitacoes } from "@/lib/solicitacao-producao";
 
 // Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
 const normObra = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
@@ -89,6 +90,9 @@ export async function GET(req) {
     orderBy: { numero: "asc" },
   });
 
+  // 5) Solicitações de início de produção do Planejamento (demanda p/ acompanhamento)
+  const solicitacoes = await carregarSolicitacoes();
+
   return NextResponse.json({
     semana: { inicio: seg.toISOString().split("T")[0], fim: dom.toISOString().split("T")[0] },
     metas,
@@ -96,6 +100,7 @@ export async function GET(req) {
     realizadoCorteDia,
     realizadoCorteObras,
     ops,
+    solicitacoes,
   });
 }
 

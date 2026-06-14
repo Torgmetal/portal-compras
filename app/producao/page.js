@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { isoWeekString } from "@/lib/semana";
 import { listarFurosApontamento, resumoCorteAtivo } from "@/lib/conjuntos-setor";
+import { carregarSolicitacoes } from "@/lib/solicitacao-producao";
 import PainelProducaoClient from "./PainelProducaoClient";
 
 export const metadata = { title: "Workspace Torg — Painel de Produção" };
@@ -108,6 +109,9 @@ export default async function PainelProducao() {
     .map(([semana, kg]) => ({ semana, kg }))
     .sort((a, b) => a.semana.localeCompare(b.semana));
 
+  // Solicitações de início de produção do Planejamento (abertas)
+  const solicitacoes = await carregarSolicitacoes(["SOLICITADA", "EM_PRODUCAO", "ATRASADA"]);
+
   return (
     <PainelProducaoClient
       hoje={hojeIso}
@@ -118,6 +122,7 @@ export default async function PainelProducao() {
       semanas={semanas}
       furos={JSON.parse(JSON.stringify(furos))}
       paradas={paradas}
+      solicitacoes={JSON.parse(JSON.stringify(solicitacoes))}
     />
   );
 }
