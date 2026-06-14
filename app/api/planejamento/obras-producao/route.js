@@ -104,12 +104,16 @@ export async function GET() {
 
     const atrasados = setores.filter((x) => x.situacao === "ATRASADO");
     const op = opInfo.get(s.opNumero);
+    // status efetivo: reflete a produção real (não fica preso em Solicitada)
+    const statusEfetivo = s.status === "CONCLUIDA" || (o.conjCount > 0 && o.expCount === o.conjCount)
+      ? "CONCLUIDA"
+      : o.pastCorte > 0 ? "EM_PRODUCAO" : s.status;
     return {
       id: s.id,
       opNumero: s.opNumero,
       cliente: op?.cliente || null,
       obra: op?.obra || null,
-      status: s.status,
+      status: statusEfetivo,
       dataEntrega: s.dataEntrega,
       prioridade: s.prioridade,
       setores,
