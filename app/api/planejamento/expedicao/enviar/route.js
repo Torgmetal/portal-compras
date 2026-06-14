@@ -30,8 +30,11 @@ export async function POST(req) {
   }
 
   // Só faz sentido enviar se houver ao menos uma entrega (qtd + local) definida.
+  // Casa pelos conjuntos da OP via opId — o `opNumero` do PecaConjunto pode
+  // diferir do `numero` da OP (normalização por dígitos: T082 ↔ T82A ↔ 082),
+  // então comparar por texto não bate. Fallback p/ opNumero se faltar opId.
   const totalEntregas = await prisma.conjuntoEntrega.count({
-    where: { pecaConjunto: { opNumero: body.opNumero } },
+    where: { pecaConjunto: body.opId ? { opId: body.opId } : { opNumero: body.opNumero } },
   });
   if (totalEntregas === 0) {
     return NextResponse.json(
