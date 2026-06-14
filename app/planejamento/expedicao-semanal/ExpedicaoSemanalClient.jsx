@@ -5,7 +5,7 @@ import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Truck, Factory, Weight,
   ArrowLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock,
-  Package, BarChart3, Star,
+  Package, BarChart3,
 } from "lucide-react";
 
 const fmtKg = (v) => {
@@ -260,20 +260,24 @@ function ObraCard({ obra }) {
 
   useEffect(() => { setItens(obra.itens || []); }, [obra.itens]);
 
-  async function togglePrioridade(it) {
-    const novo = !it.prioridadeCampo;
-    setSalvandoId(it.id);
+  const parseOrdem = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : null; };
+  const ordenarItens = (arr) => [...arr].sort((a, b) => (a.ordemCampo ?? Infinity) - (b.ordemCampo ?? Infinity));
+
+  function onChangeOrdem(id, valor) {
+    const n = parseOrdem(valor);
+    setItens((prev) => prev.map((x) => (x.id === id ? { ...x, ordemCampo: n } : x)));
+  }
+  async function salvarOrdem(id, valor) {
+    const n = parseOrdem(valor);
+    setSalvandoId(id);
     try {
-      const res = await fetch(`/api/producao/pecas/${it.id}`, {
+      const res = await fetch(`/api/producao/pecas/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prioridadeCampo: novo }),
+        body: JSON.stringify({ ordemCampo: n }),
       });
-      if (!res.ok) throw new Error("Erro ao marcar");
-      setItens((prev) =>
-        prev.map((x) => (x.id === it.id ? { ...x, prioridadeCampo: novo } : x))
-          .sort((a, b) => (b.prioridadeCampo ? 1 : 0) - (a.prioridadeCampo ? 1 : 0))
-      );
+      if (!res.ok) throw new Error("Erro ao salvar");
+      setItens((prev) => ordenarItens(prev.map((x) => (x.id === id ? { ...x, ordemCampo: n } : x))));
     } catch (e) {
       alert("Erro: " + e.message);
     } finally {
@@ -374,13 +378,13 @@ function ObraCard({ obra }) {
           {itens.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-torg-dark mb-1.5">
-                Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · ⭐ marca prioridade p/ campo)</span>
+                Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · nº = ordem de envio a campo)</span>
               </p>
               <div className="overflow-x-auto rounded-lg border border-gray-100 max-h-72 overflow-y-auto">
                 <table className="w-full text-[11px]">
                   <thead className="bg-gray-50/60 sticky top-0">
                     <tr>
-                      <th className="w-7 px-1 py-1.5"></th>
+                      <th className="w-12 px-1 py-1.5 text-center font-medium text-gray-500" title="Ordem de envio a campo">Ordem</th>
                       <th className="text-left px-2 py-1.5 font-medium text-gray-500">Marca</th>
                       <th className="text-left px-2 py-1.5 font-medium text-gray-500">Descrição</th>
                       <th className="text-right px-2 py-1.5 font-medium text-gray-500">Qtd</th>
@@ -393,18 +397,16 @@ function ObraCard({ obra }) {
                       const exp = it.status === "EXPEDIDO";
                       const pronto = it.status === "PINTURA";
                       return (
-                        <tr key={`${it.id || it.marca}-${i}`} className={`hover:bg-gray-50/50 ${it.prioridadeCampo ? "bg-amber-50/70" : ""}`}>
-                          <td className="px-1 py-1.5 text-center">
-                            <button
-                              onClick={() => togglePrioridade(it)}
+                        <tr key={`${it.id || it.marca}-${i}`} className={`hover:bg-gray-50/50 ${it.ordemCampo != null ? "bg-amber-50/70" : ""}`}>
+                          <td className="px-1 py-1 text-center">
+                            <input
+                              type="number" min="1" value={it.ordemCampo ?? ""}
+                              onChange={(e) => onChangeOrdem(it.id, e.target.value)}
+                              onBlur={(e) => salvarOrdem(it.id, e.target.value)}
                               disabled={salvandoId === it.id}
-                              title={it.prioridadeCampo ? "Prioritária para campo — clique para remover" : "Marcar como prioritária para envio a campo"}
-                              className="p-0.5 rounded hover:bg-amber-100/60 disabled:opacity-50"
-                            >
-                              {salvandoId === it.id
-                                ? <Loader2 size={13} className="animate-spin text-torg-gray" />
-                                : <Star size={13} className={it.prioridadeCampo ? "text-amber-500 fill-amber-400" : "text-gray-300 hover:text-amber-400"} />}
-                            </button>
+                              placeholder="—"
+                              className="w-10 px-1 py-0.5 text-center text-[11px] tabular-nums border border-gray-200 rounded focus:border-torg-blue focus:ring-1 focus:ring-torg-blue/30 disabled:opacity-50"
+                            />
                           </td>
                           <td className="px-2 py-1.5 font-mono font-semibold text-torg-dark whitespace-nowrap">{it.marca}</td>
                           <td className="px-2 py-1.5 text-torg-gray max-w-[220px] truncate" title={it.descricao || ""}>{it.descricao || "—"}</td>

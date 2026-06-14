@@ -61,7 +61,7 @@ export async function GET(req) {
       id: true, numero: true, cliente: true, obra: true, status: true,
       dataFimPrevista: true, dataInicio: true,
       pecasConjunto: {
-        select: { id: true, pesoTotalKg: true, status: true, qte: true, marca: true, descricao: true, tipoPeca: true, prioridadeCampo: true },
+        select: { id: true, pesoTotalKg: true, status: true, qte: true, marca: true, descricao: true, tipoPeca: true, ordemCampo: true },
       },
     },
     orderBy: { dataFimPrevista: "asc" },
@@ -153,10 +153,10 @@ export async function GET(req) {
     const ORD = { PENDENTE: 0, CORTE: 1, MONTAGEM: 2, SOLDA: 3, ACABAMENTO: 4, JATO: 5, PINTURA: 6, EXPEDIDO: 7 };
     const itens = op.pecasConjunto
       .filter((p) => p.tipoPeca === "CONJUNTO" || p.tipoPeca == null)
-      .map((p) => ({ id: p.id, marca: p.marca, descricao: p.descricao, qte: p.qte, peso: p.pesoTotalKg, status: p.status, prioridadeCampo: !!p.prioridadeCampo }))
-      // prioritários para campo primeiro, depois ordem do fluxo, depois marca
+      .map((p) => ({ id: p.id, marca: p.marca, descricao: p.descricao, qte: p.qte, peso: p.pesoTotalKg, status: p.status, ordemCampo: p.ordemCampo ?? null }))
+      // com ordem de campo primeiro (1, 2, 3…), depois ordem do fluxo, depois marca
       .sort((a, b) =>
-        (b.prioridadeCampo - a.prioridadeCampo) ||
+        ((a.ordemCampo ?? Infinity) - (b.ordemCampo ?? Infinity)) ||
         ((ORD[a.status] ?? 9) - (ORD[b.status] ?? 9)) ||
         String(a.marca).localeCompare(String(b.marca))
       );

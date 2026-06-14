@@ -21,7 +21,7 @@ const schemaUpdate = z.object({
   fluxoEspecial: z.boolean().optional(),
   maquina: z.enum(MAQUINAS_VALIDAS).nullable().optional(),
   prioridade: z.number().int().min(1).nullable().optional(),
-  prioridadeCampo: z.boolean().optional(),
+  ordemCampo: z.number().int().min(1).nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {
