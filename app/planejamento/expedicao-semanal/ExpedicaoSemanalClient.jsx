@@ -344,6 +344,49 @@ function ObraCard({ obra }) {
               ))}
             </div>
           </div>
+
+          {/* Itens a expedir (conjuntos) */}
+          {obra.itens?.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-torg-dark mb-1.5">
+                Itens a expedir <span className="text-torg-gray font-normal">({obra.itens.length} conjuntos · croqui é sub-peça do corte)</span>
+              </p>
+              <div className="overflow-x-auto rounded-lg border border-gray-100 max-h-72 overflow-y-auto">
+                <table className="w-full text-[11px]">
+                  <thead className="bg-gray-50/60 sticky top-0">
+                    <tr>
+                      <th className="text-left px-2 py-1.5 font-medium text-gray-500">Marca</th>
+                      <th className="text-left px-2 py-1.5 font-medium text-gray-500">Descrição</th>
+                      <th className="text-right px-2 py-1.5 font-medium text-gray-500">Qtd</th>
+                      <th className="text-right px-2 py-1.5 font-medium text-gray-500">Peso</th>
+                      <th className="text-center px-2 py-1.5 font-medium text-gray-500">Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {obra.itens.map((it, i) => {
+                      const exp = it.status === "EXPEDIDO";
+                      const pronto = it.status === "PINTURA";
+                      return (
+                        <tr key={`${it.marca}-${i}`} className="hover:bg-gray-50/50">
+                          <td className="px-2 py-1.5 font-mono font-semibold text-torg-dark whitespace-nowrap">{it.marca}</td>
+                          <td className="px-2 py-1.5 text-torg-gray max-w-[220px] truncate" title={it.descricao || ""}>{it.descricao || "—"}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{it.qte}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(it.peso)}</td>
+                          <td className="px-2 py-1.5 text-center">
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${
+                              exp ? "bg-emerald-100 text-emerald-700" : pronto ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-torg-gray"
+                            }`}>
+                              {exp ? "Expedido" : pronto ? "Pronto p/ expedir" : (SETOR_LABEL[it.status] || it.status)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

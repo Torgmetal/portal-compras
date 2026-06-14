@@ -61,7 +61,7 @@ export async function GET(req) {
       id: true, numero: true, cliente: true, obra: true, status: true,
       dataFimPrevista: true, dataInicio: true,
       pecasConjunto: {
-        select: { pesoTotalKg: true, status: true, qte: true },
+        select: { pesoTotalKg: true, status: true, qte: true, marca: true, descricao: true, tipoPeca: true },
       },
     },
     orderBy: { dataFimPrevista: "asc" },
@@ -149,6 +149,13 @@ export async function GET(req) {
       };
     });
 
+    // Itens a expedir = conjuntos/avulsas (croqui é sub-peça do corte, não expede)
+    const ORD = { PENDENTE: 0, CORTE: 1, MONTAGEM: 2, SOLDA: 3, ACABAMENTO: 4, JATO: 5, PINTURA: 6, EXPEDIDO: 7 };
+    const itens = op.pecasConjunto
+      .filter((p) => p.tipoPeca === "CONJUNTO" || p.tipoPeca == null)
+      .map((p) => ({ marca: p.marca, descricao: p.descricao, qte: p.qte, peso: p.pesoTotalKg, status: p.status }))
+      .sort((a, b) => (ORD[a.status] ?? 9) - (ORD[b.status] ?? 9) || String(a.marca).localeCompare(String(b.marca)));
+
     return {
       opId: op.id,
       numero: op.numero,
@@ -161,6 +168,7 @@ export async function GET(req) {
       pesoPendente,
       progresso: pesoTotal > 0 ? Math.round((pesoExpedido / pesoTotal) * 1000) / 10 : 0,
       statusProducao,
+      itens,
       semanal,
     };
   });
