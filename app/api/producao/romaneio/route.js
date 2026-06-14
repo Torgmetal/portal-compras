@@ -21,6 +21,8 @@ const schema = z.object({
   // Controle de NF (a Expedição emite/registra)
   nfStatus: z.enum(["PENDENTE", "SOLICITADA", "EMITIDA"]).nullable().optional(),
   nfNumero: z.string().max(60).nullable().optional(),
+  nfSerie: z.string().max(10).nullable().optional(),
+  nfChave: z.string().max(60).nullable().optional(),
   // Itens da carga (pré-preenchidos a partir das entregas por destino)
   itens: z
     .array(
@@ -76,6 +78,8 @@ export async function POST(req) {
       contatoTransporte: body.contatoTransporte?.trim() || null,
       nfStatus,
       nfNumero: body.nfNumero?.trim() || null,
+      nfSerie: body.nfSerie?.trim() || null,
+      nfChave: body.nfChave?.replace(/\D/g, "") || null,
       nfSolicitadaEm: nfStatus === "SOLICITADA" || nfStatus === "EMITIDA" ? new Date() : null,
       nfEmitidaEm: nfStatus === "EMITIDA" ? new Date() : null,
       createdById: user.id,

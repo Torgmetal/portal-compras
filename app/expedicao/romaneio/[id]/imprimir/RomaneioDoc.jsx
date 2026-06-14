@@ -107,8 +107,18 @@ export default function RomaneioDoc({ romaneio: r }) {
 
         {/* NF + observação */}
         <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 mt-4">
-          <Campo label="Nota fiscal" valor={r.nfNumero ? `Nº ${r.nfNumero}` : NF_LABEL[r.nfStatus] || "Pendente"} destaque={r.nfStatus === "EMITIDA"} />
+          <Campo
+            label="Nota fiscal"
+            valor={r.nfNumero ? `Nº ${r.nfNumero}${r.nfSerie ? ` · série ${r.nfSerie}` : ""}` : NF_LABEL[r.nfStatus] || "Pendente"}
+            destaque={r.nfStatus === "EMITIDA"}
+          />
           <Campo label="Peso total da carga" valor={fmtKg(totalKg)} />
+          {r.nfChave && (
+            <div className="col-span-2 flex items-baseline gap-1.5">
+              <span className="text-[9px] uppercase tracking-wide text-torg-gray font-semibold whitespace-nowrap">Chave NF-e:</span>
+              <span className="text-[11px] font-mono tracking-tight text-torg-dark break-all">{r.nfChave}</span>
+            </div>
+          )}
         </div>
         {r.observacao && (
           <div className="mt-3">

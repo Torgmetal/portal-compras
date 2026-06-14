@@ -31,6 +31,7 @@ export default function PedidosExpedicaoClient() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [carga, setCarga] = useState(null); // destino sendo romaneado
+  const [nfRomaneio, setNfRomaneio] = useState(null); // romaneio vinculando NF
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -103,7 +104,12 @@ export default function PedidosExpedicaoClient() {
           </p>
           <div className="space-y-4">
             {pedidos.map((p) => (
-              <PedidoCard key={p.opNumero} pedido={p} onRomanear={(destino) => setCarga({ pedido: p, destino })} />
+              <PedidoCard
+                key={p.opNumero}
+                pedido={p}
+                onRomanear={(destino) => setCarga({ pedido: p, destino })}
+                onVincularNF={(rom) => setNfRomaneio({ ...rom, opId: rom.opId || p.opId, opNumero: p.opNumero })}
+              />
             ))}
           </div>
         </>
@@ -117,11 +123,19 @@ export default function PedidosExpedicaoClient() {
           onCreated={() => { setCarga(null); carregar(); }}
         />
       )}
+
+      {nfRomaneio && (
+        <ModalVincularNF
+          romaneio={nfRomaneio}
+          onClose={() => setNfRomaneio(null)}
+          onSaved={() => { setNfRomaneio(null); carregar(); }}
+        />
+      )}
     </div>
   );
 }
 
-function PedidoCard({ pedido, onRomanear }) {
+function PedidoCard({ pedido, onRomanear, onVincularNF }) {
   const [aberto, setAberto] = useState(true);
   const totalUn = (pedido.destinos || []).reduce((s, d) => s + d.totalUn, 0);
   const totalKg = (pedido.destinos || []).reduce((s, d) => s + d.totalKg, 0);
@@ -199,22 +213,23 @@ function PedidoCard({ pedido, onRomanear }) {
               <p className="text-[10px] font-semibold text-torg-dark mb-1">Romaneios desta obra</p>
               <div className="flex flex-wrap gap-1.5">
                 {pedido.romaneios.map((r) => (
-                  <Link
-                    key={r.id}
-                    href={`/expedicao/romaneio/${r.id}/imprimir`}
-                    target="_blank"
-                    title="Abrir documento do romaneio"
-                    className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 inline-flex items-center gap-1.5 hover:border-torg-blue hover:bg-torg-blue-50/40 transition-colors"
-                  >
+                  <span key={r.id} className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 inline-flex items-center gap-1.5">
                     <FileText size={10} className="text-torg-blue" />
                     <strong className="text-torg-dark">{r.numero}</strong>
                     {r.destino && <span className="text-torg-gray">→ {r.destino}</span>}
                     <span className="text-torg-gray">· {fmtKg(r.pesoRealKg)}</span>
-                    <span className={`px-1.5 py-0.5 rounded-full font-medium ${NF_BADGE[r.nfStatus] || NF_BADGE.PENDENTE}`}>
+                    <button
+                      type="button"
+                      onClick={() => onVincularNF(r)}
+                      title="Vincular NF do Omie"
+                      className={`px-1.5 py-0.5 rounded-full font-medium hover:opacity-80 ${NF_BADGE[r.nfStatus] || NF_BADGE.PENDENTE}`}
+                    >
                       {r.nfNumero ? `NF ${r.nfNumero}` : NF_LABEL[r.nfStatus] || "NF pendente"}
-                    </span>
-                    <Printer size={10} className="text-torg-gray" />
-                  </Link>
+                    </button>
+                    <Link href={`/expedicao/romaneio/${r.id}/imprimir`} target="_blank" title="Abrir documento do romaneio" className="text-torg-gray hover:text-torg-blue">
+                      <Printer size={11} />
+                    </Link>
+                  </span>
                 ))}
               </div>
             </div>
@@ -233,7 +248,6 @@ function ModalRomaneio({ pedido, destino, onClose, onCreated }) {
   const [placa, setPlaca] = useState("");
   const [contato, setContato] = useState("");
   const [nfStatus, setNfStatus] = useState("PENDENTE");
-  const [nfNumero, setNfNumero] = useState("");
   const [linhas, setLinhas] = useState(
     destino.itens.map((it) => ({
       pecaConjuntoId: it.pecaConjuntoId,
@@ -280,7 +294,6 @@ function ModalRomaneio({ pedido, destino, onClose, onCreated }) {
           placaVeiculo: placa.trim() || null,
           contatoTransporte: contato.trim() || null,
           nfStatus,
-          nfNumero: nfNumero.trim() || null,
           itens,
         }),
       });
@@ -339,20 +352,17 @@ function ModalRomaneio({ pedido, destino, onClose, onCreated }) {
             </div>
           </div>
 
-          {/* NF */}
+          {/* NF — emissão vem do Omie depois (botão "Vincular NF" no romaneio) */}
           <div>
             <p className="text-[10px] font-semibold text-torg-dark uppercase mb-1.5 flex items-center gap-1"><FileText size={12} /> Nota fiscal</p>
             <div className="flex items-center gap-2 flex-wrap">
-              {["PENDENTE", "SOLICITADA", "EMITIDA"].map((s) => (
+              {["PENDENTE", "SOLICITADA"].map((s) => (
                 <button key={s} type="button" onClick={() => setNfStatus(s)}
                   className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium ${
                     nfStatus === s ? "border-torg-blue bg-torg-blue text-white" : "border-gray-200 text-torg-gray hover:bg-gray-50"
                   }`}>{NF_LABEL[s]}</button>
               ))}
-              {nfStatus === "EMITIDA" && (
-                <input value={nfNumero} onChange={(e) => setNfNumero(e.target.value)} placeholder="Nº da NF"
-                  className="px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue/30 w-32" />
-              )}
+              <span className="text-[10px] text-torg-gray">Depois de emitir, vincule a NF-e do Omie pelo botão <strong>NF</strong> do romaneio.</span>
             </div>
           </div>
 
@@ -403,6 +413,146 @@ function ModalRomaneio({ pedido, destino, onClose, onCreated }) {
           <button onClick={salvar} disabled={salvando}
             className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
             {salvando ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Criar romaneio
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ModalVincularNF — busca no Omie as NF-e de venda já emitidas para a OP do
+ * romaneio (uma por pedido/medição) e vincula a escolhida (número/série/chave).
+ * Também permite marcar a NF como Pendente/Solicitada antes da emissão.
+ */
+function ModalVincularNF({ romaneio, onClose, onSaved }) {
+  const [nfs, setNfs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [aviso, setAviso] = useState("");
+  const [erro, setErro] = useState("");
+  const [sel, setSel] = useState(null); // chave (ou numero) selecionada
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      setLoading(true); setErro(""); setAviso("");
+      try {
+        const res = await fetch(`/api/expedicao/romaneio/omie-nfs?opId=${encodeURIComponent(romaneio.opId)}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Erro ao consultar Omie");
+        if (!vivo) return;
+        setNfs(json.nfs || []);
+        if (json.aviso) setAviso(json.aviso);
+        // pré-seleciona a que já está vinculada (por número), se houver
+        if (romaneio.nfNumero) {
+          const atual = (json.nfs || []).find((n) => n.numero === romaneio.nfNumero || n.chave === romaneio.nfChave);
+          if (atual) setSel(atual.chave || atual.numero);
+        }
+      } catch (e) {
+        if (vivo) setErro(e.message);
+      } finally {
+        if (vivo) setLoading(false);
+      }
+    })();
+    return () => { vivo = false; };
+  }, [romaneio.opId, romaneio.nfNumero, romaneio.nfChave]);
+
+  async function patch(payload) {
+    setSalvando(true); setErro("");
+    try {
+      const res = await fetch(`/api/producao/romaneio/${romaneio.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok || json.success === false) throw new Error(json.error || "Erro ao salvar");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  }
+
+  function vincularSelecionada() {
+    const nf = nfs.find((n) => (n.chave || n.numero) === sel);
+    if (!nf) { setErro("Selecione uma NF."); return; }
+    patch({ nfStatus: "EMITIDA", nfNumero: nf.numero || null, nfSerie: nf.serie || null, nfChave: nf.chave || null });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between px-4 py-3 border-b border-gray-100">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><FileText size={15} className="text-torg-blue" /> Vincular NF do Omie</p>
+            <p className="text-[11px] text-torg-gray mt-0.5 truncate">
+              Romaneio <strong className="text-torg-dark">{romaneio.numero}</strong> · {fmtOP(romaneio.opNumero)}
+              {romaneio.nfNumero ? <> · atual: <strong>NF {romaneio.nfNumero}</strong></> : null}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 text-torg-gray hover:text-torg-dark rounded hover:bg-gray-100 shrink-0"><X size={16} /></button>
+        </div>
+
+        <div className="px-4 py-3 overflow-y-auto space-y-3">
+          {loading ? (
+            <div className="flex items-center gap-2 text-torg-gray text-[12px] py-6 justify-center">
+              <Loader2 size={16} className="animate-spin" /> Consultando NF-e no Omie…
+            </div>
+          ) : (
+            <>
+              {nfs.length > 0 ? (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-wide text-torg-gray font-semibold">NF-e emitidas para a OP</p>
+                  {nfs.map((nf) => {
+                    const key = nf.chave || nf.numero;
+                    const ativa = sel === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSel(key)}
+                        className={`w-full text-left px-3 py-2 rounded-lg border text-[12px] transition-colors ${
+                          ativa ? "border-torg-blue bg-torg-blue-50/50" : "border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-torg-dark">
+                            NF {nf.numero}{nf.serie ? ` · série ${nf.serie}` : ""}
+                          </span>
+                          <span className="text-[10px] text-torg-gray">{nf.dataEmissao || ""} · ped {nf.pedido}</span>
+                        </div>
+                        {nf.chave && <p className="text-[10px] font-mono text-torg-gray break-all mt-0.5">{nf.chave}</p>}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-[12px] text-torg-gray bg-amber-50 text-amber-800 rounded-lg px-3 py-2 flex items-start gap-1.5">
+                  <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {aviso || "Nenhuma NF-e encontrada no Omie para esta OP."}
+                </div>
+              )}
+
+              {/* Status manual (antes da emissão) */}
+              <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-gray-50">
+                <span className="text-[10px] text-torg-gray">Sem NF ainda?</span>
+                <button type="button" disabled={salvando} onClick={() => patch({ nfStatus: "SOLICITADA" })}
+                  className="text-[11px] px-2 py-0.5 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50">Marcar solicitada</button>
+                <button type="button" disabled={salvando} onClick={() => patch({ nfStatus: "PENDENTE", nfNumero: null, nfSerie: null, nfChave: null })}
+                  className="text-[11px] px-2 py-0.5 rounded-lg border border-gray-200 text-torg-gray hover:bg-gray-50 disabled:opacity-50">Pendente / limpar</button>
+              </div>
+
+              {erro && <p className="text-[11px] text-red-600 flex items-center gap-1"><AlertCircle size={12} /> {erro}</p>}
+            </>
+          )}
+        </div>
+
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
+          <button onClick={onClose} disabled={salvando} className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100 disabled:opacity-50">Fechar</button>
+          <button onClick={vincularSelecionada} disabled={salvando || !sel}
+            className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
+            {salvando ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Vincular NF
           </button>
         </div>
       </div>

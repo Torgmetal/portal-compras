@@ -19,6 +19,8 @@ const schema = z.object({
   contatoTransporte: z.string().max(100).nullable().optional(),
   nfStatus: z.enum(["PENDENTE", "SOLICITADA", "EMITIDA"]).nullable().optional(),
   nfNumero: z.string().max(60).nullable().optional(),
+  nfSerie: z.string().max(10).nullable().optional(),
+  nfChave: z.string().max(60).nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {

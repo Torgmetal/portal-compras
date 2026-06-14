@@ -194,6 +194,8 @@ model Romaneio {
   // Controle de NF (a própria Expedição emite/registra — controle interno)
   nfStatus          String?            @default("PENDENTE") // PENDENTE | SOLICITADA | EMITIDA
   nfNumero          String?
+  nfSerie           String?            // série da NF-e (vinda do Omie)
+  nfChave           String?            // chave de acesso (44 díg., vinda do Omie)
   nfSolicitadaEm    DateTime?
   nfEmitidaEm       DateTime?
   createdById       String?
