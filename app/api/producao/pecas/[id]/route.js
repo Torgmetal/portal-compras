@@ -21,11 +21,12 @@ const schemaUpdate = z.object({
   fluxoEspecial: z.boolean().optional(),
   maquina: z.enum(MAQUINAS_VALIDAS).nullable().optional(),
   prioridade: z.number().int().min(1).nullable().optional(),
+  prioridadeCampo: z.boolean().optional(),
 });
 
 export async function PATCH(req, { params }) {
   try {
-    await requireRole(["ADMIN", "PRODUCAO", "PCP", "PLANEJAMENTO"]);
+    await requireRole(["ADMIN", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "COMERCIAL"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }

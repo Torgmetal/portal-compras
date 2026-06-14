@@ -5,7 +5,7 @@ import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Truck, Factory, Weight,
   ArrowLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock,
-  Package, BarChart3,
+  Package, BarChart3, Star,
 } from "lucide-react";
 
 const fmtKg = (v) => {
@@ -255,6 +255,31 @@ function ObraRow({ obra, semanas }) {
 
 function ObraCard({ obra }) {
   const [expanded, setExpanded] = useState(false);
+  const [itens, setItens] = useState(obra.itens || []);
+  const [salvandoId, setSalvandoId] = useState(null);
+
+  useEffect(() => { setItens(obra.itens || []); }, [obra.itens]);
+
+  async function togglePrioridade(it) {
+    const novo = !it.prioridadeCampo;
+    setSalvandoId(it.id);
+    try {
+      const res = await fetch(`/api/producao/pecas/${it.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prioridadeCampo: novo }),
+      });
+      if (!res.ok) throw new Error("Erro ao marcar");
+      setItens((prev) =>
+        prev.map((x) => (x.id === it.id ? { ...x, prioridadeCampo: novo } : x))
+          .sort((a, b) => (b.prioridadeCampo ? 1 : 0) - (a.prioridadeCampo ? 1 : 0))
+      );
+    } catch (e) {
+      alert("Erro: " + e.message);
+    } finally {
+      setSalvandoId(null);
+    }
+  }
 
   const diasRestantes = obra.dataFimPrevista
     ? Math.ceil((new Date(obra.dataFimPrevista) - new Date()) / (1000 * 60 * 60 * 24))
@@ -346,15 +371,16 @@ function ObraCard({ obra }) {
           </div>
 
           {/* Itens a expedir (conjuntos) */}
-          {obra.itens?.length > 0 && (
+          {itens.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-torg-dark mb-1.5">
-                Itens a expedir <span className="text-torg-gray font-normal">({obra.itens.length} conjuntos · croqui é sub-peça do corte)</span>
+                Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · ⭐ marca prioridade p/ campo)</span>
               </p>
               <div className="overflow-x-auto rounded-lg border border-gray-100 max-h-72 overflow-y-auto">
                 <table className="w-full text-[11px]">
                   <thead className="bg-gray-50/60 sticky top-0">
                     <tr>
+                      <th className="w-7 px-1 py-1.5"></th>
                       <th className="text-left px-2 py-1.5 font-medium text-gray-500">Marca</th>
                       <th className="text-left px-2 py-1.5 font-medium text-gray-500">Descrição</th>
                       <th className="text-right px-2 py-1.5 font-medium text-gray-500">Qtd</th>
@@ -363,11 +389,23 @@ function ObraCard({ obra }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {obra.itens.map((it, i) => {
+                    {itens.map((it, i) => {
                       const exp = it.status === "EXPEDIDO";
                       const pronto = it.status === "PINTURA";
                       return (
-                        <tr key={`${it.marca}-${i}`} className="hover:bg-gray-50/50">
+                        <tr key={`${it.id || it.marca}-${i}`} className={`hover:bg-gray-50/50 ${it.prioridadeCampo ? "bg-amber-50/70" : ""}`}>
+                          <td className="px-1 py-1.5 text-center">
+                            <button
+                              onClick={() => togglePrioridade(it)}
+                              disabled={salvandoId === it.id}
+                              title={it.prioridadeCampo ? "Prioritária para campo — clique para remover" : "Marcar como prioritária para envio a campo"}
+                              className="p-0.5 rounded hover:bg-amber-100/60 disabled:opacity-50"
+                            >
+                              {salvandoId === it.id
+                                ? <Loader2 size={13} className="animate-spin text-torg-gray" />
+                                : <Star size={13} className={it.prioridadeCampo ? "text-amber-500 fill-amber-400" : "text-gray-300 hover:text-amber-400"} />}
+                            </button>
+                          </td>
                           <td className="px-2 py-1.5 font-mono font-semibold text-torg-dark whitespace-nowrap">{it.marca}</td>
                           <td className="px-2 py-1.5 text-torg-gray max-w-[220px] truncate" title={it.descricao || ""}>{it.descricao || "—"}</td>
                           <td className="px-2 py-1.5 text-right tabular-nums">{it.qte}</td>

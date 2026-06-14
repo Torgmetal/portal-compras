@@ -1401,6 +1401,7 @@ model PecaConjunto {
   maquina                String?                 // maquina de corte atribuida (LASER_CHAPA, LASER_PERFIL, LASER_TUBO, LASER_CANTONEIRA)
   statusEstoque          String?                 // "DISPONIVEL" | "PARCIAL" | "INDISPONIVEL" | null (nao conferido)
   prioridade             Int?                    // prioridade manual na Programação (vazia = sem prioridade); preservada na reimportação LPC
+  prioridadeCampo        Boolean                 @default(false) // conjunto marcado como prioritário para envio a campo (expedição)
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.
   corteOrdem             Int?                    // posição na fila (menor = corta primeiro)
