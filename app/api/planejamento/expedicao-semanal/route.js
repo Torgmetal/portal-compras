@@ -61,7 +61,10 @@ export async function GET(req) {
       id: true, numero: true, cliente: true, obra: true, status: true,
       dataFimPrevista: true, dataInicio: true,
       pecasConjunto: {
-        select: { id: true, pesoTotalKg: true, status: true, qte: true, marca: true, descricao: true, tipoPeca: true, ordemCampo: true, destinoCampo: true },
+        select: {
+          id: true, pesoTotalKg: true, status: true, qte: true, marca: true, descricao: true, tipoPeca: true, ordemCampo: true,
+          entregas: { select: { id: true, destino: true, quantidade: true }, orderBy: { destino: "asc" } },
+        },
       },
     },
     orderBy: { dataFimPrevista: "asc" },
@@ -153,10 +156,13 @@ export async function GET(req) {
     const ORD = { PENDENTE: 0, CORTE: 1, MONTAGEM: 2, SOLDA: 3, ACABAMENTO: 4, JATO: 5, PINTURA: 6, EXPEDIDO: 7 };
     const itens = op.pecasConjunto
       .filter((p) => p.tipoPeca === "CONJUNTO" || p.tipoPeca == null)
-      .map((p) => ({ id: p.id, marca: p.marca, descricao: p.descricao, qte: p.qte, peso: p.pesoTotalKg, status: p.status, ordemCampo: p.ordemCampo ?? null, destinoCampo: p.destinoCampo || null }))
-      // agrupa por destino, depois ordem de campo (1,2,3…), fluxo e marca
+      .map((p) => ({
+        id: p.id, marca: p.marca, descricao: p.descricao, qte: p.qte, peso: p.pesoTotalKg, status: p.status,
+        ordemCampo: p.ordemCampo ?? null,
+        entregas: p.entregas.map((e) => ({ id: e.id, destino: e.destino, quantidade: e.quantidade })),
+      }))
+      // ordem de campo (1,2,3…), depois fluxo e marca
       .sort((a, b) =>
-        String(a.destinoCampo || "~").localeCompare(String(b.destinoCampo || "~")) ||
         ((a.ordemCampo ?? Infinity) - (b.ordemCampo ?? Infinity)) ||
         ((ORD[a.status] ?? 9) - (ORD[b.status] ?? 9)) ||
         String(a.marca).localeCompare(String(b.marca))

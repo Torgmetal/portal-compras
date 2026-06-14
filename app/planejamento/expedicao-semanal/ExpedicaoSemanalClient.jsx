@@ -5,7 +5,7 @@ import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Truck, Factory, Weight,
   ArrowLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock,
-  Package, BarChart3,
+  Package, BarChart3, MapPin, Plus, Trash2, X,
 } from "lucide-react";
 
 const fmtKg = (v) => {
@@ -257,15 +257,12 @@ function ObraCard({ obra }) {
   const [expanded, setExpanded] = useState(false);
   const [itens, setItens] = useState(obra.itens || []);
   const [salvandoId, setSalvandoId] = useState(null);
+  const [modalItem, setModalItem] = useState(null); // conjunto sendo dividido por destino
 
   useEffect(() => { setItens(obra.itens || []); }, [obra.itens]);
 
   const parseOrdem = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : null; };
-  // agrupa por destino, depois ordem de campo
-  const ordenarItens = (arr) => [...arr].sort((a, b) =>
-    String(a.destinoCampo || "~").localeCompare(String(b.destinoCampo || "~")) ||
-    (a.ordemCampo ?? Infinity) - (b.ordemCampo ?? Infinity)
-  );
+  const ordenarItens = (arr) => [...arr].sort((a, b) => (a.ordemCampo ?? Infinity) - (b.ordemCampo ?? Infinity));
 
   async function salvarCampo(id, patch, novo) {
     setSalvandoId(id);
@@ -290,18 +287,22 @@ function ObraCard({ obra }) {
   }
   const salvarOrdem = (id, valor) => salvarCampo(id, { ordemCampo: parseOrdem(valor) }, { ordemCampo: parseOrdem(valor) });
 
-  function onChangeDestino(id, valor) {
-    setItens((prev) => prev.map((x) => (x.id === id ? { ...x, destinoCampo: valor } : x)));
+  function aplicarEntregas(itemId, entregas) {
+    setItens((prev) => prev.map((x) => (x.id === itemId ? { ...x, entregas } : x)));
   }
-  const salvarDestino = (id, valor) => { const v = (valor || "").trim() || null; return salvarCampo(id, { destinoCampo: v }, { destinoCampo: v }); };
 
-  // Destinos usados na obra (para sugestões) + resumo por destino
-  const destinosUsados = [...new Set(itens.map((i) => i.destinoCampo).filter(Boolean))].sort();
+  // Destinos usados na obra (sugestões) + resumo por destino (unidades + peso proporcional)
+  const destinosUsados = [...new Set(itens.flatMap((i) => (i.entregas || []).map((e) => e.destino)).filter(Boolean))].sort();
   const porDestino = {};
+  let naoAlocadoUn = 0;
   for (const it of itens) {
-    const k = it.destinoCampo || "__sem__";
-    const a = (porDestino[k] = porDestino[k] || { n: 0, kg: 0 });
-    a.n += 1; a.kg += it.peso || 0;
+    const aloc = (it.entregas || []).reduce((s, e) => s + (e.quantidade || 0), 0);
+    naoAlocadoUn += Math.max(0, (it.qte || 0) - aloc);
+    for (const e of it.entregas || []) {
+      const a = (porDestino[e.destino] = porDestino[e.destino] || { un: 0, kg: 0 });
+      a.un += e.quantidade || 0;
+      a.kg += (it.qte || 0) > 0 ? (e.quantidade / it.qte) * (it.peso || 0) : 0;
+    }
   }
 
   const diasRestantes = obra.dataFimPrevista
@@ -397,23 +398,23 @@ function ObraCard({ obra }) {
           {itens.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-torg-dark mb-1.5">
-                Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · nº = ordem · destino = local de entrega)</span>
+                Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · nº = ordem de envio · entregas = quantidade por local)</span>
               </p>
               {/* Resumo por destino (para a expedição romanear por local) */}
-              {destinosUsados.length > 0 && (
+              {(destinosUsados.length > 0 || naoAlocadoUn > 0) && (
                 <div className="flex flex-wrap gap-1 mb-2">
                   {Object.entries(porDestino).map(([k, v]) => (
-                    <span key={k} className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      k === "__sem__" ? "bg-gray-100 text-torg-gray" : "bg-torg-blue-50 text-torg-blue"
-                    }`}>
-                      {k === "__sem__" ? "Sem destino" : k}: {v.n} conj · {fmtKg(v.kg)}
+                    <span key={k} className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-torg-blue-50 text-torg-blue inline-flex items-center gap-1">
+                      <MapPin size={10} /> {k}: {v.un} un · {fmtKg(v.kg)}
                     </span>
                   ))}
+                  {naoAlocadoUn > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700">
+                      Sem destino: {naoAlocadoUn} un
+                    </span>
+                  )}
                 </div>
               )}
-              <datalist id={`destinos-${obra.numero}`}>
-                {destinosUsados.map((d) => <option key={d} value={d} />)}
-              </datalist>
               <div className="overflow-x-auto rounded-lg border border-gray-100 max-h-72 overflow-y-auto">
                 <table className="w-full text-[11px]">
                   <thead className="bg-gray-50/60 sticky top-0">
@@ -424,7 +425,7 @@ function ObraCard({ obra }) {
                       <th className="text-right px-2 py-1.5 font-medium text-gray-500">Qtd</th>
                       <th className="text-right px-2 py-1.5 font-medium text-gray-500">Peso</th>
                       <th className="text-center px-2 py-1.5 font-medium text-gray-500">Situação</th>
-                      <th className="text-left px-2 py-1.5 font-medium text-gray-500">Destino (local de entrega)</th>
+                      <th className="text-left px-2 py-1.5 font-medium text-gray-500">Entregas (quantidade por local)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -455,14 +456,32 @@ function ObraCard({ obra }) {
                             </span>
                           </td>
                           <td className="px-2 py-1">
-                            <input
-                              type="text" list={`destinos-${obra.numero}`} value={it.destinoCampo ?? ""}
-                              onChange={(e) => onChangeDestino(it.id, e.target.value)}
-                              onBlur={(e) => salvarDestino(it.id, e.target.value)}
-                              disabled={salvandoId === it.id}
-                              placeholder="ex.: Canteiro A"
-                              className="w-36 px-1.5 py-0.5 text-[11px] border border-gray-200 rounded focus:border-torg-blue focus:ring-1 focus:ring-torg-blue/30 disabled:opacity-50"
-                            />
+                            {(() => {
+                              const entregas = it.entregas || [];
+                              const aloc = entregas.reduce((s, e) => s + (e.quantidade || 0), 0);
+                              const resto = Math.max(0, (it.qte || 0) - aloc);
+                              return (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {entregas.map((e) => (
+                                    <span key={e.id || e.destino} className="text-[10px] px-1.5 py-0.5 rounded bg-torg-blue-50 text-torg-blue font-medium whitespace-nowrap">
+                                      {e.destino}: <strong className="tabular-nums">{e.quantidade}</strong>
+                                    </span>
+                                  ))}
+                                  {resto > 0 && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 whitespace-nowrap">
+                                      {entregas.length ? `falta ${resto}` : `${resto} sem destino`}
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setModalItem(it)}
+                                    className="text-[10px] px-1.5 py-0.5 rounded border border-torg-blue/40 text-torg-blue hover:bg-torg-blue/5 inline-flex items-center gap-1 whitespace-nowrap"
+                                  >
+                                    <MapPin size={10} /> {entregas.length ? "Editar" : "Definir entregas"}
+                                  </button>
+                                </div>
+                              );
+                            })()}
                           </td>
                         </tr>
                       );
@@ -474,6 +493,182 @@ function ObraCard({ obra }) {
           )}
         </div>
       )}
+
+      {modalItem && (
+        <ModalEntregas
+          item={modalItem}
+          destinosObra={destinosUsados}
+          onClose={() => setModalItem(null)}
+          onSaved={(entregas) => { aplicarEntregas(modalItem.id, entregas); setModalItem(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * ModalEntregas — divide as unidades de um conjunto entre vários endereços de
+ * entrega, com a quantidade que vai para cada local. Substitui todas as entregas
+ * do conjunto via POST /api/producao/pecas/[id]/entregas.
+ */
+function ModalEntregas({ item, destinosObra, onClose, onSaved }) {
+  const [linhas, setLinhas] = useState(
+    (item.entregas || []).length
+      ? item.entregas.map((e) => ({ destino: e.destino, quantidade: String(e.quantidade) }))
+      : [{ destino: "", quantidade: "" }]
+  );
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const total = item.qte || 0;
+  const alocado = linhas.reduce((s, l) => s + (parseInt(l.quantidade, 10) || 0), 0);
+  const resto = total - alocado;
+
+  const setLinha = (i, patch) => setLinhas((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const addLinha = () => setLinhas((prev) => [...prev, { destino: "", quantidade: resto > 0 ? String(resto) : "" }]);
+  const removerLinha = (i) => setLinhas((prev) => prev.filter((_, idx) => idx !== i));
+
+  const destinosSugeridos = [...new Set(destinosObra || [])].filter(Boolean);
+
+  async function salvar() {
+    setErro("");
+    // monta payload: só linhas com destino e quantidade > 0
+    const entregas = linhas
+      .map((l) => ({ destino: (l.destino || "").trim(), quantidade: parseInt(l.quantidade, 10) || 0 }))
+      .filter((e) => e.destino && e.quantidade > 0);
+
+    if (linhas.some((l) => (l.destino || "").trim() && !(parseInt(l.quantidade, 10) > 0))) {
+      setErro("Preencha a quantidade de cada destino (mínimo 1)."); return;
+    }
+    if (linhas.some((l) => !(l.destino || "").trim() && parseInt(l.quantidade, 10) > 0)) {
+      setErro("Informe o local de entrega de cada quantidade."); return;
+    }
+    if (alocado > total) {
+      setErro(`Total alocado (${alocado}) maior que a quantidade do conjunto (${total}).`); return;
+    }
+    // destinos duplicados
+    const nomes = entregas.map((e) => e.destino.toLowerCase());
+    if (new Set(nomes).size !== nomes.length) {
+      setErro("Há destinos repetidos — junte a quantidade num único local."); return;
+    }
+
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/producao/pecas/${item.id}/entregas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entregas }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao salvar entregas");
+      onSaved(json.entregas || []);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between px-4 py-3 border-b border-gray-100">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5">
+              <MapPin size={14} className="text-torg-blue" /> Entregas por local
+            </p>
+            <p className="text-[11px] text-torg-gray mt-0.5 truncate">
+              <span className="font-mono font-semibold text-torg-dark">{item.marca}</span>
+              {item.descricao ? ` · ${item.descricao}` : ""} · {total} un
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 text-torg-gray hover:text-torg-dark rounded hover:bg-gray-100 shrink-0">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-4 py-3 overflow-y-auto space-y-2">
+          <datalist id={`destinos-modal-${item.id}`}>
+            {destinosSugeridos.map((d) => <option key={d} value={d} />)}
+          </datalist>
+          {linhas.map((l, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                type="text"
+                list={`destinos-modal-${item.id}`}
+                value={l.destino}
+                onChange={(e) => setLinha(i, { destino: e.target.value })}
+                placeholder="Local de entrega (ex.: Canteiro A)"
+                className="flex-1 min-w-0 px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue/30"
+              />
+              <input
+                type="number" min="1" max={total}
+                value={l.quantidade}
+                onChange={(e) => setLinha(i, { quantidade: e.target.value })}
+                placeholder="Qtd"
+                className="w-20 px-2 py-1.5 text-[12px] text-right tabular-nums border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue/30"
+              />
+              <button
+                type="button"
+                onClick={() => removerLinha(i)}
+                disabled={linhas.length === 1}
+                className="p-1.5 text-torg-gray hover:text-red-600 rounded hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent shrink-0"
+                title="Remover este destino"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addLinha}
+            className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"
+          >
+            <Plus size={13} /> Adicionar destino
+          </button>
+
+          {/* Indicador de alocação */}
+          <div className={`mt-1 text-[11px] rounded-lg px-3 py-2 flex items-center justify-between ${
+            resto === 0 ? "bg-emerald-50 text-emerald-700"
+            : resto < 0 ? "bg-red-50 text-red-700"
+            : "bg-amber-50 text-amber-700"
+          }`}>
+            <span>
+              Alocado <strong className="tabular-nums">{alocado}</strong> de <strong className="tabular-nums">{total}</strong> un
+            </span>
+            <span className="font-semibold">
+              {resto === 0 ? "tudo distribuído"
+                : resto < 0 ? `${Math.abs(resto)} a mais`
+                : `${resto} sem destino`}
+            </span>
+          </div>
+
+          {erro && (
+            <p className="text-[11px] text-red-600 flex items-center gap-1">
+              <AlertCircle size={12} /> {erro}
+            </p>
+          )}
+        </div>
+
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={salvando}
+            className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={salvar}
+            disabled={salvando || resto < 0}
+            className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5"
+          >
+            {salvando ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+            Salvar entregas
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

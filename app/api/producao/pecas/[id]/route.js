@@ -22,7 +22,6 @@ const schemaUpdate = z.object({
   maquina: z.enum(MAQUINAS_VALIDAS).nullable().optional(),
   prioridade: z.number().int().min(1).nullable().optional(),
   ordemCampo: z.number().int().min(1).nullable().optional(),
-  destinoCampo: z.string().max(200).nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -39,7 +38,6 @@ export async function PATCH(req, { params }) {
   }
 
   const data = { ...body };
-  if (typeof data.destinoCampo === "string") data.destinoCampo = data.destinoCampo.trim() || null;
   // Se virou EXPEDIDO, registra data
   if (body.status === "EXPEDIDO") data.dataConcluida = new Date();
   // Atualiza ultimoSetor para o status atual (se nao for PENDENTE)
