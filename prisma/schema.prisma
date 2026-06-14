@@ -1112,6 +1112,48 @@ model Documento {
   @@index([tipo])
 }
 
+// Portal da Qualidade — Módulo 1 (Controle de Documentos). Espelha o padrão dos
+// documentos de RH (arquivo no Blob privado + backup ISO no SharePoint + proxy
+// de download), com camada de VALIDAÇÃO da informação e amarração a norma +
+// validade. Status (vigente/vencendo/vencido) é SEMPRE calculado (lib/qualidade-status).
+model DocumentoQualidade {
+  id              String    @id @default(cuid())
+  nome            String
+  categoria       String    // EQUIPAMENTOS | FUNCIONARIOS | SISTEMA | TERCEIROS
+  tipo            String?   // tipo específico (MTC, ASO, calibração, WPS...)
+  norma           String?   // AWS D1.1 · NR-35 · ISO 2808 · NBR 16775
+  vinculo         String?   // texto livre: OP-083 · Soldador João · Munck 01 · TORG
+  opNumero        String?   // vínculo estruturado opcional (alimenta o Data Book)
+  numeroCorrida   String?   // heat — certificados de material (rastreabilidade)
+  dataEmissao     DateTime?
+  dataValidade    DateTime? // null = sem validade
+  responsavel     String?
+  observacao      String?
+  origem          String    @default("registro_manual") // registro_manual | importacao_planilha
+  // Validação da informação (camada de revisão antes de valer no data book)
+  validado        Boolean   @default(false)
+  validadoPorId   String?
+  validadoEm      DateTime?
+  // Arquivo (Vercel Blob privado) + backup ISO no SharePoint (mesmo padrão do RH)
+  arquivoUrl       String?
+  arquivoNome      String?
+  arquivoTamanho   Int?
+  arquivoTipo      String?
+  sharepointUrl    String?  // webUrl da cópia no SharePoint
+  sharepointItemId String?  @unique // quando servido direto do SharePoint (importados)
+  ativo            Boolean  @default(true) // soft delete
+  invalidadoMotivo String?
+  createdById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([categoria])
+  @@index([dataValidade])
+  @@index([opNumero])
+  @@index([validado])
+  @@index([ativo])
+}
+
 model Vaga {
   id                        String    @id @default(cuid())
   titulo                    String
@@ -2402,6 +2444,7 @@ enum Modulo {
   PLANEJAMENTO
   PCP
   REQUISICOES
+  QUALIDADE
 }
 
 enum OPStatus {

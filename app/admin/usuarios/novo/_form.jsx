@@ -19,6 +19,7 @@ const MODULOS_OPCOES = [
   { value: "PLANEJAMENTO", label: "Planejamento" },
   { value: "PCP",          label: "PCP" },
   { value: "REQUISICOES",  label: "Requisições" },
+  { value: "QUALIDADE",    label: "Qualidade" },
 ];
 
 const campoVazio = {

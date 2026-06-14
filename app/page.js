@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import TorgLogo from "@/components/TorgLogo";
-import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity, DollarSign, FileText, Users, Gauge, CalendarClock, BarChart3 } from "lucide-react";
+import { ClipboardList, ShoppingCart, Truck, FolderKanban, ArrowRight, Activity, DollarSign, FileText, Users, Gauge, CalendarClock, BarChart3, ShieldCheck } from "lucide-react";
 
 const FOOTER_LOGO_W = 180;
 const FOOTER_LOGO_H = Math.round((FOOTER_LOGO_W * 1080) / 1920);
@@ -76,6 +76,13 @@ const portais = [
     desc: "Gestão de pessoas, ponto, férias, benefícios e competências.",
     Icon: Users,
     bg: "bg-rose-600",
+  },
+  {
+    href: "/qualidade",
+    label: "Qualidade",
+    desc: "Controle de documentos (norma + validade) e data books por OP.",
+    Icon: ShieldCheck,
+    bg: "bg-violet-700",
   },
   {
     href: "/fornecedores",

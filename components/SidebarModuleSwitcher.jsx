@@ -17,6 +17,7 @@ import {
   Activity,
   ClipboardList,
   Cog,
+  ShieldCheck,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -70,6 +71,14 @@ const MODULOS = [
     icon: Truck,
     cor: "bg-teal-100 text-teal-700",
     modulos: ["EXPEDICAO"],
+  },
+  {
+    href: "/qualidade",
+    label: "Qualidade",
+    desc: "Documentos e data books (NBR 16775)",
+    icon: ShieldCheck,
+    cor: "bg-violet-100 text-violet-700",
+    modulos: ["QUALIDADE"],
   },
   {
     href: "/indicadores",
