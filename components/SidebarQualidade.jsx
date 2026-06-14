@@ -7,8 +7,7 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/qualidade", label: "Controle de Documentos", icon: FileCheck2, exact: true },
-  // Próximas fases: Data Books por OP
-  { href: "/qualidade/data-books", label: "Data Books", icon: BookCheck, breve: true },
+  { href: "/qualidade/data-books", label: "Data Books", icon: BookCheck },
 ];
 
 export default function SidebarQualidade() {

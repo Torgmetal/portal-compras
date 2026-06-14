@@ -1154,6 +1154,59 @@ model DocumentoQualidade {
   @@index([ativo])
 }
 
+// Portal da Qualidade — Módulo 2 (Data Book / dossiê de qualidade por OP).
+// Uma por OP, com as 20 seções (template em lib/databook-secoes). Seções de
+// fonte "modulo1" puxam documentos do Controle de Documentos pelo vínculo de OP.
+model DataBookQualidade {
+  id          String          @id @default(cuid())
+  opNumero    String          @unique
+  opId        String?
+  cliente     String?
+  obra        String?
+  pesoTotalKg Float?
+  pecas       Int?
+  observacao  String?
+  status      String          @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO
+  emitidoEm   DateTime?
+  criadoPorId String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  secoes      DataBookSecao[]
+
+  @@index([opNumero])
+}
+
+model DataBookSecao {
+  id         String             @id @default(cuid())
+  dataBookId String
+  numero     String             // "01".."20"
+  titulo     String
+  norma      String?
+  fonte      String             // sistema | upload | modulo1 | entrada_a | misto
+  estado     String             @default("PENDENTE") // PENDENTE | ANEXADO | NA
+  observacao String?
+  ordem      Int
+  dataBook   DataBookQualidade  @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+  documentos DataBookSecaoDoc[]
+
+  @@unique([dataBookId, numero])
+  @@index([dataBookId])
+}
+
+// Vínculo de um documento do Módulo 1 a uma seção do data book. documentoId
+// referencia DocumentoQualidade (sem FK p/ não exigir back-relation; resolvido na API).
+model DataBookSecaoDoc {
+  id          String        @id @default(cuid())
+  secaoId     String
+  documentoId String
+  createdAt   DateTime      @default(now())
+  secao       DataBookSecao @relation(fields: [secaoId], references: [id], onDelete: Cascade)
+
+  @@unique([secaoId, documentoId])
+  @@index([secaoId])
+  @@index([documentoId])
+}
+
 model Vaga {
   id                        String    @id @default(cuid())
   titulo                    String
