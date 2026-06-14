@@ -3,9 +3,19 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
-  CalendarRange, ChevronLeft, ChevronRight,
+  CalendarRange, ChevronLeft, ChevronRight, CalendarDays, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
+import { SETORES_SOLICITACAO, SETOR_LABEL_SOLIC, STATUS_SOLIC } from "@/lib/solicitacao-producao-const";
+
+const fmtDiaCurto = (iso) => (iso ? new Date((typeof iso === "string" && iso.length === 10 ? iso + "T12:00:00Z" : iso)).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" }) : "—");
+const SIT_COR = {
+  ATRASADO: "text-red-600 font-bold",
+  CONCLUIDO: "text-emerald-600",
+  EM_ANDAMENTO: "text-blue-600",
+  A_INICIAR: "text-torg-gray",
+  SEM_DATA: "text-gray-300",
+};
 
 const SETORES = ["PRODUCAO", "PINTURA", "EXPEDICAO"];
 const SETOR_LABEL = { PRODUCAO: "Producao", PINTURA: "Pintura", EXPEDICAO: "Expedicao" };
@@ -51,15 +61,20 @@ export default function ProgramacaoClient() {
   const [modalNovo, setModalNovo] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [obrasProd, setObrasProd] = useState([]);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro("");
     try {
-      const res = await fetch(`/api/planejamento/programacao?semana=${semana}&ano=${ano}`);
+      const [res, resObras] = await Promise.all([
+        fetch(`/api/planejamento/programacao?semana=${semana}&ano=${ano}`),
+        fetch(`/api/planejamento/obras-producao`),
+      ]);
       if (!res.ok) throw new Error("Erro ao carregar");
       const data = await res.json();
       setItens(data.itens);
+      if (resObras.ok) setObrasProd((await resObras.json()).obras || []);
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -148,6 +163,67 @@ export default function ProgramacaoClient() {
         </div>
         <button onClick={() => mudarSemana(1)} className="p-1.5 hover:bg-gray-100 rounded"><ChevronRight size={16} /></button>
       </div>
+
+      {/* Obras em produção — acompanhamento (datas por setor × apontamento Syneco) */}
+      {obrasProd.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+            <CalendarDays size={15} className="text-torg-blue" />
+            <h3 className="text-sm font-bold text-torg-dark">Obras em produção</h3>
+            <span className="text-[11px] text-torg-gray">datas necessárias por setor × apontamento do Syneco</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[860px]">
+              <thead className="bg-gray-50/60">
+                <tr>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Obra</th>
+                  {SETORES_SOLICITACAO.map((s) => (
+                    <th key={s} className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">{SETOR_LABEL_SOLIC[s]}</th>
+                  ))}
+                  <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Entrega</th>
+                  <th className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">Situação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {obrasProd.map((o) => {
+                  const stat = STATUS_SOLIC[o.status] || STATUS_SOLIC.SOLICITADA;
+                  return (
+                    <tr key={o.id} className={`hover:bg-gray-50 ${!o.aderente ? "bg-red-50/30" : ""}`}>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className="font-mono font-bold text-torg-blue">{fmtOP(o.opNumero)}</span>
+                        {o.cliente && <span className="text-torg-gray ml-1.5">{o.cliente}</span>}
+                        <span className={`ml-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${stat.cor}`}>{stat.label}</span>
+                      </td>
+                      {o.setores.map((sc) => (
+                        <td key={sc.setor} className="px-2 py-2 text-center">
+                          <span className={`tabular-nums ${SIT_COR[sc.situacao] || "text-gray-300"}`}
+                            title={`${SETOR_LABEL_SOLIC[sc.setor]}: ${sc.situacao.toLowerCase().replace("_", " ")}${sc.data ? ` · necessária ${fmtDiaCurto(sc.data)}` : ""}`}>
+                            {sc.data ? fmtDiaCurto(sc.data) : "—"}
+                          </span>
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 text-center tabular-nums text-torg-dark">{fmtDiaCurto(o.dataEntrega)}</td>
+                      <td className="px-2 py-2 text-center">
+                        {o.aderente ? (
+                          <span className="text-[10px] font-semibold text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 size={11} /> no prazo</span>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-red-600 inline-flex items-center gap-1"><AlertTriangle size={11} /> avaliar datas</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2 bg-gray-50/60 border-t border-gray-50 flex items-center gap-4 text-[10px] text-torg-gray flex-wrap">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> atrasado (passou da data sem apontar)</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-600" /> em andamento</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> concluído</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300" /> a iniciar</span>
+          </div>
+        </div>
+      )}
 
       {/* Resumo por setor */}
       <div className="grid grid-cols-3 gap-3">
