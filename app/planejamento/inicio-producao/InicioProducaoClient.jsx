@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import { SETORES_SOLICITACAO, SETOR_LABEL_SOLIC, STATUS_SOLIC } from "@/lib/solicitacao-producao-const";
 import {
-  Search, Send, Loader2, CalendarClock, Wand2, CheckCircle2, AlertTriangle,
+  Search, Send, Loader2, CalendarClock, Wand2, CheckCircle2, AlertTriangle, Gauge,
 } from "lucide-react";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
@@ -124,7 +124,7 @@ export default function InicioProducaoClient({ obrasIniciais }) {
 
       {filtradas.length === 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 text-center py-10 text-sm text-torg-gray">
-          Nenhuma obra com cronograma encontrada.
+          Nenhuma obra com a LPC subida ainda. Suba a lista na Programação do PCP para a obra aparecer aqui.
         </div>
       )}
 
@@ -154,6 +154,47 @@ export default function InicioProducaoClient({ obrasIniciais }) {
             </div>
 
             <div className="p-4 space-y-3">
+              {/* Validação de prazo */}
+              <div className={`rounded-lg border p-3 ${
+                o.prazo.cabe === false ? "bg-red-50 border-red-200"
+                  : o.prazo.cabe === true ? "bg-emerald-50 border-emerald-200"
+                  : "bg-gray-50 border-gray-200"
+              }`}>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-[11px] font-semibold text-torg-dark uppercase tracking-wide flex items-center gap-1.5">
+                    <Gauge size={13} className="text-torg-blue" /> Validação de prazo
+                  </span>
+                  {o.prazo.cabe === true && <span className="text-[11px] font-semibold text-emerald-700">✓ cabe na janela do cronograma</span>}
+                  {o.prazo.cabe === false && <span className="text-[11px] font-semibold text-red-700">⚠ não cabe — faltam {o.prazo.faltamDias} dias úteis</span>}
+                  {o.prazo.cabe == null && <span className="text-[11px] text-torg-gray">sem cronograma para comparar</span>}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-[11px]">
+                  <div>
+                    <span className="text-torg-gray">Peso ({o.conjuntos} conj.)</span><br />
+                    <span className="font-medium text-torg-dark tabular-nums">{Math.round(o.pesoKg).toLocaleString("pt-BR")} kg</span>
+                  </div>
+                  <div>
+                    <span className="text-torg-gray">Esforço {o.prazo.fonteThroughput === "comercial" ? `(${o.hhPorTon} HH/t)` : "(benchmark)"}</span><br />
+                    <span className="font-medium text-torg-dark tabular-nums">{o.prazo.throughputDias != null ? `${o.prazo.throughputDias} d` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-torg-gray">Lead-time (fluxo)</span><br />
+                    <span className="font-medium text-torg-dark tabular-nums">{o.prazo.leadChain} d</span>
+                  </div>
+                  <div>
+                    <span className="text-torg-gray">Estimado {o.prazo.janelaDiasUteis != null ? "/ janela" : ""}</span><br />
+                    <span className="font-medium text-torg-dark tabular-nums">
+                      {o.prazo.estimadoDias} d{o.prazo.janelaDiasUteis != null ? ` / ${o.prazo.janelaDiasUteis} d` : ""}
+                    </span>
+                  </div>
+                </div>
+                {o.prazo.fonteThroughput === "benchmark" && (
+                  <p className="text-[10px] text-torg-gray mt-1.5">
+                    Sem HH/ton do comercial nesta obra — esforço estimado pela capacidade real do Syneco; lead-time = medianas medidas por setor (abertura → próximo).
+                  </p>
+                )}
+              </div>
+
               {/* Datas por setor */}
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wide">Data necessária por setor</p>
