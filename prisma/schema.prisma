@@ -1142,8 +1142,8 @@ model DocumentoQualidade {
   arquivoNome      String?
   arquivoTamanho   Int?
   arquivoTipo      String?
-  sharepointUrl    String?  // webUrl da cópia no SharePoint
-  sharepointItemId String?  @unique // quando servido direto do SharePoint (importados)
+  sharepointUrl    String?  // webUrl da cópia/origem no SharePoint
+  sharepointItemId String?  // item do SharePoint servido via proxy (1 PDF de faixa pode atender vários docs)
   ativo            Boolean  @default(true) // soft delete
   invalidadoMotivo String?
   createdById      String?

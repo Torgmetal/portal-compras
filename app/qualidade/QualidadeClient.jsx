@@ -4,7 +4,7 @@ import { upload } from "@vercel/blob/client";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, Search, ShieldCheck, ShieldAlert,
   AlertTriangle, FileText, Eye, Download, Pencil, Trash2, X, Check, CircleSlash, Clock,
-  FileSpreadsheet, Upload,
+  FileSpreadsheet, Upload, Paperclip, Link2,
 } from "lucide-react";
 import { CATEGORIAS_QUALIDADE, CATEGORIA_LABEL, STATUS_COR } from "@/lib/qualidade-status";
 
@@ -35,6 +35,7 @@ export default function QualidadeClient() {
   const [busca, setBusca] = useState("");
   const [modal, setModal] = useState(null); // { ...doc } para editar, ou {} para novo
   const [importar, setImportar] = useState(false);
+  const [casar, setCasar] = useState(false);
   const [acaoId, setAcaoId] = useState(null);
 
   const carregar = useCallback(async () => {
@@ -108,6 +109,10 @@ export default function QualidadeClient() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => setCasar(true)}
+            className="text-sm font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+            <Paperclip size={15} /> Casar PDFs
+          </button>
           <button onClick={() => setImportar(true)}
             className="text-sm font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
             <FileSpreadsheet size={15} /> Importar (CMR)
@@ -229,6 +234,107 @@ export default function QualidadeClient() {
 
       {modal && <ModalDocumento doc={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); carregar(); }} />}
       {importar && <ModalImportar onClose={() => setImportar(false)} onImported={() => { setImportar(false); carregar(); }} />}
+      {casar && <ModalCasarPdfs onClose={() => setCasar(false)} onCasado={() => { setCasar(false); carregar(); }} />}
+    </div>
+  );
+}
+
+function ModalCasarPdfs({ onClose, onCasado }) {
+  const [url, setUrl] = useState("");
+  const [carregando, setCarregando] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [erro, setErro] = useState("");
+  const [casando, setCasando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function previsualizar() {
+    setErro(""); setPreview(null); setResultado(null);
+    if (!url.trim()) { setErro("Cole o link da pasta de certificados."); return; }
+    setCarregando(true);
+    try {
+      const res = await fetch(`/api/qualidade/documentos/casar-pdfs?url=${encodeURIComponent(url.trim())}`);
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro ao ler a pasta");
+      setPreview(json);
+    } catch (e) { setErro(e.message); } finally { setCarregando(false); }
+  }
+
+  async function confirmar() {
+    setErro(""); setCasando(true);
+    try {
+      const res = await fetch("/api/qualidade/documentos/casar-pdfs", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: url.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro ao casar");
+      setResultado(json);
+    } catch (e) { setErro(e.message); } finally { setCasando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><Paperclip size={15} className="text-violet-700" /> Casar PDFs dos certificados</p>
+          <button onClick={onClose} className="p-1 text-torg-gray hover:text-torg-dark rounded hover:bg-gray-100"><X size={16} /></button>
+        </div>
+
+        <div className="px-4 py-3 overflow-y-auto space-y-3">
+          {!resultado && (
+            <>
+              <label className="block">
+                <span className="text-[10px] font-medium text-torg-gray uppercase">Link da pasta de certificados (SharePoint)</span>
+                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…sharepoint.com/:f:/s/TorgMetal/…"
+                  className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-300" />
+                <span className="text-[10px] text-torg-gray">Casa os PDFs (nomeados pelo índice, ex.: “R 260001.pdf”) com os documentos importados do CMR. Faixas (“R 260007 á 008”) atendem vários.</span>
+              </label>
+              <button onClick={previsualizar} disabled={carregando} className="text-[12px] font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
+                {carregando ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />} Pré-visualizar
+              </button>
+
+              {preview && (
+                <div className="space-y-2 border-t border-gray-100 pt-3">
+                  <p className="text-[11px] text-torg-gray truncate" title={preview.pasta}>Pasta: {preview.pasta}</p>
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <Mini label="PDFs" v={preview.totalPdfs} />
+                    <Mini label="A casar" v={preview.casaveis} cor="text-violet-700" />
+                    <Mini label="Já c/ arquivo" v={preview.jaComArquivo} cor="text-torg-gray" />
+                    <Mini label="Sem PDF" v={preview.semPdf} cor={preview.semPdf ? "text-amber-700" : "text-emerald-700"} />
+                  </div>
+                  {preview.semPdf > 0 && (
+                    <p className="text-[11px] text-amber-700 flex items-center gap-1"><AlertTriangle size={12} /> {preview.semPdf} documento(s) sem PDF correspondente{preview.amostraSemPdf?.length ? ` (ex.: índices ${preview.amostraSemPdf.join(", ")})` : ""}.</p>
+                  )}
+                  {preview.totalDocs === 0 && <p className="text-[11px] text-amber-700">Nenhum documento importado do CMR ainda — rode a importação primeiro.</p>}
+                </div>
+              )}
+            </>
+          )}
+
+          {resultado && (
+            <div className="text-center py-4">
+              <Check size={28} className="text-emerald-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-torg-dark">Casamento concluído</p>
+              <p className="text-[12px] text-torg-gray mt-1">{resultado.casados} documento(s) vinculados a PDF (de {resultado.totalPdfs} arquivos na pasta).</p>
+            </div>
+          )}
+
+          {erro && <p className="text-[11px] text-red-600 flex items-center gap-1"><AlertCircle size={12} /> {erro}</p>}
+        </div>
+
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
+          {resultado ? (
+            <button onClick={onCasado} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800">Concluir</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={casando} className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100 disabled:opacity-50">Cancelar</button>
+              <button onClick={confirmar} disabled={casando || !preview || preview.casaveis === 0}
+                className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800 disabled:opacity-50 inline-flex items-center gap-1.5">
+                {casando ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Casar {preview ? `${preview.casaveis}` : ""}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
