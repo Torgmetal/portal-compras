@@ -11,6 +11,22 @@ const toInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 const hojeIso = () => new Date().toISOString().slice(0, 10);
 const parseHH = (s) => parseFloat(String(s ?? "").replace(",", ".")) || 0;
 
+// Aritmética em dias úteis (seg–sex), em UTC
+const SET_PROD = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
+function addDiasUteis(date, n) {
+  const d = new Date(date);
+  let add = 0;
+  while (add < n) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) add++; }
+  return d;
+}
+function subDiasUteis(date, n) {
+  const d = new Date(date);
+  let sub = 0;
+  while (sub < n) { d.setUTCDate(d.getUTCDate() - 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) sub++; }
+  return d;
+}
+const isoOf = (d) => d.toISOString().slice(0, 10);
+
 // Recalcula o prazo ao vivo conforme o HH/ton é editado (espelha lib/prazo-producao;
 // throughput por HH quando informado, senão mantém o benchmark do servidor).
 function prazoPreview(o, hhStr) {
@@ -29,7 +45,7 @@ function prazoPreview(o, hhStr) {
   };
 }
 
-export default function InicioProducaoClient({ obrasIniciais, lead = {}, isAdmin = false }) {
+export default function InicioProducaoClient({ obrasIniciais, lead = {}, capacidade = {}, isAdmin = false }) {
   const [obras, setObras] = useState(obrasIniciais);
   const [busca, setBusca] = useState("");
   const [salvando, setSalvando] = useState(null);
@@ -76,11 +92,24 @@ export default function InicioProducaoClient({ obrasIniciais, lead = {}, isAdmin
       [op]: { ...prev[op], datasSetor: { ...prev[op].datasSetor, [setor]: valor || undefined } },
     }));
   }
-  function preencherDoCronograma(o) {
+  // Encadeia as datas por setor usando a produtividade (peso ÷ capacidade kg/dia).
+  // direcao "inicio": a partir do início da fabricação (forward).
+  // direcao "entrega": volta da entrega (data-limite que deveria estar em cada setor).
+  function calcularPorProdutividade(o, direcao) {
+    const dur = (s) => { const cap = capacidade?.[s] || 0; return cap > 0 ? Math.max(1, Math.ceil((o.pesoKg || 0) / cap)) : 1; };
     const ds = { ...rascunhos[o.opNumero].datasSetor };
-    if (o.fabInicio) ds.CORTE = toInput(o.fabInicio);
-    if (o.fabFim) ds.PINTURA = toInput(o.fabFim);
-    if (o.expFim || o.fabFim) ds.EXPEDICAO = toInput(o.expFim || o.fabFim);
+    if (direcao === "entrega") {
+      const entregaStr = rascunhos[o.opNumero].dataEntrega || toInput(o.expFim);
+      if (!entregaStr) { showToast("Defina a data de entrega primeiro.", "erro"); return; }
+      let dia = new Date(entregaStr + "T00:00:00Z");
+      ds.EXPEDICAO = isoOf(dia);
+      for (let i = SET_PROD.length - 1; i >= 0; i--) { dia = subDiasUteis(dia, dur(SET_PROD[i])); ds[SET_PROD[i]] = isoOf(dia); }
+    } else {
+      const inicioStr = rascunhos[o.opNumero].datasSetor.CORTE || toInput(o.fabInicio) || hojeIso();
+      let dia = new Date(inicioStr + "T00:00:00Z");
+      for (let i = 0; i < SET_PROD.length; i++) { ds[SET_PROD[i]] = isoOf(dia); dia = addDiasUteis(dia, dur(SET_PROD[i])); }
+      ds.EXPEDICAO = isoOf(dia);
+    }
     setRascunhos((prev) => ({ ...prev, [o.opNumero]: { ...prev[o.opNumero], datasSetor: ds } }));
   }
 
@@ -242,13 +271,23 @@ export default function InicioProducaoClient({ obrasIniciais, lead = {}, isAdmin
               {/* Datas por setor */}
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wide">Data necessária por setor</p>
-                <button
-                  onClick={() => preencherDoCronograma(o)}
-                  className="text-[11px] text-torg-blue hover:underline font-medium flex items-center gap-1"
-                  title="Sugere corte no início da fabricação e pintura/expedição no fim"
-                >
-                  <Wand2 size={12} /> preencher do cronograma
-                </button>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[10px] text-torg-gray flex items-center gap-1"><Wand2 size={12} className="text-torg-blue" /> calcular por produtividade:</span>
+                  <button
+                    onClick={() => calcularPorProdutividade(o, "inicio")}
+                    className="text-[11px] text-torg-blue hover:underline font-medium"
+                    title="Encadeia as datas a partir do início da fabricação, usando peso ÷ capacidade (kg/dia) de cada setor"
+                  >
+                    do início
+                  </button>
+                  <button
+                    onClick={() => calcularPorProdutividade(o, "entrega")}
+                    className="text-[11px] text-torg-blue hover:underline font-medium"
+                    title="Volta da data de entrega: a data-limite que a obra deveria estar em cada setor"
+                  >
+                    da entrega
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                 {SETORES_SOLICITACAO.map((s) => {

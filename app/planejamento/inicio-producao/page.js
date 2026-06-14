@@ -112,6 +112,7 @@ export default async function InicioProducaoPage() {
     <InicioProducaoClient
       obrasIniciais={JSON.parse(JSON.stringify(obras))}
       lead={lead}
+      capacidade={capKgDia}
       isAdmin={isAdmin}
     />
   );
