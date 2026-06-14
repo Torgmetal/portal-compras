@@ -239,7 +239,7 @@ export default function PmpClient() {
                         );
                       })}
                       <td className="px-2 py-2 text-center tabular-nums text-torg-dark">
-                        {sol.dataEntrega ? new Date(sol.dataEntrega).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}
+                        {sol.dataEntrega ? new Date(sol.dataEntrega).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" }) : "—"}
                       </td>
                       <td className="px-2 py-2 text-center">
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.cor}`}>{st.label}</span>

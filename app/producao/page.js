@@ -109,8 +109,8 @@ export default async function PainelProducao() {
     .map(([semana, kg]) => ({ semana, kg }))
     .sort((a, b) => a.semana.localeCompare(b.semana));
 
-  // Solicitações de início de produção do Planejamento (abertas)
-  const solicitacoes = await carregarSolicitacoes(["SOLICITADA", "EM_PRODUCAO", "ATRASADA"]);
+  // Demandas do Planejamento ainda pendentes (Solicitada) — somem ao virar Programada
+  const solicitacoes = await carregarSolicitacoes(["SOLICITADA"]);
 
   return (
     <PainelProducaoClient

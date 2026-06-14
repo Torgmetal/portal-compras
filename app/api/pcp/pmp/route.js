@@ -90,8 +90,8 @@ export async function GET(req) {
     orderBy: { numero: "asc" },
   });
 
-  // 5) Solicitações de início de produção do Planejamento (demanda p/ acompanhamento)
-  const solicitacoes = await carregarSolicitacoes();
+  // 5) Demandas do Planejamento ainda pendentes (Solicitada) — somem ao virar Programada
+  const solicitacoes = await carregarSolicitacoes(["SOLICITADA"]);
 
   return NextResponse.json({
     semana: { inicio: seg.toISOString().split("T")[0], fim: dom.toISOString().split("T")[0] },

@@ -13,6 +13,7 @@ import {
 } from "@/lib/sharepoint-lpc";
 import { parseLPC } from "@/lib/parse-lpc";
 import { importarLpcMerge } from "@/lib/importar-lpc-merge";
+import { digitosObra } from "@/lib/prazo-producao";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -160,6 +161,25 @@ export async function POST(req) {
 
   const resultado = await importarLpcMerge(parsed, { userId: user.id, revisao: item.rev, arquivo: item.nome });
   if (resultado.erro) return NextResponse.json({ error: resultado.erro }, { status: 422 });
+
+  // Ao selecionar/importar a LPC, a demanda do Planejamento dessa obra sai de
+  // "Solicitada" e vira "Programada" (regra do Vitor) — o PCP assumiu a programação.
+  try {
+    const dig = digitosObra(obra);
+    const abertas = await prisma.solicitacaoProducao.findMany({
+      where: { status: "SOLICITADA" }, select: { id: true, opNumero: true },
+    });
+    const alvo = abertas.filter((s) => s.opNumero === obra || digitosObra(s.opNumero) === dig).map((s) => s.id);
+    if (alvo.length) {
+      await prisma.solicitacaoProducao.updateMany({ where: { id: { in: alvo } }, data: { status: "PROGRAMADA" } });
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id, action: "SOLICITACAO_PRODUCAO_PROGRAMADA", entity: "SolicitacaoProducao",
+          entityId: alvo[0], diff: { obra, gatilho: "import-lpc", afetadas: alvo.length },
+        },
+      }).catch(() => {});
+    }
+  } catch {}
 
   return NextResponse.json({ ok: true, arquivo: item.nome, ...resultado });
 }

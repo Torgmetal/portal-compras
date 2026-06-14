@@ -16,7 +16,7 @@ const schema = z.object({
   datasSetor: z.record(z.string(), dataOpcional).default({}),
   hhPorTonManual: z.number().min(0).max(10000).nullable().optional(),
   prioridade: z.enum(["ALTA", "MEDIA", "BAIXA"]).default("MEDIA"),
-  status: z.enum(["SOLICITADA", "EM_PRODUCAO", "ATRASADA", "CONCLUIDA"]).default("SOLICITADA"),
+  status: z.enum(["SOLICITADA", "PROGRAMADA", "EM_PRODUCAO", "ATRASADA", "CONCLUIDA"]).default("SOLICITADA"),
   observacao: z.string().nullable().optional(),
 });
 
