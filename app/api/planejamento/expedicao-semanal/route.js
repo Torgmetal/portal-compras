@@ -108,6 +108,14 @@ export async function GET(req) {
     cronogramaMap[c.opNumero] = c.tarefas;
   }
 
+  // Pedido de expedição (handoff Planejamento → Expedição), 1 por obra
+  const pedidosExp = await prisma.pedidoExpedicao.findMany({
+    where: { opNumero: { in: opsAtivas.map((o) => o.numero) } },
+    select: { opNumero: true, status: true, enviadoEm: true },
+  });
+  const pedidoExpMap = {};
+  for (const p of pedidosExp) pedidoExpMap[p.opNumero] = p;
+
   // Monta grade por obra
   const obras = opsAtivas.map((op) => {
     const pesoTotal = op.pecasConjunto.reduce((s, p) => s + p.pesoTotalKg, 0);
@@ -182,6 +190,9 @@ export async function GET(req) {
       statusProducao,
       itens,
       semanal,
+      pedidoExpedicao: pedidoExpMap[op.numero]
+        ? { status: pedidoExpMap[op.numero].status, enviadoEm: pedidoExpMap[op.numero].enviadoEm }
+        : null,
     };
   });
 

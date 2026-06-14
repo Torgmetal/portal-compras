@@ -184,6 +184,18 @@ model Romaneio {
   observacao        String?
   valorPorKg        Float?
   valorTotal        Float?
+  // Destino da carga (vem da entrega definida no Planejamento)
+  destino           String?
+  // Transportadora (campos livres no romaneio — sem cadastro)
+  transportadora    String?
+  motorista         String?
+  placaVeiculo      String?
+  contatoTransporte String?
+  // Controle de NF (a própria Expedição emite/registra — controle interno)
+  nfStatus          String?            @default("PENDENTE") // PENDENTE | SOLICITADA | EMITIDA
+  nfNumero          String?
+  nfSolicitadaEm    DateTime?
+  nfEmitidaEm       DateTime?
   createdById       String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
@@ -2448,6 +2460,7 @@ enum NotificacaoTipo {
   COTACAO_RESPONDIDA
   CONSULTA_ESTOQUE
   SOLICITACAO_PRODUCAO
+  EXPEDICAO_SOLICITADA
 }
 
 // Solicitação de início de produção criada pelo Planejamento a partir das datas
@@ -2471,6 +2484,26 @@ model SolicitacaoProducao {
   updatedAt      DateTime  @updatedAt
 
   @@index([opNumero])
+}
+
+// Pedido de expedição: o Planejamento "envia para a Expedição" as entregas
+// (qtd + local) definidas por conjunto (ConjuntoEntrega). Uma por obra. A
+// Expedição lê as entregas vivas agrupadas por destino, monta o romaneio,
+// solicita/registra a NF e informa a transportadora. Desacoplado da OP
+// (opNumero @unique + opId), como SolicitacaoProducao.
+model PedidoExpedicao {
+  id           String   @id @default(cuid())
+  opNumero     String   @unique
+  opId         String?
+  status       String   @default("ENVIADO") // ENVIADO | EM_EXPEDICAO | CONCLUIDO
+  enviadoPorId String?
+  enviadoEm    DateTime @default(now())
+  observacao   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([opNumero])
+  @@index([status])
 }
 
 enum StatusOrcamento {

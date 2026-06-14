@@ -12,6 +12,13 @@ const schema = z.object({
   descricao: z.string().nullable().optional(),
   observacao: z.string().nullable().optional(),
   valorPorKg: z.number().min(0).nullable().optional(),
+  destino: z.string().max(200).nullable().optional(),
+  transportadora: z.string().max(200).nullable().optional(),
+  motorista: z.string().max(200).nullable().optional(),
+  placaVeiculo: z.string().max(20).nullable().optional(),
+  contatoTransporte: z.string().max(100).nullable().optional(),
+  nfStatus: z.enum(["PENDENTE", "SOLICITADA", "EMITIDA"]).nullable().optional(),
+  nfNumero: z.string().max(60).nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -45,6 +52,19 @@ export async function PATCH(req, { params }) {
   const peso = data.pesoRealKg ?? atual.pesoRealKg;
   const vpk = data.valorPorKg !== undefined ? data.valorPorKg : atual.valorPorKg;
   data.valorTotal = vpk ? peso * vpk : null;
+
+  // Transições de NF: carimba datas conforme muda o status
+  if (body.nfStatus && body.nfStatus !== atual.nfStatus) {
+    if (body.nfStatus === "SOLICITADA" && !atual.nfSolicitadaEm) data.nfSolicitadaEm = new Date();
+    if (body.nfStatus === "EMITIDA") {
+      data.nfEmitidaEm = new Date();
+      if (!atual.nfSolicitadaEm) data.nfSolicitadaEm = new Date();
+    }
+    if (body.nfStatus === "PENDENTE") {
+      data.nfSolicitadaEm = null;
+      data.nfEmitidaEm = null;
+    }
+  }
 
   const updated = await prisma.romaneio.update({ where: { id: params.id }, data });
 

@@ -5,8 +5,12 @@ import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Truck, Factory, Weight,
   ArrowLeft, ChevronRight, AlertTriangle, CheckCircle2, Clock,
-  Package, BarChart3, MapPin, Plus, Trash2, X,
+  Package, BarChart3, MapPin, Plus, Trash2, X, Send,
 } from "lucide-react";
+
+// enviadoEm é timestamp (não @db.Date) → exibe em horário local, com hora
+const fmtEnviado = (d) =>
+  d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
 
 const fmtKg = (v) => {
   if (!v) return "0 kg";
@@ -258,8 +262,29 @@ function ObraCard({ obra }) {
   const [itens, setItens] = useState(obra.itens || []);
   const [salvandoId, setSalvandoId] = useState(null);
   const [modalItem, setModalItem] = useState(null); // conjunto sendo dividido por destino
+  const [pedido, setPedido] = useState(obra.pedidoExpedicao || null); // handoff p/ Expedição
+  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => { setItens(obra.itens || []); }, [obra.itens]);
+  useEffect(() => { setPedido(obra.pedidoExpedicao || null); }, [obra.pedidoExpedicao]);
+
+  async function enviarExpedicao() {
+    setEnviando(true);
+    try {
+      const res = await fetch("/api/planejamento/expedicao/enviar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: obra.numero, opId: obra.opId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro ao enviar");
+      setPedido(json.pedido);
+    } catch (e) {
+      alert("Erro: " + e.message);
+    } finally {
+      setEnviando(false);
+    }
+  }
 
   const parseOrdem = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : null; };
   const ordenarItens = (arr) => [...arr].sort((a, b) => (a.ordemCampo ?? Infinity) - (b.ordemCampo ?? Infinity));
@@ -397,9 +422,30 @@ function ObraCard({ obra }) {
           {/* Itens a expedir (conjuntos) */}
           {itens.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold text-torg-dark mb-1.5">
-                Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · nº = ordem de envio · entregas = quantidade por local)</span>
-              </p>
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <p className="text-[10px] font-semibold text-torg-dark">
+                  Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · nº = ordem de envio · entregas = quantidade por local)</span>
+                </p>
+                <div className="flex items-center gap-2 shrink-0">
+                  {pedido && (
+                    <span className="text-[10px] text-emerald-700 inline-flex items-center gap-1 whitespace-nowrap">
+                      <CheckCircle2 size={11} /> Enviado {fmtEnviado(pedido.enviadoEm)}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={enviarExpedicao}
+                    disabled={enviando || destinosUsados.length === 0}
+                    title={destinosUsados.length === 0 ? "Defina ao menos uma entrega (quantidade + local) antes de enviar" : "Enviar estas entregas para o portal da Expedição"}
+                    className={`text-[10px] px-2 py-1 rounded-lg font-semibold inline-flex items-center gap-1 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${
+                      pedido ? "border border-torg-blue/40 text-torg-blue hover:bg-torg-blue/5" : "bg-torg-blue text-white hover:bg-torg-dark"
+                    }`}
+                  >
+                    {enviando ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                    {pedido ? "Reenviar à Expedição" : "Enviar à Expedição"}
+                  </button>
+                </div>
+              </div>
               {/* Resumo por destino (para a expedição romanear por local) */}
               {(destinosUsados.length > 0 || naoAlocadoUn > 0) && (
                 <div className="flex flex-wrap gap-1 mb-2">
