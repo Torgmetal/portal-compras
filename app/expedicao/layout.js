@@ -9,7 +9,7 @@ export default function ExpedicaoLayout({ children }) {
   return (
     <div className="flex min-h-screen">
       <SidebarExpedicao />
-      <main className="flex-1 ml-64 p-8 overflow-auto">{children}</main>
+      <main className="flex-1 ml-64 p-8 overflow-auto print:ml-0 print:p-0">{children}</main>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Truck, MapPin, Package, ChevronRight,
-  CheckCircle2, FileText, Plus, X, ArrowLeft, Weight, Clock, AlertTriangle,
+  CheckCircle2, FileText, Plus, X, ArrowLeft, Weight, Clock, AlertTriangle, Printer,
 } from "lucide-react";
 
 const fmtKg = (v) => (!v ? "0 kg" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
@@ -199,7 +199,13 @@ function PedidoCard({ pedido, onRomanear }) {
               <p className="text-[10px] font-semibold text-torg-dark mb-1">Romaneios desta obra</p>
               <div className="flex flex-wrap gap-1.5">
                 {pedido.romaneios.map((r) => (
-                  <span key={r.id} className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 inline-flex items-center gap-1.5">
+                  <Link
+                    key={r.id}
+                    href={`/expedicao/romaneio/${r.id}/imprimir`}
+                    target="_blank"
+                    title="Abrir documento do romaneio"
+                    className="text-[10px] px-2 py-1 rounded-lg border border-gray-200 inline-flex items-center gap-1.5 hover:border-torg-blue hover:bg-torg-blue-50/40 transition-colors"
+                  >
                     <FileText size={10} className="text-torg-blue" />
                     <strong className="text-torg-dark">{r.numero}</strong>
                     {r.destino && <span className="text-torg-gray">→ {r.destino}</span>}
@@ -207,7 +213,8 @@ function PedidoCard({ pedido, onRomanear }) {
                     <span className={`px-1.5 py-0.5 rounded-full font-medium ${NF_BADGE[r.nfStatus] || NF_BADGE.PENDENTE}`}>
                       {r.nfNumero ? `NF ${r.nfNumero}` : NF_LABEL[r.nfStatus] || "NF pendente"}
                     </span>
-                  </span>
+                    <Printer size={10} className="text-torg-gray" />
+                  </Link>
                 ))}
               </div>
             </div>
