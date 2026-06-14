@@ -9,7 +9,7 @@ import { backupISODocumentoQualidade } from "@/lib/qualidade-doc-backup";
 
 export const runtime = "nodejs";
 
-const CATEGORIAS = ["EQUIPAMENTOS", "FUNCIONARIOS", "SISTEMA", "TERCEIROS"];
+const CATEGORIAS = ["MATERIAL", "EQUIPAMENTOS", "FUNCIONARIOS", "SISTEMA", "TERCEIROS"];
 
 const schema = z.object({
   nome: z.string().min(2).optional(),

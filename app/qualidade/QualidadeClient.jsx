@@ -4,6 +4,7 @@ import { upload } from "@vercel/blob/client";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, Search, ShieldCheck, ShieldAlert,
   AlertTriangle, FileText, Eye, Download, Pencil, Trash2, X, Check, CircleSlash, Clock,
+  FileSpreadsheet, Upload,
 } from "lucide-react";
 import { CATEGORIAS_QUALIDADE, CATEGORIA_LABEL, STATUS_COR } from "@/lib/qualidade-status";
 
@@ -33,6 +34,7 @@ export default function QualidadeClient() {
   const [validado, setValidado] = useState("");
   const [busca, setBusca] = useState("");
   const [modal, setModal] = useState(null); // { ...doc } para editar, ou {} para novo
+  const [importar, setImportar] = useState(false);
   const [acaoId, setAcaoId] = useState(null);
 
   const carregar = useCallback(async () => {
@@ -105,10 +107,16 @@ export default function QualidadeClient() {
             Documentos amarrados a norma + validade. O status (vigente / vencendo / vencido) é calculado automaticamente. <span className="text-torg-gray/80">Padrão NBR 16775.</span>
           </p>
         </div>
-        <button onClick={() => setModal({ ...VAZIO })}
-          className="text-sm font-semibold text-white bg-violet-700 hover:bg-violet-800 px-4 py-2 rounded-lg inline-flex items-center gap-2 shrink-0">
-          <Plus size={15} /> Novo documento
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => setImportar(true)}
+            className="text-sm font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+            <FileSpreadsheet size={15} /> Importar (CMR)
+          </button>
+          <button onClick={() => setModal({ ...VAZIO })}
+            className="text-sm font-semibold text-white bg-violet-700 hover:bg-violet-800 px-4 py-2 rounded-lg inline-flex items-center gap-2">
+            <Plus size={15} /> Novo documento
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -220,6 +228,144 @@ export default function QualidadeClient() {
       )}
 
       {modal && <ModalDocumento doc={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); carregar(); }} />}
+      {importar && <ModalImportar onClose={() => setImportar(false)} onImported={() => { setImportar(false); carregar(); }} />}
+    </div>
+  );
+}
+
+function ModalImportar({ onClose, onImported }) {
+  const [url, setUrl] = useState("");
+  const [carregando, setCarregando] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [erro, setErro] = useState("");
+  const [importando, setImportando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function previsualizar() {
+    setErro(""); setPreview(null); setResultado(null);
+    if (!url.trim()) { setErro("Cole o link de compartilhamento do CMR."); return; }
+    setCarregando(true);
+    try {
+      const res = await fetch(`/api/qualidade/documentos/importar?url=${encodeURIComponent(url.trim())}`);
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro ao ler a planilha");
+      setPreview(json);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  async function confirmar() {
+    setErro(""); setImportando(true);
+    try {
+      const res = await fetch("/api/qualidade/documentos/importar", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: url.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro ao importar");
+      setResultado(json);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setImportando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><FileSpreadsheet size={15} className="text-violet-700" /> Importar do CMR (rastreabilidade)</p>
+          <button onClick={onClose} className="p-1 text-torg-gray hover:text-torg-dark rounded hover:bg-gray-100"><X size={16} /></button>
+        </div>
+
+        <div className="px-4 py-3 overflow-y-auto space-y-3">
+          {!resultado && (
+            <>
+              <label className="block">
+                <span className="text-[10px] font-medium text-torg-gray uppercase">Link de compartilhamento do CMR (SharePoint)</span>
+                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…sharepoint.com/:x:/s/TorgMetal/…"
+                  className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-300" />
+                <span className="text-[10px] text-torg-gray">Lê a aba do ano, detecta as colunas pelo cabeçalho e valida a corrida. Nada é gravado até você confirmar.</span>
+              </label>
+              <button onClick={previsualizar} disabled={carregando} className="text-[12px] font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
+                {carregando ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />} Pré-visualizar
+              </button>
+
+              {preview && (
+                <div className="space-y-2 border-t border-gray-100 pt-3">
+                  <p className="text-[11px] text-torg-gray"><strong className="text-torg-dark">{preview.arquivo}</strong> · aba {preview.sheet}</p>
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <Mini label="Linhas" v={preview.resumo.total} />
+                    <Mini label="Novos" v={preview.resumo.novos} cor="text-violet-700" />
+                    <Mini label="Já importados" v={preview.resumo.jaImportados} cor="text-torg-gray" />
+                    <Mini label="Sem corrida" v={preview.resumo.semCorrida} cor={preview.resumo.semCorrida ? "text-amber-700" : "text-emerald-700"} />
+                  </div>
+                  {preview.resumo.semCorrida > 0 && (
+                    <p className="text-[11px] text-amber-700 flex items-center gap-1"><AlertTriangle size={12} /> {preview.resumo.semCorrida} linha(s) sem corrida — serão importadas, mas travam a Seção 04 do data book até corrigir na origem.</p>
+                  )}
+                  <div className="overflow-x-auto rounded-lg border border-gray-100">
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-gray-50/60 text-gray-500"><tr>
+                        <th className="px-2 py-1 text-left">Material</th><th className="px-2 py-1 text-left">Corrida</th><th className="px-2 py-1 text-left">Norma</th><th className="px-2 py-1 text-left">OP</th><th className="px-2 py-1 text-left">Fornecedor</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {preview.amostra.map((l) => (
+                          <tr key={l.linha}>
+                            <td className="px-2 py-1 max-w-[200px] truncate" title={l.nome}>{l.nome}</td>
+                            <td className="px-2 py-1 font-mono">{l.numeroCorrida || <span className="text-amber-700">—</span>}</td>
+                            <td className="px-2 py-1">{l.norma || "—"}</td>
+                            <td className="px-2 py-1">{l.opNumero || "—"}</td>
+                            <td className="px-2 py-1">{l.fornecedor || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[10px] text-torg-gray">Mostrando {preview.amostra.length} de {preview.resumo.total}. Categoria: <strong>Material</strong>. Origem: importação.</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {resultado && (
+            <div className="text-center py-4">
+              <Check size={28} className="text-emerald-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-torg-dark">Importação concluída</p>
+              <p className="text-[12px] text-torg-gray mt-1">
+                {resultado.criados} novo(s) documento(s) criado(s) · {resultado.jaExistiam} já existia(m){resultado.semIndice ? ` · ${resultado.semIndice} sem índice (ignorado)` : ""}.
+              </p>
+            </div>
+          )}
+
+          {erro && <p className="text-[11px] text-red-600 flex items-center gap-1"><AlertCircle size={12} /> {erro}</p>}
+        </div>
+
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
+          {resultado ? (
+            <button onClick={onImported} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800">Concluir</button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={importando} className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100 disabled:opacity-50">Cancelar</button>
+              <button onClick={confirmar} disabled={importando || !preview || preview.resumo.novos === 0}
+                className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800 disabled:opacity-50 inline-flex items-center gap-1.5">
+                {importando ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Importar {preview ? `${preview.resumo.novos} novo(s)` : ""}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Mini({ label, v, cor = "text-torg-dark" }) {
+  return (
+    <div className="bg-gray-50 rounded-lg py-2">
+      <p className={`text-lg font-bold ${cor}`}>{v}</p>
+      <p className="text-[9px] text-torg-gray uppercase">{label}</p>
     </div>
   );
 }

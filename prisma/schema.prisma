@@ -1125,6 +1125,9 @@ model DocumentoQualidade {
   vinculo         String?   // texto livre: OP-083 · Soldador João · Munck 01 · TORG
   opNumero        String?   // vínculo estruturado opcional (alimenta o Data Book)
   numeroCorrida   String?   // heat — certificados de material (rastreabilidade)
+  numeroDocumento String?   // nº do certificado (ex.: importação CMR)
+  fornecedor      String?   // fornecedor do material (importação CMR)
+  importRef       String?   // índice na planilha de origem (dedupe do import, em código)
   dataEmissao     DateTime?
   dataValidade    DateTime? // null = sem validade
   responsavel     String?
@@ -1152,6 +1155,7 @@ model DocumentoQualidade {
   @@index([opNumero])
   @@index([validado])
   @@index([ativo])
+  @@index([importRef])
 }
 
 // Portal da Qualidade — Módulo 2 (Data Book / dossiê de qualidade por OP).
