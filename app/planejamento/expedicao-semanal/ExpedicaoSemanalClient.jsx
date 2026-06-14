@@ -261,28 +261,47 @@ function ObraCard({ obra }) {
   useEffect(() => { setItens(obra.itens || []); }, [obra.itens]);
 
   const parseOrdem = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? n : null; };
-  const ordenarItens = (arr) => [...arr].sort((a, b) => (a.ordemCampo ?? Infinity) - (b.ordemCampo ?? Infinity));
+  // agrupa por destino, depois ordem de campo
+  const ordenarItens = (arr) => [...arr].sort((a, b) =>
+    String(a.destinoCampo || "~").localeCompare(String(b.destinoCampo || "~")) ||
+    (a.ordemCampo ?? Infinity) - (b.ordemCampo ?? Infinity)
+  );
 
-  function onChangeOrdem(id, valor) {
-    const n = parseOrdem(valor);
-    setItens((prev) => prev.map((x) => (x.id === id ? { ...x, ordemCampo: n } : x)));
-  }
-  async function salvarOrdem(id, valor) {
-    const n = parseOrdem(valor);
+  async function salvarCampo(id, patch, novo) {
     setSalvandoId(id);
     try {
       const res = await fetch(`/api/producao/pecas/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ordemCampo: n }),
+        body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error("Erro ao salvar");
-      setItens((prev) => ordenarItens(prev.map((x) => (x.id === id ? { ...x, ordemCampo: n } : x))));
+      setItens((prev) => ordenarItens(prev.map((x) => (x.id === id ? { ...x, ...novo } : x))));
     } catch (e) {
       alert("Erro: " + e.message);
     } finally {
       setSalvandoId(null);
     }
+  }
+
+  function onChangeOrdem(id, valor) {
+    const n = parseOrdem(valor);
+    setItens((prev) => prev.map((x) => (x.id === id ? { ...x, ordemCampo: n } : x)));
+  }
+  const salvarOrdem = (id, valor) => salvarCampo(id, { ordemCampo: parseOrdem(valor) }, { ordemCampo: parseOrdem(valor) });
+
+  function onChangeDestino(id, valor) {
+    setItens((prev) => prev.map((x) => (x.id === id ? { ...x, destinoCampo: valor } : x)));
+  }
+  const salvarDestino = (id, valor) => { const v = (valor || "").trim() || null; return salvarCampo(id, { destinoCampo: v }, { destinoCampo: v }); };
+
+  // Destinos usados na obra (para sugestões) + resumo por destino
+  const destinosUsados = [...new Set(itens.map((i) => i.destinoCampo).filter(Boolean))].sort();
+  const porDestino = {};
+  for (const it of itens) {
+    const k = it.destinoCampo || "__sem__";
+    const a = (porDestino[k] = porDestino[k] || { n: 0, kg: 0 });
+    a.n += 1; a.kg += it.peso || 0;
   }
 
   const diasRestantes = obra.dataFimPrevista
@@ -378,8 +397,23 @@ function ObraCard({ obra }) {
           {itens.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-torg-dark mb-1.5">
-                Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · nº = ordem de envio a campo)</span>
+                Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · nº = ordem · destino = local de entrega)</span>
               </p>
+              {/* Resumo por destino (para a expedição romanear por local) */}
+              {destinosUsados.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {Object.entries(porDestino).map(([k, v]) => (
+                    <span key={k} className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                      k === "__sem__" ? "bg-gray-100 text-torg-gray" : "bg-torg-blue-50 text-torg-blue"
+                    }`}>
+                      {k === "__sem__" ? "Sem destino" : k}: {v.n} conj · {fmtKg(v.kg)}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <datalist id={`destinos-${obra.numero}`}>
+                {destinosUsados.map((d) => <option key={d} value={d} />)}
+              </datalist>
               <div className="overflow-x-auto rounded-lg border border-gray-100 max-h-72 overflow-y-auto">
                 <table className="w-full text-[11px]">
                   <thead className="bg-gray-50/60 sticky top-0">
@@ -390,6 +424,7 @@ function ObraCard({ obra }) {
                       <th className="text-right px-2 py-1.5 font-medium text-gray-500">Qtd</th>
                       <th className="text-right px-2 py-1.5 font-medium text-gray-500">Peso</th>
                       <th className="text-center px-2 py-1.5 font-medium text-gray-500">Situação</th>
+                      <th className="text-left px-2 py-1.5 font-medium text-gray-500">Destino (local de entrega)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -418,6 +453,16 @@ function ObraCard({ obra }) {
                             }`}>
                               {exp ? "Expedido" : pronto ? "Pronto p/ expedir" : (SETOR_LABEL[it.status] || it.status)}
                             </span>
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="text" list={`destinos-${obra.numero}`} value={it.destinoCampo ?? ""}
+                              onChange={(e) => onChangeDestino(it.id, e.target.value)}
+                              onBlur={(e) => salvarDestino(it.id, e.target.value)}
+                              disabled={salvandoId === it.id}
+                              placeholder="ex.: Canteiro A"
+                              className="w-36 px-1.5 py-0.5 text-[11px] border border-gray-200 rounded focus:border-torg-blue focus:ring-1 focus:ring-torg-blue/30 disabled:opacity-50"
+                            />
                           </td>
                         </tr>
                       );

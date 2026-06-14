@@ -1402,6 +1402,7 @@ model PecaConjunto {
   statusEstoque          String?                 // "DISPONIVEL" | "PARCIAL" | "INDISPONIVEL" | null (nao conferido)
   prioridade             Int?                    // prioridade manual na Programação (vazia = sem prioridade); preservada na reimportação LPC
   ordemCampo             Int?                    // ordem de envio a campo (1 = primeiro); vazio = sem prioridade
+  destinoCampo           String?                 // local/endereço de entrega deste conjunto (mesma OP pode ter vários)
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.
   corteOrdem             Int?                    // posição na fila (menor = corta primeiro)
