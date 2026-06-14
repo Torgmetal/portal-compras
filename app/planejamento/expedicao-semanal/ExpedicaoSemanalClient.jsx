@@ -208,9 +208,9 @@ function ObraRow({ obra, semanas }) {
 
   return (
     <tr className={`${isLate ? "bg-red-50/30" : ""} hover:bg-gray-50/50`}>
-      <td className="px-3 py-2 sticky left-0 bg-white z-10">
+      <td className="px-3 py-2 sticky left-0 bg-white z-10 min-w-[200px]">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-torg-blue font-mono">{fmtOP(obra.numero)}</span>
+          <span className="text-xs font-bold text-torg-blue font-mono whitespace-nowrap shrink-0">{fmtOP(obra.numero)}</span>
           <span className="text-xs text-torg-dark font-medium truncate max-w-[100px]">{obra.cliente}</span>
           {obra.obra && <span className="text-[10px] text-torg-gray truncate max-w-[80px]">({obra.obra})</span>}
         </div>
@@ -272,11 +272,11 @@ function ObraCard({ obra }) {
         onClick={() => setExpanded(!expanded)}
         className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/50 transition-colors"
       >
-        <div className="flex items-center gap-3">
-          <ChevronRight size={14} className={`text-torg-gray transition-transform ${expanded ? "rotate-90" : ""}`} />
-          <span className="text-sm font-bold text-torg-blue font-mono">{fmtOP(obra.numero)}</span>
-          <span className="text-sm text-torg-dark font-medium">{obra.cliente}</span>
-          {obra.obra && <span className="text-xs text-torg-gray">({obra.obra})</span>}
+        <div className="flex items-center gap-3 min-w-0">
+          <ChevronRight size={14} className={`text-torg-gray transition-transform shrink-0 ${expanded ? "rotate-90" : ""}`} />
+          <span className="text-sm font-bold text-torg-blue font-mono whitespace-nowrap shrink-0">{fmtOP(obra.numero)}</span>
+          <span className="text-sm text-torg-dark font-medium truncate">{obra.cliente}</span>
+          {obra.obra && <span className="text-xs text-torg-gray whitespace-nowrap shrink-0">({obra.obra})</span>}
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
