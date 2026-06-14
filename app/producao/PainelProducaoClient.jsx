@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw, AlertTriangle, Clock, ChevronDown, ChevronUp, ArrowRight,
-  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, Activity,
+  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck,
 } from "lucide-react";
 
 const fmtKg = (v) => {
@@ -28,14 +28,10 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
   const router = useRouter();
   const [verFuros, setVerFuros] = useState(false);
 
-  // KPIs derivados
+  // Total apontado hoje (usado no rótulo da seção de apontamento por setor)
   const apontHoje = useMemo(() => {
     return setores.reduce((a, s) => ({ kg: a.kg + s.hojeKg, un: a.un + s.hojeUn }), { kg: 0, un: 0 });
   }, [setores]);
-  const wip = useMemo(() => {
-    const sts = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
-    return sts.reduce((a, s) => ({ pecas: a.pecas + pipe[s].pecas, kg: a.kg + pipe[s].kg }), { pecas: 0, kg: 0 });
-  }, [pipe]);
 
   const maxHoje = Math.max(1, ...setores.map((s) => s.hojeKg));
   const maxSem = Math.max(1, ...semanas.map((s) => s.kg));
@@ -57,18 +53,6 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
         >
           <RefreshCw size={14} /> Atualizar
         </button>
-      </div>
-
-      {/* Hero KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard cor="bg-torg-blue-50 text-torg-blue ring-2 ring-offset-1 ring-torg-blue-300"
-          rotulo="Apontado hoje (Syneco)" valor={`${apontHoje.un} un`} sub={fmtKg(apontHoje.kg)} icon={Activity} />
-        <KpiCard cor="bg-amber-50 text-amber-700"
-          rotulo="Em produção" valor={`${wip.pecas} conj.`} sub={`${fmtKg(wip.kg)} · montagem → pintura`} />
-        <KpiCard cor="bg-sky-50 text-sky-700"
-          rotulo="No corte" valor={`${pipe.CORTE.pecas} pç`} sub={fmtKg(pipe.CORTE.kg)} />
-        <KpiCard cor="bg-gray-50 text-torg-gray"
-          rotulo="Aguardando liberação" valor={`${pipe.PENDENTE.pecas} pç`} sub={fmtKg(pipe.PENDENTE.kg)} />
       </div>
 
       {/* Pipeline da fábrica */}
@@ -196,15 +180,3 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
   );
 }
 
-function KpiCard({ cor, rotulo, valor, sub, icon: Icon }) {
-  return (
-    <div className={`rounded-xl p-3 ${cor}`}>
-      <div className="flex items-center gap-1.5">
-        {Icon && <Icon size={13} className="opacity-70" />}
-        <p className="text-[10px] font-medium uppercase tracking-wide opacity-70">{rotulo}</p>
-      </div>
-      <p className="text-2xl font-extrabold tabular-nums mt-1 leading-none">{valor}</p>
-      <p className="text-[10px] opacity-70 mt-1">{sub}</p>
-    </div>
-  );
-}
