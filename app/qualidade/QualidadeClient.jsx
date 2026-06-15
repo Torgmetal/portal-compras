@@ -102,7 +102,7 @@ export default function QualidadeClient() {
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2">
-            <ShieldCheck size={20} className="text-violet-700" /> Controle de Documentos
+            <ShieldCheck size={20} className="text-torg-blue" /> Controle de Documentos
           </h1>
           <p className="text-xs text-torg-gray mt-0.5">
             Documentos amarrados a norma + validade. O status (vigente / vencendo / vencido) é calculado automaticamente. <span className="text-torg-gray/80">Padrão NBR 16775.</span>
@@ -110,15 +110,15 @@ export default function QualidadeClient() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={() => setCasar(true)}
-            className="text-sm font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+            className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
             <Paperclip size={15} /> Casar PDFs
           </button>
           <button onClick={() => setImportar(true)}
-            className="text-sm font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+            className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
             <FileSpreadsheet size={15} /> Importar (CMR)
           </button>
           <button onClick={() => setModal({ ...VAZIO })}
-            className="text-sm font-semibold text-white bg-violet-700 hover:bg-violet-800 px-4 py-2 rounded-lg inline-flex items-center gap-2">
+            className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-2 rounded-lg inline-flex items-center gap-2">
             <Plus size={15} /> Novo documento
           </button>
         </div>
@@ -146,7 +146,7 @@ export default function QualidadeClient() {
           <div className="relative flex-1 min-w-[220px]">
             <Search size={14} className="absolute left-2.5 top-2.5 text-torg-gray" />
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, norma, vínculo, corrida…"
-              className="w-full pl-8 pr-2 py-1.5 text-[13px] border border-gray-200 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-300" />
+              className="w-full pl-8 pr-2 py-1.5 text-[13px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
           </div>
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="text-[13px] border border-gray-200 rounded-lg px-2 py-1.5">
             {STATUS_FILTROS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -195,7 +195,7 @@ export default function QualidadeClient() {
                     <div className="font-medium text-torg-dark">{d.nome}</div>
                     <div className="text-[11px] text-torg-gray flex items-center gap-1.5">
                       {d.tipo || "—"}
-                      {d.numeroCorrida && <span className="text-violet-700 font-mono">· corrida {d.numeroCorrida}</span>}
+                      {d.numeroCorrida && <span className="text-torg-blue font-mono">· corrida {d.numeroCorrida}</span>}
                     </div>
                   </td>
                   <td className="px-3 py-2"><span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-torg-gray">{CATEGORIA_LABEL[d.categoria] || d.categoria}</span></td>
@@ -275,7 +275,7 @@ function ModalCasarPdfs({ onClose, onCasado }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><Paperclip size={15} className="text-violet-700" /> Casar PDFs dos certificados</p>
+          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><Paperclip size={15} className="text-torg-blue" /> Casar PDFs dos certificados</p>
           <button onClick={onClose} className="p-1 text-torg-gray hover:text-torg-dark rounded hover:bg-gray-100"><X size={16} /></button>
         </div>
 
@@ -285,10 +285,10 @@ function ModalCasarPdfs({ onClose, onCasado }) {
               <label className="block">
                 <span className="text-[10px] font-medium text-torg-gray uppercase">Link da pasta de certificados (SharePoint)</span>
                 <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…sharepoint.com/:f:/s/TorgMetal/…"
-                  className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-300" />
+                  className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
                 <span className="text-[10px] text-torg-gray">Casa os PDFs (nomeados pelo índice, ex.: “R 260001.pdf”) com os documentos importados do CMR. Faixas (“R 260007 á 008”) atendem vários.</span>
               </label>
-              <button onClick={previsualizar} disabled={carregando} className="text-[12px] font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
+              <button onClick={previsualizar} disabled={carregando} className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
                 {carregando ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />} Pré-visualizar
               </button>
 
@@ -297,7 +297,7 @@ function ModalCasarPdfs({ onClose, onCasado }) {
                   <p className="text-[11px] text-torg-gray truncate" title={preview.pasta}>Pasta: {preview.pasta}</p>
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <Mini label="PDFs" v={preview.totalPdfs} />
-                    <Mini label="A casar" v={preview.casaveis} cor="text-violet-700" />
+                    <Mini label="A casar" v={preview.casaveis} cor="text-torg-blue" />
                     <Mini label="Já c/ arquivo" v={preview.jaComArquivo} cor="text-torg-gray" />
                     <Mini label="Sem PDF" v={preview.semPdf} cor={preview.semPdf ? "text-amber-700" : "text-emerald-700"} />
                   </div>
@@ -323,12 +323,12 @@ function ModalCasarPdfs({ onClose, onCasado }) {
 
         <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
           {resultado ? (
-            <button onClick={onCasado} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800">Concluir</button>
+            <button onClick={onCasado} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark">Concluir</button>
           ) : (
             <>
               <button onClick={onClose} disabled={casando} className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100 disabled:opacity-50">Cancelar</button>
               <button onClick={confirmar} disabled={casando || !preview || preview.casaveis === 0}
-                className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800 disabled:opacity-50 inline-flex items-center gap-1.5">
+                className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
                 {casando ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Casar {preview ? `${preview.casaveis}` : ""}
               </button>
             </>
@@ -383,7 +383,7 @@ function ModalImportar({ onClose, onImported }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><FileSpreadsheet size={15} className="text-violet-700" /> Importar do CMR (rastreabilidade)</p>
+          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><FileSpreadsheet size={15} className="text-torg-blue" /> Importar do CMR (rastreabilidade)</p>
           <button onClick={onClose} className="p-1 text-torg-gray hover:text-torg-dark rounded hover:bg-gray-100"><X size={16} /></button>
         </div>
 
@@ -393,10 +393,10 @@ function ModalImportar({ onClose, onImported }) {
               <label className="block">
                 <span className="text-[10px] font-medium text-torg-gray uppercase">Link de compartilhamento do CMR (SharePoint)</span>
                 <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…sharepoint.com/:x:/s/TorgMetal/…"
-                  className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-300" />
+                  className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
                 <span className="text-[10px] text-torg-gray">Lê a aba do ano, detecta as colunas pelo cabeçalho e valida a corrida. Nada é gravado até você confirmar.</span>
               </label>
-              <button onClick={previsualizar} disabled={carregando} className="text-[12px] font-semibold text-violet-700 border border-violet-300 hover:bg-violet-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
+              <button onClick={previsualizar} disabled={carregando} className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
                 {carregando ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />} Pré-visualizar
               </button>
 
@@ -405,7 +405,7 @@ function ModalImportar({ onClose, onImported }) {
                   <p className="text-[11px] text-torg-gray"><strong className="text-torg-dark">{preview.arquivo}</strong> · aba {preview.sheet}</p>
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <Mini label="Linhas" v={preview.resumo.total} />
-                    <Mini label="Novos" v={preview.resumo.novos} cor="text-violet-700" />
+                    <Mini label="Novos" v={preview.resumo.novos} cor="text-torg-blue" />
                     <Mini label="Já importados" v={preview.resumo.jaImportados} cor="text-torg-gray" />
                     <Mini label="Sem corrida" v={preview.resumo.semCorrida} cor={preview.resumo.semCorrida ? "text-amber-700" : "text-emerald-700"} />
                   </div>
@@ -451,12 +451,12 @@ function ModalImportar({ onClose, onImported }) {
 
         <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
           {resultado ? (
-            <button onClick={onImported} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800">Concluir</button>
+            <button onClick={onImported} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark">Concluir</button>
           ) : (
             <>
               <button onClick={onClose} disabled={importando} className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100 disabled:opacity-50">Cancelar</button>
               <button onClick={confirmar} disabled={importando || !preview || preview.resumo.novos === 0}
-                className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800 disabled:opacity-50 inline-flex items-center gap-1.5">
+                className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
                 {importando ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Importar {preview ? `${preview.resumo.novos} novo(s)` : ""}
               </button>
             </>
@@ -478,7 +478,7 @@ function Mini({ label, v, cor = "text-torg-dark" }) {
 
 function KpiCard({ label, valor, cor, Icon, ativo, onClick }) {
   return (
-    <button onClick={onClick} className={`text-left rounded-xl border p-3 transition-shadow hover:shadow-sm ${ativo ? "border-violet-400 ring-1 ring-violet-200" : "border-gray-100"} bg-white`}>
+    <button onClick={onClick} className={`text-left rounded-xl border p-3 transition-shadow hover:shadow-sm ${ativo ? "border-torg-blue-400 ring-1 ring-torg-blue-200" : "border-gray-100"} bg-white`}>
       <div className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${cor}`}><Icon size={12} /> {label}</div>
       <p className="text-2xl font-bold text-torg-dark mt-1.5">{valor}</p>
     </button>
@@ -487,7 +487,7 @@ function KpiCard({ label, valor, cor, Icon, ativo, onClick }) {
 
 function Chip({ ativo, onClick, children }) {
   return (
-    <button onClick={onClick} className={`text-[12px] px-2.5 py-1 rounded-lg font-medium transition-colors ${ativo ? "bg-violet-700 text-white" : "bg-gray-100 text-torg-gray hover:bg-gray-200"}`}>{children}</button>
+    <button onClick={onClick} className={`text-[12px] px-2.5 py-1 rounded-lg font-medium transition-colors ${ativo ? "bg-torg-blue text-white" : "bg-gray-100 text-torg-gray hover:bg-gray-200"}`}>{children}</button>
   );
 }
 
@@ -542,7 +542,7 @@ function ModalDocumento({ doc, onClose, onSaved }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><FileText size={15} className="text-violet-700" /> {editando ? "Editar documento" : "Novo documento"}</p>
+          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><FileText size={15} className="text-torg-blue" /> {editando ? "Editar documento" : "Novo documento"}</p>
           <button onClick={onClose} className="p-1 text-torg-gray hover:text-torg-dark rounded hover:bg-gray-100"><X size={16} /></button>
         </div>
 
@@ -551,11 +551,11 @@ function ModalDocumento({ doc, onClose, onSaved }) {
           <div className="rounded-lg border border-dashed border-gray-300 p-3">
             <label className="text-[11px] font-semibold text-torg-gray uppercase">Arquivo (scan PDF / imagem){editando ? " — opcional (troca o atual)" : ""}</label>
             <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="mt-1 block w-full text-[12px] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-violet-50 file:text-violet-700 file:font-medium hover:file:bg-violet-100" />
+              className="mt-1 block w-full text-[12px] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-torg-blue-50 file:text-torg-blue file:font-medium hover:file:bg-torg-blue-100" />
             {file && <p className="text-[11px] text-torg-gray mt-1">{file.name} · {fmtTam(file.size)}</p>}
             {editando && doc.temArquivo && !file && <p className="text-[11px] text-emerald-700 mt-1">Já possui arquivo anexado.</p>}
             {pct != null && (
-              <div className="mt-2"><div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-violet-600 rounded-full transition-all" style={{ width: `${pct}%` }} /></div><p className="text-[10px] text-torg-gray mt-0.5">Enviando arquivo… {pct}%</p></div>
+              <div className="mt-2"><div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${pct}%` }} /></div><p className="text-[10px] text-torg-gray mt-0.5">Enviando arquivo… {pct}%</p></div>
             )}
           </div>
 
@@ -578,7 +578,7 @@ function ModalDocumento({ doc, onClose, onSaved }) {
 
         <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
           <button onClick={onClose} disabled={salvando} className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100 disabled:opacity-50">Cancelar</button>
-          <button onClick={salvar} disabled={salvando} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800 disabled:opacity-50 inline-flex items-center gap-1.5">
+          <button onClick={salvar} disabled={salvando} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
             {salvando ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {editando ? "Salvar" : "Cadastrar"}
           </button>
         </div>
@@ -587,7 +587,7 @@ function ModalDocumento({ doc, onClose, onSaved }) {
   );
 }
 
-const inp = "mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-300";
+const inp = "mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300";
 
 function Campo({ label, children, full }) {
   return (

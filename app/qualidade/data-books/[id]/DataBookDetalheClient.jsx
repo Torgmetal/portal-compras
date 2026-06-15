@@ -112,7 +112,7 @@ export default function DataBookDetalheClient({ id }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-lg font-bold text-torg-dark flex items-center gap-2">
-              <BookCheck size={18} className="text-violet-700" /> {fmtOP(data.opNumero)} <span className="text-torg-gray font-normal">· {data.cliente || "—"}</span>
+              <BookCheck size={18} className="text-torg-blue" /> {fmtOP(data.opNumero)} <span className="text-torg-gray font-normal">· {data.cliente || "—"}</span>
             </h1>
             <p className="text-xs text-torg-gray mt-0.5">
               {data.obra ? `${data.obra} · ` : ""}<span className="inline-flex items-center gap-1"><Weight size={11} /> {fmtKg(data.pesoTotalKg)}</span>{data.pecas ? ` · ${data.pecas} peças` : ""}
@@ -121,7 +121,7 @@ export default function DataBookDetalheClient({ id }) {
           <div className="text-right shrink-0 flex items-center gap-2">
             <a href={`/api/qualidade/data-books/${id}/pdf?inline=1`} target="_blank" rel="noreferrer"
               title="Gerar e baixar o PDF do data book (rascunho se ainda incompleto)"
-              className="text-[12px] font-semibold text-violet-700 border border-violet-300 rounded-lg px-3 py-1.5 hover:bg-violet-50 inline-flex items-center gap-1.5">
+              className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 inline-flex items-center gap-1.5">
               <FileDown size={13} /> Baixar PDF
             </a>
             {data.status === "EMITIDO" ? (
@@ -129,7 +129,7 @@ export default function DataBookDetalheClient({ id }) {
             ) : (
               <button onClick={emitir} disabled={emitindo || !r.podeEmitir}
                 title={r.podeEmitir ? "Emitir data book" : `Faltam ${r.pendentes} seção(ões) e ${r.bloqueadas} com documento vencido`}
-                className="text-[12px] font-semibold text-white bg-violet-700 rounded-lg px-3 py-1.5 hover:bg-violet-800 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">
+                className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5">
                 {emitindo ? <Loader2 size={13} className="animate-spin" /> : r.podeEmitir ? <CheckCircle2 size={13} /> : <Lock size={13} />} Emitir data book
               </button>
             )}
@@ -142,7 +142,7 @@ export default function DataBookDetalheClient({ id }) {
             <span>{r.anexadas} de {r.obrigatorias} seções obrigatórias · {r.na} N/A</span>
             <span className="font-semibold text-torg-dark">{r.progresso}%</span>
           </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${r.progresso}%` }} /></div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${r.progresso}%` }} /></div>
           {(r.pendentes > 0 || r.bloqueadas > 0) && data.status !== "EMITIDO" && (
             <p className="text-[11px] text-amber-700 mt-1.5 inline-flex items-center gap-1">
               <Lock size={11} /> Emissão travada: {r.pendentes} pendente(s){r.bloqueadas > 0 ? ` · ${r.bloqueadas} com documento vencido` : ""}.
@@ -197,9 +197,9 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
               {secao.documentos.map((d) => (
                 <div key={d.id} className="flex items-center justify-between gap-2 text-[11px]">
                   <div className="min-w-0 flex items-center gap-1.5">
-                    <FileText size={12} className="text-violet-700 shrink-0" />
+                    <FileText size={12} className="text-torg-blue shrink-0" />
                     <span className="text-torg-dark truncate">{d.nome}</span>
-                    {d.numeroCorrida && <span className="text-violet-700 font-mono shrink-0">corrida {d.numeroCorrida}</span>}
+                    {d.numeroCorrida && <span className="text-torg-blue font-mono shrink-0">corrida {d.numeroCorrida}</span>}
                     <span className={`px-1.5 py-0.5 rounded-full font-medium shrink-0 ${STATUS_COR[d.status]}`}>{d.statusLabel}</span>
                     {!d.validado && <span className="text-[9px] text-blue-700 shrink-0">a validar</span>}
                   </div>
@@ -216,11 +216,11 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
           )}
 
           {!picker ? (
-            <button onClick={() => setPicker(true)} className="text-[11px] text-violet-700 hover:text-violet-900 inline-flex items-center gap-1 mt-1.5 font-medium"><Plus size={12} /> Vincular documento</button>
+            <button onClick={() => setPicker(true)} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 mt-1.5 font-medium"><Plus size={12} /> Vincular documento</button>
           ) : (
             <div className="mt-1.5 flex items-center gap-2">
               <select autoFocus onChange={(e) => { onVincular(e.target.value); setPicker(false); }} defaultValue=""
-                className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-violet-500">
+                className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue">
                 <option value="" disabled>Selecione um documento da OP…</option>
                 {disponiveis.map((c) => (
                   <option key={c.id} value={c.id}>{c.nome}{c.numeroCorrida ? ` (corrida ${c.numeroCorrida})` : ""} — {c.statusLabel}</option>

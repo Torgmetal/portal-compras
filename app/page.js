@@ -82,7 +82,7 @@ const portais = [
     label: "Qualidade",
     desc: "Controle de documentos (norma + validade) e data books por OP.",
     Icon: ShieldCheck,
-    bg: "bg-violet-700",
+    bg: "bg-torg-blue",
   },
   {
     href: "/fornecedores",

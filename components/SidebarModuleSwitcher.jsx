@@ -77,7 +77,7 @@ const MODULOS = [
     label: "Qualidade",
     desc: "Documentos e data books (NBR 16775)",
     icon: ShieldCheck,
-    cor: "bg-violet-100 text-violet-700",
+    cor: "bg-torg-blue-100 text-torg-blue",
     modulos: ["QUALIDADE"],
   },
   {

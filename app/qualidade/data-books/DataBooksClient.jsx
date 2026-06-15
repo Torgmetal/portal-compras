@@ -37,11 +37,11 @@ export default function DataBooksClient() {
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2">
-            <BookCheck size={20} className="text-violet-700" /> Data Books
+            <BookCheck size={20} className="text-torg-blue" /> Data Books
           </h1>
           <p className="text-xs text-torg-gray mt-0.5">Dossiês de qualidade por OP — 20 seções amarradas à norma (NBR 16775).</p>
         </div>
-        <button onClick={() => setModal(true)} className="text-sm font-semibold text-white bg-violet-700 hover:bg-violet-800 px-4 py-2 rounded-lg inline-flex items-center gap-2 shrink-0">
+        <button onClick={() => setModal(true)} className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-2 rounded-lg inline-flex items-center gap-2 shrink-0">
           <Plus size={15} /> Novo data book
         </button>
       </div>
@@ -62,7 +62,7 @@ export default function DataBooksClient() {
             <Link key={b.id} href={`/qualidade/data-books/${b.id}`} className="block bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-sm font-bold text-violet-700 font-mono whitespace-nowrap">{fmtOP(b.opNumero)}</span>
+                  <span className="text-sm font-bold text-torg-blue font-mono whitespace-nowrap">{fmtOP(b.opNumero)}</span>
                   <span className="text-sm text-torg-dark font-medium truncate">{b.cliente || "—"}</span>
                   {b.obra && <span className="text-xs text-torg-gray whitespace-nowrap shrink-0">({b.obra})</span>}
                 </div>
@@ -79,7 +79,7 @@ export default function DataBooksClient() {
                 </div>
               </div>
               <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${b.progresso}%` }} />
+                <div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${b.progresso}%` }} />
               </div>
             </Link>
           ))}
@@ -118,7 +118,7 @@ function ModalNovo({ onClose, onCreated }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><BookCheck size={15} className="text-violet-700" /> Novo data book</p>
+          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><BookCheck size={15} className="text-torg-blue" /> Novo data book</p>
           <button onClick={onClose} className="p-1 text-torg-gray hover:text-torg-dark rounded hover:bg-gray-100"><X size={16} /></button>
         </div>
         <div className="px-4 py-4">
@@ -126,14 +126,14 @@ function ModalNovo({ onClose, onCreated }) {
             <span className="text-[10px] font-medium text-torg-gray uppercase">OP (número)</span>
             <input value={op} onChange={(e) => setOp(e.target.value)} placeholder="ex.: 083" autoFocus
               onKeyDown={(e) => e.key === "Enter" && criar()}
-              className="mt-1 w-full px-2 py-1.5 text-[13px] border border-gray-200 rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-300" />
+              className="mt-1 w-full px-2 py-1.5 text-[13px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
           </label>
           <p className="text-[11px] text-torg-gray mt-2">Puxa cliente, obra, peso e nº de peças da OP e cria as 20 seções.</p>
           {erro && <p className="text-[11px] text-red-600 flex items-center gap-1 mt-2"><AlertCircle size={12} /> {erro}</p>}
         </div>
         <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
           <button onClick={onClose} disabled={salvando} className="px-3 py-1.5 text-[12px] text-torg-gray hover:text-torg-dark rounded-lg hover:bg-gray-100 disabled:opacity-50">Cancelar</button>
-          <button onClick={criar} disabled={salvando} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-violet-700 rounded-lg hover:bg-violet-800 disabled:opacity-50 inline-flex items-center gap-1.5">
+          <button onClick={criar} disabled={salvando} className="px-3 py-1.5 text-[12px] font-semibold text-white bg-torg-blue rounded-lg hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
             {salvando ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Criar
           </button>
         </div>
