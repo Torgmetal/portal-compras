@@ -81,6 +81,23 @@ export default function DataBookDetalheClient({ id }) {
     }
   }
 
+  async function popularMaterial(secao) {
+    setAcao(secao.id);
+    try {
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/popular-material`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
+      if (json.semDocs) {
+        alert("Nenhum certificado de material desta OP no Controle de Documentos. Importe o CMR (aba Rastreabilidade) e confira a OP dos certificados.");
+      }
+      await carregar();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setAcao(null);
+    }
+  }
+
   async function emitir() {
     if (!confirm("Emitir o data book? (a geração do PDF entra na próxima fase)")) return;
     setEmitindo(true);
@@ -164,14 +181,15 @@ export default function DataBookDetalheClient({ id }) {
       <div className="space-y-2">
         {data.secoes.map((s) => (
           <SecaoCard key={s.id} secao={s} candidatos={data.candidatos} acaoLoading={acao === s.id}
-            onEstado={(e) => setEstado(s, e)} onVincular={(docId) => vincular(s, docId)} onDesvincular={(docId) => desvincular(s, docId)} />
+            onEstado={(e) => setEstado(s, e)} onVincular={(docId) => vincular(s, docId)} onDesvincular={(docId) => desvincular(s, docId)}
+            onPopularMaterial={() => popularMaterial(s)} />
         ))}
       </div>
     </div>
   );
 }
 
-function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular }) {
+function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial }) {
   const [picker, setPicker] = useState(false);
   const linkedIds = new Set(secao.documentos.map((d) => d.id));
   const disponiveis = candidatos.filter((c) => !linkedIds.has(c.id));
@@ -225,7 +243,15 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
           )}
 
           {!picker ? (
-            <button onClick={() => setPicker(true)} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 mt-1.5 font-medium"><Plus size={12} /> Vincular documento</button>
+            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+              <button onClick={() => setPicker(true)} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={12} /> Vincular documento</button>
+              {secao.numero === "04" && (
+                <button onClick={onPopularMaterial} disabled={acaoLoading}
+                  className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+                  <FileText size={12} /> Trazer certificados de material desta OP
+                </button>
+              )}
+            </div>
           ) : (
             <div className="mt-1.5 flex items-center gap-2">
               <select autoFocus onChange={(e) => { onVincular(e.target.value); setPicker(false); }} defaultValue=""
