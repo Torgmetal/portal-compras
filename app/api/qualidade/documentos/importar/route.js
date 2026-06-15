@@ -14,7 +14,11 @@ import { isBlobUrlSegura } from "@/lib/blob-url";
 import { parseCMR } from "@/lib/parse-cmr";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// CMR é grande (~17MB): download do SharePoint + parse do ExcelJS pode passar de 60s
+// e a função estoura o tempo → Vercel devolve HTML e o cliente quebra no res.json()
+// ("Unexpected token '<'" no Chrome / "The string did not match the expected pattern."
+// no Safari). Pro permite até 300s. O upload direto (Blob) evita o download lento.
+export const maxDuration = 300;
 
 const bodySchema = z.object({ url: z.string().url().optional() });
 
