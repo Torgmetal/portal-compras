@@ -63,6 +63,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [filtroAtendimento, setFiltroAtendimento] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroPerfil, setFiltroPerfil] = useState("");
+  const [filtroPerfilDesc, setFiltroPerfilDesc] = useState(""); // descrição/dimensão do perfil (ex.: 150x13)
   const [filtroParte, setFiltroParte] = useState("");
   const [filtroPrioridade, setFiltroPrioridade] = useState(""); // "", "COM", "SEM" ou "1","2"…
   const [busca, setBusca] = useState("");
@@ -123,6 +124,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       if (filtroTipo === "CROQUI" && p.tipoPeca !== "CROQUI") return false;
       if (filtroTipo === "PECA" && p.tipoPeca != null) return false;
       if (filtroPerfil && tipoPerfil(p) !== filtroPerfil) return false;
+      if (filtroPerfilDesc && (p.descricao || p.perfil || "") !== filtroPerfilDesc) return false;
       if (filtroParte && parteDe(p) !== filtroParte) return false;
       if (filtroPrioridade === "COM" && p.prioridade == null) return false;
       if (filtroPrioridade === "SEM" && p.prioridade != null) return false;
@@ -145,12 +147,17 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       }
       return true;
     });
-  }, [pecas, filtroOp, filtroStatus, filtroTipo, filtroPerfil, filtroParte, filtroPrioridade, filtroMaquina, filtroAtendimento, busca]);
+  }, [pecas, filtroOp, filtroStatus, filtroTipo, filtroPerfil, filtroPerfilDesc, filtroParte, filtroPrioridade, filtroMaquina, filtroAtendimento, busca]);
 
   // Opções dos filtros novos (tipos de perfil existentes; partes da OP selecionada)
   const perfis = useMemo(
     () => [...new Set(pecas.map(tipoPerfil).filter((x) => x && x !== "—"))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
     [pecas]
+  );
+  // Descrições/dimensões de perfil (ex.: CH9.50X113, W200X26.6) — escopadas pelo tipo selecionado
+  const perfisDesc = useMemo(
+    () => [...new Set(pecas.filter((p) => !filtroPerfil || tipoPerfil(p) === filtroPerfil).map((p) => p.descricao || p.perfil || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    [pecas, filtroPerfil]
   );
   // Prioridades distintas existentes (para o dropdown)
   const prioridades = useMemo(
@@ -787,6 +794,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       filtroOp ? `OP-${filtroOp}` : null,
       filtroParte ? `Parte ${filtroParte}` : null,
       filtroPerfil ? `Perfil ${filtroPerfil}` : null,
+      filtroPerfilDesc ? `Descrição ${filtroPerfilDesc}` : null,
       filtroPrioridade === "COM" ? "Com prioridade" : filtroPrioridade === "SEM" ? "Sem prioridade" : filtroPrioridade ? `Prioridade ${filtroPrioridade}` : null,
       filtroStatus ? STATUS_LABEL[filtroStatus] : null,
       filtroMaquina ? (MAQUINA_LABEL[filtroMaquina] || filtroMaquina) : null,
@@ -1172,6 +1180,15 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           {perfis.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
         <select
+          value={filtroPerfilDesc}
+          onChange={(e) => { setFiltroPerfilDesc(e.target.value); setSelecionados(new Set()); }}
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white max-w-[170px]"
+          title="Descrição/dimensão do perfil (ex.: CH9.50X113, W200X26.6)"
+        >
+          <option value="">Todas as descrições</option>
+          {perfisDesc.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select
           value={filtroMaquina}
           onChange={(e) => { setFiltroMaquina(e.target.value); setSelecionados(new Set()); }}
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
@@ -1214,9 +1231,9 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
         >
           <Download size={13} /> Exportar
         </button>
-        {(filtroOp || filtroTipo || filtroPerfil || filtroParte || filtroPrioridade || filtroMaquina || filtroAtendimento || busca) && (
+        {(filtroOp || filtroTipo || filtroPerfil || filtroPerfilDesc || filtroParte || filtroPrioridade || filtroMaquina || filtroAtendimento || busca) && (
           <button
-            onClick={() => { setFiltroOp(""); setFiltroTipo(""); setFiltroPerfil(""); setFiltroParte(""); setFiltroPrioridade(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
+            onClick={() => { setFiltroOp(""); setFiltroTipo(""); setFiltroPerfil(""); setFiltroPerfilDesc(""); setFiltroParte(""); setFiltroPrioridade(""); setFiltroMaquina(""); setFiltroAtendimento(""); setBusca(""); }}
             className="text-xs text-torg-gray hover:text-torg-dark"
           >
             limpar
