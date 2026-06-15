@@ -341,6 +341,7 @@ model OPReceita {
   irrfPct       Float?
   csllPct       Float?
   observacao    String?
+  enderecoFaturamento String? // endereço de entrega/faturamento da linha (obra com múltiplos endereços)
   createdById   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

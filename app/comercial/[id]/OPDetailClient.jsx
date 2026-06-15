@@ -772,6 +772,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         <ModalReceita
           opId={op.id}
           receita={modalReceita === "nova" ? null : modalReceita}
+          enderecosSugeridos={[...new Set([...(op.receitas || []).map((r) => r.enderecoFaturamento), op.clienteEndereco].filter(Boolean))]}
           onClose={() => setModalReceita(null)}
           onSaved={() => { setModalReceita(null); router.refresh(); }}
         />
@@ -1845,12 +1846,13 @@ function ReceitasTabela({ receitas, onEditar }) {
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[700px]">
+      <table className="w-full text-sm min-w-[820px]">
         <thead className="bg-gray-50">
           <tr>
             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">CFOP</th>
+            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Endereço</th>
             <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Bruto</th>
             <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Impostos</th>
             <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Líquido</th>
@@ -1870,6 +1872,7 @@ function ReceitasTabela({ receitas, onEditar }) {
                 </td>
                 <td className="px-4 py-2 text-torg-dark">{r.descricao}</td>
                 <td className="px-4 py-2 text-torg-gray text-xs font-mono">{r.cfop || "—"}</td>
+                <td className="px-4 py-2 text-torg-gray text-xs max-w-[180px] truncate" title={r.enderecoFaturamento || ""}>{r.enderecoFaturamento || "—"}</td>
                 <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{fmtMoeda(r.valor)}</td>
                 <td className="px-4 py-2 text-right text-torg-orange-700 tabular-nums text-xs">
                   − {fmtMoeda(impostosVal)}
@@ -1920,7 +1923,7 @@ const CFOPS_SUGERIDOS = [
 ];
 
 // Modal de criar/editar receita
-function ModalReceita({ opId, receita, onClose, onSaved }) {
+function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = [] }) {
   const isEdit = !!receita;
   const [form, setForm] = useState({
     categoria: receita?.categoria || "PROJETO",
@@ -1936,6 +1939,7 @@ function ModalReceita({ opId, receita, onClose, onSaved }) {
     irrfPct: receita?.irrfPct ?? "",
     csllPct: receita?.csllPct ?? "",
     observacao: receita?.observacao || "",
+    enderecoFaturamento: receita?.enderecoFaturamento || "",
   });
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -1970,6 +1974,7 @@ function ModalReceita({ opId, receita, onClose, onSaved }) {
         irrfPct: form.irrfPct === "" ? null : Number(form.irrfPct),
         csllPct: form.csllPct === "" ? null : Number(form.csllPct),
         observacao: form.observacao || null,
+        enderecoFaturamento: form.enderecoFaturamento || null,
       };
       const res = await fetch(
         isEdit ? `/api/comercial/receita/${receita.id}` : `/api/comercial/op/${opId}/receita`,
@@ -2074,6 +2079,24 @@ function ModalReceita({ opId, receita, onClose, onSaved }) {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Endereço de entrega/faturamento</label>
+          <input
+            type="text"
+            list="endereco-fatur-suggest"
+            value={form.enderecoFaturamento}
+            onChange={(e) => set("enderecoFaturamento", e.target.value)}
+            placeholder="Ex: Galpão A — Rod. SP-340, km 12 (vazio = endereço padrão da obra)"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+          {enderecosSugeridos.length > 0 && (
+            <datalist id="endereco-fatur-suggest">
+              {enderecosSugeridos.map((e) => <option key={e} value={e} />)}
+            </datalist>
+          )}
+          <p className="text-[10px] text-torg-gray mt-0.5">Permite faturar/entregar linhas diferentes em endereços diferentes da mesma obra.</p>
         </div>
 
         {/* Impostos */}

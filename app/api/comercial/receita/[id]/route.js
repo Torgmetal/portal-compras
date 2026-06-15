@@ -17,6 +17,7 @@ const schema = z.object({
   irrfPct: z.number().min(0).max(100).optional().nullable(),
   csllPct: z.number().min(0).max(100).optional().nullable(),
   observacao: z.string().optional().nullable(),
+  enderecoFaturamento: z.string().optional().nullable(),
 });
 
 // PATCH — edita uma receita existente
