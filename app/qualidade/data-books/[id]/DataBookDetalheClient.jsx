@@ -158,6 +158,9 @@ export default function DataBookDetalheClient({ id }) {
       </div>
 
       {/* Seções */}
+      <p className="text-[11px] text-torg-gray mb-2">
+        Selecione as seções que <strong>compõem</strong> este data book — marque como <strong>N/A</strong> as que não se aplicam a esta obra/cliente (não entram no PDF).
+      </p>
       <div className="space-y-2">
         {data.secoes.map((s) => (
           <SecaoCard key={s.id} secao={s} candidatos={data.candidatos} acaoLoading={acao === s.id}
