@@ -48,7 +48,8 @@
  *   node mes-sync-agent.js --apont-dias 15          → apontamentos dos últimos 15 dias (backfill)
  *   node mes-sync-agent.js --apont-start 2026-06-01 → apontamentos desde 01/06 (backfill de buraco)
  *   node mes-sync-agent.js --so-apontamentos        → 1x: só o sync de apontamentos
- *   node mes-sync-agent.js --so-ordens              → 1x: só o snapshot de ordens
+ *   node mes-sync-agent.js --so-ordens              → 1x: só o snapshot de ordens (plano + produzido)
+ *   node mes-sync-agent.js --so-ordens --produzidas → 1x: ordens só das linhas COM produção (leve, p/ horária)
  *   node mes-sync-agent.js --start 2025-01-01       → ordens: snapshot desde 01/01/2025
  *   node mes-sync-agent.js --anos 2                 → ordens: snapshot dos últimos 2 anos
  */
@@ -73,6 +74,7 @@ const ARG_APONT_DIAS  = getArg("apont-dias");   // apontamentos
 const ARG_APONT_START = getArg("apont-start");  // apontamentos (backfill)
 const SO_APONTAMENTOS = temFlag("so-apontamentos");
 const SO_ORDENS       = temFlag("so-ordens");
+const SO_PRODUZIDAS   = temFlag("produzidas");    // ordens: envia só as linhas COM produção
 const LOOP            = temFlag("loop");          // roda continuamente (auto-agenda)
 const APONT_INTERVAL_MIN  = parseInt(process.env.APONT_INTERVAL_MIN  || "10", 10); // apontamentos a cada N min
 const ORDENS_INTERVAL_MIN = parseInt(process.env.ORDENS_INTERVAL_MIN || "60", 10); // ordens a cada M min
@@ -365,10 +367,20 @@ async function syncOrdens(token) {
   const linhas = await skaFetchSnapshot(token, inicio, hoje);
   log(`SKA retornou ${linhas.length} linhas em ${((Date.now()-tFetch)/1000).toFixed(1)}s`);
 
-  const ordens = linhas.map(transformarOrdem).filter(Boolean);
+  let ordens = linhas.map(transformarOrdem).filter(Boolean);
   const ign = linhas.length - ordens.length;
   const naoIniciadas = ordens.filter(o => o.produzidoUn === 0 && o.planejadoUn > 0).length;
   log(`${ordens.length} válidas${ign>0?` (${ign} ignoradas)`:""} · ${naoIniciadas} não iniciadas`);
+
+  // --produzidas: na sincronização HORÁRIA, envia só as linhas COM produção
+  // (pula as planejadas/não iniciadas, que não mudam de hora em hora — a carga
+  // diária leva o plano completo). Deixa a horária leve (~milhares em vez de ~50k).
+  if (SO_PRODUZIDAS) {
+    const antes = ordens.length;
+    ordens = ordens.filter(o => o.produzidoUn > 0 || o.pesoProduzido > 0 || o.rejeitadoUn > 0);
+    log(`Filtro --produzidas: ${ordens.length} linhas com produção (de ${antes})`);
+  }
+
   if (ordens.length === 0) { log("Nada a enviar (ordens)."); return; }
 
   const res = await enviarOrdens(ordens, inicio, hoje);
