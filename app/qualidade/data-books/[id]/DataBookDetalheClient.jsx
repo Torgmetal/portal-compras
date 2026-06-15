@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { FONTE_LABEL, ESTADO_DATABOOK } from "@/lib/databook-secoes";
 import { STATUS_COR } from "@/lib/qualidade-status";
+import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 
 const fmtKg = (v) => (!v ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
 const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
@@ -117,6 +118,11 @@ export default function DataBookDetalheClient({ id }) {
             <p className="text-xs text-torg-gray mt-0.5">
               {data.obra ? `${data.obra} · ` : ""}<span className="inline-flex items-center gap-1"><Weight size={11} /> {fmtKg(data.pesoTotalKg)}</span>{data.pecas ? ` · ${data.pecas} peças` : ""}
             </p>
+            {data.tipo && (
+              <span className="inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue font-medium">
+                {TIPO_DATABOOK_LABEL[data.tipo] || data.tipo}
+              </span>
+            )}
           </div>
           <div className="text-right shrink-0 flex items-center gap-2">
             <a href={`/api/qualidade/data-books/${id}/pdf?inline=1`} target="_blank" rel="noreferrer"

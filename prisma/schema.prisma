@@ -118,6 +118,9 @@ model OP {
   clienteTelefone      String?
   clienteUF            String?
   valorTotalContrato   Float?
+  // Definidos na abertura da OP
+  estoqueMaterial      String?              // "PROPRIO_TORG" | "CLIENTE_TERCEIRO"
+  tipoDataBook         String?              // "PADRAO_TORG" | "SNQC" | "RELATORIO_ACOMPANHAMENTO"
   aditivos             Aditivo[]
   ajustesPrazo         AjustePrazo[]
   cronogramas          Cronograma[]
@@ -1169,6 +1172,7 @@ model DataBookQualidade {
   obra        String?
   pesoTotalKg Float?
   pecas       Int?
+  tipo        String?         // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
   observacao  String?
   status      String          @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO
   emitidoEm   DateTime?

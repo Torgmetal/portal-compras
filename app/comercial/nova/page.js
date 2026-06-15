@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
+import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES } from "@/lib/op-opcoes";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -13,6 +14,7 @@ export default function NovaOP() {
   const [form, setForm] = useState({
     numero: "", cliente: "", obra: "", descricao: "",
     dataInicio: "", dataFimPrevista: "",
+    estoqueMaterial: "", tipoDataBook: "",
   });
   const [itens, setItens] = useState([novoItem()]);
   const [salvando, setSalvando] = useState(false);
@@ -137,6 +139,32 @@ export default function NovaOP() {
               onChange={(e) => set("dataFimPrevista", e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Estoque do material</label>
+            <select
+              value={form.estoqueMaterial}
+              onChange={(e) => set("estoqueMaterial", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+            >
+              <option value="">Selecione…</option>
+              {ESTOQUE_MATERIAL_OPCOES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <p className="text-[11px] text-torg-gray mt-1">De quem é o material: estoque próprio da Torg ou fornecido pelo cliente.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Data Book (qualidade)</label>
+            <select
+              value={form.tipoDataBook}
+              onChange={(e) => set("tipoDataBook", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+            >
+              <option value="">Selecione…</option>
+              {TIPO_DATABOOK_OPCOES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <p className="text-[11px] text-torg-gray mt-1">Nível do dossiê de qualidade que o cliente exige para esta obra.</p>
           </div>
         </div>
       </div>

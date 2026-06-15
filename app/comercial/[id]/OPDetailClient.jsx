@@ -10,6 +10,7 @@ import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 import MateriaisOPSection from "@/components/MateriaisOPSection";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
+import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import { fmtOP } from "@/lib/utils";
 
 const fmtMoeda = (v) =>
@@ -169,6 +170,20 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                   )}
                 </div>
                 {op.descricao && <p className="text-xs text-torg-gray mt-1.5 max-w-xl">{op.descricao}</p>}
+                {(op.estoqueMaterial || op.tipoDataBook) && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    {op.estoqueMaterial && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue font-medium">
+                        Material: {ESTOQUE_MATERIAL_LABEL[op.estoqueMaterial] || op.estoqueMaterial}
+                      </span>
+                    )}
+                    {op.tipoDataBook && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue font-medium">
+                        Data Book: {TIPO_DATABOOK_LABEL[op.tipoDataBook] || op.tipoDataBook}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-5 text-sm shrink-0">
@@ -1340,6 +1355,8 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
     dataInicio: fmtDateInput(op.dataInicio),
     dataFimPrevista: fmtDateInput(op.dataFimPrevista),
     valorTotalContrato: op.valorTotalContrato != null ? String(op.valorTotalContrato) : "",
+    estoqueMaterial: op.estoqueMaterial || "",
+    tipoDataBook: op.tipoDataBook || "",
   });
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -1374,6 +1391,8 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
           dataInicio: form.dataInicio || null,
           dataFimPrevista: form.dataFimPrevista || null,
           valorTotalContrato: !isNaN(valorTotalNum) && valorTotalNum > 0 ? valorTotalNum : null,
+          estoqueMaterial: form.estoqueMaterial || null,
+          tipoDataBook: form.tipoDataBook || null,
         }),
       });
       const data = await res.json();
@@ -1480,6 +1499,31 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
             Valor cheio acordado com o cliente — inclui receita Torg + tudo que será faturado em <strong>Faturamento Direto</strong> (em nome do cliente).
             Se deixar vazio, o sistema calcula automaticamente como <em>Receita + Verba FD</em>.
           </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Estoque do material</label>
+            <select
+              value={form.estoqueMaterial}
+              onChange={(e) => set("estoqueMaterial", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+            >
+              <option value="">Selecione…</option>
+              {ESTOQUE_MATERIAL_OPCOES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Data Book (qualidade)</label>
+            <select
+              value={form.tipoDataBook}
+              onChange={(e) => set("tipoDataBook", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
+            >
+              <option value="">Selecione…</option>
+              {TIPO_DATABOOK_OPCOES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
         </div>
       </div>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">

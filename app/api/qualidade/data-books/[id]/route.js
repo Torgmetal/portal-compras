@@ -68,7 +68,7 @@ async function montarDetalhe(id) {
 
   return {
     id: book.id, opNumero: book.opNumero, cliente: book.cliente, obra: book.obra,
-    pesoTotalKg: book.pesoTotalKg, pecas: book.pecas, observacao: book.observacao,
+    pesoTotalKg: book.pesoTotalKg, pecas: book.pecas, observacao: book.observacao, tipo: book.tipo,
     status: book.status, emitidoEm: book.emitidoEm, createdAt: book.createdAt,
     secoes, candidatos: candidatosResolvidos,
     resumo: {

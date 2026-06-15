@@ -74,7 +74,7 @@ export async function POST(req) {
   const op = await prisma.oP.findUnique({
     where: { numero: opNumero },
     select: {
-      id: true, cliente: true, obra: true,
+      id: true, cliente: true, obra: true, tipoDataBook: true,
       pecasConjunto: {
         where: { OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] },
         select: { qte: true, pesoTotalKg: true },
@@ -93,6 +93,7 @@ export async function POST(req) {
       opId: op.id,
       cliente: op.cliente || null,
       obra: op.obra || null,
+      tipo: op.tipoDataBook || null,
       pesoTotalKg,
       pecas,
       criadoPorId: user.id,

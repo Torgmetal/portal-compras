@@ -28,6 +28,8 @@ const opSchema = z.object({
   descricao: z.string().optional().nullable(),
   dataInicio: z.string().optional().nullable(),
   dataFimPrevista: z.string().optional().nullable(),
+  estoqueMaterial: z.enum(["PROPRIO_TORG", "CLIENTE_TERCEIRO"]).optional().nullable(),
+  tipoDataBook: z.enum(["PADRAO_TORG", "SNQC", "RELATORIO_ACOMPANHAMENTO"]).optional().nullable(),
   itens: z.array(itemSchema).min(1),
 });
 
@@ -62,6 +64,8 @@ export async function POST(req) {
       descricao: body.descricao || null,
       dataInicio: body.dataInicio ? new Date(body.dataInicio) : null,
       dataFimPrevista: body.dataFimPrevista ? new Date(body.dataFimPrevista) : null,
+      estoqueMaterial: body.estoqueMaterial || null,
+      tipoDataBook: body.tipoDataBook || null,
       createdById: user.id,
       itens: {
         create: body.itens.map((it, idx) => ({
