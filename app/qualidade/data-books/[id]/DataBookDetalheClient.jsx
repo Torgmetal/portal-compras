@@ -220,17 +220,19 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
       {secao.usaModulo1 && (
         <div className="mt-2 pt-2 border-t border-gray-50">
           {secao.documentos.length > 0 ? (
-            <div className="space-y-1">
+            <div className="divide-y divide-gray-50">
               {secao.documentos.map((d) => (
-                <div key={d.id} className="flex items-center justify-between gap-2 text-[11px]">
-                  <div className="min-w-0 flex items-center gap-1.5">
-                    <FileText size={12} className="text-torg-blue shrink-0" />
+                <div key={d.id} className="flex items-center justify-between gap-3 py-1 text-[12px]">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <FileText size={13} className="text-torg-blue shrink-0" />
                     <span className="text-torg-dark truncate">{d.nome}</span>
-                    {d.numeroCorrida && <span className="text-torg-blue font-mono shrink-0">corrida {d.numeroCorrida}</span>}
-                    <span className={`px-1.5 py-0.5 rounded-full font-medium shrink-0 ${STATUS_COR[d.status]}`}>{d.statusLabel}</span>
-                    {!d.validado && <span className="text-[9px] text-blue-700 shrink-0">a validar</span>}
                   </div>
-                  <button onClick={() => onDesvincular(d.id)} disabled={acaoLoading} className="text-torg-gray hover:text-red-600 shrink-0 disabled:opacity-50"><X size={13} /></button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {d.numeroCorrida && <span className="text-torg-gray font-mono text-[11px] whitespace-nowrap">corrida {d.numeroCorrida}</span>}
+                    {d.status !== "SEM_VALIDADE" && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COR[d.status]}`}>{d.statusLabel}</span>}
+                    {!d.validado && <span className="text-[10px] text-amber-600 whitespace-nowrap">a validar</span>}
+                    <button onClick={() => onDesvincular(d.id)} disabled={acaoLoading} className="text-torg-gray hover:text-red-600 disabled:opacity-50"><X size={14} /></button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -258,7 +260,7 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                 className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue">
                 <option value="" disabled>Selecione um documento da OP…</option>
                 {disponiveis.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nome}{c.numeroCorrida ? ` (corrida ${c.numeroCorrida})` : ""} — {c.statusLabel}</option>
+                  <option key={c.id} value={c.id}>{c.nome}{c.numeroCorrida ? ` (corrida ${c.numeroCorrida})` : ""}{c.status !== "SEM_VALIDADE" ? ` — ${c.statusLabel}` : ""}</option>
                 ))}
               </select>
               <button onClick={() => setPicker(false)} className="text-torg-gray hover:text-torg-dark"><X size={14} /></button>
