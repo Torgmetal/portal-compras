@@ -28,8 +28,8 @@ export async function GET(req) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
 
-  const url = new URL(req.url).searchParams.get("url") || process.env.SHAREPOINT_CERTS_URL;
-  if (!url) return NextResponse.json({ success: false, error: "Informe a URL de compartilhamento da pasta de certificados." }, { status: 400 });
+  // sem link → usa a pasta fixa de certificados (mapearCertificados trata null)
+  const url = new URL(req.url).searchParams.get("url") || process.env.SHAREPOINT_CERTS_URL || null;
 
   let mapa;
   try {
@@ -74,8 +74,7 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
 
-  const url = body.url || process.env.SHAREPOINT_CERTS_URL;
-  if (!url) return NextResponse.json({ success: false, error: "Informe a URL de compartilhamento da pasta de certificados." }, { status: 400 });
+  const url = body.url || process.env.SHAREPOINT_CERTS_URL || null;
 
   let mapa;
   try {

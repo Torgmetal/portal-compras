@@ -298,10 +298,10 @@ function ModalCasarPdfs({ onClose, onCasado }) {
 
   async function previsualizar() {
     setErro(""); setPreview(null); setResultado(null);
-    if (!url.trim()) { setErro("Cole o link da pasta de certificados."); return; }
     setCarregando(true);
     try {
-      const res = await fetch(`/api/qualidade/documentos/casar-pdfs?url=${encodeURIComponent(url.trim())}`);
+      const q = url.trim() ? `?url=${encodeURIComponent(url.trim())}` : ""; // vazio = pasta fixa de certificados
+      const res = await fetch(`/api/qualidade/documentos/casar-pdfs${q}`);
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro ao ler a pasta");
       setPreview(json);
@@ -312,7 +312,7 @@ function ModalCasarPdfs({ onClose, onCasado }) {
     setErro(""); setCasando(true);
     try {
       const res = await fetch("/api/qualidade/documentos/casar-pdfs", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: url.trim() }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(url.trim() ? { url: url.trim() } : {}),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro ao casar");
@@ -331,9 +331,12 @@ function ModalCasarPdfs({ onClose, onCasado }) {
         <div className="px-4 py-3 overflow-y-auto space-y-3">
           {!resultado && (
             <>
+              <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg px-3 py-2 text-[11px] text-torg-dark">
+                Usando a <strong>pasta de certificados configurada</strong> (Almoxarifado / 01. Rastreabilidade / Certificados do ano → “Certificados Digitalizados”). É só clicar em <strong>Pré-visualizar</strong>.
+              </div>
               <label className="block">
-                <span className="text-[10px] font-medium text-torg-gray uppercase">Link da pasta de certificados (SharePoint)</span>
-                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…sharepoint.com/:f:/s/TorgMetal/…"
+                <span className="text-[10px] font-medium text-torg-gray uppercase">Outra pasta (opcional)</span>
+                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="cole um link de pasta só se for outra"
                   className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
                 <span className="text-[10px] text-torg-gray">Casa os PDFs (nomeados pelo índice, ex.: “R 260001.pdf”) com os documentos importados do CMR. Faixas (“R 260007 á 008”) atendem vários.</span>
               </label>
@@ -398,10 +401,10 @@ function ModalImportar({ onClose, onImported }) {
 
   async function previsualizar() {
     setErro(""); setPreview(null); setResultado(null);
-    if (!url.trim()) { setErro("Cole o link de compartilhamento do CMR."); return; }
     setCarregando(true);
     try {
-      const res = await fetch(`/api/qualidade/documentos/importar?url=${encodeURIComponent(url.trim())}`);
+      const q = url.trim() ? `?url=${encodeURIComponent(url.trim())}` : ""; // vazio = CMR fixo configurado
+      const res = await fetch(`/api/qualidade/documentos/importar${q}`);
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro ao ler a planilha");
       setPreview(json);
@@ -416,7 +419,7 @@ function ModalImportar({ onClose, onImported }) {
     setErro(""); setImportando(true);
     try {
       const res = await fetch("/api/qualidade/documentos/importar", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: url.trim() }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(url.trim() ? { url: url.trim() } : {}),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro ao importar");
@@ -439,9 +442,12 @@ function ModalImportar({ onClose, onImported }) {
         <div className="px-4 py-3 overflow-y-auto space-y-3">
           {!resultado && (
             <>
+              <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg px-3 py-2 text-[11px] text-torg-dark">
+                Usando o <strong>CMR configurado</strong> da Torg (Almoxarifado / 01. Rastreabilidade / CMR TORG do ano). É só clicar em <strong>Pré-visualizar</strong> — não precisa colar link.
+              </div>
               <label className="block">
-                <span className="text-[10px] font-medium text-torg-gray uppercase">Link de compartilhamento do CMR (SharePoint)</span>
-                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…sharepoint.com/:x:/s/TorgMetal/…"
+                <span className="text-[10px] font-medium text-torg-gray uppercase">Outro arquivo (opcional)</span>
+                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="cole um link de compartilhamento só se for outro CMR"
                   className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
                 <span className="text-[10px] text-torg-gray">Lê a aba do ano, detecta as colunas pelo cabeçalho e valida a corrida. Nada é gravado até você confirmar.</span>
               </label>

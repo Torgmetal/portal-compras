@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, prismaDirect } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { downloadSharedFile } from "@/lib/sharepoint";
+import { downloadSharedFile, downloadFileByPath } from "@/lib/sharepoint";
 import { parseCMR } from "@/lib/parse-cmr";
 
 export const runtime = "nodejs";
@@ -17,8 +17,21 @@ export const maxDuration = 60;
 
 const bodySchema = z.object({ url: z.string().url().optional() });
 
+// CMR fica sempre no mesmo lugar do SharePoint (sem link/token). Caminho por ano,
+// com override por env. O usuário não precisa colar nada — só clicar Importar.
+const ANO = new Date().getFullYear();
+export const CMR_PATH = process.env.SHAREPOINT_CMR_PATH || `/Almoxarifado/01. Rastreabilidade/CMR TORG-${ANO}.xlsx`;
+
 async function baixarEParsear(url) {
-  const { buffer, name } = await downloadSharedFile(url);
+  let buffer, name;
+  if (url) {
+    ({ buffer, name } = await downloadSharedFile(url));
+  } else {
+    const driveId = process.env.SHAREPOINT_DRIVE_ID;
+    if (!driveId) throw new Error("SHAREPOINT_DRIVE_ID não configurado");
+    buffer = await downloadFileByPath({ driveId, fullPath: CMR_PATH });
+    name = CMR_PATH.split("/").pop();
+  }
   const parsed = await parseCMR(buffer);
   return { name, parsed };
 }
@@ -38,8 +51,8 @@ export async function GET(req) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
 
-  const url = new URL(req.url).searchParams.get("url") || process.env.SHAREPOINT_CMR_URL;
-  if (!url) return NextResponse.json({ success: false, error: "Informe a URL de compartilhamento do CMR." }, { status: 400 });
+  // sem link → usa o CMR fixo (CMR_PATH); só usa URL se o usuário colar uma
+  const url = new URL(req.url).searchParams.get("url") || process.env.SHAREPOINT_CMR_URL || null;
 
   let r;
   try {
@@ -78,8 +91,7 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
 
-  const url = body.url || process.env.SHAREPOINT_CMR_URL;
-  if (!url) return NextResponse.json({ success: false, error: "Informe a URL de compartilhamento do CMR." }, { status: 400 });
+  const url = body.url || process.env.SHAREPOINT_CMR_URL || null;
 
   let r;
   try {
