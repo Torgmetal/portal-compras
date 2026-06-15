@@ -10,6 +10,7 @@ import { z } from "zod";
 import { prisma, prismaDirect } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { downloadSharedFile, downloadFileByPath } from "@/lib/sharepoint";
+import { isBlobUrlSegura } from "@/lib/blob-url";
 import { parseCMR } from "@/lib/parse-cmr";
 
 export const runtime = "nodejs";
@@ -24,9 +25,17 @@ export const CMR_PATH = process.env.SHAREPOINT_CMR_PATH || `/Almoxarifado/01. Ra
 
 async function baixarEParsear(url) {
   let buffer, name;
-  if (url) {
+  if (url && isBlobUrlSegura(url)) {
+    // planilha enviada pelo usuário (upload direto no Blob)
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`não consegui ler a planilha enviada (HTTP ${r.status})`);
+    buffer = Buffer.from(await r.arrayBuffer());
+    name = "planilha enviada";
+  } else if (url) {
+    // link de compartilhamento do SharePoint
     ({ buffer, name } = await downloadSharedFile(url));
   } else {
+    // sem nada → CMR fixo configurado
     const driveId = process.env.SHAREPOINT_DRIVE_ID;
     if (!driveId) throw new Error("SHAREPOINT_DRIVE_ID não configurado");
     buffer = await downloadFileByPath({ driveId, fullPath: CMR_PATH });

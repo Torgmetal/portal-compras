@@ -393,17 +393,41 @@ function ModalCasarPdfs({ onClose, onCasado }) {
 
 function ModalImportar({ onClose, onImported }) {
   const [url, setUrl] = useState("");
+  const [arquivoUrl, setArquivoUrl] = useState(""); // planilha enviada (Blob)
+  const [arquivoNome, setArquivoNome] = useState("");
+  const [subindo, setSubindo] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [preview, setPreview] = useState(null);
   const [erro, setErro] = useState("");
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState(null);
 
+  // fonte da planilha: arquivo enviado > link colado > (vazio = CMR fixo configurado)
+  const fonte = arquivoUrl || url.trim();
+
+  async function onPickPlanilha(f) {
+    setErro(""); setPreview(null); setResultado(null);
+    if (!f) { setArquivoUrl(""); setArquivoNome(""); return; }
+    setSubindo(true);
+    try {
+      const safe = String(f.name || "planilha").replace(/[^\w.\- ]/g, "_").slice(0, 100);
+      const blob = await upload(`qualidade-cmr/${Date.now()}-${safe}`, f, {
+        access: "public",
+        handleUploadUrl: "/api/qualidade/documentos/importar/upload-token",
+      });
+      setArquivoUrl(blob.url); setArquivoNome(f.name); setUrl("");
+    } catch (e) {
+      setErro("Falha ao enviar a planilha: " + e.message);
+    } finally {
+      setSubindo(false);
+    }
+  }
+
   async function previsualizar() {
     setErro(""); setPreview(null); setResultado(null);
     setCarregando(true);
     try {
-      const q = url.trim() ? `?url=${encodeURIComponent(url.trim())}` : ""; // vazio = CMR fixo configurado
+      const q = fonte ? `?url=${encodeURIComponent(fonte)}` : ""; // vazio = CMR fixo configurado
       const res = await fetch(`/api/qualidade/documentos/importar${q}`);
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro ao ler a planilha");
@@ -419,7 +443,7 @@ function ModalImportar({ onClose, onImported }) {
     setErro(""); setImportando(true);
     try {
       const res = await fetch("/api/qualidade/documentos/importar", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(url.trim() ? { url: url.trim() } : {}),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fonte ? { url: fonte } : {}),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro ao importar");
@@ -442,16 +466,21 @@ function ModalImportar({ onClose, onImported }) {
         <div className="px-4 py-3 overflow-y-auto space-y-3">
           {!resultado && (
             <>
-              <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg px-3 py-2 text-[11px] text-torg-dark">
-                Usando o <strong>CMR configurado</strong> da Torg (Almoxarifado / 01. Rastreabilidade / CMR TORG do ano). É só clicar em <strong>Pré-visualizar</strong> — não precisa colar link.
+              {/* Opção principal: selecionar a planilha do computador */}
+              <div className="rounded-lg border border-dashed border-gray-300 p-3">
+                <label className="text-[11px] font-semibold text-torg-gray uppercase">Selecionar a planilha (CMR .xlsx)</label>
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => onPickPlanilha(e.target.files?.[0] || null)}
+                  className="mt-1 block w-full text-[12px] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-torg-blue-50 file:text-torg-blue file:font-medium hover:file:bg-torg-blue-100" />
+                {subindo && <p className="text-[11px] text-torg-blue mt-1 inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Enviando a planilha…</p>}
+                {arquivoNome && !subindo && <p className="text-[11px] text-emerald-700 mt-1">✓ {arquivoNome} selecionada.</p>}
               </div>
-              <label className="block">
-                <span className="text-[10px] font-medium text-torg-gray uppercase">Outro arquivo (opcional)</span>
-                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="cole um link de compartilhamento só se for outro CMR"
-                  className="mt-1 w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
-                <span className="text-[10px] text-torg-gray">Lê a aba do ano, detecta as colunas pelo cabeçalho e valida a corrida. Nada é gravado até você confirmar.</span>
-              </label>
-              <button onClick={previsualizar} disabled={carregando} className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
+              <div className="text-[11px] text-torg-gray">
+                Sem selecionar nada, usa o <strong>CMR configurado</strong> da Torg (Almoxarifado / 01. Rastreabilidade). Lê a aba do ano, detecta as colunas pelo cabeçalho e valida a corrida — nada é gravado até confirmar.
+              </div>
+              <input value={url} onChange={(e) => { setUrl(e.target.value); if (e.target.value) { setArquivoUrl(""); setArquivoNome(""); } }}
+                placeholder="(opcional) link de compartilhamento do arquivo no SharePoint"
+                className="w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
+              <button onClick={previsualizar} disabled={carregando || subindo} className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
                 {carregando ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />} Pré-visualizar
               </button>
 
