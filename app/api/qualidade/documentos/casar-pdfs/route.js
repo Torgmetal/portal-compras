@@ -10,7 +10,7 @@ import { requireRole } from "@/lib/session";
 import { mapearCertificados } from "@/lib/match-certificados";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const bodySchema = z.object({ url: z.string().url().optional() });
 
@@ -83,15 +83,42 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: "Falha ao ler do SharePoint: " + e.message }, { status: 502 });
   }
 
-  // Um updateMany por PDF (vincula todos os índices da faixa que ainda não têm arquivo)
+  // Escrita em massa num ÚNICO UPDATE (UNNEST) — antes era 1 updateMany por PDF
+  // (centenas de PDFs → centenas de idas ao banco → timeout/504). Ver CLAUDE.md
+  // (bulk write: SQL constante + arrays-literais de texto + cast ::text[]).
+  const refs = [], itemIds = [], urls = [], nomes = [];
+  for (const [indice, a] of mapa.porIndice) {
+    if (!a) continue;
+    refs.push(indice);
+    itemIds.push(a.id);
+    urls.push(a.webUrl || null);
+    nomes.push(a.name || null);
+  }
+  const pgArr = (arr) =>
+    "{" + arr.map((v) => (v == null ? "NULL" : `"${String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`)).join(",") + "}";
+
   let casados = 0;
-  for (const a of mapa.arquivos) {
-    if (!a.indices.length) continue;
-    const res = await prismaDirect.documentoQualidade.updateMany({
-      where: { origem: "importacao_planilha", importRef: { in: a.indices }, sharepointItemId: null, ativo: true },
-      data: { sharepointItemId: a.id, sharepointUrl: a.webUrl || null, arquivoNome: a.name, arquivoTipo: "application/pdf" },
-    });
-    casados += res.count;
+  if (refs.length) {
+    try {
+      casados = await prismaDirect.$executeRawUnsafe(
+        `UPDATE "DocumentoQualidade" AS d
+            SET "sharepointItemId" = v.item_id,
+                "sharepointUrl"    = v.url,
+                "arquivoNome"      = v.nome,
+                "arquivoTipo"      = 'application/pdf'
+          FROM (SELECT unnest($1::text[]) AS ref,
+                       unnest($2::text[]) AS item_id,
+                       unnest($3::text[]) AS url,
+                       unnest($4::text[]) AS nome) AS v
+         WHERE d."importRef" = v.ref
+           AND d."origem" = 'importacao_planilha'
+           AND d."sharepointItemId" IS NULL
+           AND d."ativo" = true`,
+        pgArr(refs), pgArr(itemIds), pgArr(urls), pgArr(nomes)
+      );
+    } catch (e) {
+      return NextResponse.json({ success: false, error: "Falha ao vincular os PDFs: " + e.message }, { status: 500 });
+    }
   }
 
   await prisma.auditLog
