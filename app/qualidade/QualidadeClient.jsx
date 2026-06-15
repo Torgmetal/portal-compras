@@ -35,6 +35,8 @@ export default function QualidadeClient({ escopo = "empresa" }) {
   const [status, setStatus] = useState("");
   const [validado, setValidado] = useState("");
   const [busca, setBusca] = useState("");
+  const [op, setOp] = useState(""); // filtro por OP (rastreabilidade)
+  const [ops, setOps] = useState([]); // OPs disponíveis no seletor
   const [modal, setModal] = useState(null); // { ...doc } para editar, ou {} para novo
   const [importar, setImportar] = useState(false);
   const [casar, setCasar] = useState(false);
@@ -49,17 +51,19 @@ export default function QualidadeClient({ escopo = "empresa" }) {
       if (status) p.set("status", status);
       if (validado) p.set("validado", validado);
       if (busca.trim()) p.set("busca", busca.trim());
+      if (op) p.set("op", op);
       const res = await fetch(`/api/qualidade/documentos?${p}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erro ao carregar");
       setDocs(json.data || []);
       setStats(json.stats || null);
+      if (json.ops) setOps(json.ops);
     } catch (e) {
       setErro(e.message);
     } finally {
       setLoading(false);
     }
-  }, [escopo, cat, status, validado, busca]);
+  }, [escopo, cat, status, validado, busca, op]);
 
   useEffect(() => {
     const t = setTimeout(carregar, busca ? 300 : 0); // debounce na busca
@@ -174,6 +178,13 @@ export default function QualidadeClient({ escopo = "empresa" }) {
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, norma, vínculo, corrida…"
               className="w-full pl-8 pr-2 py-1.5 text-[13px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
           </div>
+          {material && ops.length > 0 && (
+            <select value={op} onChange={(e) => setOp(e.target.value)} title="Filtrar por OP"
+              className="text-[13px] border border-gray-200 rounded-lg px-2 py-1.5">
+              <option value="">Todas as OPs</option>
+              {ops.map((o) => <option key={o} value={o}>{fmtOP(o)}</option>)}
+            </select>
+          )}
           {!material && (
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="text-[13px] border border-gray-200 rounded-lg px-2 py-1.5">
               {STATUS_FILTROS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}

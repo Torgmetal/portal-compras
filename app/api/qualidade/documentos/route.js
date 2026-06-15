@@ -46,6 +46,7 @@ export async function GET(req) {
   const escopo = searchParams.get("escopo"); // "material" (rastreabilidade) | "empresa" (docs da empresa)
   const statusFiltro = searchParams.get("status"); // VIGENTE|VENCENDO|VENCIDO|SEM_VALIDADE
   const validadoFiltro = searchParams.get("validado"); // true|false (default todos)
+  const opFiltro = searchParams.get("op"); // filtra por opNumero (rastreabilidade)
   const busca = (searchParams.get("busca") || "").trim().toLowerCase();
 
   const where = { ativo: true };
@@ -92,6 +93,9 @@ export async function GET(req) {
     };
   });
 
+  // OPs distintas para o seletor — calculadas ANTES dos filtros de busca/OP
+  const ops = [...new Set(lista.map((d) => d.opNumero).filter(Boolean))].sort();
+
   if (busca) {
     lista = lista.filter((d) =>
       [d.nome, d.tipo, d.norma, d.vinculo, d.opNumero, d.numeroCorrida, d.numeroDocumento, d.importRef, d.fornecedor, d.responsavel]
@@ -99,6 +103,7 @@ export async function GET(req) {
         .some((v) => String(v).toLowerCase().includes(busca))
     );
   }
+  if (opFiltro) lista = lista.filter((d) => d.opNumero === opFiltro);
 
   const stats = {
     total: lista.length,
@@ -111,7 +116,7 @@ export async function GET(req) {
 
   if (statusFiltro) lista = lista.filter((d) => d.status === statusFiltro);
 
-  return NextResponse.json({ success: true, data: lista, stats });
+  return NextResponse.json({ success: true, data: lista, stats, ops });
 }
 
 export async function POST(req) {
