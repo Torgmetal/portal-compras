@@ -21,7 +21,7 @@ const STATUS_FILTROS = [
 
 const VAZIO = {
   nome: "", categoria: "EQUIPAMENTOS", tipo: "", norma: "", vinculo: "", opNumero: "",
-  numeroCorrida: "", dataEmissao: "", dataValidade: "", responsavel: "", observacao: "",
+  numeroCorrida: "", numeroDocumento: "", dataEmissao: "", dataValidade: "", responsavel: "", observacao: "",
 };
 
 export default function QualidadeClient() {
@@ -82,13 +82,20 @@ export default function QualidadeClient() {
   }
 
   async function excluir(doc) {
-    if (!confirm(`Excluir o documento "${doc.nome}"? (a cópia no SharePoint é preservada)`)) return;
+    const vencido = doc.status === "VENCIDO";
+    const msg = vencido
+      ? `Excluir o documento VENCIDO "${doc.nome}"? O arquivo será movido para a pasta Obsoleto no SharePoint.`
+      : `Excluir o documento "${doc.nome}"? (a cópia no SharePoint é preservada)`;
+    if (!confirm(msg)) return;
     setAcaoId(doc.id);
     try {
       const res = await fetch(`/api/qualidade/documentos/${doc.id}`, { method: "DELETE" });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || "Erro");
       setDocs((prev) => prev.filter((d) => d.id !== doc.id));
+      if (json.obsoleto && json.obsoleto.ok === false) {
+        alert("Documento excluído, mas não consegui mover o arquivo para Obsoleto: " + (json.obsoleto.erro || "erro"));
+      }
     } catch (e) {
       alert("Erro: " + e.message);
     } finally {
@@ -497,9 +504,46 @@ function ModalDocumento({ doc, onClose, onSaved }) {
   const [file, setFile] = useState(null);
   const [pct, setPct] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [extraindo, setExtraindo] = useState(false);
   const [erro, setErro] = useState("");
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  // Ao escolher o arquivo, lê os dados (nº do certificado, emissão, validade,
+  // norma) com a IA e preenche só os campos ainda vazios (não sobrescreve).
+  async function onPickFile(f) {
+    setFile(f || null);
+    const lerTipos = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
+    if (!f || !lerTipos.includes(f.type)) return;
+    setExtraindo(true);
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result));
+        r.onerror = rej;
+        r.readAsDataURL(f);
+      });
+      const resp = await fetch("/api/qualidade/documentos/extrair", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64, tipo: f.type }),
+      });
+      const json = await resp.json();
+      if (resp.ok && json.success && json.dados) {
+        const d = json.dados;
+        setForm((p) => ({
+          ...p,
+          numeroDocumento: p.numeroDocumento || d.numeroDocumento || "",
+          dataEmissao: p.dataEmissao || d.dataEmissao || "",
+          dataValidade: p.dataValidade || d.dataValidade || "",
+          norma: p.norma || d.norma || "",
+        }));
+      }
+    } catch {
+      /* leitura é best-effort — silencioso, o usuário preenche manualmente */
+    } finally {
+      setExtraindo(false);
+    }
+  }
 
   async function salvar() {
     setErro("");
@@ -519,6 +563,7 @@ function ModalDocumento({ doc, onClose, onSaved }) {
       const payload = {
         nome: form.nome, categoria: form.categoria, tipo: form.tipo || null, norma: form.norma || null,
         vinculo: form.vinculo || null, opNumero: form.opNumero || null, numeroCorrida: form.numeroCorrida || null,
+        numeroDocumento: form.numeroDocumento || null,
         dataEmissao: form.dataEmissao || null, dataValidade: form.dataValidade || null,
         responsavel: form.responsavel || null, observacao: form.observacao || null, ...arquivo,
       };
@@ -550,10 +595,13 @@ function ModalDocumento({ doc, onClose, onSaved }) {
           {/* Arquivo */}
           <div className="rounded-lg border border-dashed border-gray-300 p-3">
             <label className="text-[11px] font-semibold text-torg-gray uppercase">Arquivo (scan PDF / imagem){editando ? " — opcional (troca o atual)" : ""}</label>
-            <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" onChange={(e) => setFile(e.target.files?.[0] || null)}
+            <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" onChange={(e) => onPickFile(e.target.files?.[0] || null)}
               className="mt-1 block w-full text-[12px] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-torg-blue-50 file:text-torg-blue file:font-medium hover:file:bg-torg-blue-100" />
             {file && <p className="text-[11px] text-torg-gray mt-1">{file.name} · {fmtTam(file.size)}</p>}
             {editando && doc.temArquivo && !file && <p className="text-[11px] text-emerald-700 mt-1">Já possui arquivo anexado.</p>}
+            {extraindo
+              ? <p className="text-[11px] text-torg-blue mt-1 inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Lendo o documento (nº do certificado, datas, norma)…</p>
+              : <p className="text-[10px] text-torg-gray mt-1">Ao anexar um PDF/imagem, o sistema tenta preencher nº do certificado, emissão, validade e norma. Confira antes de salvar.</p>}
             {pct != null && (
               <div className="mt-2"><div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-torg-blue rounded-full transition-all" style={{ width: `${pct}%` }} /></div><p className="text-[10px] text-torg-gray mt-0.5">Enviando arquivo… {pct}%</p></div>
             )}
@@ -564,6 +612,7 @@ function ModalDocumento({ doc, onClose, onSaved }) {
             <Campo label="Categoria *"><select value={form.categoria} onChange={(e) => set("categoria", e.target.value)} className={inp}>{CATEGORIAS_QUALIDADE.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select></Campo>
             <Campo label="Tipo"><input value={form.tipo || ""} onChange={(e) => set("tipo", e.target.value)} className={inp} placeholder="MTC · ASO · Calibração · WPS" /></Campo>
             <Campo label="Norma"><input value={form.norma || ""} onChange={(e) => set("norma", e.target.value)} className={inp} placeholder="AWS D1.1 · NR-35 · ISO 2808" /></Campo>
+            <Campo label="Nº do certificado"><input value={form.numeroDocumento || ""} onChange={(e) => set("numeroDocumento", e.target.value)} className={inp} placeholder="preenchido do arquivo" /></Campo>
             <Campo label="Nº da corrida (heat)"><input value={form.numeroCorrida || ""} onChange={(e) => set("numeroCorrida", e.target.value)} className={inp} placeholder="só p/ certificado de material" /></Campo>
             <Campo label="Vínculo (livre)"><input value={form.vinculo || ""} onChange={(e) => set("vinculo", e.target.value)} className={inp} placeholder="OP-083 · Soldador João · Munck 01" /></Campo>
             <Campo label="OP (vínculo p/ data book)"><input value={form.opNumero || ""} onChange={(e) => set("opNumero", e.target.value)} className={inp} placeholder="ex.: 083" /></Campo>
