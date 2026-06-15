@@ -43,12 +43,16 @@ export async function GET(req) {
 
   const { searchParams } = new URL(req.url);
   const categoria = searchParams.get("categoria");
+  const escopo = searchParams.get("escopo"); // "material" (rastreabilidade) | "empresa" (docs da empresa)
   const statusFiltro = searchParams.get("status"); // VIGENTE|VENCENDO|VENCIDO|SEM_VALIDADE
   const validadoFiltro = searchParams.get("validado"); // true|false (default todos)
   const busca = (searchParams.get("busca") || "").trim().toLowerCase();
 
   const where = { ativo: true };
+  // Escopo separa rastreabilidade (MATERIAL) dos documentos da empresa (demais categorias).
   if (categoria && CATEGORIAS.includes(categoria)) where.categoria = categoria;
+  else if (escopo === "material") where.categoria = "MATERIAL";
+  else if (escopo === "empresa") where.categoria = { not: "MATERIAL" };
   if (validadoFiltro === "true") where.validado = true;
   if (validadoFiltro === "false") where.validado = false;
 
@@ -70,6 +74,7 @@ export async function GET(req) {
       opNumero: d.opNumero,
       numeroCorrida: d.numeroCorrida,
       numeroDocumento: d.numeroDocumento,
+      fornecedor: d.fornecedor,
       dataEmissao: d.dataEmissao,
       dataValidade: d.dataValidade,
       responsavel: d.responsavel,
@@ -88,7 +93,7 @@ export async function GET(req) {
 
   if (busca) {
     lista = lista.filter((d) =>
-      [d.nome, d.tipo, d.norma, d.vinculo, d.opNumero, d.numeroCorrida, d.responsavel]
+      [d.nome, d.tipo, d.norma, d.vinculo, d.opNumero, d.numeroCorrida, d.numeroDocumento, d.fornecedor, d.responsavel]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(busca))
     );

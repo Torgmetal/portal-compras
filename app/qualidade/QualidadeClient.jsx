@@ -4,12 +4,13 @@ import { upload } from "@vercel/blob/client";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, Search, ShieldCheck, ShieldAlert,
   AlertTriangle, FileText, Eye, Download, Pencil, Trash2, X, Check, CircleSlash, Clock,
-  FileSpreadsheet, Upload, Paperclip, Link2,
+  FileSpreadsheet, Upload, Paperclip, Link2, ScrollText,
 } from "lucide-react";
 import { CATEGORIAS_QUALIDADE, CATEGORIA_LABEL, STATUS_COR } from "@/lib/qualidade-status";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtTam = (b) => (!b ? "" : b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(1)} MB`);
+const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 const STATUS_FILTROS = [
   { key: "", label: "Todos" },
@@ -24,7 +25,8 @@ const VAZIO = {
   numeroCorrida: "", numeroDocumento: "", dataEmissao: "", dataValidade: "", responsavel: "", observacao: "",
 };
 
-export default function QualidadeClient() {
+export default function QualidadeClient({ escopo = "empresa" }) {
+  const material = escopo === "material"; // aba Rastreabilidade (certificados de material)
   const [docs, setDocs] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +44,7 @@ export default function QualidadeClient() {
     setLoading(true); setErro("");
     try {
       const p = new URLSearchParams();
+      p.set("escopo", escopo);
       if (cat) p.set("categoria", cat);
       if (status) p.set("status", status);
       if (validado) p.set("validado", validado);
@@ -56,7 +59,7 @@ export default function QualidadeClient() {
     } finally {
       setLoading(false);
     }
-  }, [cat, status, validado, busca]);
+  }, [escopo, cat, status, validado, busca]);
 
   useEffect(() => {
     const t = setTimeout(carregar, busca ? 300 : 0); // debounce na busca
@@ -109,30 +112,44 @@ export default function QualidadeClient() {
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2">
-            <ShieldCheck size={20} className="text-torg-blue" /> Controle de Documentos
+            {material ? <ScrollText size={20} className="text-torg-blue" /> : <ShieldCheck size={20} className="text-torg-blue" />}
+            {material ? "Rastreabilidade" : "Controle de Documentos"}
           </h1>
           <p className="text-xs text-torg-gray mt-0.5">
-            Documentos amarrados a norma + validade. O status (vigente / vencendo / vencido) é calculado automaticamente. <span className="text-torg-gray/80">Padrão NBR 16775.</span>
+            {material
+              ? <>Certificados de material por OP (corrida / MTC). Importados do CMR e casados com os PDFs escaneados.</>
+              : <>Documentos da empresa amarrados a norma + validade (equipamentos, funcionários, sistema, terceiros). O status (vigente / vencendo / vencido) é calculado automaticamente. <span className="text-torg-gray/80">Padrão NBR 16775.</span></>}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => setCasar(true)}
-            className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-            <Paperclip size={15} /> Casar PDFs
-          </button>
-          <button onClick={() => setImportar(true)}
-            className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-            <FileSpreadsheet size={15} /> Importar (CMR)
-          </button>
-          <button onClick={() => setModal({ ...VAZIO })}
+          {material && (
+            <>
+              <button onClick={() => setCasar(true)}
+                className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+                <Paperclip size={15} /> Casar PDFs
+              </button>
+              <button onClick={() => setImportar(true)}
+                className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+                <FileSpreadsheet size={15} /> Importar (CMR)
+              </button>
+            </>
+          )}
+          <button onClick={() => setModal({ ...VAZIO, categoria: material ? "MATERIAL" : "EQUIPAMENTOS" })}
             className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-2 rounded-lg inline-flex items-center gap-2">
-            <Plus size={15} /> Novo documento
+            <Plus size={15} /> {material ? "Novo certificado" : "Novo documento"}
           </button>
         </div>
       </div>
 
       {/* KPIs */}
-      {stats && (
+      {material ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <KpiCard label="Certificados" valor={docs.length} cor="text-torg-blue bg-torg-blue-50" Icon={ScrollText} />
+          <KpiCard label="Com corrida" valor={docs.filter((d) => d.numeroCorrida).length} cor="text-emerald-700 bg-emerald-50" Icon={Check} />
+          <KpiCard label="Sem corrida" valor={docs.filter((d) => !d.numeroCorrida).length} cor="text-amber-700 bg-amber-50" Icon={AlertTriangle} />
+          <KpiCard label="Com arquivo (PDF)" valor={docs.filter((d) => d.temArquivo).length} cor="text-blue-700 bg-blue-50" Icon={FileText} />
+        </div>
+      ) : stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <KpiCard label="Vencidos" valor={stats.vencidos} cor="text-red-700 bg-red-50" Icon={ShieldAlert} ativo={status === "VENCIDO"} onClick={() => setStatus(status === "VENCIDO" ? "" : "VENCIDO")} />
           <KpiCard label="Vencendo (≤30d)" valor={stats.vencendo} cor="text-amber-700 bg-amber-50" Icon={AlertTriangle} ativo={status === "VENCENDO"} onClick={() => setStatus(status === "VENCENDO" ? "" : "VENCENDO")} />
@@ -143,21 +160,25 @@ export default function QualidadeClient() {
 
       {/* Filtros */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 mb-4 space-y-3">
-        <div className="flex flex-wrap gap-1.5">
-          <Chip ativo={!cat} onClick={() => setCat("")}>Todas</Chip>
-          {CATEGORIAS_QUALIDADE.map((c) => (
-            <Chip key={c.value} ativo={cat === c.value} onClick={() => setCat(cat === c.value ? "" : c.value)}>{c.label}</Chip>
-          ))}
-        </div>
+        {!material && (
+          <div className="flex flex-wrap gap-1.5">
+            <Chip ativo={!cat} onClick={() => setCat("")}>Todas</Chip>
+            {CATEGORIAS_QUALIDADE.filter((c) => c.value !== "MATERIAL").map((c) => (
+              <Chip key={c.value} ativo={cat === c.value} onClick={() => setCat(cat === c.value ? "" : c.value)}>{c.label}</Chip>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[220px]">
             <Search size={14} className="absolute left-2.5 top-2.5 text-torg-gray" />
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, norma, vínculo, corrida…"
               className="w-full pl-8 pr-2 py-1.5 text-[13px] border border-gray-200 rounded-lg focus:border-torg-blue focus:ring-1 focus:ring-torg-blue-300" />
           </div>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="text-[13px] border border-gray-200 rounded-lg px-2 py-1.5">
-            {STATUS_FILTROS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
+          {!material && (
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="text-[13px] border border-gray-200 rounded-lg px-2 py-1.5">
+              {STATUS_FILTROS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+          )}
           <select value={validado} onChange={(e) => setValidado(e.target.value)} className="text-[13px] border border-gray-200 rounded-lg px-2 py-1.5">
             <option value="">Validação: todas</option>
             <option value="true">Validados</option>
@@ -177,20 +198,31 @@ export default function QualidadeClient() {
       ) : docs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center text-torg-gray">
           <FileText size={32} className="mb-3 opacity-40" />
-          <p className="text-sm font-medium text-torg-dark">Nenhum documento</p>
-          <p className="text-xs mt-1">Clique em “Novo documento” para subir o primeiro certificado.</p>
+          <p className="text-sm font-medium text-torg-dark">Nenhum {material ? "certificado" : "documento"}</p>
+          <p className="text-xs mt-1">{material ? "Use “Importar (CMR)” para trazer os certificados de material, ou “Novo certificado”." : "Clique em “Novo documento” para subir o primeiro."}</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead className="bg-gray-50/60">
               <tr className="text-left text-gray-500">
-                <th className="px-3 py-2 font-medium">Documento</th>
-                <th className="px-3 py-2 font-medium">Categoria</th>
-                <th className="px-3 py-2 font-medium">Vínculo</th>
-                <th className="px-3 py-2 font-medium">Norma</th>
-                <th className="px-3 py-2 font-medium">Validade</th>
-                <th className="px-3 py-2 font-medium text-center">Status</th>
+                <th className="px-3 py-2 font-medium">{material ? "Material" : "Documento"}</th>
+                {material ? (
+                  <>
+                    <th className="px-3 py-2 font-medium">OP</th>
+                    <th className="px-3 py-2 font-medium">Corrida</th>
+                    <th className="px-3 py-2 font-medium">Nº cert.</th>
+                    <th className="px-3 py-2 font-medium">Fornecedor</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="px-3 py-2 font-medium">Categoria</th>
+                    <th className="px-3 py-2 font-medium">Vínculo</th>
+                    <th className="px-3 py-2 font-medium">Norma</th>
+                    <th className="px-3 py-2 font-medium">Validade</th>
+                    <th className="px-3 py-2 font-medium text-center">Status</th>
+                  </>
+                )}
                 <th className="px-3 py-2 font-medium text-center">Validado</th>
                 <th className="px-3 py-2 font-medium text-right">Ações</th>
               </tr>
@@ -200,18 +232,28 @@ export default function QualidadeClient() {
                 <tr key={d.id} className={`hover:bg-gray-50/50 ${d.status === "VENCIDO" ? "bg-red-50/40" : d.status === "VENCENDO" ? "bg-amber-50/30" : ""}`}>
                   <td className="px-3 py-2">
                     <div className="font-medium text-torg-dark">{d.nome}</div>
-                    <div className="text-[11px] text-torg-gray flex items-center gap-1.5">
-                      {d.tipo || "—"}
-                      {d.numeroCorrida && <span className="text-torg-blue font-mono">· corrida {d.numeroCorrida}</span>}
+                    <div className="text-[11px] text-torg-gray">
+                      {d.tipo || "—"}{!material && d.numeroCorrida ? <span className="text-torg-blue font-mono"> · corrida {d.numeroCorrida}</span> : null}
                     </div>
                   </td>
-                  <td className="px-3 py-2"><span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-torg-gray">{CATEGORIA_LABEL[d.categoria] || d.categoria}</span></td>
-                  <td className="px-3 py-2 text-torg-gray max-w-[160px] truncate" title={d.vinculo || d.opNumero || ""}>{d.vinculo || d.opNumero || "—"}</td>
-                  <td className="px-3 py-2 text-torg-gray">{d.norma || "—"}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-torg-gray">{fmtData(d.dataValidade)}</td>
-                  <td className="px-3 py-2 text-center">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COR[d.status]}`}>{d.statusLabel}</span>
-                  </td>
+                  {material ? (
+                    <>
+                      <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{d.opNumero ? fmtOP(d.opNumero) : "—"}</td>
+                      <td className="px-3 py-2 font-mono whitespace-nowrap">{d.numeroCorrida ? <span className="text-torg-blue">{d.numeroCorrida}</span> : <span className="text-amber-600">sem corrida</span>}</td>
+                      <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{d.numeroDocumento || "—"}</td>
+                      <td className="px-3 py-2 text-torg-gray max-w-[160px] truncate" title={d.fornecedor || ""}>{d.fornecedor || "—"}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-3 py-2"><span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-torg-gray">{CATEGORIA_LABEL[d.categoria] || d.categoria}</span></td>
+                      <td className="px-3 py-2 text-torg-gray max-w-[160px] truncate" title={d.vinculo || d.opNumero || ""}>{d.vinculo || d.opNumero || "—"}</td>
+                      <td className="px-3 py-2 text-torg-gray">{d.norma || "—"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-torg-gray">{fmtData(d.dataValidade)}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COR[d.status]}`}>{d.statusLabel}</span>
+                      </td>
+                    </>
+                  )}
                   <td className="px-3 py-2 text-center">
                     <button onClick={() => toggleValidado(d)} disabled={acaoId === d.id}
                       title={d.validado ? "Validado — clique para desfazer" : "Marcar como validado"}

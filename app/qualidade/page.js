@@ -6,5 +6,5 @@ export const metadata = { title: "Qualidade — Controle de Documentos" };
 
 export default async function QualidadePage() {
   await requireRole(["ADMIN", "QUALIDADE"]);
-  return <QualidadeClient />;
+  return <QualidadeClient escopo="empresa" />;
 }

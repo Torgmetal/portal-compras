@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileCheck2, BookCheck } from "lucide-react";
+import { FileCheck2, BookCheck, ScrollText } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/qualidade", label: "Controle de Documentos", icon: FileCheck2, exact: true },
+  { href: "/qualidade/rastreabilidade", label: "Rastreabilidade", icon: ScrollText },
   { href: "/qualidade/data-books", label: "Data Books", icon: BookCheck },
 ];
 
