@@ -209,7 +209,7 @@ export default function QualidadeClient({ escopo = "empresa" }) {
                 <th className="px-3 py-2 font-medium">{material ? "Material" : "Documento"}</th>
                 {material ? (
                   <>
-                    <th className="px-3 py-2 font-medium">Índice R</th>
+                    <th className="px-3 py-2 font-medium">Rastreabilidade</th>
                     <th className="px-3 py-2 font-medium">OP</th>
                     <th className="px-3 py-2 font-medium">Corrida</th>
                     <th className="px-3 py-2 font-medium">Nº cert.</th>
