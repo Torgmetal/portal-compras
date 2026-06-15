@@ -209,6 +209,7 @@ export default function QualidadeClient({ escopo = "empresa" }) {
                 <th className="px-3 py-2 font-medium">{material ? "Material" : "Documento"}</th>
                 {material ? (
                   <>
+                    <th className="px-3 py-2 font-medium">Índice R</th>
                     <th className="px-3 py-2 font-medium">OP</th>
                     <th className="px-3 py-2 font-medium">Corrida</th>
                     <th className="px-3 py-2 font-medium">Nº cert.</th>
@@ -238,6 +239,7 @@ export default function QualidadeClient({ escopo = "empresa" }) {
                   </td>
                   {material ? (
                     <>
+                      <td className="px-3 py-2 font-mono whitespace-nowrap text-torg-dark">{d.importRef || <span className="text-amber-600">sem índice</span>}</td>
                       <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{d.opNumero ? fmtOP(d.opNumero) : "—"}</td>
                       <td className="px-3 py-2 font-mono whitespace-nowrap">{d.numeroCorrida ? <span className="text-torg-blue">{d.numeroCorrida}</span> : <span className="text-amber-600">sem corrida</span>}</td>
                       <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{d.numeroDocumento || "—"}</td>

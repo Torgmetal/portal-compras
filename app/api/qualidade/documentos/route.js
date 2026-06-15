@@ -74,6 +74,7 @@ export async function GET(req) {
       opNumero: d.opNumero,
       numeroCorrida: d.numeroCorrida,
       numeroDocumento: d.numeroDocumento,
+      importRef: d.importRef,
       fornecedor: d.fornecedor,
       dataEmissao: d.dataEmissao,
       dataValidade: d.dataValidade,
@@ -93,7 +94,7 @@ export async function GET(req) {
 
   if (busca) {
     lista = lista.filter((d) =>
-      [d.nome, d.tipo, d.norma, d.vinculo, d.opNumero, d.numeroCorrida, d.numeroDocumento, d.fornecedor, d.responsavel]
+      [d.nome, d.tipo, d.norma, d.vinculo, d.opNumero, d.numeroCorrida, d.numeroDocumento, d.importRef, d.fornecedor, d.responsavel]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(busca))
     );
