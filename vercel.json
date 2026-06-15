@@ -13,6 +13,11 @@
       "permanent": true
     }
   ],
+  "functions": {
+    "app/api/qualidade/documentos/importar/route.js": {
+      "memory": 3009
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/estoque-produtos",
