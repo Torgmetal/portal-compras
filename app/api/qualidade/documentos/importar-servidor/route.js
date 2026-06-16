@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { listChildrenByPath, downloadFileById } from "@/lib/sharepoint";
 import { extrairDadosDocumento } from "@/lib/extrair-doc-qualidade";
-import { whereDocsEmpresa } from "@/lib/databook-secoes";
+import { whereDocsEmpresa, SECAO_PROCEDIMENTOS, procedimentoCasaSecao, whereProcedimentos } from "@/lib/databook-secoes";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // dezenas de PDFs × extração Claude; re-rodar continua (dedupe)
@@ -187,9 +187,36 @@ export async function POST(req) {
     }
   }
 
+  // Procedimentos (SISTEMA) são globais e se espalham por VÁRIAS seções conforme o
+  // processo (pintura→§14, END→§12, soldagem→§06/07/09…). Casa por nome e vincula em
+  // TODOS os data books. Roda quando a pasta importada é de procedimentos.
+  let procVinculos = 0;
+  if (pasta === "Procedimentos" || pasta === "Documentos SNQC") {
+    try {
+      const [procs, secoesP] = await Promise.all([
+        prisma.documentoQualidade.findMany({ where: whereProcedimentos(), select: { id: true, nome: true } }),
+        prisma.dataBookSecao.findMany({ where: { numero: { in: Object.keys(SECAO_PROCEDIMENTOS) } }, select: { id: true, numero: true } }),
+      ]);
+      const vinc = [];
+      const secoesComMatch = new Set();
+      for (const s of secoesP) {
+        for (const d of procs) {
+          if (procedimentoCasaSecao(d.nome, s.numero)) { vinc.push({ secaoId: s.id, documentoId: d.id }); secoesComMatch.add(s.id); }
+        }
+      }
+      if (vinc.length) {
+        const r = await prisma.dataBookSecaoDoc.createMany({ data: vinc, skipDuplicates: true });
+        await prisma.dataBookSecao.updateMany({ where: { id: { in: [...secoesComMatch] } }, data: { estado: "ANEXADO" } });
+        procVinculos = r.count;
+      }
+    } catch {
+      /* a propagação pro data book não deve falhar o import */
+    }
+  }
+
   await prisma.auditLog
-    .create({ data: { userId: user.id, action: "IMPORTAR_SERVIDOR_QUALIDADE", entity: "DocumentoQualidade", entityId: "-", diff: { pasta, criados, jaExistiam: setExist.size, comExtracao, semLeitura, secoesVinculadas, vinculosCriados } } })
+    .create({ data: { userId: user.id, action: "IMPORTAR_SERVIDOR_QUALIDADE", entity: "DocumentoQualidade", entityId: "-", diff: { pasta, criados, jaExistiam: setExist.size, comExtracao, semLeitura, secoesVinculadas, vinculosCriados, procVinculos } } })
     .catch(() => {});
 
-  return NextResponse.json({ success: true, pasta, criados, jaExistiam: setExist.size, comExtracao, semLeitura, total: arquivos.length, secoesVinculadas, vinculosCriados });
+  return NextResponse.json({ success: true, pasta, criados, jaExistiam: setExist.size, comExtracao, semLeitura, total: arquivos.length, secoesVinculadas, vinculosCriados, procVinculos });
 }

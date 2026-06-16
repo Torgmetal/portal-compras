@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { classificarMaterial, GRUPO_POR_SECAO } from "@/lib/databook-secoes";
 
 export const runtime = "nodejs";
 
@@ -19,18 +20,21 @@ export async function POST(req, { params }) {
 
   const secao = await prisma.dataBookSecao.findUnique({
     where: { id: params.secaoId },
-    select: { id: true, dataBook: { select: { opNumero: true } } },
+    select: { id: true, numero: true, dataBook: { select: { opNumero: true } } },
   });
   if (!secao) return NextResponse.json({ success: false, error: "Seção não encontrada" }, { status: 404 });
 
   const opNumero = secao.dataBook?.opNumero;
   if (!opNumero) return NextResponse.json({ success: false, error: "Data book sem OP vinculada" }, { status: 400 });
 
-  // Certificados de material da OP (rastreabilidade importada do CMR)
-  const docs = await prisma.documentoQualidade.findMany({
+  // Certificados de material da OP (rastreabilidade importada do CMR), filtrados pelo
+  // grupo da seção: §04 aço estrutural, §05 fixadores, §15 tintas. Outras seções: todos.
+  const grupo = GRUPO_POR_SECAO[secao.numero] || null;
+  const todos = await prisma.documentoQualidade.findMany({
     where: { ativo: true, categoria: "MATERIAL", opNumero },
-    select: { id: true },
+    select: { id: true, nome: true },
   });
+  const docs = grupo ? todos.filter((d) => classificarMaterial(d.nome) === grupo) : todos;
   if (!docs.length) {
     return NextResponse.json({ success: true, vinculados: 0, total: 0, semDocs: true });
   }
