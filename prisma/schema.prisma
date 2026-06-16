@@ -1235,6 +1235,7 @@ model AuditoriaDoc {
   id               String    @id @default(cuid())
   auditoriaId      String
   tipo             String    @default("EVIDENCIA") // SOLICITACAO (pedido do cliente) | EVIDENCIA (compartilhado)
+  secao            String?   // agrupamento no portal (Sistema de Gestão, Soldagem, Ensaios…)
   nome             String
   arquivoUrl       String?
   arquivoTipo      String?

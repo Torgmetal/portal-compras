@@ -7,6 +7,7 @@ import {
   Send, Copy, ExternalLink, Save, ClipboardList, FolderOpen, CheckCircle2,
   Sparkles, Plus, Mail, Eye,
 } from "lucide-react";
+import { SECOES_AUDITORIA, ordenarSecoes } from "@/lib/auditoria-secoes";
 
 const fmtDH = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
@@ -166,6 +167,7 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
   const fileRef = useRef(null);
   const [enviando, setEnviando] = useState(false);
   const [progresso, setProgresso] = useState("");
+  const [secaoUpload, setSecaoUpload] = useState(SECOES_AUDITORIA[0]);
   const [picker, setPicker] = useState(false);
   const [busca, setBusca] = useState("");
   const [resultados, setResultados] = useState(null);
@@ -207,7 +209,7 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
         setProgresso(`${i + 1}/${files.length}`);
         const f = files[i];
         const blob = await upload(f.name, f, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
-        itens.push({ tipo, nome: f.name, arquivoUrl: blob.url, arquivoTipo: f.type || null, arquivoTamanho: f.size });
+        itens.push({ tipo, secao: sugestao ? secaoUpload : undefined, nome: f.name, arquivoUrl: blob.url, arquivoTipo: f.type || null, arquivoTamanho: f.size });
       }
       const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens }) });
       const j = await r.json();
@@ -220,7 +222,7 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
     const novas = (sugestoes || []).filter((s) => !s.jaAnexado);
     if (!novas.length) return;
     try {
-      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: novas.map((s) => ({ tipo, nome: s.nome, documentoId: s.id })) }) });
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: novas.map((s) => ({ tipo, secao: s.secao || undefined, nome: s.nome, documentoId: s.id })) }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       setSugestoes((prev) => (prev ? prev.map((x) => ({ ...x, jaAnexado: true })) : prev));
@@ -241,7 +243,7 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
 
   async function vincular(d) {
     try {
-      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, nome: d.nome, documentoId: d.id }) });
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, secao: d.secao || undefined, nome: d.nome, documentoId: d.id }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       setPicker(false); setBusca(""); setResultados(null);
@@ -256,21 +258,60 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
     await onChange();
   }
 
+  async function moverSecao(docId, novaSecao) {
+    await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ docId, secao: novaSecao }) });
+    await onChange();
+  }
+
+  // Linha de um documento (com seletor de seção quando é a área do cliente)
+  const Linha = (d) => (
+    <div key={d.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[12px]">
+      <span className="inline-flex items-center gap-1.5 min-w-0"><FileText size={13} className="text-torg-blue shrink-0" /><span className="truncate text-torg-dark">{d.nome}</span></span>
+      <div className="flex items-center gap-2 shrink-0">
+        {sugestao && (
+          <select value={SECOES_AUDITORIA.includes(d.secao) ? d.secao : "Outros"} onChange={(e) => moverSecao(d.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 text-torg-gray focus:border-torg-blue max-w-[150px]">
+            {SECOES_AUDITORIA.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+        <button onClick={() => remover(d.id)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
+      </div>
+    </div>
+  );
+
+  // Agrupa por seção (só na área do cliente / EVIDENCIA)
+  const gruposDoc = (() => {
+    if (!sugestao) return null;
+    const m = {};
+    for (const d of docs) { const s = SECOES_AUDITORIA.includes(d.secao) ? d.secao : "Outros"; (m[s] ||= []).push(d); }
+    return ordenarSecoes(Object.keys(m)).map((s) => [s, m[s]]);
+  })();
+
   return (
     <div className="mt-2">
       {titulo && <p className="text-[11px] font-semibold text-torg-gray mb-1.5">{titulo}</p>}
-      {docs.length > 0 ? (
-        <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg mb-2">
-          {docs.map((d) => (
-            <div key={d.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[12px]">
-              <span className="inline-flex items-center gap-1.5 min-w-0"><FileText size={13} className="text-torg-blue shrink-0" /><span className="truncate text-torg-dark">{d.nome}</span></span>
-              <button onClick={() => remover(d.id)} className="text-torg-gray hover:text-red-600 shrink-0"><Trash2 size={13} /></button>
+      {docs.length === 0 ? (
+        <p className="text-[11px] text-torg-gray italic mb-2">Nenhum documento.</p>
+      ) : gruposDoc ? (
+        <div className="space-y-2 mb-2">
+          {gruposDoc.map(([secao, lista]) => (
+            <div key={secao} className="border border-gray-100 rounded-lg overflow-hidden">
+              <div className="bg-gray-50/70 px-2.5 py-1 text-[10px] font-semibold text-torg-gray uppercase tracking-wide">{secao} · {lista.length}</div>
+              <div className="divide-y divide-gray-50">{lista.map((d) => Linha(d))}</div>
             </div>
           ))}
         </div>
-      ) : <p className="text-[11px] text-torg-gray italic mb-2">Nenhum documento.</p>}
+      ) : (
+        <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg mb-2">{docs.map((d) => Linha(d))}</div>
+      )}
 
       <div className="flex items-center gap-3 flex-wrap">
+        {sugestao && (
+          <label className="text-[10px] text-torg-gray inline-flex items-center gap-1">Seção:
+            <select value={secaoUpload} onChange={(e) => setSecaoUpload(e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 text-torg-dark focus:border-torg-blue">
+              {SECOES_AUDITORIA.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+        )}
         <input ref={fileRef} type="file" multiple className="hidden" onChange={anexarArquivo} accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.msg,.eml" />
         <button onClick={() => fileRef.current?.click()} disabled={enviando} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? `Enviando ${progresso}…` : "Anexar arquivos"}</button>
         <button onClick={() => setPicker((v) => !v)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Search size={12} /> Trazer do Controle de Documentos</button>

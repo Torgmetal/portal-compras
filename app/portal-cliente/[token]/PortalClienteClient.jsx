@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck } from "lucide-react";
+import { ordenarSecoes } from "@/lib/auditoria-secoes";
 
 const fmtTam = (b) => {
   if (!b) return "";
@@ -36,6 +37,11 @@ export default function PortalClienteClient({ token }) {
 
   const base = `/api/qualidade/auditorias/portal/${token}/doc`;
 
+  // Agrupa os documentos por seção, na ordem padrão.
+  const porSecao = {};
+  for (const d of data.documentos) { const s = d.secao || "Outros"; (porSecao[s] ||= []).push(d); }
+  const grupos = ordenarSecoes(Object.keys(porSecao)).map((s) => [s, porSecao[s]]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* HERO imersivo */}
@@ -69,19 +75,30 @@ export default function PortalClienteClient({ token }) {
           {data.documentos.length === 0 ? (
             <div className="text-center py-12 text-torg-gray"><FileText size={32} className="mx-auto mb-2 text-gray-300" /><p className="text-sm">Os documentos serão disponibilizados em breve.</p></div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {data.documentos.map((d) => (
-                <div key={d.id} className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-200 hover:shadow-sm transition-all">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-torg-dark leading-snug break-words">{d.nome}</p>
-                      {d.arquivoTamanho ? <p className="text-[11px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
-                      <div className="flex items-center gap-3 mt-2">
-                        <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[12px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Eye size={13} /> Visualizar</a>
-                        <a href={`${base}/${d.id}`} className="text-[12px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Download size={13} /> Baixar</a>
+            <div className="space-y-6">
+              {grupos.map(([secao, docs]) => (
+                <div key={secao}>
+                  <div className="flex items-center gap-3 mb-2.5">
+                    <h3 className="text-[12px] font-semibold text-torg-dark uppercase tracking-wide whitespace-nowrap">{secao}</h3>
+                    <span className="h-px bg-gray-100 flex-1" />
+                    <span className="text-[11px] text-torg-gray">{docs.length}</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {docs.map((d) => (
+                      <div key={d.id} className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-200 hover:shadow-sm transition-all">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-torg-dark leading-snug break-words">{d.nome}</p>
+                            {d.arquivoTamanho ? <p className="text-[11px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
+                            <div className="flex items-center gap-3 mt-2">
+                              <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[12px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Eye size={13} /> Visualizar</a>
+                              <a href={`${base}/${d.id}`} className="text-[12px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Download size={13} /> Baixar</a>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               ))}
