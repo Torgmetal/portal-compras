@@ -1,7 +1,15 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck } from "lucide-react";
+import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers } from "lucide-react";
 import { ordenarSecoes } from "@/lib/auditoria-secoes";
+
+function Chip({ icon: Icon, label }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-full px-3 py-1.5 text-[13px] text-white">
+      <Icon size={14} className="text-torg-orange" /> {label}
+    </span>
+  );
+}
 
 const fmtTam = (b) => {
   if (!b) return "";
@@ -44,20 +52,35 @@ export default function PortalClienteClient({ token }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <style jsx global>{`
+        @keyframes pcUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pcShimmer { 0% { transform: translateX(-120%); } 60%, 100% { transform: translateX(360%); } }
+        .pc-up { opacity: 0; animation: pcUp .6s cubic-bezier(.2,.7,.3,1) forwards; }
+        .pc-bar { position: relative; overflow: hidden; }
+        .pc-bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 28%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); animation: pcShimmer 5s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .pc-up { opacity: 1; animation: none; } .pc-bar::after { display: none; } }
+      `}</style>
+
       {/* HERO imersivo */}
       <div className="relative bg-torg-dark overflow-hidden">
         <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)", backgroundSize: "22px 22px" }} />
-        <div className="absolute top-0 left-0 right-0 h-1 bg-torg-orange" />
-        <div className="relative max-w-4xl mx-auto px-6 py-14">
-          <div className="text-white text-2xl font-extrabold tracking-tight mb-8">TORG <span className="font-light text-blue-300">METAL</span></div>
-          <p className="text-torg-orange text-[15px] font-semibold tracking-wide uppercase mb-2">Portal do Cliente · Qualidade</p>
-          <h1 className="text-white text-4xl sm:text-5xl font-extrabold leading-tight mb-3">
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-torg-blue/20 blur-3xl" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-torg-orange pc-bar" />
+        <div className="relative max-w-4xl mx-auto px-6 py-16">
+          <img src="/torg-logo-white.png" alt="Torg Metal" className="h-9 mb-8 pc-up" style={{ animationDelay: "0ms" }} />
+          <p className="text-torg-orange text-[15px] font-semibold tracking-wide uppercase mb-2 pc-up" style={{ animationDelay: "80ms" }}>Portal do Cliente · Qualidade</p>
+          <h1 className="text-white text-4xl sm:text-5xl font-extrabold leading-tight mb-3 pc-up" style={{ animationDelay: "160ms" }}>
             {data.contato ? `Bem-vindo(a), ${data.contato}!` : "Seja bem-vindo(a)!"}
           </h1>
-          <p className="text-blue-100 text-lg max-w-2xl leading-relaxed">
+          <p className="text-blue-100 text-lg max-w-2xl leading-relaxed pc-up" style={{ animationDelay: "240ms" }}>
             {data.mensagemBoasVindas || `É um prazer receber a ${data.empresa}. Reunimos aqui, de forma organizada e transparente, toda a documentação da qualidade solicitada para a sua conferência.`}
           </p>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 text-[15px]">
+          <div className="flex flex-wrap items-center gap-2.5 mt-7 pc-up" style={{ animationDelay: "320ms" }}>
+            <Chip icon={Layers} label={`${grupos.length} ${grupos.length === 1 ? "seção" : "seções"}`} />
+            <Chip icon={FileText} label={`${data.documentos.length} ${data.documentos.length === 1 ? "documento" : "documentos"}`} />
+            <Chip icon={BadgeCheck} label="ISO 9001 · Bureau Veritas" />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-5 text-[15px] pc-up" style={{ animationDelay: "400ms" }}>
             <span className="text-blue-200"><span className="text-blue-400">Empresa:</span> <strong className="text-white">{data.empresa}</strong></span>
             {data.titulo && <span className="text-blue-200"><span className="text-blue-400">Auditoria:</span> <strong className="text-white">{data.titulo}</strong></span>}
           </div>
@@ -76,16 +99,17 @@ export default function PortalClienteClient({ token }) {
             <div className="text-center py-12 text-torg-gray"><FileText size={32} className="mx-auto mb-2 text-gray-300" /><p className="text-base">Os documentos serão disponibilizados em breve.</p></div>
           ) : (
             <div className="space-y-6">
-              {grupos.map(([secao, docs]) => (
+              {grupos.map(([secao, docs], gi) => (
                 <div key={secao}>
-                  <div className="flex items-center gap-3 mb-2.5">
+                  <div className="flex items-center gap-3 mb-2.5 pc-up" style={{ animationDelay: `${gi * 120}ms` }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-torg-orange shrink-0" />
                     <h3 className="text-[14px] font-semibold text-torg-dark uppercase tracking-wide whitespace-nowrap">{secao}</h3>
                     <span className="h-px bg-gray-100 flex-1" />
                     <span className="text-[12px] text-torg-gray">{docs.length}</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {docs.map((d) => (
-                      <div key={d.id} className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-200 hover:shadow-sm transition-all">
+                    {docs.map((d, di) => (
+                      <div key={d.id} className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-300 hover:shadow-lg transition-shadow duration-200 pc-up" style={{ animationDelay: `${gi * 120 + di * 55}ms` }}>
                         <div className="flex items-start gap-3">
                           <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
                           <div className="min-w-0 flex-1">
