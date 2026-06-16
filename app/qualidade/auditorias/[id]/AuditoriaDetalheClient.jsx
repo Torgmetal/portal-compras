@@ -170,8 +170,22 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
   const [busca, setBusca] = useState("");
   const [resultados, setResultados] = useState(null);
   const [buscando, setBuscando] = useState(false);
+  const [selDocs, setSelDocs] = useState(new Set());
   const [sugerindo, setSugerindo] = useState(false);
   const [sugestoes, setSugestoes] = useState(null);
+
+  const toggleSel = (id) => setSelDocs((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  async function adicionarSelecionados() {
+    const escolhidos = (resultados || []).filter((d) => selDocs.has(d.id));
+    if (!escolhidos.length) return;
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: escolhidos.map((d) => ({ tipo, nome: d.nome, documentoId: d.id })) }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setPicker(false); setBusca(""); setResultados(null); setSelDocs(new Set());
+      await onChange();
+    } catch (err) { alert(err.message); }
+  }
 
   async function sugerir() {
     setSugerindo(true);
@@ -272,14 +286,21 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
             <button type="submit" disabled={buscando} className="text-[11px] text-torg-blue inline-flex items-center gap-1 disabled:opacity-50">{buscando ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />} Buscar</button>
           </form>
           {resultados && (resultados.length ? (
-            <div className="divide-y divide-gray-50 max-h-52 overflow-y-auto">
-              {resultados.map((d) => (
-                <button key={d.id} onClick={() => vincular(d)} className="w-full text-left px-2 py-1.5 text-[11px] hover:bg-torg-blue-50 flex items-center justify-between gap-2">
-                  <span className="truncate text-torg-dark">{d.nome}</span>
-                  <span className="text-torg-gray shrink-0 whitespace-nowrap">{d.categoria}{d.temArquivo ? "" : " · sem arquivo"}</span>
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="divide-y divide-gray-50 max-h-52 overflow-y-auto">
+                {resultados.map((d) => (
+                  <label key={d.id} className="flex items-center gap-2 px-2 py-1.5 text-[11px] hover:bg-torg-blue-50 cursor-pointer">
+                    <input type="checkbox" checked={selDocs.has(d.id)} onChange={() => toggleSel(d.id)} className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue shrink-0" />
+                    <span className="truncate text-torg-dark flex-1">{d.nome}</span>
+                    <span className="text-torg-gray shrink-0 whitespace-nowrap">{d.categoria}{d.temArquivo ? "" : " · sem arquivo"}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-gray-50">
+                <span className="text-[10px] text-torg-gray">{selDocs.size} selecionado(s)</span>
+                <button onClick={adicionarSelecionados} disabled={selDocs.size === 0} className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1 inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50"><Plus size={12} /> Adicionar selecionados</button>
+              </div>
+            </>
           ) : <p className="text-[10px] text-torg-gray">Nenhum documento encontrado.</p>)}
         </div>
       )}
