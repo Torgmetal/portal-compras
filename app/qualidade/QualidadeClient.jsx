@@ -40,6 +40,7 @@ export default function QualidadeClient({ escopo = "empresa" }) {
   const [modal, setModal] = useState(null); // { ...doc } para editar, ou {} para novo
   const [importar, setImportar] = useState(false);
   const [casar, setCasar] = useState(false);
+  const [importarServidor, setImportarServidor] = useState(false);
   const [acaoId, setAcaoId] = useState(null);
 
   const carregar = useCallback(async () => {
@@ -137,6 +138,12 @@ export default function QualidadeClient({ escopo = "empresa" }) {
                 <FileSpreadsheet size={15} /> Importar (CMR)
               </button>
             </>
+          )}
+          {!material && (
+            <button onClick={() => setImportarServidor(true)}
+              className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+              <FileText size={15} /> Importar do servidor
+            </button>
           )}
           <button onClick={() => setModal({ ...VAZIO, categoria: material ? "MATERIAL" : "EQUIPAMENTOS" })}
             className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-2 rounded-lg inline-flex items-center gap-2">
@@ -297,6 +304,7 @@ export default function QualidadeClient({ escopo = "empresa" }) {
       {modal && <ModalDocumento doc={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); carregar(); }} />}
       {importar && <ModalImportar onClose={() => setImportar(false)} onImported={() => { setImportar(false); carregar(); }} />}
       {casar && <ModalCasarPdfs onClose={() => setCasar(false)} onCasado={() => { setCasar(false); carregar(); }} />}
+      {importarServidor && <ModalImportarServidor onClose={() => setImportarServidor(false)} onImported={() => { setImportarServidor(false); carregar(); }} />}
     </div>
   );
 }
@@ -397,6 +405,118 @@ function ModalCasarPdfs({ onClose, onCasado }) {
                 {casando ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Casar {preview ? `${preview.casaveis}` : ""}
               </button>
             </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const PASTAS_SERVIDOR = [
+  "Inspetores",
+  "Funcionários",
+  "CQS",
+  "Certificado de Calibração - Equipamentos",
+  "EPS + RQPS",
+  "Procedimentos",
+  "Documentos SNQC",
+  "ISO 9001",
+];
+
+function ModalImportarServidor({ onClose, onImported }) {
+  const [pasta, setPasta] = useState("Inspetores");
+  const [carregando, setCarregando] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [erro, setErro] = useState("");
+  const [importando, setImportando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function previsualizar() {
+    setErro(""); setPreview(null); setResultado(null);
+    setCarregando(true);
+    try {
+      const res = await fetch(`/api/qualidade/documentos/importar-servidor?pasta=${encodeURIComponent(pasta)}`);
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro ao ler a pasta");
+      setPreview(json);
+    } catch (e) { setErro(e.message); } finally { setCarregando(false); }
+  }
+
+  async function confirmar() {
+    setErro(""); setImportando(true);
+    try {
+      const res = await fetch("/api/qualidade/documentos/importar-servidor", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pasta }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro ao importar");
+      setResultado(json);
+    } catch (e) { setErro(e.message); } finally { setImportando(false); }
+  }
+
+  const fechar = resultado ? onImported : onClose;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={fechar}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <p className="text-sm font-bold text-torg-dark flex items-center gap-1.5"><FileText size={15} className="text-torg-blue" /> Importar do servidor (Qualidade)</p>
+          <button onClick={fechar} className="p-1 text-torg-gray hover:text-torg-dark rounded hover:bg-gray-100"><X size={16} /></button>
+        </div>
+        <div className="px-4 py-3 overflow-y-auto space-y-3">
+          {!resultado && (
+            <>
+              <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg px-3 py-2 text-[11px] text-torg-dark">
+                Lê a pasta <strong>Qualidade / Workspace</strong> do servidor (pula OBSOLETO), traz os documentos pro Controle de Documentos <strong>apontando pro arquivo no SharePoint</strong>, categoriza pela pasta e <strong>extrai emissão / vencimento / nº / norma</strong> com IA. Nada é gravado até confirmar.
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-torg-dark mb-1">Pasta</label>
+                <select value={pasta} onChange={(e) => { setPasta(e.target.value); setPreview(null); }}
+                  className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+                  {PASTAS_SERVIDOR.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <button onClick={previsualizar} disabled={carregando}
+                className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
+                {carregando ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} Pré-visualizar
+              </button>
+
+              {erro && <p className="text-[11px] text-red-600 flex items-center gap-1"><AlertCircle size={12} /> {erro}</p>}
+
+              {preview && (
+                <div className="border border-gray-100 rounded-lg p-3 space-y-2">
+                  <p className="text-[11px] text-torg-gray">Categoria: <strong className="text-torg-dark">{preview.categoria}</strong>{preview.tipo ? <> · Tipo: <strong className="text-torg-dark">{preview.tipo}</strong></> : null}</p>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <Mini label="Arquivos" v={preview.total} cor="text-torg-blue" />
+                    <Mini label="Novos" v={preview.novos} cor={preview.novos ? "text-emerald-700" : "text-torg-gray"} />
+                    <Mini label="Já importados" v={preview.jaImportados} cor="text-torg-gray" />
+                  </div>
+                  {preview.amostra?.length > 0 && (
+                    <ul className="text-[11px] text-torg-gray list-disc pl-4 max-h-32 overflow-y-auto">
+                      {preview.amostra.map((n, i) => <li key={i} className="truncate">{n}</li>)}
+                    </ul>
+                  )}
+                  <p className="text-[10px] text-torg-gray">A leitura de cada documento (datas/nº) usa IA — pode levar um tempo. Pasta grande que exceder o limite: rode de novo que continua de onde parou.</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {resultado && (
+            <div className="text-center py-4 space-y-1">
+              <Check size={28} className="mx-auto text-emerald-600" />
+              <p className="text-sm font-bold text-torg-dark">Importação concluída</p>
+              <p className="text-[12px] text-torg-gray">{resultado.criados} novo(s) · {resultado.jaExistiam} já existia(m) · {resultado.comExtracao} com datas lidas{resultado.semLeitura ? ` · ${resultado.semLeitura} sem leitura` : ""}</p>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-100">
+          <button onClick={fechar} className="text-[12px] text-torg-gray hover:text-torg-dark px-3 py-1.5">{resultado ? "Concluir" : "Cancelar"}</button>
+          {!resultado && (
+            <button onClick={confirmar} disabled={importando || !preview || preview.novos === 0}
+              className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
+              {importando ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} Importar {preview?.novos ? `${preview.novos}` : ""}
+            </button>
           )}
         </div>
       </div>
