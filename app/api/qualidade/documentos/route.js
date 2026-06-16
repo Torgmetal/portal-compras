@@ -53,7 +53,7 @@ export async function GET(req) {
   // Escopo separa rastreabilidade (MATERIAL) dos documentos da empresa (demais categorias).
   if (categoria && CATEGORIAS.includes(categoria)) where.categoria = categoria;
   else if (escopo === "material") where.categoria = "MATERIAL";
-  else if (escopo === "empresa") where.categoria = { notIn: ["MATERIAL", "RELATORIO"] }; // RELATORIO só vive nas seções do data book
+  else if (escopo === "empresa") where.categoria = { notIn: ["MATERIAL", "RELATORIO", "ANEXO"] }; // RELATORIO/ANEXO vivem só nas seções do data book
   if (validadoFiltro === "true") where.validado = true;
   if (validadoFiltro === "false") where.validado = false;
 

@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { upload } from "@vercel/blob/client";
 import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, Search,
-  FileText, CheckCircle2, Lock, BookCheck, FileDown,
+  FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload,
 } from "lucide-react";
 import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
 import { STATUS_COR } from "@/lib/qualidade-status";
@@ -294,20 +295,45 @@ export default function DataBookDetalheClient({ id }) {
           <SecaoCard key={s.id} secao={s} candidatos={data.candidatos} acaoLoading={acao === s.id}
             onEstado={(e) => setEstado(s, e)} onVincular={(docId) => vincular(s, docId)} onDesvincular={(docId) => desvincular(s, docId)}
             onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onPopularProcedimentos={() => popularProcedimentos(s)}
-            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} />
+            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onReload={carregar} />
         ))}
       </div>
     </div>
   );
 }
 
-function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit }) {
+function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onReload }) {
   const [picker, setPicker] = useState(false);
   const [codBusca, setCodBusca] = useState("");
   const [codResultados, setCodResultados] = useState(null);
   const [codBuscando, setCodBuscando] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const fileRef = useRef(null);
   const linkedIds = new Set(secao.documentos.map((d) => d.id));
   const disponiveis = candidatos.filter((c) => !linkedIds.has(c.id));
+
+  // Anexa um arquivo do computador direto à seção (Vercel Blob + endpoint /anexar).
+  // Para conteúdo que não vem do portal (relatório avulso, documento do cliente…).
+  async function anexarArquivo(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEnviando(true);
+    try {
+      const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/anexar`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arquivoUrl: blob.url, arquivoNome: file.name, arquivoTipo: file.type || null, arquivoTamanho: file.size }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro ao anexar");
+      await onReload?.();
+    } catch (err) {
+      alert(err.message || "Falha no upload");
+    } finally {
+      setEnviando(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   // Busca um certificado pelo código de rastreabilidade (Índice R / importRef) em
   // todo o Controle de Documentos — não fica limitado aos candidatos da OP.
@@ -349,8 +375,10 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
         </div>
       </div>
 
-      {/* Documentos vinculados (seções do Módulo 1 / empresa / procedimentos / relatórios) */}
-      {(secao.usaModulo1 || secaoUsaEmpresa(secao.numero) || secaoUsaProcedimentos(secao.numero) || secaoUsaRelatoriosServidor(secao.numero)) && (
+      {/* Documentos vinculados — TODA seção de conteúdo (exceto §01 lista mestra, que é
+          gerada automaticamente). Além do que vem do portal, sempre permite anexar
+          arquivo do computador — inclusive na §10 (PIT), que ainda mostra o editor abaixo. */}
+      {secao.numero !== "01" && (
         <div className="mt-2 pt-2 border-t border-gray-50">
           {secao.documentos.length > 0 ? (
             <div className="divide-y divide-gray-50">
@@ -379,6 +407,11 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
           {!picker ? (
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               <button onClick={() => setPicker(true)} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={12} /> Vincular documento</button>
+              <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" className="hidden" onChange={anexarArquivo} />
+              <button onClick={() => fileRef.current?.click()} disabled={enviando || acaoLoading}
+                className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium disabled:opacity-50">
+                {enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? "Enviando…" : "Anexar arquivo"}
+              </button>
               {GRUPO_POR_SECAO[secao.numero] && (
                 <button onClick={onPopularMaterial} disabled={acaoLoading}
                   className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
