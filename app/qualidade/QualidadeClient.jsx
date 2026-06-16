@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { upload } from "@vercel/blob/client";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, Search, ShieldCheck, ShieldAlert,
-  AlertTriangle, FileText, Eye, Download, Pencil, Trash2, X, Check, CircleSlash, Clock,
+  AlertTriangle, FileText, Eye, Download, Pencil, Trash2, X, Check,
   FileSpreadsheet, Upload, Paperclip, Link2, ScrollText,
 } from "lucide-react";
 import { CATEGORIAS_QUALIDADE, CATEGORIA_LABEL, STATUS_COR } from "@/lib/qualidade-status";
@@ -33,7 +33,6 @@ export default function QualidadeClient({ escopo = "empresa" }) {
   const [erro, setErro] = useState("");
   const [cat, setCat] = useState("");
   const [status, setStatus] = useState("");
-  const [validado, setValidado] = useState("");
   const [busca, setBusca] = useState("");
   const [op, setOp] = useState(""); // filtro por OP (rastreabilidade)
   const [ops, setOps] = useState([]); // OPs disponíveis no seletor
@@ -50,7 +49,6 @@ export default function QualidadeClient({ escopo = "empresa" }) {
       p.set("escopo", escopo);
       if (cat) p.set("categoria", cat);
       if (status) p.set("status", status);
-      if (validado) p.set("validado", validado);
       if (busca.trim()) p.set("busca", busca.trim());
       if (op) p.set("op", op);
       const res = await fetch(`/api/qualidade/documentos?${p}`);
@@ -64,30 +62,12 @@ export default function QualidadeClient({ escopo = "empresa" }) {
     } finally {
       setLoading(false);
     }
-  }, [escopo, cat, status, validado, busca, op]);
+  }, [escopo, cat, status, busca, op]);
 
   useEffect(() => {
     const t = setTimeout(carregar, busca ? 300 : 0); // debounce na busca
     return () => clearTimeout(t);
   }, [carregar, busca]);
-
-  async function toggleValidado(doc) {
-    setAcaoId(doc.id);
-    try {
-      const res = await fetch(`/api/qualidade/documentos/${doc.id}/validar`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ validado: !doc.validado }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
-      setDocs((prev) => prev.map((d) => (d.id === doc.id ? { ...d, validado: !doc.validado } : d)));
-      setStats((s) => s && { ...s, naoValidados: s.naoValidados + (doc.validado ? 1 : -1) });
-    } catch (e) {
-      alert("Erro: " + e.message);
-    } finally {
-      setAcaoId(null);
-    }
-  }
 
   async function excluir(doc) {
     const vencido = doc.status === "VENCIDO";
@@ -161,10 +141,9 @@ export default function QualidadeClient({ escopo = "empresa" }) {
           <KpiCard label="Com arquivo (PDF)" valor={docs.filter((d) => d.temArquivo).length} cor="text-blue-700 bg-blue-50" Icon={FileText} />
         </div>
       ) : stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-3 gap-3 mb-4">
           <KpiCard label="Vencidos" valor={stats.vencidos} cor="text-red-700 bg-red-50" Icon={ShieldAlert} ativo={status === "VENCIDO"} onClick={() => setStatus(status === "VENCIDO" ? "" : "VENCIDO")} />
           <KpiCard label="Vencendo (≤30d)" valor={stats.vencendo} cor="text-amber-700 bg-amber-50" Icon={AlertTriangle} ativo={status === "VENCENDO"} onClick={() => setStatus(status === "VENCENDO" ? "" : "VENCENDO")} />
-          <KpiCard label="A validar" valor={stats.naoValidados} cor="text-blue-700 bg-blue-50" Icon={Clock} ativo={validado === "false"} onClick={() => setValidado(validado === "false" ? "" : "false")} />
           <KpiCard label="Vigentes" valor={stats.vigentes} cor="text-emerald-700 bg-emerald-50" Icon={ShieldCheck} ativo={status === "VIGENTE"} onClick={() => setStatus(status === "VIGENTE" ? "" : "VIGENTE")} />
         </div>
       )}
@@ -197,11 +176,6 @@ export default function QualidadeClient({ escopo = "empresa" }) {
               {STATUS_FILTROS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           )}
-          <select value={validado} onChange={(e) => setValidado(e.target.value)} className="text-[13px] border border-gray-200 rounded-lg px-2 py-1.5">
-            <option value="">Validação: todas</option>
-            <option value="true">Validados</option>
-            <option value="false">A validar</option>
-          </select>
           <button onClick={carregar} disabled={loading} className="text-xs text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50">
             <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Atualizar
           </button>
@@ -242,7 +216,6 @@ export default function QualidadeClient({ escopo = "empresa" }) {
                     <th className="px-3 py-2 font-medium text-center">Status</th>
                   </>
                 )}
-                <th className="px-3 py-2 font-medium text-center">Validado</th>
                 <th className="px-3 py-2 font-medium text-right">Ações</th>
               </tr>
             </thead>
@@ -274,14 +247,6 @@ export default function QualidadeClient({ escopo = "empresa" }) {
                       </td>
                     </>
                   )}
-                  <td className="px-3 py-2 text-center">
-                    <button onClick={() => toggleValidado(d)} disabled={acaoId === d.id}
-                      title={d.validado ? "Validado — clique para desfazer" : "Marcar como validado"}
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1 disabled:opacity-50 ${d.validado ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
-                      {acaoId === d.id ? <Loader2 size={10} className="animate-spin" /> : d.validado ? <Check size={10} /> : <CircleSlash size={10} />}
-                      {d.validado ? "Validado" : "A validar"}
-                    </button>
-                  </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center justify-end gap-1">
                       {d.temArquivo && (
