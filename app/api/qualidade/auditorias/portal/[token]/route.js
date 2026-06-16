@@ -13,6 +13,10 @@ export async function GET(_req, { params }) {
   if (!aud || aud.status !== "PUBLICADO") {
     return NextResponse.json({ success: false, error: "Portal indisponível ou link inválido." }, { status: 404 });
   }
+  // Registra o acesso do cliente (não bloqueia a resposta).
+  prisma.auditoria
+    .update({ where: { id: aud.id }, data: { ultimoAcessoEm: new Date(), ...(aud.primeiroAcessoEm ? {} : { primeiroAcessoEm: new Date() }) } })
+    .catch(() => {});
   return NextResponse.json({
     success: true,
     data: {

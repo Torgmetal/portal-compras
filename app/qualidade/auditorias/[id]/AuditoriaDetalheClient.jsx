@@ -5,7 +5,10 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Building2, Upload, Search, X, FileText, Trash2,
   Send, Copy, ExternalLink, Save, ClipboardList, FolderOpen, CheckCircle2,
+  Sparkles, Plus, Mail, Eye,
 } from "lucide-react";
+
+const fmtDH = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
 export default function AuditoriaDetalheClient({ id }) {
   const [data, setData] = useState(null);
@@ -15,6 +18,8 @@ export default function AuditoriaDetalheClient({ id }) {
   const [salvando, setSalvando] = useState(false);
   const [publicando, setPublicando] = useState(false);
   const [link, setLink] = useState("");
+  const [emailCliente, setEmailCliente] = useState("");
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -47,6 +52,20 @@ export default function AuditoriaDetalheClient({ id }) {
       if (j.link) setLink(j.link);
       await carregar();
     } catch (e) { alert(e.message); } finally { setPublicando(false); }
+  }
+
+  async function enviarEmail() {
+    if (!/^\S+@\S+\.\S+$/.test(emailCliente.trim())) { alert("Informe um e-mail válido do cliente."); return; }
+    setEnviandoEmail(true);
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${id}/enviar-email`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: emailCliente.trim() }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      if (j.link) setLink(j.link);
+      if (!j.enviado) alert("Link gerado, mas o e-mail não pôde ser enviado agora. Copie o link e envie manualmente.");
+      else alert("E-mail enviado ao cliente.");
+      await carregar();
+    } catch (e) { alert(e.message); } finally { setEnviandoEmail(false); }
   }
 
   if (loading) return <div className="flex flex-col items-center justify-center py-24 text-torg-gray"><Loader2 size={24} className="animate-spin mb-3" /><p className="text-sm">Carregando…</p></div>;
@@ -88,29 +107,48 @@ export default function AuditoriaDetalheClient({ id }) {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
         <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1"><FolderOpen size={15} className="text-torg-blue" /> Documentos para o cliente</h2>
         <p className="text-[11px] text-torg-gray mb-2">Estes documentos aparecem no portal do cliente para conferência e download.</p>
-        <DocSection auditoriaId={id} tipo="EVIDENCIA" titulo="" docs={evidenciaDocs} onChange={carregar} />
+        <DocSection auditoriaId={id} tipo="EVIDENCIA" titulo="" docs={evidenciaDocs} onChange={carregar} sugestao />
       </div>
 
-      {/* Publicação */}
+      {/* Publicação + envio */}
       <div className="bg-torg-dark rounded-xl shadow-sm p-4 mb-8 text-white">
         <h2 className="text-sm font-bold inline-flex items-center gap-1.5 mb-1.5"><Send size={15} className="text-torg-orange" /> Portal do cliente</h2>
         {data.status === "PUBLICADO" ? (
           <>
-            <p className="text-[12px] text-blue-100 mb-2">Publicado — envie o link abaixo ao cliente. {evidenciaDocs.length} documento(s) disponível(is).</p>
-            {(link || data.token) && (
-              <div className="flex items-center gap-2 flex-wrap bg-white/10 rounded-lg px-3 py-2 mb-2">
-                <span className="text-[11px] font-mono text-blue-100 break-all flex-1 min-w-[180px]">{link || `${typeof window !== "undefined" ? window.location.origin : ""}/portal-cliente/${data.token}`}</span>
-                <button onClick={() => navigator.clipboard?.writeText(link || `${window.location.origin}/portal-cliente/${data.token}`)} className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><Copy size={12} /> copiar</button>
-                <a href={`/portal-cliente/${data.token}`} target="_blank" rel="noreferrer" className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><ExternalLink size={12} /> abrir</a>
-              </div>
-            )}
-            <button onClick={() => publicar(true)} disabled={publicando} className="text-[11px] text-blue-100 hover:text-white underline disabled:opacity-50">Despublicar (desativa o link)</button>
+            <p className="text-[12px] text-blue-100 mb-2">Publicado · {evidenciaDocs.length} documento(s) disponível(is).</p>
+            <div className="flex items-center gap-2 flex-wrap bg-white/10 rounded-lg px-3 py-2 mb-2.5">
+              <span className="text-[11px] font-mono text-blue-100 break-all flex-1 min-w-[180px]">{link || (typeof window !== "undefined" ? `${window.location.origin}/portal-cliente/${data.token}` : `/portal-cliente/${data.token}`)}</span>
+              <button onClick={() => navigator.clipboard?.writeText(link || `${window.location.origin}/portal-cliente/${data.token}`)} className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><Copy size={12} /> copiar</button>
+              <a href={`/portal-cliente/${data.token}`} target="_blank" rel="noreferrer" className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><ExternalLink size={12} /> abrir</a>
+            </div>
           </>
         ) : (
-          <>
-            <p className="text-[12px] text-blue-100 mb-2.5">Gere um link exclusivo para o cliente acessar os documentos com a identidade da Torg.</p>
-            <button onClick={() => publicar(false)} disabled={publicando || evidenciaDocs.length === 0} title={evidenciaDocs.length === 0 ? "Adicione ao menos 1 documento para o cliente" : ""} className="text-[13px] font-semibold text-torg-dark bg-white rounded-lg px-4 py-2 hover:bg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">{publicando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Publicar e gerar link</button>
-          </>
+          <p className="text-[12px] text-blue-100 mb-2.5">Envie por e-mail (publica e manda o link) ou apenas gere o link.{evidenciaDocs.length === 0 ? " Adicione ao menos 1 documento." : ""}</p>
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <input type="email" value={emailCliente} onChange={(e) => setEmailCliente(e.target.value)} placeholder="e-mail do cliente"
+            className="flex-1 min-w-[180px] text-[12px] rounded-lg px-2.5 py-1.5 bg-white text-torg-dark border border-white/20 focus:outline-none" />
+          <button onClick={enviarEmail} disabled={enviandoEmail || evidenciaDocs.length === 0}
+            className="text-[12px] font-semibold text-torg-dark bg-white rounded-lg px-3 py-1.5 hover:bg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
+            {enviandoEmail ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} {data.status === "PUBLICADO" ? "Reenviar e-mail" : "Publicar e enviar"}
+          </button>
+        </div>
+        {data.status !== "PUBLICADO" && (
+          <button onClick={() => publicar(false)} disabled={publicando || evidenciaDocs.length === 0} className="text-[11px] text-blue-100 hover:text-white underline disabled:opacity-50 mt-2">
+            {publicando ? "Gerando…" : "ou só gerar o link, sem e-mail"}
+          </button>
+        )}
+
+        <div className="text-[11px] text-blue-200 mt-2.5 space-y-0.5">
+          {data.clienteEmail && data.enviadoEmailEm && <p className="inline-flex items-center gap-1"><Mail size={11} /> Enviado para {data.clienteEmail} em {fmtDH(data.enviadoEmailEm)}</p>}
+          {data.status === "PUBLICADO" && (data.ultimoAcessoEm
+            ? <p className="inline-flex items-center gap-1 text-emerald-300"><Eye size={11} /> Cliente acessou — último em {fmtDH(data.ultimoAcessoEm)}</p>
+            : <p className="text-blue-300">Aguardando o primeiro acesso do cliente.</p>)}
+        </div>
+
+        {data.status === "PUBLICADO" && (
+          <button onClick={() => publicar(true)} disabled={publicando} className="text-[11px] text-blue-100 hover:text-white underline disabled:opacity-50 mt-2 block">Despublicar (desativa o link)</button>
         )}
       </div>
 
@@ -124,13 +162,25 @@ function Campo({ label, children, wide }) {
 }
 
 // Seção de documentos (upload + vincular doc da Qualidade + lista)
-function DocSection({ auditoriaId, tipo, titulo, docs, onChange }) {
+function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
   const fileRef = useRef(null);
   const [enviando, setEnviando] = useState(false);
   const [picker, setPicker] = useState(false);
   const [busca, setBusca] = useState("");
   const [resultados, setResultados] = useState(null);
   const [buscando, setBuscando] = useState(false);
+  const [sugerindo, setSugerindo] = useState(false);
+  const [sugestoes, setSugestoes] = useState(null);
+
+  async function sugerir() {
+    setSugerindo(true);
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/sugerir-docs`, { method: "POST" });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setSugestoes(j.sugestoes || []);
+    } catch (err) { alert(err.message); } finally { setSugerindo(false); }
+  }
 
   async function anexarArquivo(e) {
     const file = e.target.files?.[0];
@@ -162,6 +212,7 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange }) {
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       setPicker(false); setBusca(""); setResultados(null);
+      setSugestoes((prev) => (prev ? prev.map((x) => (x.id === d.id ? { ...x, jaAnexado: true } : x)) : prev));
       await onChange();
     } catch (err) { alert(err.message); }
   }
@@ -190,6 +241,9 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange }) {
         <input ref={fileRef} type="file" className="hidden" onChange={anexarArquivo} accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.msg,.eml" />
         <button onClick={() => fileRef.current?.click()} disabled={enviando} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? "Enviando…" : "Anexar arquivo"}</button>
         <button onClick={() => setPicker((v) => !v)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Search size={12} /> Trazer do Controle de Documentos</button>
+        {sugestao && (
+          <button onClick={sugerir} disabled={sugerindo} title="O Torguinho lê as solicitações do cliente e sugere os documentos" className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1 inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50">{sugerindo ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} {sugerindo ? "Analisando…" : "Sugerir documentos (IA)"}</button>
+        )}
       </div>
 
       {picker && (
@@ -208,6 +262,27 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange }) {
               ))}
             </div>
           ) : <p className="text-[10px] text-torg-gray">Nenhum documento encontrado.</p>)}
+        </div>
+      )}
+
+      {sugestao && sugestoes && (
+        <div className="mt-2 border border-torg-blue-200 bg-torg-blue-50/40 rounded-lg p-2.5">
+          <p className="text-[11px] font-semibold text-torg-dark mb-1.5 inline-flex items-center gap-1"><Sparkles size={12} className="text-torg-blue" /> Sugestões do Torguinho ({sugestoes.length})</p>
+          {sugestoes.length ? (
+            <div className="space-y-1.5">
+              {sugestoes.map((s) => (
+                <div key={s.id} className="flex items-start justify-between gap-2 bg-white rounded-lg border border-gray-100 px-2.5 py-1.5">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium text-torg-dark truncate">{s.nome}</p>
+                    {s.motivo && <p className="text-[10px] text-torg-gray leading-snug">{s.motivo}</p>}
+                  </div>
+                  {s.jaAnexado
+                    ? <span className="text-[10px] text-emerald-600 inline-flex items-center gap-1 shrink-0"><CheckCircle2 size={11} /> já incluso</span>
+                    : <button onClick={() => vincular(s)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 shrink-0"><Plus size={12} /> adicionar</button>}
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-[10px] text-torg-gray">Nenhuma sugestão — refine as solicitações ou adicione manualmente.</p>}
         </div>
       )}
     </div>

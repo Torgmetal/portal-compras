@@ -1219,6 +1219,10 @@ model Auditoria {
   token              String?        @unique
   status             String         @default("RASCUNHO") // RASCUNHO | PUBLICADO
   publicadoEm        DateTime?
+  clienteEmail       String?
+  enviadoEmailEm     DateTime?
+  primeiroAcessoEm   DateTime?
+  ultimoAcessoEm     DateTime?
   criadoPorId        String?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
