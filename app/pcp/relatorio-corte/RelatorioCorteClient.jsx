@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Scissors, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox } from "lucide-react";
+import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, adicionarLegenda, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR")} kg`;
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
@@ -42,22 +43,60 @@ export default function RelatorioCorteClient() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  function exportarCSV() {
-    let linhas, nome;
+  async function exportarExcel() {
+    const periodo = de || ate ? ` · período ${de || "início"} a ${ate || "hoje"}` : "";
+    const hoje = new Date().toISOString().split("T")[0];
     if (detalhe) {
-      nome = `corte_${detalhe.obra}.csv`;
-      linhas = [["Peça", "Descrição / Perfil", "Programado", "Cortado", "Saldo", "Situação", "Data do corte", "Máquina", "Operador"],
-        ...detalhe.itens.map((i) => [i.peca, i.descricao, i.programado, i.cortado, i.saldo, i.situacao, fmtDataHora(i.data), i.maquina, i.operador])];
+      const headers = ["Peça", "Descrição / Perfil", "Programado", "Cortado", "Saldo", "Situação", "Data do corte", "Máquina", "Operador"];
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: `Relatorio de Corte — Obra ${detalhe.obra}`,
+        subtitulo: `Pecas programadas e cortadas (Syneco)${periodo}`,
+        kpis: [`Programado: ${detalhe.programadoUn} un  |  Cortado: ${detalhe.cortadoUn} un  |  Pecas cortadas: ${detalhe.cortadas}/${detalhe.total}  |  Pendentes: ${detalhe.pendentes}`],
+        totalColunas: headers.length,
+        nomePlanilha: `Corte ${detalhe.obra}`.slice(0, 31),
+        codigoDoc: "REL-PRD-005",
+      });
+      ws.columns = [{ width: 16 }, { width: 30 }, { width: 11 }, { width: 9 }, { width: 8 }, { width: 11 }, { width: 18 }, { width: 16 }, { width: 16 }];
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, headers); row++;
+      const first = row;
+      for (const i of detalhe.itens) {
+        const fill = i.situacao === "Cortada" ? CORES.LIGHT_GREEN : i.situacao === "Parcial" ? CORES.LIGHT_ORANGE : undefined;
+        const corSit = i.situacao === "Cortada" ? "16A34A" : i.situacao === "Parcial" ? "EA580C" : "9CA3AF";
+        adicionarLinhaTabela(ws, row, [i.peca, i.descricao, i.programado, i.cortado, i.saldo, i.situacao, fmtDataHora(i.data), i.maquina, i.operador], {
+          fillColor: fill, fontColors: { 5: corSit },
+          alinhamento: { 2: "right", 3: "right", 4: "right", 5: "center", 6: "center" },
+        });
+        row++;
+      }
+      const last = row - 1;
+      adicionarLinhaTotais(ws, row, ["TOTAL", "", { formula: `SUM(C${first}:C${last})` }, { formula: `SUM(D${first}:D${last})` }, { formula: `SUM(E${first}:E${last})` }, "", "", "", ""]);
+      row += 2;
+      adicionarLegenda(ws, row, [{ cor: CORES.LIGHT_GREEN, label: "Verde = cortada" }, { cor: CORES.LIGHT_ORANGE, label: "Laranja = parcial" }, { cor: "FFFFFF", label: "Branco = pendente" }], headers.length);
+      await downloadWorkbook(workbook, `Torg_Corte_${detalhe.obra}_${hoje}.xlsx`);
     } else {
-      nome = "corte_resumo.csv";
-      linhas = [["Obra", "Peças", "Programado (un)", "Cortado (un)", "% cortado", "Peso cortado (kg)", "Último corte"],
-        ...obras.map((o) => [o.obra, o.pecas, o.programadoUn, o.cortadoUn, `${o.pct}%`, o.pesoCortado, fmtData(o.ultima)])];
+      const headers = ["Obra", "Pecas", "Programado (un)", "Cortado (un)", "% cortado", "Peso cortado (kg)", "Ultimo corte"];
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: "Relatorio de Corte — Resumo por obra",
+        subtitulo: `Apenas obras com lista (LPC) no portal${periodo}`,
+        totalColunas: headers.length,
+        nomePlanilha: "Corte (resumo)",
+        codigoDoc: "REL-PRD-005",
+      });
+      ws.columns = [{ width: 12 }, { width: 8 }, { width: 15 }, { width: 13 }, { width: 11 }, { width: 16 }, { width: 14 }];
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, headers); row++;
+      const first = row;
+      for (const o of obras) {
+        adicionarLinhaTabela(ws, row, [o.obra, o.pecas, o.programadoUn, o.cortadoUn, `${o.pct}%`, o.pesoCortado, fmtData(o.ultima)], {
+          alinhamento: { 1: "right", 2: "right", 3: "right", 4: "center", 5: "right" },
+        });
+        row++;
+      }
+      const last = row - 1;
+      adicionarLinhaTotais(ws, row, ["TOTAL", { formula: `SUM(B${first}:B${last})` }, { formula: `SUM(C${first}:C${last})` }, { formula: `SUM(D${first}:D${last})` }, "", { formula: `SUM(F${first}:F${last})` }, ""]);
+      await downloadWorkbook(workbook, `Torg_Corte_Resumo_${hoje}.xlsx`);
     }
-    const csv = "﻿" + linhas.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    a.download = nome;
-    a.click();
   }
 
   const vazio = detalhe ? !detalhe.itens?.length : !obras.length;
@@ -69,7 +108,7 @@ export default function RelatorioCorteClient() {
           <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2"><Scissors size={20} className="text-torg-blue" /> Relatório de Corte</h1>
           <p className="text-xs text-torg-gray mt-0.5">Peças <strong>programadas</strong> e <strong>cortadas</strong> por obra — situação, data/hora, máquina e operador (Syneco).</p>
         </div>
-        <button onClick={exportarCSV} disabled={loading || vazio}
+        <button onClick={exportarExcel} disabled={loading || vazio}
           className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50 shrink-0">
           <Download size={15} /> Exportar
         </button>
