@@ -22,6 +22,7 @@ export default function PortalClienteClient({ token }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [aba, setAba] = useState(null); // seção (aba) ativa escolhida pelo cliente
 
   const carregar = useCallback(async () => {
     try {
@@ -49,6 +50,9 @@ export default function PortalClienteClient({ token }) {
   const porSecao = {};
   for (const d of data.documentos) { const s = d.secao || "Outros"; (porSecao[s] ||= []).push(d); }
   const grupos = ordenarSecoes(Object.keys(porSecao)).map((s) => [s, porSecao[s]]);
+  // Aba ativa: a escolhida pelo cliente (se ainda existe) ou a primeira seção.
+  const abaAtiva = (aba && porSecao[aba]) ? aba : (grupos[0]?.[0] || null);
+  const docsAtivos = abaAtiva ? porSecao[abaAtiva] : [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -107,35 +111,39 @@ export default function PortalClienteClient({ token }) {
           {data.documentos.length === 0 ? (
             <div className="text-center py-12 text-torg-gray"><FileText size={32} className="mx-auto mb-2 text-gray-300" /><p className="text-base">Os documentos serão disponibilizados em breve.</p></div>
           ) : (
-            <div className="space-y-6">
-              {grupos.map(([secao, docs], gi) => (
-                <div key={secao}>
-                  <div className="flex items-center gap-3 mb-2.5 pc-up" style={{ animationDelay: `${gi * 120}ms` }}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-torg-orange shrink-0" />
-                    <h3 className="text-[14px] font-semibold text-torg-dark uppercase tracking-wide whitespace-nowrap">{secao}</h3>
-                    <span className="h-px bg-gray-100 flex-1" />
-                    <span className="text-[12px] text-torg-gray">{docs.length}</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {docs.map((d, di) => (
-                      <div key={d.id} className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-300 hover:shadow-lg transition-shadow duration-200 pc-up" style={{ animationDelay: `${gi * 120 + di * 55}ms` }}>
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-base font-medium text-torg-dark leading-snug break-words">{d.nome}</p>
-                            {d.arquivoTamanho ? <p className="text-[13px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
-                            <div className="flex items-center gap-4 mt-2.5">
-                              <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
-                              <a href={`${base}/${d.id}`} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
-                            </div>
-                          </div>
+            <>
+              {/* Abas por tipo de documento — o cliente escolhe e vê só aquela seção */}
+              <div className="flex flex-wrap gap-2 mb-6">
+                {grupos.map(([secao, docs]) => {
+                  const ativa = secao === abaAtiva;
+                  return (
+                    <button key={secao} onClick={() => setAba(secao)}
+                      className={`text-[13px] font-medium rounded-full px-3.5 py-1.5 border transition-colors inline-flex items-center gap-2 ${ativa ? "bg-torg-dark text-white border-torg-dark" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue-300 hover:text-torg-dark"}`}>
+                      <span className="uppercase tracking-wide">{secao}</span>
+                      <span className={`text-[11px] rounded-full px-1.5 ${ativa ? "bg-white/25 text-white" : "bg-gray-100 text-torg-gray"}`}>{docs.length}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Documentos da aba ativa */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {docsAtivos.map((d, di) => (
+                  <div key={d.id} className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-300 hover:shadow-lg transition-shadow duration-200 pc-up" style={{ animationDelay: `${di * 55}ms` }}>
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-base font-semibold text-torg-dark leading-snug break-words uppercase">{d.nome}</p>
+                        {d.arquivoTamanho ? <p className="text-[13px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
+                        <div className="flex items-center gap-4 mt-2.5">
+                          <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
+                          <a href={`${base}/${d.id}`} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
