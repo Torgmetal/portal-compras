@@ -76,6 +76,11 @@ export async function PATCH(req, { params }) {
     );
   }
 
+  // Cancelar uma programacao de carga e restrito a ADMIN (decisao do Vitor).
+  if (body.status === "CANCELADO" && user.tipo !== "ADMIN") {
+    return NextResponse.json({ success: false, error: "Apenas administradores podem cancelar uma programacao de carga." }, { status: 403 });
+  }
+
   const atual = await prisma.planejamentoCarga.findUnique({
     where: { id: params.id },
     include: { itens: true },
@@ -150,7 +155,7 @@ export async function PATCH(req, { params }) {
 export async function DELETE(_req, { params }) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "EXPEDICAO"]);
+    user = await requireRole(["ADMIN"]); // excluir/cancelar programacao de carga e so do Admin
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });

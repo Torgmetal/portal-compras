@@ -7,6 +7,6 @@ export const metadata = {
 };
 
 export default async function ProgramacaoCargasPage() {
-  await requireRole(["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "PLANEJAMENTO"]);
-  return <ProgramacaoCargasClient />;
+  const user = await requireRole(["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "PLANEJAMENTO"]);
+  return <ProgramacaoCargasClient isAdmin={user.tipo === "ADMIN"} />;
 }

@@ -301,6 +301,7 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
   const [descricao, setDescricao] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
   const [buscaItem, setBuscaItem] = useState("");
+  const [soProntas, setSoProntas] = useState(false); // mostra só peças prontas (Pintura)
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState("");
 
@@ -347,12 +348,24 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
     return lista;
   }, [pecas, acessorios]);
 
-  // Filtra itens pela busca
+  // Peças prontas (pós-pintura) = status PINTURA — as mais próximas de expedir.
+  const totalProntas = useMemo(
+    () => itensSelecionaveis.filter((i) => i.tipo === "PECA" && i.statusProd === "PINTURA").length,
+    [itensSelecionaveis]
+  );
+
+  // Filtra itens pela busca + toggle "só prontas"
   const itensFiltrados = useMemo(() => {
-    if (!buscaItem.trim()) return itensSelecionaveis;
+    let base = itensSelecionaveis;
+    if (soProntas) base = base.filter((i) => i.tipo !== "PECA" || i.statusProd === "PINTURA");
+    if (!buscaItem.trim()) return base;
     const q = buscaItem.toLowerCase();
-    return itensSelecionaveis.filter((i) => i.descricao.toLowerCase().includes(q));
-  }, [itensSelecionaveis, buscaItem]);
+    return base.filter((i) => i.descricao.toLowerCase().includes(q));
+  }, [itensSelecionaveis, buscaItem, soProntas]);
+
+  const selecionarProntas = () => {
+    setSelecionados(new Set(itensSelecionaveis.filter((i) => i.tipo === "PECA" && i.statusProd === "PINTURA").map((i) => i.key)));
+  };
 
   const pecasFiltradas = itensFiltrados.filter((i) => i.tipo === "PECA");
   const acessFiltrados = itensFiltrados.filter((i) => i.tipo === "ACESSORIO");
@@ -482,6 +495,25 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
             >
               {selecionados.size === itensSelecionaveis.length ? "Desmarcar todos" : "Selecionar todos"}
             </button>
+          </div>
+
+          {/* Atalho peças prontas (pós-pintura) */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="flex items-center gap-1.5 text-xs text-torg-dark cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={soProntas}
+                onChange={(e) => setSoProntas(e.target.checked)}
+                className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
+              />
+              Mostrar só peças prontas (pós-pintura)
+              <span className="text-torg-gray">· {totalProntas} pronta{totalProntas === 1 ? "" : "s"}</span>
+            </label>
+            {totalProntas > 0 && (
+              <button onClick={selecionarProntas} className="text-xs text-torg-blue hover:underline whitespace-nowrap">
+                Selecionar prontas
+              </button>
+            )}
           </div>
 
           {/* Resumo da selecao */}

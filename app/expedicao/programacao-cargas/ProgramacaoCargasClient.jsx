@@ -15,7 +15,7 @@ const STATUS_COR = {
   CANCELADO: { bg: "bg-red-100", text: "text-red-700", label: "Cancelado" },
 };
 
-export default function ProgramacaoCargasClient() {
+export default function ProgramacaoCargasClient({ isAdmin = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -208,7 +208,7 @@ export default function ProgramacaoCargasClient() {
 
       {/* Conteudo da aba */}
       {aba === "cargas" ? (
-        <TabCargas cargas={cargas} busca={busca} />
+        <TabCargas cargas={cargas} busca={busca} isAdmin={isAdmin} onChanged={carregar} />
       ) : (
         <TabProgressoOPs progressoOPs={progressoOPs} busca={busca} />
       )}
@@ -218,7 +218,7 @@ export default function ProgramacaoCargasClient() {
 
 // ─── Tab: Cargas Programadas ──────────────────────────────────
 
-function TabCargas({ cargas, busca }) {
+function TabCargas({ cargas, busca, isAdmin, onChanged }) {
   const filtradas = useMemo(() => {
     if (!busca.trim()) return cargas;
     const q = busca.toLowerCase();
@@ -254,25 +254,25 @@ function TabCargas({ cargas, busca }) {
     <div className="space-y-4">
       {/* Vencidas (destacadas) */}
       {vencidas.length > 0 && (
-        <GrupoCarga titulo="Vencidas" cor="text-red-600" cargas={vencidas} destaque="red" />
+        <GrupoCarga titulo="Vencidas" cor="text-red-600" cargas={vencidas} destaque="red" isAdmin={isAdmin} onChanged={onChanged} />
       )}
       {emCarga.length > 0 && (
-        <GrupoCarga titulo="Em carregamento" cor="text-amber-600" cargas={emCarga} destaque="amber" />
+        <GrupoCarga titulo="Em carregamento" cor="text-amber-600" cargas={emCarga} destaque="amber" isAdmin={isAdmin} onChanged={onChanged} />
       )}
       {planejadas.length > 0 && (
-        <GrupoCarga titulo="Proximas cargas" cor="text-torg-blue" cargas={planejadas} />
+        <GrupoCarga titulo="Proximas cargas" cor="text-torg-blue" cargas={planejadas} isAdmin={isAdmin} onChanged={onChanged} />
       )}
       {concluidas.length > 0 && (
-        <GrupoCarga titulo="Concluidas" cor="text-green-600" cargas={concluidas} />
+        <GrupoCarga titulo="Concluidas" cor="text-green-600" cargas={concluidas} isAdmin={isAdmin} onChanged={onChanged} />
       )}
       {canceladas.length > 0 && (
-        <GrupoCarga titulo="Canceladas" cor="text-gray-400" cargas={canceladas} />
+        <GrupoCarga titulo="Canceladas" cor="text-gray-400" cargas={canceladas} isAdmin={isAdmin} onChanged={onChanged} />
       )}
     </div>
   );
 }
 
-function GrupoCarga({ titulo, cor, cargas, destaque }) {
+function GrupoCarga({ titulo, cor, cargas, destaque, isAdmin, onChanged }) {
   const borderMap = { red: "border-l-red-400", amber: "border-l-amber-400" };
   const borderClass = borderMap[destaque] || "border-l-gray-200";
 
@@ -283,15 +283,34 @@ function GrupoCarga({ titulo, cor, cargas, destaque }) {
       </h4>
       <div className="space-y-2">
         {cargas.map((c) => (
-          <CargaCard key={c.id} carga={c} borderClass={borderClass} />
+          <CargaCard key={c.id} carga={c} borderClass={borderClass} isAdmin={isAdmin} onChanged={onChanged} />
         ))}
       </div>
     </div>
   );
 }
 
-function CargaCard({ carga, borderClass }) {
+function CargaCard({ carga, borderClass, isAdmin, onChanged }) {
   const st = STATUS_COR[carga.status] || STATUS_COR.PLANEJADO;
+  const [cancelando, setCancelando] = useState(false);
+  const podeCancelar = isAdmin && carga.status !== "CONCLUIDO" && carga.status !== "CANCELADO";
+
+  async function cancelar() {
+    if (!confirm(`Cancelar a programacao de carga de ${fmtOP(carga.opNumero)}${carga.descricao ? ` (${carga.descricao})` : ""}? Os itens voltam a ficar sem carga.`)) return;
+    setCancelando(true);
+    try {
+      const r = await fetch(`/api/expedicao/planejamento/${carga.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "CANCELADO" }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao cancelar");
+      onChanged?.();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setCancelando(false);
+    }
+  }
 
   return (
     <div className={`bg-white rounded-lg border border-gray-100 shadow-sm ${borderClass} border-l-4 hover:shadow transition-shadow`}>
@@ -359,6 +378,16 @@ function CargaCard({ carga, borderClass }) {
           >
             <Eye size={12} /> Ver
           </Link>
+          {podeCancelar && (
+            <button
+              onClick={cancelar}
+              disabled={cancelando}
+              title="Cancelar programacao de carga (somente Admin)"
+              className="text-red-500 hover:text-red-700 flex items-center gap-1 disabled:opacity-50"
+            >
+              {cancelando ? <Loader2 size={12} className="animate-spin" /> : <Ban size={12} />} Cancelar
+            </button>
+          )}
         </div>
       </div>
     </div>
