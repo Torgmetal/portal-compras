@@ -100,19 +100,10 @@ export default function QualidadeClient({ escopo = "empresa" }) {
             {material ? <ScrollText size={20} className="text-torg-blue" /> : <ShieldCheck size={20} className="text-torg-blue" />}
             {material ? "Rastreabilidade" : "Controle de Documentos"}
           </h1>
-          <p className="text-xs text-torg-gray mt-0.5">
-            {material
-              ? <>Certificados de material por OP (corrida / MTC). Importados do CMR e casados com os PDFs escaneados.</>
-              : <>Documentos da empresa amarrados a norma + validade (equipamentos, funcionários, sistema, terceiros). O status (vigente / vencendo / vencido) é calculado automaticamente. <span className="text-torg-gray/80">Padrão NBR 16775.</span></>}
-          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {material && (
             <>
-              <button onClick={() => setCasar(true)}
-                className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-                <Paperclip size={15} /> Casar PDFs
-              </button>
               <button onClick={() => setImportar(true)}
                 className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
                 <FileSpreadsheet size={15} /> Importar (CMR)
@@ -195,7 +186,7 @@ export default function QualidadeClient({ escopo = "empresa" }) {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px] [&_td]:align-top">
             <thead className="bg-gray-50/60">
               <tr className="text-left text-gray-500">
                 <th className="px-3 py-2 font-medium">{material ? "Material" : "Documento"}</th>
@@ -238,7 +229,7 @@ export default function QualidadeClient({ escopo = "empresa" }) {
                     </>
                   ) : (
                     <>
-                      <td className="px-3 py-2"><span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-torg-gray">{CATEGORIA_LABEL[d.categoria] || d.categoria}</span></td>
+                      <td className="px-3 py-2"><span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-torg-gray whitespace-nowrap">{CATEGORIA_LABEL[d.categoria] || d.categoria}</span></td>
                       <td className="px-3 py-2 text-torg-gray max-w-[160px] truncate" title={d.vinculo || d.opNumero || ""}>{d.vinculo || d.opNumero || "—"}</td>
                       <td className="px-3 py-2 text-torg-gray">{d.norma || "—"}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-torg-gray">{fmtData(d.dataValidade)}</td>

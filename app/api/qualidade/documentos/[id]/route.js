@@ -10,7 +10,7 @@ import { calcStatusValidade, diasAlertaCategoria } from "@/lib/qualidade-status"
 
 export const runtime = "nodejs";
 
-const CATEGORIAS = ["MATERIAL", "EQUIPAMENTOS", "FUNCIONARIOS", "SISTEMA", "TERCEIROS"];
+const CATEGORIAS = ["MATERIAL", "EQUIPAMENTOS", "FUNCIONARIOS", "SISTEMA", "INSPETORES"];
 
 const schema = z.object({
   nome: z.string().min(2).optional(),

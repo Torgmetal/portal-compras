@@ -24,7 +24,7 @@ const MAPA = {
   "Certificado de Calibração - Equipamentos": { categoria: "EQUIPAMENTOS", tipo: "Certificado de calibração" },
   CQS: { categoria: "FUNCIONARIOS", tipo: "Qualificação de soldador (CQS)" },
   Funcionários: { categoria: "FUNCIONARIOS", tipo: "Qualificação de funcionário" },
-  Inspetores: { categoria: "FUNCIONARIOS", tipo: "Qualificação de inspetor" },
+  Inspetores: { categoria: "INSPETORES", tipo: "Qualificação de inspetor" },
   "EPS + RQPS": { categoria: "SISTEMA", tipo: "EPS / RQPS" },
   Procedimentos: { categoria: "SISTEMA", tipo: "Procedimento" },
   "Documentos SNQC": { categoria: "SISTEMA", tipo: "Procedimento SNQC" },

@@ -1123,7 +1123,7 @@ model Documento {
 model DocumentoQualidade {
   id              String    @id @default(cuid())
   nome            String
-  categoria       String    // EQUIPAMENTOS | FUNCIONARIOS | SISTEMA | TERCEIROS
+  categoria       String    // EQUIPAMENTOS | FUNCIONARIOS | SISTEMA | INSPETORES
   tipo            String?   // tipo específico (MTC, ASO, calibração, WPS...)
   norma           String?   // AWS D1.1 · NR-35 · ISO 2808 · NBR 16775
   vinculo         String?   // texto livre: OP-083 · Soldador João · Munck 01 · TORG
