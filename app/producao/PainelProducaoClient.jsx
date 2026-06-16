@@ -1,10 +1,11 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
+import * as XLSX from "xlsx";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw, AlertTriangle, Clock, ChevronDown, ChevronUp, ArrowRight,
-  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, CalendarClock,
+  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, CalendarClock, Download,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { SETORES_SOLICITACAO, SETOR_LABEL_SOLIC, STATUS_SOLIC } from "@/lib/solicitacao-producao-const";
@@ -29,6 +30,27 @@ const FLUXO = [
 export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setores, semanas, furos, paradas, solicitacoes = [] }) {
   const router = useRouter();
   const [verFuros, setVerFuros] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  // Exporta a lista de furos para Excel (operadores usam para corrigir no Syneco)
+  const exportarFuros = () => {
+    const header = ["Marca", "OP", "Etapa apontada", "Qtd", "Etapa anterior", "Qtd anterior", "Diferença"];
+    const linhas = furos.map((f) => [
+      f.marca,
+      f.opNumero ?? "",
+      f.setor ?? "",
+      f.valor ?? "",
+      f.setorUp ?? "",
+      f.valorUp ?? "",
+      f.diff ?? "",
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...linhas]);
+    ws["!cols"] = [{ wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 8 }, { wch: 16 }, { wch: 12 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Furos");
+    const hojeStr = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
+    XLSX.writeFile(wb, `furos-apontamento-${hojeStr}.xlsx`);
+  };
 
   // Total apontado hoje (usado no rótulo da seção de apontamento por setor)
   const apontHoje = useMemo(() => {
@@ -50,10 +72,11 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
           </p>
         </div>
         <button
-          onClick={() => router.refresh()}
-          className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5"
+          onClick={() => startTransition(() => router.refresh())}
+          disabled={isPending}
+          className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5 disabled:opacity-60"
         >
-          <RefreshCw size={14} /> Atualizar
+          <RefreshCw size={14} className={isPending ? "animate-spin" : ""} /> {isPending ? "Atualizando…" : "Atualizar"}
         </button>
       </div>
 
@@ -138,13 +161,22 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {furos.length > 0 && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-              <button onClick={() => setVerFuros((v) => !v)} className="w-full flex items-center justify-between gap-2 text-left">
-                <span className="flex items-center gap-2 text-sm font-semibold text-red-800">
-                  <AlertTriangle size={16} className="text-red-600" />
-                  {furos.length} furo{furos.length > 1 ? "s" : ""} de apontamento no Syneco
-                </span>
-                {verFuros ? <ChevronUp size={16} className="text-red-600" /> : <ChevronDown size={16} className="text-red-600" />}
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                <button onClick={() => setVerFuros((v) => !v)} className="flex-1 flex items-center justify-between gap-2 text-left">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-red-800">
+                    <AlertTriangle size={16} className="text-red-600" />
+                    {furos.length} furo{furos.length > 1 ? "s" : ""} de apontamento no Syneco
+                  </span>
+                  {verFuros ? <ChevronUp size={16} className="text-red-600" /> : <ChevronDown size={16} className="text-red-600" />}
+                </button>
+                <button
+                  onClick={exportarFuros}
+                  className="shrink-0 px-2 py-1 bg-white border border-red-200 text-red-700 text-xs rounded-lg hover:bg-red-100 font-medium flex items-center gap-1.5"
+                  title="Exportar lista de furos para Excel"
+                >
+                  <Download size={13} /> Excel
+                </button>
+              </div>
               {verFuros && (
                 <div className="mt-2 space-y-1 text-xs text-red-800">
                   {furos.map((f) => (
