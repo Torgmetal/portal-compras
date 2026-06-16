@@ -1,11 +1,12 @@
 @echo off
 REM ============================================================================
-REM MES Sync - ORDENS (a cada 1 hora) - SO AS PRODUZIDAS
-REM   - --so-ordens --produzidas: envia so as linhas COM producao (~milhares),
-REM     pulando as ~50k planejadas que nao mudam de hora em hora.
-REM   - Janela = ORDENS_DIAS_ATRAS do .env (ex: 7). Leve, sem risco de OOM.
-REM   - O plano completo (3 anos) e carregado pela tarefa diaria (03:00).
+REM MES Sync - ORDENS reconciliacao (a cada 1 hora)
+REM   - So ordens (dataset 150) DO DIA com janela de envio de 7 dias (--hoje-dias 7).
+REM   - Rede de seguranca entre a tarefa de 10 min (3 dias) e a diaria (3 anos):
+REM     pega qualquer correcao da ultima semana caso uma rodada de 10 min falhe.
+REM   - LEVE (~centenas de linhas) — substitui o antigo "--so-ordens" que escrevia
+REM     ~54 mil linhas/hora e estourava a memoria do Neon (OOM).
 REM Copie este arquivo para C:\MesSync\
 REM ============================================================================
 cd /d C:\MesSync
-node mes-sync-agent.js --so-ordens --produzidas
+node mes-sync-agent.js --so-ordens --hoje --hoje-dias 7

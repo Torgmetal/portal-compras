@@ -48,8 +48,7 @@
  *   node mes-sync-agent.js --apont-dias 15          → apontamentos dos últimos 15 dias (backfill)
  *   node mes-sync-agent.js --apont-start 2026-06-01 → apontamentos desde 01/06 (backfill de buraco)
  *   node mes-sync-agent.js --so-apontamentos        → 1x: só o sync de apontamentos
- *   node mes-sync-agent.js --so-ordens              → 1x: só o snapshot de ordens (plano + produzido)
- *   node mes-sync-agent.js --so-ordens --produzidas → 1x: ordens só das linhas COM produção (leve, p/ horária)
+ *   node mes-sync-agent.js --so-ordens              → 1x: só o snapshot de ordens
  *   node mes-sync-agent.js --start 2025-01-01       → ordens: snapshot desde 01/01/2025
  *   node mes-sync-agent.js --anos 2                 → ordens: snapshot dos últimos 2 anos
  */
@@ -74,8 +73,14 @@ const ARG_APONT_DIAS  = getArg("apont-dias");   // apontamentos
 const ARG_APONT_START = getArg("apont-start");  // apontamentos (backfill)
 const SO_APONTAMENTOS = temFlag("so-apontamentos");
 const SO_ORDENS       = temFlag("so-ordens");
-const SO_PRODUZIDAS   = temFlag("produzidas");    // ordens: envia só as linhas COM produção
 const LOOP            = temFlag("loop");          // roda continuamente (auto-agenda)
+// --hoje: sync de ordens "do dia" (leve, p/ rodar de 10 em 10 min). Faz um fetch
+// LARGO (ORDENS_HOJE_FETCH_DIAS, padrão 120 dias — pro filtro por Data de Início
+// do dataset alcançar operações antigas corrigidas hoje) mas ENVIA só as linhas
+// com Fim/Início nos últimos HOJE_DIAS dias ou em produção. ~300 linhas, sem OOM.
+const HOJE            = temFlag("hoje");
+const HOJE_DIAS       = parseInt(getArg("hoje-dias") || "3", 10);
+const HOJE_FETCH_DIAS = parseInt(process.env.ORDENS_HOJE_FETCH_DIAS || "120", 10);
 const APONT_INTERVAL_MIN  = parseInt(process.env.APONT_INTERVAL_MIN  || "10", 10); // apontamentos a cada N min
 const ORDENS_INTERVAL_MIN = parseInt(process.env.ORDENS_INTERVAL_MIN || "60", 10); // ordens a cada M min
 
@@ -104,6 +109,13 @@ function fmtData(d) {
 }
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 const num = (v) => parseFloat(String(v ?? "0").replace(",", ".")) || 0;
+// "28/05/2026 00:00:00" → Date (datas do Syneco vêm em BRT). Retorna null se vazio.
+function parseDataBR(s) {
+  if (!s || s === "---") return null;
+  const m = String(s).match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+}
 
 const CAP_SKA = 99999; // teto de linhas por resposta do SKA
 const DIA_MS  = 24 * 60 * 60 * 1000;
@@ -355,13 +367,17 @@ async function syncOrdens(token) {
     if (isNaN(inicio.getTime())) throw new Error(`--start inválido: "${ARG_START}". Use YYYY-MM-DD`);
   } else if (ARG_ANOS) {
     inicio = new Date(hoje); inicio.setFullYear(inicio.getFullYear() - parseInt(ARG_ANOS, 10)); inicio.setHours(0, 0, 0, 0);
+  } else if (HOJE) {
+    // --hoje: fetch LARGO (o filtro do dataset é por Data de Início, então precisa
+    // alcançar o início de operações antigas que foram corrigidas hoje).
+    inicio = new Date(hoje.getTime() - HOJE_FETCH_DIAS * DIA_MS); inicio.setHours(0, 0, 0, 0);
   } else if (process.env.ORDENS_DIAS_ATRAS) {
     const dias = parseInt(process.env.ORDENS_DIAS_ATRAS, 10) || 60;
     inicio = new Date(hoje.getTime() - dias * DIA_MS); inicio.setHours(0, 0, 0, 0);
   } else {
     inicio = new Date(hoje); inicio.setFullYear(inicio.getFullYear() - 3); inicio.setHours(0, 0, 0, 0);
   }
-  log(`Período (snapshot): ${fmtData(inicio)} → ${fmtData(hoje)}`);
+  log(`Período (snapshot): ${fmtData(inicio)} → ${fmtData(hoje)}${HOJE ? ` [--hoje: envia só Fim/Início ≤ ${HOJE_DIAS}d ou em produção]` : ""}`);
 
   const tFetch = Date.now();
   const linhas = await skaFetchSnapshot(token, inicio, hoje);
@@ -372,13 +388,20 @@ async function syncOrdens(token) {
   const naoIniciadas = ordens.filter(o => o.produzidoUn === 0 && o.planejadoUn > 0).length;
   log(`${ordens.length} válidas${ign>0?` (${ign} ignoradas)`:""} · ${naoIniciadas} não iniciadas`);
 
-  // --produzidas: na sincronização HORÁRIA, envia só as linhas COM produção
-  // (pula as planejadas/não iniciadas, que não mudam de hora em hora — a carga
-  // diária leva o plano completo). Deixa a horária leve (~milhares em vez de ~50k).
-  if (SO_PRODUZIDAS) {
+  // --hoje: envia só o que mudou recentemente — linhas com Data de Fim OU Início
+  // nos últimos HOJE_DIAS dias, ou que ainda estão "Produzindo". Mantém a escrita
+  // minúscula (~centenas) para rodar de 10 em 10 min sem estourar a compute do Neon.
+  if (HOJE) {
+    const corte = new Date(); corte.setHours(0, 0, 0, 0);
+    corte.setDate(corte.getDate() - (HOJE_DIAS - 1));
     const antes = ordens.length;
-    ordens = ordens.filter(o => o.produzidoUn > 0 || o.pesoProduzido > 0 || o.rejeitadoUn > 0);
-    log(`Filtro --produzidas: ${ordens.length} linhas com produção (de ${antes})`);
+    ordens = ordens.filter(o => {
+      const f = parseDataBR(o.dataFim);
+      const i = parseDataBR(o.dataInicio);
+      const emProducao = /produzindo/i.test(o.status || "");
+      return (f && f >= corte) || (i && i >= corte) || emProducao;
+    });
+    log(`Filtro --hoje: ${ordens.length} linhas recentes (de ${antes})`);
   }
 
   if (ordens.length === 0) { log("Nada a enviar (ordens)."); return; }
