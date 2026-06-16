@@ -71,7 +71,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   const [liberando, setLiberando] = useState(false);
   const [revertendo, setRevertendo] = useState(false);
   const [marcandoConjunto, setMarcandoConjunto] = useState(false);
-  const [expandido, setExpandido] = useState(new Set(Object.keys(MAQUINAS)));
+  const [expandido, setExpandido] = useState(new Set([...Object.keys(MAQUINAS), "CORTE_MANUAL"]));
   const [reclassificando, setReclassificando] = useState(false);
 
   // Modais de importacao
@@ -183,7 +183,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
   // Agrupar por maquina
   const porMaquina = useMemo(() => {
     const map = {};
-    for (const maq of Object.keys(MAQUINAS)) map[maq] = [];
+    for (const maq of [...Object.keys(MAQUINAS), "CORTE_MANUAL"]) map[maq] = [];
     map["SEM_MAQUINA"] = [];
     for (const p of pecasFiltradas) {
       const k = p.maquina || "SEM_MAQUINA";
