@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
-  Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X,
+  Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, Search,
   FileText, CheckCircle2, Lock, BookCheck, FileDown,
 } from "lucide-react";
 import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa } from "@/lib/databook-secoes";
@@ -208,8 +208,29 @@ export default function DataBookDetalheClient({ id }) {
 
 function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa }) {
   const [picker, setPicker] = useState(false);
+  const [codBusca, setCodBusca] = useState("");
+  const [codResultados, setCodResultados] = useState(null);
+  const [codBuscando, setCodBuscando] = useState(false);
   const linkedIds = new Set(secao.documentos.map((d) => d.id));
   const disponiveis = candidatos.filter((c) => !linkedIds.has(c.id));
+
+  // Busca um certificado pelo código de rastreabilidade (Índice R / importRef) em
+  // todo o Controle de Documentos — não fica limitado aos candidatos da OP.
+  async function buscarPorCodigo(e) {
+    e?.preventDefault();
+    const q = codBusca.trim();
+    if (q.length < 2) return;
+    setCodBuscando(true);
+    try {
+      const res = await fetch(`/api/qualidade/documentos?busca=${encodeURIComponent(q)}`);
+      const j = await res.json();
+      setCodResultados((j.data || []).filter((d) => !linkedIds.has(d.id)).slice(0, 15));
+    } catch {
+      setCodResultados([]);
+    } finally {
+      setCodBuscando(false);
+    }
+  }
 
   return (
     <div className={`bg-white rounded-xl border shadow-sm p-3 ${secao.bloqueada ? "border-red-200" : "border-gray-100"}`}>
@@ -277,15 +298,35 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
               )}
             </div>
           ) : (
-            <div className="mt-1.5 flex items-center gap-2">
-              <select autoFocus onChange={(e) => { onVincular(e.target.value); setPicker(false); }} defaultValue=""
-                className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue">
-                <option value="" disabled>Selecione um documento da OP…</option>
-                {disponiveis.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nome}{c.numeroCorrida ? ` (corrida ${c.numeroCorrida})` : ""}{c.status !== "SEM_VALIDADE" ? ` — ${c.statusLabel}` : ""}</option>
-                ))}
-              </select>
-              <button onClick={() => setPicker(false)} className="text-torg-gray hover:text-torg-dark"><X size={14} /></button>
+            <div className="mt-1.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <select autoFocus onChange={(e) => { if (e.target.value) { onVincular(e.target.value); setPicker(false); } }} defaultValue=""
+                  className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue">
+                  <option value="" disabled>Selecione um documento da OP…</option>
+                  {disponiveis.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nome}{c.numeroCorrida ? ` (corrida ${c.numeroCorrida})` : ""}{c.status !== "SEM_VALIDADE" ? ` — ${c.statusLabel}` : ""}</option>
+                  ))}
+                </select>
+                <button onClick={() => { setPicker(false); setCodResultados(null); setCodBusca(""); }} className="text-torg-gray hover:text-torg-dark"><X size={14} /></button>
+              </div>
+              <form onSubmit={buscarPorCodigo} className="flex items-center gap-2">
+                <input value={codBusca} onChange={(e) => setCodBusca(e.target.value)} placeholder="ou buscar por código de rastreabilidade (ex.: 260001, nº do certificado)…"
+                  className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue" />
+                <button type="submit" disabled={codBuscando} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium disabled:opacity-50">
+                  {codBuscando ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />} Buscar
+                </button>
+              </form>
+              {codResultados && (codResultados.length ? (
+                <div className="border border-gray-100 rounded-lg divide-y divide-gray-50 max-h-52 overflow-y-auto">
+                  {codResultados.map((d) => (
+                    <button key={d.id} onClick={() => { onVincular(d.id); setPicker(false); setCodResultados(null); setCodBusca(""); }}
+                      className="w-full text-left px-2 py-1.5 text-[11px] hover:bg-torg-blue-50 flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate"><span className="font-mono font-semibold text-torg-blue">{d.importRef || "s/ código"}</span> · <span className="text-torg-dark">{d.nome}</span></span>
+                      <span className="text-torg-gray shrink-0 whitespace-nowrap">{d.numeroDocumento || ""}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : <p className="text-[10px] text-torg-gray">Nenhum documento com esse código.</p>)}
             </div>
           )}
           {picker && disponiveis.length === 0 && <p className="text-[10px] text-torg-gray mt-1">Nenhum documento desta OP no Controle de Documentos. Cadastre na aba “Controle de Documentos” com a OP no campo correspondente.</p>}
