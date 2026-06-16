@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { listChildrenByPath, downloadFileById } from "@/lib/sharepoint";
 import { extrairDadosDocumento } from "@/lib/extrair-doc-qualidade";
+import { whereDocsEmpresa } from "@/lib/databook-secoes";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // dezenas de PDFs × extração Claude; re-rodar continua (dedupe)
@@ -31,6 +32,14 @@ const MAPA = {
   Documentos: { categoria: "SISTEMA", tipo: null },
 };
 const mapaDe = (pasta) => MAPA[pasta] || { categoria: "SISTEMA", tipo: null };
+
+// Pasta do servidor → seção do Data Book que recebe esses documentos (globais).
+const SECAO_POR_PASTA = {
+  Inspetores: "13",
+  CQS: "08",
+  "EPS + RQPS": "07",
+  "Certificado de Calibração - Equipamentos": "19",
+};
 
 const EXT_OK = /\.(pdf|png|jpe?g|webp)$/i;
 
@@ -154,9 +163,33 @@ export async function POST(req) {
     }
   }
 
+  // Documentos da empresa são GLOBAIS: vinculam às seções correspondentes de TODOS
+  // os data books (inspetor→13, soldador→08, EPS/RQPS→07, calibração→19). Inclui
+  // docs sem validade (ex.: CQS de soldador, que valem por continuidade).
+  let secoesVinculadas = 0, vinculosCriados = 0;
+  const numeroSecao = SECAO_POR_PASTA[pasta];
+  if (numeroSecao) {
+    try {
+      const [docsEmpresa, secoes] = await Promise.all([
+        prisma.documentoQualidade.findMany({ where: whereDocsEmpresa(numeroSecao), select: { id: true } }),
+        prisma.dataBookSecao.findMany({ where: { numero: numeroSecao }, select: { id: true } }),
+      ]);
+      if (docsEmpresa.length && secoes.length) {
+        const vinc = [];
+        for (const s of secoes) for (const d of docsEmpresa) vinc.push({ secaoId: s.id, documentoId: d.id });
+        const r = await prisma.dataBookSecaoDoc.createMany({ data: vinc, skipDuplicates: true });
+        await prisma.dataBookSecao.updateMany({ where: { id: { in: secoes.map((s) => s.id) } }, data: { estado: "ANEXADO" } });
+        secoesVinculadas = secoes.length;
+        vinculosCriados = r.count;
+      }
+    } catch {
+      /* a propagação pro data book não deve falhar o import */
+    }
+  }
+
   await prisma.auditLog
-    .create({ data: { userId: user.id, action: "IMPORTAR_SERVIDOR_QUALIDADE", entity: "DocumentoQualidade", entityId: "-", diff: { pasta, criados, jaExistiam: setExist.size, comExtracao, semLeitura } } })
+    .create({ data: { userId: user.id, action: "IMPORTAR_SERVIDOR_QUALIDADE", entity: "DocumentoQualidade", entityId: "-", diff: { pasta, criados, jaExistiam: setExist.size, comExtracao, semLeitura, secoesVinculadas, vinculosCriados } } })
     .catch(() => {});
 
-  return NextResponse.json({ success: true, pasta, criados, jaExistiam: setExist.size, comExtracao, semLeitura, total: arquivos.length });
+  return NextResponse.json({ success: true, pasta, criados, jaExistiam: setExist.size, comExtracao, semLeitura, total: arquivos.length, secoesVinculadas, vinculosCriados });
 }
