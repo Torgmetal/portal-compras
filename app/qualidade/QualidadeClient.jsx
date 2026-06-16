@@ -4,7 +4,7 @@ import { upload } from "@vercel/blob/client";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, Search, ShieldCheck, ShieldAlert,
   AlertTriangle, FileText, Eye, Download, Pencil, Trash2, X, Check,
-  FileSpreadsheet, Upload, Paperclip, Link2, ScrollText,
+  FileSpreadsheet, Upload, Paperclip, Link2, ScrollText, Mail,
 } from "lucide-react";
 import { CATEGORIAS_QUALIDADE, CATEGORIA_LABEL, STATUS_COR } from "@/lib/qualidade-status";
 
@@ -25,7 +25,7 @@ const VAZIO = {
   numeroCorrida: "", numeroDocumento: "", dataEmissao: "", dataValidade: "", responsavel: "", observacao: "",
 };
 
-export default function QualidadeClient({ escopo = "empresa" }) {
+export default function QualidadeClient({ escopo = "empresa", isAdmin = false }) {
   const material = escopo === "material"; // aba Rastreabilidade (certificados de material)
   const [docs, setDocs] = useState([]);
   const [stats, setStats] = useState(null);
@@ -41,6 +41,22 @@ export default function QualidadeClient({ escopo = "empresa" }) {
   const [casar, setCasar] = useState(false);
   const [importarServidor, setImportarServidor] = useState(false);
   const [acaoId, setAcaoId] = useState(null);
+  const [testandoAlerta, setTestandoAlerta] = useState(false);
+
+  async function testarAlerta() {
+    setTestandoAlerta(true);
+    try {
+      const res = await fetch("/api/cron/qualidade-vencidos");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro");
+      if (json.skipped) alert(json.motivo || "Nada a enviar no momento.");
+      else alert(`Alerta de teste enviado para o seu e-mail (${json.vencidos} vencido(s), ${json.vencendo} a vencer). Confira a caixa de entrada.`);
+    } catch (e) {
+      alert("Erro ao enviar o teste: " + e.message);
+    } finally {
+      setTestandoAlerta(false);
+    }
+  }
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -111,10 +127,18 @@ export default function QualidadeClient({ escopo = "empresa" }) {
             </>
           )}
           {!material && (
-            <button onClick={() => setImportarServidor(true)}
-              className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
-              <FileText size={15} /> Importar do servidor
-            </button>
+            <>
+              <button onClick={() => setImportarServidor(true)}
+                className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+                <FileText size={15} /> Importar do servidor
+              </button>
+              {isAdmin && (
+                <button onClick={testarAlerta} disabled={testandoAlerta} title="Envia o resumo de vencidos para o seu e-mail (teste)"
+                  className="text-sm font-semibold text-torg-gray border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
+                  {testandoAlerta ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Testar alerta
+                </button>
+              )}
+            </>
           )}
           <button onClick={() => setModal({ ...VAZIO, categoria: material ? "MATERIAL" : "EQUIPAMENTOS" })}
             className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-2 rounded-lg inline-flex items-center gap-2">

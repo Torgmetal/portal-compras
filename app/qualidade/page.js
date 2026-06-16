@@ -5,6 +5,6 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Qualidade — Controle de Documentos" };
 
 export default async function QualidadePage() {
-  await requireRole(["ADMIN", "QUALIDADE"]);
-  return <QualidadeClient escopo="empresa" />;
+  const user = await requireRole(["ADMIN", "QUALIDADE"]);
+  return <QualidadeClient escopo="empresa" isAdmin={user.tipo === "ADMIN"} />;
 }

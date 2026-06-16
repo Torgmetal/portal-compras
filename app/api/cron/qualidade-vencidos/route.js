@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { calcStatusValidade, diasAlertaCategoria, CATEGORIA_LABEL } from "@/lib/qualidade-status";
+import { requireRole } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -55,14 +56,22 @@ export async function GET(req) {
   const auth = req.headers.get("authorization") || "";
   const ua = req.headers.get("user-agent") || "";
   const isCron = ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
-  if (!isCron && process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Disparo manual: ADMIN logado → envia uma PRÉVIA só pro próprio e-mail (teste,
+  // sem spammar os destinatários). Senão, só o cron interno do Vercel roda.
+  let admin = null;
+  if (!isCron) {
+    try {
+      admin = await requireRole(["ADMIN"]);
+    } catch (e) {
+      return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
+    }
   }
 
-  const to = await destinatarios();
+  const to = admin ? [admin.email].filter(Boolean) : await destinatarios();
   if (!to.length) {
-    console.warn("[cron qualidade-vencidos] nenhum destinatário cadastrado — pulando");
-    return NextResponse.json({ ok: true, skipped: true, motivo: "sem destinatários (cadastre em /compras/notificacoes — evento QUALIDADE_VENCIDOS — ou env QUALIDADE_ALERTA_EMAILS)" });
+    if (!admin) console.warn("[cron qualidade-vencidos] nenhum destinatário cadastrado — pulando");
+    return NextResponse.json({ ok: !admin, skipped: true, motivo: admin ? "seu usuário não tem e-mail cadastrado" : "sem destinatários (cadastre em /compras/notificacoes — evento QUALIDADE_VENCIDOS — ou env QUALIDADE_ALERTA_EMAILS)" });
   }
 
   const docs = await prisma.documentoQualidade.findMany({
@@ -75,16 +84,19 @@ export async function GET(req) {
     if (d._st.key === "VENCIDO") vencidos.push(d);
     else if (d._st.key === "VENCENDO") vencendo.push(d);
   }
-  if (!vencidos.length && !vencendo.length) {
+  if (!admin && !vencidos.length && !vencendo.length) {
     return NextResponse.json({ ok: true, skipped: true, motivo: "nada vencido / a vencer" });
   }
   vencidos.sort((a, b) => a._st.dias - b._st.dias); // mais vencido primeiro
   vencendo.sort((a, b) => a._st.dias - b._st.dias); // vence antes primeiro
 
-  const subject = `[Qualidade] ${vencidos.length} documento(s) vencido(s) · ${vencendo.length} a vencer`;
+  const prefixo = admin ? "[TESTE] " : "";
+  const vazio = !vencidos.length && !vencendo.length;
+  const subject = `${prefixo}[Qualidade] ${vencidos.length} documento(s) vencido(s) · ${vencendo.length} a vencer`;
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#002945;max-width:720px;">
       <h2 style="color:#006EAB;margin:0 0 4px;">Documentos da Qualidade — vencimentos</h2>
       <p style="color:#576D7E;font-size:13px;margin:0 0 8px;">Resumo automático. Renove os documentos abaixo no Controle de Documentos.</p>
+      ${vazio ? '<p style="color:#0a7d33;font-size:13px;">Nenhum documento vencido ou a vencer no momento. ✓</p>' : ""}
       ${tabelaHtml("Vencidos", "#c0392b", vencidos)}
       ${tabelaHtml("A vencer (até 30 dias)", "#b9770e", vencendo)}
       <p style="margin-top:18px;"><a href="${PORTAL}" style="background:#006EAB;color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:13px;">Abrir o Controle de Documentos</a></p>
@@ -97,5 +109,5 @@ export async function GET(req) {
   ].join("\n");
 
   const res = await sendEmail({ to, subject, html, text });
-  return NextResponse.json({ ok: res.ok, vencidos: vencidos.length, vencendo: vencendo.length, enviado: res.ok, error: res.error });
+  return NextResponse.json({ ok: res.ok, modo: admin ? "teste" : "agendado", para: admin ? to : undefined, vencidos: vencidos.length, vencendo: vencendo.length, enviado: res.ok, error: res.error });
 }
