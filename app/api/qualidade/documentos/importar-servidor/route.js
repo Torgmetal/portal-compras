@@ -22,7 +22,7 @@ const BASE = process.env.SHAREPOINT_QUALIDADE_WORKSPACE || "/Qualidade/Workspace
 // Subpasta do servidor → categoria + tipo do documento
 const MAPA = {
   "Certificado de Calibração - Equipamentos": { categoria: "EQUIPAMENTOS", tipo: "Certificado de calibração" },
-  CQS: { categoria: "FUNCIONARIOS", tipo: "Qualificação de soldador (CQS)" },
+  CQS: { categoria: "FUNCIONARIOS", tipo: "Qualificação de soldador (CQS)", semValidade: true }, // CQS valem por continuidade — não vencem
   Funcionários: { categoria: "FUNCIONARIOS", tipo: "Qualificação de funcionário" },
   Inspetores: { categoria: "INSPETORES", tipo: "Qualificação de inspetor" },
   "EPS + RQPS": { categoria: "SISTEMA", tipo: "EPS / RQPS" },
@@ -147,7 +147,7 @@ export async function POST(req) {
           norma: dados.norma || null,
           numeroDocumento: dados.numeroDocumento || null,
           dataEmissao: dados.dataEmissao ? new Date(dados.dataEmissao) : null,
-          dataValidade: dados.dataValidade ? new Date(dados.dataValidade) : null,
+          dataValidade: map.semValidade ? null : (dados.dataValidade ? new Date(dados.dataValidade) : null),
           origem: "importacao_servidor",
           sharepointItemId: a.id,
           sharepointUrl: a.webUrl,
