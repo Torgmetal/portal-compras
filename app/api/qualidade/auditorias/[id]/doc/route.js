@@ -28,46 +28,54 @@ export async function POST(req, { params }) {
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
-  let body;
+  // Aceita um único documento OU um lote { itens: [...] } (importar vários de uma vez).
+  let raw;
+  try { raw = await req.json(); } catch { return NextResponse.json({ success: false, error: "JSON inválido" }, { status: 400 }); }
+  const lista = Array.isArray(raw?.itens) ? raw.itens : [raw];
+  let itens;
   try {
-    body = schema.parse(await req.json());
+    itens = lista.map((x) => schema.parse(x));
   } catch (e) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
-  if (body.arquivoUrl && !BLOB_OK.test(body.arquivoUrl)) {
-    return NextResponse.json({ success: false, error: "Arquivo inválido (origem não permitida)." }, { status: 400 });
-  }
-  if (!body.arquivoUrl && !body.documentoId) {
-    return NextResponse.json({ success: false, error: "Anexe um arquivo ou vincule um documento existente." }, { status: 400 });
+  if (!itens.length) return NextResponse.json({ success: false, error: "Nada para anexar." }, { status: 400 });
+  for (const it of itens) {
+    if (it.arquivoUrl && !BLOB_OK.test(it.arquivoUrl)) {
+      return NextResponse.json({ success: false, error: "Arquivo inválido (origem não permitida)." }, { status: 400 });
+    }
+    if (!it.arquivoUrl && !it.documentoId) {
+      return NextResponse.json({ success: false, error: "Cada item precisa de um arquivo ou documento vinculado." }, { status: 400 });
+    }
   }
 
   const aud = await prisma.auditoria.findUnique({ where: { id: params.id }, select: { id: true } });
   if (!aud) return NextResponse.json({ success: false, error: "Auditoria não encontrada" }, { status: 404 });
 
-  // Vínculo a documento da Qualidade: copia a referência do arquivo (Blob ou SharePoint).
-  let sharepointItemId = null, arquivoUrl = body.arquivoUrl || null, arquivoTipo = body.arquivoTipo || null;
-  if (body.documentoId) {
-    const d = await prisma.documentoQualidade.findUnique({ where: { id: body.documentoId }, select: { arquivoUrl: true, sharepointItemId: true, arquivoTipo: true } });
-    if (!d) return NextResponse.json({ success: false, error: "Documento da Qualidade não encontrado" }, { status: 404 });
-    arquivoUrl = d.arquivoUrl || null;
-    sharepointItemId = d.sharepointItemId || null;
-    arquivoTipo = d.arquivoTipo || null;
+  // Resolve em lote os vínculos a documentos da Qualidade (copia a referência do arquivo).
+  const docIds = [...new Set(itens.map((i) => i.documentoId).filter(Boolean))];
+  const qmap = new Map();
+  if (docIds.length) {
+    const qs = await prisma.documentoQualidade.findMany({ where: { id: { in: docIds } }, select: { id: true, arquivoUrl: true, sharepointItemId: true, arquivoTipo: true } });
+    qs.forEach((d) => qmap.set(d.id, d));
   }
 
-  const doc = await prisma.auditoriaDoc.create({
-    data: {
+  const data = itens.map((it) => {
+    const q = it.documentoId ? qmap.get(it.documentoId) : null;
+    return {
       auditoriaId: params.id,
-      tipo: body.tipo,
-      nome: body.nome.slice(0, 300),
-      arquivoUrl,
-      arquivoTipo,
-      arquivoTamanho: body.arquivoTamanho ?? null,
-      sharepointItemId,
-      documentoId: body.documentoId || null,
-    },
+      tipo: it.tipo,
+      nome: it.nome.slice(0, 300),
+      arquivoUrl: q ? (q.arquivoUrl || null) : (it.arquivoUrl || null),
+      arquivoTipo: q ? (q.arquivoTipo || null) : (it.arquivoTipo || null),
+      arquivoTamanho: it.arquivoTamanho ?? null,
+      sharepointItemId: q ? (q.sharepointItemId || null) : null,
+      documentoId: it.documentoId || null,
+    };
   });
-  await prisma.auditLog.create({ data: { userId: user.id, action: "ANEXAR_DOC_AUDITORIA", entity: "Auditoria", entityId: params.id, diff: { tipo: body.tipo, nome: body.nome } } }).catch(() => {});
-  return NextResponse.json({ success: true, doc });
+
+  const res = await prisma.auditoriaDoc.createMany({ data });
+  await prisma.auditLog.create({ data: { userId: user.id, action: "ANEXAR_DOC_AUDITORIA", entity: "Auditoria", entityId: params.id, diff: { qtd: res.count } } }).catch(() => {});
+  return NextResponse.json({ success: true, criados: res.count });
 }
 
 export async function DELETE(req, { params }) {

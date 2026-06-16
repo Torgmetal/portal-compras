@@ -165,6 +165,7 @@ function Campo({ label, children, wide }) {
 function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
   const fileRef = useRef(null);
   const [enviando, setEnviando] = useState(false);
+  const [progresso, setProgresso] = useState("");
   const [picker, setPicker] = useState(false);
   const [busca, setBusca] = useState("");
   const [resultados, setResultados] = useState(null);
@@ -183,16 +184,34 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
   }
 
   async function anexarArquivo(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setEnviando(true);
     try {
-      const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
-      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, nome: file.name, arquivoUrl: blob.url, arquivoTipo: file.type || null, arquivoTamanho: file.size }) });
+      const itens = [];
+      for (let i = 0; i < files.length; i++) {
+        setProgresso(`${i + 1}/${files.length}`);
+        const f = files[i];
+        const blob = await upload(f.name, f, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+        itens.push({ tipo, nome: f.name, arquivoUrl: blob.url, arquivoTipo: f.type || null, arquivoTamanho: f.size });
+      }
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       await onChange();
-    } catch (err) { alert(err.message || "Falha no upload"); } finally { setEnviando(false); if (fileRef.current) fileRef.current.value = ""; }
+    } catch (err) { alert(err.message || "Falha no upload"); } finally { setEnviando(false); setProgresso(""); if (fileRef.current) fileRef.current.value = ""; }
+  }
+
+  async function adicionarTodas() {
+    const novas = (sugestoes || []).filter((s) => !s.jaAnexado);
+    if (!novas.length) return;
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: novas.map((s) => ({ tipo, nome: s.nome, documentoId: s.id })) }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setSugestoes((prev) => (prev ? prev.map((x) => ({ ...x, jaAnexado: true })) : prev));
+      await onChange();
+    } catch (err) { alert(err.message); }
   }
 
   async function buscar(e) {
@@ -238,8 +257,8 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
       ) : <p className="text-[11px] text-torg-gray italic mb-2">Nenhum documento.</p>}
 
       <div className="flex items-center gap-3 flex-wrap">
-        <input ref={fileRef} type="file" className="hidden" onChange={anexarArquivo} accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.msg,.eml" />
-        <button onClick={() => fileRef.current?.click()} disabled={enviando} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? "Enviando…" : "Anexar arquivo"}</button>
+        <input ref={fileRef} type="file" multiple className="hidden" onChange={anexarArquivo} accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.msg,.eml" />
+        <button onClick={() => fileRef.current?.click()} disabled={enviando} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? `Enviando ${progresso}…` : "Anexar arquivos"}</button>
         <button onClick={() => setPicker((v) => !v)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Search size={12} /> Trazer do Controle de Documentos</button>
         {sugestao && (
           <button onClick={sugerir} disabled={sugerindo} title="O Torguinho lê as solicitações do cliente e sugere os documentos" className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1 inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50">{sugerindo ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} {sugerindo ? "Analisando…" : "Sugerir documentos (IA)"}</button>
@@ -267,7 +286,12 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
 
       {sugestao && sugestoes && (
         <div className="mt-2 border border-torg-blue-200 bg-torg-blue-50/40 rounded-lg p-2.5">
-          <p className="text-[11px] font-semibold text-torg-dark mb-1.5 inline-flex items-center gap-1"><Sparkles size={12} className="text-torg-blue" /> Sugestões do Torguinho ({sugestoes.length})</p>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <p className="text-[11px] font-semibold text-torg-dark inline-flex items-center gap-1"><Sparkles size={12} className="text-torg-blue" /> Sugestões do Torguinho ({sugestoes.length})</p>
+            {sugestoes.some((s) => !s.jaAnexado) && (
+              <button onClick={adicionarTodas} className="text-[11px] font-semibold text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Plus size={12} /> Adicionar todas</button>
+            )}
+          </div>
           {sugestoes.length ? (
             <div className="space-y-1.5">
               {sugestoes.map((s) => (
