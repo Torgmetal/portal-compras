@@ -616,6 +616,11 @@ function ModalImportar({ onClose, onImported }) {
               <p className="text-[12px] text-torg-gray mt-1">
                 {resultado.criados} novo(s) documento(s) criado(s) · {resultado.jaExistiam} já existia(m){resultado.semIndice ? ` · ${resultado.semIndice} sem índice (ignorado)` : ""}.
               </p>
+              {resultado.casados != null && (
+                <p className="text-[12px] text-torg-gray mt-0.5">
+                  {resultado.casados} certificado(s) vinculado(s) aos PDFs escaneados{resultado.totalPdfsCertificados ? ` (de ${resultado.totalPdfsCertificados} na pasta)` : ""}.
+                </p>
+              )}
             </div>
           )}
 

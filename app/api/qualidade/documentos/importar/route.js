@@ -12,6 +12,7 @@ import { requireRole } from "@/lib/session";
 import { downloadSharedFile, downloadFileByPath } from "@/lib/sharepoint";
 import { isBlobUrlSegura } from "@/lib/blob-url";
 import { parseCMR } from "@/lib/parse-cmr";
+import { casarCertificados } from "@/lib/match-certificados";
 
 export const runtime = "nodejs";
 // CMR é grande (~17MB): download do SharePoint + parse do ExcelJS pode passar de 60s
@@ -143,8 +144,18 @@ export async function POST(req) {
     criados += res.count;
   }
 
+  // Casa automaticamente os PDFs escaneados dos certificados pelo Índice R — antes
+  // era um botão "Casar PDFs" à parte; agora vem junto do import (sincroniza tudo).
+  let casados = 0, totalPdfsCertificados = 0;
+  try {
+    const c = await casarCertificados();
+    casados = c.casados; totalPdfsCertificados = c.totalPdfs;
+  } catch {
+    /* o casamento dos PDFs não deve fazer o import falhar */
+  }
+
   await prisma.auditLog
-    .create({ data: { userId: user.id, action: "IMPORTAR_CMR_QUALIDADE", entity: "DocumentoQualidade", entityId: "-", diff: { criados, jaExistiam: setExist.size, semIndice, arquivo: r.name } } })
+    .create({ data: { userId: user.id, action: "IMPORTAR_CMR_QUALIDADE", entity: "DocumentoQualidade", entityId: "-", diff: { criados, jaExistiam: setExist.size, semIndice, arquivo: r.name, casados } } })
     .catch(() => {});
 
   return NextResponse.json({
@@ -154,5 +165,7 @@ export async function POST(req) {
     semIndice,
     semCorrida: r.parsed.resumo.semCorrida,
     total: r.parsed.linhas.length,
+    casados,
+    totalPdfsCertificados,
   });
 }
