@@ -13,6 +13,7 @@ export const runtime = "nodejs";
 const schema = z.object({
   estado: z.enum(["PENDENTE", "ANEXADO", "NA"]).optional(),
   observacao: z.string().nullable().optional(),
+  conteudoJson: z.any().optional(), // ex.: { itens: [...] } do PIT (§10) montado no portal
 });
 
 export async function PATCH(req, { params }) {
@@ -52,6 +53,14 @@ export async function PATCH(req, { params }) {
   const data = {};
   if (body.estado !== undefined) data.estado = body.estado;
   if (body.observacao !== undefined) data.observacao = body.observacao?.trim() || null;
+  if (body.conteudoJson !== undefined) {
+    data.conteudoJson = body.conteudoJson;
+    // PIT (§10) preenchido marca a seção como anexada; vazio volta a pendente.
+    if (body.estado === undefined) {
+      const itens = body.conteudoJson?.itens;
+      if (Array.isArray(itens)) data.estado = itens.length > 0 ? "ANEXADO" : "PENDENTE";
+    }
+  }
 
   const atualizada = await prisma.dataBookSecao.update({ where: { id: params.secaoId }, data });
   await prisma.auditLog

@@ -54,6 +54,7 @@ async function montarDetalhe(id) {
     return {
       id: s.id, numero: s.numero, titulo: s.titulo, norma: s.norma, fonte: s.fonte,
       estado: s.estado, observacao: s.observacao, usaModulo1: usaM1,
+      conteudoJson: s.conteudoJson || null,
       documentos: docs, temVencido,
       bloqueada: s.estado === "ANEXADO" && temVencido, // anexada mas com doc vencido
     };

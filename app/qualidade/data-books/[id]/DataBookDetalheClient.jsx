@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, Search,
   FileText, CheckCircle2, Lock, BookCheck, FileDown,
 } from "lucide-react";
-import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO } from "@/lib/databook-secoes";
+import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
 import { STATUS_COR } from "@/lib/qualidade-status";
 import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 
@@ -139,6 +139,22 @@ export default function DataBookDetalheClient({ id }) {
     }
   }
 
+  async function savePit(secao, itens) {
+    setAcao(secao.id);
+    try {
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conteudoJson: { itens } }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
+      await carregar();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setAcao(null);
+    }
+  }
+
   async function emitir() {
     if (!confirm("Emitir o data book? (a geração do PDF entra na próxima fase)")) return;
     setEmitindo(true);
@@ -260,14 +276,15 @@ export default function DataBookDetalheClient({ id }) {
         {data.secoes.map((s) => (
           <SecaoCard key={s.id} secao={s} candidatos={data.candidatos} acaoLoading={acao === s.id}
             onEstado={(e) => setEstado(s, e)} onVincular={(docId) => vincular(s, docId)} onDesvincular={(docId) => desvincular(s, docId)}
-            onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onPopularProcedimentos={() => popularProcedimentos(s)} />
+            onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onPopularProcedimentos={() => popularProcedimentos(s)}
+            onSavePit={(itens) => savePit(s, itens)} />
         ))}
       </div>
     </div>
   );
 }
 
-function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos }) {
+function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onSavePit }) {
   const [picker, setPicker] = useState(false);
   const [codBusca, setCodBusca] = useState("");
   const [codResultados, setCodResultados] = useState(null);
@@ -399,6 +416,65 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
           {picker && disponiveis.length === 0 && <p className="text-[10px] text-torg-gray mt-1">Nenhum documento desta OP no Controle de Documentos. Cadastre na aba “Controle de Documentos” com a OP no campo correspondente.</p>}
         </div>
       )}
+
+      {/* §10 PIT — editor de tabela montado no portal */}
+      {secao.numero === "10" && <PitEditor secao={secao} acaoLoading={acaoLoading} onSave={onSavePit} />}
+    </div>
+  );
+}
+
+function PitEditor({ secao, acaoLoading, onSave }) {
+  const inicial = Array.isArray(secao.conteudoJson?.itens) ? secao.conteudoJson.itens : [];
+  const [itens, setItens] = useState(inicial.map((x) => ({ ...x })));
+  const [dirty, setDirty] = useState(false);
+  const upd = (i, key, val) => { setItens((arr) => arr.map((r, j) => (j === i ? { ...r, [key]: val } : r))); setDirty(true); };
+  const add = () => { setItens((arr) => [...arr, Object.fromEntries(PIT_COLUNAS.map((c) => [c.key, ""]))]); setDirty(true); };
+  const rm = (i) => { setItens((arr) => arr.filter((_, j) => j !== i)); setDirty(true); };
+  const padrao = () => { setItens(PIT_PADRAO.map((x) => ({ ...x }))); setDirty(true); };
+
+  return (
+    <div className="mt-2 pt-2 border-t border-gray-50">
+      <p className="text-[11px] text-torg-gray mb-1.5">Plano de Inspeção e Testes — monte a tabela; ela entra no PDF do data book.</p>
+      {itens.length > 0 ? (
+        <div className="overflow-x-auto -mx-1 px-1">
+          <table className="w-full text-[10px] border-collapse">
+            <thead>
+              <tr>
+                {PIT_COLUNAS.map((c) => <th key={c.key} className="text-left font-semibold text-torg-gray px-1 py-1 border-b border-gray-100 whitespace-nowrap">{c.label}</th>)}
+                <th className="w-6 border-b border-gray-100" />
+              </tr>
+            </thead>
+            <tbody>
+              {itens.map((row, i) => (
+                <tr key={i} className="align-top">
+                  {PIT_COLUNAS.map((c) => (
+                    <td key={c.key} className="px-0.5 py-0.5">
+                      <textarea rows={2} value={row[c.key] || ""} onChange={(e) => upd(i, c.key, e.target.value)}
+                        className="w-full min-w-[90px] text-[10px] border border-gray-200 rounded px-1 py-0.5 focus:border-torg-blue resize-y" />
+                    </td>
+                  ))}
+                  <td className="px-0.5 py-1 text-center">
+                    <button onClick={() => rm(i)} className="text-torg-gray hover:text-red-600" title="Remover linha"><X size={13} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-[11px] text-torg-gray italic">Nenhuma linha. Adicione manualmente ou carregue o modelo padrão da Torg.</p>
+      )}
+      <div className="flex items-center gap-3 mt-2 flex-wrap">
+        <button onClick={add} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={12} /> Adicionar linha</button>
+        {itens.length === 0 && (
+          <button onClick={padrao} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium">Carregar modelo padrão</button>
+        )}
+        <button onClick={() => { onSave(itens); setDirty(false); }} disabled={acaoLoading || !dirty}
+          className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+          {acaoLoading ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Salvar PIT
+        </button>
+        {dirty && <span className="text-[10px] text-amber-600">alterações não salvas</span>}
+      </div>
     </div>
   );
 }

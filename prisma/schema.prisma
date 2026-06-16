@@ -1194,6 +1194,7 @@ model DataBookSecao {
   fonte      String             // sistema | upload | modulo1 | entrada_a | misto
   estado     String             @default("PENDENTE") // PENDENTE | ANEXADO | NA
   observacao String?
+  conteudoJson Json?            // conteúdo gerado no portal (ex.: tabela do PIT da §10)
   ordem      Int
   dataBook   DataBookQualidade  @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
   documentos DataBookSecaoDoc[]
