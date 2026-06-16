@@ -50,14 +50,14 @@ export default function PortalClienteClient({ token }) {
         <div className="absolute top-0 left-0 right-0 h-1 bg-torg-orange" />
         <div className="relative max-w-4xl mx-auto px-6 py-14">
           <div className="text-white text-2xl font-extrabold tracking-tight mb-8">TORG <span className="font-light text-blue-300">METAL</span></div>
-          <p className="text-torg-orange text-sm font-semibold tracking-wide uppercase mb-2">Portal do Cliente · Qualidade</p>
-          <h1 className="text-white text-3xl sm:text-4xl font-extrabold leading-tight mb-3">
+          <p className="text-torg-orange text-[15px] font-semibold tracking-wide uppercase mb-2">Portal do Cliente · Qualidade</p>
+          <h1 className="text-white text-4xl sm:text-5xl font-extrabold leading-tight mb-3">
             {data.contato ? `Bem-vindo(a), ${data.contato}!` : "Seja bem-vindo(a)!"}
           </h1>
-          <p className="text-blue-100 text-base max-w-2xl leading-relaxed">
+          <p className="text-blue-100 text-lg max-w-2xl leading-relaxed">
             {data.mensagemBoasVindas || `É um prazer receber a ${data.empresa}. Reunimos aqui, de forma organizada e transparente, toda a documentação da qualidade solicitada para a sua conferência.`}
           </p>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 text-sm">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-6 text-[15px]">
             <span className="text-blue-200"><span className="text-blue-400">Empresa:</span> <strong className="text-white">{data.empresa}</strong></span>
             {data.titulo && <span className="text-blue-200"><span className="text-blue-400">Auditoria:</span> <strong className="text-white">{data.titulo}</strong></span>}
           </div>
@@ -68,20 +68,20 @@ export default function PortalClienteClient({ token }) {
       <div className="max-w-4xl mx-auto px-6 py-10 -mt-6">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 sm:p-8">
           <div className="flex items-center justify-between gap-3 mb-5">
-            <h2 className="text-lg font-bold text-torg-dark">Documentos da auditoria</h2>
-            <span className="text-[12px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{data.documentos.length} {data.documentos.length === 1 ? "documento" : "documentos"}</span>
+            <h2 className="text-xl font-bold text-torg-dark">Documentos da auditoria</h2>
+            <span className="text-[13px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{data.documentos.length} {data.documentos.length === 1 ? "documento" : "documentos"}</span>
           </div>
 
           {data.documentos.length === 0 ? (
-            <div className="text-center py-12 text-torg-gray"><FileText size={32} className="mx-auto mb-2 text-gray-300" /><p className="text-sm">Os documentos serão disponibilizados em breve.</p></div>
+            <div className="text-center py-12 text-torg-gray"><FileText size={32} className="mx-auto mb-2 text-gray-300" /><p className="text-base">Os documentos serão disponibilizados em breve.</p></div>
           ) : (
             <div className="space-y-6">
               {grupos.map(([secao, docs]) => (
                 <div key={secao}>
                   <div className="flex items-center gap-3 mb-2.5">
-                    <h3 className="text-[12px] font-semibold text-torg-dark uppercase tracking-wide whitespace-nowrap">{secao}</h3>
+                    <h3 className="text-[14px] font-semibold text-torg-dark uppercase tracking-wide whitespace-nowrap">{secao}</h3>
                     <span className="h-px bg-gray-100 flex-1" />
-                    <span className="text-[11px] text-torg-gray">{docs.length}</span>
+                    <span className="text-[12px] text-torg-gray">{docs.length}</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {docs.map((d) => (
@@ -89,11 +89,11 @@ export default function PortalClienteClient({ token }) {
                         <div className="flex items-start gap-3">
                           <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-torg-dark leading-snug break-words">{d.nome}</p>
-                            {d.arquivoTamanho ? <p className="text-[11px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
-                            <div className="flex items-center gap-3 mt-2">
-                              <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[12px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Eye size={13} /> Visualizar</a>
-                              <a href={`${base}/${d.id}`} className="text-[12px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Download size={13} /> Baixar</a>
+                            <p className="text-base font-medium text-torg-dark leading-snug break-words">{d.nome}</p>
+                            {d.arquivoTamanho ? <p className="text-[13px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
+                            <div className="flex items-center gap-4 mt-2.5">
+                              <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
+                              <a href={`${base}/${d.id}`} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
                             </div>
                           </div>
                         </div>
@@ -107,11 +107,11 @@ export default function PortalClienteClient({ token }) {
         </div>
 
         {/* selo de confiança */}
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 mt-8 text-[12px] text-torg-gray">
-          <span className="inline-flex items-center gap-1.5"><ShieldCheck size={15} className="text-torg-blue" /> Documentação controlada</span>
-          <span className="inline-flex items-center gap-1.5"><BadgeCheck size={15} className="text-torg-blue" /> Sistema de Gestão certificado ABNT NBR ISO 9001</span>
+        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 mt-8 text-[13px] text-torg-gray">
+          <span className="inline-flex items-center gap-1.5"><ShieldCheck size={16} className="text-torg-blue" /> Documentação controlada</span>
+          <span className="inline-flex items-center gap-1.5"><BadgeCheck size={16} className="text-torg-blue" /> Sistema de Gestão certificado ABNT NBR ISO 9001</span>
         </div>
-        <p className="text-center text-[11px] text-gray-400 mt-3">© TORG METAL · Estruturas Metálicas</p>
+        <p className="text-center text-[12px] text-gray-400 mt-3">© TORG METAL · Estruturas Metálicas</p>
       </div>
     </div>
   );
