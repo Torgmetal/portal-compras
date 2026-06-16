@@ -22,11 +22,14 @@ export async function GET(_req, { params }) {
   return NextResponse.json({ success: true, data: a });
 }
 
+const BLOB_OK = /^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i;
+
 const schema = z.object({
   empresa: z.string().min(2).max(160).optional(),
   contato: z.string().max(160).nullable().optional(),
   titulo: z.string().max(160).nullable().optional(),
   mensagemBoasVindas: z.string().max(2000).nullable().optional(),
+  capaUrl: z.string().url().nullable().optional(),
   solicitacoes: z.string().max(8000).nullable().optional(),
 });
 
@@ -43,8 +46,11 @@ export async function PATCH(req, { params }) {
   } catch (e) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
+  if (body.capaUrl && !BLOB_OK.test(body.capaUrl)) {
+    return NextResponse.json({ success: false, error: "Imagem de capa inválida (origem não permitida)." }, { status: 400 });
+  }
   const data = {};
-  for (const k of ["empresa", "contato", "titulo", "mensagemBoasVindas", "solicitacoes"]) {
+  for (const k of ["empresa", "contato", "titulo", "mensagemBoasVindas", "capaUrl", "solicitacoes"]) {
     if (body[k] !== undefined) data[k] = typeof body[k] === "string" ? (body[k].trim() || null) : body[k];
   }
   const a = await prisma.auditoria.update({ where: { id: params.id }, data, include: { documentos: { orderBy: { createdAt: "asc" } } } });

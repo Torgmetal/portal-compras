@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Building2, Upload, Search, X, FileText, Trash2,
   Send, Copy, ExternalLink, Save, ClipboardList, FolderOpen, CheckCircle2,
-  Sparkles, Plus, Mail, Eye,
+  Sparkles, Plus, Mail, Eye, Image as ImageIcon,
 } from "lucide-react";
 import { SECOES_AUDITORIA, ordenarSecoes } from "@/lib/auditoria-secoes";
 
@@ -21,6 +21,8 @@ export default function AuditoriaDetalheClient({ id }) {
   const [link, setLink] = useState("");
   const [emailCliente, setEmailCliente] = useState("");
   const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const capaRef = useRef(null);
+  const [enviandoCapa, setEnviandoCapa] = useState(false);
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -42,6 +44,25 @@ export default function AuditoriaDetalheClient({ id }) {
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       setData(j.data);
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
+  }
+
+  async function salvarCapa(capaUrl) {
+    const r = await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ capaUrl }) });
+    const j = await r.json();
+    if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+    setData(j.data);
+  }
+  async function enviarCapa(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEnviandoCapa(true);
+    try {
+      const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+      await salvarCapa(blob.url);
+    } catch (err) { alert(err.message || "Falha no upload"); } finally { setEnviandoCapa(false); if (capaRef.current) capaRef.current.value = ""; }
+  }
+  async function removerCapa() {
+    try { await salvarCapa(null); } catch (e) { alert(e.message); }
   }
 
   async function publicar(despublicar) {
@@ -85,6 +106,22 @@ export default function AuditoriaDetalheClient({ id }) {
         <div className="flex items-center justify-between gap-3 mb-3">
           <h1 className="text-base font-bold text-torg-dark inline-flex items-center gap-2 min-w-0"><Building2 size={18} className="text-torg-blue shrink-0" /> <span className="truncate">{data.empresa}</span></h1>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${data.status === "PUBLICADO" ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-torg-gray"}`}>{data.status === "PUBLICADO" ? "Publicado" : "Rascunho"}</span>
+        </div>
+
+        {/* Foto de capa do portal (ex.: foto da obra) */}
+        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-50">
+          {data.capaUrl
+            ? <img src={data.capaUrl} alt="capa" className="w-32 h-[72px] object-cover rounded-lg border border-gray-200 shrink-0" />
+            : <div className="w-32 h-[72px] rounded-lg bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-gray-300 shrink-0"><ImageIcon size={22} /></div>}
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-torg-dark mb-1">Foto de capa do portal {data.capaUrl ? "" : "(opcional)"}</p>
+            <input ref={capaRef} type="file" accept="image/*" className="hidden" onChange={enviarCapa} />
+            <div className="flex items-center gap-3">
+              <button onClick={() => capaRef.current?.click()} disabled={enviandoCapa} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviandoCapa ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />} {enviandoCapa ? "Enviando…" : data.capaUrl ? "Trocar foto" : "Enviar foto"}</button>
+              {data.capaUrl && <button onClick={removerCapa} className="text-[11px] text-torg-gray hover:text-red-600">Remover</button>}
+            </div>
+            <p className="text-[10px] text-torg-gray mt-0.5">Aparece em destaque no topo do portal do cliente.</p>
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Campo label="Empresa"><input value={form.empresa} onChange={(e) => set("empresa", e.target.value)} className="inp" /></Campo>

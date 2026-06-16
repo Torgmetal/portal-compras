@@ -63,10 +63,19 @@ export default function PortalClienteClient({ token }) {
 
       {/* HERO imersivo */}
       <div className="relative bg-torg-dark overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)", backgroundSize: "22px 22px" }} />
-        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-torg-blue/20 blur-3xl" />
-        <div className="absolute top-0 left-0 right-0 h-1 bg-torg-orange pc-bar" />
-        <div className="relative max-w-4xl mx-auto px-6 py-16">
+        {data.capaUrl ? (
+          <>
+            <div className="absolute inset-0 bg-cover bg-center scale-105" style={{ backgroundImage: `url(${data.capaUrl})` }} />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(115deg, rgba(0,41,69,.95) 0%, rgba(0,41,69,.82) 42%, rgba(0,41,69,.55) 100%)" }} />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)", backgroundSize: "22px 22px" }} />
+            <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-torg-blue/20 blur-3xl" />
+          </>
+        )}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-torg-orange pc-bar z-10" />
+        <div className="relative z-10 max-w-4xl mx-auto px-6 py-16 sm:py-20">
           <img src="/torg-logo-white.png" alt="Torg Metal" className="h-9 mb-8 pc-up" style={{ animationDelay: "0ms" }} />
           <p className="text-torg-orange text-[15px] font-semibold tracking-wide uppercase mb-2 pc-up" style={{ animationDelay: "80ms" }}>Portal do Cliente · Qualidade</p>
           <h1 className="text-white text-4xl sm:text-5xl font-extrabold leading-tight mb-3 pc-up" style={{ animationDelay: "160ms" }}>

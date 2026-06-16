@@ -1215,6 +1215,7 @@ model Auditoria {
   contato            String?        // pessoa de contato no cliente
   titulo             String?        // ex.: "Auditoria de Qualificação 2026"
   mensagemBoasVindas String?
+  capaUrl            String?        // foto de capa do hero do portal (Blob)
   solicitacoes       String?        // o que o cliente pediu (texto / e-mail colado)
   token              String?        @unique
   status             String         @default("RASCUNHO") // RASCUNHO | PUBLICADO

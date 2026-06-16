@@ -24,6 +24,7 @@ export async function GET(_req, { params }) {
       contato: aud.contato,
       titulo: aud.titulo,
       mensagemBoasVindas: aud.mensagemBoasVindas,
+      capaUrl: aud.capaUrl,
       publicadoEm: aud.publicadoEm,
       documentos: aud.documentos,
     },
