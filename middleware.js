@@ -52,7 +52,10 @@ export default withAuth(
           path.startsWith("/api/kickoff/aceite/") ||
           // Aceite do Data Book pelo cliente — publico via token unico
           path.startsWith("/data-book/aceite/") ||
-          path.startsWith("/api/qualidade/data-books/aceite/")
+          path.startsWith("/api/qualidade/data-books/aceite/") ||
+          // Portal do cliente (auditorias externas) — publico via token unico
+          path.startsWith("/portal-cliente/") ||
+          path.startsWith("/api/qualidade/auditorias/portal/")
         ) {
           return true;
         }

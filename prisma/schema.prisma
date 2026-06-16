@@ -1207,6 +1207,42 @@ model DataBookAprovacao {
   @@index([dataBookId])
 }
 
+// Auditorias externas — registra a solicitação do cliente e os documentos que serão
+// compartilhados com ele num portal público (link por token, sem login).
+model Auditoria {
+  id                 String         @id @default(cuid())
+  empresa            String         // empresa do cliente/auditor
+  contato            String?        // pessoa de contato no cliente
+  titulo             String?        // ex.: "Auditoria de Qualificação 2026"
+  mensagemBoasVindas String?
+  solicitacoes       String?        // o que o cliente pediu (texto / e-mail colado)
+  token              String?        @unique
+  status             String         @default("RASCUNHO") // RASCUNHO | PUBLICADO
+  publicadoEm        DateTime?
+  criadoPorId        String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  documentos         AuditoriaDoc[]
+
+  @@index([status])
+}
+
+model AuditoriaDoc {
+  id               String    @id @default(cuid())
+  auditoriaId      String
+  tipo             String    @default("EVIDENCIA") // SOLICITACAO (pedido do cliente) | EVIDENCIA (compartilhado)
+  nome             String
+  arquivoUrl       String?
+  arquivoTipo      String?
+  arquivoTamanho   Int?
+  sharepointItemId String?
+  documentoId      String?   // vínculo opcional a um DocumentoQualidade existente
+  createdAt        DateTime  @default(now())
+  auditoria        Auditoria @relation(fields: [auditoriaId], references: [id], onDelete: Cascade)
+
+  @@index([auditoriaId])
+}
+
 model DataBookSecao {
   id         String             @id @default(cuid())
   dataBookId String
