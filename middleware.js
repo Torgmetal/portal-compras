@@ -49,7 +49,10 @@ export default withAuth(
           path.startsWith("/api/planejamento/cronogramas/cobranca/") ||
           // Aceite do Kick Off pelos setores — publico via token unico
           path.startsWith("/kickoff/aceite/") ||
-          path.startsWith("/api/kickoff/aceite/")
+          path.startsWith("/api/kickoff/aceite/") ||
+          // Aceite do Data Book pelo cliente — publico via token unico
+          path.startsWith("/data-book/aceite/") ||
+          path.startsWith("/api/qualidade/data-books/aceite/")
         ) {
           return true;
         }

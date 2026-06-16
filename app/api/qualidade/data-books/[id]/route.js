@@ -29,7 +29,10 @@ function resolverDoc(d) {
 async function montarDetalhe(id) {
   const book = await prisma.dataBookQualidade.findUnique({
     where: { id },
-    include: { secoes: { orderBy: { ordem: "asc" }, include: { documentos: true } } },
+    include: {
+      secoes: { orderBy: { ordem: "asc" }, include: { documentos: true } },
+      aprovacoes: { orderBy: { aprovadoEm: "asc" } },
+    },
   });
   if (!book) return null;
 
@@ -71,6 +74,9 @@ async function montarDetalhe(id) {
     id: book.id, opNumero: book.opNumero, cliente: book.cliente, obra: book.obra,
     pesoTotalKg: book.pesoTotalKg, pecas: book.pecas, observacao: book.observacao, tipo: book.tipo,
     status: book.status, emitidoEm: book.emitidoEm, createdAt: book.createdAt,
+    aprovacoes: book.aprovacoes.map((a) => ({ id: a.id, userId: a.userId, nome: a.nome, papel: a.papel, aprovadoEm: a.aprovadoEm })),
+    clienteEmail: book.clienteEmail, enviadoClienteEm: book.enviadoClienteEm,
+    aceiteEm: book.aceiteEm, aceiteNome: book.aceiteNome, tokenCliente: book.tokenCliente,
     secoes, candidatos: candidatosResolvidos,
     resumo: {
       total: secoes.length, anexadas, na: secoes.filter((s) => s.estado === "NA").length,

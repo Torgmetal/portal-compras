@@ -1175,14 +1175,36 @@ model DataBookQualidade {
   pecas       Int?
   tipo        String?         // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
   observacao  String?
-  status      String          @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO
+  status      String          @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | ENVIADO_CLIENTE | ACEITO
   emitidoEm   DateTime?
+  // Envio e aceite pelo cliente (link público por token, sem login)
+  tokenCliente     String?    @unique
+  clienteEmail     String?
+  enviadoClienteEm DateTime?
+  aceiteEm         DateTime?
+  aceiteNome       String?
+  aceiteIp         String?
   criadoPorId String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   secoes      DataBookSecao[]
+  aprovacoes  DataBookAprovacao[]
 
   @@index([opNumero])
+}
+
+// Aprovação interna do data book (inspetor + envolvidos) antes do envio ao cliente.
+model DataBookAprovacao {
+  id         String            @id @default(cuid())
+  dataBookId String
+  userId     String?
+  nome       String
+  papel      String?           // INSPETOR | QUALIDADE | RESP_TECNICO | OUTRO
+  aprovadoEm DateTime          @default(now())
+  dataBook   DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+
+  @@unique([dataBookId, userId])
+  @@index([dataBookId])
 }
 
 model DataBookSecao {
