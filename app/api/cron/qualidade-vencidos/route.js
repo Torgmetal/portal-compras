@@ -14,8 +14,17 @@ export const maxDuration = 60;
 const PORTAL = "https://workspace.torg.com.br/qualidade";
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
-function destinatarios() {
-  return (process.env.QUALIDADE_ALERTA_EMAILS || "").split(",").map((s) => s.trim()).filter(Boolean);
+// Destinatários fixos da Qualidade: cadastrados no banco (EmailNotificacao, evento
+// QUALIDADE_VENCIDOS — geríveis em /compras/notificacoes) + opcional env
+// QUALIDADE_ALERTA_EMAILS. Deduplicado.
+async function destinatarios() {
+  const env = (process.env.QUALIDADE_ALERTA_EMAILS || "").split(",").map((s) => s.trim()).filter(Boolean);
+  let db = [];
+  try {
+    const insc = await prisma.emailNotificacao.findMany({ where: { ativo: true, eventos: { has: "QUALIDADE_VENCIDOS" } }, select: { email: true } });
+    db = insc.map((i) => i.email).filter(Boolean);
+  } catch { /* sem inscritos no banco não é fatal */ }
+  return [...new Set([...db, ...env])];
 }
 
 function linhasHtml(docs) {
@@ -50,10 +59,10 @@ export async function GET(req) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const to = destinatarios();
+  const to = await destinatarios();
   if (!to.length) {
-    console.warn("[cron qualidade-vencidos] QUALIDADE_ALERTA_EMAILS não configurado — pulando");
-    return NextResponse.json({ ok: true, skipped: true, motivo: "QUALIDADE_ALERTA_EMAILS não configurado" });
+    console.warn("[cron qualidade-vencidos] nenhum destinatário cadastrado — pulando");
+    return NextResponse.json({ ok: true, skipped: true, motivo: "sem destinatários (cadastre em /compras/notificacoes — evento QUALIDADE_VENCIDOS — ou env QUALIDADE_ALERTA_EMAILS)" });
   }
 
   const docs = await prisma.documentoQualidade.findMany({
