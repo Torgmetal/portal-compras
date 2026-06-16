@@ -19,6 +19,7 @@ export default function DataBookDetalheClient({ id }) {
   const [erro, setErro] = useState("");
   const [acao, setAcao] = useState(null); // secaoId em ação
   const [emitindo, setEmitindo] = useState(false);
+  const [rastr, setRastr] = useState(null);
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -35,6 +36,12 @@ export default function DataBookDetalheClient({ id }) {
   }, [id]);
 
   useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    fetch(`/api/qualidade/data-books/${id}/rastreabilidade`)
+      .then((r) => r.json())
+      .then((j) => { if (!j.error) setRastr(j); })
+      .catch(() => {});
+  }, [id]);
 
   async function setEstado(secao, estado) {
     setAcao(secao.id);
@@ -190,6 +197,43 @@ export default function DataBookDetalheClient({ id }) {
           )}
         </div>
       </div>
+
+      {/* Rastreabilidade da obra — casamento LPC × certificados de material (§04) */}
+      {rastr && rastr.totalMateriais > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h2 className="text-sm font-bold text-torg-dark">
+              Rastreabilidade da obra <span className="text-torg-gray font-normal">· materiais da LPC × certificados</span>
+            </h2>
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${rastr.comCertificado === rastr.totalMateriais ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+              {rastr.comCertificado}/{rastr.totalMateriais} com certificado
+            </span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {rastr.materiais.map((m) => (
+              <div key={m.material} className="flex items-center justify-between gap-3 py-1.5 text-[12px]">
+                <span className="inline-flex items-center gap-1.5 min-w-0">
+                  {m.temCertificado
+                    ? <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                    : <AlertCircle size={14} className="text-amber-500 shrink-0" />}
+                  <span className="font-medium text-torg-dark truncate">{m.material}</span>
+                  <span className="text-torg-gray shrink-0">· {m.pecas} peça{m.pecas !== 1 ? "s" : ""}</span>
+                </span>
+                <span className="text-[11px] text-torg-gray shrink-0">
+                  {m.temCertificado ? `${m.certificados} certificado${m.certificados !== 1 ? "s" : ""}` : "sem certificado"}
+                </span>
+              </div>
+            ))}
+          </div>
+          {rastr.totalCertificados === 0
+            ? <p className="text-[11px] text-amber-700 mt-2 inline-flex items-center gap-1"><AlertCircle size={12} className="shrink-0" /> Nenhum certificado de material importado para a OP — importe o CMR na aba Rastreabilidade.</p>
+            : rastr.comCertificado < rastr.totalMateriais && (
+              <p className="text-[10px] text-torg-gray mt-2">
+                ⚠ = material da obra sem certificado correspondente (confira no Controle de Documentos). Casamento feito pelo código do material na norma do certificado.
+              </p>
+            )}
+        </div>
+      )}
 
       {/* Seções */}
       <p className="text-[11px] text-torg-gray mb-2">
