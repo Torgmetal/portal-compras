@@ -7,6 +7,12 @@ const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: 
 const fmtDataHora = (d) =>
   d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
+const SIT_COR = {
+  Cortada: "bg-emerald-100 text-emerald-700",
+  Parcial: "bg-amber-100 text-amber-700",
+  Pendente: "bg-gray-100 text-gray-500",
+};
+
 export default function RelatorioCorteClient() {
   const [obras, setObras] = useState([]);
   const [obra, setObra] = useState("");
@@ -40,12 +46,12 @@ export default function RelatorioCorteClient() {
     let linhas, nome;
     if (detalhe) {
       nome = `corte_${detalhe.obra}.csv`;
-      linhas = [["Peça", "Descrição / Perfil", "Qte", "Peso (kg)", "Data do corte", "Máquina", "Operador"],
-        ...detalhe.itens.map((i) => [i.peca, i.descricao, i.un, i.kg, fmtDataHora(i.data), i.maquina, i.operador])];
+      linhas = [["Peça", "Descrição / Perfil", "Programado", "Cortado", "Saldo", "Situação", "Data do corte", "Máquina", "Operador"],
+        ...detalhe.itens.map((i) => [i.peca, i.descricao, i.programado, i.cortado, i.saldo, i.situacao, fmtDataHora(i.data), i.maquina, i.operador])];
     } else {
       nome = "corte_resumo.csv";
-      linhas = [["Obra", "Peças cortadas", "Peso (kg)", "Apontamentos", "Último corte"],
-        ...obras.map((o) => [o.obra, o.pecas, o.kg, o.apontamentos, fmtData(o.ultima)])];
+      linhas = [["Obra", "Peças", "Programado (un)", "Cortado (un)", "% cortado", "Peso cortado (kg)", "Último corte"],
+        ...obras.map((o) => [o.obra, o.pecas, o.programadoUn, o.cortadoUn, `${o.pct}%`, o.pesoCortado, fmtData(o.ultima)])];
     }
     const csv = "﻿" + linhas.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\n");
     const a = document.createElement("a");
@@ -61,7 +67,7 @@ export default function RelatorioCorteClient() {
       <div className="flex items-start justify-between mb-5 gap-3">
         <div>
           <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2"><Scissors size={20} className="text-torg-blue" /> Relatório de Corte</h1>
-          <p className="text-xs text-torg-gray mt-0.5">Rastreabilidade das peças cortadas por obra — data/hora, máquina e operador (apontamentos do Syneco).</p>
+          <p className="text-xs text-torg-gray mt-0.5">Peças <strong>programadas</strong> e <strong>cortadas</strong> por obra — situação, data/hora, máquina e operador (Syneco).</p>
         </div>
         <button onClick={exportarCSV} disabled={loading || vazio}
           className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50 shrink-0">
@@ -69,7 +75,6 @@ export default function RelatorioCorteClient() {
         </button>
       </div>
 
-      {/* Filtros */}
       <div className="flex items-center gap-3 flex-wrap mb-4 bg-white border border-gray-100 rounded-xl shadow-sm p-3">
         <select value={obra} onChange={(e) => setObra(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
           <option value="">Todas as obras (resumo)</option>
@@ -80,6 +85,7 @@ export default function RelatorioCorteClient() {
         {(de || ate) && <button onClick={() => { setDe(""); setAte(""); }} className="text-xs text-torg-gray hover:text-torg-dark underline">limpar datas</button>}
         {obra && <button onClick={() => setObra("")} className="text-xs text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 ml-auto"><ChevronLeft size={13} /> voltar ao resumo</button>}
       </div>
+      {(de || ate) && <p className="text-[11px] text-torg-gray -mt-2 mb-3">Filtro de período mostra só o que foi <strong>cortado</strong> no intervalo (pendentes aparecem sem filtro de data).</p>}
 
       {loading ? (
         <div className="text-center py-16 text-torg-gray"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Carregando…</div>
@@ -87,21 +93,23 @@ export default function RelatorioCorteClient() {
         <div className="text-center py-16"><AlertCircle size={22} className="mx-auto text-red-500 mb-2" /><p className="text-red-600 text-sm">{erro}</p>
           <button onClick={carregar} className="mt-3 text-sm text-torg-blue inline-flex items-center gap-1"><RefreshCw size={13} /> Tentar novamente</button></div>
       ) : vazio ? (
-        <div className="text-center py-16 text-torg-gray"><Inbox size={28} className="mx-auto mb-2 opacity-50" /><p className="text-sm">Nenhum corte apontado{(de || ate) ? " no período." : "."}</p></div>
+        <div className="text-center py-16 text-torg-gray"><Inbox size={28} className="mx-auto mb-2 opacity-50" /><p className="text-sm">Nada encontrado{(de || ate) ? " no período." : "."}</p></div>
       ) : detalhe ? (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-            <Kpi label="Obra" valor={detalhe.obra} />
-            <Kpi label="Peças cortadas" valor={detalhe.totalUn.toLocaleString("pt-BR")} />
-            <Kpi label="Peso cortado" valor={fmtKg(detalhe.totalKg)} />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <Kpi label="Programado" valor={`${detalhe.programadoUn.toLocaleString("pt-BR")} un`} />
+            <Kpi label="Cortado" valor={`${detalhe.cortadoUn.toLocaleString("pt-BR")} un`} cor="text-emerald-700" />
+            <Kpi label="Peças cortadas" valor={`${detalhe.cortadas} / ${detalhe.total}`} />
+            <Kpi label="Pendentes" valor={detalhe.pendentes} cor="text-torg-gray" />
           </div>
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
             <table className="w-full text-[13px] [&_td]:align-top">
               <thead className="bg-gray-50/60"><tr className="text-left text-gray-500">
                 <th className="px-3 py-2 font-medium">Peça</th>
                 <th className="px-3 py-2 font-medium">Descrição / Perfil</th>
-                <th className="px-3 py-2 font-medium text-right">Qte</th>
-                <th className="px-3 py-2 font-medium text-right">Peso</th>
+                <th className="px-3 py-2 font-medium text-right">Prog.</th>
+                <th className="px-3 py-2 font-medium text-right">Cort.</th>
+                <th className="px-3 py-2 font-medium text-center">Situação</th>
                 <th className="px-3 py-2 font-medium">Data do corte</th>
                 <th className="px-3 py-2 font-medium">Máquina</th>
                 <th className="px-3 py-2 font-medium">Operador</th>
@@ -111,8 +119,9 @@ export default function RelatorioCorteClient() {
                   <tr key={idx} className="hover:bg-gray-50/50">
                     <td className="px-3 py-2 font-mono font-medium text-torg-dark whitespace-nowrap">{i.peca}</td>
                     <td className="px-3 py-2 text-torg-gray">{i.descricao}</td>
-                    <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{i.un}</td>
-                    <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{fmtKg(i.kg)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{i.programado}</td>
+                    <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{i.cortado}</td>
+                    <td className="px-3 py-2 text-center"><span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${SIT_COR[i.situacao] || ""}`}>{i.situacao}</span></td>
                     <td className="px-3 py-2 whitespace-nowrap text-torg-dark">{fmtDataHora(i.data)}</td>
                     <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{i.maquina}</td>
                     <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{i.operador}</td>
@@ -127,9 +136,11 @@ export default function RelatorioCorteClient() {
           <table className="w-full text-[13px]">
             <thead className="bg-gray-50/60"><tr className="text-left text-gray-500">
               <th className="px-3 py-2 font-medium">Obra</th>
-              <th className="px-3 py-2 font-medium text-right">Peças cortadas</th>
-              <th className="px-3 py-2 font-medium text-right">Peso</th>
-              <th className="px-3 py-2 font-medium text-right">Apontamentos</th>
+              <th className="px-3 py-2 font-medium text-right">Peças</th>
+              <th className="px-3 py-2 font-medium text-right">Programado</th>
+              <th className="px-3 py-2 font-medium text-right">Cortado</th>
+              <th className="px-3 py-2 font-medium text-right">% cortado</th>
+              <th className="px-3 py-2 font-medium text-right">Peso cortado</th>
               <th className="px-3 py-2 font-medium">Último corte</th>
               <th className="px-3 py-2 font-medium text-right">Ações</th>
             </tr></thead>
@@ -137,9 +148,11 @@ export default function RelatorioCorteClient() {
               {obras.map((o) => (
                 <tr key={o.obra} className="hover:bg-gray-50/50">
                   <td className="px-3 py-2 font-mono font-semibold text-torg-dark">{o.obra}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{o.pecas.toLocaleString("pt-BR")}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtKg(o.kg)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-torg-gray">{o.apontamentos}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-torg-gray">{o.pecas}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{o.programadoUn.toLocaleString("pt-BR")}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-emerald-700">{o.cortadoUn.toLocaleString("pt-BR")}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium">{o.pct}%</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-torg-gray">{fmtKg(o.pesoCortado)}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-torg-gray">{fmtData(o.ultima)}</td>
                   <td className="px-3 py-2 text-right">
                     <button onClick={() => setObra(o.obra)} className="text-[12px] text-torg-blue hover:text-torg-dark font-medium">ver peças →</button>
@@ -154,11 +167,11 @@ export default function RelatorioCorteClient() {
   );
 }
 
-function Kpi({ label, valor }) {
+function Kpi({ label, valor, cor = "text-torg-dark" }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
       <p className="text-[10px] text-torg-gray uppercase tracking-wide">{label}</p>
-      <p className="text-lg font-bold text-torg-dark mt-0.5">{valor}</p>
+      <p className={`text-lg font-bold mt-0.5 ${cor}`}>{valor}</p>
     </div>
   );
 }
