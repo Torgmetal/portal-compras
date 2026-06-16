@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, Search,
   FileText, CheckCircle2, Lock, BookCheck, FileDown,
 } from "lucide-react";
-import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
+import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
 import { STATUS_COR } from "@/lib/qualidade-status";
 import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 
@@ -130,6 +130,23 @@ export default function DataBookDetalheClient({ id }) {
       if (!res.ok || !json.success) throw new Error(json.error || "Erro");
       if (json.semDocs) {
         alert("Nenhum procedimento aplicável a esta seção no Controle de Documentos. Importe pela aba “Importar do servidor” (pasta Procedimentos).");
+      }
+      await carregar();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setAcao(null);
+    }
+  }
+
+  async function puxarRelatorios(secao) {
+    setAcao(secao.id);
+    try {
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/puxar-relatorios`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
+      if (json.semDocs) {
+        alert("Nenhum relatório desta OP encontrado na pasta do servidor (SGQ). Confira se o relatório já foi salvo com o código da obra no nome.");
       }
       await carregar();
     } catch (e) {
@@ -277,14 +294,14 @@ export default function DataBookDetalheClient({ id }) {
           <SecaoCard key={s.id} secao={s} candidatos={data.candidatos} acaoLoading={acao === s.id}
             onEstado={(e) => setEstado(s, e)} onVincular={(docId) => vincular(s, docId)} onDesvincular={(docId) => desvincular(s, docId)}
             onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onPopularProcedimentos={() => popularProcedimentos(s)}
-            onSavePit={(itens) => savePit(s, itens)} />
+            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} />
         ))}
       </div>
     </div>
   );
 }
 
-function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onSavePit }) {
+function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit }) {
   const [picker, setPicker] = useState(false);
   const [codBusca, setCodBusca] = useState("");
   const [codResultados, setCodResultados] = useState(null);
@@ -332,8 +349,8 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
         </div>
       </div>
 
-      {/* Documentos vinculados (seções do Módulo 1 / empresa / procedimentos) */}
-      {(secao.usaModulo1 || secaoUsaEmpresa(secao.numero) || secaoUsaProcedimentos(secao.numero)) && (
+      {/* Documentos vinculados (seções do Módulo 1 / empresa / procedimentos / relatórios) */}
+      {(secao.usaModulo1 || secaoUsaEmpresa(secao.numero) || secaoUsaProcedimentos(secao.numero) || secaoUsaRelatoriosServidor(secao.numero)) && (
         <div className="mt-2 pt-2 border-t border-gray-50">
           {secao.documentos.length > 0 ? (
             <div className="divide-y divide-gray-50">
@@ -378,6 +395,12 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                 <button onClick={onPopularProcedimentos} disabled={acaoLoading}
                   className="text-[11px] text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
                   <FileText size={12} /> Trazer procedimentos aplicáveis
+                </button>
+              )}
+              {secaoUsaRelatoriosServidor(secao.numero) && (
+                <button onClick={onPuxarRelatorios} disabled={acaoLoading}
+                  className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+                  <FileText size={12} /> Trazer {SECAO_RELATORIOS_SERVIDOR[secao.numero].label} da OP (servidor)
                 </button>
               )}
             </div>
