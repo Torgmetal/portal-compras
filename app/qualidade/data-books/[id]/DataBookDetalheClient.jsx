@@ -396,31 +396,39 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
   const [codResultados, setCodResultados] = useState(null);
   const [codBuscando, setCodBuscando] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [progresso, setProgresso] = useState(""); // "2/5" durante o upload em lote
   const fileRef = useRef(null);
   const linkedIds = new Set(secao.documentos.map((d) => d.id));
   const disponiveis = candidatos.filter((c) => !linkedIds.has(c.id));
 
-  // Anexa um arquivo do computador direto à seção (Vercel Blob + endpoint /anexar).
-  // Para conteúdo que não vem do portal (relatório avulso, documento do cliente…).
-  async function anexarArquivo(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Anexa um OU VÁRIOS arquivos do computador direto à seção (Vercel Blob +
+  // endpoint /anexar). Sobe em sequência, com progresso; uma falha num arquivo
+  // não derruba os demais — no fim avisa só os que falharam.
+  async function anexarArquivos(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setEnviando(true);
-    try {
-      const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
-      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/anexar`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ arquivoUrl: blob.url, arquivoNome: file.name, arquivoTipo: file.type || null, arquivoTamanho: file.size }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || "Erro ao anexar");
-      await onReload?.();
-    } catch (err) {
-      alert(err.message || "Falha no upload");
-    } finally {
-      setEnviando(false);
-      if (fileRef.current) fileRef.current.value = "";
+    const falhas = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setProgresso(files.length > 1 ? `${i + 1}/${files.length}` : "");
+      try {
+        const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+        const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/anexar`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ arquivoUrl: blob.url, arquivoNome: file.name, arquivoTipo: file.type || null, arquivoTamanho: file.size }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.error || "erro ao anexar");
+      } catch (err) {
+        falhas.push(`• ${file.name}: ${err.message || "falha no upload"}`);
+      }
     }
+    setEnviando(false);
+    setProgresso("");
+    if (fileRef.current) fileRef.current.value = "";
+    await onReload?.();
+    if (falhas.length) alert(`${falhas.length} de ${files.length} arquivo(s) não foram anexados:\n\n${falhas.join("\n")}`);
   }
 
   // Busca um certificado pelo código de rastreabilidade (Índice R / importRef) em
@@ -495,10 +503,10 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
           {!picker ? (
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               <button onClick={() => setPicker(true)} className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={12} /> Vincular documento</button>
-              <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" className="hidden" onChange={anexarArquivo} />
+              <input ref={fileRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" className="hidden" onChange={anexarArquivos} />
               <button onClick={() => fileRef.current?.click()} disabled={enviando || acaoLoading}
                 className="text-[11px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium disabled:opacity-50">
-                {enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? "Enviando…" : "Anexar arquivo"}
+                {enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? `Enviando${progresso ? " " + progresso : ""}…` : "Anexar arquivos"}
               </button>
               {GRUPO_POR_SECAO[secao.numero] && (
                 <button onClick={onPopularMaterial} disabled={acaoLoading}
