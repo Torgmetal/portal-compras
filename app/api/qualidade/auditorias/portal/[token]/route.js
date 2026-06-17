@@ -18,20 +18,25 @@ export async function GET(_req, { params }) {
     .update({ where: { id: aud.id }, data: { ultimoAcessoEm: new Date(), ...(aud.primeiroAcessoEm ? {} : { primeiroAcessoEm: new Date() }) } })
     .catch(() => {});
 
-  // Organograma: setores ativos com nº de funcionários ATIVOS — só os que têm gente.
-  let organograma = [];
+  // Equipe: resumo em dois grupos — Administrativo e Fábrica (nº de funcionários ATIVOS).
+  let equipe = [];
   let totalFuncionarios = 0;
   try {
     const setores = await prisma.setor.findMany({
       where: { ativo: true },
-      select: { nome: true, sigla: true, cor: true, gestor: { select: { nome: true } }, _count: { select: { funcionarios: { where: { ativo: true, status: "ATIVO" } } } } },
-      orderBy: { nome: "asc" },
+      select: { nome: true, _count: { select: { funcionarios: { where: { ativo: true, status: "ATIVO" } } } } },
     });
-    organograma = setores
-      .filter((s) => s._count.funcionarios > 0)
-      .map((s) => ({ nome: s.nome, sigla: s.sigla, cor: s.cor, gestor: s.gestor?.nome || null, funcionarios: s._count.funcionarios }));
-    totalFuncionarios = organograma.reduce((a, s) => a + s.funcionarios, 0);
-  } catch { /* RH pode não ter dados — organograma fica vazio */ }
+    const RX_FABRICA = /(produ|f[áa]bric|montag|solda|prepar|corte|pintura|jato|jatea|almox|expedi|caldeir|acabamento|usinag|oficina|manuten|ferrament|serralher|estoque)/i;
+    let adm = 0, fab = 0;
+    for (const s of setores) {
+      const n = s._count.funcionarios;
+      if (!n) continue;
+      if (RX_FABRICA.test(s.nome)) fab += n; else adm += n;
+    }
+    totalFuncionarios = adm + fab;
+    if (adm) equipe.push({ grupo: "Administrativo", funcionarios: adm });
+    if (fab) equipe.push({ grupo: "Fábrica", funcionarios: fab });
+  } catch { /* RH pode não ter dados — equipe fica vazia */ }
 
   return NextResponse.json({
     success: true,
@@ -44,7 +49,7 @@ export async function GET(_req, { params }) {
       dataBookModeloUrl: aud.dataBookModeloUrl,
       publicadoEm: aud.publicadoEm,
       documentos: aud.documentos,
-      organograma,
+      equipe,
       totalFuncionarios,
     },
   });

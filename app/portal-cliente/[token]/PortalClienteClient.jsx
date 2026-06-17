@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen } from "lucide-react";
+import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen, Factory, Building2 } from "lucide-react";
 import { ordenarSecoes } from "@/lib/auditoria-secoes";
 import PlantaFabril from "@/components/PlantaFabril";
 import MaquinasEquipamentos from "@/components/MaquinasEquipamentos";
@@ -155,23 +155,25 @@ export default function PortalClienteClient({ token }) {
 
         <MaquinasEquipamentos />
 
-        {/* Equipe e organograma */}
-        {data.organograma?.length > 0 && (
+        {/* Equipe — Administrativo e Fábrica */}
+        {data.equipe?.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 sm:p-8 mt-6">
             <div className="flex items-center justify-between gap-3 mb-1">
-              <h2 className="text-xl font-bold text-torg-dark inline-flex items-center gap-2"><Users size={20} className="text-torg-blue" /> Equipe e organograma</h2>
+              <h2 className="text-xl font-bold text-torg-dark inline-flex items-center gap-2"><Users size={20} className="text-torg-blue" /> Nossa equipe</h2>
               <span className="text-[13px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{data.totalFuncionarios} colaboradores</span>
             </div>
-            <p className="text-[13px] text-torg-gray mb-5">Estrutura por setor (apenas setores com equipe ativa).</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {data.organograma.map((s) => (
-                <div key={s.nome} className="border border-gray-100 rounded-xl p-4">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.cor || "#006eab" }} />
-                    <p className="text-[14px] font-semibold text-torg-dark leading-snug">{s.nome}</p>
+            <p className="text-[13px] text-torg-gray mb-5">Estrutura organizacional.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {data.equipe.map((g) => (
+                <div key={g.grupo} className="border border-gray-100 rounded-xl p-5 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-torg-blue-50 flex items-center justify-center shrink-0">
+                    {g.grupo === "Fábrica" ? <Factory size={24} className="text-torg-blue" /> : <Building2 size={24} className="text-torg-blue" />}
                   </div>
-                  <p className="text-2xl font-bold text-torg-dark mt-1.5">{s.funcionarios}</p>
-                  <p className="text-[12px] text-torg-gray">{s.funcionarios === 1 ? "colaborador" : "colaboradores"}{s.gestor ? ` · gestor: ${s.gestor}` : ""}</p>
+                  <div>
+                    <p className="text-[13px] font-semibold text-torg-gray uppercase tracking-wide">{g.grupo}</p>
+                    <p className="text-3xl font-bold text-torg-dark leading-tight">{g.funcionarios}</p>
+                    <p className="text-[12px] text-torg-gray">{g.funcionarios === 1 ? "colaborador" : "colaboradores"}</p>
+                  </div>
                 </div>
               ))}
             </div>
