@@ -298,8 +298,10 @@ export default function KickoffClient({ opId }) {
           <p className="text-sm text-torg-gray mt-1">{op.cliente}{op.obra ? ` · ${op.obra}` : ""} — alinhamento para divulgação aos setores.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
-            <Printer size={15} /> Imprimir
+          <button onClick={async () => { const ok = await salvar(); if (ok) window.open(`/comercial/${opId}/kickoff/imprimir`, "_blank"); }} disabled={salvando}
+            title="Salva e abre a versão limpa para gerar o PDF"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 disabled:opacity-50">
+            <Printer size={15} /> Salvar PDF
           </button>
           <button onClick={() => salvar()} disabled={salvando}
             className="inline-flex items-center gap-2 px-4 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium disabled:opacity-50">
