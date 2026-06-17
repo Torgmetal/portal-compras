@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
-const DESTINOS = ["MONTAGEM", "PINTURA", "EXPEDICAO"];
+const DESTINOS = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 
 const schema = z.object({
   ids: z.array(z.string()).min(1, "Selecione ao menos uma peça"),

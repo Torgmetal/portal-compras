@@ -12,12 +12,18 @@ const fmtDataHora = (v) =>
 
 const DESTINOS = [
   { v: "MONTAGEM", label: "Montagem" },
+  { v: "SOLDA", label: "Solda" },
+  { v: "ACABAMENTO", label: "Acabamento" },
+  { v: "JATO", label: "Jato" },
   { v: "PINTURA", label: "Pintura" },
   { v: "EXPEDICAO", label: "Expedição" },
 ];
-const DESTINO_LABEL = { MONTAGEM: "Montagem", PINTURA: "Pintura", EXPEDICAO: "Expedição" };
+const DESTINO_LABEL = { MONTAGEM: "Montagem", SOLDA: "Solda", ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura", EXPEDICAO: "Expedição" };
 const DESTINO_COR = {
   MONTAGEM: "bg-blue-50 text-blue-700 border-blue-200",
+  SOLDA: "bg-orange-50 text-orange-700 border-orange-200",
+  ACABAMENTO: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+  JATO: "bg-cyan-50 text-cyan-700 border-cyan-200",
   PINTURA: "bg-purple-50 text-purple-700 border-purple-200",
   EXPEDICAO: "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
