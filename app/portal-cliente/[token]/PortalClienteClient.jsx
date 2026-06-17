@@ -179,7 +179,7 @@ export default function PortalClienteClient({ token }) {
               );
             })}
           </div>
-          {reqsAtivos.length ? (
+          {reqsAtivos.length >= 2 ? (
             <div className="space-y-5">
               {reqsAtivos.map((r) => {
                 const ds = docsPorReq[r.id] || [];

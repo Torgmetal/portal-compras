@@ -402,7 +402,7 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
               {SECOES_AUDITORIA.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
-          {sugestao && reqs.length > 0 && (
+          {sugestao && reqs.length >= 2 && (
             <select value={d.requisito || ""} onChange={(e) => moverRequisito(d.id, e.target.value)} title="Linha (requisito) que o documento atende" className="text-[10px] border border-gray-200 rounded px-1 py-0.5 text-torg-gray focus:border-torg-blue max-w-[150px]">
               <option value="">— linha —</option>
               {reqs.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
