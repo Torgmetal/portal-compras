@@ -1,20 +1,20 @@
-// Planta ilustrativa (elaborada) da fábrica da Torg para o portal do cliente.
-// Layout dos galpões + zonas de processo com marcadores de equipamento, metragens e
-// o fluxo produtivo. Bem mais clara que a planta CAD. Atende "Capacidade Fabril".
+// Planta ilustrativa (limpa e profissional) da fábrica da Torg para o portal do cliente.
+// Esquema espaçado dos galpões e zonas de processo + metragens + fluxo produtivo.
+// Os equipamentos ficam no painel "Máquinas e equipamentos" (não poluem a planta).
 import { ArrowRight } from "lucide-react";
 
 const AREA_TOTAL = "3.729,96 m²";
 const FLUXO = ["Preparação", "Montagem", "Solda", "Jato", "Pintura", "Expedição"];
 
-// zona: x,y,w,h em viewBox 680x380; cor de preenchimento + texto; equipamentos (chips)
-const Z = (x, y, w, h, nome, fill, tcor, eqs) => ({ x, y, w, h, nome, fill, tcor, eqs });
+// zonas em viewBox 640x300 — tons suaves e harmônicos (não "arco-íris")
+const Z = (x, y, w, h, nome, fill, tcor) => ({ x, y, w, h, nome, fill, tcor });
 const ZONAS = [
-  Z(34, 60, 270, 104, "PREPARAÇÃO", "#e6f1fb", "#0c447c", ["Lasers Calfran (chapa/perfil/tubo)", "Oxicorte · Serra"]),
-  Z(34, 172, 130, 150, "MONTAGEM", "#e1f5ee", "#0f6e56", ["3× Ponte rolante 5t"]),
-  Z(172, 172, 132, 150, "SOLDA", "#faece7", "#993c1d", ["10× Solda 450A", "Braço giratório"]),
-  Z(316, 60, 70, 262, "JATO", "#f1efe8", "#444441", ["Cabine 4,5×15 m", "Jato turbina"]),
-  Z(398, 172, 250, 150, "PINTURA", "#eeedfe", "#3c3489", ["Linha eletrostática", "Airless · Tanques"]),
-  Z(398, 60, 250, 104, "ADMINISTRATIVO", "#faeeda", "#854f0b", ["Escritórios · Recepção · Diretoria"]),
+  Z(36, 64, 256, 86, "PREPARAÇÃO", "#e6f1fb", "#0c447c"),
+  Z(36, 158, 122, 104, "MONTAGEM", "#eaeefb", "#3c3489"),
+  Z(170, 158, 122, 104, "SOLDA", "#fdeee6", "#993c1d"),
+  Z(306, 64, 54, 198, "JATO", "#eef1f5", "#444441"),
+  Z(374, 158, 230, 104, "PINTURA", "#efe8fb", "#3c3489"),
+  Z(374, 64, 230, 86, "EXPEDIÇÃO", "#e8f5ee", "#0f6e56"),
 ];
 
 export default function PlantaFabril() {
@@ -24,42 +24,27 @@ export default function PlantaFabril() {
         <h2 className="text-xl font-bold text-torg-dark">Nossa estrutura fabril</h2>
         <span className="text-[13px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{AREA_TOTAL} construídos</span>
       </div>
-      <p className="text-[13px] text-torg-gray mb-5">Layout dos galpões, áreas de processo e principais equipamentos.</p>
+      <p className="text-[13px] text-torg-gray mb-5">Layout dos galpões e áreas de processo.</p>
 
-      <div className="rounded-xl border border-gray-100 bg-gradient-to-b from-gray-50 to-white p-3 sm:p-5 overflow-x-auto">
-        <svg viewBox="0 0 680 392" className="w-full" style={{ minWidth: 560 }} role="img" aria-label="Planta ilustrativa da fábrica Torg Metal">
-          <defs>
-            <filter id="pfsh" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#002945" floodOpacity="0.12" /></filter>
-          </defs>
-          {/* terreno */}
-          <rect x="8" y="40" width="664" height="300" rx="10" fill="#f7f8fa" stroke="#e3e6ea" />
-          {/* paredes dos galpões (profundidade) */}
-          <rect x="26" y="50" width="286" height="282" rx="6" fill="#ffffff" stroke="#002945" strokeWidth="3" filter="url(#pfsh)" />
-          <rect x="390" y="50" width="266" height="282" rx="6" fill="#ffffff" stroke="#002945" strokeWidth="3" filter="url(#pfsh)" />
-          {/* cabine de jato entre os galpões */}
-          <rect x="316" y="60" width="70" height="262" rx="5" fill="#ffffff" stroke="#5f5e5a" strokeWidth="2" strokeDasharray="4 3" />
+      <div className="rounded-xl border border-gray-100 bg-gray-50/40 p-4 sm:p-6 overflow-x-auto">
+        <svg viewBox="0 0 640 318" className="w-full" style={{ minWidth: 520 }} role="img" aria-label="Planta da fábrica Torg Metal">
+          {/* galpões */}
+          <rect x="24" y="48" width="280" height="230" rx="6" fill="#ffffff" stroke="#002945" strokeWidth="2" />
+          <rect x="362" y="48" width="254" height="230" rx="6" fill="#ffffff" stroke="#002945" strokeWidth="2" />
 
           {/* zonas */}
           {ZONAS.map((z) => (
             <g key={z.nome}>
               <rect x={z.x} y={z.y} width={z.w} height={z.h} rx="5" fill={z.fill} />
-              <text x={z.x + z.w / 2} y={z.y + 18} textAnchor="middle" fontSize="11.5" fontWeight="700" fill={z.tcor} fontFamily="Arial">{z.nome}</text>
-              {z.eqs.map((e, i) => (
-                <text key={i} x={z.x + z.w / 2} y={z.y + 36 + i * 14} textAnchor="middle" fontSize="9" fill={z.tcor} fontFamily="Arial" opacity="0.85">{e}</text>
-              ))}
+              <text x={z.x + z.w / 2} y={z.y + z.h / 2 + 4} textAnchor="middle" fontSize="12.5" fontWeight="700" fill={z.tcor} fontFamily="Arial" letterSpacing="0.3">{z.nome}</text>
             </g>
           ))}
 
           {/* rótulos dos galpões + metragens */}
-          <text x="169" y="68" textAnchor="middle" fontSize="11" fontWeight="700" fill="#002945" fontFamily="Arial">GALPÃO 01 · PRODUÇÃO</text>
-          <text x="523" y="68" textAnchor="middle" fontSize="11" fontWeight="700" fill="#002945" fontFamily="Arial">GALPÃO 02 · PINTURA</text>
-          {/* cotas (dimensões) */}
-          <text x="169" y="350" textAnchor="middle" fontSize="11" fontWeight="700" fill="#006eab" fontFamily="Arial">2.767,64 m²</text>
-          <text x="523" y="350" textAnchor="middle" fontSize="11" fontWeight="700" fill="#006eab" fontFamily="Arial">962,32 m²</text>
-          {/* norte */}
-          <g transform="translate(642,66)"><path d="M0,-12 L5,6 L0,1 L-5,6 Z" fill="#002945" /><text x="0" y="20" textAnchor="middle" fontSize="8" fill="#576d7e" fontFamily="Arial">N</text></g>
-          {/* título da planta */}
-          <text x="20" y="28" fontSize="10" fontWeight="700" fill="#576d7e" fontFamily="Arial" letterSpacing="1">PLANTA — PARQUE INDUSTRIAL TORG METAL</text>
+          <text x="164" y="38" textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#002945" fontFamily="Arial">GALPÃO 01 · PRODUÇÃO</text>
+          <text x="489" y="38" textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#002945" fontFamily="Arial">GALPÃO 02 · PINTURA</text>
+          <text x="164" y="300" textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#006eab" fontFamily="Arial">2.767,64 m²</text>
+          <text x="489" y="300" textAnchor="middle" fontSize="11.5" fontWeight="700" fill="#006eab" fontFamily="Arial">962,32 m²</text>
         </svg>
       </div>
 
@@ -76,7 +61,7 @@ export default function PlantaFabril() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
         <div className="bg-torg-blue-50/50 rounded-xl p-3"><p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Galpão 01 · Produção</p><p className="text-lg font-bold text-torg-dark mt-0.5">2.767,64 m²</p><p className="text-[12px] text-torg-gray">Preparação · Montagem · Solda</p></div>
-        <div className="bg-torg-blue-50/50 rounded-xl p-3"><p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Galpão 02 · Pintura</p><p className="text-lg font-bold text-torg-dark mt-0.5">962,32 m²</p><p className="text-[12px] text-torg-gray">Jato · Pintura · Administrativo</p></div>
+        <div className="bg-torg-blue-50/50 rounded-xl p-3"><p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Galpão 02 · Pintura</p><p className="text-lg font-bold text-torg-dark mt-0.5">962,32 m²</p><p className="text-[12px] text-torg-gray">Jato · Pintura · Expedição</p></div>
         <div className="bg-torg-dark rounded-xl p-3 flex flex-col justify-center"><p className="text-[11px] font-semibold text-blue-200 uppercase tracking-wide">Área construída</p><p className="text-lg font-bold text-white mt-0.5">{AREA_TOTAL}</p></div>
       </div>
     </div>
