@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen, Factory, Building2, Cog } from "lucide-react";
-import { ordenarSecoes } from "@/lib/auditoria-secoes";
+import { ordenarSecoes, SECOES_AUDITORIA } from "@/lib/auditoria-secoes";
 import PlantaFabril from "@/components/PlantaFabril";
 import MaquinasEquipamentos from "@/components/MaquinasEquipamentos";
 
@@ -53,9 +53,11 @@ export default function PortalClienteClient({ token }) {
   const porSecao = {};
   for (const d of data.documentos) { const s = d.secao || "Outros"; (porSecao[s] ||= []).push(d); }
   const grupos = ordenarSecoes(Object.keys(porSecao)).map((s) => [s, porSecao[s]]);
-  // Aba ativa: a escolhida pelo cliente (se ainda existe) ou a primeira seção.
-  const abaAtiva = (aba && porSecao[aba]) ? aba : (grupos[0]?.[0] || null);
-  const docsAtivos = abaAtiva ? porSecao[abaAtiva] : [];
+  // Abas de seção FIXAS = todas as áreas do GQ-FQ-003 (mesmo sem documento ainda);
+  // "Outros" só aparece se tiver algo. Cada aba mostra sua contagem.
+  const secoesTabs = SECOES_AUDITORIA.filter((s) => s !== "Outros" || porSecao["Outros"]?.length);
+  const abaAtiva = (aba && secoesTabs.includes(aba)) ? aba : (secoesTabs[0] || null);
+  const docsAtivos = abaAtiva ? (porSecao[abaAtiva] || []) : [];
 
   // Abas de topo do portal (o cliente seleciona e abre)
   const tabs = [
@@ -63,7 +65,7 @@ export default function PortalClienteClient({ token }) {
     { id: "estrutura", label: "Estrutura", icon: Layers },
     { id: "maquinas", label: "Máquinas", icon: Cog },
     ...(data.equipe?.length ? [{ id: "equipe", label: "Equipe", icon: Users }] : []),
-    ...(data.dataBookModeloUrl ? [{ id: "modelo", label: "Data Book modelo", icon: BookOpen }] : []),
+    { id: "modelo", label: "Data Book modelo", icon: BookOpen },
   ];
   const painelAtivo = tabs.some((t) => t.id === painel) ? painel : "documentos";
 
@@ -104,7 +106,7 @@ export default function PortalClienteClient({ token }) {
             {data.mensagemBoasVindas || `É um prazer receber a ${data.empresa}. Reunimos aqui, de forma organizada e transparente, toda a documentação da qualidade solicitada para a sua conferência.`}
           </p>
           <div className="flex flex-wrap items-center gap-2.5 mt-7 pc-up" style={{ animationDelay: "320ms" }}>
-            <Chip icon={Layers} label={`${grupos.length} ${grupos.length === 1 ? "seção" : "seções"}`} />
+            <Chip icon={Layers} label={`${secoesTabs.length} ${secoesTabs.length === 1 ? "seção" : "seções"}`} />
             <Chip icon={FileText} label={`${data.documentos.length} ${data.documentos.length === 1 ? "documento" : "documentos"}`} />
             <Chip icon={BadgeCheck} label="ISO 9001 · Bureau Veritas" />
           </div>
@@ -138,42 +140,43 @@ export default function PortalClienteClient({ token }) {
             <span className="text-[13px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{data.documentos.length} {data.documentos.length === 1 ? "documento" : "documentos"}</span>
           </div>
 
-          {data.documentos.length === 0 ? (
-            <div className="text-center py-12 text-torg-gray"><FileText size={32} className="mx-auto mb-2 text-gray-300" /><p className="text-base">Os documentos serão disponibilizados em breve.</p></div>
-          ) : (
-            <>
-              {/* Abas por tipo de documento — o cliente escolhe e vê só aquela seção */}
-              <div className="flex flex-wrap gap-2 mb-6">
-                {grupos.map(([secao, docs]) => {
-                  const ativa = secao === abaAtiva;
-                  return (
-                    <button key={secao} onClick={() => setAba(secao)}
-                      className={`text-[13px] font-medium rounded-full px-3.5 py-1.5 border transition-colors inline-flex items-center gap-2 ${ativa ? "bg-torg-dark text-white border-torg-dark" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue-300 hover:text-torg-dark"}`}>
-                      <span className="uppercase tracking-wide">{secao}</span>
-                      <span className={`text-[11px] rounded-full px-1.5 ${ativa ? "bg-white/25 text-white" : "bg-gray-100 text-torg-gray"}`}>{docs.length}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Documentos da aba ativa */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {docsAtivos.map((d, di) => (
-                  <div key={d.id} className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-300 hover:shadow-lg transition-shadow duration-200 pc-up" style={{ animationDelay: `${di * 55}ms` }}>
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-base font-semibold text-torg-dark leading-snug break-words uppercase">{d.nome}</p>
-                        {d.arquivoTamanho ? <p className="text-[13px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
-                        <div className="flex items-center gap-4 mt-2.5">
-                          <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
-                          <a href={`${base}/${d.id}`} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
-                        </div>
+          {/* Abas por tipo de documento — TODAS as áreas (mesmo sem documento ainda) */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {secoesTabs.map((secao) => {
+              const ativa = secao === abaAtiva;
+              const n = porSecao[secao]?.length || 0;
+              return (
+                <button key={secao} onClick={() => setAba(secao)}
+                  className={`text-[13px] font-medium rounded-full px-3.5 py-1.5 border transition-colors inline-flex items-center gap-2 ${ativa ? "bg-torg-dark text-white border-torg-dark" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue-300 hover:text-torg-dark"}`}>
+                  <span className="uppercase tracking-wide">{secao}</span>
+                  <span className={`text-[11px] rounded-full px-1.5 ${ativa ? "bg-white/25 text-white" : n ? "bg-gray-100 text-torg-gray" : "bg-gray-50 text-gray-300"}`}>{n}</span>
+                </button>
+              );
+            })}
+          </div>
+          {docsAtivos.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {docsAtivos.map((d, di) => (
+                <div key={d.id} className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-300 hover:shadow-lg transition-shadow duration-200 pc-up" style={{ animationDelay: `${di * 55}ms` }}>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold text-torg-dark leading-snug break-words uppercase">{d.nome}</p>
+                      {d.arquivoTamanho ? <p className="text-[13px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
+                      <div className="flex items-center gap-4 mt-2.5">
+                        <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
+                        <a href={`${base}/${d.id}`} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10 text-torg-gray border border-dashed border-gray-200 rounded-xl">
+              <FileText size={28} className="mx-auto mb-2 text-gray-300" />
+              <p className="text-[14px]">Os documentos desta seção serão disponibilizados em breve.</p>
+            </div>
           )}
         </div>
         )}
@@ -208,20 +211,27 @@ export default function PortalClienteClient({ token }) {
         )}
 
         {/* Modelo de Data Book */}
-        {painelAtivo === "modelo" && data.dataBookModeloUrl && (
+        {painelAtivo === "modelo" && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 sm:p-8 mt-6">
             <h2 className="text-xl font-bold text-torg-dark inline-flex items-center gap-2 mb-1"><BookOpen size={20} className="text-torg-blue" /> Modelo do Data Book</h2>
             <p className="text-[13px] text-torg-gray mb-4">Veja um exemplo de como será entregue o Data Book da Qualidade da sua obra.</p>
-            <div className="flex items-center gap-4 border border-gray-100 rounded-xl p-4">
-              <div className="w-12 h-12 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={22} className="text-torg-blue" /></div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-medium text-torg-dark">Data Book — modelo de referência</p>
-                <div className="flex items-center gap-4 mt-1.5">
-                  <a href={data.dataBookModeloUrl} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
-                  <a href={data.dataBookModeloUrl} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
+            {data.dataBookModeloUrl ? (
+              <div className="flex items-center gap-4 border border-gray-100 rounded-xl p-4">
+                <div className="w-12 h-12 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={22} className="text-torg-blue" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-medium text-torg-dark">Data Book — modelo de referência</p>
+                  <div className="flex items-center gap-4 mt-1.5">
+                    <a href={data.dataBookModeloUrl} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
+                    <a href={data.dataBookModeloUrl} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-10 text-torg-gray border border-dashed border-gray-200 rounded-xl">
+                <BookOpen size={28} className="mx-auto mb-2 text-gray-300" />
+                <p className="text-[14px]">O modelo do Data Book será disponibilizado em breve.</p>
+              </div>
+            )}
           </div>
         )}
 
