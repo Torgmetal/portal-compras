@@ -703,6 +703,8 @@ model Cotacao {
   total                  Float         @default(0)
   prazoResposta          DateTime?
   recebidaEm             DateTime?
+  declinadaEm            DateTime?
+  motivoDeclinio         String?
   status                 CotacaoStatus @default(PENDENTE)
   token                  String?       @unique
   createdAt              DateTime      @default(now())
@@ -2633,6 +2635,7 @@ enum CotacaoStatus {
   RECEBIDA
   VENCIDA
   CANCELADA
+  DECLINADA
 }
 
 enum NotificacaoTipo {

@@ -90,6 +90,27 @@ export default async function CotacaoPorToken({ params }) {
     );
   }
 
+  if (cotacao.status === "DECLINADA") {
+    return (
+      <MarketingShell
+        image="/obras/torre-escada.jpg"
+        kicker="Cotação encerrada"
+        title="Você declinou esta cotação"
+        lead="Registramos que sua empresa não vai cotar esta RM. A cotação foi encerrada — não fica pendente no seu histórico. Se foi engano, fale com o comprador da Torg."
+      >
+        <div className="bg-white rounded-2xl border border-gray-200 p-7">
+          <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-4">
+            <CheckCircle2 size={22} className="text-torg-gray" />
+          </div>
+          {cotacao.motivoDeclinio && (
+            <p className="text-sm text-torg-gray mb-2">Motivo informado: “{cotacao.motivoDeclinio}”</p>
+          )}
+          <p className="text-sm text-torg-gray">Declinada em {fmtData(cotacao.declinadaEm)}.</p>
+        </div>
+      </MarketingShell>
+    );
+  }
+
   // Modo "Revisao Final" — quando Compras solicitou ao fornecedor que ele
   // revise APENAS os itens em que ele venceu, pra confirmar valores finais.
   // Nesse modo, filtramos cotacao.itens pra mostrar so vencedor=true.
