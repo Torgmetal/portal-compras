@@ -1216,6 +1216,7 @@ model Auditoria {
   titulo             String?        // ex.: "Auditoria de Qualificação 2026"
   mensagemBoasVindas String?
   capaUrl            String?        // foto de capa do hero do portal (Blob)
+  checklistJson      Json?          // status dos requisitos do GQ-FQ-003 { reqId: status }
   solicitacoes       String?        // o que o cliente pediu (texto / e-mail colado)
   token              String?        @unique
   status             String         @default("RASCUNHO") // RASCUNHO | PUBLICADO

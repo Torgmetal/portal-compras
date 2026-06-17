@@ -5,9 +5,9 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Building2, Upload, Search, X, FileText, Trash2,
   Send, Copy, ExternalLink, Save, ClipboardList, FolderOpen, CheckCircle2,
-  Sparkles, Plus, Mail, Eye, Image as ImageIcon,
+  Sparkles, Plus, Mail, Eye, Image as ImageIcon, ClipboardCheck,
 } from "lucide-react";
-import { SECOES_AUDITORIA, ordenarSecoes } from "@/lib/auditoria-secoes";
+import { SECOES_AUDITORIA, ordenarSecoes, REQUISITOS_GQFQ003, STATUS_REQUISITO } from "@/lib/auditoria-secoes";
 
 const fmtDH = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
@@ -65,6 +65,14 @@ export default function AuditoriaDetalheClient({ id }) {
     try { await salvarCapa(null); } catch (e) { alert(e.message); }
   }
 
+  async function setReqStatus(reqId, status) {
+    const novo = { ...(data.checklistJson || {}), [reqId]: status };
+    setData((d) => ({ ...d, checklistJson: novo })); // otimista
+    try {
+      await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ checklistJson: novo }) });
+    } catch { /* mantém o estado otimista; recarregar reverte se falhar */ }
+  }
+
   async function publicar(despublicar) {
     setPublicando(true);
     try {
@@ -96,6 +104,18 @@ export default function AuditoriaDetalheClient({ id }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const solicitacoesDocs = data.documentos.filter((d) => d.tipo === "SOLICITACAO");
   const evidenciaDocs = data.documentos.filter((d) => d.tipo === "EVIDENCIA");
+
+  // Checklist GQ-FQ-003: progresso + agrupamento por seção
+  const checklist = data.checklistJson || {};
+  const reqNA = REQUISITOS_GQFQ003.filter((r) => checklist[r.id] === "NA").length;
+  const reqAtend = REQUISITOS_GQFQ003.filter((r) => checklist[r.id] === "ATENDIDO").length;
+  const reqBase = REQUISITOS_GQFQ003.length - reqNA;
+  const reqPct = reqBase > 0 ? Math.round((reqAtend / reqBase) * 100) : 0;
+  const reqGrupos = [];
+  for (const r of REQUISITOS_GQFQ003) {
+    const g = reqGrupos.find((x) => x[0] === r.secao);
+    if (g) g[1].push(r); else reqGrupos.push([r.secao, [r]]);
+  }
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -146,6 +166,36 @@ export default function AuditoriaDetalheClient({ id }) {
         <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1"><FolderOpen size={15} className="text-torg-blue" /> Documentos para o cliente</h2>
         <p className="text-[11px] text-torg-gray mb-2">Estes documentos aparecem no portal do cliente para conferência e download.</p>
         <DocSection auditoriaId={id} tipo="EVIDENCIA" titulo="" docs={evidenciaDocs} onChange={carregar} sugestao />
+      </div>
+
+      {/* Checklist do auditor (GQ-FQ-003) */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><ClipboardCheck size={15} className="text-torg-blue" /> Checklist do auditor (GQ-FQ-003)</h2>
+          <span className="text-[12px] font-bold text-torg-dark">{reqAtend}/{reqBase} · {reqPct}%</span>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-3"><div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${reqPct}%` }} /></div>
+        <div className="space-y-3">
+          {reqGrupos.map(([secao, reqs]) => (
+            <div key={secao}>
+              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">{secao}</p>
+              <div className="divide-y divide-gray-50">
+                {reqs.map((r) => {
+                  const st = checklist[r.id] || "PENDENTE";
+                  return (
+                    <div key={r.id} className="flex items-center justify-between gap-3 py-1.5 text-[12px]">
+                      <span className="text-torg-dark min-w-0">{r.label}</span>
+                      <select value={st} onChange={(e) => setReqStatus(r.id, e.target.value)}
+                        className={`shrink-0 text-[11px] font-medium rounded-lg px-2 py-1 border-0 focus:ring-1 focus:ring-torg-blue ${STATUS_REQUISITO[st].cor}`}>
+                        {Object.entries(STATUS_REQUISITO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Publicação + envio */}

@@ -30,6 +30,7 @@ const schema = z.object({
   titulo: z.string().max(160).nullable().optional(),
   mensagemBoasVindas: z.string().max(2000).nullable().optional(),
   capaUrl: z.string().url().nullable().optional(),
+  checklistJson: z.any().optional(),
   solicitacoes: z.string().max(8000).nullable().optional(),
 });
 
@@ -53,6 +54,7 @@ export async function PATCH(req, { params }) {
   for (const k of ["empresa", "contato", "titulo", "mensagemBoasVindas", "capaUrl", "solicitacoes"]) {
     if (body[k] !== undefined) data[k] = typeof body[k] === "string" ? (body[k].trim() || null) : body[k];
   }
+  if (body.checklistJson !== undefined) data.checklistJson = body.checklistJson;
   const a = await prisma.auditoria.update({ where: { id: params.id }, data, include: { documentos: { orderBy: { createdAt: "asc" } } } });
   await prisma.auditLog.create({ data: { userId: user.id, action: "EDITAR_AUDITORIA", entity: "Auditoria", entityId: params.id, diff: body } }).catch(() => {});
   return NextResponse.json({ success: true, data: a });
