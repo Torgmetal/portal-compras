@@ -51,6 +51,14 @@ module.exports = {
         sans: ['"Saira"', "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
         display: ['"Saira"', "system-ui", "sans-serif"],
       },
+      // #5 — legibilidade: os dois tamanhos dominantes da UI eram pequenos
+      // (text-xs 12px, text-sm 14px). Sobem 1px cada; títulos (base/lg/xl…)
+      // ficam no padrão do Tailwind. Os literais text-[9..13px] têm piso no
+      // globals.css. Reversível: basta remover este bloco.
+      fontSize: {
+        xs: ["0.8125rem", { lineHeight: "1.125rem" }], // 13px
+        sm: ["0.9375rem", { lineHeight: "1.4rem" }],   // 15px
+      },
       keyframes: {
         "logo-fade": {
           "0%, 100%": { opacity: "0.18" },

@@ -24,3 +24,13 @@ h1, h2, h3, h4 {
   font-weight: 700;
   letter-spacing: -0.01em;
 }
+
+/* #5 — piso de legibilidade para os micro-textos cravados em px (badges,
+   legendas, chips). Havia ~1500 usos de 9–13px, pequenos demais. Aqui só
+   elevamos o piso; quem já era ≥14px não muda. Reversível: remover o bloco.
+   !important garante prioridade sobre a utility arbitrária gerada pelo Tailwind. */
+.text-\[9px\]  { font-size: 11px !important; }
+.text-\[10px\] { font-size: 12px !important; }
+.text-\[11px\] { font-size: 13px !important; }
+.text-\[12px\] { font-size: 13px !important; }
+.text-\[13px\] { font-size: 14px !important; }
