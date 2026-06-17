@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen, Factory, Building2 } from "lucide-react";
+import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen, Factory, Building2, Cog } from "lucide-react";
 import { ordenarSecoes } from "@/lib/auditoria-secoes";
 import PlantaFabril from "@/components/PlantaFabril";
 import MaquinasEquipamentos from "@/components/MaquinasEquipamentos";
@@ -25,6 +25,7 @@ export default function PortalClienteClient({ token }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [aba, setAba] = useState(null); // seção (aba) ativa escolhida pelo cliente
+  const [painel, setPainel] = useState("documentos"); // aba de topo: documentos | estrutura | maquinas | equipe | modelo
 
   const carregar = useCallback(async () => {
     try {
@@ -55,6 +56,16 @@ export default function PortalClienteClient({ token }) {
   // Aba ativa: a escolhida pelo cliente (se ainda existe) ou a primeira seção.
   const abaAtiva = (aba && porSecao[aba]) ? aba : (grupos[0]?.[0] || null);
   const docsAtivos = abaAtiva ? porSecao[abaAtiva] : [];
+
+  // Abas de topo do portal (o cliente seleciona e abre)
+  const tabs = [
+    { id: "documentos", label: "Documentos", icon: FileText },
+    { id: "estrutura", label: "Estrutura", icon: Layers },
+    { id: "maquinas", label: "Máquinas", icon: Cog },
+    ...(data.equipe?.length ? [{ id: "equipe", label: "Equipe", icon: Users }] : []),
+    ...(data.dataBookModeloUrl ? [{ id: "modelo", label: "Data Book modelo", icon: BookOpen }] : []),
+  ];
+  const painelAtivo = tabs.some((t) => t.id === painel) ? painel : "documentos";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -104,8 +115,23 @@ export default function PortalClienteClient({ token }) {
         </div>
       </div>
 
-      {/* DOCUMENTOS */}
+      {/* CONTEÚDO em abas de topo */}
       <div className="max-w-4xl mx-auto px-6 py-10 -mt-6">
+        {/* Abas de topo — o cliente seleciona a área e abre */}
+        <div className="flex flex-wrap gap-1.5 mb-5 bg-white rounded-2xl border border-gray-100 shadow-sm p-2">
+          {tabs.map((t) => {
+            const on = t.id === painelAtivo;
+            const I = t.icon;
+            return (
+              <button key={t.id} onClick={() => setPainel(t.id)}
+                className={`text-[13px] font-medium rounded-xl px-3.5 py-2 inline-flex items-center gap-1.5 transition-colors ${on ? "bg-torg-dark text-white" : "text-torg-gray hover:bg-gray-50 hover:text-torg-dark"}`}>
+                <I size={15} className={on ? "text-torg-orange" : ""} /> {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {painelAtivo === "documentos" && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 sm:p-8">
           <div className="flex items-center justify-between gap-3 mb-5">
             <h2 className="text-xl font-bold text-torg-dark">Documentos da auditoria</h2>
@@ -150,13 +176,14 @@ export default function PortalClienteClient({ token }) {
             </>
           )}
         </div>
+        )}
 
-        <PlantaFabril />
+        {painelAtivo === "estrutura" && <PlantaFabril />}
 
-        <MaquinasEquipamentos />
+        {painelAtivo === "maquinas" && <MaquinasEquipamentos />}
 
         {/* Equipe — Administrativo e Fábrica */}
-        {data.equipe?.length > 0 && (
+        {painelAtivo === "equipe" && data.equipe?.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 sm:p-8 mt-6">
             <div className="flex items-center justify-between gap-3 mb-1">
               <h2 className="text-xl font-bold text-torg-dark inline-flex items-center gap-2"><Users size={20} className="text-torg-blue" /> Nossa equipe</h2>
@@ -181,7 +208,7 @@ export default function PortalClienteClient({ token }) {
         )}
 
         {/* Modelo de Data Book */}
-        {data.dataBookModeloUrl && (
+        {painelAtivo === "modelo" && data.dataBookModeloUrl && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 sm:p-8 mt-6">
             <h2 className="text-xl font-bold text-torg-dark inline-flex items-center gap-2 mb-1"><BookOpen size={20} className="text-torg-blue" /> Modelo do Data Book</h2>
             <p className="text-[13px] text-torg-gray mb-4">Veja um exemplo de como será entregue o Data Book da Qualidade da sua obra.</p>
