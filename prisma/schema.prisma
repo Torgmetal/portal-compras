@@ -1588,6 +1588,11 @@ model PecaConjunto {
   statusEstoque          String?                 // "DISPONIVEL" | "PARCIAL" | "INDISPONIVEL" | null (nao conferido)
   prioridade             Int?                    // prioridade manual na Programação (vazia = sem prioridade); preservada na reimportação LPC
   ordemCampo             Int?                    // ordem de envio a campo (1 = primeiro); vazio = sem prioridade
+  // Serviço terceirizado — peça fabricada por terceiros: NÃO passa pelo corte; fica em
+  // espera (status TERCEIRIZADO) até o Compras receber, então é liberada pro destino.
+  terceirizado           Boolean                 @default(false)
+  destinoTerceirizado    String?                 // "MONTAGEM" | "PINTURA" | "EXPEDICAO"
+  terceirizadoRecebidoEm DateTime?
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.
   corteOrdem             Int?                    // posição na fila (menor = corta primeiro)
