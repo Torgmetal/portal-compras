@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers } from "lucide-react";
 import { ordenarSecoes } from "@/lib/auditoria-secoes";
+import PlantaFabril from "@/components/PlantaFabril";
 
 function Chip({ icon: Icon, label }) {
   return (
@@ -146,6 +147,8 @@ export default function PortalClienteClient({ token }) {
             </>
           )}
         </div>
+
+        <PlantaFabril />
 
         {/* selo de confiança */}
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 mt-8 text-[13px] text-torg-gray">
