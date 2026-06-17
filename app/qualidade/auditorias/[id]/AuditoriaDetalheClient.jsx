@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Loader2, AlertCircle, ArrowLeft, Building2, Upload, Search, X, FileText, Trash2,
   Send, Copy, ExternalLink, Save, ClipboardList, FolderOpen, CheckCircle2,
-  Sparkles, Plus, Mail, Eye, Image as ImageIcon, ClipboardCheck,
+  Sparkles, Plus, Mail, Eye, Image as ImageIcon, ClipboardCheck, BookOpen,
 } from "lucide-react";
 import { SECOES_AUDITORIA, ordenarSecoes, REQUISITOS_GQFQ003, STATUS_REQUISITO } from "@/lib/auditoria-secoes";
 
@@ -23,6 +23,8 @@ export default function AuditoriaDetalheClient({ id }) {
   const [enviandoEmail, setEnviandoEmail] = useState(false);
   const capaRef = useRef(null);
   const [enviandoCapa, setEnviandoCapa] = useState(false);
+  const modeloRef = useRef(null);
+  const [enviandoModelo, setEnviandoModelo] = useState(false);
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -63,6 +65,24 @@ export default function AuditoriaDetalheClient({ id }) {
   }
   async function removerCapa() {
     try { await salvarCapa(null); } catch (e) { alert(e.message); }
+  }
+
+  async function enviarModelo(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEnviandoModelo(true);
+    try {
+      const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+      const r = await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataBookModeloUrl: blob.url }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setData(j.data);
+    } catch (err) { alert(err.message || "Falha no upload"); } finally { setEnviandoModelo(false); if (modeloRef.current) modeloRef.current.value = ""; }
+  }
+  async function removerModelo() {
+    const r = await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataBookModeloUrl: null }) });
+    const j = await r.json();
+    if (j.success) setData(j.data);
   }
 
   async function setReqStatus(reqId, status) {
@@ -141,6 +161,21 @@ export default function AuditoriaDetalheClient({ id }) {
               {data.capaUrl && <button onClick={removerCapa} className="text-[11px] text-torg-gray hover:text-red-600">Remover</button>}
             </div>
             <p className="text-[10px] text-torg-gray mt-0.5">Aparece em destaque no topo do portal do cliente.</p>
+          </div>
+        </div>
+
+        {/* Modelo do Data Book (PDF) */}
+        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-50">
+          <div className="w-32 h-[72px] rounded-lg bg-torg-blue-50/60 border border-gray-100 flex items-center justify-center text-torg-blue shrink-0"><BookOpen size={24} /></div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-torg-dark mb-1">Modelo do Data Book {data.dataBookModeloUrl ? "" : "(opcional)"}</p>
+            <input ref={modeloRef} type="file" accept=".pdf" className="hidden" onChange={enviarModelo} />
+            <div className="flex items-center gap-3">
+              <button onClick={() => modeloRef.current?.click()} disabled={enviandoModelo} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviandoModelo ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviandoModelo ? "Enviando…" : data.dataBookModeloUrl ? "Trocar PDF" : "Enviar PDF"}</button>
+              {data.dataBookModeloUrl && <a href={data.dataBookModeloUrl} target="_blank" rel="noreferrer" className="text-[11px] text-torg-blue hover:underline">ver</a>}
+              {data.dataBookModeloUrl && <button onClick={removerModelo} className="text-[11px] text-torg-gray hover:text-red-600">Remover</button>}
+            </div>
+            <p className="text-[10px] text-torg-gray mt-0.5">PDF de exemplo pro cliente ver como será o Data Book dele.</p>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

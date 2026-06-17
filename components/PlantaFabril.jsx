@@ -1,84 +1,84 @@
-// Planta ilustrativa da fábrica da Torg para o portal do cliente (auditoria).
-// Esquemática e limpa — bem mais clara que a planta CAD. As metragens vêm do
-// objeto FABRIL (atualizável conforme o Vitor confirmar as áreas).
-const FABRIL = {
-  areaTotal: "3.729,96 m²",
-  galpoes: [
-    {
-      nome: "GALPÃO 01 · PRODUÇÃO", m2: "2.767,64 m²", piso: "Piso de concreto",
-      zonas: [
-        { n: "PREPARAÇÃO", x: 18, y: 30, w: 314, h: 96, c: "#e6f1fb", t: "#0c447c" },
-        { n: "MONTAGEM", x: 18, y: 132, w: 152, h: 120, c: "#e1f5ee", t: "#0f6e56" },
-        { n: "SOLDA", x: 176, y: 132, w: 156, h: 120, c: "#faece7", t: "#993c1d" },
-      ],
-    },
-    {
-      nome: "GALPÃO 02 · PINTURA", m2: "962,32 m²", piso: "Piso de concreto",
-      zonas: [
-        { n: "ADMINISTRATIVO", x: 350, y: 30, w: 150, h: 70, c: "#faeeda", t: "#854f0b" },
-        { n: "PINTURA", x: 350, y: 106, w: 150, h: 146, c: "#eeedfe", t: "#3c3489" },
-      ],
-    },
-  ],
-  // Áreas da "Capacidade Fabril" (GQ-FQ-003) — preencher metragens reais quando confirmadas.
-  areas: [
-    { nome: "Cabine de jateamento", m2: null },
-    { nome: "Cabine de pintura", m2: null },
-    { nome: "Recebimento / Armazenagem", m2: null },
-    { nome: "Pré-montagem", m2: null },
-    { nome: "Ensaios e testes", m2: null },
-    { nome: "Embalagem / Expedição", m2: null },
-  ],
-};
+// Planta ilustrativa (elaborada) da fábrica da Torg para o portal do cliente.
+// Layout dos galpões + zonas de processo com marcadores de equipamento, metragens e
+// o fluxo produtivo. Bem mais clara que a planta CAD. Atende "Capacidade Fabril".
+import { ArrowRight } from "lucide-react";
+
+const AREA_TOTAL = "3.729,96 m²";
+const FLUXO = ["Preparação", "Montagem", "Solda", "Jato", "Pintura", "Expedição"];
+
+// zona: x,y,w,h em viewBox 680x380; cor de preenchimento + texto; equipamentos (chips)
+const Z = (x, y, w, h, nome, fill, tcor, eqs) => ({ x, y, w, h, nome, fill, tcor, eqs });
+const ZONAS = [
+  Z(34, 60, 270, 104, "PREPARAÇÃO", "#e6f1fb", "#0c447c", ["Lasers Calfran (chapa/perfil/tubo)", "Oxicorte · Serra"]),
+  Z(34, 172, 130, 150, "MONTAGEM", "#e1f5ee", "#0f6e56", ["3× Ponte rolante 5t"]),
+  Z(172, 172, 132, 150, "SOLDA", "#faece7", "#993c1d", ["10× Solda 450A", "Braço giratório"]),
+  Z(316, 60, 70, 262, "JATO", "#f1efe8", "#444441", ["Cabine 4,5×15 m", "Jato turbina"]),
+  Z(398, 172, 250, 150, "PINTURA", "#eeedfe", "#3c3489", ["Linha eletrostática", "Airless · Tanques"]),
+  Z(398, 60, 250, 104, "ADMINISTRATIVO", "#faeeda", "#854f0b", ["Escritórios · Recepção · Diretoria"]),
+];
 
 export default function PlantaFabril() {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 sm:p-8 mt-6">
       <div className="flex items-center justify-between gap-3 mb-1">
         <h2 className="text-xl font-bold text-torg-dark">Nossa estrutura fabril</h2>
-        <span className="text-[13px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{FABRIL.areaTotal} construídos</span>
+        <span className="text-[13px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{AREA_TOTAL} construídos</span>
       </div>
-      <p className="text-[13px] text-torg-gray mb-5">Layout dos galpões e áreas de processo.</p>
+      <p className="text-[13px] text-torg-gray mb-5">Layout dos galpões, áreas de processo e principais equipamentos.</p>
 
-      <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-3 sm:p-4 overflow-x-auto">
-        <svg viewBox="0 0 520 280" className="w-full" style={{ minWidth: 440 }} role="img" aria-label="Planta da fábrica Torg Metal">
-          {/* Galpão 01 */}
-          <rect x="14" y="22" width="324" height="240" rx="6" fill="#ffffff" stroke="#002945" strokeWidth="2" />
-          {/* Galpão 02 */}
-          <rect x="346" y="22" width="160" height="240" rx="6" fill="#ffffff" stroke="#002945" strokeWidth="2" />
-          {FABRIL.galpoes.flatMap((g) => g.zonas).map((z) => (
-            <g key={z.n}>
-              <rect x={z.x} y={z.y} width={z.w} height={z.h} rx="4" fill={z.c} />
-              <text x={z.x + z.w / 2} y={z.y + z.h / 2 + 3} textAnchor="middle" fontSize="11" fontWeight="600" fill={z.t} fontFamily="Arial">{z.n}</text>
+      <div className="rounded-xl border border-gray-100 bg-gradient-to-b from-gray-50 to-white p-3 sm:p-5 overflow-x-auto">
+        <svg viewBox="0 0 680 392" className="w-full" style={{ minWidth: 560 }} role="img" aria-label="Planta ilustrativa da fábrica Torg Metal">
+          <defs>
+            <filter id="pfsh" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#002945" floodOpacity="0.12" /></filter>
+          </defs>
+          {/* terreno */}
+          <rect x="8" y="40" width="664" height="300" rx="10" fill="#f7f8fa" stroke="#e3e6ea" />
+          {/* paredes dos galpões (profundidade) */}
+          <rect x="26" y="50" width="286" height="282" rx="6" fill="#ffffff" stroke="#002945" strokeWidth="3" filter="url(#pfsh)" />
+          <rect x="390" y="50" width="266" height="282" rx="6" fill="#ffffff" stroke="#002945" strokeWidth="3" filter="url(#pfsh)" />
+          {/* cabine de jato entre os galpões */}
+          <rect x="316" y="60" width="70" height="262" rx="5" fill="#ffffff" stroke="#5f5e5a" strokeWidth="2" strokeDasharray="4 3" />
+
+          {/* zonas */}
+          {ZONAS.map((z) => (
+            <g key={z.nome}>
+              <rect x={z.x} y={z.y} width={z.w} height={z.h} rx="5" fill={z.fill} />
+              <text x={z.x + z.w / 2} y={z.y + 18} textAnchor="middle" fontSize="11.5" fontWeight="700" fill={z.tcor} fontFamily="Arial">{z.nome}</text>
+              {z.eqs.map((e, i) => (
+                <text key={i} x={z.x + z.w / 2} y={z.y + 36 + i * 14} textAnchor="middle" fontSize="9" fill={z.tcor} fontFamily="Arial" opacity="0.85">{e}</text>
+              ))}
             </g>
           ))}
-          {/* rótulos dos galpões */}
-          <text x="176" y="16" textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#002945" fontFamily="Arial">GALPÃO 01 · PRODUÇÃO — 2.767,64 m²</text>
-          <text x="426" y="16" textAnchor="middle" fontSize="10.5" fontWeight="700" fill="#002945" fontFamily="Arial">GALPÃO 02 — 962,32 m²</text>
+
+          {/* rótulos dos galpões + metragens */}
+          <text x="169" y="68" textAnchor="middle" fontSize="11" fontWeight="700" fill="#002945" fontFamily="Arial">GALPÃO 01 · PRODUÇÃO</text>
+          <text x="523" y="68" textAnchor="middle" fontSize="11" fontWeight="700" fill="#002945" fontFamily="Arial">GALPÃO 02 · PINTURA</text>
+          {/* cotas (dimensões) */}
+          <text x="169" y="350" textAnchor="middle" fontSize="11" fontWeight="700" fill="#006eab" fontFamily="Arial">2.767,64 m²</text>
+          <text x="523" y="350" textAnchor="middle" fontSize="11" fontWeight="700" fill="#006eab" fontFamily="Arial">962,32 m²</text>
+          {/* norte */}
+          <g transform="translate(642,66)"><path d="M0,-12 L5,6 L0,1 L-5,6 Z" fill="#002945" /><text x="0" y="20" textAnchor="middle" fontSize="8" fill="#576d7e" fontFamily="Arial">N</text></g>
+          {/* título da planta */}
+          <text x="20" y="28" fontSize="10" fontWeight="700" fill="#576d7e" fontFamily="Arial" letterSpacing="1">PLANTA — PARQUE INDUSTRIAL TORG METAL</text>
         </svg>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
-        {FABRIL.galpoes.map((g) => (
-          <div key={g.nome} className="bg-torg-blue-50/50 rounded-xl p-3">
-            <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">{g.nome}</p>
-            <p className="text-lg font-bold text-torg-dark mt-0.5">{g.m2}</p>
-            <p className="text-[12px] text-torg-gray">{g.piso}</p>
-          </div>
+      {/* fluxo produtivo */}
+      <div className="flex items-center flex-wrap gap-1.5 mt-4">
+        <span className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mr-1">Fluxo:</span>
+        {FLUXO.map((f, i) => (
+          <span key={f} className="inline-flex items-center gap-1.5">
+            <span className="text-[12px] font-medium text-torg-dark bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1">{f}</span>
+            {i < FLUXO.length - 1 && <ArrowRight size={13} className="text-torg-orange" />}
+          </span>
         ))}
-        <div className="bg-torg-dark rounded-xl p-3 flex flex-col justify-center">
-          <p className="text-[11px] font-semibold text-blue-200 uppercase tracking-wide">Área construída</p>
-          <p className="text-lg font-bold text-white mt-0.5">{FABRIL.areaTotal}</p>
-        </div>
       </div>
 
-      {FABRIL.areas.some((a) => a.m2) && (
-        <div className="flex flex-wrap gap-2 mt-4">
-          {FABRIL.areas.filter((a) => a.m2).map((a) => (
-            <span key={a.nome} className="text-[12px] text-torg-dark bg-gray-50 border border-gray-100 rounded-full px-3 py-1">{a.nome}: <strong>{a.m2}</strong></span>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+        <div className="bg-torg-blue-50/50 rounded-xl p-3"><p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Galpão 01 · Produção</p><p className="text-lg font-bold text-torg-dark mt-0.5">2.767,64 m²</p><p className="text-[12px] text-torg-gray">Preparação · Montagem · Solda</p></div>
+        <div className="bg-torg-blue-50/50 rounded-xl p-3"><p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Galpão 02 · Pintura</p><p className="text-lg font-bold text-torg-dark mt-0.5">962,32 m²</p><p className="text-[12px] text-torg-gray">Jato · Pintura · Administrativo</p></div>
+        <div className="bg-torg-dark rounded-xl p-3 flex flex-col justify-center"><p className="text-[11px] font-semibold text-blue-200 uppercase tracking-wide">Área construída</p><p className="text-lg font-bold text-white mt-0.5">{AREA_TOTAL}</p></div>
+      </div>
     </div>
   );
 }

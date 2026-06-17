@@ -30,6 +30,7 @@ const schema = z.object({
   titulo: z.string().max(160).nullable().optional(),
   mensagemBoasVindas: z.string().max(2000).nullable().optional(),
   capaUrl: z.string().url().nullable().optional(),
+  dataBookModeloUrl: z.string().url().nullable().optional(),
   checklistJson: z.any().optional(),
   solicitacoes: z.string().max(8000).nullable().optional(),
 });
@@ -50,8 +51,11 @@ export async function PATCH(req, { params }) {
   if (body.capaUrl && !BLOB_OK.test(body.capaUrl)) {
     return NextResponse.json({ success: false, error: "Imagem de capa inválida (origem não permitida)." }, { status: 400 });
   }
+  if (body.dataBookModeloUrl && !BLOB_OK.test(body.dataBookModeloUrl)) {
+    return NextResponse.json({ success: false, error: "Arquivo inválido (origem não permitida)." }, { status: 400 });
+  }
   const data = {};
-  for (const k of ["empresa", "contato", "titulo", "mensagemBoasVindas", "capaUrl", "solicitacoes"]) {
+  for (const k of ["empresa", "contato", "titulo", "mensagemBoasVindas", "capaUrl", "dataBookModeloUrl", "solicitacoes"]) {
     if (body[k] !== undefined) data[k] = typeof body[k] === "string" ? (body[k].trim() || null) : body[k];
   }
   if (body.checklistJson !== undefined) data.checklistJson = body.checklistJson;

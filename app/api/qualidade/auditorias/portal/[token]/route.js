@@ -17,6 +17,22 @@ export async function GET(_req, { params }) {
   prisma.auditoria
     .update({ where: { id: aud.id }, data: { ultimoAcessoEm: new Date(), ...(aud.primeiroAcessoEm ? {} : { primeiroAcessoEm: new Date() }) } })
     .catch(() => {});
+
+  // Organograma: setores ativos com nº de funcionários ATIVOS — só os que têm gente.
+  let organograma = [];
+  let totalFuncionarios = 0;
+  try {
+    const setores = await prisma.setor.findMany({
+      where: { ativo: true },
+      select: { nome: true, sigla: true, cor: true, gestor: { select: { nome: true } }, _count: { select: { funcionarios: { where: { ativo: true, status: "ATIVO" } } } } },
+      orderBy: { nome: "asc" },
+    });
+    organograma = setores
+      .filter((s) => s._count.funcionarios > 0)
+      .map((s) => ({ nome: s.nome, sigla: s.sigla, cor: s.cor, gestor: s.gestor?.nome || null, funcionarios: s._count.funcionarios }));
+    totalFuncionarios = organograma.reduce((a, s) => a + s.funcionarios, 0);
+  } catch { /* RH pode não ter dados — organograma fica vazio */ }
+
   return NextResponse.json({
     success: true,
     data: {
@@ -25,8 +41,11 @@ export async function GET(_req, { params }) {
       titulo: aud.titulo,
       mensagemBoasVindas: aud.mensagemBoasVindas,
       capaUrl: aud.capaUrl,
+      dataBookModeloUrl: aud.dataBookModeloUrl,
       publicadoEm: aud.publicadoEm,
       documentos: aud.documentos,
+      organograma,
+      totalFuncionarios,
     },
   });
 }

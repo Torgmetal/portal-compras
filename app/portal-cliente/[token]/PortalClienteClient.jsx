@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers } from "lucide-react";
+import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen } from "lucide-react";
 import { ordenarSecoes } from "@/lib/auditoria-secoes";
 import PlantaFabril from "@/components/PlantaFabril";
+import MaquinasEquipamentos from "@/components/MaquinasEquipamentos";
 
 function Chip({ icon: Icon, label }) {
   return (
@@ -60,10 +61,12 @@ export default function PortalClienteClient({ token }) {
       <style jsx global>{`
         @keyframes pcUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pcShimmer { 0% { transform: translateX(-120%); } 60%, 100% { transform: translateX(360%); } }
+        @keyframes pcShine { to { background-position: -200% 0; } }
         .pc-up { opacity: 0; animation: pcUp .6s cubic-bezier(.2,.7,.3,1) forwards; }
         .pc-bar { position: relative; overflow: hidden; }
         .pc-bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 28%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); animation: pcShimmer 5s ease-in-out infinite; }
-        @media (prefers-reduced-motion: reduce) { .pc-up { opacity: 1; animation: none; } .pc-bar::after { display: none; } }
+        .pc-shine { background: linear-gradient(90deg, #f4801f 35%, #ffe0bf 50%, #f4801f 65%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: pcShine 3.5s linear infinite; }
+        @media (prefers-reduced-motion: reduce) { .pc-up { opacity: 1; animation: none; } .pc-bar::after { display: none; } .pc-shine { animation: none; color: #f4801f; } }
       `}</style>
 
       {/* HERO imersivo */}
@@ -81,8 +84,8 @@ export default function PortalClienteClient({ token }) {
         )}
         <div className="absolute top-0 left-0 right-0 h-1 bg-torg-orange pc-bar z-10" />
         <div className="relative z-10 max-w-4xl mx-auto px-6 py-16 sm:py-20">
-          <img src="/torg-logo-white.png" alt="Torg Metal" className="h-9 mb-8 pc-up" style={{ animationDelay: "0ms" }} />
-          <p className="text-torg-orange text-[15px] font-semibold tracking-wide uppercase mb-2 pc-up" style={{ animationDelay: "80ms" }}>Portal do Cliente · Qualidade</p>
+          <img src="/torg-logo-white.png" alt="Torg Metal" className="h-14 sm:h-16 mb-8 pc-up" style={{ animationDelay: "0ms" }} />
+          <p className="pc-shine text-[15px] font-semibold tracking-wide uppercase mb-2 pc-up inline-block" style={{ animationDelay: "80ms" }}>Portal do Cliente · Qualidade</p>
           <h1 className="text-white text-4xl sm:text-5xl font-extrabold leading-tight mb-3 pc-up" style={{ animationDelay: "160ms" }}>
             {data.contato ? `Bem-vindo(a), ${data.contato}!` : "Seja bem-vindo(a)!"}
           </h1>
@@ -149,6 +152,49 @@ export default function PortalClienteClient({ token }) {
         </div>
 
         <PlantaFabril />
+
+        <MaquinasEquipamentos />
+
+        {/* Equipe e organograma */}
+        {data.organograma?.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 sm:p-8 mt-6">
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <h2 className="text-xl font-bold text-torg-dark inline-flex items-center gap-2"><Users size={20} className="text-torg-blue" /> Equipe e organograma</h2>
+              <span className="text-[13px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{data.totalFuncionarios} colaboradores</span>
+            </div>
+            <p className="text-[13px] text-torg-gray mb-5">Estrutura por setor (apenas setores com equipe ativa).</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {data.organograma.map((s) => (
+                <div key={s.nome} className="border border-gray-100 rounded-xl p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.cor || "#006eab" }} />
+                    <p className="text-[14px] font-semibold text-torg-dark leading-snug">{s.nome}</p>
+                  </div>
+                  <p className="text-2xl font-bold text-torg-dark mt-1.5">{s.funcionarios}</p>
+                  <p className="text-[12px] text-torg-gray">{s.funcionarios === 1 ? "colaborador" : "colaboradores"}{s.gestor ? ` · gestor: ${s.gestor}` : ""}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Modelo de Data Book */}
+        {data.dataBookModeloUrl && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-lg p-6 sm:p-8 mt-6">
+            <h2 className="text-xl font-bold text-torg-dark inline-flex items-center gap-2 mb-1"><BookOpen size={20} className="text-torg-blue" /> Modelo do Data Book</h2>
+            <p className="text-[13px] text-torg-gray mb-4">Veja um exemplo de como será entregue o Data Book da Qualidade da sua obra.</p>
+            <div className="flex items-center gap-4 border border-gray-100 rounded-xl p-4">
+              <div className="w-12 h-12 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={22} className="text-torg-blue" /></div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[15px] font-medium text-torg-dark">Data Book — modelo de referência</p>
+                <div className="flex items-center gap-4 mt-1.5">
+                  <a href={data.dataBookModeloUrl} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
+                  <a href={data.dataBookModeloUrl} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* selo de confiança */}
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 mt-8 text-[13px] text-torg-gray">
