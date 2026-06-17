@@ -32,42 +32,61 @@ export async function POST(req) {
   try {
     const { opNumero } = body;
 
-    // Encontrar a OP (tenta com e sem zero à esquerda)
-    const numeroPadded = opNumero.padStart(3, "0");
+    // Normaliza qualquer código (088 / 88 / T88A) → número da OP "088".
+    // As peças da LPC guardam opNumero como código SKA (T88A, T67B…), não o
+    // número da OP, então o casamento certo é por opId — não por texto.
+    const numOP = (s) => {
+      const m = String(s || "").match(/^T0*(\d+)/i) || String(s || "").match(/^0*(\d+)/);
+      return m ? m[1].padStart(3, "0") : null;
+    };
+    const numAlvo = numOP(opNumero) || opNumero;
+
+    // Encontrar a OP (aceita 088, 88 ou T88A)
     const op = await prisma.oP.findFirst({
-      where: { OR: [{ numero: numeroPadded }, { numero: opNumero }] },
+      where: { OR: [{ numero: numAlvo }, { numero: opNumero }, { numero: opNumero.padStart(3, "0") }] },
       select: { id: true, numero: true, cliente: true, obra: true },
     });
     if (!op) {
       return NextResponse.json({ error: `OP ${opNumero} não encontrada` }, { status: 404 });
     }
+    const obraCode = "T" + parseInt(op.numero); // só p/ mensagens/log
 
-    // Código da obra no Syneco: T + número sem zeros (T85, T86...)
-    const obraCode = "T" + parseInt(opNumero);
-
-    // Buscar MesOrdem para esta obra, setor Corte
-    const mesOrdens = await prisma.mesOrdem.findMany({
-      where: {
-        obra: obraCode,
-        setor: { contains: "Corte", mode: "insensitive" },
-      },
+    // Buscar MesOrdem (corte) desta OP — por opId (o sync já mapeia T88, T88A,
+    // T88B… → a mesma OP). Fallback por prefixo de obra normalizado.
+    let mesOrdens = await prisma.mesOrdem.findMany({
+      where: { opId: op.id, setor: { contains: "Corte", mode: "insensitive" } },
       orderBy: { item: "asc" },
     });
+    if (mesOrdens.length === 0) {
+      const cand = await prisma.mesOrdem.findMany({
+        where: { obra: { startsWith: "T" + parseInt(op.numero) }, setor: { contains: "Corte", mode: "insensitive" } },
+        orderBy: { item: "asc" },
+      });
+      mesOrdens = cand.filter((o) => numOP(o.obra) === op.numero);
+    }
 
     if (mesOrdens.length === 0) {
       return NextResponse.json({
-        error: `Nenhum dado do Syneco encontrado para obra ${obraCode} no setor Corte. Verifique se o sync do MES já rodou para esta OP.`,
+        error: `Nenhum dado do Syneco encontrado para a OP ${op.numero} (${obraCode}) no setor Corte. Verifique se o sync do MES já rodou para esta OP.`,
         obraCode,
       }, { status: 404 });
     }
 
     // Buscar PecaConjunto desta OP — SÓ as importadas via LPC (regra do Vitor:
     // apontamentos do Syneco sem peça correspondente na LPC são ignorados;
-    // nada é criado/baixado a partir do Syneco sozinho)
-    const pecas = await prisma.pecaConjunto.findMany({
-      where: { opNumero, fonte: "LPC_IMPORT" },
+    // nada é criado/baixado a partir do Syneco sozinho). Por opId (robusto);
+    // fallback por opNumero normalizado.
+    let pecas = await prisma.pecaConjunto.findMany({
+      where: { opId: op.id, fonte: "LPC_IMPORT" },
       select: { id: true, marca: true, descricao: true, status: true, pesoTotalKg: true, qte: true },
     });
+    if (pecas.length === 0) {
+      const cand = await prisma.pecaConjunto.findMany({
+        where: { fonte: "LPC_IMPORT", opNumero: { startsWith: "T" + parseInt(op.numero) } },
+        select: { id: true, marca: true, descricao: true, status: true, pesoTotalKg: true, qte: true, opNumero: true },
+      });
+      pecas = cand.filter((p) => numOP(p.opNumero) === op.numero);
+    }
     const pecasPorMarca = Object.fromEntries(pecas.map(p => [p.marca, p]));
 
     // Processar cada registro do MES — coletar detalhes de atendimento
