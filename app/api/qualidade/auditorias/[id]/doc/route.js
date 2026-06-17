@@ -14,6 +14,7 @@ const BLOB_OK = /^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i;
 const schema = z.object({
   tipo: z.enum(["SOLICITACAO", "EVIDENCIA"]).default("EVIDENCIA"),
   secao: z.string().max(120).optional().nullable(),
+  requisito: z.string().max(60).optional().nullable(),
   nome: z.string().min(1).max(300),
   // origem A: upload pro Blob
   arquivoUrl: z.string().url().optional().nullable(),
@@ -69,6 +70,7 @@ export async function POST(req, { params }) {
       auditoriaId: params.id,
       tipo: it.tipo,
       secao: it.tipo === "EVIDENCIA" ? secao : null,
+      requisito: it.tipo === "EVIDENCIA" ? (it.requisito || null) : null,
       nome: it.nome.slice(0, 300),
       arquivoUrl: q ? (q.arquivoUrl || null) : (it.arquivoUrl || null),
       arquivoTipo: q ? (q.arquivoTipo || null) : (it.arquivoTipo || null),
@@ -106,10 +108,13 @@ export async function PATCH(req, { params }) {
   }
   let body;
   try {
-    body = z.object({ docId: z.string().min(1), secao: z.string().max(120).nullable() }).parse(await req.json());
+    body = z.object({ docId: z.string().min(1), secao: z.string().max(120).nullable().optional(), requisito: z.string().max(60).nullable().optional() }).parse(await req.json());
   } catch (e) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
-  await prisma.auditoriaDoc.updateMany({ where: { id: body.docId, auditoriaId: params.id }, data: { secao: body.secao?.trim() || "Outros" } });
+  const data = {};
+  if (body.secao !== undefined) data.secao = body.secao?.trim() || "Outros";
+  if (body.requisito !== undefined) data.requisito = body.requisito || null;
+  await prisma.auditoriaDoc.updateMany({ where: { id: body.docId, auditoriaId: params.id }, data });
   return NextResponse.json({ success: true });
 }

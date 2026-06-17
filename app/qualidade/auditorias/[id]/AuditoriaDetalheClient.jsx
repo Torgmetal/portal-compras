@@ -7,7 +7,7 @@ import {
   Send, Copy, ExternalLink, Save, ClipboardList, FolderOpen, CheckCircle2,
   Sparkles, Plus, Mail, Eye, Image as ImageIcon, ClipboardCheck, BookOpen,
 } from "lucide-react";
-import { SECOES_AUDITORIA, ordenarSecoes, REQUISITOS_GQFQ003, STATUS_REQUISITO } from "@/lib/auditoria-secoes";
+import { SECOES_AUDITORIA, ordenarSecoes, REQUISITOS_GQFQ003, STATUS_REQUISITO, requisitosDaSecao } from "@/lib/auditoria-secoes";
 
 const fmtDH = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
@@ -344,7 +344,7 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
     const novas = (sugestoes || []).filter((s) => !s.jaAnexado);
     if (!novas.length) return;
     try {
-      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: novas.map((s) => ({ tipo, secao: s.secao || undefined, nome: s.nome, documentoId: s.id })) }) });
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: novas.map((s) => ({ tipo, secao: s.secao || undefined, requisito: s.requisito || undefined, nome: s.nome, documentoId: s.id })) }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       setSugestoes((prev) => (prev ? prev.map((x) => ({ ...x, jaAnexado: true })) : prev));
@@ -365,7 +365,7 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
 
   async function vincular(d) {
     try {
-      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, secao: d.secao || undefined, nome: d.nome, documentoId: d.id }) });
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, secao: d.secao || undefined, requisito: d.requisito || undefined, nome: d.nome, documentoId: d.id }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       setPicker(false); setBusca(""); setResultados(null);
@@ -381,24 +381,38 @@ function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
   }
 
   async function moverSecao(docId, novaSecao) {
-    await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ docId, secao: novaSecao }) });
+    await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ docId, secao: novaSecao, requisito: null }) });
+    await onChange();
+  }
+  async function moverRequisito(docId, requisito) {
+    await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ docId, requisito: requisito || null }) });
     await onChange();
   }
 
-  // Linha de um documento (com seletor de seção quando é a área do cliente)
-  const Linha = (d) => (
-    <div key={d.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[12px]">
-      <span className="inline-flex items-center gap-1.5 min-w-0"><FileText size={13} className="text-torg-blue shrink-0" /><span className="truncate text-torg-dark">{d.nome}</span></span>
-      <div className="flex items-center gap-2 shrink-0">
-        {sugestao && (
-          <select value={SECOES_AUDITORIA.includes(d.secao) ? d.secao : "Outros"} onChange={(e) => moverSecao(d.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 text-torg-gray focus:border-torg-blue max-w-[150px]">
-            {SECOES_AUDITORIA.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        )}
-        <button onClick={() => remover(d.id)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
+  // Linha de um documento (com seletor de seção e de requisito quando é a área do cliente)
+  const Linha = (d) => {
+    const sec = SECOES_AUDITORIA.includes(d.secao) ? d.secao : "Outros";
+    const reqs = requisitosDaSecao(sec);
+    return (
+      <div key={d.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[12px]">
+        <span className="inline-flex items-center gap-1.5 min-w-0"><FileText size={13} className="text-torg-blue shrink-0" /><span className="truncate text-torg-dark">{d.nome}</span></span>
+        <div className="flex items-center gap-2 shrink-0">
+          {sugestao && (
+            <select value={sec} onChange={(e) => moverSecao(d.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 text-torg-gray focus:border-torg-blue max-w-[130px]">
+              {SECOES_AUDITORIA.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+          {sugestao && reqs.length > 0 && (
+            <select value={d.requisito || ""} onChange={(e) => moverRequisito(d.id, e.target.value)} title="Linha (requisito) que o documento atende" className="text-[10px] border border-gray-200 rounded px-1 py-0.5 text-torg-gray focus:border-torg-blue max-w-[150px]">
+              <option value="">— linha —</option>
+              {reqs.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+            </select>
+          )}
+          <button onClick={() => remover(d.id)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Agrupa por seção (só na área do cliente / EVIDENCIA)
   const gruposDoc = (() => {

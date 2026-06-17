@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export async function GET(_req, { params }) {
   const aud = await prisma.auditoria.findUnique({
     where: { token: params.token },
-    include: { documentos: { where: { tipo: "EVIDENCIA" }, orderBy: { createdAt: "asc" }, select: { id: true, nome: true, secao: true, arquivoTipo: true, arquivoTamanho: true } } },
+    include: { documentos: { where: { tipo: "EVIDENCIA" }, orderBy: { createdAt: "asc" }, select: { id: true, nome: true, secao: true, requisito: true, arquivoTipo: true, arquivoTamanho: true } } },
   });
   if (!aud || aud.status !== "PUBLICADO") {
     return NextResponse.json({ success: false, error: "Portal indisponível ou link inválido." }, { status: 404 });

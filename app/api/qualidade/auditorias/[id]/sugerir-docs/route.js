@@ -42,7 +42,7 @@ export async function POST(_req, { params }) {
 
   const jaAnexados = new Set(aud.documentos.map((d) => d.documentoId).filter(Boolean));
   const resultado = sugestoes.map((s) => ({
-    id: s.id, nome: s.nome, categoria: s.categoria, secao: s.secao, motivo: s.motivo,
+    id: s.id, nome: s.nome, categoria: s.categoria, secao: s.secao, requisito: s.requisito, motivo: s.motivo,
     temArquivo: !!(s.arquivoUrl || s.sharepointItemId),
     jaAnexado: jaAnexados.has(s.id),
   }));

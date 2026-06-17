@@ -1,9 +1,27 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen, Factory, Building2, Cog } from "lucide-react";
-import { ordenarSecoes, SECOES_AUDITORIA } from "@/lib/auditoria-secoes";
+import { ordenarSecoes, SECOES_AUDITORIA, requisitosDaSecao } from "@/lib/auditoria-secoes";
 import PlantaFabril from "@/components/PlantaFabril";
 import MaquinasEquipamentos from "@/components/MaquinasEquipamentos";
+
+function DocCard({ d, base, i = 0 }) {
+  return (
+    <div className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-300 hover:shadow-lg transition-shadow duration-200 pc-up" style={{ animationDelay: `${i * 45}ms` }}>
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-torg-dark leading-snug break-words uppercase">{d.nome}</p>
+          {d.arquivoTamanho ? <p className="text-[13px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
+          <div className="flex items-center gap-4 mt-2.5">
+            <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
+            <a href={`${base}/${d.id}`} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Chip({ icon: Icon, label }) {
   return (
@@ -58,6 +76,13 @@ export default function PortalClienteClient({ token }) {
   const secoesTabs = SECOES_AUDITORIA.filter((s) => s !== "Outros" || porSecao["Outros"]?.length);
   const abaAtiva = (aba && secoesTabs.includes(aba)) ? aba : (secoesTabs[0] || null);
   const docsAtivos = abaAtiva ? (porSecao[abaAtiva] || []) : [];
+  // Linhas (requisitos) da aba ativa + documentos agrupados por linha
+  const reqsAtivos = abaAtiva ? requisitosDaSecao(abaAtiva) : [];
+  const docsPorReq = {};
+  for (const d of docsAtivos) {
+    const k = d.requisito && reqsAtivos.some((r) => r.id === d.requisito) ? d.requisito : "__sem__";
+    (docsPorReq[k] ||= []).push(d);
+  }
 
   // Abas de topo do portal (o cliente seleciona e abre)
   const tabs = [
@@ -154,24 +179,34 @@ export default function PortalClienteClient({ token }) {
               );
             })}
           </div>
-          {docsAtivos.length ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {docsAtivos.map((d, di) => (
-                <div key={d.id} className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-300 hover:shadow-lg transition-shadow duration-200 pc-up" style={{ animationDelay: `${di * 55}ms` }}>
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-torg-dark leading-snug break-words uppercase">{d.nome}</p>
-                      {d.arquivoTamanho ? <p className="text-[13px] text-torg-gray mt-0.5">{fmtTam(d.arquivoTamanho)}</p> : null}
-                      <div className="flex items-center gap-4 mt-2.5">
-                        <a href={`${base}/${d.id}?inline=1`} target="_blank" rel="noreferrer" className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Eye size={16} /> Visualizar</a>
-                        <a href={`${base}/${d.id}`} className="text-[14px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Download size={16} /> Baixar</a>
-                      </div>
+          {reqsAtivos.length ? (
+            <div className="space-y-5">
+              {reqsAtivos.map((r) => {
+                const ds = docsPorReq[r.id] || [];
+                return (
+                  <div key={r.id}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-torg-orange shrink-0" />
+                      <h4 className="text-[14px] font-semibold text-torg-dark">{r.label}</h4>
+                      {ds.length > 0 && <span className="text-[11px] text-torg-gray">· {ds.length}</span>}
                     </div>
+                    {ds.length ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{ds.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} />)}</div>
+                    ) : (
+                      <p className="text-[12px] text-torg-gray italic pl-3.5">Documentos serão disponibilizados em breve.</p>
+                    )}
                   </div>
+                );
+              })}
+              {docsPorReq["__sem__"]?.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2"><span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" /><h4 className="text-[14px] font-semibold text-torg-dark">Outros documentos</h4></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{docsPorReq["__sem__"].map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} />)}</div>
                 </div>
-              ))}
+              )}
             </div>
+          ) : docsAtivos.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{docsAtivos.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} />)}</div>
           ) : (
             <div className="text-center py-10 text-torg-gray border border-dashed border-gray-200 rounded-xl">
               <FileText size={28} className="mx-auto mb-2 text-gray-300" />
