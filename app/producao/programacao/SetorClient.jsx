@@ -18,6 +18,7 @@ import {
   adicionarLinhaTotais, downloadWorkbook, CORES,
 } from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
+import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 
 const STATUS_LABEL = {
   PENDENTE: "Pendente", CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
@@ -359,6 +360,7 @@ export default function SetorClient({
         >
           <Download size={13} /> Exportar
         </button>
+        {setorAtual !== "EXPEDIDO" && <BotaoRelatorioDia setor={labelAtual} />}
         {(filtroOp || busca) && (
           <button
             onClick={() => { setFiltroOp(""); setBusca(""); }}

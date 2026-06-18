@@ -11,6 +11,7 @@ import {
   downloadWorkbook, CORES,
 } from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
+import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
 
 const STATUS_LABEL = {
@@ -449,6 +450,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
         >
           <Download size={13} /> Exportar
         </button>
+        <BotaoRelatorioDia setor="Montagem" />
         {(filtroOp || filtroProntidao || busca) && (
           <button
             onClick={() => { setFiltroOp(""); setFiltroProntidao(""); setBusca(""); }}
