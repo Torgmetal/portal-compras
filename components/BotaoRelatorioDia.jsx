@@ -36,22 +36,31 @@ export default function BotaoRelatorioDia({ setor, codigoDoc = "REL-PRD-010" }) 
         titulo: `Peças feitas no dia — ${setor}`,
         subtitulo: fmtDataBR(data),
         kpis: [`${j.totais.itens} apontamento(s)  |  ${j.totais.un.toLocaleString("pt-BR")} un  |  ${Math.round(j.totais.kg).toLocaleString("pt-BR")} kg`],
-        totalColunas: 7,
+        totalColunas: 11,
         nomePlanilha: setor,
         codigoDoc,
       });
-      ws.columns = [{ width: 8 }, { width: 14 }, { width: 34 }, { width: 16 }, { width: 18 }, { width: 9 }, { width: 12 }];
+      ws.columns = [
+        { width: 8 }, { width: 12 }, { width: 14 }, { width: 28 }, { width: 15 }, { width: 16 },
+        { width: 9 }, { width: 11 }, { width: 10 }, { width: 11 }, { width: 8 },
+      ];
 
       let row = linhaInicio;
-      adicionarHeaderTabela(ws, row, ["Hora", "Obra", "Item / Peça", "Máquina", "Operador", "Qtd", "Peso (kg)"]);
+      // Qtd = feito neste dia · Total (lista)/Feito (total)/Saldo = progresso do item no setor (Syneco)
+      adicionarHeaderTabela(ws, row, ["Hora", "Obra", "Marca", "Item / Peça", "Máquina", "Operador", "Qtd (dia)", "Peso (kg)", "Total (lista)", "Feito (total)", "Saldo"]);
       row++;
       for (const it of j.itens) {
-        adicionarLinhaTabela(ws, row, [fmtHora(it.hora), it.obra, it.item, it.maquina, it.operador, it.un, Math.round(it.kg)], {
-          alinhamento: { 5: "right", 6: "right" },
+        adicionarLinhaTabela(ws, row, [
+          fmtHora(it.hora), it.obra, it.marca, it.item, it.maquina, it.operador,
+          it.un, Math.round(it.kg),
+          it.total ?? "—", it.feitoTotal ?? "—", it.saldo ?? "—",
+        ], {
+          alinhamento: { 6: "right", 7: "right", 8: "right", 9: "right", 10: "right" },
+          fontColors: it.saldo === 0 ? { 10: "1D9E75" } : {},
         });
         row++;
       }
-      adicionarLinhaTotais(ws, row, ["", "", `TOTAL — ${j.totais.itens} item(ns)`, "", "", j.totais.un, Math.round(j.totais.kg)]);
+      adicionarLinhaTotais(ws, row, ["", "", "", `TOTAL — ${j.totais.itens} item(ns)`, "", "", j.totais.un, Math.round(j.totais.kg), "", "", ""]);
 
       await downloadWorkbook(workbook, `Relatorio dia ${setor} ${data}.xlsx`);
     } catch (e) {

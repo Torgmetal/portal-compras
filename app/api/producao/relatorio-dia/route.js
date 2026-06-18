@@ -38,15 +38,36 @@ export async function GET(req) {
     orderBy: [{ maquina: "asc" }, { dataFim: "asc" }],
   });
 
-  const itens = apont.map((a) => ({
-    hora: a.dataFim,
-    obra: a.obra || "—",
-    item: a.descricaoItem || a.opSka || "—",
-    maquina: a.maquina || "—",
-    operador: a.operador || "—",
-    un: a.produzidoUn || 0,
-    kg: a.produzidoKg || 0,
-  }));
+  // Total na lista × feito (acumulado) × saldo: vem da ordem do Syneco (MesOrdem)
+  // do mesmo setor, casada por obra + item (= opSka do apontamento).
+  const obras = [...new Set(apont.map((a) => a.obra).filter(Boolean))];
+  const ordens = obras.length
+    ? await prisma.mesOrdem.findMany({
+        where: { setor: { equals: setor, mode: "insensitive" }, obra: { in: obras } },
+        select: { obra: true, item: true, planejadoUn: true, produzidoUn: true },
+      })
+    : [];
+  const ordMap = new Map();
+  for (const o of ordens) ordMap.set(`${o.obra}|${o.item}`, { total: o.planejadoUn || 0, feito: o.produzidoUn || 0 });
+
+  const itens = apont.map((a) => {
+    const mo = a.opSka ? ordMap.get(`${a.obra}|${a.opSka}`) : null;
+    const total = mo ? mo.total : null;
+    const feitoTotal = mo ? mo.feito : null;
+    return {
+      hora: a.dataFim,
+      obra: a.obra || "—",
+      marca: a.opSka || "—",
+      item: a.descricaoItem || a.opSka || "—",
+      maquina: a.maquina || "—",
+      operador: a.operador || "—",
+      un: a.produzidoUn || 0,
+      kg: a.produzidoKg || 0,
+      total,
+      feitoTotal,
+      saldo: total != null ? Math.max(0, total - (feitoTotal || 0)) : null,
+    };
+  });
   const totais = {
     itens: itens.length,
     un: itens.reduce((s, i) => s + i.un, 0),
