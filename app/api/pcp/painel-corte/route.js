@@ -209,8 +209,16 @@ export async function GET() {
     const clienteMap = new Map(opsInfo.map((o) => [o.numero, o.cliente]));
     for (const o of obras) o.cliente = clienteMap.get(o.opNumero) || null;
 
+    // Carimbo da baixa automática (cron) — "última baixa" no painel.
+    const ultBaixa = await prisma.auditLog.findFirst({
+      where: { action: "RECONCILIAR_SYNECO_AUTO" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, diff: true },
+    });
+
     return NextResponse.json({
       hoje: hojeIso,
+      ultimaBaixa: ultBaixa ? { em: ultBaixa.createdAt, atualizadas: ultBaixa.diff?.atualizadas ?? null } : null,
       meta: { kgMes: metaKg },
       mes: {
         cortadoKg,

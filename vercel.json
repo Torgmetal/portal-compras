@@ -50,6 +50,10 @@
     {
       "path": "/api/cron/qualidade-vencidos",
       "schedule": "0 11 * * 1"
+    },
+    {
+      "path": "/api/cron/reconciliar-syneco-corte",
+      "schedule": "15 6-20 * * *"
     }
   ]
 }
