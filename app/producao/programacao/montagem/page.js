@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { produzidoPorMarca } from "@/lib/conjuntos-setor";
 import MontagemClient from "./MontagemClient";
 
 export const metadata = { title: "Workspace Torg — Programação · Montagem" };
@@ -36,9 +37,13 @@ export default async function ProgramacaoMontagem() {
     take: 3000,
   });
 
+  // "Feito" na montagem = produzido no Syneco (setor Montagem) por marca de conjunto.
+  const apontamentos = await produzidoPorMarca("Montagem", conjuntos.map((c) => c.marca));
+
   return (
     <MontagemClient
       conjuntosIniciais={JSON.parse(JSON.stringify(conjuntos))}
+      apontamentos={apontamentos}
       userRole={user.role}
     />
   );
