@@ -2173,6 +2173,23 @@ model MesOrdem {
   @@index([opId])
 }
 
+// Setores "inativos sem produção" no Syneco (IsEnabled=0 e PartCount=0) — etapas
+// feitas FORA da fábrica/terceirizadas. Usado SÓ no relatório de furos de
+// apontamento, para não acusar falso furo (ex.: Pintura X acima de Montagem 0
+// quando Montagem foi feita fora). Sincronizado do banco do Syneco (tabela
+// Production) e SUBSTITUÍDO por inteiro a cada sync (self-correcting: se o
+// gerente reativar um setor no SSP, ele sai desta lista no próximo sync).
+model MesInativo {
+  id           String   @id @default(cuid())
+  op           String
+  item         String
+  operacao     String
+  atualizadoEm DateTime @default(now())
+
+  @@unique([op, item, operacao])
+  @@index([item])
+}
+
 model MesSyncLog {
   id          String   @id @default(cuid())
   sucesso     Boolean

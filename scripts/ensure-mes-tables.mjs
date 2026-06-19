@@ -19,6 +19,22 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("[ensure-mes-tables] Verificando tabelas MES...");
 
+  // MesInativo (setores feitos fora / inativos sem produção, p/ o relatório de
+  // furos). Idempotente — sempre garante, sem depender do bloco abaixo.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "MesInativo" (
+      "id"           TEXT         NOT NULL,
+      "op"           TEXT         NOT NULL,
+      "item"         TEXT         NOT NULL,
+      "operacao"     TEXT         NOT NULL,
+      "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "MesInativo_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "MesInativo_op_item_operacao_key" ON "MesInativo"("op","item","operacao")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MesInativo_item_idx" ON "MesInativo"("item")`);
+  console.log("[ensure-mes-tables] OK — MesInativo garantida.");
+
   // Verifica quais das duas tabelas existem
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename
