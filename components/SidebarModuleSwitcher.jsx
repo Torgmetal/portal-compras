@@ -18,6 +18,7 @@ import {
   ClipboardList,
   Cog,
   ShieldCheck,
+  Lock,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -113,6 +114,14 @@ const MODULOS = [
     modulos: ["PCP", "PLANEJAMENTO", "PRODUCAO"],
   },
   {
+    href: "/diretoria",
+    label: "Diretoria",
+    desc: "Área restrita — acesso liberado pelo Vitor",
+    icon: Lock,
+    cor: "bg-slate-200 text-slate-700",
+    apenasDiretoria: true, // visível só p/ quem está na allowlist (nem ADMIN burla)
+  },
+  {
     href: "/admin/usuarios",
     label: "Administração",
     desc: "Usuários e configurações",
@@ -161,6 +170,7 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
   // Filtrar módulos acessíveis por tipo/modulos
   const modulosVisiveis = MODULOS.filter((m) => {
     if (!session?.user) return false;
+    if (m.apenasDiretoria) return !!session.user.diretoria; // allowlist própria — nem ADMIN burla
     if (m.apenasAdmin) return isAdmin;
     if (m.modulos === null) return true; // liberado pra todos os logados
     if (isAdmin) return true;

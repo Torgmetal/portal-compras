@@ -2264,6 +2264,17 @@ model MesSyncLog {
   @@index([sucesso])
 }
 
+// Allowlist do módulo Diretoria (acesso restrito). O dono (vitor@torg.com.br) é
+// sempre liberado em código; esta tabela guarda quem ele liberou além dele.
+// Nem ADMIN entra sem estar aqui (gate próprio em lib/diretoria.js).
+model AcessoDiretoria {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  nome             String?
+  liberadoPorEmail String?
+  createdAt        DateTime @default(now())
+}
+
 // Vínculo manual de uma NFS-e emitida na prefeitura (SigissWeb/Conchal), que não
 // está no Omie, com um projeto/obra do Omie — para somar no faturado da obra.
 model NfseConchalVinculo {
