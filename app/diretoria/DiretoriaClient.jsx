@@ -147,7 +147,12 @@ export default function DiretoriaClient({ isDono, userNome }) {
 
         {/* ════════ A PAGAR / A RECEBER ════════ */}
         {(aba === "pagar" || aba === "receber") && (
-          <ContasView tipo={aba} data={listas[aba]} loading={loadingLista} erro={erroLista} onRetry={() => carregarLista(aba)} />
+          <div className="space-y-6">
+            {aba === "receber" && fin?.previsao && (
+              <ReceberProjetado faturadoAberto={fin.aReceber.total} previsao={fin.previsao} />
+            )}
+            <ContasView tipo={aba} data={listas[aba]} loading={loadingLista} erro={erroLista} onRetry={() => carregarLista(aba)} />
+          </div>
         )}
 
         {/* ════════ ACESSO ════════ */}
@@ -201,7 +206,7 @@ export default function DiretoriaClient({ isDono, userNome }) {
 
 /* ─────────────────────── PONTOS DE RUPTURA ─────────────────────── */
 function Ruptura({ fin }) {
-  const { ruptura, aPagar, aReceber } = fin;
+  const { ruptura, previsao } = fin;
   return (
     <div className="space-y-6">
       {/* Leitura crítica */}
@@ -250,12 +255,19 @@ function Ruptura({ fin }) {
             );
           })}
         </div>
-        {ruptura.cobertura != null && (
-          <div className="px-5 pb-5">
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-torg-gray">Cobertura (a receber ÷ a pagar em aberto):</span>
-              <span className={`font-bold tabular-nums ${ruptura.cobertura < 30 ? "text-red-700" : ruptura.cobertura < 100 ? "text-amber-700" : "text-emerald-700"}`}>{ruptura.cobertura}%</span>
-            </div>
+        {(ruptura.cobertura != null || previsao?.aFaturar > 0) && (
+          <div className="px-5 pb-5 space-y-1.5">
+            {ruptura.cobertura != null && (
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-torg-gray">Cobertura (a receber faturado ÷ a pagar em aberto):</span>
+                <span className={`font-bold tabular-nums ${ruptura.cobertura < 30 ? "text-red-700" : ruptura.cobertura < 100 ? "text-amber-700" : "text-emerald-700"}`}>{ruptura.cobertura}%</span>
+              </div>
+            )}
+            {previsao?.aFaturar > 0 && (
+              <p className="text-[11px] text-torg-gray">
+                Fora do gap: <span className="font-semibold text-emerald-700">{fmtR$(previsao.aFaturar)}</span> a faturar da carteira ativa (sem data definida) — entra no caixa conforme as medições/entregas avançam. Detalhe na aba <span className="font-medium text-torg-dark">A receber</span>.
+              </p>
+            )}
           </div>
         )}
       </section>
@@ -338,49 +350,7 @@ function Resumo({ fin }) {
         )}
       </section>
 
-      {fin.previsao && (
-        <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h2 className="font-semibold text-torg-dark flex items-center gap-2"><Truck size={18} className="text-torg-blue" /> Previsão de receita por entregas</h2>
-              <p className="text-[11px] text-torg-gray mt-0.5">Estimativa do que falta faturar da carteira em produção (contrato × % ainda não entregue, por peso).</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-extrabold text-torg-blue tabular-nums leading-none">{fmtR$(fin.previsao.aFaturar)}</p>
-              <p className="text-[11px] text-torg-gray">a faturar · {fin.previsao.qtdObras} obras · carteira {fmtR$(fin.previsao.totalContrato)}</p>
-            </div>
-          </div>
-          <div className="p-5 overflow-x-auto">
-            {fin.previsao.ops.length === 0 ? (
-              <p className="text-sm text-torg-gray text-center py-4">Nenhuma obra ativa com contrato lançado.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="text-left text-[11px] uppercase tracking-wide text-torg-gray">
-                  <tr><th className="pb-2">OP</th><th className="pb-2">Cliente / Obra</th><th className="pb-2 text-right">Contrato</th><th className="pb-2 w-40">Entregue</th><th className="pb-2 text-right">A faturar</th></tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {fin.previsao.ops.map((o) => (
-                    <tr key={o.numero} className="hover:bg-gray-50/50">
-                      <td className="py-1.5 font-semibold text-torg-dark whitespace-nowrap">{fmtOP(o.numero)}</td>
-                      <td className="py-1.5 text-torg-gray truncate max-w-[220px]">{o.cliente}{o.obra ? ` · ${o.obra}` : ""}</td>
-                      <td className="py-1.5 text-right tabular-nums">{fmtR$(o.contrato)}</td>
-                      <td className="py-1.5">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-torg-blue" style={{ width: `${o.pctEntregue}%` }} />
-                          </div>
-                          <span className="text-[11px] text-torg-gray tabular-nums w-9 text-right">{o.pctEntregue}%</span>
-                        </div>
-                      </td>
-                      <td className="py-1.5 text-right tabular-nums font-medium">{fmtR$(o.aFaturar)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </section>
-      )}
+      {fin.previsao && <PrevisaoReceita previsao={fin.previsao} />}
     </div>
   );
 }
@@ -416,8 +386,8 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-lg font-bold text-torg-dark">Contas {ehPagar ? "a pagar" : "a receber"}</h2>
-          <p className="text-[11px] text-torg-gray">{data.qtd} título(s) em aberto · total {fmtR$(data.total)}</p>
+          <h2 className="text-lg font-bold text-torg-dark">{ehPagar ? "Contas a pagar" : "Títulos já faturados (em aberto)"}</h2>
+          <p className="text-[11px] text-torg-gray">{data.qtd} título(s) em aberto · total {fmtR$(data.total)}{ehPagar ? "" : " · aguardando recebimento"}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setSoVencidos((v) => !v)}
@@ -467,6 +437,67 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
       {filtrados.length > LIMITE && (
         <p className="text-xs text-torg-gray text-center">Mostrando os {LIMITE} primeiros (ordenados por vencimento) de {filtrados.length}. Use a busca para refinar.</p>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────── previsão / a receber projetado ─────────────────────── */
+function PrevisaoReceita({ previsao }) {
+  return (
+    <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
+      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-semibold text-torg-dark flex items-center gap-2"><Truck size={18} className="text-torg-blue" /> A receber projetado — carteira ativa</h2>
+          <p className="text-[11px] text-torg-gray mt-0.5">Saldo a faturar das OPs ativas: receita lançada menos o que já foi medido/faturado no Omie (mesma base do Comercial).</p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-extrabold text-torg-blue tabular-nums leading-none">{fmtR$(previsao.aFaturar)}</p>
+          <p className="text-[11px] text-torg-gray">a faturar · {previsao.qtdObras} obras · carteira {fmtR$(previsao.receitaTotal)} · já faturado {fmtR$(previsao.faturado)}</p>
+        </div>
+      </div>
+      <div className="p-5 overflow-x-auto">
+        {previsao.ops.length === 0 ? (
+          <p className="text-sm text-torg-gray text-center py-4">Nenhuma obra ativa com receita lançada.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-left text-[11px] uppercase tracking-wide text-torg-gray">
+              <tr><th className="pb-2">OP</th><th className="pb-2">Cliente / Obra</th><th className="pb-2 text-right">Receita</th><th className="pb-2 w-40">Faturado</th><th className="pb-2 text-right">A faturar</th></tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {previsao.ops.map((o) => (
+                <tr key={o.numero} className="hover:bg-gray-50/50">
+                  <td className="py-1.5 font-semibold text-torg-dark whitespace-nowrap">{fmtOP(o.numero)}</td>
+                  <td className="py-1.5 text-torg-gray truncate max-w-[220px]">{o.cliente}{o.obra ? ` · ${o.obra}` : ""}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmtR$(o.receita)}</td>
+                  <td className="py-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${o.pctFaturado}%` }} />
+                      </div>
+                      <span className="text-[11px] text-torg-gray tabular-nums w-9 text-right">{o.pctFaturado}%</span>
+                    </div>
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums font-medium">{fmtR$(o.aFaturar)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ReceberProjetado({ faturadoAberto, previsao }) {
+  const total = (faturadoAberto || 0) + (previsao?.aFaturar || 0);
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <KpiGrande titulo="Faturado em aberto" valor={faturadoAberto} icon={Banknote} cor="emerald" sub="títulos já emitidos, aguardando recebimento" />
+        <KpiGrande titulo="A faturar (carteira ativa)" valor={previsao?.aFaturar} icon={Truck} cor="blue" sub={`saldo a medir · ${previsao?.qtdObras || 0} obras`} />
+        <KpiGrande titulo="A receber potencial" valor={total} icon={TrendingUp} cor="blue" sub="faturado + projetado" />
+      </div>
+      {previsao && <PrevisaoReceita previsao={previsao} />}
     </div>
   );
 }

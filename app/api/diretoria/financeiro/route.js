@@ -47,8 +47,12 @@ export async function GET() {
       select: { saldo: true, dataVencimento: true, clienteNome: true, numeroDocumento: true },
     }),
     prisma.oP.findMany({
-      where: { status: { in: ["ABERTA", "EM_EXECUCAO", "ATRASADA"] }, valorTotalContrato: { gt: 0 } },
-      select: { id: true, numero: true, cliente: true, obra: true, valorTotalContrato: true, status: true },
+      where: { status: { in: ["ABERTA", "EM_EXECUCAO", "ATRASADA"] } },
+      select: {
+        numero: true, cliente: true, obra: true, status: true,
+        receitas: { select: { valor: true } },
+        medicoes: { select: { valorBruto: true } },
+      },
     }),
     prisma.omieSyncState.findUnique({ where: { id: "contapagar" }, select: { ultimoSync: true } }),
     prisma.omieSyncState.findUnique({ where: { id: "contareceber" }, select: { ultimoSync: true } }),
@@ -61,28 +65,25 @@ export async function GET() {
   const aReceber = balde(recItems, hoje, em30);
   const posicao = r2(aReceber.total - aPagar.total);
 
-  // ── Previsão de receita por entregas ──
-  const opIds = ops.map((o) => o.id);
-  const [totG, expG] = opIds.length
-    ? await Promise.all([
-        prisma.pecaConjunto.groupBy({ by: ["opId"], where: { opId: { in: opIds }, fonte: "LPC_IMPORT" }, _sum: { pesoTotalKg: true } }),
-        prisma.pecaConjunto.groupBy({ by: ["opId"], where: { opId: { in: opIds }, fonte: "LPC_IMPORT", status: "EXPEDIDO" }, _sum: { pesoTotalKg: true } }),
-      ])
-    : [[], []];
-  const totMap = new Map(totG.map((g) => [g.opId, g._sum.pesoTotalKg || 0]));
-  const expMap = new Map(expG.map((g) => [g.opId, g._sum.pesoTotalKg || 0]));
+  // ── Previsão de receita (a receber projetado) ──
+  // Base = medições do Omie, igual ao comercial: receita bruta da OP (Σ OPReceita)
+  // menos o que já foi medido/faturado (Σ OPMedicao.valorBruto). O saldo é o que
+  // ainda vai virar título a receber. Não usa valorTotalContrato (preenchido em
+  // poucas OPs) — a receita lançada cobre a maioria da carteira ativa.
   const opsForecast = ops
     .map((o) => {
-      const tot = totMap.get(o.id) || 0, exp = expMap.get(o.id) || 0;
-      const pct = tot > 0 ? exp / tot : 0;
-      const contrato = o.valorTotalContrato || 0;
-      return { numero: o.numero, cliente: o.cliente, obra: o.obra, status: o.status, contrato, pctEntregue: Math.round(pct * 100), aFaturar: r2(contrato * (1 - pct)) };
+      const receita = o.receitas.reduce((s, r) => s + (r.valor || 0), 0);
+      const faturado = o.medicoes.reduce((s, m) => s + (m.valorBruto || 0), 0);
+      const aFaturar = r2(Math.max(0, receita - faturado));
+      return { numero: o.numero, cliente: o.cliente, obra: o.obra, status: o.status, receita: r2(receita), faturado: r2(faturado), pctFaturado: receita > 0 ? Math.round((faturado / receita) * 100) : 0, aFaturar };
     })
+    .filter((o) => o.receita > 0)
     .sort((a, b) => b.aFaturar - a.aFaturar);
   const previsao = {
-    totalContrato: r2(ops.reduce((s, o) => s + (o.valorTotalContrato || 0), 0)),
+    receitaTotal: r2(opsForecast.reduce((s, o) => s + o.receita, 0)),
+    faturado: r2(opsForecast.reduce((s, o) => s + o.faturado, 0)),
     aFaturar: r2(opsForecast.reduce((s, o) => s + o.aFaturar, 0)),
-    qtdObras: ops.length,
+    qtdObras: opsForecast.length,
     ops: opsForecast.slice(0, 25),
   };
 
