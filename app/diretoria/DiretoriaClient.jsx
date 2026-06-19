@@ -14,10 +14,12 @@ const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 const ABAS_BASE = [
   { id: "ruptura", label: "Pontos de ruptura" },
+  { id: "cortar", label: "Onde cortar" },
   { id: "resumo", label: "Resumo" },
   { id: "pagar", label: "A pagar" },
   { id: "receber", label: "A receber" },
 ];
+const ABAS_FIN = ["ruptura", "resumo", "cortar"]; // dependem do fetch /financeiro
 
 export default function DiretoriaClient({ isDono, userNome }) {
   const [aba, setAba] = useState("ruptura");
@@ -130,17 +132,20 @@ export default function DiretoriaClient({ isDono, userNome }) {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
-        {erroFin && (aba === "ruptura" || aba === "resumo") ? (
+        {erroFin && ABAS_FIN.includes(aba) ? (
           <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
             <AlertCircle size={18} /> {erroFin}
             <button onClick={carregarFin} className="ml-auto text-xs underline">tentar de novo</button>
           </div>
-        ) : (loadingFin || !fin) && (aba === "ruptura" || aba === "resumo") ? (
+        ) : (loadingFin || !fin) && ABAS_FIN.includes(aba) ? (
           <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Carregando números…</div>
         ) : null}
 
         {/* ════════ PONTOS DE RUPTURA ════════ */}
         {aba === "ruptura" && fin && <Ruptura fin={fin} />}
+
+        {/* ════════ ONDE CORTAR ════════ */}
+        {aba === "cortar" && fin && <OndeCortar categorias={fin.categoriasPagar} totalPagar={fin.aPagar.total} />}
 
         {/* ════════ RESUMO ════════ */}
         {aba === "resumo" && fin && <Resumo fin={fin} />}
@@ -441,6 +446,47 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
   );
 }
 
+/* ─────────────────────── onde cortar (a pagar por categoria) ─────────────────────── */
+function OndeCortar({ categorias, totalPagar }) {
+  const [n, setN] = useState(15);
+  if (!categorias?.length) return <p className="text-sm text-torg-gray text-center py-16">Sem dados de categorias.</p>;
+  const max = categorias[0].valor || 1;
+  const semCat = categorias.find((c) => c.nome === "(sem categoria)");
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-bold text-torg-dark">Onde cortar — a pagar por categoria</h2>
+        <p className="text-[11px] text-torg-gray">{categorias.length} categorias · total em aberto {fmtR$(totalPagar)}. Maiores blocos primeiro; em vermelho a parcela já vencida de cada um.</p>
+      </div>
+      {semCat && semCat.pct >= 8 && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <span><b>{fmtR$(semCat.valor)} ({semCat.pct}%)</b> está <b>sem categoria</b> no Omie — categorizar esse bloco é o primeiro passo pra enxergar o que dá pra cortar.</span>
+        </div>
+      )}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+        {categorias.slice(0, n).map((c, i) => (
+          <div key={i} className="px-5 py-3">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-torg-dark font-medium truncate flex-1" title={c.nome}>{c.nome}</span>
+              <span className="text-[11px] text-torg-gray whitespace-nowrap hidden sm:inline">{c.qtd} tít.</span>
+              {c.vencido > 0 && <span className="text-[11px] text-red-600 whitespace-nowrap">{fmtR$(c.vencido)} venc.</span>}
+              <span className="tabular-nums font-semibold text-torg-dark whitespace-nowrap w-28 text-right">{fmtR$(c.valor)}</span>
+              <span className="text-[11px] text-torg-gray tabular-nums w-9 text-right">{c.pct}%</span>
+            </div>
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1.5">
+              <div className="h-full rounded-full bg-rose-400" style={{ width: `${Math.round((c.valor / max) * 100)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {categorias.length > n && (
+        <button onClick={() => setN(categorias.length)} className="text-xs text-torg-blue hover:underline">ver todas as {categorias.length} categorias →</button>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────────────── previsão / a receber projetado ─────────────────────── */
 function PrevisaoReceita({ previsao }) {
   return (
@@ -448,11 +494,14 @@ function PrevisaoReceita({ previsao }) {
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-semibold text-torg-dark flex items-center gap-2"><Truck size={18} className="text-torg-blue" /> A receber projetado — carteira ativa</h2>
-          <p className="text-[11px] text-torg-gray mt-0.5">Saldo a faturar das OPs ativas: receita lançada menos o que já foi medido/faturado no Omie (mesma base do Comercial).</p>
+          <p className="text-[11px] text-torg-gray mt-0.5">Saldo a faturar das OPs ativas, <b>líquido de impostos</b> e <b>sem os faturamentos projetados</b> do Omie (pedidos "Não Faturado"). Base de medições, igual ao Comercial.</p>
         </div>
         <div className="text-right">
           <p className="text-2xl font-extrabold text-torg-blue tabular-nums leading-none">{fmtR$(previsao.aFaturar)}</p>
-          <p className="text-[11px] text-torg-gray">a faturar · {previsao.qtdObras} obras · carteira {fmtR$(previsao.receitaTotal)} · já faturado {fmtR$(previsao.faturado)}</p>
+          <p className="text-[11px] text-torg-gray">a faturar líquido · {previsao.qtdObras} obras · receita líq. {fmtR$(previsao.receitaTotal)} · já faturado {fmtR$(previsao.faturado)}</p>
+          {previsao.projetadoExcluido > 0 && (
+            <p className="text-[10px] text-amber-600 mt-0.5">{fmtR$(previsao.projetadoExcluido)} em pedidos projetados do Omie foram descartados</p>
+          )}
         </div>
       </div>
       <div className="p-5 overflow-x-auto">
@@ -494,7 +543,7 @@ function ReceberProjetado({ faturadoAberto, previsao }) {
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <KpiGrande titulo="Faturado em aberto" valor={faturadoAberto} icon={Banknote} cor="emerald" sub="títulos já emitidos, aguardando recebimento" />
-        <KpiGrande titulo="A faturar (carteira ativa)" valor={previsao?.aFaturar} icon={Truck} cor="blue" sub={`saldo a medir · ${previsao?.qtdObras || 0} obras`} />
+        <KpiGrande titulo="A faturar (carteira ativa)" valor={previsao?.aFaturar} icon={Truck} cor="blue" sub={`líquido de impostos · ${previsao?.qtdObras || 0} obras`} />
         <KpiGrande titulo="A receber potencial" valor={total} icon={TrendingUp} cor="blue" sub="faturado + projetado" />
       </div>
       {previsao && <PrevisaoReceita previsao={previsao} />}

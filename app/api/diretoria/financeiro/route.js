@@ -40,7 +40,7 @@ export async function GET() {
   const [pagarRaw, recRaw, ops, syncPg, syncRc] = await Promise.all([
     prisma.contaPagar.findMany({
       where: { status: { notIn: ["PAGO", "CANCELADO", "LIQUIDADO"] } },
-      select: { valor: true, valorPago: true, dataVencimento: true, fornecedorNome: true, numeroDocumento: true },
+      select: { valor: true, valorPago: true, dataVencimento: true, fornecedorNome: true, numeroDocumento: true, categoriaNome: true },
     }),
     prisma.contaReceber.findMany({
       where: { saldo: { gt: 0 }, status: { not: "CANCELADO" } },
@@ -50,8 +50,8 @@ export async function GET() {
       where: { status: { in: ["ABERTA", "EM_EXECUCAO", "ATRASADA"] } },
       select: {
         numero: true, cliente: true, obra: true, status: true,
-        receitas: { select: { valor: true } },
-        medicoes: { select: { valorBruto: true } },
+        receitas: { select: { valor: true, icmsPct: true, ipiPct: true, pisPct: true, cofinsPct: true, issPct: true, irrfPct: true, csllPct: true } },
+        medicoes: { select: { valorBruto: true, status: true } },
       },
     }),
     prisma.omieSyncState.findUnique({ where: { id: "contapagar" }, select: { ultimoSync: true } }),
@@ -66,23 +66,40 @@ export async function GET() {
   const posicao = r2(aReceber.total - aPagar.total);
 
   // ── Previsão de receita (a receber projetado) ──
-  // Base = medições do Omie, igual ao comercial: receita bruta da OP (Σ OPReceita)
-  // menos o que já foi medido/faturado (Σ OPMedicao.valorBruto). O saldo é o que
-  // ainda vai virar título a receber. Não usa valorTotalContrato (preenchido em
-  // poucas OPs) — a receita lançada cobre a maioria da carteira ativa.
+  // Base = medições do Omie, igual ao comercial, com dois ajustes de realidade
+  // pedidos pela direção:
+  //  • LÍQUIDO de impostos (receita − ICMS/IPI/PIS/COFINS/ISS/IRRF/CSLL por linha)
+  //  • EXCLUI faturamentos projetados (pedidos de venda status "Não Faturado", que
+  //    no Omie ficam pré-lançados sem nota — não são realidade)
+  const taxaLinha = (r) => (((r.icmsPct || 0) + (r.ipiPct || 0) + (r.pisPct || 0) + (r.cofinsPct || 0) + (r.issPct || 0) + (r.irrfPct || 0) + (r.csllPct || 0)) / 100);
+  const ehProjetado = (m) => (m.status || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase().startsWith("nao faturado");
+  let projetadoExcluido = 0;
   const opsForecast = ops
     .map((o) => {
-      const receita = o.receitas.reduce((s, r) => s + (r.valor || 0), 0);
-      const faturado = o.medicoes.reduce((s, m) => s + (m.valorBruto || 0), 0);
-      const aFaturar = r2(Math.max(0, receita - faturado));
-      return { numero: o.numero, cliente: o.cliente, obra: o.obra, status: o.status, receita: r2(receita), faturado: r2(faturado), pctFaturado: receita > 0 ? Math.round((faturado / receita) * 100) : 0, aFaturar };
+      const receitaBruta = o.receitas.reduce((s, r) => s + (r.valor || 0), 0);
+      const impostos = o.receitas.reduce((s, r) => s + (r.valor || 0) * taxaLinha(r), 0);
+      const netRatio = receitaBruta > 0 ? (receitaBruta - impostos) / receitaBruta : 0;
+      const faturadoBruto = o.medicoes.reduce((s, m) => {
+        if (ehProjetado(m)) { projetadoExcluido += m.valorBruto || 0; return s; }
+        return s + (m.valorBruto || 0);
+      }, 0);
+      const aFaturarBruto = Math.max(0, receitaBruta - faturadoBruto);
+      return {
+        numero: o.numero, cliente: o.cliente, obra: o.obra, status: o.status,
+        receita: r2(receitaBruta - impostos),          // líquida
+        faturado: r2(faturadoBruto * netRatio),        // líquida
+        pctFaturado: receitaBruta > 0 ? Math.round((faturadoBruto / receitaBruta) * 100) : 0,
+        aFaturar: r2(aFaturarBruto * netRatio),         // líquida
+      };
     })
     .filter((o) => o.receita > 0)
     .sort((a, b) => b.aFaturar - a.aFaturar);
   const previsao = {
+    liquida: true,
     receitaTotal: r2(opsForecast.reduce((s, o) => s + o.receita, 0)),
     faturado: r2(opsForecast.reduce((s, o) => s + o.faturado, 0)),
     aFaturar: r2(opsForecast.reduce((s, o) => s + o.aFaturar, 0)),
+    projetadoExcluido: r2(projetadoExcluido),
     qtdObras: opsForecast.length,
     ops: opsForecast.slice(0, 25),
   };
@@ -110,6 +127,21 @@ export async function GET() {
 
   const cobertura = aPagar.total > 0 ? Math.round((aReceber.total / aPagar.total) * 100) : null;
 
+  // ── Categorias do a pagar (análise de cortes) ──
+  const porCategoria = new Map();
+  for (const c of pagarRaw) {
+    const s = Math.max(0, (c.valor || 0) - (c.valorPago || 0));
+    if (s <= 0.005) continue;
+    const k = (c.categoriaNome || "").trim() || "(sem categoria)";
+    const e = porCategoria.get(k) || { valor: 0, qtd: 0, vencido: 0 };
+    e.valor += s; e.qtd++;
+    if (c.dataVencimento && new Date(c.dataVencimento) < hoje) e.vencido += s;
+    porCategoria.set(k, e);
+  }
+  const categoriasPagar = [...porCategoria.entries()]
+    .map(([nome, e]) => ({ nome, valor: r2(e.valor), qtd: e.qtd, vencido: r2(e.vencido), pct: aPagar.total > 0 ? Math.round((e.valor / aPagar.total) * 100) : 0 }))
+    .sort((a, b) => b.valor - a.valor);
+
   // Leitura crítica (flags priorizadas por severidade)
   const flags = [];
   const gap30 = janelas.find((j) => j.dias === 30);
@@ -128,7 +160,7 @@ export async function GET() {
     flags.push({ sev: "alta", texto: `Curtíssimo prazo: faltam ${fmtR$(Math.abs(g7.gap))} para os compromissos dos próximos 7 dias.` });
 
   return NextResponse.json({
-    aPagar, aReceber, posicao, previsao,
+    aPagar, aReceber, posicao, previsao, categoriasPagar,
     ruptura: { janelas, topCredores, topTitulosPagar, cobertura, flags },
     sync: { pagar: syncPg?.ultimoSync || null, receber: syncRc?.ultimoSync || null },
   });
