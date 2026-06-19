@@ -5,7 +5,7 @@ import {
   Lock, Loader2, AlertCircle, UserPlus, X, ShieldCheck, ArrowLeft,
   TrendingUp, TrendingDown, Wallet, Banknote, Truck, RefreshCw,
   AlertTriangle, Flame, Search, ArrowDownRight, ArrowUpRight,
-  CalendarClock, Zap, Clock,
+  CalendarClock, Zap, Clock, Pencil,
 } from "lucide-react";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
@@ -470,6 +470,36 @@ function PrevisaoFaturamento() {
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
+  // Edição manual da data de faturamento por OP
+  const [editId, setEditId] = useState(null);
+  const [editData, setEditData] = useState("");
+  const [editObs, setEditObs] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  function abrirEdicao(o) {
+    setEditId(o.opId);
+    setEditData((o.dataFaturamento || "").slice(0, 10));
+    setEditObs(o.observacao || "");
+  }
+  async function salvarData() {
+    if (!editData) return;
+    setSalvando(true);
+    try {
+      const r = await fetch("/api/diretoria/previsao-faturamento", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ opId: editId, dataFaturamento: editData, observacao: editObs || null }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao salvar");
+      setEditId(null); await carregar();
+    } catch (e) { alert(e.message); } finally { setSalvando(false); }
+  }
+  async function limparData(opId) {
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/diretoria/previsao-faturamento?opId=${encodeURIComponent(opId)}`, { method: "DELETE" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao limpar");
+      setEditId(null); await carregar();
+    } catch (e) { alert(e.message); } finally { setSalvando(false); }
+  }
+
   if (loading) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Calculando previsão…</div>;
   if (erro) return <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={carregar} className="ml-auto text-xs underline">tentar de novo</button></div>;
   if (!data) return null;
@@ -537,8 +567,32 @@ function PrevisaoFaturamento() {
                   {o.pctPronto > 0 && <p className="text-[10px] text-emerald-600 mt-0.5">{o.pctPronto}% pronto/pintado</p>}
                 </td>
                 <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                  <p className={`tabular-nums ${o.atrasado ? "text-red-600 font-semibold" : "text-torg-dark"}`}>{fmtDia(o.dataFaturamento)}</p>
-                  <p className="text-[10px] text-torg-gray">{o.base}</p>
+                  {editId === o.opId ? (
+                    <div className="flex flex-col items-center gap-1">
+                      <input type="date" value={editData} onChange={(e) => setEditData(e.target.value)}
+                        className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
+                      <input value={editObs} onChange={(e) => setEditObs(e.target.value)} placeholder="motivo (opcional)"
+                        className="text-[11px] border border-gray-200 rounded px-2 py-0.5 outline-none focus:border-torg-blue w-36" />
+                      <div className="flex items-center gap-2">
+                        <button onClick={salvarData} disabled={salvando || !editData} className="text-[11px] text-white bg-torg-blue px-2 py-0.5 rounded disabled:opacity-50">salvar</button>
+                        <button onClick={() => setEditId(null)} className="text-[11px] text-torg-gray hover:underline">cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="inline-flex flex-col items-center">
+                      <span className={`tabular-nums inline-flex items-center gap-1 ${o.atrasado ? "text-red-600 font-semibold" : "text-torg-dark"}`}>
+                        {fmtDia(o.dataFaturamento)}
+                        <button onClick={() => abrirEdicao(o)} title="Editar data" className="text-torg-gray hover:text-torg-blue"><Pencil size={11} /></button>
+                      </span>
+                      {o.manual ? (
+                        <button onClick={() => limparData(o.opId)} disabled={salvando} title="Voltar ao automático" className="text-[10px] text-amber-600 hover:underline">
+                          manual · auto: {fmtDia(o.dataFaturamentoAuto)}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-torg-gray">{o.base}</span>
+                      )}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-2.5 text-center whitespace-nowrap">
                   <p className="tabular-nums text-torg-dark">{fmtDia(o.dataRecebimento)}</p>
@@ -550,7 +604,7 @@ function PrevisaoFaturamento() {
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-torg-gray">v1: todo o saldo é datado na entrega da OP. Eventos parciais (ex.: % na OC dos materiais) e atrasos de produção ainda não deslocam a data individualmente — dá pra refinar.</p>
+      <p className="text-[10px] text-torg-gray">A data vem do cronograma vigente (ajusta sozinha quando o cronograma muda). Clique no lápis pra fixar uma data manual — ela passa a valer até você voltar pro automático. O saldo é datado na entrega; fracionar por evento parcial fica pra um próximo passo.</p>
     </div>
   );
 }

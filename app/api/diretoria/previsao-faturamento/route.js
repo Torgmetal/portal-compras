@@ -4,6 +4,7 @@
 // de pagamento do cliente (do kickoff). Cruza com o progresso de produção pra
 // sinalizar o que dá pra antecipar. Gate próprio (requireDiretoria).
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireDiretoria } from "@/lib/diretoria";
 
@@ -55,6 +56,10 @@ export async function GET() {
     progByOp.get(g.opId).push({ status: g.status, peso: g._sum.pesoTotalKg || 0 });
   }
 
+  // Overrides manuais de data de faturamento (prevalecem sobre o automático)
+  const overrides = await prisma.diretoriaFaturamentoData.findMany();
+  const ovByOp = new Map(overrides.map((o) => [o.opId, o]));
+
   const linhas = [];
   for (const o of ops) {
     const receitaBruta = o.receitas.reduce((s, r) => s + (r.valor || 0), 0);
@@ -64,10 +69,13 @@ export async function GET() {
     const saldoLiq = r2(Math.max(0, (receitaBruta - faturadoBruto) * netRatio));
     if (saldoLiq <= 0.5) continue;
 
-    // Data de faturamento: cronograma vigente, senão prazo de entrega da OP
+    // Data de faturamento: override manual > cronograma vigente > prazo da OP
     const cronoFim = o.cronogramas[0]?.dataFim || null;
-    const entrega = cronoFim || o.dataFimPrevista || null;
-    const base = cronoFim ? "cronograma" : o.dataFimPrevista ? "prazo OP" : "sem data";
+    const entregaAuto = cronoFim || o.dataFimPrevista || null;
+    const baseAuto = cronoFim ? "cronograma" : o.dataFimPrevista ? "prazo OP" : "sem data";
+    const ov = ovByOp.get(o.id);
+    const entrega = ov?.dataFaturamento || entregaAuto;
+    const base = ov ? "manual" : baseAuto;
 
     // Prazo de pagamento (do kickoff); usa o maior dos eventos, senão estima 30 dias
     const eventos = Array.isArray(o.kickoff?.faturamentoEventos) ? o.kickoff.faturamentoEventos : [];
@@ -94,8 +102,10 @@ export async function GET() {
     const antecipavel = pctPronto >= 50 && billing && billing - hoje > 30 * 86400000;
 
     linhas.push({
-      numero: o.numero, cliente: o.cliente, obra: o.obra, saldoLiq,
+      numero: o.numero, opId: o.id, cliente: o.cliente, obra: o.obra, saldoLiq,
       dataFaturamento: billing ? billing.toISOString() : null,
+      dataFaturamentoAuto: entregaAuto ? new Date(entregaAuto).toISOString() : null,
+      manual: !!ov, observacao: ov?.observacao || null,
       dataRecebimento: cash ? cash.toISOString() : null,
       prazoDias, prazoEstimado, base, atrasado, antecipavel,
       pctProducao, pctPronto,
@@ -121,4 +131,49 @@ export async function GET() {
     faturamentoMes: mkSerie(fatMes), recebimentoMes: mkSerie(recMes),
     ops: linhas,
   });
+}
+
+// POST — define/atualiza a data de faturamento manual de uma OP (override).
+const bodySchema = z.object({
+  opId: z.string().min(1),
+  dataFaturamento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida (use AAAA-MM-DD)"),
+  observacao: z.string().max(500).optional().nullable(),
+});
+
+export async function POST(req) {
+  let user;
+  try { user = await requireDiretoria(); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  let body;
+  try { body = bodySchema.parse(await req.json()); }
+  catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
+
+  const data = new Date(body.dataFaturamento + "T00:00:00.000Z");
+  if (isNaN(data.getTime())) return NextResponse.json({ error: "Data inválida" }, { status: 400 });
+
+  const op = await prisma.oP.findUnique({ where: { id: body.opId }, select: { id: true, numero: true } });
+  if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
+
+  const saved = await prisma.diretoriaFaturamentoData.upsert({
+    where: { opId: body.opId },
+    create: { opId: body.opId, dataFaturamento: data, observacao: body.observacao || null, atualizadoPor: user.email },
+    update: { dataFaturamento: data, observacao: body.observacao || null, atualizadoPor: user.email },
+  });
+  await prisma.auditLog.create({ data: { userId: user.id, action: "DIRETORIA_DATA_FATURAMENTO", entity: "OP", entityId: op.numero, diff: { dataFaturamento: body.dataFaturamento, observacao: body.observacao || null } } }).catch(() => {});
+  return NextResponse.json({ ok: true, dataFaturamento: saved.dataFaturamento });
+}
+
+// DELETE — remove o override e volta a data ao automático (cronograma › prazo OP).
+export async function DELETE(req) {
+  let user;
+  try { user = await requireDiretoria(); }
+  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+
+  const opId = new URL(req.url).searchParams.get("opId");
+  if (!opId) return NextResponse.json({ error: "opId obrigatório" }, { status: 400 });
+
+  await prisma.diretoriaFaturamentoData.deleteMany({ where: { opId } });
+  await prisma.auditLog.create({ data: { userId: user.id, action: "DIRETORIA_DATA_FATURAMENTO_LIMPAR", entity: "OP", entityId: opId } }).catch(() => {});
+  return NextResponse.json({ ok: true });
 }

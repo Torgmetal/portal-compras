@@ -2292,6 +2292,18 @@ model AcessoDiretoria {
   createdAt        DateTime @default(now())
 }
 
+// Override manual da data prevista de faturamento por OP (módulo Diretoria).
+// Quando existe, prevalece sobre a data automática (cronograma › prazo da OP).
+model DiretoriaFaturamentoData {
+  id              String   @id @default(cuid())
+  opId            String   @unique
+  dataFaturamento DateTime
+  observacao      String?
+  atualizadoPor   String?
+  createdAt       DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+}
+
 // Vínculo manual de uma NFS-e emitida na prefeitura (SigissWeb/Conchal), que não
 // está no Omie, com um projeto/obra do Omie — para somar no faturado da obra.
 model NfseConchalVinculo {
