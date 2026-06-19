@@ -12,10 +12,15 @@ schtasks /Delete /TN "MesSync-Ordens"       /F >nul 2>&1
 schtasks /Delete /TN "MesSync-Loop"         /F >nul 2>&1
 schtasks /Delete /TN "MesSync-Diario"       /F >nul 2>&1
 schtasks /Delete /TN "MesSync-Apontamentos" /F >nul 2>&1
+schtasks /Delete /TN "MesSync-Status"       /F >nul 2>&1
 
 echo.
 echo Criando tarefa a cada 10 MIN - apontamentos em tempo real...
 schtasks /Create /TN "MesSync-Apontamentos" /TR "C:\MesSync\mes-sync-apontamentos.bat" /SC MINUTE /MO 10 /RU SYSTEM /RL HIGHEST /F
+
+echo.
+echo Criando tarefa a cada 10 MIN - status de setores inativos (furos)...
+schtasks /Create /TN "MesSync-Status" /TR "C:\MesSync\mes-sync-status.bat" /SC MINUTE /MO 10 /RU SYSTEM /RL HIGHEST /F
 
 echo.
 echo Criando tarefa a cada 1 HORA - ordens (janela curta)...
@@ -29,6 +34,7 @@ echo.
 echo ============================================================================
 echo Tarefas criadas. Conferindo:
 schtasks /Query /TN "MesSync-Apontamentos" /FO LIST | findstr /i "Nome TaskName Status Proxima Next"
+schtasks /Query /TN "MesSync-Status"       /FO LIST | findstr /i "Nome TaskName Status Proxima Next"
 schtasks /Query /TN "MesSync-Ordens"       /FO LIST | findstr /i "Nome TaskName Status Proxima Next"
 schtasks /Query /TN "MesSync-Diario"       /FO LIST | findstr /i "Nome TaskName Status Proxima Next"
 echo ============================================================================
