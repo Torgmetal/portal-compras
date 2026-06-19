@@ -15,6 +15,7 @@ import {
   downloadWorkbook, CORES,
 } from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
+import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 import {
   MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, PERDA_MAQUINA,
   calcularResumoBarras, parsePerfil, gerarProgramaCorte, classificarMaquina,
@@ -921,6 +922,7 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <BotaoRelatorioDia setor="Corte" />
           <button
             onClick={exportarListaMaterial}
             className="px-3 py-1.5 border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5"

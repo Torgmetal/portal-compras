@@ -703,6 +703,8 @@ model Cotacao {
   total                  Float         @default(0)
   prazoResposta          DateTime?
   recebidaEm             DateTime?
+  declinadaEm            DateTime?
+  motivoDeclinio         String?
   status                 CotacaoStatus @default(PENDENTE)
   token                  String?       @unique
   createdAt              DateTime      @default(now())
@@ -1175,14 +1177,81 @@ model DataBookQualidade {
   pecas       Int?
   tipo        String?         // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
   observacao  String?
-  status      String          @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO
+  status      String          @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | ENVIADO_CLIENTE | ACEITO
   emitidoEm   DateTime?
+  // Envio e aceite pelo cliente (link público por token, sem login)
+  tokenCliente     String?    @unique
+  clienteEmail     String?
+  enviadoClienteEm DateTime?
+  aceiteEm         DateTime?
+  aceiteNome       String?
+  aceiteIp         String?
   criadoPorId String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   secoes      DataBookSecao[]
+  aprovacoes  DataBookAprovacao[]
 
   @@index([opNumero])
+}
+
+// Aprovação interna do data book (inspetor + envolvidos) antes do envio ao cliente.
+model DataBookAprovacao {
+  id         String            @id @default(cuid())
+  dataBookId String
+  userId     String?
+  nome       String
+  papel      String?           // INSPETOR | QUALIDADE | RESP_TECNICO | OUTRO
+  aprovadoEm DateTime          @default(now())
+  dataBook   DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+
+  @@unique([dataBookId, userId])
+  @@index([dataBookId])
+}
+
+// Auditorias externas — registra a solicitação do cliente e os documentos que serão
+// compartilhados com ele num portal público (link por token, sem login).
+model Auditoria {
+  id                 String         @id @default(cuid())
+  empresa            String         // empresa do cliente/auditor
+  contato            String?        // pessoa de contato no cliente
+  titulo             String?        // ex.: "Auditoria de Qualificação 2026"
+  mensagemBoasVindas String?
+  capaUrl            String?        // foto de capa do hero do portal (Blob)
+  dataBookModeloUrl  String?        // PDF de Data Book modelo (exemplo p/ o cliente ver)
+  checklistJson      Json?          // status dos requisitos do GQ-FQ-003 { reqId: status }
+  solicitacoes       String?        // o que o cliente pediu (texto / e-mail colado)
+  token              String?        @unique
+  status             String         @default("RASCUNHO") // RASCUNHO | PUBLICADO
+  publicadoEm        DateTime?
+  clienteEmail       String?
+  enviadoEmailEm     DateTime?
+  primeiroAcessoEm   DateTime?
+  ultimoAcessoEm     DateTime?
+  criadoPorId        String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  documentos         AuditoriaDoc[]
+
+  @@index([status])
+}
+
+model AuditoriaDoc {
+  id               String    @id @default(cuid())
+  auditoriaId      String
+  tipo             String    @default("EVIDENCIA") // SOLICITACAO (pedido do cliente) | EVIDENCIA (compartilhado)
+  secao            String?   // área do GQ-FQ-003 (aba no portal)
+  requisito        String?   // id do requisito/linha do GQ-FQ-003 que o documento atende
+  nome             String
+  arquivoUrl       String?
+  arquivoTipo      String?
+  arquivoTamanho   Int?
+  sharepointItemId String?
+  documentoId      String?   // vínculo opcional a um DocumentoQualidade existente
+  createdAt        DateTime  @default(now())
+  auditoria        Auditoria @relation(fields: [auditoriaId], references: [id], onDelete: Cascade)
+
+  @@index([auditoriaId])
 }
 
 model DataBookSecao {
@@ -1521,6 +1590,11 @@ model PecaConjunto {
   statusEstoque          String?                 // "DISPONIVEL" | "PARCIAL" | "INDISPONIVEL" | null (nao conferido)
   prioridade             Int?                    // prioridade manual na Programação (vazia = sem prioridade); preservada na reimportação LPC
   ordemCampo             Int?                    // ordem de envio a campo (1 = primeiro); vazio = sem prioridade
+  // Serviço terceirizado — peça fabricada por terceiros: NÃO passa pelo corte; fica em
+  // espera (status TERCEIRIZADO) até o Compras receber, então é liberada pro destino.
+  terceirizado           Boolean                 @default(false)
+  destinoTerceirizado    String?                 // "MONTAGEM" | "PINTURA" | "EXPEDICAO"
+  terceirizadoRecebidoEm DateTime?
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.
   corteOrdem             Int?                    // posição na fila (menor = corta primeiro)
@@ -2207,6 +2281,17 @@ model MesSyncLog {
   @@index([sucesso])
 }
 
+// Allowlist do módulo Diretoria (acesso restrito). O dono (vitor@torg.com.br) é
+// sempre liberado em código; esta tabela guarda quem ele liberou além dele.
+// Nem ADMIN entra sem estar aqui (gate próprio em lib/diretoria.js).
+model AcessoDiretoria {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  nome             String?
+  liberadoPorEmail String?
+  createdAt        DateTime @default(now())
+}
+
 // Vínculo manual de uma NFS-e emitida na prefeitura (SigissWeb/Conchal), que não
 // está no Omie, com um projeto/obra do Omie — para somar no faturado da obra.
 model NfseConchalVinculo {
@@ -2578,6 +2663,7 @@ enum CotacaoStatus {
   RECEBIDA
   VENCIDA
   CANCELADA
+  DECLINADA
 }
 
 enum NotificacaoTipo {

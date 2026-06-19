@@ -80,6 +80,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [enviadoAgora, setEnviadoAgora] = useState(false);
+  // Declinar a cotação (não vai cotar) — evita ficar em aberto e prejudicar o scorecard
+  const [declinando, setDeclinando] = useState(false);
+  const [declinado, setDeclinado] = useState(false);
+  const [mostrarDeclinar, setMostrarDeclinar] = useState(false);
+  const [motivoDeclinio, setMotivoDeclinio] = useState("");
   // Nomes dos PDFs subidos nessa sessao (alem dos anexosCotacao que ja vem do servidor)
   const [arquivosSessao, setArquivosSessao] = useState([]);
   const [parsing, setParsing] = useState(false);
@@ -383,6 +388,55 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       setEnviando(false);
     }
   };
+
+  async function declinar() {
+    setDeclinando(true);
+    setErro("");
+    try {
+      const res = await fetch(`/api/cotacao/declinar/${cotacao.token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo: motivoDeclinio.trim() || null }),
+      });
+      let data;
+      try { data = await res.json(); } catch { throw new Error(`Erro ${res.status} do servidor`); }
+      if (!res.ok) throw new Error(data.error || "Erro ao declinar a cotação");
+      setDeclinado(true);
+    } catch (e) {
+      setErro(e.message);
+      setMostrarDeclinar(false);
+    } finally {
+      setDeclinando(false);
+    }
+  }
+
+  // Tela de confirmação após declinar
+  if (declinado) {
+    return (
+      <div className="min-h-screen bg-torg-blue-50/30">
+        <header className="bg-white border-b border-torg-blue-100">
+          <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-3">
+            <TorgLogo size="sm" />
+            <span className="text-xs text-torg-gray hidden sm:inline">Portal de Cotações</span>
+          </div>
+        </header>
+        <div className="max-w-2xl mx-auto px-6 py-12">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <PackageX size={26} className="text-torg-gray" />
+            </div>
+            <h1 className="text-xl font-bold text-torg-dark">Cotação declinada</h1>
+            <p className="text-sm text-torg-gray mt-2 max-w-md mx-auto">
+              Obrigado por nos avisar que não vai cotar a <strong>RM {cotacao.rm.numero}</strong>. Registramos seu retorno e encerramos a cotação — assim ela não fica pendente no seu histórico. Você já pode fechar esta página.
+            </p>
+            {motivoDeclinio.trim() && (
+              <p className="text-xs text-torg-gray mt-3">Motivo informado: “{motivoDeclinio.trim()}”</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-torg-blue-50/30">
@@ -947,7 +1001,56 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             </div>
           </div>
 
-          <div className="flex justify-end">
+          {/* Declinar — confirmação com motivo opcional */}
+          {!jaEnviou && !emRevisaoFinal && mostrarDeclinar && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2.5">
+              <p className="text-sm font-semibold text-torg-dark flex items-center gap-2">
+                <PackageX size={16} className="text-torg-gray" /> Declinar esta cotação?
+              </p>
+              <p className="text-xs text-torg-gray">
+                Use isto quando <strong>não vai cotar</strong> esta RM. A cotação é encerrada na hora — assim não fica pendente no seu histórico. Se mudar de ideia depois, fale com o comprador.
+              </p>
+              <textarea
+                value={motivoDeclinio}
+                onChange={(e) => setMotivoDeclinio(e.target.value)}
+                rows={2}
+                placeholder="Motivo (opcional): sem estoque, fora do nosso escopo, sem capacidade no prazo…"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={declinar}
+                  disabled={declinando}
+                  className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 font-medium inline-flex items-center gap-2 disabled:opacity-50"
+                >
+                  {declinando ? <Loader2 size={15} className="animate-spin" /> : <PackageX size={15} />}
+                  Confirmar declínio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMostrarDeclinar(false)}
+                  disabled={declinando}
+                  className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark"
+                >
+                  Voltar
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            {!jaEnviou && !emRevisaoFinal && !mostrarDeclinar ? (
+              <button
+                type="button"
+                onClick={() => setMostrarDeclinar(true)}
+                className="text-sm text-torg-gray hover:text-red-600 inline-flex items-center gap-1.5 underline-offset-2 hover:underline"
+              >
+                <PackageX size={15} /> Não vou cotar (declinar)
+              </button>
+            ) : (
+              <span />
+            )}
             <button
               type="submit"
               disabled={enviando}

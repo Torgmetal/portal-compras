@@ -2,6 +2,7 @@
 // liberação para montagem), sem sair do módulo PCP.
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { produzidoPorMarca } from "@/lib/conjuntos-setor";
 import MontagemClient from "@/app/producao/programacao/montagem/MontagemClient";
 
 export const metadata = { title: "Workspace Torg — PCP · Montagem" };
@@ -39,9 +40,13 @@ export default async function PcpMontagem() {
     take: 3000,
   });
 
+  // "Feito" na montagem = produzido no Syneco (setor Montagem) por marca de conjunto.
+  const apontamentos = await produzidoPorMarca("Montagem", conjuntos.map((c) => c.marca));
+
   return (
     <MontagemClient
       conjuntosIniciais={JSON.parse(JSON.stringify(conjuntos))}
+      apontamentos={apontamentos}
       userRole={user.role}
     />
   );

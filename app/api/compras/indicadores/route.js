@@ -127,7 +127,10 @@ async function calcularScorecard(dataInicio, dataFim) {
 
     // ── Critério 1: Prazo de Resposta (20%) ──
     // % de cotações respondidas dentro do prazo (prazoResposta ou 3 dias úteis)
-    let rfqsEnviadas = cots.length;
+    // Declinar é um retorno do fornecedor (não vai cotar), não uma cotação
+    // ignorada — não conta como RFQ em aberto contra ele.
+    const declinadas = cots.filter((c) => c.status === "DECLINADA").length;
+    let rfqsEnviadas = cots.length - declinadas;
     let rfqsNoPrazo = 0;
     for (const c of cots) {
       if (c.recebidaEm) {
@@ -200,6 +203,7 @@ async function calcularScorecard(dataInicio, dataFim) {
         nota: notaResposta !== null ? Math.round(notaResposta * 10) / 10 : null,
         rfqsEnviadas,
         respondidas,
+        declinadas,
         noPrazo: rfqsNoPrazo,
       },
       entrega: {

@@ -11,6 +11,7 @@ import {
   downloadWorkbook, CORES,
 } from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
+import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
 
 const STATUS_LABEL = {
@@ -95,7 +96,7 @@ function calcularProntidao(conjunto) {
   return { pronto, liberavel, podeLiberar, total, atendidos, pct, itens, categoria };
 }
 
-export default function MontagemClient({ conjuntosIniciais, userRole }) {
+export default function MontagemClient({ conjuntosIniciais, userRole, apontamentos = {} }) {
   const router = useRouter();
   const [conjuntos, setConjuntos] = useState(conjuntosIniciais);
   const [filtroOp, setFiltroOp] = useState("");
@@ -260,7 +261,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
       kpis: [
         `Total: ${filtrados.length} conjuntos (${totalPecas} pc)  |  Croquis: ${totalAtendidos}/${totalCroquis} cortados (${pctGeral}%)  |  Peso: ${Math.round(totalPeso).toLocaleString("pt-BR")} kg`,
       ],
-      totalColunas: 12,
+      totalColunas: 14,
       nomePlanilha: "Montagem",
       codigoDoc: "REL-PRD-004",
     });
@@ -269,10 +270,13 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
       { width: 8 }, { width: 14 }, { width: 30 }, { width: 14 },
       { width: 7 }, { width: 11 }, { width: 11 }, { width: 11 },
       { width: 10 }, { width: 10 }, { width: 12 }, { width: 14 },
+      { width: 9 }, { width: 8 },
     ];
 
     let row = linhaInicio;
-    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Comp.", "Peso", "Maquina", "Produzido", "Falta", "Situacao", "Status"];
+    // "Produzido/Falta" = croquis cortados (prontidão). "Montado/Saldo" = conjuntos
+    // montados no Syneco vs total na lista.
+    const headers = ["OP", "Marca", "Descricao", "Material", "Qte", "Comp.", "Peso", "Maquina", "Produzido", "Falta", "Situacao", "Status", "Montado", "Saldo"];
     adicionarHeaderTabela(ws, row, headers);
     row++;
 
@@ -280,6 +284,8 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
       const { prontidao } = c;
       const fillColor = prontidao.pronto ? CORES.LIGHT_GREEN : prontidao.atendidos > 0 ? CORES.LIGHT_ORANGE : undefined;
       const faltam = prontidao.total - prontidao.atendidos;
+      const montado = apontamentos[c.marca] || 0;          // conjuntos montados (Syneco)
+      const saldoMont = Math.max(0, (c.qte || 1) - montado); // saldo a montar
 
       // Linha do CONJUNTO (negrito, destaque)
       adicionarLinhaTabela(ws, row, [
@@ -295,12 +301,14 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
         faltam,
         prontidao.pronto ? "Pronto" : prontidao.liberavel ? "Pode montar" : `${prontidao.pct}%`,
         STATUS_LABEL[c.status] || c.status,
+        montado,
+        saldoMont,
       ], {
         fillColor,
-        alinhamento: { 4: "right", 5: "right", 6: "right", 8: "right", 9: "right", 10: "right" },
+        alinhamento: { 4: "right", 5: "right", 6: "right", 8: "right", 9: "right", 10: "right", 12: "right", 13: "right" },
       });
       // Negrito em toda a linha do conjunto
-      for (let col = 1; col <= 12; col++) {
+      for (let col = 1; col <= 14; col++) {
         const cell = ws.getCell(row, col);
         cell.font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
       }
@@ -324,12 +332,14 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
           item.falta === 0 ? "✓" : `-${item.falta}`,
           item.ok ? "OK" : "Falta",
           "",
+          "",
+          "",
         ], {
           fillColor: croquiFill,
           alinhamento: { 4: "right", 5: "right", 6: "right", 8: "right", 9: "right", 10: "right" },
         });
         // Estilo croqui: cinza, fonte 8
-        for (let col = 1; col <= 12; col++) {
+        for (let col = 1; col <= 14; col++) {
           const cell = ws.getCell(row, col);
           cell.font = { name: "Arial", size: 8, color: { argb: "576D7E" } };
         }
@@ -347,7 +357,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
       { cor: CORES.LIGHT_ORANGE, label: "Laranja = parcialmente cortado" },
       { cor: "FFFFFF", label: "Branco = nenhum croqui cortado" },
       { cor: "E8F5E9", label: "Croqui verde claro = croqui ja cortado" },
-    ], 12);
+    ], 14);
 
     const filtroDesc = [
       filtroOp ? `OP-${filtroOp}` : "Todas-OPs",
@@ -449,6 +459,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole }) {
         >
           <Download size={13} /> Exportar
         </button>
+        <BotaoRelatorioDia setor="Montagem" />
         {(filtroOp || filtroProntidao || busca) && (
           <button
             onClick={() => { setFiltroOp(""); setFiltroProntidao(""); setBusca(""); }}

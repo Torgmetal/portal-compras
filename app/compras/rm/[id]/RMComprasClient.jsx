@@ -1326,7 +1326,7 @@ function CotacoesList({ rm, outrasRMs = [] }) {
   // Pre-fetch dos emails das cotacoes ativas. Cacheia no state pra que o
   // clipboard.write seja sincrono no clique (sem perder user gesture).
   useEffect(() => {
-    const ativas = (rm.cotacoes || []).filter((c) => c.status !== "CANCELADA");
+    const ativas = (rm.cotacoes || []).filter((c) => c.status !== "CANCELADA" && c.status !== "DECLINADA");
     ativas.forEach((c) => {
       if (emailsCache[c.id]) return;
       fetch(`/api/cotacao/${c.id}/preview-email?format=json`)
@@ -1376,6 +1376,7 @@ function CotacoesList({ rm, outrasRMs = [] }) {
     RECEBIDA: { label: "Recebida",   className: "bg-torg-orange-50 text-torg-orange-700" },
     VENCIDA:  { label: "Vencida",    className: "bg-red-50 text-red-700" },
     CANCELADA:{ label: "Cancelada",  className: "bg-gray-100 text-gray-500" },
+    DECLINADA:{ label: "Declinada",  className: "bg-gray-100 text-gray-500" },
   };
 
   return (

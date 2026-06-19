@@ -18,6 +18,7 @@ import {
   adicionarLinhaTotais, downloadWorkbook, CORES,
 } from "@/lib/excel-relatorio";
 import { fmtOP } from "@/lib/utils";
+import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 
 const STATUS_LABEL = {
   PENDENTE: "Pendente", CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda",
@@ -207,33 +208,40 @@ export default function SetorClient({
       titulo: `Programacao de ${labelAtual}`,
       subtitulo: tituloFiltro,
       kpis: [`Total: ${filtradas.length} conjuntos (${totalPecas} pc)  |  Peso: ${Math.round(totalPeso).toLocaleString("pt-BR")} kg`],
-      totalColunas: 8,
+      totalColunas: 10,
       nomePlanilha: labelAtual,
       codigoDoc,
     });
 
     ws.columns = [
-      { width: 8 }, { width: 14 }, { width: 30 }, { width: 14 },
-      { width: 7 }, { width: 11 }, { width: 14 }, { width: 14 },
+      { width: 8 }, { width: 14 }, { width: 28 }, { width: 13 },
+      { width: 9 }, { width: 8 }, { width: 8 }, { width: 11 }, { width: 14 }, { width: 14 },
     ];
 
     let row = linhaInicio;
-    adicionarHeaderTabela(ws, row, ["OP", "Marca", "Descricao", "Material", "Qte", "Peso Total", "Cliente", "Obra"]);
+    // Qte (total na lista) · Feito (apontado no Syneco neste setor) · Saldo a produzir
+    adicionarHeaderTabela(ws, row, ["OP", "Marca", "Descrição", "Material", "Qte (lista)", `Feito (${labelAtual})`, "Saldo", "Peso Total", "Cliente", "Obra"]);
     row++;
     const primeiraLinha = row;
 
     for (const p of filtradas) {
+      const total = p.qte || 1;
+      const feito = apontamentos[p.marca]?.produzido || 0;
+      const saldo = Math.max(0, total - feito);
       adicionarLinhaTabela(ws, row, [
         fmtOP(p.opNumero),
         p.marca,
         p.descricao || "",
         p.material || "",
-        p.qte || 1,
+        total,
+        feito,
+        saldo,
         p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : 0,
         p.op?.cliente || "",
         p.op?.obra || "",
       ], {
-        alinhamento: { 4: "right", 5: "right" },
+        alinhamento: { 4: "right", 5: "right", 6: "right", 7: "right" },
+        fontColors: saldo === 0 ? { 6: "1D9E75" } : {}, // saldo zerado em verde
       });
       ws.getCell(row, 2).font = { name: "Arial", size: 9, bold: true, color: { argb: CORES.TORG_DARK } };
       row++;
@@ -244,6 +252,8 @@ export default function SetorClient({
       "TOTAL", "", "", "",
       { formula: `SUM(E${primeiraLinha}:E${ultima})` },
       { formula: `SUM(F${primeiraLinha}:F${ultima})` },
+      { formula: `SUM(G${primeiraLinha}:G${ultima})` },
+      { formula: `SUM(H${primeiraLinha}:H${ultima})` },
       "", "",
     ]);
 
@@ -359,6 +369,7 @@ export default function SetorClient({
         >
           <Download size={13} /> Exportar
         </button>
+        {setorAtual !== "EXPEDIDO" && <BotaoRelatorioDia setor={labelAtual} />}
         {(filtroOp || busca) && (
           <button
             onClick={() => { setFiltroOp(""); setBusca(""); }}

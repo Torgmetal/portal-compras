@@ -6,6 +6,7 @@ import {
   Clock, Package, Layers,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import BotaoRelatorioDia from "@/components/BotaoRelatorioDia";
 import { MAQUINA_LABEL, MAQUINA_COR } from "@/lib/maquina-corte";
 
 // ─── helpers de data (comparação só por dia, em UTC) ───────────────────────
@@ -178,13 +179,16 @@ export default function FilaCorteClient({ pecasIniciais }) {
   // ── render ───────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-          <Scissors size={26} className="text-torg-blue" /> Fila de Corte
-        </h2>
-        <p className="text-xs text-torg-gray mt-0.5">
-          Peças liberadas entram na fila → programe a meta de início/fim (alimenta o PMP) → acompanhe o real × estimado.
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
+            <Scissors size={26} className="text-torg-blue" /> Fila de Corte
+          </h2>
+          <p className="text-xs text-torg-gray mt-0.5">
+            Peças liberadas entram na fila → programe a meta de início/fim (alimenta o PMP) → acompanhe o real × estimado.
+          </p>
+        </div>
+        <BotaoRelatorioDia setor="Corte" />
       </div>
 
       {/* KPIs */}

@@ -1,0 +1,512 @@
+"use client";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { upload } from "@vercel/blob/client";
+import Link from "next/link";
+import {
+  Loader2, AlertCircle, ArrowLeft, Building2, Upload, Search, X, FileText, Trash2,
+  Send, Copy, ExternalLink, Save, ClipboardList, FolderOpen, CheckCircle2,
+  Sparkles, Plus, Mail, Eye, Image as ImageIcon, ClipboardCheck, BookOpen,
+} from "lucide-react";
+import { SECOES_AUDITORIA, ordenarSecoes, REQUISITOS_GQFQ003, STATUS_REQUISITO, requisitosDaSecao } from "@/lib/auditoria-secoes";
+
+const fmtDH = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
+
+export default function AuditoriaDetalheClient({ id }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [form, setForm] = useState({ empresa: "", contato: "", titulo: "", mensagemBoasVindas: "", solicitacoes: "" });
+  const [salvando, setSalvando] = useState(false);
+  const [publicando, setPublicando] = useState(false);
+  const [link, setLink] = useState("");
+  const [emailCliente, setEmailCliente] = useState("");
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const capaRef = useRef(null);
+  const [enviandoCapa, setEnviandoCapa] = useState(false);
+  const modeloRef = useRef(null);
+  const [enviandoModelo, setEnviandoModelo] = useState(false);
+
+  const carregar = useCallback(async () => {
+    setErro("");
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${id}`);
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setData(j.data);
+      setForm({ empresa: j.data.empresa || "", contato: j.data.contato || "", titulo: j.data.titulo || "", mensagemBoasVindas: j.data.mensagemBoasVindas || "", solicitacoes: j.data.solicitacoes || "" });
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  }, [id]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setData(j.data);
+    } catch (e) { alert(e.message); } finally { setSalvando(false); }
+  }
+
+  async function salvarCapa(capaUrl) {
+    const r = await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ capaUrl }) });
+    const j = await r.json();
+    if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+    setData(j.data);
+  }
+  async function enviarCapa(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEnviandoCapa(true);
+    try {
+      const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+      await salvarCapa(blob.url);
+    } catch (err) { alert(err.message || "Falha no upload"); } finally { setEnviandoCapa(false); if (capaRef.current) capaRef.current.value = ""; }
+  }
+  async function removerCapa() {
+    try { await salvarCapa(null); } catch (e) { alert(e.message); }
+  }
+
+  async function enviarModelo(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEnviandoModelo(true);
+    try {
+      const blob = await upload(file.name, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+      const r = await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataBookModeloUrl: blob.url }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setData(j.data);
+    } catch (err) { alert(err.message || "Falha no upload"); } finally { setEnviandoModelo(false); if (modeloRef.current) modeloRef.current.value = ""; }
+  }
+  async function removerModelo() {
+    const r = await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataBookModeloUrl: null }) });
+    const j = await r.json();
+    if (j.success) setData(j.data);
+  }
+
+  async function setReqStatus(reqId, status) {
+    const novo = { ...(data.checklistJson || {}), [reqId]: status };
+    setData((d) => ({ ...d, checklistJson: novo })); // otimista
+    try {
+      await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ checklistJson: novo }) });
+    } catch { /* mantém o estado otimista; recarregar reverte se falhar */ }
+  }
+
+  async function publicar(despublicar) {
+    setPublicando(true);
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${id}/publicar`, { method: despublicar ? "DELETE" : "POST" });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      if (j.link) setLink(j.link);
+      await carregar();
+    } catch (e) { alert(e.message); } finally { setPublicando(false); }
+  }
+
+  async function enviarEmail() {
+    if (!/^\S+@\S+\.\S+$/.test(emailCliente.trim())) { alert("Informe um e-mail válido do cliente."); return; }
+    setEnviandoEmail(true);
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${id}/enviar-email`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: emailCliente.trim() }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      if (j.link) setLink(j.link);
+      if (!j.enviado) alert("Link gerado, mas o e-mail não pôde ser enviado agora. Copie o link e envie manualmente.");
+      else alert("E-mail enviado ao cliente.");
+      await carregar();
+    } catch (e) { alert(e.message); } finally { setEnviandoEmail(false); }
+  }
+
+  if (loading) return <div className="flex flex-col items-center justify-center py-24 text-torg-gray"><Loader2 size={24} className="animate-spin mb-3" /><p className="text-sm">Carregando…</p></div>;
+  if (erro) return <div className="flex flex-col items-center justify-center py-20 text-center"><AlertCircle size={24} className="text-red-500 mb-3" /><p className="text-sm text-torg-dark mb-3">{erro}</p><button onClick={carregar} className="text-xs text-torg-blue hover:underline">Tentar novamente</button></div>;
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const solicitacoesDocs = data.documentos.filter((d) => d.tipo === "SOLICITACAO");
+  const evidenciaDocs = data.documentos.filter((d) => d.tipo === "EVIDENCIA");
+
+  // Checklist GQ-FQ-003: progresso + agrupamento por seção
+  const checklist = data.checklistJson || {};
+  const reqNA = REQUISITOS_GQFQ003.filter((r) => checklist[r.id] === "NA").length;
+  const reqAtend = REQUISITOS_GQFQ003.filter((r) => checklist[r.id] === "ATENDIDO").length;
+  const reqBase = REQUISITOS_GQFQ003.length - reqNA;
+  const reqPct = reqBase > 0 ? Math.round((reqAtend / reqBase) * 100) : 0;
+  const reqGrupos = [];
+  for (const r of REQUISITOS_GQFQ003) {
+    const g = reqGrupos.find((x) => x[0] === r.secao);
+    if (g) g[1].push(r); else reqGrupos.push([r.secao, [r]]);
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <Link href="/qualidade/auditorias" className="text-[11px] text-torg-gray hover:text-torg-dark inline-flex items-center gap-1 mb-2"><ArrowLeft size={12} /> Auditorias</Link>
+
+      {/* Cabeçalho editável */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h1 className="text-base font-bold text-torg-dark inline-flex items-center gap-2 min-w-0"><Building2 size={18} className="text-torg-blue shrink-0" /> <span className="truncate">{data.empresa}</span></h1>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${data.status === "PUBLICADO" ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-torg-gray"}`}>{data.status === "PUBLICADO" ? "Publicado" : "Rascunho"}</span>
+        </div>
+
+        {/* Foto de capa do portal (ex.: foto da obra) */}
+        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-50">
+          {data.capaUrl
+            ? <img src={data.capaUrl} alt="capa" className="w-32 h-[72px] object-cover rounded-lg border border-gray-200 shrink-0" />
+            : <div className="w-32 h-[72px] rounded-lg bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center text-gray-300 shrink-0"><ImageIcon size={22} /></div>}
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-torg-dark mb-1">Foto de capa do portal {data.capaUrl ? "" : "(opcional)"}</p>
+            <input ref={capaRef} type="file" accept="image/*" className="hidden" onChange={enviarCapa} />
+            <div className="flex items-center gap-3">
+              <button onClick={() => capaRef.current?.click()} disabled={enviandoCapa} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviandoCapa ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />} {enviandoCapa ? "Enviando…" : data.capaUrl ? "Trocar foto" : "Enviar foto"}</button>
+              {data.capaUrl && <button onClick={removerCapa} className="text-[11px] text-torg-gray hover:text-red-600">Remover</button>}
+            </div>
+            <p className="text-[10px] text-torg-gray mt-0.5">Aparece em destaque no topo do portal do cliente.</p>
+          </div>
+        </div>
+
+        {/* Modelo do Data Book (PDF) */}
+        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-50">
+          <div className="w-32 h-[72px] rounded-lg bg-torg-blue-50/60 border border-gray-100 flex items-center justify-center text-torg-blue shrink-0"><BookOpen size={24} /></div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-torg-dark mb-1">Modelo do Data Book {data.dataBookModeloUrl ? "" : "(opcional)"}</p>
+            <input ref={modeloRef} type="file" accept=".pdf" className="hidden" onChange={enviarModelo} />
+            <div className="flex items-center gap-3">
+              <button onClick={() => modeloRef.current?.click()} disabled={enviandoModelo} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviandoModelo ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviandoModelo ? "Enviando…" : data.dataBookModeloUrl ? "Trocar PDF" : "Enviar PDF"}</button>
+              {data.dataBookModeloUrl && <a href={data.dataBookModeloUrl} target="_blank" rel="noreferrer" className="text-[11px] text-torg-blue hover:underline">ver</a>}
+              {data.dataBookModeloUrl && <button onClick={removerModelo} className="text-[11px] text-torg-gray hover:text-red-600">Remover</button>}
+            </div>
+            <p className="text-[10px] text-torg-gray mt-0.5">PDF de exemplo pro cliente ver como será o Data Book dele.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Campo label="Empresa"><input value={form.empresa} onChange={(e) => set("empresa", e.target.value)} className="inp" /></Campo>
+          <Campo label="Pessoa de contato"><input value={form.contato} onChange={(e) => set("contato", e.target.value)} className="inp" /></Campo>
+          <Campo label="Título da auditoria" wide><input value={form.titulo} onChange={(e) => set("titulo", e.target.value)} className="inp" /></Campo>
+          <Campo label="Mensagem de boas-vindas (o cliente vê)" wide><textarea value={form.mensagemBoasVindas} onChange={(e) => set("mensagemBoasVindas", e.target.value)} rows={2} className="inp resize-y" /></Campo>
+        </div>
+        <div className="flex justify-end mt-3">
+          <button onClick={salvar} disabled={salvando} className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">{salvando ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar</button>
+        </div>
+      </div>
+
+      {/* Solicitações do cliente */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+        <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5 mb-2"><ClipboardList size={15} className="text-torg-blue" /> Solicitações do cliente</h2>
+        <textarea value={form.solicitacoes} onChange={(e) => set("solicitacoes", e.target.value)} onBlur={salvar} rows={3} placeholder="Cole o e-mail / a lista de documentos que o cliente pediu…" className="inp resize-y w-full text-[12px]" />
+        <DocSection auditoriaId={id} tipo="SOLICITACAO" titulo="Anexos da solicitação (e-mails/listas — uso interno)" docs={solicitacoesDocs} onChange={carregar} />
+      </div>
+
+      {/* Documentos compartilhados */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+        <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1"><FolderOpen size={15} className="text-torg-blue" /> Documentos para o cliente</h2>
+        <p className="text-[11px] text-torg-gray mb-2">Estes documentos aparecem no portal do cliente para conferência e download.</p>
+        <DocSection auditoriaId={id} tipo="EVIDENCIA" titulo="" docs={evidenciaDocs} onChange={carregar} sugestao />
+      </div>
+
+      {/* Checklist do auditor (GQ-FQ-003) */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><ClipboardCheck size={15} className="text-torg-blue" /> Checklist do auditor (GQ-FQ-003)</h2>
+          <span className="text-[12px] font-bold text-torg-dark">{reqAtend}/{reqBase} · {reqPct}%</span>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-3"><div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${reqPct}%` }} /></div>
+        <div className="space-y-3">
+          {reqGrupos.map(([secao, reqs]) => (
+            <div key={secao}>
+              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">{secao}</p>
+              <div className="divide-y divide-gray-50">
+                {reqs.map((r) => {
+                  const st = checklist[r.id] || "PENDENTE";
+                  return (
+                    <div key={r.id} className="flex items-center justify-between gap-3 py-1.5 text-[12px]">
+                      <span className="text-torg-dark min-w-0">{r.label}</span>
+                      <select value={st} onChange={(e) => setReqStatus(r.id, e.target.value)}
+                        className={`shrink-0 text-[11px] font-medium rounded-lg px-2 py-1 border-0 focus:ring-1 focus:ring-torg-blue ${STATUS_REQUISITO[st].cor}`}>
+                        {Object.entries(STATUS_REQUISITO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Publicação + envio */}
+      <div className="bg-torg-dark rounded-xl shadow-sm p-4 mb-8 text-white">
+        <h2 className="text-sm font-bold inline-flex items-center gap-1.5 mb-1.5"><Send size={15} className="text-torg-orange" /> Portal do cliente</h2>
+        {data.status === "PUBLICADO" ? (
+          <>
+            <p className="text-[12px] text-blue-100 mb-2">Publicado · {evidenciaDocs.length} documento(s) disponível(is).</p>
+            <div className="flex items-center gap-2 flex-wrap bg-white/10 rounded-lg px-3 py-2 mb-2.5">
+              <span className="text-[11px] font-mono text-blue-100 break-all flex-1 min-w-[180px]">{link || (typeof window !== "undefined" ? `${window.location.origin}/portal-cliente/${data.token}` : `/portal-cliente/${data.token}`)}</span>
+              <button onClick={() => navigator.clipboard?.writeText(link || `${window.location.origin}/portal-cliente/${data.token}`)} className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><Copy size={12} /> copiar</button>
+              <a href={`/portal-cliente/${data.token}`} target="_blank" rel="noreferrer" className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><ExternalLink size={12} /> abrir</a>
+            </div>
+          </>
+        ) : (
+          <p className="text-[12px] text-blue-100 mb-2.5">Envie por e-mail (publica e manda o link) ou apenas gere o link.{evidenciaDocs.length === 0 ? " Adicione ao menos 1 documento." : ""}</p>
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <input type="email" value={emailCliente} onChange={(e) => setEmailCliente(e.target.value)} placeholder="e-mail do cliente"
+            className="flex-1 min-w-[180px] text-[12px] rounded-lg px-2.5 py-1.5 bg-white text-torg-dark border border-white/20 focus:outline-none" />
+          <button onClick={enviarEmail} disabled={enviandoEmail || evidenciaDocs.length === 0}
+            className="text-[12px] font-semibold text-torg-dark bg-white rounded-lg px-3 py-1.5 hover:bg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
+            {enviandoEmail ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} {data.status === "PUBLICADO" ? "Reenviar e-mail" : "Publicar e enviar"}
+          </button>
+        </div>
+        {data.status !== "PUBLICADO" && (
+          <button onClick={() => publicar(false)} disabled={publicando || evidenciaDocs.length === 0} className="text-[11px] text-blue-100 hover:text-white underline disabled:opacity-50 mt-2">
+            {publicando ? "Gerando…" : "ou só gerar o link, sem e-mail"}
+          </button>
+        )}
+
+        <div className="text-[11px] text-blue-200 mt-2.5 space-y-0.5">
+          {data.clienteEmail && data.enviadoEmailEm && <p className="inline-flex items-center gap-1"><Mail size={11} /> Enviado para {data.clienteEmail} em {fmtDH(data.enviadoEmailEm)}</p>}
+          {data.status === "PUBLICADO" && (data.ultimoAcessoEm
+            ? <p className="inline-flex items-center gap-1 text-emerald-300"><Eye size={11} /> Cliente acessou — último em {fmtDH(data.ultimoAcessoEm)}</p>
+            : <p className="text-blue-300">Aguardando o primeiro acesso do cliente.</p>)}
+        </div>
+
+        {data.status === "PUBLICADO" && (
+          <button onClick={() => publicar(true)} disabled={publicando} className="text-[11px] text-blue-100 hover:text-white underline disabled:opacity-50 mt-2 block">Despublicar (desativa o link)</button>
+        )}
+      </div>
+
+      <style jsx global>{`.inp{width:100%;border:1px solid #d1d5db;border-radius:0.5rem;padding:0.45rem 0.7rem;font-size:0.8rem}.inp:focus{outline:none;border-color:#006eab;box-shadow:0 0 0 2px rgba(0,110,171,.15)}`}</style>
+    </div>
+  );
+}
+
+function Campo({ label, children, wide }) {
+  return <label className={`block ${wide ? "sm:col-span-2" : ""}`}><span className="text-[11px] font-medium text-torg-dark mb-1 block">{label}</span>{children}</label>;
+}
+
+// Seção de documentos (upload + vincular doc da Qualidade + lista)
+function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
+  const fileRef = useRef(null);
+  const [enviando, setEnviando] = useState(false);
+  const [progresso, setProgresso] = useState("");
+  const [secaoUpload, setSecaoUpload] = useState(SECOES_AUDITORIA[0]);
+  const [picker, setPicker] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [resultados, setResultados] = useState(null);
+  const [buscando, setBuscando] = useState(false);
+  const [selDocs, setSelDocs] = useState(new Set());
+  const [sugerindo, setSugerindo] = useState(false);
+  const [sugestoes, setSugestoes] = useState(null);
+
+  const toggleSel = (id) => setSelDocs((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  async function adicionarSelecionados() {
+    const escolhidos = (resultados || []).filter((d) => selDocs.has(d.id));
+    if (!escolhidos.length) return;
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: escolhidos.map((d) => ({ tipo, nome: d.nome, documentoId: d.id })) }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setPicker(false); setBusca(""); setResultados(null); setSelDocs(new Set());
+      await onChange();
+    } catch (err) { alert(err.message); }
+  }
+
+  async function sugerir() {
+    setSugerindo(true);
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/sugerir-docs`, { method: "POST" });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setSugestoes(j.sugestoes || []);
+    } catch (err) { alert(err.message); } finally { setSugerindo(false); }
+  }
+
+  async function anexarArquivo(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setEnviando(true);
+    try {
+      const itens = [];
+      for (let i = 0; i < files.length; i++) {
+        setProgresso(`${i + 1}/${files.length}`);
+        const f = files[i];
+        const blob = await upload(f.name, f, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+        itens.push({ tipo, secao: sugestao ? secaoUpload : undefined, nome: f.name, arquivoUrl: blob.url, arquivoTipo: f.type || null, arquivoTamanho: f.size });
+      }
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      await onChange();
+    } catch (err) { alert(err.message || "Falha no upload"); } finally { setEnviando(false); setProgresso(""); if (fileRef.current) fileRef.current.value = ""; }
+  }
+
+  async function adicionarTodas() {
+    const novas = (sugestoes || []).filter((s) => !s.jaAnexado);
+    if (!novas.length) return;
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: novas.map((s) => ({ tipo, secao: s.secao || undefined, requisito: s.requisito || undefined, nome: s.nome, documentoId: s.id })) }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setSugestoes((prev) => (prev ? prev.map((x) => ({ ...x, jaAnexado: true })) : prev));
+      await onChange();
+    } catch (err) { alert(err.message); }
+  }
+
+  async function buscar(e) {
+    e?.preventDefault();
+    if (busca.trim().length < 2) return;
+    setBuscando(true);
+    try {
+      const r = await fetch(`/api/qualidade/documentos?busca=${encodeURIComponent(busca.trim())}`);
+      const j = await r.json();
+      setResultados((j.data || []).slice(0, 12));
+    } catch { setResultados([]); } finally { setBuscando(false); }
+  }
+
+  async function vincular(d) {
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, secao: d.secao || undefined, requisito: d.requisito || undefined, nome: d.nome, documentoId: d.id }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setPicker(false); setBusca(""); setResultados(null);
+      setSugestoes((prev) => (prev ? prev.map((x) => (x.id === d.id ? { ...x, jaAnexado: true } : x)) : prev));
+      await onChange();
+    } catch (err) { alert(err.message); }
+  }
+
+  async function remover(docId) {
+    if (!confirm("Remover este documento?")) return;
+    await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc?docId=${encodeURIComponent(docId)}`, { method: "DELETE" });
+    await onChange();
+  }
+
+  async function moverSecao(docId, novaSecao) {
+    await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ docId, secao: novaSecao, requisito: null }) });
+    await onChange();
+  }
+  async function moverRequisito(docId, requisito) {
+    await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ docId, requisito: requisito || null }) });
+    await onChange();
+  }
+
+  // Linha de um documento (com seletor de seção e de requisito quando é a área do cliente)
+  const Linha = (d) => {
+    const sec = SECOES_AUDITORIA.includes(d.secao) ? d.secao : "Outros";
+    const reqs = requisitosDaSecao(sec);
+    return (
+      <div key={d.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[12px]">
+        <span className="inline-flex items-center gap-1.5 min-w-0"><FileText size={13} className="text-torg-blue shrink-0" /><span className="truncate text-torg-dark">{d.nome}</span></span>
+        <div className="flex items-center gap-2 shrink-0">
+          {sugestao && (
+            <select value={sec} onChange={(e) => moverSecao(d.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 text-torg-gray focus:border-torg-blue max-w-[130px]">
+              {SECOES_AUDITORIA.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+          {sugestao && reqs.length >= 2 && (
+            <select value={d.requisito || ""} onChange={(e) => moverRequisito(d.id, e.target.value)} title="Linha (requisito) que o documento atende" className="text-[10px] border border-gray-200 rounded px-1 py-0.5 text-torg-gray focus:border-torg-blue max-w-[150px]">
+              <option value="">— linha —</option>
+              {reqs.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+            </select>
+          )}
+          <button onClick={() => remover(d.id)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
+        </div>
+      </div>
+    );
+  };
+
+  // Agrupa por seção (só na área do cliente / EVIDENCIA)
+  const gruposDoc = (() => {
+    if (!sugestao) return null;
+    const m = {};
+    for (const d of docs) { const s = SECOES_AUDITORIA.includes(d.secao) ? d.secao : "Outros"; (m[s] ||= []).push(d); }
+    return ordenarSecoes(Object.keys(m)).map((s) => [s, m[s]]);
+  })();
+
+  return (
+    <div className="mt-2">
+      {titulo && <p className="text-[11px] font-semibold text-torg-gray mb-1.5">{titulo}</p>}
+      {docs.length === 0 ? (
+        <p className="text-[11px] text-torg-gray italic mb-2">Nenhum documento.</p>
+      ) : gruposDoc ? (
+        <div className="space-y-2 mb-2">
+          {gruposDoc.map(([secao, lista]) => (
+            <div key={secao} className="border border-gray-100 rounded-lg overflow-hidden">
+              <div className="bg-gray-50/70 px-2.5 py-1 text-[10px] font-semibold text-torg-gray uppercase tracking-wide">{secao} · {lista.length}</div>
+              <div className="divide-y divide-gray-50">{lista.map((d) => Linha(d))}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg mb-2">{docs.map((d) => Linha(d))}</div>
+      )}
+
+      <div className="flex items-center gap-3 flex-wrap">
+        {sugestao && (
+          <label className="text-[10px] text-torg-gray inline-flex items-center gap-1">Seção:
+            <select value={secaoUpload} onChange={(e) => setSecaoUpload(e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 text-torg-dark focus:border-torg-blue">
+              {SECOES_AUDITORIA.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+        )}
+        <input ref={fileRef} type="file" multiple className="hidden" onChange={anexarArquivo} accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.msg,.eml" />
+        <button onClick={() => fileRef.current?.click()} disabled={enviando} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? `Enviando ${progresso}…` : "Anexar arquivos"}</button>
+        <button onClick={() => setPicker((v) => !v)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Search size={12} /> Trazer do Controle de Documentos</button>
+        {sugestao && (
+          <button onClick={sugerir} disabled={sugerindo} title="O Torguinho lê as solicitações do cliente e sugere os documentos" className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1 inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50">{sugerindo ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} {sugerindo ? "Analisando…" : "Sugerir documentos (IA)"}</button>
+        )}
+      </div>
+
+      {picker && (
+        <div className="mt-2 border border-gray-100 rounded-lg p-2">
+          <form onSubmit={buscar} className="flex items-center gap-2 mb-1.5">
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="buscar por nome, norma, nº…" className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue" />
+            <button type="submit" disabled={buscando} className="text-[11px] text-torg-blue inline-flex items-center gap-1 disabled:opacity-50">{buscando ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />} Buscar</button>
+          </form>
+          {resultados && (resultados.length ? (
+            <>
+              <div className="divide-y divide-gray-50 max-h-52 overflow-y-auto">
+                {resultados.map((d) => (
+                  <label key={d.id} className="flex items-center gap-2 px-2 py-1.5 text-[11px] hover:bg-torg-blue-50 cursor-pointer">
+                    <input type="checkbox" checked={selDocs.has(d.id)} onChange={() => toggleSel(d.id)} className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue shrink-0" />
+                    <span className="truncate text-torg-dark flex-1">{d.nome}</span>
+                    <span className="text-torg-gray shrink-0 whitespace-nowrap">{d.categoria}{d.temArquivo ? "" : " · sem arquivo"}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-gray-50">
+                <span className="text-[10px] text-torg-gray">{selDocs.size} selecionado(s)</span>
+                <button onClick={adicionarSelecionados} disabled={selDocs.size === 0} className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1 inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50"><Plus size={12} /> Adicionar selecionados</button>
+              </div>
+            </>
+          ) : <p className="text-[10px] text-torg-gray">Nenhum documento encontrado.</p>)}
+        </div>
+      )}
+
+      {sugestao && sugestoes && (
+        <div className="mt-2 border border-torg-blue-200 bg-torg-blue-50/40 rounded-lg p-2.5">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <p className="text-[11px] font-semibold text-torg-dark inline-flex items-center gap-1"><Sparkles size={12} className="text-torg-blue" /> Sugestões do Torguinho ({sugestoes.length})</p>
+            {sugestoes.some((s) => !s.jaAnexado) && (
+              <button onClick={adicionarTodas} className="text-[11px] font-semibold text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Plus size={12} /> Adicionar todas</button>
+            )}
+          </div>
+          {sugestoes.length ? (
+            <div className="space-y-1.5">
+              {sugestoes.map((s) => (
+                <div key={s.id} className="flex items-start justify-between gap-2 bg-white rounded-lg border border-gray-100 px-2.5 py-1.5">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium text-torg-dark truncate">{s.nome}</p>
+                    {s.motivo && <p className="text-[10px] text-torg-gray leading-snug">{s.motivo}</p>}
+                  </div>
+                  {s.jaAnexado
+                    ? <span className="text-[10px] text-emerald-600 inline-flex items-center gap-1 shrink-0"><CheckCircle2 size={11} /> já incluso</span>
+                    : <button onClick={() => vincular(s)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 shrink-0"><Plus size={12} /> adicionar</button>}
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-[10px] text-torg-gray">Nenhuma sugestão — refine as solicitações ou adicione manualmente.</p>}
+        </div>
+      )}
+    </div>
+  );
+}

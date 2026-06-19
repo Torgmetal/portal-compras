@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, RefreshCw, Scissors, Clock, PackageSearch } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Scissors, Clock, PackageSearch, Gauge } from "lucide-react";
 import { MAQUINA_COR } from "@/lib/maquina-corte";
 
 const fmtKg = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
@@ -64,6 +64,25 @@ export default function CargaCorteClient() {
         </button>
       </div>
 
+      {/* Resumo da preparação (meta do setor) */}
+      <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <Gauge size={20} className="text-torg-blue" />
+          <div>
+            <p className="text-sm font-bold text-torg-dark">Carga da Preparação</p>
+            <p className="text-[11px] text-torg-gray">
+              meta {dados.metaKgDia.toLocaleString("pt-BR")} kg/dia (setor) · fila atual {fmtKg(dados.preparacao.backlogKg)}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-extrabold text-torg-blue tabular-nums leading-none">
+            {dados.preparacao.dias} <span className="text-sm font-semibold text-torg-gray">dias</span>
+          </p>
+          <p className="text-[11px] text-torg-gray">à meta do setor</p>
+        </div>
+      </div>
+
       {/* Aguardando liberação (sem máquina) */}
       {dados.pendentes.pecas > 0 && (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center gap-2.5 text-sm">
@@ -86,7 +105,7 @@ export default function CargaCorteClient() {
                 <span className={`text-sm font-bold flex items-center gap-2 ${cor.text}`}>
                   <span className={`w-2.5 h-2.5 rounded-full ${cor.dot}`} /> {m.label}
                 </span>
-                <span className="text-[11px] text-torg-gray">cap. {m.capKgDia ? `${m.capKgDia.toLocaleString("pt-BR")} kg/dia` : "sem base"}</span>
+                <span className="text-[11px] text-torg-gray">{m.ritmoRealKgDia ? `ritmo 30d: ${m.ritmoRealKgDia.toLocaleString("pt-BR")} kg/dia` : "sem base 30d"}</span>
               </div>
               <div className="p-4 space-y-3">
                 {/* Carga / dias */}
@@ -136,8 +155,8 @@ export default function CargaCorteClient() {
       </div>
 
       <p className="text-[11px] text-torg-gray">
-        Dias de carga = peso comprometido ÷ capacidade real da máquina (kg/dia, medida no Syneco nos últimos 30 dias).
-        O slot livre assume a fila atual sem furo de prioridade.
+        Dias de carga = peso comprometido ÷ meta da preparação ({dados.metaKgDia.toLocaleString("pt-BR")} kg/dia do setor).
+        "Ritmo 30d" é a produção real medida no Syneco, mostrada só como referência. O slot livre assume a fila atual sem furo de prioridade.
       </p>
     </div>
   );

@@ -358,6 +358,15 @@ export default function PCPDashboardClient() {
             </div>
           </div>
 
+          {/* Carimbo da baixa automática (cron) */}
+          {data.ultimaBaixa && (
+            <div className="px-5 py-1.5 bg-gray-50/70 border-b border-gray-100 flex items-center gap-1.5 text-[10px] text-torg-gray">
+              <RefreshCw size={11} className="text-torg-blue" />
+              Baixa automática do corte · última: <span className="font-semibold text-torg-dark">{fmtHora(data.ultimaBaixa.em)}</span>
+              {data.ultimaBaixa.atualizadas > 0 && <span className="text-torg-blue">· {data.ultimaBaixa.atualizadas} peça(s) baixada(s)</span>}
+            </div>
+          )}
+
           {/* Em corte agora */}
           <div className="px-5 py-2.5 bg-green-50/40 border-b border-green-100">
             <p className="text-[10px] font-bold text-torg-gray uppercase tracking-wider mb-1.5">Em corte agora ({agoraFiltrado.length})</p>
