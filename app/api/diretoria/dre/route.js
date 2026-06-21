@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireDiretoria } from "@/lib/diretoria";
-import { DRE_ANO, DRE_GRUPOS, DRE_RESULTADOS, prefixoCategoria, ehParcelamento } from "@/lib/dre-alvo";
+import { DRE_ANO, DRE_GRUPOS, DRE_RESULTADOS, TAXA_DEDUCAO, prefixoCategoria, ehParcelamento, ehComissao } from "@/lib/dre-alvo";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -40,16 +40,21 @@ export async function GET(req) {
 
   // Agrega a pagar por prefixo de categoria
   const porPrefixo = new Map();
-  let semCategoria = 0, deducoesReal = 0, parcelFin = 0;
+  let semCategoria = 0, parcelFin = 0, comissoes = 0;
   for (const c of pg) {
     const v = c.valor || 0;
     const nome = (c.categoriaNome || "").trim();
     if (!nome) { semCategoria += v; continue; }
+    if (ehComissao(nome)) { comissoes += v; continue; } // despesa comercial/comissão → Gastos Variáveis
     const pre = prefixoCategoria(nome);
-    if (pre === "2") { if (ehParcelamento(nome)) parcelFin += v; else deducoesReal += v; continue; }
+    // prefixo 2 = impostos s/ venda (absorvidos na dedução % abaixo); só o parcelamento vira financeira
+    if (pre === "2") { if (ehParcelamento(nome)) parcelFin += v; continue; }
     if (!pre) { semCategoria += v; continue; }
     porPrefixo.set(pre, (porPrefixo.get(pre) || 0) + v);
   }
+
+  // Deduções = % da receita (igual ao alvo); não estão lançadas no a pagar (retidas na nota)
+  const deducoes = r2(receita * TAXA_DEDUCAO);
 
   // Realizado por grupo + prefixos usados
   const usados = new Set();
@@ -57,6 +62,7 @@ export async function GET(req) {
     let real = 0;
     for (const p of g.prefixos) { real += porPrefixo.get(p) || 0; usados.add(p); }
     if (g.key === "financeiras") real += parcelFin; // 2.x parcelamento entra em financeiras
+    if (g.key === "variaveis") real = comissoes;    // comissões/despesas comerciais
     return { ...g, alvo: r2(g.alvoAno * fator), real: r2(real) };
   });
   const get = (k) => grupos.find((g) => g.key === k);
@@ -71,7 +77,6 @@ export async function GET(req) {
   const sgaReal = soma("SGA");
   const ativosReal = get("ativos").real;
   const financeirasReal = get("financeiras").real;
-  const deducoes = r2(deducoesReal);
   const receitaLiquida = r2(receita - deducoes);
   const resultadoBruto = r2(receitaLiquida - custoTotalReal);
   const resultadoOperacional = r2(resultadoBruto - sgaReal);
