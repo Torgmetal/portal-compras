@@ -282,6 +282,9 @@ function Ruptura({ fin }) {
         )}
       </section>
 
+      {/* Fluxo de caixa diário */}
+      <FluxoDiario fluxo={ruptura.fluxoDiario} piorAcumulado={ruptura.piorAcumulado} piorDia={ruptura.piorDia} />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Concentração de credores */}
         <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
@@ -448,6 +451,60 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
         <p className="text-xs text-torg-gray text-center">Mostrando os {LIMITE} primeiros (ordenados por vencimento) de {filtrados.length}. Use a busca para refinar.</p>
       )}
     </div>
+  );
+}
+
+/* ─────────────────────── fluxo de caixa diário (ruptura) ─────────────────────── */
+function FluxoDiario({ fluxo, piorAcumulado, piorDia }) {
+  if (!fluxo?.length) return (
+    <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
+      <p className="text-sm text-torg-gray mt-2">Sem movimentos nos próximos 60 dias.</p>
+    </section>
+  );
+  const hojeK = new Date().toISOString().slice(0, 10);
+  return (
+    <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
+      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
+          <p className="text-[11px] text-torg-gray mt-0.5">A pagar (saída) × recebimentos faturados e previsões (entrada), por dia. O acumulado parte de zero (não inclui o caixa atual) — serve pra achar o pico e decidir antecipações. Vencidos entram no primeiro dia.</p>
+        </div>
+        {piorAcumulado < 0 && (
+          <div className="text-right shrink-0">
+            <p className="text-[11px] text-torg-gray">Pico de necessidade</p>
+            <p className="text-lg font-extrabold text-red-700 tabular-nums leading-none">−{fmtR$(Math.abs(piorAcumulado))}</p>
+            <p className="text-[10px] text-torg-gray">por volta de {fmtDia(piorDia)}</p>
+          </div>
+        )}
+      </div>
+      <div className="max-h-96 overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50/80 text-left text-[11px] uppercase tracking-wide text-torg-gray sticky top-0">
+            <tr>
+              <th className="px-4 py-2">Dia</th>
+              <th className="px-4 py-2 text-right">A pagar</th>
+              <th className="px-4 py-2 text-right">Receb. faturado</th>
+              <th className="px-4 py-2 text-right">Receb. previsto</th>
+              <th className="px-4 py-2 text-right">Líquido</th>
+              <th className="px-4 py-2 text-right">Acumulado</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {fluxo.map((f) => (
+              <tr key={f.dia} className="hover:bg-gray-50/50">
+                <td className="px-4 py-1.5 whitespace-nowrap text-torg-dark">{fmtDia(f.dia)}{f.dia === hojeK ? <span className="text-[10px] text-torg-gray"> (+vencidos)</span> : null}</td>
+                <td className="px-4 py-1.5 text-right tabular-nums text-rose-600">{f.pagar > 0 ? fmtR$(f.pagar) : "—"}</td>
+                <td className="px-4 py-1.5 text-right tabular-nums text-emerald-700">{f.receberFat > 0 ? fmtR$(f.receberFat) : "—"}</td>
+                <td className="px-4 py-1.5 text-right tabular-nums text-torg-blue">{f.receberPrev > 0 ? fmtR$(f.receberPrev) : "—"}</td>
+                <td className={`px-4 py-1.5 text-right tabular-nums font-medium ${f.liquido < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmtR$(f.liquido)}</td>
+                <td className={`px-4 py-1.5 text-right tabular-nums font-semibold ${f.acumulado < 0 ? "text-red-700 bg-red-50/50" : "text-torg-dark"}`}>{fmtR$(f.acumulado)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
