@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import Link from "next/link";
 import {
   Lock, Loader2, AlertCircle, UserPlus, X, ShieldCheck, ArrowLeft,
@@ -43,6 +43,23 @@ export default function DiretoriaClient({ isDono, userNome }) {
     } catch (e) { setErroFin(e.message); } finally { setLoadingFin(false); }
   }, []);
   useEffect(() => { carregarFin(); }, [carregarFin]);
+
+  // Sincroniza Contas a Pagar + a Receber do Omie (botão "sincronizar" + rede de
+  // segurança: se o dado estiver com mais de 12h ao abrir, atualiza sozinho 1x).
+  const [sincronizando, setSincronizando] = useState(false);
+  const autoSyncFeito = useRef(false);
+  const sincronizarFin = useCallback(async () => {
+    setSincronizando(true);
+    try { await fetch("/api/diretoria/sincronizar", { method: "POST" }); }
+    catch { /* silencioso */ }
+    finally { await carregarFin(); setSincronizando(false); }
+  }, [carregarFin]);
+  useEffect(() => {
+    if (!fin || autoSyncFeito.current) return;
+    const ts = [fin.sync?.pagar, fin.sync?.receber].filter(Boolean).map((d) => new Date(d).getTime());
+    const horas = ts.length ? (Date.now() - Math.min(...ts)) / 3600000 : 999;
+    if (horas > 12) { autoSyncFeito.current = true; sincronizarFin(); }
+  }, [fin, sincronizarFin]);
 
   // ── Listas detalhadas (lazy por aba) ────────────────────────
   const [listas, setListas] = useState({});
@@ -115,8 +132,13 @@ export default function DiretoriaClient({ isDono, userNome }) {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={carregarFin} disabled={loadingFin} className="text-xs text-white/80 hover:text-white inline-flex items-center gap-1.5 disabled:opacity-50">
-              <RefreshCw size={13} className={loadingFin ? "animate-spin" : ""} /> atualizar
+            {fin?.sync?.receber && (
+              <span className="text-[10px] text-white/55 hidden sm:inline" title={`Omie — a pagar: ${fmtDataHora(fin.sync.pagar)} · a receber: ${fmtDataHora(fin.sync.receber)}`}>
+                Omie: {fmtDataHora(fin.sync.receber)}
+              </span>
+            )}
+            <button onClick={sincronizarFin} disabled={sincronizando || loadingFin} className="text-xs text-white/80 hover:text-white inline-flex items-center gap-1.5 disabled:opacity-50">
+              <RefreshCw size={13} className={sincronizando || loadingFin ? "animate-spin" : ""} /> {sincronizando ? "sincronizando…" : "sincronizar Omie"}
             </button>
             <Link href="/" className="text-xs text-white/80 hover:text-white inline-flex items-center gap-1.5"><ArrowLeft size={14} /> Portal</Link>
           </div>
