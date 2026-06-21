@@ -2304,6 +2304,16 @@ model DiretoriaFaturamentoData {
   atualizadoEm    DateTime @updatedAt
 }
 
+// Config chave-valor do módulo Diretoria (ex: id "saldoCaixa" = saldo de caixa
+// atual, usado como ponto de partida do fluxo de caixa diário).
+model DiretoriaConfig {
+  id            String   @id
+  valor         Float    @default(0)
+  observacao    String?
+  atualizadoPor String?
+  atualizadoEm  DateTime @updatedAt
+}
+
 // Vínculo manual de uma NFS-e emitida na prefeitura (SigissWeb/Conchal), que não
 // está no Omie, com um projeto/obra do Omie — para somar no faturado da obra.
 model NfseConchalVinculo {

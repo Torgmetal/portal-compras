@@ -38,7 +38,7 @@ export async function GET() {
   const hoje = new Date(hojeIso + "T00:00:00.000Z");
   const em30 = new Date(hoje.getTime() + 30 * 86400000);
 
-  const [pagarRaw, recRaw, prev, syncPg, syncRc] = await Promise.all([
+  const [pagarRaw, recRaw, prev, syncPg, syncRc, cfgSaldo] = await Promise.all([
     prisma.contaPagar.findMany({
       where: { status: { notIn: ["PAGO", "CANCELADO", "LIQUIDADO"] } },
       select: { valor: true, valorPago: true, dataVencimento: true, fornecedorNome: true, numeroDocumento: true, categoriaNome: true },
@@ -50,6 +50,7 @@ export async function GET() {
     calcularPrevisaoFaturamento(hoje), // fonte única (mesma da aba Previsão de faturamento)
     prisma.omieSyncState.findUnique({ where: { id: "contapagar" }, select: { ultimoSync: true } }),
     prisma.omieSyncState.findUnique({ where: { id: "contareceber" }, select: { ultimoSync: true } }),
+    prisma.diretoriaConfig.findUnique({ where: { id: "saldoCaixa" } }),
   ]);
 
   const pagarItems = pagarRaw.map((c) => ({ saldo: Math.max(0, (c.valor || 0) - (c.valorPago || 0)), venc: c.dataVencimento, nome: c.fornecedorNome || "—", doc: c.numeroDocumento }));
@@ -135,7 +136,10 @@ export async function GET() {
   for (const it of pagarItems) { if (it.saldo > 0.005) addDia(bucket(it.venc), "pagar", it.saldo); }
   for (const it of recItems) { if (it.saldo > 0.005) addDia(bucket(it.venc), "receberFat", it.saldo); }
   for (const o of prev.ops) { if (o.saldoLiq > 0.005 && o.dataRecebimento) addDia(bucket(o.dataRecebimento), "receberPrev", o.saldoLiq); }
-  let acum = 0, piorAcumulado = 0, piorDia = null;
+  // Acumulado parte do saldo de caixa atual (config "saldoCaixa") → vira o saldo
+  // de caixa PROJETADO dia a dia.
+  const saldoInicial = r2(cfgSaldo?.valor || 0);
+  let acum = saldoInicial, piorAcumulado = saldoInicial, piorDia = hojeK;
   const fluxoDiario = [...dias.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, e]) => {
     const liquido = e.receberFat + e.receberPrev - e.pagar;
     acum += liquido;
@@ -161,11 +165,11 @@ export async function GET() {
   if (g7 && g7.gap < 0)
     flags.push({ sev: "alta", texto: `Curtíssimo prazo: faltam ${fmtR$(Math.abs(g7.gap))} para os compromissos dos próximos 7 dias.` });
   if (piorAcumulado < 0)
-    flags.push({ sev: "alta", texto: `Pico de caixa negativo de ${fmtR$(Math.abs(piorAcumulado))} por volta de ${ddmm(piorDia)} (a pagar supera recebimentos + previsões acumulados em 60 dias) — avaliar antecipar faturamento para cobrir.` });
+    flags.push({ sev: "alta", texto: `Caixa projetado chega a ${fmtR$(piorAcumulado)} por volta de ${ddmm(piorDia)} (partindo de ${fmtR$(saldoInicial)} hoje, a pagar supera recebimentos + previsões) — avaliar antecipar faturamento para cobrir.` });
 
   return NextResponse.json({
     aPagar, aReceber, posicao, previsao, categoriasPagar,
-    ruptura: { janelas, topCredores, topTitulosPagar, cobertura, flags, fluxoDiario, piorAcumulado: r2(piorAcumulado), piorDia },
+    ruptura: { janelas, topCredores, topTitulosPagar, cobertura, flags, fluxoDiario, piorAcumulado: r2(piorAcumulado), piorDia, saldoInicial, saldoAtualizadoEm: cfgSaldo?.atualizadoEm || null },
     sync: { pagar: syncPg?.ultimoSync || null, receber: syncRc?.ultimoSync || null },
   });
 }

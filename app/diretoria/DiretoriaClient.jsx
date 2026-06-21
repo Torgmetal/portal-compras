@@ -144,7 +144,7 @@ export default function DiretoriaClient({ isDono, userNome }) {
         ) : null}
 
         {/* ════════ PONTOS DE RUPTURA ════════ */}
-        {aba === "ruptura" && fin && <Ruptura fin={fin} />}
+        {aba === "ruptura" && fin && <Ruptura fin={fin} onRefresh={carregarFin} />}
 
         {/* ════════ ONDE CORTAR ════════ */}
         {aba === "cortar" && fin && <OndeCortar categorias={fin.categoriasPagar} totalPagar={fin.aPagar.total} />}
@@ -215,7 +215,7 @@ export default function DiretoriaClient({ isDono, userNome }) {
 }
 
 /* ─────────────────────── PONTOS DE RUPTURA ─────────────────────── */
-function Ruptura({ fin }) {
+function Ruptura({ fin, onRefresh }) {
   const { ruptura, previsao } = fin;
   return (
     <div className="space-y-6">
@@ -283,7 +283,8 @@ function Ruptura({ fin }) {
       </section>
 
       {/* Fluxo de caixa diário */}
-      <FluxoDiario fluxo={ruptura.fluxoDiario} piorAcumulado={ruptura.piorAcumulado} piorDia={ruptura.piorDia} />
+      <FluxoDiario fluxo={ruptura.fluxoDiario} piorAcumulado={ruptura.piorAcumulado} piorDia={ruptura.piorDia}
+        saldoInicial={ruptura.saldoInicial} saldoAtualizadoEm={ruptura.saldoAtualizadoEm} onRefresh={onRefresh} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Concentração de credores */}
@@ -455,25 +456,63 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
 }
 
 /* ─────────────────────── fluxo de caixa diário (ruptura) ─────────────────────── */
-function FluxoDiario({ fluxo, piorAcumulado, piorDia }) {
+function FluxoDiario({ fluxo, piorAcumulado, piorDia, saldoInicial, saldoAtualizadoEm, onRefresh }) {
+  const [editandoSaldo, setEditandoSaldo] = useState(false);
+  const [saldoInput, setSaldoInput] = useState(String(saldoInicial ?? 0));
+  const [salvandoSaldo, setSalvandoSaldo] = useState(false);
+
+  async function salvarSaldo() {
+    const v = Number(String(saldoInput).replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(v)) { alert("Valor inválido"); return; }
+    setSalvandoSaldo(true);
+    try {
+      const r = await fetch("/api/diretoria/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ saldoCaixa: v }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao salvar");
+      setEditandoSaldo(false);
+      onRefresh?.();
+    } catch (e) { alert(e.message); } finally { setSalvandoSaldo(false); }
+  }
+
+  const hojeK = new Date().toISOString().slice(0, 10);
+  const saldoBox = (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-torg-gray">Saldo em caixa hoje:</span>
+      {editandoSaldo ? (
+        <>
+          <input value={saldoInput} onChange={(e) => setSaldoInput(e.target.value)} autoFocus
+            className="w-32 px-2 py-1 text-sm border border-gray-200 rounded outline-none focus:border-torg-blue tabular-nums" placeholder="-90000" />
+          <button onClick={salvarSaldo} disabled={salvandoSaldo} className="text-[11px] text-white bg-torg-blue px-2 py-1 rounded disabled:opacity-50">salvar</button>
+          <button onClick={() => { setEditandoSaldo(false); setSaldoInput(String(saldoInicial ?? 0)); }} className="text-[11px] text-torg-gray hover:underline">cancelar</button>
+        </>
+      ) : (
+        <>
+          <span className={`font-bold tabular-nums ${(saldoInicial || 0) < 0 ? "text-red-700" : "text-torg-dark"}`}>{fmtR$(saldoInicial)}</span>
+          <button onClick={() => { setSaldoInput(String(saldoInicial ?? 0)); setEditandoSaldo(true); }} title="Editar saldo" className="text-torg-gray hover:text-torg-blue"><Pencil size={12} /></button>
+        </>
+      )}
+    </div>
+  );
+
   if (!fluxo?.length) return (
-    <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+    <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-2">
       <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
-      <p className="text-sm text-torg-gray mt-2">Sem movimentos nos próximos 60 dias.</p>
+      {saldoBox}
+      <p className="text-sm text-torg-gray">Sem movimentos nos próximos 60 dias.</p>
     </section>
   );
-  const hojeK = new Date().toISOString().slice(0, 10);
   return (
     <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
-      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+      <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
-          <p className="text-[11px] text-torg-gray mt-0.5">A pagar (saída) × recebimentos faturados e previsões (entrada), por dia. O acumulado parte de zero (não inclui o caixa atual) — serve pra achar o pico e decidir antecipações. Vencidos entram no primeiro dia.</p>
+          <p className="text-[11px] text-torg-gray mt-0.5 mb-2">A pagar (saída) × recebimentos faturados e previsões (entrada), por dia. O <b>acumulado</b> é o <b>saldo de caixa projetado</b>, partindo do saldo de hoje. Vencidos entram no primeiro dia.</p>
+          {saldoBox}
         </div>
         {piorAcumulado < 0 && (
           <div className="text-right shrink-0">
-            <p className="text-[11px] text-torg-gray">Pico de necessidade</p>
-            <p className="text-lg font-extrabold text-red-700 tabular-nums leading-none">−{fmtR$(Math.abs(piorAcumulado))}</p>
+            <p className="text-[11px] text-torg-gray">Pior saldo projetado</p>
+            <p className="text-lg font-extrabold text-red-700 tabular-nums leading-none">{fmtR$(piorAcumulado)}</p>
             <p className="text-[10px] text-torg-gray">por volta de {fmtDia(piorDia)}</p>
           </div>
         )}
@@ -487,7 +526,7 @@ function FluxoDiario({ fluxo, piorAcumulado, piorDia }) {
               <th className="px-4 py-2 text-right">Receb. faturado</th>
               <th className="px-4 py-2 text-right">Receb. previsto</th>
               <th className="px-4 py-2 text-right">Líquido</th>
-              <th className="px-4 py-2 text-right">Acumulado</th>
+              <th className="px-4 py-2 text-right">Saldo projetado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
