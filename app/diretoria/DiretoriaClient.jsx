@@ -5,7 +5,7 @@ import {
   Lock, Loader2, AlertCircle, UserPlus, X, ShieldCheck, ArrowLeft,
   TrendingUp, TrendingDown, Wallet, Banknote, Truck, RefreshCw,
   AlertTriangle, Flame, Search, ArrowDownRight, ArrowUpRight,
-  CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown,
+  CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download,
 } from "lucide-react";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
@@ -480,6 +480,7 @@ function Conferencia() {
   const [busca, setBusca] = useState("");
   const [expand, setExpand] = useState(null);
   const [salvandoId, setSalvandoId] = useState(null);
+  const [exportando, setExportando] = useState(false);
   const LIMITE = 400;
 
   const carregar = useCallback(async (t) => {
@@ -504,6 +505,37 @@ function Conferencia() {
       if (!resp.ok) throw new Error(j.error || "Erro");
       setData((d) => ({ ...d, itens: d.itens.map((i) => (i.id === item.id ? { ...i, situacao: limpar ? null : situacao } : i)) }));
     } catch (e) { alert(e.message); } finally { setSalvandoId(null); }
+  }
+
+  async function exportar() {
+    if (!data?.itens?.length) return;
+    setExportando(true);
+    try {
+      const xl = await import("@/lib/excel-relatorio");
+      const headers = ["Situação", "Código Omie", tipo === "receber" ? "Cliente" : "Fornecedor", "Categoria", "Cód. cat", "Tipo doc", "Nº doc", "NF", "Chave NFe", tipo === "receber" ? "Pedido/OS" : "Pedido compra", "Conta corrente", "Emissão", "Vencimento", "Status Omie", "Detalhe", "Sincronizado", "Alterado Omie", "Sinais", "Valor", "Saldo"];
+      const { workbook, sheet: ws, linhaInicio } = await xl.criarRelatorioTorg({
+        titulo: `Conferência de lançamentos — ${tipo === "receber" ? "A Receber" : "A Pagar"}`,
+        nomePlanilha: tipo === "receber" ? "A Receber" : "A Pagar",
+        totalColunas: headers.length, codigoDoc: "REL-DIR-002",
+      });
+      let row = linhaInicio;
+      xl.adicionarHeaderTabela(ws, row, headers); row++;
+      const alin = { 18: "right", 19: "right" };
+      for (const i of data.itens) {
+        xl.adicionarLinhaTabela(ws, row, [
+          i.situacao === "CONFERIDO" ? "Conferido" : i.situacao === "SUSPEITO" ? "Suspeito" : "",
+          i.id, i.nome, i.categoriaNome || "", i.categoriaCodigo || "", i.tipoDoc || "",
+          i.numeroDocumento || "", i.numeroDocFiscal || "", i.chaveNfe || "", i.numeroPedido || "",
+          i.contaCorrenteId || "", fmtDia(i.emissao), fmtDia(i.venc), i.status || "",
+          i.detalheCarregado ? "sim" : "não", fmtDataHora(i.syncedAt), fmtDataHora(i.dataAlteracaoOmie),
+          i.flags.join(", "), Number(i.valor || 0), Number(i.saldo || 0),
+        ], { alinhamento: alin });
+        row++;
+      }
+      xl.adicionarLinhaTotais(ws, row, ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", `TOTAL — ${data.itens.length} título(s)`, "", Number(data.resumo.saldoTotal)]);
+      const hojeStr = new Date().toLocaleDateString("en-CA");
+      await xl.downloadWorkbook(workbook, `Conferencia ${tipo === "receber" ? "a receber" : "a pagar"} ${hojeStr}.xlsx`);
+    } catch (e) { alert("Erro ao exportar: " + e.message); } finally { setExportando(false); }
   }
 
   const { lista, cont } = useMemo(() => {
@@ -564,9 +596,15 @@ function Conferencia() {
           <FiltroBtn id="conferidos" label="Conferidos" n={cont.conferidos} />
           <FiltroBtn id="todos" label="Todos" n={resumo.total} />
         </div>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="código, fornecedor, NF…" className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none w-56" />
+        <div className="flex items-center gap-2">
+          <button onClick={exportar} disabled={exportando} title="Exportar todos os lançamentos com a trilha e os sinais (Excel com filtro)"
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-medium hover:bg-emerald-100 disabled:opacity-50">
+            {exportando ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Exportar Excel
+          </button>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="código, fornecedor, NF…" className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none w-56" />
+          </div>
         </div>
       </div>
 
