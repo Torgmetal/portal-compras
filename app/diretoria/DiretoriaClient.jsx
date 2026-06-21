@@ -504,6 +504,7 @@ function Conferencia() {
   const [erro, setErro] = useState("");
   const [filtro, setFiltro] = useState("atencao");
   const [busca, setBusca] = useState("");
+  const [mesVenc, setMesVenc] = useState("todos");
   const [expand, setExpand] = useState(null);
   const [salvandoId, setSalvandoId] = useState(null);
   const [exportando, setExportando] = useState(false);
@@ -547,7 +548,8 @@ function Conferencia() {
       let row = linhaInicio;
       xl.adicionarHeaderTabela(ws, row, headers); row++;
       const alin = { 18: "right", 19: "right" };
-      for (const i of data.itens) {
+      const exp = lista; // exporta o recorte atual (mês + filtro + busca)
+      for (const i of exp) {
         xl.adicionarLinhaTabela(ws, row, [
           i.situacao === "CONFERIDO" ? "Conferido" : i.situacao === "SUSPEITO" ? "Suspeito" : "",
           i.id, i.nome, i.categoriaNome || "", i.categoriaCodigo || "", i.tipoDoc || "",
@@ -558,31 +560,37 @@ function Conferencia() {
         ], { alinhamento: alin });
         row++;
       }
-      xl.adicionarLinhaTotais(ws, row, ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", `TOTAL — ${data.itens.length} título(s)`, "", Number(data.resumo.saldoTotal)]);
+      xl.adicionarLinhaTotais(ws, row, ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", `TOTAL — ${exp.length} título(s)`, "", Number(exp.reduce((s, i) => s + (i.saldo || 0), 0))]);
       const hojeStr = new Date().toLocaleDateString("en-CA");
-      await xl.downloadWorkbook(workbook, `Conferencia ${tipo === "receber" ? "a receber" : "a pagar"} ${hojeStr}.xlsx`);
+      const sufixoMes = mesVenc !== "todos" ? ` venc ${mesVenc}` : "";
+      await xl.downloadWorkbook(workbook, `Conferencia ${tipo === "receber" ? "a receber" : "a pagar"}${sufixoMes} ${hojeStr}.xlsx`);
     } catch (e) { alert("Erro ao exportar: " + e.message); } finally { setExportando(false); }
   }
 
-  const { lista, cont } = useMemo(() => {
+  const { lista, cont, meses, totalMes } = useMemo(() => {
     const itens = data?.itens || [];
     const GRAVES = ["possível duplicado", "sem vínculo", "sem categoria", "alterado após sync"];
     const ehGrave = (i) => i.flags.some((f) => GRAVES.includes(f));
+    // meses de vencimento presentes (p/ o seletor)
+    const meses = [...new Set(itens.map((i) => (i.venc || "").slice(0, 7)).filter(Boolean))].sort();
+    // base = recorte do mês de vencimento escolhido
+    const base = mesVenc === "todos" ? itens : itens.filter((i) => (i.venc || "").slice(0, 7) === mesVenc);
     const cont = {
-      conferidos: itens.filter((i) => i.situacao === "CONFERIDO").length,
-      suspeitos: itens.filter((i) => i.situacao === "SUSPEITO").length,
-      atencao: itens.filter((i) => ehGrave(i) && i.situacao !== "CONFERIDO").length,
+      conferidos: base.filter((i) => i.situacao === "CONFERIDO").length,
+      suspeitos: base.filter((i) => i.situacao === "SUSPEITO").length,
+      atencao: base.filter((i) => ehGrave(i) && i.situacao !== "CONFERIDO").length,
     };
     const q = busca.trim().toLowerCase();
-    const lista = itens.filter((i) => {
+    const lista = base.filter((i) => {
       if (filtro === "atencao" && !(ehGrave(i) && i.situacao !== "CONFERIDO")) return false;
       if (filtro === "suspeitos" && i.situacao !== "SUSPEITO") return false;
       if (filtro === "conferidos" && i.situacao !== "CONFERIDO") return false;
       if (!q) return true;
       return [i.nome, i.id, i.numeroDocFiscal, i.numeroDocumento, i.categoriaNome].some((s) => (s || "").toLowerCase().includes(q));
     });
-    return { lista, cont };
-  }, [data, filtro, busca]);
+    const totalMes = base.reduce((s, i) => s + (i.saldo || 0), 0);
+    return { lista, cont, meses, totalMes };
+  }, [data, filtro, busca, mesVenc]);
 
   if (loading) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Carregando lançamentos…</div>;
   if (erro) return <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => carregar(tipo)} className="ml-auto text-xs underline">tentar de novo</button></div>;
@@ -623,7 +631,12 @@ function Conferencia() {
           <FiltroBtn id="todos" label="Todos" n={resumo.total} />
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportar} disabled={exportando} title="Exportar todos os lançamentos com a trilha e os sinais (Excel com filtro)"
+          <select value={mesVenc} onChange={(e) => setMesVenc(e.target.value)} title="Filtrar por mês de vencimento"
+            className="text-xs border border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-torg-blue bg-white text-torg-dark">
+            <option value="todos">Todos os meses</option>
+            {meses.map((m) => <option key={m} value={m}>vence {labelMes(m)}</option>)}
+          </select>
+          <button onClick={exportar} disabled={exportando} title="Exportar os lançamentos do recorte atual com a trilha e os sinais (Excel com filtro)"
             className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-medium hover:bg-emerald-100 disabled:opacity-50">
             {exportando ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Exportar Excel
           </button>
@@ -633,6 +646,10 @@ function Conferencia() {
           </div>
         </div>
       </div>
+
+      {mesVenc !== "todos" && (
+        <p className="text-xs text-torg-gray">Vencendo em <b className="text-torg-dark">{labelMes(mesVenc)}</b>: {lista.length} título(s) no filtro · total do mês <b className="text-torg-dark">{fmtR$(totalMes)}</b></p>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
