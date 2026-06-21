@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import Link from "next/link";
 import {
   Lock, Loader2, AlertCircle, UserPlus, X, ShieldCheck, ArrowLeft,
   TrendingUp, TrendingDown, Wallet, Banknote, Truck, RefreshCw,
   AlertTriangle, Flame, Search, ArrowDownRight, ArrowUpRight,
-  CalendarClock, Zap, Clock, Pencil,
+  CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown,
 } from "lucide-react";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
@@ -19,6 +19,7 @@ const ABAS_BASE = [
   { id: "resumo", label: "Resumo" },
   { id: "pagar", label: "A pagar" },
   { id: "receber", label: "A receber" },
+  { id: "conferencia", label: "Conferência" },
   { id: "previsao", label: "Previsão de faturamento" },
 ];
 const ABAS_FIN = ["ruptura", "resumo", "cortar"]; // dependem do fetch /financeiro
@@ -161,6 +162,9 @@ export default function DiretoriaClient({ isDono, userNome }) {
             <ContasView tipo={aba} data={listas[aba]} loading={loadingLista} erro={erroLista} onRetry={() => carregarLista(aba)} />
           </div>
         )}
+
+        {/* ════════ CONFERÊNCIA DE LANÇAMENTOS ════════ */}
+        {aba === "conferencia" && <Conferencia />}
 
         {/* ════════ PREVISÃO DE FATURAMENTO ════════ */}
         {aba === "previsao" && <PrevisaoFaturamento />}
@@ -451,6 +455,218 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
       {filtrados.length > LIMITE && (
         <p className="text-xs text-torg-gray text-center">Mostrando os {LIMITE} primeiros (ordenados por vencimento) de {filtrados.length}. Use a busca para refinar.</p>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────── conferência / rastreabilidade de lançamentos ─────────────────────── */
+const OMIE_TENANT = process.env.NEXT_PUBLIC_OMIE_TENANT || "torg-5mos4yik";
+const omieModuloUrl = (tipo) => `https://app.omie.com.br/gestao/${OMIE_TENANT}/#${tipo === "receber" ? "VEN" : "COM"}`;
+const FLAG_COR = {
+  "sem categoria": "bg-amber-50 text-amber-700 border-amber-200",
+  "sem NF": "bg-orange-50 text-orange-700 border-orange-200",
+  "sem vínculo": "bg-red-50 text-red-700 border-red-200",
+  "detalhe pendente": "bg-gray-100 text-gray-600 border-gray-200",
+  "possível duplicado": "bg-rose-50 text-rose-700 border-rose-200",
+  "alterado após sync": "bg-purple-50 text-purple-700 border-purple-200",
+};
+
+function Conferencia() {
+  const [tipo, setTipo] = useState("pagar");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [filtro, setFiltro] = useState("atencao");
+  const [busca, setBusca] = useState("");
+  const [expand, setExpand] = useState(null);
+  const [salvandoId, setSalvandoId] = useState(null);
+  const LIMITE = 400;
+
+  const carregar = useCallback(async (t) => {
+    setLoading(true); setErro("");
+    try {
+      const r = await fetch(`/api/diretoria/conferencia?tipo=${t}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      setData(j);
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { carregar(tipo); }, [tipo, carregar]);
+
+  async function marcar(item, situacao) {
+    setSalvandoId(item.id);
+    const limpar = item.situacao === situacao;
+    try {
+      const resp = limpar
+        ? await fetch(`/api/diretoria/conferencia?tipo=${tipo}&lancamentoId=${encodeURIComponent(item.id)}`, { method: "DELETE" })
+        : await fetch("/api/diretoria/conferencia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, lancamentoId: item.id, situacao }) });
+      const j = await resp.json();
+      if (!resp.ok) throw new Error(j.error || "Erro");
+      setData((d) => ({ ...d, itens: d.itens.map((i) => (i.id === item.id ? { ...i, situacao: limpar ? null : situacao } : i)) }));
+    } catch (e) { alert(e.message); } finally { setSalvandoId(null); }
+  }
+
+  const { lista, cont } = useMemo(() => {
+    const itens = data?.itens || [];
+    const GRAVES = ["possível duplicado", "sem vínculo", "sem categoria", "alterado após sync"];
+    const ehGrave = (i) => i.flags.some((f) => GRAVES.includes(f));
+    const cont = {
+      conferidos: itens.filter((i) => i.situacao === "CONFERIDO").length,
+      suspeitos: itens.filter((i) => i.situacao === "SUSPEITO").length,
+      atencao: itens.filter((i) => ehGrave(i) && i.situacao !== "CONFERIDO").length,
+    };
+    const q = busca.trim().toLowerCase();
+    const lista = itens.filter((i) => {
+      if (filtro === "atencao" && !(ehGrave(i) && i.situacao !== "CONFERIDO")) return false;
+      if (filtro === "suspeitos" && i.situacao !== "SUSPEITO") return false;
+      if (filtro === "conferidos" && i.situacao !== "CONFERIDO") return false;
+      if (!q) return true;
+      return [i.nome, i.id, i.numeroDocFiscal, i.numeroDocumento, i.categoriaNome].some((s) => (s || "").toLowerCase().includes(q));
+    });
+    return { lista, cont };
+  }, [data, filtro, busca]);
+
+  if (loading) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Carregando lançamentos…</div>;
+  if (erro) return <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => carregar(tipo)} className="ml-auto text-xs underline">tentar de novo</button></div>;
+  if (!data) return null;
+  const { resumo } = data;
+
+  const FiltroBtn = ({ id, label, n }) => (
+    <button onClick={() => setFiltro(id)} className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${filtro === id ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue/40"}`}>
+      {label}{n != null ? ` (${n})` : ""}
+    </button>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-bold text-torg-dark">Conferência de lançamentos</h2>
+          <p className="text-[11px] text-torg-gray">Rastreabilidade título a título: origem no Omie, NF, pedido e datas. Marque conferido ✓ ou suspeito ⚠ pra construir a trilha de auditoria.</p>
+        </div>
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+          <button onClick={() => { setTipo("pagar"); setExpand(null); }} className={`px-3 py-2 ${tipo === "pagar" ? "bg-torg-blue text-white" : "bg-white text-torg-gray"}`}>A pagar</button>
+          <button onClick={() => { setTipo("receber"); setExpand(null); }} className={`px-3 py-2 ${tipo === "receber" ? "bg-torg-blue text-white" : "bg-white text-torg-gray"}`}>A receber</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <MiniCard titulo="Em aberto" valor={fmtR$(resumo.saldoTotal)} sub={`${resumo.total} títulos`} />
+        <MiniCard titulo="Com sinalização" valor={fmtR$(resumo.saldoComFlag)} sub={`${resumo.comFlag} títulos`} cor="amber" />
+        <MiniCard titulo="Conferidos" valor={String(cont.conferidos)} sub="marcados ✓" cor="emerald" />
+        <MiniCard titulo="Suspeitos" valor={String(cont.suspeitos)} sub="marcados ⚠" cor="rose" />
+      </div>
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <FiltroBtn id="atencao" label="Precisam atenção" n={cont.atencao} />
+          <FiltroBtn id="suspeitos" label="Suspeitos" n={cont.suspeitos} />
+          <FiltroBtn id="conferidos" label="Conferidos" n={cont.conferidos} />
+          <FiltroBtn id="todos" label="Todos" n={resumo.total} />
+        </div>
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="código, fornecedor, NF…" className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none w-56" />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50/60 text-left text-[11px] uppercase tracking-wide text-torg-gray">
+            <tr>
+              <th className="px-3 py-2.5">Conferir</th>
+              <th className="px-3 py-2.5">{tipo === "receber" ? "Cliente" : "Fornecedor"} / origem</th>
+              <th className="px-3 py-2.5">Categoria</th>
+              <th className="px-3 py-2.5 text-center">Vencimento</th>
+              <th className="px-3 py-2.5 text-right">Saldo</th>
+              <th className="px-3 py-2.5">Sinais</th>
+              <th className="px-3 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {lista.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-torg-gray text-sm">Nenhum lançamento neste filtro.</td></tr>
+            ) : lista.slice(0, LIMITE).map((i) => (
+              <Fragment key={i.id}>
+                <tr className={`hover:bg-gray-50/50 ${i.situacao === "SUSPEITO" ? "bg-rose-50/40" : i.situacao === "CONFERIDO" ? "bg-emerald-50/30" : ""}`}>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => marcar(i, "CONFERIDO")} disabled={salvandoId === i.id} title="Marcar conferido"
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center border ${i.situacao === "CONFERIDO" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-torg-gray border-gray-200 hover:border-emerald-400"}`}><CheckCircle2 size={15} /></button>
+                      <button onClick={() => marcar(i, "SUSPEITO")} disabled={salvandoId === i.id} title="Marcar suspeito"
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center border ${i.situacao === "SUSPEITO" ? "bg-rose-600 text-white border-rose-600" : "bg-white text-torg-gray border-gray-200 hover:border-rose-400"}`}><AlertTriangle size={15} /></button>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <p className="text-torg-dark font-medium truncate max-w-[220px]" title={i.nome}>{i.nome}</p>
+                    <p className="text-[10px] text-torg-gray font-mono">Omie #{i.id}{i.numeroDocFiscal ? ` · NF ${i.numeroDocFiscal}` : ""}</p>
+                  </td>
+                  <td className="px-3 py-2 text-torg-gray max-w-[150px] truncate" title={i.categoriaNome}>{i.categoriaNome || <span className="text-amber-600">sem categoria</span>}</td>
+                  <td className="px-3 py-2 text-center whitespace-nowrap"><span className={i.vencido ? "text-red-600 font-semibold" : "text-torg-gray"}>{fmtDia(i.venc)}</span></td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium text-torg-dark whitespace-nowrap">{fmtR$(i.saldo)}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-wrap gap-1 max-w-[200px]">
+                      {i.flags.map((f) => <span key={f} className={`text-[9px] px-1.5 py-0.5 rounded border ${FLAG_COR[f] || "bg-gray-100 text-gray-600 border-gray-200"}`}>{f}</span>)}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => setExpand(expand === i.id ? null : i.id)} className="text-torg-gray hover:text-torg-blue"><ChevronDown size={16} className={`transition-transform ${expand === i.id ? "rotate-180" : ""}`} /></button>
+                  </td>
+                </tr>
+                {expand === i.id && (
+                  <tr className="bg-gray-50/40">
+                    <td colSpan={7} className="px-5 py-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1.5 text-[11px]">
+                        <Trace l="Código Omie" v={i.id} mono />
+                        <Trace l="Cód. parceiro" v={i.codParceiro} mono />
+                        <Trace l="Tipo doc" v={i.tipoDoc} />
+                        <Trace l="Nº documento" v={i.numeroDocumento} />
+                        <Trace l="NF (doc fiscal)" v={i.numeroDocFiscal} />
+                        <Trace l="Chave NFe" v={i.chaveNfe} mono />
+                        <Trace l={tipo === "receber" ? "Pedido / OS" : "Pedido compra"} v={i.numeroPedido} />
+                        <Trace l="Conta corrente" v={i.contaCorrenteId} mono />
+                        <Trace l="Emissão" v={fmtDia(i.emissao)} />
+                        <Trace l="Vencimento" v={fmtDia(i.venc)} />
+                        <Trace l="Status Omie" v={i.status} />
+                        <Trace l="Categoria (cód.)" v={i.categoriaCodigo} />
+                        <Trace l="Detalhe carregado" v={i.detalheCarregado ? "sim" : "não"} />
+                        <Trace l="Sincronizado em" v={fmtDataHora(i.syncedAt)} />
+                        <Trace l="Alterado no Omie" v={fmtDataHora(i.dataAlteracaoOmie)} />
+                        <Trace l="Valor total" v={fmtR$(i.valor)} />
+                      </div>
+                      {i.observacao && <p className="text-[11px] text-torg-gray mt-2"><b>Obs Omie:</b> {i.observacao}</p>}
+                      <div className="flex items-center gap-3 mt-2">
+                        <a href={omieModuloUrl(tipo)} target="_blank" rel="noopener noreferrer" className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><ExternalLink size={11} /> abrir módulo no Omie</a>
+                        {i.situacao && <span className="text-[10px] text-torg-gray">{i.situacao === "CONFERIDO" ? "✓ conferido" : "⚠ suspeito"} por {i.conferenciaPor || "—"}</span>}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {lista.length > LIMITE && <p className="text-xs text-torg-gray text-center">Mostrando {LIMITE} de {lista.length}. Refine com a busca ou filtros.</p>}
+    </div>
+  );
+}
+
+function MiniCard({ titulo, valor, sub, cor }) {
+  const c = cor === "amber" ? "text-amber-700" : cor === "emerald" ? "text-emerald-700" : cor === "rose" ? "text-rose-700" : "text-torg-dark";
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+      <p className="text-[11px] text-torg-gray">{titulo}</p>
+      <p className={`text-lg font-extrabold tabular-nums leading-tight ${c}`}>{valor}</p>
+      {sub && <p className="text-[10px] text-torg-gray">{sub}</p>}
+    </div>
+  );
+}
+function Trace({ l, v, mono }) {
+  return (
+    <div>
+      <span className="text-torg-gray">{l}: </span>
+      <span className={`text-torg-dark ${mono ? "font-mono break-all" : ""}`}>{v && String(v).trim() ? v : "—"}</span>
     </div>
   );
 }
