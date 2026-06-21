@@ -283,7 +283,7 @@ function Ruptura({ fin, onRefresh }) {
       </section>
 
       {/* Fluxo de caixa diário */}
-      <FluxoDiario fluxo={ruptura.fluxoDiario} piorAcumulado={ruptura.piorAcumulado} piorDia={ruptura.piorDia}
+      <FluxoDiario fluxo={ruptura.fluxoDiario} fluxoNaturezas={ruptura.fluxoNaturezas}
         saldoInicial={ruptura.saldoInicial} saldoAtualizadoEm={ruptura.saldoAtualizadoEm} onRefresh={onRefresh} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -456,10 +456,12 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
 }
 
 /* ─────────────────────── fluxo de caixa diário (ruptura) ─────────────────────── */
-function FluxoDiario({ fluxo, piorAcumulado, piorDia, saldoInicial, saldoAtualizadoEm, onRefresh }) {
+function FluxoDiario({ fluxo, fluxoNaturezas, saldoInicial, saldoAtualizadoEm, onRefresh }) {
   const [editandoSaldo, setEditandoSaldo] = useState(false);
   const [saldoInput, setSaldoInput] = useState(String(saldoInicial ?? 0));
   const [salvandoSaldo, setSalvandoSaldo] = useState(false);
+  const [incluirFin, setIncluirFin] = useState(true);
+  const [incluirInv, setIncluirInv] = useState(true);
 
   async function salvarSaldo() {
     const v = Number(String(saldoInput).replace(/\./g, "").replace(",", "."));
@@ -475,6 +477,21 @@ function FluxoDiario({ fluxo, piorAcumulado, piorDia, saldoInicial, saldoAtualiz
   }
 
   const hojeK = new Date().toISOString().slice(0, 10);
+  const nat = fluxoNaturezas || { operacional: 0, financeiro: 0, investimento: 0 };
+
+  // Recalcula o saldo projetado conforme os toggles de natureza
+  const { rows, pior, piorDiaCalc } = useMemo(() => {
+    let acc = saldoInicial || 0, p = saldoInicial || 0, pd = null;
+    const rows = (fluxo || []).map((e) => {
+      const pagar = e.pagarOper + (incluirFin ? e.pagarFin : 0) + (incluirInv ? e.pagarInv : 0);
+      const liquido = e.receberFat + e.receberPrev - pagar;
+      acc += liquido;
+      if (acc < p) { p = acc; pd = e.dia; }
+      return { dia: e.dia, pagar, receberFat: e.receberFat, receberPrev: e.receberPrev, liquido, saldo: acc };
+    });
+    return { rows, pior: p, piorDiaCalc: pd };
+  }, [fluxo, incluirFin, incluirInv, saldoInicial]);
+
   const saldoBox = (
     <div className="flex items-center gap-2 text-sm">
       <span className="text-torg-gray">Saldo em caixa hoje:</span>
@@ -494,6 +511,21 @@ function FluxoDiario({ fluxo, piorAcumulado, piorDia, saldoInicial, saldoAtualiz
     </div>
   );
 
+  const chips = (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[11px] text-torg-gray">No fluxo:</span>
+      <span className="text-[11px] px-2 py-1 rounded bg-gray-100 text-torg-dark">Operacional {fmtR$(nat.operacional)}</span>
+      <button onClick={() => setIncluirFin((v) => !v)} title="Incluir/excluir do fluxo"
+        className={`text-[11px] px-2 py-1 rounded border transition-colors ${incluirFin ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-white border-gray-200 text-torg-gray line-through"}`}>
+        {incluirFin ? "✓" : "✕"} Dívida/financ. {fmtR$(nat.financeiro)}
+      </button>
+      <button onClick={() => setIncluirInv((v) => !v)} title="Incluir/excluir do fluxo"
+        className={`text-[11px] px-2 py-1 rounded border transition-colors ${incluirInv ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-white border-gray-200 text-torg-gray line-through"}`}>
+        {incluirInv ? "✓" : "✕"} Investimento {fmtR$(nat.investimento)}
+      </button>
+    </div>
+  );
+
   if (!fluxo?.length) return (
     <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-2">
       <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
@@ -503,19 +535,22 @@ function FluxoDiario({ fluxo, piorAcumulado, piorDia, saldoInicial, saldoAtualiz
   );
   return (
     <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
-      <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
-          <p className="text-[11px] text-torg-gray mt-0.5 mb-2">A pagar (saída) × recebimentos faturados e previsões (entrada), por dia. O <b>acumulado</b> é o <b>saldo de caixa projetado</b>, partindo do saldo de hoje. Vencidos entram no primeiro dia.</p>
-          {saldoBox}
-        </div>
-        {piorAcumulado < 0 && (
-          <div className="text-right shrink-0">
-            <p className="text-[11px] text-torg-gray">Pior saldo projetado</p>
-            <p className="text-lg font-extrabold text-red-700 tabular-nums leading-none">{fmtR$(piorAcumulado)}</p>
-            <p className="text-[10px] text-torg-gray">por volta de {fmtDia(piorDia)}</p>
+      <div className="px-5 py-4 border-b border-gray-100 space-y-2.5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
+            <p className="text-[11px] text-torg-gray mt-0.5">A pagar (saída) × recebimentos faturados e previsões (entrada), por dia. O <b>saldo projetado</b> parte do caixa de hoje. Tire a dívida/investimento abaixo pra ver o aperto só do operacional. Vencidos entram no primeiro dia.</p>
           </div>
-        )}
+          {pior < 0 && (
+            <div className="text-right shrink-0">
+              <p className="text-[11px] text-torg-gray">Pior saldo projetado</p>
+              <p className="text-lg font-extrabold text-red-700 tabular-nums leading-none">{fmtR$(pior)}</p>
+              <p className="text-[10px] text-torg-gray">{piorDiaCalc ? `por volta de ${fmtDia(piorDiaCalc)}` : ""}</p>
+            </div>
+          )}
+        </div>
+        {saldoBox}
+        {chips}
       </div>
       <div className="max-h-96 overflow-y-auto">
         <table className="w-full text-sm">
@@ -530,14 +565,14 @@ function FluxoDiario({ fluxo, piorAcumulado, piorDia, saldoInicial, saldoAtualiz
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {fluxo.map((f) => (
+            {rows.map((f) => (
               <tr key={f.dia} className="hover:bg-gray-50/50">
                 <td className="px-4 py-1.5 whitespace-nowrap text-torg-dark">{fmtDia(f.dia)}{f.dia === hojeK ? <span className="text-[10px] text-torg-gray"> (+vencidos)</span> : null}</td>
                 <td className="px-4 py-1.5 text-right tabular-nums text-rose-600">{f.pagar > 0 ? fmtR$(f.pagar) : "—"}</td>
                 <td className="px-4 py-1.5 text-right tabular-nums text-emerald-700">{f.receberFat > 0 ? fmtR$(f.receberFat) : "—"}</td>
                 <td className="px-4 py-1.5 text-right tabular-nums text-torg-blue">{f.receberPrev > 0 ? fmtR$(f.receberPrev) : "—"}</td>
                 <td className={`px-4 py-1.5 text-right tabular-nums font-medium ${f.liquido < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmtR$(f.liquido)}</td>
-                <td className={`px-4 py-1.5 text-right tabular-nums font-semibold ${f.acumulado < 0 ? "text-red-700 bg-red-50/50" : "text-torg-dark"}`}>{fmtR$(f.acumulado)}</td>
+                <td className={`px-4 py-1.5 text-right tabular-nums font-semibold ${f.saldo < 0 ? "text-red-700 bg-red-50/50" : "text-torg-dark"}`}>{fmtR$(f.saldo)}</td>
               </tr>
             ))}
           </tbody>

@@ -27,6 +27,15 @@ function balde(items, hoje, em30) {
 const acumAte = (items, lim) => r2(items.filter((i) => i.venc && new Date(i.venc) <= lim).reduce((s, i) => s + (i.saldo || 0), 0));
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+// Natureza do gasto (a pagar): separa dívida/financiamento e investimento do
+// custeio operacional, pra avaliar o pico de caixa sem o que pode ser rolado.
+function classificarNatureza(nome) {
+  const n = (nome || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  if (/emprestimo|financiamento|juros|encargos|parcelamento|consorcio|leasing|banc/.test(n)) return "FINANCEIRO";
+  if (/maquina|equipamento|investimento|imobilizado|benfeitoria|obras em andamento/.test(n)) return "INVESTIMENTO";
+  return "OPERACIONAL";
+}
+
 export async function GET() {
   try {
     await requireDiretoria();
@@ -53,7 +62,7 @@ export async function GET() {
     prisma.diretoriaConfig.findUnique({ where: { id: "saldoCaixa" } }),
   ]);
 
-  const pagarItems = pagarRaw.map((c) => ({ saldo: Math.max(0, (c.valor || 0) - (c.valorPago || 0)), venc: c.dataVencimento, nome: c.fornecedorNome || "—", doc: c.numeroDocumento }));
+  const pagarItems = pagarRaw.map((c) => ({ saldo: Math.max(0, (c.valor || 0) - (c.valorPago || 0)), venc: c.dataVencimento, nome: c.fornecedorNome || "—", doc: c.numeroDocumento, natureza: classificarNatureza(c.categoriaNome) }));
   const recItems = recRaw.map((c) => ({ saldo: c.saldo || 0, venc: c.dataVencimento, nome: c.clienteNome || "—", doc: c.numeroDocumento }));
 
   const aPagar = balde(pagarItems, hoje, em30);
@@ -130,22 +139,34 @@ export async function GET() {
   const dias = new Map();
   const addDia = (k, campo, v) => {
     if (!k) return;
-    const e = dias.get(k) || { pagar: 0, receberFat: 0, receberPrev: 0 };
+    const e = dias.get(k) || { pagarOper: 0, pagarFin: 0, pagarInv: 0, receberFat: 0, receberPrev: 0 };
     e[campo] += v; dias.set(k, e);
   };
-  for (const it of pagarItems) { if (it.saldo > 0.005) addDia(bucket(it.venc), "pagar", it.saldo); }
+  const campoNat = { OPERACIONAL: "pagarOper", FINANCEIRO: "pagarFin", INVESTIMENTO: "pagarInv" };
+  let totPagarOper = 0, totPagarFin = 0, totPagarInv = 0;
+  for (const it of pagarItems) {
+    if (it.saldo <= 0.005) continue;
+    const k = bucket(it.venc); if (!k) continue;
+    addDia(k, campoNat[it.natureza] || "pagarOper", it.saldo);
+    if (it.natureza === "FINANCEIRO") totPagarFin += it.saldo;
+    else if (it.natureza === "INVESTIMENTO") totPagarInv += it.saldo;
+    else totPagarOper += it.saldo;
+  }
   for (const it of recItems) { if (it.saldo > 0.005) addDia(bucket(it.venc), "receberFat", it.saldo); }
   for (const o of prev.ops) { if (o.saldoLiq > 0.005 && o.dataRecebimento) addDia(bucket(o.dataRecebimento), "receberPrev", o.saldoLiq); }
-  // Acumulado parte do saldo de caixa atual (config "saldoCaixa") → vira o saldo
-  // de caixa PROJETADO dia a dia.
+
+  // Acumulado parte do saldo de caixa atual → saldo de caixa PROJETADO dia a dia.
+  // Cenário "completo" (todas as naturezas) usado pra flag; o cliente recalcula
+  // por toggle (operacional / + dívida / + investimento).
   const saldoInicial = r2(cfgSaldo?.valor || 0);
   let acum = saldoInicial, piorAcumulado = saldoInicial, piorDia = hojeK;
   const fluxoDiario = [...dias.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, e]) => {
-    const liquido = e.receberFat + e.receberPrev - e.pagar;
-    acum += liquido;
+    const pagar = e.pagarOper + e.pagarFin + e.pagarInv;
+    acum += e.receberFat + e.receberPrev - pagar;
     if (acum < piorAcumulado) { piorAcumulado = acum; piorDia = dia; }
-    return { dia, pagar: r2(e.pagar), receberFat: r2(e.receberFat), receberPrev: r2(e.receberPrev), liquido: r2(liquido), acumulado: r2(acum) };
+    return { dia, pagarOper: r2(e.pagarOper), pagarFin: r2(e.pagarFin), pagarInv: r2(e.pagarInv), receberFat: r2(e.receberFat), receberPrev: r2(e.receberPrev), acumulado: r2(acum) };
   });
+  const fluxoNaturezas = { operacional: r2(totPagarOper), financeiro: r2(totPagarFin), investimento: r2(totPagarInv) };
   const ddmm = (k) => (k ? k.split("-").slice(1).reverse().join("/") : "");
 
   // Leitura crítica (flags priorizadas por severidade)
@@ -169,7 +190,7 @@ export async function GET() {
 
   return NextResponse.json({
     aPagar, aReceber, posicao, previsao, categoriasPagar,
-    ruptura: { janelas, topCredores, topTitulosPagar, cobertura, flags, fluxoDiario, piorAcumulado: r2(piorAcumulado), piorDia, saldoInicial, saldoAtualizadoEm: cfgSaldo?.atualizadoEm || null },
+    ruptura: { janelas, topCredores, topTitulosPagar, cobertura, flags, fluxoDiario, fluxoNaturezas, piorAcumulado: r2(piorAcumulado), piorDia, saldoInicial, saldoAtualizadoEm: cfgSaldo?.atualizadoEm || null },
     sync: { pagar: syncPg?.ultimoSync || null, receber: syncRc?.ultimoSync || null },
   });
 }
