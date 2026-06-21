@@ -130,34 +130,40 @@ export async function GET() {
   const DIAS_FLUXO = 60;
   const fimFluxo = new Date(hoje.getTime() + DIAS_FLUXO * 86400000);
   const hojeK = hoje.toISOString().slice(0, 10);
-  const bucket = (d) => {
+  // Vencidos NÃO entram na projeção diária — viram um bloco "em aberto" à parte.
+  // O dia de hoje recebe só o que vence hoje.
+  const destino = (d) => {
     if (!d) return null;
     const dt = new Date(d);
+    if (dt < hoje) return "VENCIDO";
     if (dt > fimFluxo) return null;
-    return dt < hoje ? hojeK : dt.toISOString().slice(0, 10);
+    return dt.toISOString().slice(0, 10);
   };
   const dias = new Map();
+  const venc = { pagarOper: 0, pagarFin: 0, pagarInv: 0, receberFat: 0, receberPrev: 0 };
   const addDia = (k, campo, v) => {
-    if (!k) return;
     const e = dias.get(k) || { pagarOper: 0, pagarFin: 0, pagarInv: 0, receberFat: 0, receberPrev: 0 };
     e[campo] += v; dias.set(k, e);
+  };
+  const lanca = (d, campo, v) => {
+    const k = destino(d);
+    if (!k) return;
+    if (k === "VENCIDO") venc[campo] += v; else addDia(k, campo, v);
   };
   const campoNat = { OPERACIONAL: "pagarOper", FINANCEIRO: "pagarFin", INVESTIMENTO: "pagarInv" };
   let totPagarOper = 0, totPagarFin = 0, totPagarInv = 0;
   for (const it of pagarItems) {
     if (it.saldo <= 0.005) continue;
-    const k = bucket(it.venc); if (!k) continue;
-    addDia(k, campoNat[it.natureza] || "pagarOper", it.saldo);
+    const k = destino(it.venc); if (!k) continue;
+    lanca(it.venc, campoNat[it.natureza] || "pagarOper", it.saldo);
     if (it.natureza === "FINANCEIRO") totPagarFin += it.saldo;
     else if (it.natureza === "INVESTIMENTO") totPagarInv += it.saldo;
     else totPagarOper += it.saldo;
   }
-  for (const it of recItems) { if (it.saldo > 0.005) addDia(bucket(it.venc), "receberFat", it.saldo); }
-  for (const o of prev.ops) { if (o.saldoLiq > 0.005 && o.dataRecebimento) addDia(bucket(o.dataRecebimento), "receberPrev", o.saldoLiq); }
+  for (const it of recItems) { if (it.saldo > 0.005) lanca(it.venc, "receberFat", it.saldo); }
+  for (const o of prev.ops) { if (o.saldoLiq > 0.005 && o.dataRecebimento) lanca(o.dataRecebimento, "receberPrev", o.saldoLiq); }
 
-  // Acumulado parte do saldo de caixa atual → saldo de caixa PROJETADO dia a dia.
-  // Cenário "completo" (todas as naturezas) usado pra flag; o cliente recalcula
-  // por toggle (operacional / + dívida / + investimento).
+  // Saldo de caixa PROJETADO dia a dia (parte do saldo atual; só hoje→futuro).
   const saldoInicial = r2(cfgSaldo?.valor || 0);
   let acum = saldoInicial, piorAcumulado = saldoInicial, piorDia = hojeK;
   const fluxoDiario = [...dias.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, e]) => {
@@ -166,6 +172,7 @@ export async function GET() {
     if (acum < piorAcumulado) { piorAcumulado = acum; piorDia = dia; }
     return { dia, pagarOper: r2(e.pagarOper), pagarFin: r2(e.pagarFin), pagarInv: r2(e.pagarInv), receberFat: r2(e.receberFat), receberPrev: r2(e.receberPrev), acumulado: r2(acum) };
   });
+  const fluxoVencido = { pagarOper: r2(venc.pagarOper), pagarFin: r2(venc.pagarFin), pagarInv: r2(venc.pagarInv), receberFat: r2(venc.receberFat), receberPrev: r2(venc.receberPrev) };
   const fluxoNaturezas = { operacional: r2(totPagarOper), financeiro: r2(totPagarFin), investimento: r2(totPagarInv) };
   const ddmm = (k) => (k ? k.split("-").slice(1).reverse().join("/") : "");
 
@@ -190,7 +197,7 @@ export async function GET() {
 
   return NextResponse.json({
     aPagar, aReceber, posicao, previsao, categoriasPagar,
-    ruptura: { janelas, topCredores, topTitulosPagar, cobertura, flags, fluxoDiario, fluxoNaturezas, piorAcumulado: r2(piorAcumulado), piorDia, saldoInicial, saldoAtualizadoEm: cfgSaldo?.atualizadoEm || null },
+    ruptura: { janelas, topCredores, topTitulosPagar, cobertura, flags, fluxoDiario, fluxoVencido, fluxoNaturezas, piorAcumulado: r2(piorAcumulado), piorDia, saldoInicial, saldoAtualizadoEm: cfgSaldo?.atualizadoEm || null },
     sync: { pagar: syncPg?.ultimoSync || null, receber: syncRc?.ultimoSync || null },
   });
 }

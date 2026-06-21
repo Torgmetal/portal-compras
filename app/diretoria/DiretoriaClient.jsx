@@ -309,7 +309,7 @@ function Ruptura({ fin, onRefresh }) {
       </section>
 
       {/* Fluxo de caixa diário */}
-      <FluxoDiario fluxo={ruptura.fluxoDiario} fluxoNaturezas={ruptura.fluxoNaturezas}
+      <FluxoDiario fluxo={ruptura.fluxoDiario} fluxoNaturezas={ruptura.fluxoNaturezas} fluxoVencido={ruptura.fluxoVencido}
         saldoInicial={ruptura.saldoInicial} saldoAtualizadoEm={ruptura.saldoAtualizadoEm} onRefresh={onRefresh} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -732,7 +732,7 @@ function Trace({ l, v, mono }) {
 }
 
 /* ─────────────────────── fluxo de caixa diário (ruptura) ─────────────────────── */
-function FluxoDiario({ fluxo, fluxoNaturezas, saldoInicial, saldoAtualizadoEm, onRefresh }) {
+function FluxoDiario({ fluxo, fluxoNaturezas, fluxoVencido, saldoInicial, saldoAtualizadoEm, onRefresh }) {
   const [editandoSaldo, setEditandoSaldo] = useState(false);
   const [saldoInput, setSaldoInput] = useState(String(saldoInicial ?? 0));
   const [salvandoSaldo, setSalvandoSaldo] = useState(false);
@@ -767,6 +767,12 @@ function FluxoDiario({ fluxo, fluxoNaturezas, saldoInicial, saldoAtualizadoEm, o
     });
     return { rows, pior: p, piorDiaCalc: pd };
   }, [fluxo, incluirFin, incluirInv, saldoInicial]);
+
+  // Vencidos em aberto (fora da projeção diária), respeitando os toggles
+  const v = fluxoVencido || { pagarOper: 0, pagarFin: 0, pagarInv: 0, receberFat: 0, receberPrev: 0 };
+  const vencPagar = v.pagarOper + (incluirFin ? v.pagarFin : 0) + (incluirInv ? v.pagarInv : 0);
+  const vencReceber = (v.receberFat || 0) + (v.receberPrev || 0);
+  const temVencido = vencPagar > 0.5 || vencReceber > 0.5;
 
   const saldoBox = (
     <div className="flex items-center gap-2 text-sm">
@@ -815,7 +821,7 @@ function FluxoDiario({ fluxo, fluxoNaturezas, saldoInicial, saldoAtualizadoEm, o
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
-            <p className="text-[11px] text-torg-gray mt-0.5">A pagar (saída) × recebimentos faturados e previsões (entrada), por dia. O <b>saldo projetado</b> parte do caixa de hoje. Tire a dívida/investimento abaixo pra ver o aperto só do operacional. Vencidos entram no primeiro dia.</p>
+            <p className="text-[11px] text-torg-gray mt-0.5">A pagar (saída) × recebimentos faturados e previsões (entrada), por dia. O <b>saldo projetado</b> parte do caixa de hoje. Tire a dívida/investimento abaixo pra ver o aperto só do operacional. <b>Vencidos ficam em aberto</b>, fora desta projeção.</p>
           </div>
           {pior < 0 && (
             <div className="text-right shrink-0">
@@ -828,6 +834,16 @@ function FluxoDiario({ fluxo, fluxoNaturezas, saldoInicial, saldoAtualizadoEm, o
         {saldoBox}
         {chips}
       </div>
+      {temVencido && (
+        <div className="px-5 py-3 border-b border-gray-100 bg-amber-50/50 flex items-center justify-between gap-3 flex-wrap text-sm">
+          <span className="text-amber-800 font-medium inline-flex items-center gap-1.5"><AlertTriangle size={15} /> Vencido em aberto <span className="text-[11px] font-normal text-amber-700/80">(já passou do vencimento — fora da projeção diária)</span></span>
+          <div className="flex items-center gap-4 text-[12px] tabular-nums">
+            <span className="text-torg-gray">a pagar <b className="text-rose-700">{fmtR$(vencPagar)}</b></span>
+            <span className="text-torg-gray">a receber <b className="text-emerald-700">{fmtR$(vencReceber)}</b></span>
+            <span className="text-torg-gray">líquido <b className={vencReceber - vencPagar < 0 ? "text-red-700" : "text-emerald-700"}>{fmtR$(vencReceber - vencPagar)}</b></span>
+          </div>
+        </div>
+      )}
       <div className="max-h-96 overflow-y-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50/80 text-left text-[11px] uppercase tracking-wide text-torg-gray sticky top-0">
@@ -843,7 +859,7 @@ function FluxoDiario({ fluxo, fluxoNaturezas, saldoInicial, saldoAtualizadoEm, o
           <tbody className="divide-y divide-gray-50">
             {rows.map((f) => (
               <tr key={f.dia} className="hover:bg-gray-50/50">
-                <td className="px-4 py-1.5 whitespace-nowrap text-torg-dark">{fmtDia(f.dia)}{f.dia === hojeK ? <span className="text-[10px] text-torg-gray"> (+vencidos)</span> : null}</td>
+                <td className="px-4 py-1.5 whitespace-nowrap text-torg-dark">{fmtDia(f.dia)}{f.dia === hojeK ? <span className="text-[10px] text-torg-gray"> (hoje)</span> : null}</td>
                 <td className="px-4 py-1.5 text-right tabular-nums text-rose-600">{f.pagar > 0 ? fmtR$(f.pagar) : "—"}</td>
                 <td className="px-4 py-1.5 text-right tabular-nums text-emerald-700">{f.receberFat > 0 ? fmtR$(f.receberFat) : "—"}</td>
                 <td className="px-4 py-1.5 text-right tabular-nums text-torg-blue">{f.receberPrev > 0 ? fmtR$(f.receberPrev) : "—"}</td>
