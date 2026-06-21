@@ -5,7 +5,7 @@ import {
   Lock, Loader2, AlertCircle, UserPlus, X, ShieldCheck, ArrowLeft,
   TrendingUp, TrendingDown, Wallet, Banknote, Truck, RefreshCw,
   AlertTriangle, Flame, Search, ArrowDownRight, ArrowUpRight,
-  CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download,
+  CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download, Target,
 } from "lucide-react";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
@@ -16,6 +16,7 @@ const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 const ABAS_BASE = [
   { id: "ruptura", label: "Pontos de ruptura" },
   { id: "cortar", label: "Onde cortar" },
+  { id: "dre", label: "DRE Alvo × Real" },
   { id: "resumo", label: "Resumo" },
   { id: "pagar", label: "A pagar" },
   { id: "receber", label: "A receber" },
@@ -171,6 +172,9 @@ export default function DiretoriaClient({ isDono, userNome }) {
 
         {/* ════════ ONDE CORTAR ════════ */}
         {aba === "cortar" && fin && <OndeCortar categorias={fin.categoriasPagar} totalPagar={fin.aPagar.total} />}
+
+        {/* ════════ DRE ALVO × REALIZADO ════════ */}
+        {aba === "dre" && <DreAlvo />}
 
         {/* ════════ RESUMO ════════ */}
         {aba === "resumo" && fin && <Resumo fin={fin} />}
@@ -727,6 +731,90 @@ function Trace({ l, v, mono }) {
     <div>
       <span className="text-torg-gray">{l}: </span>
       <span className={`text-torg-dark ${mono ? "font-mono break-all" : ""}`}>{v && String(v).trim() ? v : "—"}</span>
+    </div>
+  );
+}
+
+/* ─────────────────────── DRE Alvo × Realizado ─────────────────────── */
+function DreAlvo() {
+  const [meses, setMeses] = useState(null);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+
+  const carregar = useCallback(async (m) => {
+    setLoading(true); setErro("");
+    try {
+      const r = await fetch(`/api/diretoria/dre${m ? `?meses=${m}` : ""}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      setData(j); setMeses(j.meses);
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { carregar(null); }, [carregar]);
+
+  if (loading && !data) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Montando DRE…</div>;
+  if (erro) return <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => carregar(meses)} className="ml-auto text-xs underline">tentar de novo</button></div>;
+  if (!data) return null;
+
+  const periodoLabel = `jan–${MESES_ABREV[data.meses - 1]}/${String(data.ano).slice(2)}`;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-bold text-torg-dark flex items-center gap-2"><Target size={20} className="text-torg-blue" /> DRE Alvo × Realizado · {data.ano}</h2>
+          <p className="text-[11px] text-torg-gray">Alvo gerencial (definido no início do ano), proporcional ao período. Realizado por competência (data de emissão): receita = faturamento; custos/despesas = a pagar por categoria.</p>
+        </div>
+        <label className="text-xs text-torg-gray flex items-center gap-2 shrink-0">
+          Acumulado até
+          <select value={data.meses} onChange={(e) => carregar(Number(e.target.value))} disabled={loading}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-torg-blue disabled:opacity-50">
+            {MESES_ABREV.map((m, i) => <option key={i} value={i + 1}>{m}/{String(data.ano).slice(2)}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {data.naoClassificado > 0 && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <span><b>{fmtR$(data.naoClassificado)}</b> de gastos <b>sem categoria/não mapeados</b> entraram como custo no Resultado Final (linha "Não classificado"). O realizado fica mais preciso conforme esses lançamentos forem categorizados no Omie.</span>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50/60 text-left text-[11px] uppercase tracking-wide text-torg-gray">
+            <tr>
+              <th className="px-4 py-2.5">Linha (DRE)</th>
+              <th className="px-4 py-2.5 text-right">Alvo · {periodoLabel}</th>
+              <th className="px-4 py-2.5 text-right">Realizado</th>
+              <th className="px-4 py-2.5 text-right">Δ</th>
+              <th className="px-4 py-2.5 text-right">Atingido</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {data.linhas.map((l, i) => {
+              const sub = l.kind === "subtotal" || l.kind === "resultado" || l.kind === "grupoHeader";
+              const delta = l.real - l.alvo;
+              const pct = l.alvo > 0 ? Math.round((l.real / l.alvo) * 100) : null;
+              const bom = l.sentido === "receita" ? l.real >= l.alvo : l.real <= l.alvo;
+              return (
+                <tr key={i} className={`${sub ? "bg-gray-50/40 font-semibold" : ""} ${l.kind === "resultado" ? "border-t-2 border-torg-dark/20" : ""} ${l.kind === "naoclass" ? "bg-amber-50/40" : ""}`}>
+                  <td className={`px-4 py-2 ${l.nivel === 0 ? "text-torg-dark" : "text-torg-gray pl-8"}`}>{l.label}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-torg-gray">{l.alvo ? fmtR$(l.alvo) : "—"}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-torg-dark">{fmtR$(l.real)}</td>
+                  <td className={`px-4 py-2 text-right tabular-nums ${bom ? "text-emerald-700" : "text-red-600"}`}>{delta >= 0 ? "+" : ""}{fmtR$(delta)}</td>
+                  <td className="px-4 py-2 text-right">
+                    {pct != null ? <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold tabular-nums ${bom ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{pct}%</span> : <span className="text-torg-gray">—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[10px] text-torg-gray">Δ e % na ótica de cada linha: em receita/resultado, realizado acima do alvo é bom (verde); em custos/despesas, acima do alvo é estouro (vermelho). v1 — mapeamento por prefixo de categoria do Omie; valide e me diga ajustes.</p>
     </div>
   );
 }
