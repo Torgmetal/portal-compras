@@ -286,6 +286,10 @@ model FluxoCaixa {
   dataRealizado DateTime?
   opId          String?
   observacao    String?
+  // Origem Omie (extrato de conta corrente) — importados pelo /importar-omie.
+  origemOmieId  String?   // ex: "EXT-<nCodCC>-<nCodLancamento>"; null = lançamento manual
+  contaCorrente String?   // banco/conta de origem (ex: "Inter")
+  transferencia Boolean   @default(false) // transferência entre contas próprias
   createdById   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -295,6 +299,7 @@ model FluxoCaixa {
   @@index([tipo])
   @@index([categoria])
   @@index([opId])
+  @@index([origemOmieId])
 }
 
 model OPMedicao {

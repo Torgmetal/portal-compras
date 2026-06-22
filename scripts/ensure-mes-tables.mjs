@@ -35,6 +35,13 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MesInativo_item_idx" ON "MesInativo"("item")`);
   console.log("[ensure-mes-tables] OK — MesInativo garantida.");
 
+  // Colunas do FluxoCaixa para import do extrato Omie (idempotente).
+  await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "origemOmieId" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "contaCorrente" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "transferencia" BOOLEAN NOT NULL DEFAULT false`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "FluxoCaixa_origemOmieId_idx" ON "FluxoCaixa"("origemOmieId")`);
+  console.log("[ensure-mes-tables] OK — colunas FluxoCaixa (Omie) garantidas.");
+
   // Verifica quais das duas tabelas existem
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename
