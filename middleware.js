@@ -53,6 +53,9 @@ export default withAuth(
           // Aceite do Data Book pelo cliente — publico via token unico
           path.startsWith("/data-book/aceite/") ||
           path.startsWith("/api/qualidade/data-books/aceite/") ||
+          // Cadeia de assinaturas do Data Book (elaborador→inspetor→RT→cliente) — publico via token
+          path.startsWith("/data-book/assinar/") ||
+          path.startsWith("/api/qualidade/data-books/assinar/") ||
           // Portal do cliente (auditorias externas) — publico via token unico
           path.startsWith("/portal-cliente/") ||
           path.startsWith("/api/qualidade/auditorias/portal/")
