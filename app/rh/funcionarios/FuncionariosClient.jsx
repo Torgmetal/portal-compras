@@ -42,6 +42,7 @@ export default function FuncionariosClient() {
   const [filtroSetor, setFiltroSetor] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
   const [modalAberto, setModalAberto] = useState(false);
+  const [editandoId, setEditandoId] = useState(null); // null = novo; id = editando
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState({});
 
@@ -115,6 +116,8 @@ export default function FuncionariosClient() {
 
   // Abrir modal novo
   const abrirNovo = () => {
+    setEditandoId(null);
+    setErro("");
     setForm({
       nome: "", cpf: "", rg: "", dataNascimento: "", email: "", telefone: "",
       endereco: "", cidadeUF: "", matricula: "", dataAdmissao: "",
@@ -122,6 +125,37 @@ export default function FuncionariosClient() {
       salario: "", tipoContrato: "CLT", jornadaHoras: 44, turno: "", observacao: "",
     });
     setModalAberto(true);
+  };
+
+  // Abrir modal de edição — busca o detalhe completo (a lista não traz todos os campos)
+  // e formata as datas como YYYY-MM-DD (exigência do input type="date"; sem isso o
+  // campo fica vazio e o botão Salvar trava).
+  const soData = (d) => (d ? String(d).slice(0, 10) : "");
+  const abrirEditar = async (func) => {
+    setMenuAberto(null);
+    setEditandoId(func.id);
+    setErro("");
+    setForm({
+      nome: func.nome || "", cpf: func.cpf || "", rg: "", dataNascimento: "", email: func.email || "",
+      telefone: func.telefone || "", endereco: "", cidadeUF: "", matricula: func.matricula || "",
+      dataAdmissao: soData(func.dataAdmissao), setorId: func.setor?.id || "", cargoId: func.cargo?.id || "",
+      salario: func.salario ?? "", tipoContrato: func.tipoContrato || "CLT", jornadaHoras: 44, turno: "", observacao: "",
+    });
+    setModalAberto(true);
+    try {
+      const res = await fetch(`/api/rh/funcionarios/${func.id}`);
+      const j = await res.json();
+      if (res.ok && j.success) {
+        const f = j.data;
+        setForm({
+          nome: f.nome || "", cpf: f.cpf || "", rg: f.rg || "", dataNascimento: soData(f.dataNascimento),
+          email: f.email || "", telefone: f.telefone || "", endereco: f.endereco || "", cidadeUF: f.cidadeUF || "",
+          matricula: f.matricula || "", dataAdmissao: soData(f.dataAdmissao), setorId: f.setor?.id || "", cargoId: f.cargo?.id || "",
+          salario: f.salario ?? "", tipoContrato: f.tipoContrato || "CLT", jornadaHoras: f.jornadaHoras || 44,
+          turno: f.turno || "", observacao: f.observacao || "",
+        });
+      }
+    } catch { /* mantém o preenchimento parcial da linha */ }
   };
 
   // Salvar
@@ -144,20 +178,23 @@ export default function FuncionariosClient() {
         turno: form.turno || null,
         observacao: form.observacao || null,
       };
-      const res = await fetch("/api/rh/funcionarios", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(
+        editandoId ? `/api/rh/funcionarios/${editandoId}` : "/api/rh/funcionarios",
+        { method: editandoId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao salvar");
 
-      setFuncionarios((prev) => [...prev, {
+      const enriquecido = {
         ...data.data,
-        setor: setores.find((s) => s.id === form.setorId) || null,
-        cargo: cargos.find((c) => c.id === form.cargoId) || null,
-      }]);
+        setor: setores.find((s) => s.id === form.setorId) || data.data.setor || null,
+        cargo: cargos.find((c) => c.id === form.cargoId) || data.data.cargo || null,
+      };
+      setFuncionarios((prev) => editandoId
+        ? prev.map((f) => (f.id === editandoId ? { ...f, ...enriquecido } : f))
+        : [...prev, enriquecido]);
       setModalAberto(false);
+      setEditandoId(null);
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -458,6 +495,13 @@ export default function FuncionariosClient() {
                                 <div className="fixed inset-0 z-40" onClick={() => setMenuAberto(null)} />
                                 <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
                                   <button
+                                    onClick={() => abrirEditar(f)}
+                                    className="w-full px-3 py-2 text-sm text-left text-torg-dark hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <Pencil size={14} className="text-torg-blue" />
+                                    Editar cadastro
+                                  </button>
+                                  <button
                                     onClick={() => abrirAjuste(f)}
                                     className="w-full px-3 py-2 text-sm text-left text-torg-dark hover:bg-gray-50 flex items-center gap-2"
                                   >
@@ -492,7 +536,7 @@ export default function FuncionariosClient() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !salvando && setModalAberto(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-torg-dark">Novo Funcionário</h3>
+              <h3 className="text-lg font-bold text-torg-dark">{editandoId ? "Editar funcionário" : "Novo Funcionário"}</h3>
               <button onClick={() => setModalAberto(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
@@ -545,8 +589,8 @@ export default function FuncionariosClient() {
               </button>
               <button onClick={salvar} disabled={salvando || !form.nome || !form.dataAdmissao || !form.setorId || !form.cargoId}
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
-                {salvando ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-                {salvando ? "Salvando…" : "Cadastrar"}
+                {salvando ? <Loader2 size={14} className="animate-spin" /> : editandoId ? <Pencil size={14} /> : <PlusCircle size={14} />}
+                {salvando ? "Salvando…" : editandoId ? "Salvar alterações" : "Cadastrar"}
               </button>
             </div>
           </div>
