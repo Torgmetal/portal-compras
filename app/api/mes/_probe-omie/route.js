@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 // SONDA TEMPORARIA — descobre o formato do extrato de conta corrente do Omie.
+// Sob /api/mes/ porque o middleware libera esse prefixo p/ Bearer (financeiro exige sessao).
 // Roda em producao (Vercel tem OMIE_APP_KEY/SECRET). Auth: Bearer MES_SYNC_API_KEY.
 // Remover apos mapear a API.
 
@@ -50,7 +51,7 @@ export async function GET(req) {
   if (cc) {
     const lista = cc.ListarResumoContasCorrentes || cc.conta_corrente_resumido || cc.conta_corrente_cadastro || cc.contasCorrentes || [];
     const first = Array.isArray(lista) ? lista[0] : null;
-    nCodCC = first?.nCodCC || first?.codigo_conta_corrente || first?.nCodCC || null;
+    nCodCC = first?.nCodCC || first?.codigo_conta_corrente || null;
     out.notas.push("nCodCC usado no teste de extrato: " + nCodCC);
   }
 
