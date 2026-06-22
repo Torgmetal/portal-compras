@@ -40,12 +40,8 @@
       "schedule": "0 7 * * *"
     },
     {
-      "path": "/api/cron/contas-pagar",
+      "path": "/api/cron/financeiro",
       "schedule": "30 7 * * *"
-    },
-    {
-      "path": "/api/cron/contas-receber",
-      "schedule": "45 7 * * *"
     },
     {
       "path": "/api/cron/qualidade-vencidos",

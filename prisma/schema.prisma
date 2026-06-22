@@ -2304,6 +2304,33 @@ model DiretoriaFaturamentoData {
   atualizadoEm    DateTime @updatedAt
 }
 
+// Config chave-valor do módulo Diretoria (ex: id "saldoCaixa" = saldo de caixa
+// atual, usado como ponto de partida do fluxo de caixa diário).
+model DiretoriaConfig {
+  id            String   @id
+  valor         Float    @default(0)
+  observacao    String?
+  atualizadoPor String?
+  atualizadoEm  DateTime @updatedAt
+}
+
+// Conferência/rastreabilidade de lançamentos financeiros (módulo Diretoria):
+// marca um título a pagar/receber como conferido ou suspeito, com trilha de quem
+// e quando. lancamentoId = id do ContaPagar/ContaReceber (= código do Omie).
+model LancamentoConferencia {
+  id           String   @id @default(cuid())
+  tipo         String // "PAGAR" | "RECEBER"
+  lancamentoId String
+  situacao     String // "CONFERIDO" | "SUSPEITO"
+  observacao   String?
+  por          String?
+  createdAt    DateTime @default(now())
+  em           DateTime @updatedAt
+
+  @@unique([tipo, lancamentoId])
+  @@index([tipo, situacao])
+}
+
 // Vínculo manual de uma NFS-e emitida na prefeitura (SigissWeb/Conchal), que não
 // está no Omie, com um projeto/obra do Omie — para somar no faturado da obra.
 model NfseConchalVinculo {

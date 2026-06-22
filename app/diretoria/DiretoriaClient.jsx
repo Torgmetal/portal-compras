@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import Link from "next/link";
 import {
   Lock, Loader2, AlertCircle, UserPlus, X, ShieldCheck, ArrowLeft,
   TrendingUp, TrendingDown, Wallet, Banknote, Truck, RefreshCw,
   AlertTriangle, Flame, Search, ArrowDownRight, ArrowUpRight,
-  CalendarClock, Zap, Clock, Pencil,
+  CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download, Target,
 } from "lucide-react";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
@@ -16,9 +16,11 @@ const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 const ABAS_BASE = [
   { id: "ruptura", label: "Pontos de ruptura" },
   { id: "cortar", label: "Onde cortar" },
+  { id: "dre", label: "DRE Alvo × Real" },
   { id: "resumo", label: "Resumo" },
   { id: "pagar", label: "A pagar" },
   { id: "receber", label: "A receber" },
+  { id: "conferencia", label: "Conferência" },
   { id: "previsao", label: "Previsão de faturamento" },
 ];
 const ABAS_FIN = ["ruptura", "resumo", "cortar"]; // dependem do fetch /financeiro
@@ -42,6 +44,23 @@ export default function DiretoriaClient({ isDono, userNome }) {
     } catch (e) { setErroFin(e.message); } finally { setLoadingFin(false); }
   }, []);
   useEffect(() => { carregarFin(); }, [carregarFin]);
+
+  // Sincroniza Contas a Pagar + a Receber do Omie (botão "sincronizar" + rede de
+  // segurança: se o dado estiver com mais de 12h ao abrir, atualiza sozinho 1x).
+  const [sincronizando, setSincronizando] = useState(false);
+  const autoSyncFeito = useRef(false);
+  const sincronizarFin = useCallback(async () => {
+    setSincronizando(true);
+    try { await fetch("/api/diretoria/sincronizar", { method: "POST" }); }
+    catch { /* silencioso */ }
+    finally { await carregarFin(); setSincronizando(false); }
+  }, [carregarFin]);
+  useEffect(() => {
+    if (!fin || autoSyncFeito.current) return;
+    const ts = [fin.sync?.pagar, fin.sync?.receber].filter(Boolean).map((d) => new Date(d).getTime());
+    const horas = ts.length ? (Date.now() - Math.min(...ts)) / 3600000 : 999;
+    if (horas > 12) { autoSyncFeito.current = true; sincronizarFin(); }
+  }, [fin, sincronizarFin]);
 
   // ── Listas detalhadas (lazy por aba) ────────────────────────
   const [listas, setListas] = useState({});
@@ -114,8 +133,13 @@ export default function DiretoriaClient({ isDono, userNome }) {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={carregarFin} disabled={loadingFin} className="text-xs text-white/80 hover:text-white inline-flex items-center gap-1.5 disabled:opacity-50">
-              <RefreshCw size={13} className={loadingFin ? "animate-spin" : ""} /> atualizar
+            {fin?.sync?.receber && (
+              <span className="text-[10px] text-white/55 hidden sm:inline" title={`Omie — a pagar: ${fmtDataHora(fin.sync.pagar)} · a receber: ${fmtDataHora(fin.sync.receber)}`}>
+                Omie: {fmtDataHora(fin.sync.receber)}
+              </span>
+            )}
+            <button onClick={sincronizarFin} disabled={sincronizando || loadingFin} className="text-xs text-white/80 hover:text-white inline-flex items-center gap-1.5 disabled:opacity-50">
+              <RefreshCw size={13} className={sincronizando || loadingFin ? "animate-spin" : ""} /> {sincronizando ? "sincronizando…" : "sincronizar Omie"}
             </button>
             <Link href="/" className="text-xs text-white/80 hover:text-white inline-flex items-center gap-1.5"><ArrowLeft size={14} /> Portal</Link>
           </div>
@@ -144,10 +168,13 @@ export default function DiretoriaClient({ isDono, userNome }) {
         ) : null}
 
         {/* ════════ PONTOS DE RUPTURA ════════ */}
-        {aba === "ruptura" && fin && <Ruptura fin={fin} />}
+        {aba === "ruptura" && fin && <Ruptura fin={fin} onRefresh={carregarFin} />}
 
         {/* ════════ ONDE CORTAR ════════ */}
         {aba === "cortar" && fin && <OndeCortar categorias={fin.categoriasPagar} totalPagar={fin.aPagar.total} />}
+
+        {/* ════════ DRE ALVO × REALIZADO ════════ */}
+        {aba === "dre" && <DreAlvo />}
 
         {/* ════════ RESUMO ════════ */}
         {aba === "resumo" && fin && <Resumo fin={fin} />}
@@ -161,6 +188,9 @@ export default function DiretoriaClient({ isDono, userNome }) {
             <ContasView tipo={aba} data={listas[aba]} loading={loadingLista} erro={erroLista} onRetry={() => carregarLista(aba)} />
           </div>
         )}
+
+        {/* ════════ CONFERÊNCIA DE LANÇAMENTOS ════════ */}
+        {aba === "conferencia" && <Conferencia />}
 
         {/* ════════ PREVISÃO DE FATURAMENTO ════════ */}
         {aba === "previsao" && <PrevisaoFaturamento />}
@@ -215,7 +245,7 @@ export default function DiretoriaClient({ isDono, userNome }) {
 }
 
 /* ─────────────────────── PONTOS DE RUPTURA ─────────────────────── */
-function Ruptura({ fin }) {
+function Ruptura({ fin, onRefresh }) {
   const { ruptura, previsao } = fin;
   return (
     <div className="space-y-6">
@@ -281,6 +311,10 @@ function Ruptura({ fin }) {
           </div>
         )}
       </section>
+
+      {/* Fluxo de caixa diário */}
+      <FluxoDiario fluxo={ruptura.fluxoDiario} fluxoNaturezas={ruptura.fluxoNaturezas} fluxoVencido={ruptura.fluxoVencido}
+        saldoInicial={ruptura.saldoInicial} saldoAtualizadoEm={ruptura.saldoAtualizadoEm} onRefresh={onRefresh} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Concentração de credores */}
@@ -448,6 +482,500 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
         <p className="text-xs text-torg-gray text-center">Mostrando os {LIMITE} primeiros (ordenados por vencimento) de {filtrados.length}. Use a busca para refinar.</p>
       )}
     </div>
+  );
+}
+
+/* ─────────────────────── conferência / rastreabilidade de lançamentos ─────────────────────── */
+const OMIE_TENANT = process.env.NEXT_PUBLIC_OMIE_TENANT || "torg-5mos4yik";
+const omieModuloUrl = (tipo) => `https://app.omie.com.br/gestao/${OMIE_TENANT}/#${tipo === "receber" ? "VEN" : "COM"}`;
+const FLAG_COR = {
+  "sem categoria": "bg-amber-50 text-amber-700 border-amber-200",
+  "sem NF": "bg-orange-50 text-orange-700 border-orange-200",
+  "sem vínculo": "bg-red-50 text-red-700 border-red-200",
+  "detalhe pendente": "bg-gray-100 text-gray-600 border-gray-200",
+  "possível duplicado": "bg-rose-50 text-rose-700 border-rose-200",
+  "alterado após sync": "bg-purple-50 text-purple-700 border-purple-200",
+};
+
+function Conferencia() {
+  const [tipo, setTipo] = useState("pagar");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [filtro, setFiltro] = useState("atencao");
+  const [busca, setBusca] = useState("");
+  const [mesVenc, setMesVenc] = useState("todos");
+  const [expand, setExpand] = useState(null);
+  const [salvandoId, setSalvandoId] = useState(null);
+  const [exportando, setExportando] = useState(false);
+  const LIMITE = 400;
+
+  const carregar = useCallback(async (t) => {
+    setLoading(true); setErro("");
+    try {
+      const r = await fetch(`/api/diretoria/conferencia?tipo=${t}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      setData(j);
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { carregar(tipo); }, [tipo, carregar]);
+
+  async function marcar(item, situacao) {
+    setSalvandoId(item.id);
+    const limpar = item.situacao === situacao;
+    try {
+      const resp = limpar
+        ? await fetch(`/api/diretoria/conferencia?tipo=${tipo}&lancamentoId=${encodeURIComponent(item.id)}`, { method: "DELETE" })
+        : await fetch("/api/diretoria/conferencia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, lancamentoId: item.id, situacao }) });
+      const j = await resp.json();
+      if (!resp.ok) throw new Error(j.error || "Erro");
+      setData((d) => ({ ...d, itens: d.itens.map((i) => (i.id === item.id ? { ...i, situacao: limpar ? null : situacao } : i)) }));
+    } catch (e) { alert(e.message); } finally { setSalvandoId(null); }
+  }
+
+  async function exportar() {
+    if (!data?.itens?.length) return;
+    setExportando(true);
+    try {
+      const xl = await import("@/lib/excel-relatorio");
+      const headers = ["Situação", "Código Omie", tipo === "receber" ? "Cliente" : "Fornecedor", "Categoria", "Cód. cat", "Tipo doc", "Nº doc", "NF", "Chave NFe", tipo === "receber" ? "Pedido/OS" : "Pedido compra", "Conta corrente", "Emissão", "Vencimento", "Status Omie", "Detalhe", "Sincronizado", "Alterado Omie", "Sinais", "Valor", "Saldo"];
+      const { workbook, sheet: ws, linhaInicio } = await xl.criarRelatorioTorg({
+        titulo: `Conferência de lançamentos — ${tipo === "receber" ? "A Receber" : "A Pagar"}`,
+        nomePlanilha: tipo === "receber" ? "A Receber" : "A Pagar",
+        totalColunas: headers.length, codigoDoc: "REL-DIR-002",
+      });
+      let row = linhaInicio;
+      xl.adicionarHeaderTabela(ws, row, headers); row++;
+      const alin = { 18: "right", 19: "right" };
+      const exp = lista; // exporta o recorte atual (mês + filtro + busca)
+      for (const i of exp) {
+        xl.adicionarLinhaTabela(ws, row, [
+          i.situacao === "CONFERIDO" ? "Conferido" : i.situacao === "SUSPEITO" ? "Suspeito" : "",
+          i.id, i.nome, i.categoriaNome || "", i.categoriaCodigo || "", i.tipoDoc || "",
+          i.numeroDocumento || "", i.numeroDocFiscal || "", i.chaveNfe || "", i.numeroPedido || "",
+          i.contaCorrenteId || "", fmtDia(i.emissao), fmtDia(i.venc), i.status || "",
+          i.detalheCarregado ? "sim" : "não", fmtDataHora(i.syncedAt), fmtDataHora(i.dataAlteracaoOmie),
+          i.flags.join(", "), Number(i.valor || 0), Number(i.saldo || 0),
+        ], { alinhamento: alin });
+        row++;
+      }
+      xl.adicionarLinhaTotais(ws, row, ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", `TOTAL — ${exp.length} título(s)`, "", Number(exp.reduce((s, i) => s + (i.saldo || 0), 0))]);
+      const hojeStr = new Date().toLocaleDateString("en-CA");
+      const sufixoMes = mesVenc !== "todos" ? ` venc ${mesVenc}` : "";
+      await xl.downloadWorkbook(workbook, `Conferencia ${tipo === "receber" ? "a receber" : "a pagar"}${sufixoMes} ${hojeStr}.xlsx`);
+    } catch (e) { alert("Erro ao exportar: " + e.message); } finally { setExportando(false); }
+  }
+
+  const { lista, cont, meses, totalMes } = useMemo(() => {
+    const itens = data?.itens || [];
+    const GRAVES = ["possível duplicado", "sem vínculo", "sem categoria", "alterado após sync"];
+    const ehGrave = (i) => i.flags.some((f) => GRAVES.includes(f));
+    // meses de vencimento presentes (p/ o seletor)
+    const meses = [...new Set(itens.map((i) => (i.venc || "").slice(0, 7)).filter(Boolean))].sort();
+    // base = recorte do mês de vencimento escolhido
+    const base = mesVenc === "todos" ? itens : itens.filter((i) => (i.venc || "").slice(0, 7) === mesVenc);
+    const cont = {
+      conferidos: base.filter((i) => i.situacao === "CONFERIDO").length,
+      suspeitos: base.filter((i) => i.situacao === "SUSPEITO").length,
+      atencao: base.filter((i) => ehGrave(i) && i.situacao !== "CONFERIDO").length,
+    };
+    const q = busca.trim().toLowerCase();
+    const lista = base.filter((i) => {
+      if (filtro === "atencao" && !(ehGrave(i) && i.situacao !== "CONFERIDO")) return false;
+      if (filtro === "suspeitos" && i.situacao !== "SUSPEITO") return false;
+      if (filtro === "conferidos" && i.situacao !== "CONFERIDO") return false;
+      if (!q) return true;
+      return [i.nome, i.id, i.numeroDocFiscal, i.numeroDocumento, i.categoriaNome].some((s) => (s || "").toLowerCase().includes(q));
+    });
+    const totalMes = base.reduce((s, i) => s + (i.saldo || 0), 0);
+    return { lista, cont, meses, totalMes };
+  }, [data, filtro, busca, mesVenc]);
+
+  if (loading) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Carregando lançamentos…</div>;
+  if (erro) return <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => carregar(tipo)} className="ml-auto text-xs underline">tentar de novo</button></div>;
+  if (!data) return null;
+  const { resumo } = data;
+
+  const FiltroBtn = ({ id, label, n }) => (
+    <button onClick={() => setFiltro(id)} className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${filtro === id ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue/40"}`}>
+      {label}{n != null ? ` (${n})` : ""}
+    </button>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-bold text-torg-dark">Conferência de lançamentos</h2>
+          <p className="text-[11px] text-torg-gray">Rastreabilidade título a título: origem no Omie, NF, pedido e datas. Marque conferido ✓ ou suspeito ⚠ pra construir a trilha de auditoria.</p>
+        </div>
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+          <button onClick={() => { setTipo("pagar"); setExpand(null); }} className={`px-3 py-2 ${tipo === "pagar" ? "bg-torg-blue text-white" : "bg-white text-torg-gray"}`}>A pagar</button>
+          <button onClick={() => { setTipo("receber"); setExpand(null); }} className={`px-3 py-2 ${tipo === "receber" ? "bg-torg-blue text-white" : "bg-white text-torg-gray"}`}>A receber</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <MiniCard titulo="Em aberto" valor={fmtR$(resumo.saldoTotal)} sub={`${resumo.total} títulos`} />
+        <MiniCard titulo="Com sinalização" valor={fmtR$(resumo.saldoComFlag)} sub={`${resumo.comFlag} títulos`} cor="amber" />
+        <MiniCard titulo="Conferidos" valor={String(cont.conferidos)} sub="marcados ✓" cor="emerald" />
+        <MiniCard titulo="Suspeitos" valor={String(cont.suspeitos)} sub="marcados ⚠" cor="rose" />
+      </div>
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <FiltroBtn id="atencao" label="Precisam atenção" n={cont.atencao} />
+          <FiltroBtn id="suspeitos" label="Suspeitos" n={cont.suspeitos} />
+          <FiltroBtn id="conferidos" label="Conferidos" n={cont.conferidos} />
+          <FiltroBtn id="todos" label="Todos" n={resumo.total} />
+        </div>
+        <div className="flex items-center gap-2">
+          <select value={mesVenc} onChange={(e) => setMesVenc(e.target.value)} title="Filtrar por mês de vencimento"
+            className="text-xs border border-gray-200 rounded-lg px-2 py-2 outline-none focus:border-torg-blue bg-white text-torg-dark">
+            <option value="todos">Todos os meses</option>
+            {meses.map((m) => <option key={m} value={m}>vence {labelMes(m)}</option>)}
+          </select>
+          <button onClick={exportar} disabled={exportando} title="Exportar os lançamentos do recorte atual com a trilha e os sinais (Excel com filtro)"
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-medium hover:bg-emerald-100 disabled:opacity-50">
+            {exportando ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Exportar Excel
+          </button>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="código, fornecedor, NF…" className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none w-56" />
+          </div>
+        </div>
+      </div>
+
+      {mesVenc !== "todos" && (
+        <p className="text-xs text-torg-gray">Vencendo em <b className="text-torg-dark">{labelMes(mesVenc)}</b>: {lista.length} título(s) no filtro · total do mês <b className="text-torg-dark">{fmtR$(totalMes)}</b></p>
+      )}
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50/60 text-left text-[11px] uppercase tracking-wide text-torg-gray">
+            <tr>
+              <th className="px-3 py-2.5">Conferir</th>
+              <th className="px-3 py-2.5">{tipo === "receber" ? "Cliente" : "Fornecedor"} / origem</th>
+              <th className="px-3 py-2.5">Categoria</th>
+              <th className="px-3 py-2.5 text-center">Vencimento</th>
+              <th className="px-3 py-2.5 text-right">Saldo</th>
+              <th className="px-3 py-2.5">Sinais</th>
+              <th className="px-3 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {lista.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-torg-gray text-sm">Nenhum lançamento neste filtro.</td></tr>
+            ) : lista.slice(0, LIMITE).map((i) => (
+              <Fragment key={i.id}>
+                <tr className={`hover:bg-gray-50/50 ${i.situacao === "SUSPEITO" ? "bg-rose-50/40" : i.situacao === "CONFERIDO" ? "bg-emerald-50/30" : ""}`}>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => marcar(i, "CONFERIDO")} disabled={salvandoId === i.id} title="Marcar conferido"
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center border ${i.situacao === "CONFERIDO" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-torg-gray border-gray-200 hover:border-emerald-400"}`}><CheckCircle2 size={15} /></button>
+                      <button onClick={() => marcar(i, "SUSPEITO")} disabled={salvandoId === i.id} title="Marcar suspeito"
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center border ${i.situacao === "SUSPEITO" ? "bg-rose-600 text-white border-rose-600" : "bg-white text-torg-gray border-gray-200 hover:border-rose-400"}`}><AlertTriangle size={15} /></button>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <p className="text-torg-dark font-medium truncate max-w-[220px]" title={i.nome}>{i.nome}</p>
+                    <p className="text-[10px] text-torg-gray font-mono">Omie #{i.id}{i.numeroDocFiscal ? ` · NF ${i.numeroDocFiscal}` : ""}</p>
+                  </td>
+                  <td className="px-3 py-2 text-torg-gray max-w-[150px] truncate" title={i.categoriaNome}>{i.categoriaNome || <span className="text-amber-600">sem categoria</span>}</td>
+                  <td className="px-3 py-2 text-center whitespace-nowrap"><span className={i.vencido ? "text-red-600 font-semibold" : "text-torg-gray"}>{fmtDia(i.venc)}</span></td>
+                  <td className="px-3 py-2 text-right tabular-nums font-medium text-torg-dark whitespace-nowrap">{fmtR$(i.saldo)}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-wrap gap-1 max-w-[200px]">
+                      {i.flags.map((f) => <span key={f} className={`text-[9px] px-1.5 py-0.5 rounded border ${FLAG_COR[f] || "bg-gray-100 text-gray-600 border-gray-200"}`}>{f}</span>)}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => setExpand(expand === i.id ? null : i.id)} className="text-torg-gray hover:text-torg-blue"><ChevronDown size={16} className={`transition-transform ${expand === i.id ? "rotate-180" : ""}`} /></button>
+                  </td>
+                </tr>
+                {expand === i.id && (
+                  <tr className="bg-gray-50/40">
+                    <td colSpan={7} className="px-5 py-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1.5 text-[11px]">
+                        <Trace l="Código Omie" v={i.id} mono />
+                        <Trace l="Cód. parceiro" v={i.codParceiro} mono />
+                        <Trace l="Tipo doc" v={i.tipoDoc} />
+                        <Trace l="Nº documento" v={i.numeroDocumento} />
+                        <Trace l="NF (doc fiscal)" v={i.numeroDocFiscal} />
+                        <Trace l="Chave NFe" v={i.chaveNfe} mono />
+                        <Trace l={tipo === "receber" ? "Pedido / OS" : "Pedido compra"} v={i.numeroPedido} />
+                        <Trace l="Conta corrente" v={i.contaCorrenteId} mono />
+                        <Trace l="Emissão" v={fmtDia(i.emissao)} />
+                        <Trace l="Vencimento" v={fmtDia(i.venc)} />
+                        <Trace l="Status Omie" v={i.status} />
+                        <Trace l="Categoria (cód.)" v={i.categoriaCodigo} />
+                        <Trace l="Detalhe carregado" v={i.detalheCarregado ? "sim" : "não"} />
+                        <Trace l="Sincronizado em" v={fmtDataHora(i.syncedAt)} />
+                        <Trace l="Alterado no Omie" v={fmtDataHora(i.dataAlteracaoOmie)} />
+                        <Trace l="Valor total" v={fmtR$(i.valor)} />
+                      </div>
+                      {i.observacao && <p className="text-[11px] text-torg-gray mt-2"><b>Obs Omie:</b> {i.observacao}</p>}
+                      <div className="flex items-center gap-3 mt-2">
+                        <a href={omieModuloUrl(tipo)} target="_blank" rel="noopener noreferrer" className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><ExternalLink size={11} /> abrir módulo no Omie</a>
+                        {i.situacao && <span className="text-[10px] text-torg-gray">{i.situacao === "CONFERIDO" ? "✓ conferido" : "⚠ suspeito"} por {i.conferenciaPor || "—"}</span>}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {lista.length > LIMITE && <p className="text-xs text-torg-gray text-center">Mostrando {LIMITE} de {lista.length}. Refine com a busca ou filtros.</p>}
+    </div>
+  );
+}
+
+function MiniCard({ titulo, valor, sub, cor }) {
+  const c = cor === "amber" ? "text-amber-700" : cor === "emerald" ? "text-emerald-700" : cor === "rose" ? "text-rose-700" : "text-torg-dark";
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+      <p className="text-[11px] text-torg-gray">{titulo}</p>
+      <p className={`text-lg font-extrabold tabular-nums leading-tight ${c}`}>{valor}</p>
+      {sub && <p className="text-[10px] text-torg-gray">{sub}</p>}
+    </div>
+  );
+}
+function Trace({ l, v, mono }) {
+  return (
+    <div>
+      <span className="text-torg-gray">{l}: </span>
+      <span className={`text-torg-dark ${mono ? "font-mono break-all" : ""}`}>{v && String(v).trim() ? v : "—"}</span>
+    </div>
+  );
+}
+
+/* ─────────────────────── DRE Alvo × Realizado ─────────────────────── */
+function DreAlvo() {
+  const [meses, setMeses] = useState(null);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+
+  const carregar = useCallback(async (m) => {
+    setLoading(true); setErro("");
+    try {
+      const r = await fetch(`/api/diretoria/dre${m ? `?meses=${m}` : ""}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      setData(j); setMeses(j.meses);
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { carregar(null); }, [carregar]);
+
+  if (loading && !data) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Montando DRE…</div>;
+  if (erro) return <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => carregar(meses)} className="ml-auto text-xs underline">tentar de novo</button></div>;
+  if (!data) return null;
+
+  const periodoLabel = `jan–${MESES_ABREV[data.meses - 1]}/${String(data.ano).slice(2)}`;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-bold text-torg-dark flex items-center gap-2"><Target size={20} className="text-torg-blue" /> DRE Alvo × Realizado · {data.ano}</h2>
+          <p className="text-[11px] text-torg-gray">Alvo gerencial (definido no início do ano), proporcional ao período. Realizado por competência (data de emissão): receita = faturamento; custos/despesas = a pagar por categoria.</p>
+        </div>
+        <label className="text-xs text-torg-gray flex items-center gap-2 shrink-0">
+          Acumulado até
+          <select value={data.meses} onChange={(e) => carregar(Number(e.target.value))} disabled={loading}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:border-torg-blue disabled:opacity-50">
+            {MESES_ABREV.map((m, i) => <option key={i} value={i + 1}>{m}/{String(data.ano).slice(2)}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {data.naoClassificado > 0 && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+          <span><b>{fmtR$(data.naoClassificado)}</b> de gastos <b>sem categoria/não mapeados</b> entraram como custo no Resultado Final (linha "Não classificado"). O realizado fica mais preciso conforme esses lançamentos forem categorizados no Omie.</span>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50/60 text-left text-[11px] uppercase tracking-wide text-torg-gray">
+            <tr>
+              <th className="px-4 py-2.5">Linha (DRE)</th>
+              <th className="px-4 py-2.5 text-right">Alvo · {periodoLabel}</th>
+              <th className="px-4 py-2.5 text-right">Realizado</th>
+              <th className="px-4 py-2.5 text-right">Δ</th>
+              <th className="px-4 py-2.5 text-right">Atingido</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {data.linhas.map((l, i) => {
+              const sub = l.kind === "subtotal" || l.kind === "resultado" || l.kind === "grupoHeader";
+              const delta = l.real - l.alvo;
+              const pct = l.alvo > 0 ? Math.round((l.real / l.alvo) * 100) : null;
+              const bom = l.sentido === "receita" ? l.real >= l.alvo : l.real <= l.alvo;
+              return (
+                <tr key={i} className={`${sub ? "bg-gray-50/40 font-semibold" : ""} ${l.kind === "resultado" ? "border-t-2 border-torg-dark/20" : ""} ${l.kind === "naoclass" ? "bg-amber-50/40" : ""}`}>
+                  <td className={`px-4 py-2 ${l.nivel === 0 ? "text-torg-dark" : "text-torg-gray pl-8"}`}>{l.label}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-torg-gray">{l.alvo ? fmtR$(l.alvo) : "—"}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-torg-dark">{fmtR$(l.real)}</td>
+                  <td className={`px-4 py-2 text-right tabular-nums ${bom ? "text-emerald-700" : "text-red-600"}`}>{delta >= 0 ? "+" : ""}{fmtR$(delta)}</td>
+                  <td className="px-4 py-2 text-right">
+                    {pct != null ? <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold tabular-nums ${bom ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{pct}%</span> : <span className="text-torg-gray">—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[10px] text-torg-gray">Δ e % na ótica de cada linha: em receita/resultado, realizado acima do alvo é bom (verde); em custos/despesas, acima do alvo é estouro (vermelho). v1 — mapeamento por prefixo de categoria do Omie; valide e me diga ajustes.</p>
+    </div>
+  );
+}
+
+/* ─────────────────────── fluxo de caixa diário (ruptura) ─────────────────────── */
+function FluxoDiario({ fluxo, fluxoNaturezas, fluxoVencido, saldoInicial, saldoAtualizadoEm, onRefresh }) {
+  const [editandoSaldo, setEditandoSaldo] = useState(false);
+  const [saldoInput, setSaldoInput] = useState(String(saldoInicial ?? 0));
+  const [salvandoSaldo, setSalvandoSaldo] = useState(false);
+  const [incluirFin, setIncluirFin] = useState(true);
+  const [incluirInv, setIncluirInv] = useState(true);
+
+  async function salvarSaldo() {
+    const v = Number(String(saldoInput).replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(v)) { alert("Valor inválido"); return; }
+    setSalvandoSaldo(true);
+    try {
+      const r = await fetch("/api/diretoria/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ saldoCaixa: v }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao salvar");
+      setEditandoSaldo(false);
+      onRefresh?.();
+    } catch (e) { alert(e.message); } finally { setSalvandoSaldo(false); }
+  }
+
+  const hojeK = new Date().toISOString().slice(0, 10);
+  const nat = fluxoNaturezas || { operacional: 0, financeiro: 0, investimento: 0 };
+
+  // Recalcula o saldo projetado conforme os toggles de natureza
+  const { rows, pior, piorDiaCalc } = useMemo(() => {
+    let acc = saldoInicial || 0, p = saldoInicial || 0, pd = null;
+    const rows = (fluxo || []).map((e) => {
+      const pagar = e.pagarOper + (incluirFin ? e.pagarFin : 0) + (incluirInv ? e.pagarInv : 0);
+      const liquido = e.receberFat + e.receberPrev - pagar;
+      acc += liquido;
+      if (acc < p) { p = acc; pd = e.dia; }
+      return { dia: e.dia, pagar, receberFat: e.receberFat, receberPrev: e.receberPrev, liquido, saldo: acc };
+    });
+    return { rows, pior: p, piorDiaCalc: pd };
+  }, [fluxo, incluirFin, incluirInv, saldoInicial]);
+
+  // Vencidos em aberto (fora da projeção diária), respeitando os toggles
+  const v = fluxoVencido || { pagarOper: 0, pagarFin: 0, pagarInv: 0, receberFat: 0, receberPrev: 0 };
+  const vencPagar = v.pagarOper + (incluirFin ? v.pagarFin : 0) + (incluirInv ? v.pagarInv : 0);
+  const vencReceber = (v.receberFat || 0) + (v.receberPrev || 0);
+  const temVencido = vencPagar > 0.5 || vencReceber > 0.5;
+
+  const saldoBox = (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-torg-gray">Saldo em caixa hoje:</span>
+      {editandoSaldo ? (
+        <>
+          <input value={saldoInput} onChange={(e) => setSaldoInput(e.target.value)} autoFocus
+            className="w-32 px-2 py-1 text-sm border border-gray-200 rounded outline-none focus:border-torg-blue tabular-nums" placeholder="-90000" />
+          <button onClick={salvarSaldo} disabled={salvandoSaldo} className="text-[11px] text-white bg-torg-blue px-2 py-1 rounded disabled:opacity-50">salvar</button>
+          <button onClick={() => { setEditandoSaldo(false); setSaldoInput(String(saldoInicial ?? 0)); }} className="text-[11px] text-torg-gray hover:underline">cancelar</button>
+        </>
+      ) : (
+        <>
+          <span className={`font-bold tabular-nums ${(saldoInicial || 0) < 0 ? "text-red-700" : "text-torg-dark"}`}>{fmtR$(saldoInicial)}</span>
+          <button onClick={() => { setSaldoInput(String(saldoInicial ?? 0)); setEditandoSaldo(true); }} title="Editar saldo" className="text-torg-gray hover:text-torg-blue"><Pencil size={12} /></button>
+        </>
+      )}
+    </div>
+  );
+
+  const chips = (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[11px] text-torg-gray">No fluxo:</span>
+      <span className="text-[11px] px-2 py-1 rounded bg-gray-100 text-torg-dark">Operacional {fmtR$(nat.operacional)}</span>
+      <button onClick={() => setIncluirFin((v) => !v)} title="Incluir/excluir do fluxo"
+        className={`text-[11px] px-2 py-1 rounded border transition-colors ${incluirFin ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-white border-gray-200 text-torg-gray line-through"}`}>
+        {incluirFin ? "✓" : "✕"} Dívida/financ. {fmtR$(nat.financeiro)}
+      </button>
+      <button onClick={() => setIncluirInv((v) => !v)} title="Incluir/excluir do fluxo"
+        className={`text-[11px] px-2 py-1 rounded border transition-colors ${incluirInv ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-white border-gray-200 text-torg-gray line-through"}`}>
+        {incluirInv ? "✓" : "✕"} Investimento {fmtR$(nat.investimento)}
+      </button>
+    </div>
+  );
+
+  if (!fluxo?.length) return (
+    <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-2">
+      <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
+      {saldoBox}
+      <p className="text-sm text-torg-gray">Sem movimentos nos próximos 60 dias.</p>
+    </section>
+  );
+  return (
+    <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
+      <div className="px-5 py-4 border-b border-gray-100 space-y-2.5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="font-semibold text-torg-dark">Fluxo de caixa diário · próximos 60 dias</h2>
+            <p className="text-[11px] text-torg-gray mt-0.5">A pagar (saída) × recebimentos faturados e previsões (entrada), por dia. O <b>saldo projetado</b> parte do caixa de hoje. Tire a dívida/investimento abaixo pra ver o aperto só do operacional. <b>Vencidos ficam em aberto</b>, fora desta projeção.</p>
+          </div>
+          {pior < 0 && (
+            <div className="text-right shrink-0">
+              <p className="text-[11px] text-torg-gray">Pior saldo projetado</p>
+              <p className="text-lg font-extrabold text-red-700 tabular-nums leading-none">{fmtR$(pior)}</p>
+              <p className="text-[10px] text-torg-gray">{piorDiaCalc ? `por volta de ${fmtDia(piorDiaCalc)}` : ""}</p>
+            </div>
+          )}
+        </div>
+        {saldoBox}
+        {chips}
+      </div>
+      {temVencido && (
+        <div className="px-5 py-3 border-b border-gray-100 bg-amber-50/50 flex items-center justify-between gap-3 flex-wrap text-sm">
+          <span className="text-amber-800 font-medium inline-flex items-center gap-1.5"><AlertTriangle size={15} /> Vencido em aberto <span className="text-[11px] font-normal text-amber-700/80">(já passou do vencimento — fora da projeção diária)</span></span>
+          <div className="flex items-center gap-4 text-[12px] tabular-nums">
+            <span className="text-torg-gray">a pagar <b className="text-rose-700">{fmtR$(vencPagar)}</b></span>
+            <span className="text-torg-gray">a receber <b className="text-emerald-700">{fmtR$(vencReceber)}</b></span>
+            <span className="text-torg-gray">líquido <b className={vencReceber - vencPagar < 0 ? "text-red-700" : "text-emerald-700"}>{fmtR$(vencReceber - vencPagar)}</b></span>
+          </div>
+        </div>
+      )}
+      <div className="max-h-96 overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50/80 text-left text-[11px] uppercase tracking-wide text-torg-gray sticky top-0">
+            <tr>
+              <th className="px-4 py-2">Dia</th>
+              <th className="px-4 py-2 text-right">A pagar</th>
+              <th className="px-4 py-2 text-right">Receb. faturado</th>
+              <th className="px-4 py-2 text-right">Receb. previsto</th>
+              <th className="px-4 py-2 text-right">Líquido</th>
+              <th className="px-4 py-2 text-right">Saldo projetado</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {rows.map((f) => (
+              <tr key={f.dia} className="hover:bg-gray-50/50">
+                <td className="px-4 py-1.5 whitespace-nowrap text-torg-dark">{fmtDia(f.dia)}{f.dia === hojeK ? <span className="text-[10px] text-torg-gray"> (hoje)</span> : null}</td>
+                <td className="px-4 py-1.5 text-right tabular-nums text-rose-600">{f.pagar > 0 ? fmtR$(f.pagar) : "—"}</td>
+                <td className="px-4 py-1.5 text-right tabular-nums text-emerald-700">{f.receberFat > 0 ? fmtR$(f.receberFat) : "—"}</td>
+                <td className="px-4 py-1.5 text-right tabular-nums text-torg-blue">{f.receberPrev > 0 ? fmtR$(f.receberPrev) : "—"}</td>
+                <td className={`px-4 py-1.5 text-right tabular-nums font-medium ${f.liquido < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmtR$(f.liquido)}</td>
+                <td className={`px-4 py-1.5 text-right tabular-nums font-semibold ${f.saldo < 0 ? "text-red-700 bg-red-50/50" : "text-torg-dark"}`}>{fmtR$(f.saldo)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
