@@ -45,30 +45,26 @@ export async function GET(req) {
     } catch (e) { out.contasTried.push({ call, erro: e.message }); }
   }
 
-  // descobre um nCodCC pra testar o extrato
-  let nCodCC = null;
-  const cc = out.contasCorrentes?.amostra;
-  if (cc) {
-    const lista = cc.ListarResumoContasCorrentes || cc.conta_corrente_resumido || cc.conta_corrente_cadastro || cc.contasCorrentes || [];
-    const first = Array.isArray(lista) ? lista[0] : null;
-    nCodCC = first?.nCodCC || first?.codigo_conta_corrente || null;
-    out.notas.push("nCodCC usado no teste de extrato: " + nCodCC);
-  }
+  // Contas correntes do tipo CC/CA/CX (bancos/caixa) com nCodCC
+  const lista = out.contasCorrentes?.amostra?.conta_corrente_lista || [];
+  const contas = lista.map((c) => ({ nCodCC: c.nCodCC, descricao: c.descricao, banco: c.codigo_banco, tipo: c.tipo }));
+  out.notas.push(`contas: ${contas.length}`);
 
-  // 2) Tenta o extrato com calls/params candidatos (ultimos ~30 dias)
+  // 2) Extrato: ListarExtrato com params validos (dPeriodoInicial/dPeriodoFinal; SEM nPagina).
+  //    Testa nas 3 primeiras contas com saldo/banco real, ultimos ~30 dias.
   const periodoIni = brHoje(-30), periodoFim = brHoje(0);
-  const tentativas = [
-    { call: "ListarExtrato", param: { nCodCC, dPeriodoInicial: periodoIni, dPeriodoFinal: periodoFim, nPagina: 1, nRegPorPagina: 20 } },
-    { call: "ListarExtrato", param: { nCodCC, cExibirApenasSaldo: "N", dDtInicial: periodoIni, dDtFinal: periodoFim, nPagina: 1, nRegPorPagina: 20 } },
-    { call: "ObterExtrato",  param: { nCodCC, dPeriodoInicial: periodoIni, dPeriodoFinal: periodoFim } },
-  ];
-  for (let i = 0; i < tentativas.length; i++) {
-    const t = tentativas[i];
+  const alvos = contas.filter((c) => c.nCodCC).slice(0, 3);
+  for (const c of alvos) {
     try {
-      const r = await omie(URL_EXTRATO, t.call, t.param);
-      out.extrato[`tent${i}_${t.call}`] = { param: t.param, faultstring: r.faultstring || null, amostra: r.faultstring ? null : r };
-      if (!r.faultstring) break;
-    } catch (e) { out.extrato[`tent${i}_${t.call}`] = { erro: e.message }; }
+      const r = await omie(URL_EXTRATO, "ListarExtrato", {
+        nCodCC: c.nCodCC, dPeriodoInicial: periodoIni, dPeriodoFinal: periodoFim, cExibirApenasSaldo: "N",
+      });
+      out.extrato[`${c.descricao} (${c.nCodCC})`] = {
+        faultstring: r.faultstring || null,
+        chaves: r.faultstring ? null : Object.keys(r),
+        amostra: r.faultstring ? null : r,
+      };
+    } catch (e) { out.extrato[`${c.descricao} (${c.nCodCC})`] = { erro: e.message }; }
   }
 
   return NextResponse.json(out);
