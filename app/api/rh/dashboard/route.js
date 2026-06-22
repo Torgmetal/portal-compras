@@ -37,15 +37,16 @@ export async function GET() {
         where: { ativo: true },
         _count: true,
       }),
-      // Admissões nos últimos 30 dias
+      // Admissões nos últimos 30 dias (sem futuro). Busca um pouco mais para
+      // depois descartar artefatos de importação (datas carimbadas no import).
       prisma.funcionario.findMany({
         where: {
-          dataAdmissao: { gte: new Date(Date.now() - 30 * 86400000) },
+          dataAdmissao: { gte: new Date(Date.now() - 30 * 86400000), lte: new Date() },
           ativo: true,
         },
         select: { id: true, nome: true, dataAdmissao: true, cargo: { select: { nome: true } }, setor: { select: { nome: true } } },
         orderBy: { dataAdmissao: "desc" },
-        take: 10,
+        take: 40,
       }),
       // Aniversariantes do mês
       prisma.$queryRaw`
@@ -77,6 +78,12 @@ export async function GET() {
         take: 10,
       }),
     ]);
+
+    // "Admissões recentes": só datas reais (date-only em UTC meia-noite). Datas com
+    // hora ≠ meia-noite vêm de importação que carimbou a data do momento do import
+    // (admissão real perdida) — não são admissões recentes de verdade.
+    const dataReal = (d) => { const x = new Date(d); return x.getUTCHours() === 0 && x.getUTCMinutes() === 0 && x.getUTCSeconds() === 0; };
+    const admissoesRecentesLimpa = admissoesRecentes.filter((f) => f.dataAdmissao && dataReal(f.dataAdmissao)).slice(0, 10);
 
     // Enriquecer porSetor com nome
     const setores = await prisma.setor.findMany({
@@ -121,7 +128,7 @@ export async function GET() {
         funcionariosPorSetor,
         custoPorSetor,
         porContrato: porContrato.map((g) => ({ tipo: g.tipoContrato, count: g._count })),
-        admissoesRecentes,
+        admissoesRecentes: admissoesRecentesLimpa,
         aniversariantes,
         feriasProximas,
       },
