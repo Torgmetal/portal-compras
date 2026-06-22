@@ -756,7 +756,9 @@ function DreAlvo() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [expandKey, setExpandKey] = useState(null);
-  const [drill, setDrill] = useState({}); // key -> { loading } | { data } | { erro }
+  const [drillState, setDrillState] = useState(null); // { loading } | { data } | { erro }
+  const [drillDe, setDrillDe] = useState("");
+  const [drillAte, setDrillAte] = useState("");
 
   const carregar = useCallback(async (m) => {
     setLoading(true); setErro("");
@@ -764,24 +766,37 @@ function DreAlvo() {
       const r = await fetch(`/api/diretoria/dre${m ? `?meses=${m}` : ""}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
-      setData(j); setMeses(j.meses); setExpandKey(null); setDrill({});
+      setData(j); setMeses(j.meses); setExpandKey(null); setDrillState(null);
     } catch (e) { setErro(e.message); } finally { setLoading(false); }
   }, []);
   useEffect(() => { carregar(null); }, [carregar]);
 
-  async function toggleDrill(l) {
-    if (l.key === "computed") return;
-    if (expandKey === l.key) { setExpandKey(null); return; }
-    setExpandKey(l.key);
-    if (drill[l.key]) return;
-    setDrill((d) => ({ ...d, [l.key]: { loading: true } }));
+  async function fetchDrill(key, de, ate) {
+    setDrillState({ loading: true });
     try {
-      const r = await fetch(`/api/diretoria/dre/lancamentos?linha=${encodeURIComponent(l.key)}&meses=${data.meses}`, { cache: "no-store" });
+      const qs = new URLSearchParams({ linha: key, meses: String(data.meses) });
+      if (de) qs.set("de", de);
+      if (ate) qs.set("ate", ate);
+      const r = await fetch(`/api/diretoria/dre/lancamentos?${qs.toString()}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
-      setDrill((d) => ({ ...d, [l.key]: { data: j } }));
-    } catch (e) { setDrill((d) => ({ ...d, [l.key]: { erro: e.message } })); }
+      setDrillState({ data: j });
+    } catch (e) { setDrillState({ erro: e.message }); }
   }
+  function toggleDrill(l) {
+    if (l.key === "computed") return;
+    if (expandKey === l.key) { setExpandKey(null); setDrillState(null); return; }
+    setExpandKey(l.key); setDrillDe(""); setDrillAte("");
+    fetchDrill(l.key, "", "");
+  }
+  function filtrarMes(mes) { // mes "YYYY-MM" ou "" (todos)
+    if (!mes) { setDrillDe(""); setDrillAte(""); fetchDrill(expandKey, "", ""); return; }
+    const [y, m] = mes.split("-").map(Number);
+    const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const dDe = `${mes}-01`, dAte = `${mes}-${String(ultimo).padStart(2, "0")}`;
+    setDrillDe(dDe); setDrillAte(dAte); fetchDrill(expandKey, dDe, dAte);
+  }
+  function filtrarData(dDe, dAte) { setDrillDe(dDe); setDrillAte(dAte); fetchDrill(expandKey, dDe, dAte); }
 
   if (loading && !data) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Montando DRE…</div>;
   if (erro) return <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => carregar(meses)} className="ml-auto text-xs underline">tentar de novo</button></div>;
@@ -847,7 +862,7 @@ function DreAlvo() {
                   </tr>
                   {aberto && (
                     <tr className="bg-gray-50/30">
-                      <td colSpan={5} className="px-4 py-3"><DrillLancamentos dr={drill[l.key]} label={l.label} /></td>
+                      <td colSpan={5} className="px-4 py-3"><DrillLancamentos state={drillState} label={l.label} de={drillDe} ate={drillAte} onMes={filtrarMes} onData={filtrarData} /></td>
                     </tr>
                   )}
                 </Fragment>
@@ -861,34 +876,66 @@ function DreAlvo() {
   );
 }
 
-function DrillLancamentos({ dr, label }) {
-  if (!dr || dr.loading) return <div className="text-xs text-torg-gray py-2"><Loader2 size={14} className="animate-spin inline mr-1" /> carregando lançamentos…</div>;
-  if (dr.erro) return <div className="text-xs text-red-600 py-2">{dr.erro}</div>;
-  const d = dr.data;
+function DrillLancamentos({ state, label, de, ate, onMes, onData }) {
+  if (!state || state.loading) return <div className="text-xs text-torg-gray py-2"><Loader2 size={14} className="animate-spin inline mr-1" /> carregando lançamentos…</div>;
+  if (state.erro) return <div className="text-xs text-red-600 py-2">{state.erro}</div>;
+  const d = state.data;
   if (d?.computed) return <div className="text-xs text-torg-gray py-2">{d.nota}</div>;
-  if (!d?.itens?.length) return <div className="text-xs text-torg-gray py-2">Nenhum lançamento em "{label}" no período.</div>;
+  const porMes = d?.porMes || [];
+  const maxMes = Math.max(1, ...porMes.map((m) => Math.abs(m.valor)));
+  const mesAtivo = de && /^\d{4}-\d{2}-01$/.test(de) ? de.slice(0, 7) : null;
+  const filtrado = !!(de || ate);
   return (
-    <div>
-      {d.nota && <p className="text-[11px] text-amber-700 mb-2">{d.nota}</p>}
-      <p className="text-[11px] text-torg-gray mb-2">{d.qtd} lançamento(s) · total <b className="text-torg-dark">{fmtR$(d.total)}</b>{d.qtd > d.itens.length ? ` · mostrando os ${d.itens.length} maiores` : ""}</p>
-      <div className="rounded-lg border border-gray-100 overflow-hidden max-h-72 overflow-y-auto bg-white">
-        <table className="w-full text-[12px]">
-          <thead className="bg-gray-50/80 sticky top-0 text-left text-[10px] uppercase tracking-wide text-torg-gray">
-            <tr><th className="px-3 py-1.5">Fornecedor / Cliente</th><th className="px-3 py-1.5">Categoria</th><th className="px-3 py-1.5">Doc</th><th className="px-3 py-1.5 text-center">Emissão</th><th className="px-3 py-1.5 text-right">Valor</th></tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {d.itens.map((it) => (
-              <tr key={it.id} className="hover:bg-gray-50/50">
-                <td className="px-3 py-1.5 text-torg-dark max-w-[240px] truncate" title={it.nome}>{it.nome}</td>
-                <td className="px-3 py-1.5 text-torg-gray max-w-[180px] truncate" title={it.categoria}>{it.categoria || "—"}</td>
-                <td className="px-3 py-1.5 text-torg-gray whitespace-nowrap">{it.doc || "—"}</td>
-                <td className="px-3 py-1.5 text-center text-torg-gray whitespace-nowrap">{fmtDia(it.data)}</td>
-                <td className="px-3 py-1.5 text-right tabular-nums text-torg-dark whitespace-nowrap">{fmtR$(it.valor)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="space-y-2">
+      {d.nota && <p className="text-[11px] text-amber-700">{d.nota}</p>}
+
+      {/* Quebra por mês — onde está mais crítico */}
+      {porMes.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-torg-gray mr-1">por mês:</span>
+          <button onClick={() => onMes("")} className={`text-[11px] px-2 py-1 rounded border ${!mesAtivo && !ate ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue/40"}`}>Todos</button>
+          {porMes.map((m) => (
+            <button key={m.mes} onClick={() => onMes(m.mes)} title={`${m.qtd} lançamento(s)`}
+              className={`text-[11px] px-2 py-1 rounded border tabular-nums ${mesAtivo === m.mes ? "bg-torg-blue text-white border-torg-blue" : "bg-white border-gray-200 hover:border-torg-blue/40"} ${m.valor === maxMes && !mesAtivo ? "ring-1 ring-red-300" : ""}`}>
+              {labelMes(m.mes)} · {fmtR$(m.valor)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Filtro fino por data (dia/intervalo) */}
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-torg-gray">
+        <span>de</span>
+        <input type="date" value={de} onChange={(e) => onData(e.target.value, ate)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
+        <span>até</span>
+        <input type="date" value={ate} onChange={(e) => onData(de, e.target.value)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
+        {filtrado && <button onClick={() => onData("", "")} className="text-torg-blue hover:underline">limpar</button>}
       </div>
+
+      <p className="text-[11px] text-torg-gray">{d.qtd} lançamento(s){filtrado ? " no filtro" : ""} · total <b className="text-torg-dark">{fmtR$(d.total)}</b>{filtrado ? ` (de ${fmtR$(d.totalJanela)} no período todo)` : ""}{d.qtd > d.itens.length ? ` · mostrando os ${d.itens.length} maiores` : ""}</p>
+
+      {!d.itens?.length ? (
+        <p className="text-xs text-torg-gray py-2">Nenhum lançamento em "{label}" nesse recorte.</p>
+      ) : (
+        <div className="rounded-lg border border-gray-100 overflow-hidden max-h-72 overflow-y-auto bg-white">
+          <table className="w-full text-[12px]">
+            <thead className="bg-gray-50/80 sticky top-0 text-left text-[10px] uppercase tracking-wide text-torg-gray">
+              <tr><th className="px-3 py-1.5">Fornecedor / Cliente</th><th className="px-3 py-1.5">Categoria</th><th className="px-3 py-1.5">Doc</th><th className="px-3 py-1.5 text-center">Emissão</th><th className="px-3 py-1.5 text-right">Valor</th></tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {d.itens.map((it) => (
+                <tr key={it.id} className="hover:bg-gray-50/50">
+                  <td className="px-3 py-1.5 text-torg-dark max-w-[240px] truncate" title={it.nome}>{it.nome}</td>
+                  <td className="px-3 py-1.5 text-torg-gray max-w-[180px] truncate" title={it.categoria}>{it.categoria || "—"}</td>
+                  <td className="px-3 py-1.5 text-torg-gray whitespace-nowrap">{it.doc || "—"}</td>
+                  <td className="px-3 py-1.5 text-center text-torg-gray whitespace-nowrap">{fmtDia(it.data)}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-torg-dark whitespace-nowrap">{fmtR$(it.valor)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
