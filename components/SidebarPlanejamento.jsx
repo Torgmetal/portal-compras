@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ListTodo, CalendarRange, GanttChart, Truck, ClipboardCheck, CalendarClock, Brain, Sparkles } from "lucide-react";
+import { LayoutDashboard, ListTodo, CalendarRange, GanttChart, Truck, ClipboardCheck, CalendarClock, Brain, Sparkles, Mail } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -12,6 +12,7 @@ const menu = [
   { href: "/planejamento/programacao", label: "Programação Semanal", icon: CalendarRange },
   { href: "/planejamento/analise-critica", label: "Análise Crítica", icon: Brain },
   { href: "/planejamento/distribuir-tarefas", label: "Distribuir tarefas (IA)", icon: Sparkles },
+  { href: "/planejamento/comunicacao", label: "Matriz de comunicação", icon: Mail },
   { href: "/planejamento/expedicao-semanal", label: "Expedição Semanal", icon: Truck },
   { href: "/planejamento/tarefas", label: "Tarefas", icon: ListTodo },
   { href: "/planejamento/compromissos", label: "Meus Compromissos", icon: ClipboardCheck },

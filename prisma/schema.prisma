@@ -2628,6 +2628,17 @@ model TarefaPlanejamento {
   @@index([status])
 }
 
+// Matriz de comunicação por setor: contatos (nome+e-mail) que recebem as
+// tarefas distribuídas pelo Planejamento. 1 registro por setor (setor único).
+model ComunicacaoSetor {
+  id        String   @id @default(cuid())
+  setor     String   @unique
+  contatos  Json     @default("[]") // [{ nome, email }]
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model NecessidadeSemanal {
   id          String   @id @default(cuid())
   semanaIso   Int
