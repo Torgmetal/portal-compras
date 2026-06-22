@@ -44,6 +44,7 @@ export default function DistribuirTarefasClient() {
   const [enviarEmail, setEnviarEmail] = useState(true);
   const [destinatarios, setDestinatarios] = useState({}); // { SETOR: [email] }
   const [novoEmail, setNovoEmail] = useState({}); // { SETOR: "digitando…" }
+  const [confirmando, setConfirmando] = useState(false);
 
   // carrega a matriz de comunicação (pré-seleção dos destinatários por setor)
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function DistribuirTarefasClient() {
     setDestinatarios((d) => ({ ...d, [setor]: [...new Set([...(d[setor] || []), e])] }));
     setNovoEmail((n) => ({ ...n, [setor]: "" }));
   };
+  const setSectorAll = (setor, on) => setDestinatarios((d) => ({ ...d, [setor]: on ? (matriz?.[setor]?.contatos || []).map((c) => c.email) : [] }));
 
   function addFiles(e) {
     const novos = Array.from(e.target.files || []);
@@ -139,6 +141,7 @@ export default function DistribuirTarefasClient() {
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao distribuir");
       setResultado(j);
+      setConfirmando(false);
       setTarefas(null); setTexto(""); setArquivos([]); setResumo(""); setDestinatarios({}); setDataProgramada("");
     } catch (e) { setErro(e.message); } finally { setDistribuindo(false); }
   }
@@ -222,57 +225,95 @@ export default function DistribuirTarefasClient() {
             ))}
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-            <label className="flex items-center gap-2 text-sm font-semibold text-torg-dark cursor-pointer">
-              <input type="checkbox" checked={enviarEmail} onChange={(e) => setEnviarEmail(e.target.checked)} className="accent-torg-blue" />
-              <Mail size={15} className="text-torg-blue" /> Enviar e-mail aos setores ao distribuir
-            </label>
-            {enviarEmail && (
-              <div className="space-y-2">
-                {setoresPresentes.map((setor) => {
-                  const contatos = matriz?.[setor]?.contatos || [];
-                  const sel = destinatarios[setor] || [];
-                  const extras = sel.filter((e) => !contatos.some((c) => c.email === e));
-                  return (
-                    <div key={setor} className="border border-gray-100 rounded-lg p-3">
-                      <p className="text-[12px] font-semibold text-torg-dark mb-1.5">{LABEL[setor]} <span className="font-normal text-torg-gray">· {sel.length} destinatário(s)</span></p>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1">
-                        {contatos.map((c) => (
-                          <label key={c.email} className="inline-flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
-                            <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggleDest(setor, c.email)} className="accent-torg-blue" />
-                            {c.nome ? `${c.nome} ` : ""}<span className="text-torg-gray">{c.email}</span>
-                          </label>
-                        ))}
-                        {extras.map((e) => (
-                          <label key={e} className="inline-flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
-                            <input type="checkbox" checked onChange={() => toggleDest(setor, e)} className="accent-torg-blue" />
-                            <span className="text-torg-gray">{e}</span>
-                          </label>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <input value={novoEmail[setor] || ""} onChange={(e) => setNovoEmail((n) => ({ ...n, [setor]: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDest(setor); } }} placeholder="adicionar e-mail avulso" className="flex-1 text-[12px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue outline-none" />
-                        <button type="button" onClick={() => addDest(setor)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark">adicionar</button>
-                      </div>
-                      {contatos.length === 0 && extras.length === 0 && <p className="text-[11px] text-amber-600 mt-1">Sem contatos na matriz — adicione um e-mail avulso ou configure a <Link href="/planejamento/comunicacao" className="underline">Matriz de comunicação</Link>.</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-end justify-between gap-3 flex-wrap sticky bottom-3">
             <div className="flex items-end gap-2 flex-wrap">
               <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">Data programada</span><input type="date" value={dataProgramada} onChange={(e) => aplicarDataProgramada(e.target.value)} title="Vira o prazo das tarefas sem data e ajusta a semana ISO" className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
               <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">Semana ISO</span><input type="number" min={1} max={53} value={semanaIso} onChange={(e) => setSemanaIso(Number(e.target.value))} className="w-20 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
               <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">Ano</span><input type="number" value={ano} onChange={(e) => setAno(Number(e.target.value))} className="w-24 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
             </div>
-            <button onClick={distribuir} disabled={distribuindo || incluidasCount === 0} className="text-sm font-semibold text-white bg-torg-blue rounded-lg px-5 py-2.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-2">
-              {distribuindo ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Distribuir {incluidasCount} tarefa(s)
+            <button onClick={() => setConfirmando(true)} disabled={incluidasCount === 0} className="text-sm font-semibold text-white bg-torg-blue rounded-lg px-5 py-2.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-2">
+              <Send size={16} /> Revisar e distribuir {incluidasCount} tarefa(s)
             </button>
             <p className="w-full text-[10px] text-torg-gray">A <b>data programada</b> ajusta a semana e vira o prazo das tarefas sem data — você ainda pode editar o prazo de cada tarefa acima.</p>
           </div>
+
+          {confirmando && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && setConfirmando(false)}>
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[88vh] overflow-y-auto">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+                  <h3 className="text-base font-semibold text-torg-dark flex items-center gap-2"><Send size={16} className="text-torg-blue" /> Distribuir {incluidasCount} tarefa(s)</h3>
+                  <button onClick={() => setConfirmando(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                </div>
+                <div className="px-5 py-4 space-y-4">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-torg-dark cursor-pointer">
+                    <input type="checkbox" checked={enviarEmail} onChange={(e) => setEnviarEmail(e.target.checked)} className="accent-torg-blue" />
+                    <Mail size={15} className="text-torg-blue" /> Enviar e-mail aos setores
+                  </label>
+
+                  {enviarEmail ? (
+                    <div className="space-y-2">
+                      <p className="text-[12px] text-torg-gray">Escolha quem recebe em cada setor — desmarque quem não deve receber:</p>
+                      {setoresPresentes.map((setor) => {
+                        const contatos = matriz?.[setor]?.contatos || [];
+                        const sel = destinatarios[setor] || [];
+                        const extras = sel.filter((e) => !contatos.some((c) => c.email === e));
+                        return (
+                          <div key={setor} className="border border-gray-100 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <p className="text-[12px] font-semibold text-torg-dark">{LABEL[setor]} <span className="font-normal text-torg-gray">· {sel.length} selecionado(s)</span></p>
+                              {contatos.length > 0 && <span className="text-[10px] text-torg-blue flex gap-2"><button type="button" onClick={() => setSectorAll(setor, true)} className="hover:underline">todos</button><button type="button" onClick={() => setSectorAll(setor, false)} className="hover:underline">nenhum</button></span>}
+                            </div>
+                            <div className="space-y-1">
+                              {contatos.map((c) => (
+                                <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
+                                  <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggleDest(setor, c.email)} className="accent-torg-blue" />
+                                  {c.nome ? `${c.nome} ` : ""}<span className="text-torg-gray">{c.email}</span>
+                                </label>
+                              ))}
+                              {extras.map((e) => (
+                                <label key={e} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
+                                  <input type="checkbox" checked onChange={() => toggleDest(setor, e)} className="accent-torg-blue" />
+                                  <span className="text-torg-gray">{e}</span>
+                                </label>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <input value={novoEmail[setor] || ""} onChange={(e) => setNovoEmail((n) => ({ ...n, [setor]: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDest(setor); } }} placeholder="adicionar e-mail avulso" className="flex-1 text-[12px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue outline-none" />
+                              <button type="button" onClick={() => addDest(setor)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark">adicionar</button>
+                            </div>
+                            {contatos.length === 0 && extras.length === 0 && <p className="text-[11px] text-amber-600 mt-1">Sem contatos — adicione um e-mail avulso ou configure a <Link href="/planejamento/comunicacao" className="underline">Matriz</Link>.</p>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-[12px] text-torg-gray bg-gray-50 rounded-lg px-3 py-2">Nenhum e-mail será enviado — as tarefas só serão criadas no quadro.</p>
+                  )}
+
+                  {tarefas.filter((t) => t.incluir && t.doCliente).length > 0 && (
+                    <div className="border border-orange-200 bg-orange-50/50 rounded-lg p-3">
+                      <p className="text-[12px] font-semibold text-torg-orange flex items-center gap-1.5"><Building2 size={13} /> Tarefas do cliente</p>
+                      <p className="text-[11px] text-torg-gray mt-0.5 mb-1.5">O cliente <b>não</b> recebe e-mail agora — guarde o e-mail aqui para cobrar depois (painel da Diretoria ou botão “Avisar cliente” no quadro).</p>
+                      {tarefas.map((t, i) => (t.incluir && t.doCliente) ? (
+                        <div key={i} className="flex items-center gap-2 mt-1">
+                          <span className="text-[11px] text-torg-dark flex-1 truncate" title={t.titulo}>{t.titulo}</span>
+                          <input value={t.clienteEmail || ""} onChange={(e) => upd(i, "clienteEmail", e.target.value)} placeholder="e-mail do cliente" className="w-48 text-[11px] border border-gray-200 rounded px-2 py-1 focus:border-torg-blue outline-none" />
+                        </div>
+                      ) : null)}
+                    </div>
+                  )}
+
+                  <p className="text-[12px] text-torg-gray">Vai criar <b>{incluidasCount}</b> tarefa(s) na <b>Semana {semanaIso}/{ano}</b>{enviarEmail ? <> e enviar e-mail para <b>{setoresPresentes.reduce((n, s) => n + (destinatarios[s]?.length || 0), 0)}</b> destinatário(s).</> : "."}</p>
+                </div>
+                <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 sticky bottom-0">
+                  <button onClick={() => setConfirmando(false)} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
+                  <button onClick={distribuir} disabled={distribuindo} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50">
+                    {distribuindo ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Confirmar e distribuir
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
