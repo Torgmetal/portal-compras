@@ -86,22 +86,23 @@ export async function GET(req) {
   const custos = grupos.filter((g) => g.secao === "CUSTO");
   const despesasSga = grupos.filter((g) => g.secao === "SGA");
 
-  // Linhas ordenadas pro front (sentido: "receita"=mais é bom, "custo"=mais é ruim)
-  const L = (label, nivel, kind, alvo, real, sentido) => ({ label, nivel, kind, alvo: r2(alvo), real: r2(real), sentido });
+  // Linhas ordenadas pro front (sentido: "receita"=mais é bom, "custo"=mais é ruim).
+  // `key` identifica a linha pro drill-down de lançamentos; "computed" = não clicável.
+  const L = (key, label, nivel, kind, alvo, real, sentido) => ({ key, label, nivel, kind, alvo: r2(alvo), real: r2(real), sentido });
   const linhas = [
-    L("Receita Bruta", 0, "receita", alvoP(DRE_RESULTADOS.receitaLiquida + DRE_RESULTADOS.deducoes), receita, "receita"),
-    L("(−) Deduções", 1, "deducao", alvoP(DRE_RESULTADOS.deducoes), deducoes, "custo"),
-    L("Receita Líquida", 0, "subtotal", alvoP(DRE_RESULTADOS.receitaLiquida), receitaLiquida, "receita"),
-    L("Custo Total", 0, "grupoHeader", alvoP(DRE_RESULTADOS.custoTotal), custoTotalReal, "custo"),
-    ...custos.map((g) => L(g.label, 1, "custo", g.alvo, g.real, "custo")),
-    L("Resultado Bruto", 0, "subtotal", alvoP(DRE_RESULTADOS.resultadoBruto), resultadoBruto, "receita"),
-    L("SG&A (despesas)", 0, "grupoHeader", alvoP(DRE_RESULTADOS.sga), sgaReal, "custo"),
-    ...despesasSga.map((g) => L(g.label, 1, "despesa", g.alvo, g.real, "custo")),
-    L("Resultado Operacional", 0, "subtotal", alvoP(DRE_RESULTADOS.resultadoOperacional), resultadoOperacional, "receita"),
-    L("(−) Ativos (investimentos)", 1, "abaixo", get("ativos").alvo, ativosReal, "custo"),
-    L("(−) Despesas Financeiras", 1, "abaixo", get("financeiras").alvo, financeirasReal, "custo"),
-    L("(−) Não classificado", 1, "naoclass", 0, naoClassificado, "custo"),
-    L("Resultado Final", 0, "resultado", alvoP(DRE_RESULTADOS.resultadoFinal), resultadoFinal, "receita"),
+    L("receita", "Receita Bruta", 0, "receita", alvoP(DRE_RESULTADOS.receitaLiquida + DRE_RESULTADOS.deducoes), receita, "receita"),
+    L("deducoes", "(−) Deduções", 1, "deducao", alvoP(DRE_RESULTADOS.deducoes), deducoes, "custo"),
+    L("computed", "Receita Líquida", 0, "subtotal", alvoP(DRE_RESULTADOS.receitaLiquida), receitaLiquida, "receita"),
+    L("custoTotal", "Custo Total", 0, "grupoHeader", alvoP(DRE_RESULTADOS.custoTotal), custoTotalReal, "custo"),
+    ...custos.map((g) => L(g.key, g.label, 1, "custo", g.alvo, g.real, "custo")),
+    L("computed", "Resultado Bruto", 0, "subtotal", alvoP(DRE_RESULTADOS.resultadoBruto), resultadoBruto, "receita"),
+    L("sga", "SG&A (despesas)", 0, "grupoHeader", alvoP(DRE_RESULTADOS.sga), sgaReal, "custo"),
+    ...despesasSga.map((g) => L(g.key, g.label, 1, "despesa", g.alvo, g.real, "custo")),
+    L("computed", "Resultado Operacional", 0, "subtotal", alvoP(DRE_RESULTADOS.resultadoOperacional), resultadoOperacional, "receita"),
+    L("ativos", "(−) Ativos (investimentos)", 1, "abaixo", get("ativos").alvo, ativosReal, "custo"),
+    L("financeiras", "(−) Despesas Financeiras", 1, "abaixo", get("financeiras").alvo, financeirasReal, "custo"),
+    L("naoclass", "(−) Não classificado", 1, "naoclass", 0, naoClassificado, "custo"),
+    L("computed", "Resultado Final", 0, "resultado", alvoP(DRE_RESULTADOS.resultadoFinal), resultadoFinal, "receita"),
   ];
 
   return NextResponse.json({
