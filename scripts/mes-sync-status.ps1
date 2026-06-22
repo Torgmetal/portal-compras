@@ -47,7 +47,7 @@ SELECT p.OrderNum AS op, p.PartCode AS item, p.Operation AS operacao
 FROM Production p
 WHERE p.IsEnabled = 0 AND ISNULL(p.PartCount,0) = 0
   AND p.OrderNum IS NOT NULL AND p.PartCode IS NOT NULL AND p.Operation IS NOT NULL
-  AND EXISTS (SELECT 1 FROM Production p2 WHERE p2.OrderNum = p.OrderNum AND p2.IsEnabled = 1)
+  AND EXISTS (SELECT 1 FROM Production p2 WHERE p2.OrderNum = p.OrderNum AND ISNULL(p2.PartCount,0) > 0)
 "@
 
 $rows = New-Object System.Collections.Generic.List[object]
