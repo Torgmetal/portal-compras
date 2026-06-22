@@ -502,6 +502,8 @@ function Conferencia() {
   const [filtro, setFiltro] = useState("atencao");
   const [busca, setBusca] = useState("");
   const [mesVenc, setMesVenc] = useState("todos");
+  const [vencDe, setVencDe] = useState("");
+  const [vencAte, setVencAte] = useState("");
   const [expand, setExpand] = useState(null);
   const [salvandoId, setSalvandoId] = useState(null);
   const [exportando, setExportando] = useState(false);
@@ -570,8 +572,15 @@ function Conferencia() {
     const ehGrave = (i) => i.flags.some((f) => GRAVES.includes(f));
     // meses de vencimento presentes (p/ o seletor)
     const meses = [...new Set(itens.map((i) => (i.venc || "").slice(0, 7)).filter(Boolean))].sort();
-    // base = recorte do mês de vencimento escolhido
-    const base = mesVenc === "todos" ? itens : itens.filter((i) => (i.venc || "").slice(0, 7) === mesVenc);
+    // base = recorte por mês de vencimento e/ou intervalo de datas (de/até)
+    let base = mesVenc === "todos" ? itens : itens.filter((i) => (i.venc || "").slice(0, 7) === mesVenc);
+    if (vencDe || vencAte) base = base.filter((i) => {
+      const v = (i.venc || "").slice(0, 10);
+      if (!v) return false;
+      if (vencDe && v < vencDe) return false;
+      if (vencAte && v > vencAte) return false;
+      return true;
+    });
     const cont = {
       conferidos: base.filter((i) => i.situacao === "CONFERIDO").length,
       suspeitos: base.filter((i) => i.situacao === "SUSPEITO").length,
@@ -587,7 +596,7 @@ function Conferencia() {
     });
     const totalMes = base.reduce((s, i) => s + (i.saldo || 0), 0);
     return { lista, cont, meses, totalMes };
-  }, [data, filtro, busca, mesVenc]);
+  }, [data, filtro, busca, mesVenc, vencDe, vencAte]);
 
   if (loading) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Carregando lançamentos…</div>;
   if (erro) return <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => carregar(tipo)} className="ml-auto text-xs underline">tentar de novo</button></div>;
@@ -644,8 +653,16 @@ function Conferencia() {
         </div>
       </div>
 
-      {mesVenc !== "todos" && (
-        <p className="text-xs text-torg-gray">Vencendo em <b className="text-torg-dark">{labelMes(mesVenc)}</b>: {lista.length} título(s) no filtro · total do mês <b className="text-torg-dark">{fmtR$(totalMes)}</b></p>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-torg-gray">
+        <span>vencimento de</span>
+        <input type="date" value={vencDe} onChange={(e) => setVencDe(e.target.value)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
+        <span>até</span>
+        <input type="date" value={vencAte} onChange={(e) => setVencAte(e.target.value)} className="border border-gray-200 rounded px-2 py-1 outline-none focus:border-torg-blue" />
+        {(vencDe || vencAte) && <button onClick={() => { setVencDe(""); setVencAte(""); }} className="text-torg-blue hover:underline">limpar datas</button>}
+      </div>
+
+      {(mesVenc !== "todos" || vencDe || vencAte) && (
+        <p className="text-xs text-torg-gray">{lista.length} título(s) no recorte · total <b className="text-torg-dark">{fmtR$(totalMes)}</b></p>
       )}
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
@@ -876,7 +893,7 @@ function DreAlvo() {
   );
 }
 
-function DrillLancamentos({ state, label, de, ate, onMes, onData }) {
+function DrillLancamentos({ state, label, de, ate, onMes, onData, labelData = "Emissão" }) {
   if (!state || state.loading) return <div className="text-xs text-torg-gray py-2"><Loader2 size={14} className="animate-spin inline mr-1" /> carregando lançamentos…</div>;
   if (state.erro) return <div className="text-xs text-red-600 py-2">{state.erro}</div>;
   const d = state.data;
@@ -920,7 +937,7 @@ function DrillLancamentos({ state, label, de, ate, onMes, onData }) {
         <div className="rounded-lg border border-gray-100 overflow-hidden max-h-72 overflow-y-auto bg-white">
           <table className="w-full text-[12px]">
             <thead className="bg-gray-50/80 sticky top-0 text-left text-[10px] uppercase tracking-wide text-torg-gray">
-              <tr><th className="px-3 py-1.5">Fornecedor / Cliente</th><th className="px-3 py-1.5">Categoria</th><th className="px-3 py-1.5">Doc</th><th className="px-3 py-1.5 text-center">Emissão</th><th className="px-3 py-1.5 text-right">Valor</th></tr>
+              <tr><th className="px-3 py-1.5">Fornecedor / Cliente</th><th className="px-3 py-1.5">Categoria</th><th className="px-3 py-1.5">Doc</th><th className="px-3 py-1.5 text-center">{labelData}</th><th className="px-3 py-1.5 text-right">Valor</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {d.itens.map((it) => (
@@ -1268,6 +1285,36 @@ function SerieMensal({ titulo, serie, max, hojeMes, cor, legenda }) {
 /* ─────────────────────── onde cortar (a pagar por categoria) ─────────────────────── */
 function OndeCortar({ categorias, totalPagar }) {
   const [n, setN] = useState(15);
+  const [expandCat, setExpandCat] = useState(null);
+  const [drillState, setDrillState] = useState(null);
+  const [de, setDe] = useState("");
+  const [ate, setAte] = useState("");
+
+  async function fetchDrill(cat, d, a) {
+    setDrillState({ loading: true });
+    try {
+      const qs = new URLSearchParams({ categoria: cat });
+      if (d) qs.set("de", d);
+      if (a) qs.set("ate", a);
+      const r = await fetch(`/api/diretoria/cortar/lancamentos?${qs.toString()}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      setDrillState({ data: j });
+    } catch (e) { setDrillState({ erro: e.message }); }
+  }
+  function toggle(cat) {
+    if (expandCat === cat) { setExpandCat(null); setDrillState(null); return; }
+    setExpandCat(cat); setDe(""); setAte(""); fetchDrill(cat, "", "");
+  }
+  function filtrarMes(mes) {
+    if (!mes) { setDe(""); setAte(""); fetchDrill(expandCat, "", ""); return; }
+    const [y, m] = mes.split("-").map(Number);
+    const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const dDe = `${mes}-01`, dAte = `${mes}-${String(ultimo).padStart(2, "0")}`;
+    setDe(dDe); setAte(dAte); fetchDrill(expandCat, dDe, dAte);
+  }
+  function filtrarData(dDe, dAte) { setDe(dDe); setAte(dAte); fetchDrill(expandCat, dDe, dAte); }
+
   if (!categorias?.length) return <p className="text-sm text-torg-gray text-center py-16">Sem dados de categorias.</p>;
   const max = categorias[0].valor || 1;
   const semCat = categorias.find((c) => c.nome === "(sem categoria)");
@@ -1275,7 +1322,7 @@ function OndeCortar({ categorias, totalPagar }) {
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-bold text-torg-dark">Onde cortar — a pagar por categoria</h2>
-        <p className="text-[11px] text-torg-gray">{categorias.length} categorias · total em aberto {fmtR$(totalPagar)}. Maiores blocos primeiro; em vermelho a parcela já vencida de cada um.</p>
+        <p className="text-[11px] text-torg-gray">{categorias.length} categorias · total em aberto {fmtR$(totalPagar)}. Clique numa categoria para ver os títulos e filtrar por mês/data de vencimento.</p>
       </div>
       {semCat && semCat.pct >= 8 && (
         <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm">
@@ -1284,20 +1331,32 @@ function OndeCortar({ categorias, totalPagar }) {
         </div>
       )}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-        {categorias.slice(0, n).map((c, i) => (
-          <div key={i} className="px-5 py-3">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-torg-dark font-medium truncate flex-1" title={c.nome}>{c.nome}</span>
-              <span className="text-[11px] text-torg-gray whitespace-nowrap hidden sm:inline">{c.qtd} tít.</span>
-              {c.vencido > 0 && <span className="text-[11px] text-red-600 whitespace-nowrap">{fmtR$(c.vencido)} venc.</span>}
-              <span className="tabular-nums font-semibold text-torg-dark whitespace-nowrap w-28 text-right">{fmtR$(c.valor)}</span>
-              <span className="text-[11px] text-torg-gray tabular-nums w-9 text-right">{c.pct}%</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1.5">
-              <div className="h-full rounded-full bg-rose-400" style={{ width: `${Math.round((c.valor / max) * 100)}%` }} />
-            </div>
-          </div>
-        ))}
+        {categorias.slice(0, n).map((c, i) => {
+          const aberto = expandCat === c.nome;
+          return (
+            <Fragment key={i}>
+              <div onClick={() => toggle(c.nome)} className={`px-5 py-3 cursor-pointer ${aberto ? "bg-torg-blue-50/40" : "hover:bg-gray-50/50"}`}>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-torg-dark font-medium truncate flex-1 inline-flex items-center gap-1" title={c.nome}>
+                    <ChevronDown size={12} className={`text-torg-gray transition-transform shrink-0 ${aberto ? "rotate-180" : ""}`} />{c.nome}
+                  </span>
+                  <span className="text-[11px] text-torg-gray whitespace-nowrap hidden sm:inline">{c.qtd} tít.</span>
+                  {c.vencido > 0 && <span className="text-[11px] text-red-600 whitespace-nowrap">{fmtR$(c.vencido)} venc.</span>}
+                  <span className="tabular-nums font-semibold text-torg-dark whitespace-nowrap w-28 text-right">{fmtR$(c.valor)}</span>
+                  <span className="text-[11px] text-torg-gray tabular-nums w-9 text-right">{c.pct}%</span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1.5">
+                  <div className="h-full rounded-full bg-rose-400" style={{ width: `${Math.round((c.valor / max) * 100)}%` }} />
+                </div>
+              </div>
+              {aberto && (
+                <div className="px-5 py-3 bg-gray-50/30">
+                  <DrillLancamentos state={drillState} label={c.nome} de={de} ate={ate} onMes={filtrarMes} onData={filtrarData} labelData="Vencimento" />
+                </div>
+              )}
+            </Fragment>
+          );
+        })}
       </div>
       {categorias.length > n && (
         <button onClick={() => setN(categorias.length)} className="text-xs text-torg-blue hover:underline">ver todas as {categorias.length} categorias →</button>
