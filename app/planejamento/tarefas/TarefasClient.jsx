@@ -4,7 +4,7 @@ import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
   CheckCircle2, Clock, Circle, ListTodo, Bell, Send,
-  GanttChart, AlertTriangle, Mail, User, Building2,
+  GanttChart, AlertTriangle, Mail, User, Building2, CalendarClock, LayoutGrid, List,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
@@ -44,6 +44,28 @@ const STATUS_ICON = {
   CANCELADA: X,
 };
 
+// Colunas do kanban (status abertos + concluída)
+const COLUNAS_KANBAN = [
+  { key: "PENDENTE", label: "Pendente", cor: "bg-gray-100 text-torg-gray" },
+  { key: "EM_ANDAMENTO", label: "Em andamento", cor: "bg-amber-50 text-amber-700" },
+  { key: "CONCLUIDA", label: "Concluída", cor: "bg-emerald-50 text-emerald-700" },
+];
+const fmtPrazoCurto = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit" }) : null);
+function ehAtrasada(t) {
+  if (!t.dataPrevista || t.status === "CONCLUIDA" || t.status === "CANCELADA") return false;
+  const hoje = new Date(); hoje.setUTCHours(0, 0, 0, 0);
+  return new Date(t.dataPrevista) < hoje;
+}
+function ordenarPorPrazo(arr) {
+  const ordem = { ALTA: 0, MEDIA: 1, BAIXA: 2 };
+  return [...arr].sort((a, b) => {
+    const pa = a.dataPrevista ? new Date(a.dataPrevista).getTime() : Infinity;
+    const pb = b.dataPrevista ? new Date(b.dataPrevista).getTime() : Infinity;
+    if (pa !== pb) return pa - pb;
+    return (ordem[a.prioridade] ?? 1) - (ordem[b.prioridade] ?? 1);
+  });
+}
+
 function getISOWeek() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -57,6 +79,7 @@ function getISOWeek() {
 
 export default function TarefasClient() {
   const [aba, setAba] = useState("semanais"); // "semanais" | "cronograma"
+  const [vista, setVista] = useState("kanban"); // "kanban" | "lista"
   const { semana: semanaInit, ano: anoInit } = getISOWeek();
   const [tarefas, setTarefas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -205,6 +228,16 @@ export default function TarefasClient() {
           className="text-xs text-torg-gray hover:text-torg-dark ml-auto">
           Semana atual
         </button>
+        <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+          <button onClick={() => setVista("kanban")} title="Kanban"
+            className={`px-2 py-1 text-[11px] rounded flex items-center gap-1 ${vista === "kanban" ? "bg-white shadow-sm text-torg-blue font-semibold" : "text-torg-gray hover:text-torg-dark"}`}>
+            <LayoutGrid size={12} /> Kanban
+          </button>
+          <button onClick={() => setVista("lista")} title="Lista"
+            className={`px-2 py-1 text-[11px] rounded flex items-center gap-1 ${vista === "lista" ? "bg-white shadow-sm text-torg-blue font-semibold" : "text-torg-gray hover:text-torg-dark"}`}>
+            <List size={12} /> Lista
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -226,6 +259,53 @@ export default function TarefasClient() {
           <button onClick={() => setModalNova(true)} className="text-sm text-torg-blue hover:underline mt-2">
             Criar primeira tarefa
           </button>
+        </div>
+      ) : vista === "kanban" ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {COLUNAS_KANBAN.map((col) => {
+            const doStatus = ordenarPorPrazo(tarefas.filter((t) => t.status === col.key));
+            const atrasadasCol = doStatus.filter(ehAtrasada).length;
+            return (
+              <div key={col.key} className="bg-gray-50/60 rounded-xl border border-gray-100 p-2 min-h-[120px]">
+                <div className="flex items-center justify-between px-1 py-1.5">
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${col.cor}`}>{col.label}</span>
+                  <span className="text-[11px] text-torg-gray">{doStatus.length}{col.key !== "CONCLUIDA" && atrasadasCol > 0 ? ` · ${atrasadasCol} atras.` : ""}</span>
+                </div>
+                <div className="space-y-2 mt-1">
+                  {doStatus.length === 0 && <p className="text-[11px] text-torg-gray/60 italic px-2 py-4 text-center">vazio</p>}
+                  {doStatus.map((t) => {
+                    const atras = ehAtrasada(t);
+                    const prazo = fmtPrazoCurto(t.dataPrevista);
+                    return (
+                      <div key={t.id} className={`bg-white rounded-lg border p-2.5 shadow-sm ${atras ? "border-red-200" : "border-gray-100"}`}>
+                        <p className={`text-[13px] font-medium ${t.status === "CONCLUIDA" ? "line-through text-torg-gray" : "text-torg-dark"}`}>{t.titulo}</p>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="text-[9px] font-semibold text-torg-gray uppercase tracking-wide">{SETOR_LABEL[t.setor] || t.setor}</span>
+                          {t.opNumero && <span className="text-[10px] text-torg-blue font-mono">{fmtOP(t.opNumero)}</span>}
+                          <span className={`px-1.5 py-0 text-[9px] font-semibold rounded border ${PRIORIDADE_COR[t.prioridade]}`}>{t.prioridade}</span>
+                        </div>
+                        {(prazo || t.responsavel) && (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            {prazo && <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${atras ? "text-red-600" : "text-torg-gray"}`}><CalendarClock size={11} /> {prazo}{atras ? " · atrasada" : ""}</span>}
+                            {t.responsavel && <span className="text-[10px] text-torg-gray truncate">{t.responsavel}</span>}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-50">
+                          <select value={t.status} onChange={(e) => atualizarStatus(t.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 bg-white flex-1">
+                            {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                          </select>
+                          <button onClick={() => enviarLembrete(t)} disabled={enviandoLembrete === t.id} className="text-gray-300 hover:text-torg-blue p-0.5 disabled:opacity-50" title="Lembrete por e-mail">
+                            {enviandoLembrete === t.id ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />}
+                          </button>
+                          <button onClick={() => setConfirmDelete(t)} className="text-gray-300 hover:text-red-500 p-0.5" title="Excluir"><Trash2 size={12} /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="space-y-2">

@@ -22,7 +22,7 @@ const GRAVIDADE_LABELS = {
   FATAL: { label: "Fatal", cor: "bg-red-100 text-red-800" },
 };
 
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
 const anoAtual = new Date().getFullYear();
 
