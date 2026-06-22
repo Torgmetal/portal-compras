@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   DollarSign, Plus, Loader2, AlertCircle, X,
-  TrendingUp, TrendingDown, Pencil, Trash2, Activity,
+  TrendingUp, TrendingDown, Pencil, Trash2, Activity, Download,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -27,6 +27,7 @@ const labelCatFluxo = (c) => CATEGORIAS_FLUXO.find((x) => x.codigo === c)?.label
 export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, semanaAtual }) {
   const router = useRouter();
   const [modalFluxo, setModalFluxo] = useState(null);
+  const [modalImport, setModalImport] = useState(false);
 
   // Receita gerada por Romaneios (peso real produzido × valorPorKg)
   const receitaPorSemana = useMemo(() => {
@@ -120,12 +121,20 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
             Fluxo de caixa, receita gerada por produção (Romaneios) e validação financeira.
           </p>
         </div>
-        <button
-          onClick={() => setModalFluxo("novo")}
-          className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
-        >
-          <Plus size={16} /> Lançamento de fluxo
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setModalImport(true)}
+            className="px-4 py-2 bg-white border border-torg-blue text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+          >
+            <Download size={16} /> Importar do Omie
+          </button>
+          <button
+            onClick={() => setModalFluxo("novo")}
+            className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"
+          >
+            <Plus size={16} /> Lançamento de fluxo
+          </button>
+        </div>
       </div>
 
       {/* KPIs financeiros */}
@@ -280,7 +289,93 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
           onSaved={() => { setModalFluxo(null); router.refresh(); }}
         />
       )}
+
+      {modalImport && (
+        <ModalImportarOmie
+          onClose={() => setModalImport(false)}
+          onDone={() => { setModalImport(false); router.refresh(); }}
+        />
+      )}
     </div>
+  );
+}
+
+function ModalImportarOmie({ onClose, onDone }) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const ini = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const [de, setDe] = useState(ini);
+  const [ate, setAte] = useState(hoje);
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState(null);
+  const [res, setRes] = useState(null);
+
+  const importar = async () => {
+    setLoading(true); setErro(null); setRes(null);
+    try {
+      const r = await fetch("/api/financeiro/fluxo/importar-omie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ de, ate }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao importar");
+      setRes(d);
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  };
+
+  const t = res?.totais;
+  return (
+    <Modal titulo="Importar fluxo do Omie (extrato bancário)" onClose={onClose}>
+      <div className="p-6 space-y-4">
+        <p className="text-sm text-torg-gray">
+          Importa o extrato de conta corrente do Omie no período — entradas e saídas,
+          realizadas e previstas (transferências entre contas marcadas como "Transferência").
+          Reimportar o mesmo período atualiza sem duplicar; lançamentos manuais não são afetados.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-sm">
+            <span className="text-torg-gray">De</span>
+            <input type="date" value={de} onChange={(e) => setDe(e.target.value)}
+              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+          </label>
+          <label className="text-sm">
+            <span className="text-torg-gray">Até</span>
+            <input type="date" value={ate} onChange={(e) => setAte(e.target.value)}
+              className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+          </label>
+        </div>
+
+        {erro && (
+          <div className="text-sm text-red-600 bg-red-50 rounded-lg p-3 flex items-center gap-2">
+            <AlertCircle size={16} /> {erro}
+          </div>
+        )}
+
+        {t && (
+          <div className="text-sm bg-torg-blue-50/50 border border-torg-blue-100 rounded-lg p-3 space-y-1">
+            <p className="font-semibold text-torg-dark">{res.criados} lançamentos importados ({res.contas} contas).</p>
+            <p className="text-torg-gray">Entradas: {fmtMoeda(t.entradaRealizada)} realizadas · {fmtMoeda(t.entradaPrevista)} previstas</p>
+            <p className="text-torg-gray">Saídas: {fmtMoeda(t.saidaRealizada)} realizadas · {fmtMoeda(t.saidaPrevista)} previstas</p>
+            <p className="text-xs text-torg-gray">{t.transferencias} transferências entre contas · {res.apagados} substituídas</p>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark">Fechar</button>
+          {res ? (
+            <button onClick={onDone} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium">
+              Ver no fluxo
+            </button>
+          ) : (
+            <button onClick={importar} disabled={loading}
+              className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-60">
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              {loading ? "Importando..." : "Importar"}
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }
 
