@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { upload } from "@vercel/blob/client";
-import { Sparkles, Loader2, AlertCircle, FileUp, Trash2, Send, CheckCircle2, X } from "lucide-react";
+import { Sparkles, Loader2, AlertCircle, FileUp, FileText, Trash2, Send, CheckCircle2, X } from "lucide-react";
 
 const SETORES = ["PRODUCAO", "PINTURA", "PCP", "EXPEDICAO", "COMERCIAL", "ENGENHARIA", "COMPRAS", "ALMOXARIFADO", "FINANCEIRO", "RH", "PLANEJAMENTO"];
 const PRIORIDADES = ["ALTA", "MEDIA", "BAIXA"];
@@ -20,7 +20,7 @@ function isoWeek(d) {
 export default function DistribuirTarefasClient() {
   const sem = isoWeek(new Date());
   const [texto, setTexto] = useState("");
-  const [arquivo, setArquivo] = useState(null);
+  const [arquivos, setArquivos] = useState([]);
   const [analisando, setAnalisando] = useState(false);
   const [erro, setErro] = useState("");
   const [resumo, setResumo] = useState("");
@@ -30,17 +30,33 @@ export default function DistribuirTarefasClient() {
   const [distribuindo, setDistribuindo] = useState(false);
   const [resultado, setResultado] = useState(null);
 
+  function addFiles(e) {
+    const novos = Array.from(e.target.files || []);
+    setArquivos((prev) => {
+      const out = [...prev];
+      for (const f of novos) {
+        if (out.length >= 10) break;
+        if (!out.some((x) => x.name === f.name && x.size === f.size)) out.push(f);
+      }
+      return out;
+    });
+    e.target.value = ""; // permite re-selecionar o mesmo arquivo
+  }
+  const removerArquivo = (i) => setArquivos((arr) => arr.filter((_, j) => j !== i));
+
   async function analisar() {
-    if (!texto.trim() && !arquivo) { setErro("Cole o texto da ata/transcrição ou selecione um arquivo (PDF/TXT)."); return; }
+    if (!texto.trim() && arquivos.length === 0) { setErro("Cole o texto da ata/transcrição ou envie ao menos um arquivo (PDF/TXT)."); return; }
     setAnalisando(true); setErro(""); setResultado(null);
     try {
-      let payload = { texto: texto.trim() || null };
-      if (arquivo) {
-        const safe = String(arquivo.name || "ata").replace(/[^\w.\- ]/g, "_").slice(0, 80);
-        const blob = await upload(`planejamento-atas/${Date.now()}-${safe}`, arquivo, { access: "public", handleUploadUrl: "/api/planejamento/upload-token" });
-        payload = { arquivoUrl: blob.url, arquivoTipo: arquivo.type || null };
+      const documentos = [];
+      if (texto.trim()) documentos.push({ nome: "Texto colado", texto: texto.trim() });
+      for (let i = 0; i < arquivos.length; i++) {
+        const f = arquivos[i];
+        const safe = String(f.name || "ata").replace(/[^\w.\- ]/g, "_").slice(0, 80);
+        const blob = await upload(`planejamento-atas/${Date.now()}-${i}-${safe}`, f, { access: "public", handleUploadUrl: "/api/planejamento/upload-token" });
+        documentos.push({ nome: f.name, arquivoUrl: blob.url, arquivoTipo: f.type || null });
       }
-      const r = await fetch("/api/planejamento/extrair-tarefas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const r = await fetch("/api/planejamento/extrair-tarefas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentos }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao analisar");
       setResumo(j.resumo || "");
@@ -67,7 +83,7 @@ export default function DistribuirTarefasClient() {
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao distribuir");
       setResultado(j);
-      setTarefas(null); setTexto(""); setArquivo(null); setResumo("");
+      setTarefas(null); setTexto(""); setArquivos([]); setResumo("");
     } catch (e) { setErro(e.message); } finally { setDistribuindo(false); }
   }
 
@@ -77,7 +93,7 @@ export default function DistribuirTarefasClient() {
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2"><Sparkles size={20} className="text-torg-blue" /> Distribuir tarefas com IA</h1>
-        <p className="text-[12px] text-torg-gray mt-0.5">Cole a ata/transcrição da reunião ou envie um arquivo (PDF/TXT). A IA extrai as tarefas, sugere o setor responsável e você revisa antes de distribuir.</p>
+        <p className="text-[12px] text-torg-gray mt-0.5">Cole a ata/transcrição e/ou envie vários arquivos (PDF/TXT, até 10). A IA lê tudo em conjunto, extrai as tarefas, sugere o setor responsável e você revisa antes de distribuir.</p>
       </div>
 
       {erro && <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => setErro("")} className="ml-auto"><X size={14} /></button></div>}
@@ -150,15 +166,31 @@ export default function DistribuirTarefasClient() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-          <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={10} placeholder="Cole aqui a ata ou a transcrição da reunião…"
+          <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={10} placeholder="Cole aqui a ata ou a transcrição da reunião… (opcional se você anexar arquivos)"
             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:border-torg-blue outline-none resize-y" />
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <label className="text-[12px] text-torg-gray inline-flex items-center gap-2 cursor-pointer hover:text-torg-blue">
-              <FileUp size={15} /> {arquivo ? arquivo.name : "ou enviar arquivo (PDF/TXT)"}
-              <input type="file" accept=".pdf,.txt,.csv" className="hidden" onChange={(e) => { setArquivo(e.target.files?.[0] || null); }} />
+
+          <div>
+            <label className={`text-[12px] inline-flex items-center gap-2 ${arquivos.length >= 10 ? "text-torg-gray/40 cursor-not-allowed" : "text-torg-blue cursor-pointer hover:text-torg-dark"}`}>
+              <FileUp size={15} /> {arquivos.length >= 10 ? "limite de 10 arquivos atingido" : "Adicionar arquivos (PDF/TXT) — pode selecionar vários"}
+              <input type="file" accept=".pdf,.txt,.csv" multiple disabled={arquivos.length >= 10} className="hidden" onChange={addFiles} />
             </label>
-            {arquivo && <button onClick={() => setArquivo(null)} className="text-[11px] text-torg-gray hover:text-red-600">remover arquivo</button>}
-            <button onClick={analisar} disabled={analisando} className="ml-auto text-sm font-semibold text-white bg-torg-blue rounded-lg px-5 py-2.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-2">
+            {arquivos.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {arquivos.map((f, i) => (
+                  <li key={i} className="flex items-center gap-2 text-[12px] text-torg-dark bg-gray-50 rounded-lg px-2.5 py-1.5">
+                    <FileText size={13} className="text-torg-blue shrink-0" />
+                    <span className="truncate flex-1">{f.name}</span>
+                    <span className="text-[10px] text-torg-gray shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                    <button onClick={() => removerArquivo(i)} className="text-torg-gray hover:text-red-600 shrink-0" title="Remover"><X size={13} /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-3 flex-wrap">
+            {(texto.trim() || arquivos.length > 0) && <span className="text-[11px] text-torg-gray mr-auto">{[texto.trim() && "texto colado", arquivos.length > 0 && `${arquivos.length} arquivo(s)`].filter(Boolean).join(" + ")}</span>}
+            <button onClick={analisar} disabled={analisando} className="text-sm font-semibold text-white bg-torg-blue rounded-lg px-5 py-2.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-2">
               {analisando ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} {analisando ? "Analisando…" : "Analisar com IA"}
             </button>
           </div>
