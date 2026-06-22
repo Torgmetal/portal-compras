@@ -755,6 +755,8 @@ function DreAlvo() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [expandKey, setExpandKey] = useState(null);
+  const [drill, setDrill] = useState({}); // key -> { loading } | { data } | { erro }
 
   const carregar = useCallback(async (m) => {
     setLoading(true); setErro("");
@@ -762,10 +764,24 @@ function DreAlvo() {
       const r = await fetch(`/api/diretoria/dre${m ? `?meses=${m}` : ""}`, { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
-      setData(j); setMeses(j.meses);
+      setData(j); setMeses(j.meses); setExpandKey(null); setDrill({});
     } catch (e) { setErro(e.message); } finally { setLoading(false); }
   }, []);
   useEffect(() => { carregar(null); }, [carregar]);
+
+  async function toggleDrill(l) {
+    if (l.key === "computed") return;
+    if (expandKey === l.key) { setExpandKey(null); return; }
+    setExpandKey(l.key);
+    if (drill[l.key]) return;
+    setDrill((d) => ({ ...d, [l.key]: { loading: true } }));
+    try {
+      const r = await fetch(`/api/diretoria/dre/lancamentos?linha=${encodeURIComponent(l.key)}&meses=${data.meses}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      setDrill((d) => ({ ...d, [l.key]: { data: j } }));
+    } catch (e) { setDrill((d) => ({ ...d, [l.key]: { erro: e.message } })); }
+  }
 
   if (loading && !data) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Montando DRE…</div>;
   if (erro) return <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => carregar(meses)} className="ml-auto text-xs underline">tentar de novo</button></div>;
@@ -813,22 +829,66 @@ function DreAlvo() {
               const delta = l.real - l.alvo;
               const pct = l.alvo > 0 ? Math.round((l.real / l.alvo) * 100) : null;
               const bom = l.sentido === "receita" ? l.real >= l.alvo : l.real <= l.alvo;
+              const drillable = l.key !== "computed";
+              const aberto = expandKey === l.key;
               return (
-                <tr key={i} className={`${sub ? "bg-gray-50/40 font-semibold" : ""} ${l.kind === "resultado" ? "border-t-2 border-torg-dark/20" : ""} ${l.kind === "naoclass" ? "bg-amber-50/40" : ""}`}>
-                  <td className={`px-4 py-2 ${l.nivel === 0 ? "text-torg-dark" : "text-torg-gray pl-8"}`}>{l.label}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-torg-gray">{l.alvo ? fmtR$(l.alvo) : "—"}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-torg-dark">{fmtR$(l.real)}</td>
-                  <td className={`px-4 py-2 text-right tabular-nums ${bom ? "text-emerald-700" : "text-red-600"}`}>{delta >= 0 ? "+" : ""}{fmtR$(delta)}</td>
-                  <td className="px-4 py-2 text-right">
-                    {pct != null ? <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold tabular-nums ${bom ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{pct}%</span> : <span className="text-torg-gray">—</span>}
-                  </td>
-                </tr>
+                <Fragment key={i}>
+                  <tr onClick={() => toggleDrill(l)} className={`${drillable ? "cursor-pointer" : ""} ${aberto ? "bg-torg-blue-50/50" : sub ? "bg-gray-50/40" : drillable ? "hover:bg-torg-blue-50/30" : ""} ${sub ? "font-semibold" : ""} ${l.kind === "resultado" ? "border-t-2 border-torg-dark/20" : ""} ${l.kind === "naoclass" && !aberto ? "bg-amber-50/40" : ""}`}>
+                    <td className={`px-4 py-2 ${l.nivel === 0 ? "text-torg-dark" : "text-torg-gray pl-8"}`}>
+                      {drillable && <ChevronDown size={12} className={`inline mr-1 text-torg-gray transition-transform ${aberto ? "rotate-180" : ""}`} />}
+                      {l.label}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums text-torg-gray">{l.alvo ? fmtR$(l.alvo) : "—"}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-torg-dark">{fmtR$(l.real)}</td>
+                    <td className={`px-4 py-2 text-right tabular-nums ${bom ? "text-emerald-700" : "text-red-600"}`}>{delta >= 0 ? "+" : ""}{fmtR$(delta)}</td>
+                    <td className="px-4 py-2 text-right">
+                      {pct != null ? <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold tabular-nums ${bom ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{pct}%</span> : <span className="text-torg-gray">—</span>}
+                    </td>
+                  </tr>
+                  {aberto && (
+                    <tr className="bg-gray-50/30">
+                      <td colSpan={5} className="px-4 py-3"><DrillLancamentos dr={drill[l.key]} label={l.label} /></td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-torg-gray">Δ e % na ótica de cada linha: em receita/resultado, realizado acima do alvo é bom (verde); em custos/despesas, acima do alvo é estouro (vermelho). v1 — mapeamento por prefixo de categoria do Omie; valide e me diga ajustes.</p>
+      <p className="text-[10px] text-torg-gray"><b>Clique em qualquer linha</b> para ver os lançamentos que a compõem. Δ e % na ótica de cada linha: em receita/resultado, realizado acima do alvo é bom (verde); em custos/despesas, acima do alvo é estouro (vermelho). Mapeamento por prefixo de categoria do Omie.</p>
+    </div>
+  );
+}
+
+function DrillLancamentos({ dr, label }) {
+  if (!dr || dr.loading) return <div className="text-xs text-torg-gray py-2"><Loader2 size={14} className="animate-spin inline mr-1" /> carregando lançamentos…</div>;
+  if (dr.erro) return <div className="text-xs text-red-600 py-2">{dr.erro}</div>;
+  const d = dr.data;
+  if (d?.computed) return <div className="text-xs text-torg-gray py-2">{d.nota}</div>;
+  if (!d?.itens?.length) return <div className="text-xs text-torg-gray py-2">Nenhum lançamento em "{label}" no período.</div>;
+  return (
+    <div>
+      {d.nota && <p className="text-[11px] text-amber-700 mb-2">{d.nota}</p>}
+      <p className="text-[11px] text-torg-gray mb-2">{d.qtd} lançamento(s) · total <b className="text-torg-dark">{fmtR$(d.total)}</b>{d.qtd > d.itens.length ? ` · mostrando os ${d.itens.length} maiores` : ""}</p>
+      <div className="rounded-lg border border-gray-100 overflow-hidden max-h-72 overflow-y-auto bg-white">
+        <table className="w-full text-[12px]">
+          <thead className="bg-gray-50/80 sticky top-0 text-left text-[10px] uppercase tracking-wide text-torg-gray">
+            <tr><th className="px-3 py-1.5">Fornecedor / Cliente</th><th className="px-3 py-1.5">Categoria</th><th className="px-3 py-1.5">Doc</th><th className="px-3 py-1.5 text-center">Emissão</th><th className="px-3 py-1.5 text-right">Valor</th></tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {d.itens.map((it) => (
+              <tr key={it.id} className="hover:bg-gray-50/50">
+                <td className="px-3 py-1.5 text-torg-dark max-w-[240px] truncate" title={it.nome}>{it.nome}</td>
+                <td className="px-3 py-1.5 text-torg-gray max-w-[180px] truncate" title={it.categoria}>{it.categoria || "—"}</td>
+                <td className="px-3 py-1.5 text-torg-gray whitespace-nowrap">{it.doc || "—"}</td>
+                <td className="px-3 py-1.5 text-center text-torg-gray whitespace-nowrap">{fmtDia(it.data)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-torg-dark whitespace-nowrap">{fmtR$(it.valor)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
