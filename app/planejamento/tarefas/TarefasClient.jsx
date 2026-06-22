@@ -92,6 +92,7 @@ export default function TarefasClient() {
   const [deleting, setDeleting] = useState(false);
   const [enviandoLembrete, setEnviandoLembrete] = useState(null);
   const [toast, setToast] = useState(null);
+  const [avisarTarefa, setAvisarTarefa] = useState(null);
 
   function showToast(msg, tipo = "sucesso") {
     setToast({ msg, tipo });
@@ -283,6 +284,7 @@ export default function TarefasClient() {
                           <span className="text-[9px] font-semibold text-torg-gray uppercase tracking-wide">{SETOR_LABEL[t.setor] || t.setor}</span>
                           {t.opNumero && <span className="text-[10px] text-torg-blue font-mono">{fmtOP(t.opNumero)}</span>}
                           <span className={`px-1.5 py-0 text-[9px] font-semibold rounded border ${PRIORIDADE_COR[t.prioridade]}`}>{t.prioridade}</span>
+                          {t.doCliente && <span className="px-1.5 py-0 text-[9px] font-semibold rounded border bg-orange-50 text-torg-orange border-orange-200 inline-flex items-center gap-0.5"><Building2 size={9} /> CLIENTE</span>}
                         </div>
                         {(prazo || t.responsavel) && (
                           <div className="flex items-center gap-2 mt-1.5">
@@ -290,10 +292,16 @@ export default function TarefasClient() {
                             {t.responsavel && <span className="text-[10px] text-torg-gray truncate">{t.responsavel}</span>}
                           </div>
                         )}
+                        {t.doCliente && (t.clienteRespostaEm
+                          ? <p className="text-[10px] text-emerald-600 mt-1.5">📨 {t.clienteResposta || "Cliente respondeu"}</p>
+                          : t.clienteAvisadoEm
+                            ? <p className="text-[10px] text-torg-orange mt-1.5">⏳ aguardando resposta do cliente…</p>
+                            : null)}
                         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-50">
                           <select value={t.status} onChange={(e) => atualizarStatus(t.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 bg-white flex-1">
                             {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                           </select>
+                          {t.doCliente && <button onClick={() => setAvisarTarefa(t)} className="text-gray-300 hover:text-torg-orange p-0.5" title="Avisar/cobrar cliente por e-mail"><Building2 size={12} /></button>}
                           <button onClick={() => enviarLembrete(t)} disabled={enviandoLembrete === t.id} className="text-gray-300 hover:text-torg-blue p-0.5 disabled:opacity-50" title="Lembrete por e-mail">
                             {enviandoLembrete === t.id ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />}
                           </button>
@@ -345,6 +353,8 @@ export default function TarefasClient() {
                         <span className={`px-2 py-0.5 text-[10px] font-semibold rounded border ${PRIORIDADE_COR[t.prioridade]}`}>
                           {t.prioridade}
                         </span>
+                        {t.doCliente && <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded border bg-orange-50 text-torg-orange border-orange-200 inline-flex items-center gap-0.5" title={t.clienteRespostaEm ? t.clienteResposta : t.clienteAvisadoEm ? "aguardando resposta do cliente" : "tarefa do cliente"}><Building2 size={10} /> {t.clienteRespostaEm ? "respondeu" : "cliente"}</span>}
+                        {t.doCliente && <button onClick={() => setAvisarTarefa(t)} className="text-gray-300 hover:text-torg-orange p-1" title="Avisar/cobrar cliente por e-mail"><Building2 size={13} /></button>}
                         <select
                           value={t.status}
                           onChange={(e) => atualizarStatus(t.id, e.target.value)}
@@ -382,6 +392,15 @@ export default function TarefasClient() {
           ano={ano}
           onClose={() => setModalNova(false)}
           onCriada={(t) => { setTarefas((prev) => [t, ...prev]); setModalNova(false); }}
+        />
+      )}
+
+      {avisarTarefa && (
+        <ModalAvisarCliente
+          tarefa={avisarTarefa}
+          onClose={() => setAvisarTarefa(null)}
+          onEnviado={(msg) => { setAvisarTarefa(null); showToast(msg, "sucesso"); carregar(); }}
+          onErro={(msg) => showToast(msg, "erro")}
         />
       )}
 
@@ -506,6 +525,67 @@ function ModalNovaTarefa({ semana, ano, onClose, onCriada }) {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// ─── Modal: avisar/cobrar o cliente por e-mail (resposta de 1 clique) ──────────
+function ModalAvisarCliente({ tarefa, onClose, onEnviado, onErro }) {
+  const [email, setEmail] = useState(tarefa.clienteEmail || "");
+  const [tipo, setTipo] = useState(tarefa.status === "CONCLUIDA" ? "CONFIRMACAO" : "COBRANCA");
+  const [mensagem, setMensagem] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  async function enviar() {
+    if (!email.includes("@")) { onErro("Informe um e-mail de cliente válido."); return; }
+    setEnviando(true);
+    try {
+      const res = await fetch(`/api/planejamento/tarefas/${tarefa.id}/avisar-cliente`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteEmail: email, tipo, mensagem: mensagem.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Erro ao enviar");
+      onEnviado(`E-mail enviado ao cliente (${data.email})`);
+    } catch (e) { onErro(e.message); } finally { setEnviando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><Mail size={15} className="text-torg-orange" /> Avisar cliente</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-sm font-semibold text-torg-dark">{tarefa.titulo}</p>
+            {tarefa.opNumero && <p className="text-[11px] text-torg-blue font-mono mt-0.5">{fmtOP(tarefa.opNumero)}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">E-mail do cliente</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cliente@empresa.com" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Motivo</label>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
+              <option value="COBRANCA">Cobrar / lembrar da data</option>
+              <option value="CONFIRMACAO">Pedir confirmação de conclusão</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Mensagem (opcional)</label>
+            <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={2} placeholder="Ex.: Precisamos disso para liberar a produção…" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm" />
+          </div>
+          <p className="text-[11px] text-torg-gray">O cliente recebe botões de 1 clique (Já concluí / Informar nova data). A resposta volta para esta tarefa e avisa o Planejamento — sem login.</p>
+        </div>
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
+          <button onClick={enviar} disabled={enviando || !email.includes("@")} className="px-4 py-1.5 bg-torg-orange text-white text-sm rounded-lg hover:opacity-90 font-medium flex items-center gap-1.5 disabled:opacity-50">
+            {enviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} {enviando ? "Enviando..." : "Enviar ao cliente"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

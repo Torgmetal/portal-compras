@@ -58,7 +58,10 @@ export default withAuth(
           path.startsWith("/api/qualidade/data-books/assinar/") ||
           // Portal do cliente (auditorias externas) — publico via token unico
           path.startsWith("/portal-cliente/") ||
-          path.startsWith("/api/qualidade/auditorias/portal/")
+          path.startsWith("/api/qualidade/auditorias/portal/") ||
+          // Resposta do cliente a tarefas do Planejamento — publico via token unico
+          path.startsWith("/cliente/tarefa/") ||
+          path.startsWith("/api/cliente/tarefa/")
         ) {
           return true;
         }
