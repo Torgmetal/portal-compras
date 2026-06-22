@@ -19,6 +19,14 @@ function isoWeek(d) {
   return { semana: week, ano: date.getUTCFullYear() };
 }
 
+// semana/ano ISO a partir de uma data "AAAA-MM-DD" (parse local p/ não virar o dia)
+function semanaDeData(str) {
+  if (!str) return null;
+  const d = new Date(str + "T00:00:00");
+  if (isNaN(d)) return null;
+  return isoWeek(d);
+}
+
 export default function DistribuirTarefasClient() {
   const sem = isoWeek(new Date());
   const [texto, setTexto] = useState("");
@@ -31,6 +39,7 @@ export default function DistribuirTarefasClient() {
   const [ano, setAno] = useState(sem.ano);
   const [distribuindo, setDistribuindo] = useState(false);
   const [resultado, setResultado] = useState(null);
+  const [dataProgramada, setDataProgramada] = useState("");
   const [matriz, setMatriz] = useState(null);
   const [enviarEmail, setEnviarEmail] = useState(true);
   const [destinatarios, setDestinatarios] = useState({}); // { SETOR: [email] }
@@ -102,6 +111,14 @@ export default function DistribuirTarefasClient() {
   const upd = (i, k, v) => setTarefas((arr) => arr.map((t, j) => (j === i ? { ...t, [k]: v } : t)));
   const remover = (i) => setTarefas((arr) => arr.filter((_, j) => j !== i));
 
+  // data programada do lote: ajusta a semana/ano e preenche o prazo das tarefas sem data
+  function aplicarDataProgramada(v) {
+    setDataProgramada(v);
+    const w = semanaDeData(v);
+    if (w) { setSemanaIso(w.semana); setAno(w.ano); }
+    if (v) setTarefas((arr) => (arr ? arr.map((t) => (t.dataPrevista ? t : { ...t, dataPrevista: v })) : arr));
+  }
+
   async function distribuir() {
     const incluidas = (tarefas || []).filter((t) => t.incluir && t.titulo.trim());
     if (!incluidas.length) { setErro("Selecione ao menos uma tarefa para distribuir."); return; }
@@ -114,7 +131,7 @@ export default function DistribuirTarefasClient() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           semanaIso, ano,
-          tarefas: incluidas.map((t) => ({ titulo: t.titulo.trim(), descricao: t.descricao || null, setor: t.setor, prioridade: t.prioridade || "MEDIA", responsavel: t.responsavel || null, dataPrevista: t.dataPrevista || null, opNumero: t.opNumero || null })),
+          tarefas: incluidas.map((t) => ({ titulo: t.titulo.trim(), descricao: t.descricao || null, setor: t.setor, prioridade: t.prioridade || "MEDIA", responsavel: t.responsavel || null, dataPrevista: t.dataPrevista || dataProgramada || null, opNumero: t.opNumero || null })),
           enviarEmail,
           destinatariosPorSetor: enviarEmail ? destPorSetor : undefined,
         }),
@@ -122,7 +139,7 @@ export default function DistribuirTarefasClient() {
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao distribuir");
       setResultado(j);
-      setTarefas(null); setTexto(""); setArquivos([]); setResumo(""); setDestinatarios({});
+      setTarefas(null); setTexto(""); setArquivos([]); setResumo(""); setDestinatarios({}); setDataProgramada("");
     } catch (e) { setErro(e.message); } finally { setDistribuindo(false); }
   }
 
@@ -237,13 +254,15 @@ export default function DistribuirTarefasClient() {
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-end justify-between gap-3 flex-wrap sticky bottom-3">
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-2 flex-wrap">
+              <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">Data programada</span><input type="date" value={dataProgramada} onChange={(e) => aplicarDataProgramada(e.target.value)} title="Vira o prazo das tarefas sem data e ajusta a semana ISO" className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
               <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">Semana ISO</span><input type="number" min={1} max={53} value={semanaIso} onChange={(e) => setSemanaIso(Number(e.target.value))} className="w-20 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
               <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">Ano</span><input type="number" value={ano} onChange={(e) => setAno(Number(e.target.value))} className="w-24 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
             </div>
             <button onClick={distribuir} disabled={distribuindo || incluidasCount === 0} className="text-sm font-semibold text-white bg-torg-blue rounded-lg px-5 py-2.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-2">
               {distribuindo ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Distribuir {incluidasCount} tarefa(s)
             </button>
+            <p className="w-full text-[10px] text-torg-gray">A <b>data programada</b> ajusta a semana e vira o prazo das tarefas sem data — você ainda pode editar o prazo de cada tarefa acima.</p>
           </div>
         </div>
       ) : (
