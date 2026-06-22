@@ -14,19 +14,18 @@ const fmtDia = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-dig
 const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 const ABAS_BASE = [
-  { id: "ruptura", label: "Pontos de ruptura" },
-  { id: "cortar", label: "Onde cortar" },
-  { id: "dre", label: "DRE Alvo × Real" },
   { id: "resumo", label: "Resumo" },
-  { id: "pagar", label: "A pagar" },
+  { id: "dre", label: "DRE Alvo × Real" },
   { id: "receber", label: "A receber" },
+  { id: "pagar", label: "A pagar" },
   { id: "conferencia", label: "Conferência" },
+  { id: "cortar", label: "Onde cortar" },
   { id: "previsao", label: "Previsão de faturamento" },
 ];
-const ABAS_FIN = ["ruptura", "resumo", "cortar"]; // dependem do fetch /financeiro
+const ABAS_FIN = ["resumo", "cortar"]; // dependem do fetch /financeiro
 
 export default function DiretoriaClient({ isDono, userNome }) {
-  const [aba, setAba] = useState("ruptura");
+  const [aba, setAba] = useState("resumo");
   const abas = isDono ? [...ABAS_BASE, { id: "acesso", label: "Acesso" }] : ABAS_BASE;
 
   // ── Financeiro (resumo + ruptura) ───────────────────────────
@@ -167,8 +166,8 @@ export default function DiretoriaClient({ isDono, userNome }) {
           <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Carregando números…</div>
         ) : null}
 
-        {/* ════════ PONTOS DE RUPTURA ════════ */}
-        {aba === "ruptura" && fin && <Ruptura fin={fin} onRefresh={carregarFin} />}
+        {/* ════════ PONTOS DE RUPTURA — oculto por ora (a pedido do Vitor; reativar adicionando em ABAS_BASE) ════════ */}
+        {/* {aba === "ruptura" && fin && <Ruptura fin={fin} onRefresh={carregarFin} />} */}
 
         {/* ════════ ONDE CORTAR ════════ */}
         {aba === "cortar" && fin && <OndeCortar categorias={fin.categoriasPagar} totalPagar={fin.aPagar.total} />}
@@ -182,9 +181,7 @@ export default function DiretoriaClient({ isDono, userNome }) {
         {/* ════════ A PAGAR / A RECEBER ════════ */}
         {(aba === "pagar" || aba === "receber") && (
           <div className="space-y-6">
-            {aba === "receber" && fin?.previsao && (
-              <ReceberProjetado faturadoAberto={fin.aReceber.total} previsao={fin.previsao} />
-            )}
+            {aba === "receber" && <SaldoContratos faturadoAberto={fin?.aReceber?.total} />}
             <ContasView tipo={aba} data={listas[aba]} loading={loadingLista} erro={erroLista} onRetry={() => carregarLista(aba)} />
           </div>
         )}
@@ -1198,6 +1195,84 @@ function OndeCortar({ categorias, totalPagar }) {
       {categorias.length > n && (
         <button onClick={() => setN(categorias.length)} className="text-xs text-torg-blue hover:underline">ver todas as {categorias.length} categorias →</button>
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────── saldo de contratos Omie (venda+serviço) — A receber ─────────────────────── */
+function SaldoContratos({ faturadoAberto }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const carregar = useCallback(async (forcar) => {
+    setLoading(true); setErro("");
+    try {
+      const r = await fetch(`/api/diretoria/saldo-contratos${forcar ? "?forcar=1" : ""}`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      setData(j);
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { carregar(false); }, [carregar]);
+
+  const aFaturar = data?.totalAFaturar || 0;
+  const total = (faturadoAberto || 0) + aFaturar;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <KpiGrande titulo="Faturado em aberto" valor={faturadoAberto} icon={Banknote} cor="emerald" sub="títulos já emitidos (Contas a Receber)" />
+        <KpiGrande titulo="A faturar — contratos Omie" valor={aFaturar} icon={Truck} cor="blue" sub="saldo de medições: venda + serviço" />
+        <KpiGrande titulo="A receber potencial" valor={total} icon={TrendingUp} cor="blue" sub="faturado + saldo de contratos" />
+      </div>
+
+      <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="font-semibold text-torg-dark flex items-center gap-2"><Truck size={18} className="text-torg-blue" /> Saldo de contratos no Omie (venda + serviço)</h2>
+            <p className="text-[11px] text-torg-gray mt-0.5">O que ainda há para faturar das medições em aberto — pedidos de venda e ordens de serviço.{data?.atualizadoEm ? ` Atualizado ${fmtDataHora(data.atualizadoEm)}.` : ""}{data?.obrasComAtraso ? ` ${data.obrasComAtraso} obra(s) com previsão atrasada.` : ""}{data?.doCache ? " (cache)" : ""}</p>
+          </div>
+          <button onClick={() => carregar(true)} disabled={loading} className="text-xs text-torg-blue hover:underline inline-flex items-center gap-1 disabled:opacity-50">
+            <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> atualizar do Omie
+          </button>
+        </div>
+        <div className="p-5">
+          {loading && !data ? (
+            <div className="text-center py-8 text-torg-gray text-sm"><Loader2 size={20} className="animate-spin mx-auto mb-2" /> Consultando o Omie…</div>
+          ) : erro ? (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => carregar(false)} className="ml-auto text-xs underline">tentar de novo</button></div>
+          ) : !data?.obras?.length ? (
+            <p className="text-sm text-torg-gray text-center py-4">Nenhum contrato em aberto no Omie.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-left text-[11px] uppercase tracking-wide text-torg-gray">
+                  <tr><th className="pb-2">OP / Obra</th><th className="pb-2">Tipo</th><th className="pb-2 text-right">Contratado</th><th className="pb-2 w-36">Faturado</th><th className="pb-2 text-right">A faturar</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {data.obras.map((o, i) => (
+                    <tr key={i} className="hover:bg-gray-50/50">
+                      <td className="py-1.5 max-w-[260px] truncate" title={o.projeto}>
+                        {o.numeroOp ? <span className="font-semibold text-torg-dark">{fmtOP(o.numeroOp)} </span> : null}<span className="text-torg-gray">{o.projeto}</span>
+                        {o.atrasado && <span className="ml-1 text-[10px] text-red-600 whitespace-nowrap">⚠ atrasada</span>}
+                      </td>
+                      <td className="py-1.5"><span className={`text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap ${o.tipo === "Serviço" ? "bg-purple-50 text-purple-700" : o.tipo === "Venda+Serviço" ? "bg-indigo-50 text-indigo-700" : "bg-blue-50 text-blue-700"}`}>{o.tipo}</span></td>
+                      <td className="py-1.5 text-right tabular-nums text-torg-gray whitespace-nowrap">{fmtR$(o.total)}</td>
+                      <td className="py-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${o.pctFaturado}%` }} /></div>
+                          <span className="text-[11px] text-torg-gray tabular-nums w-9 text-right">{o.pctFaturado}%</span>
+                        </div>
+                      </td>
+                      <td className="py-1.5 text-right tabular-nums font-medium text-torg-dark whitespace-nowrap">{fmtR$(o.aFaturar)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
