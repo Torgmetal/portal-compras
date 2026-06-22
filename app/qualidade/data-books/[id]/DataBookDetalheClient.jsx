@@ -286,56 +286,8 @@ export default function DataBookDetalheClient({ id, userId }) {
         </div>
       </div>
 
-      {/* Aprovação interna + envio ao cliente para aceite */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><Users size={15} className="text-torg-blue" /> Aprovação e envio ao cliente</h2>
-          {data.status === "ACEITO" ? <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Aceito pelo cliente</span>
-            : data.status === "ENVIADO_CLIENTE" ? <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Enviado · aguardando aceite</span>
-            : <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray">{data.status === "EMITIDO" ? "Emitido" : "Em montagem"}</span>}
-        </div>
-
-        {data.status === "ACEITO" ? (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[12px] text-emerald-800">
-            <CheckCircle2 size={14} className="inline mr-1 -mt-0.5" /> Recebimento e entrega confirmados por <strong>{data.aceiteNome}</strong> em {data.aceiteEm ? new Date(data.aceiteEm).toLocaleString("pt-BR") : "—"}.
-          </div>
-        ) : (
-          <>
-            <div className="mb-3">
-              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Aprovações internas ({aprov.length})</p>
-              {aprov.length ? (
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {aprov.map((a) => <span key={a.id} className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5 inline-flex items-center gap-1"><CheckCircle2 size={11} /> {a.nome}</span>)}
-                </div>
-              ) : <p className="text-[11px] text-torg-gray italic mb-2">Nenhuma aprovação ainda — inspetor e envolvidos devem aprovar antes do envio ao cliente.</p>}
-              <button onClick={() => aprovar(jaAprovei)} disabled={aprovando}
-                className={`text-[11px] font-medium rounded-lg px-2.5 py-1 inline-flex items-center gap-1 disabled:opacity-50 ${jaAprovei ? "text-torg-gray border border-gray-200 hover:bg-gray-50" : "text-white bg-emerald-600 hover:bg-emerald-700"}`}>
-                {aprovando ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} {jaAprovei ? "Remover minha aprovação" : "Aprovar este data book"}
-              </button>
-            </div>
-
-            <div className="border-t border-gray-50 pt-3">
-              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1.5">Enviar ao cliente para aceite</p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <input type="email" value={emailCliente} onChange={(e) => setEmailCliente(e.target.value)} placeholder="e-mail do cliente"
-                  className="flex-1 min-w-[180px] text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue" />
-                <button onClick={enviarCliente} disabled={enviandoCliente || aprov.length === 0}
-                  title={aprov.length === 0 ? "Precisa de ao menos 1 aprovação interna" : "Gera o link e envia o e-mail ao cliente"}
-                  className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
-                  {enviandoCliente ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} {data.status === "ENVIADO_CLIENTE" ? "Reenviar" : "Enviar"}
-                </button>
-              </div>
-              {(data.enviadoClienteEm || linkCliente) && (
-                <p className="mt-2 text-[11px] text-torg-gray">
-                  {data.enviadoClienteEm && <>Enviado {data.clienteEmail ? `para ${data.clienteEmail} ` : ""}em {new Date(data.enviadoClienteEm).toLocaleString("pt-BR")}. </>}
-                  {linkCliente && <button onClick={() => navigator.clipboard?.writeText(linkCliente)} className="text-torg-blue hover:underline inline-flex items-center gap-1"><Copy size={11} /> copiar link</button>}
-                </p>
-              )}
-              {aprov.length === 0 && <p className="text-[10px] text-amber-600 mt-1.5">O envio libera após ao menos uma aprovação interna.</p>}
-            </div>
-          </>
-        )}
-      </div>
+      {/* Fluxo de assinaturas — Elaborador → Inspetor → Resp. Técnico → Cliente (por e-mail/link) */}
+      <FluxoAssinaturas id={id} cliente={data.cliente} clienteEmail={data.clienteEmail} onChange={carregar} />
 
       {/* Rastreabilidade da obra — casamento LPC × certificados de material (§04) */}
       {rastr && rastr.totalMateriais > 0 && (
@@ -387,6 +339,115 @@ export default function DataBookDetalheClient({ id, userId }) {
         ))}
       </div>
     </div>
+  );
+}
+
+const PAPEL_LABEL_UI = { ELABORADOR: "Elaborador", INSPETOR: "Inspetor responsável", RESP_TECNICO: "Resp. Técnico · Guilherme A. Corte Campos", CLIENTE: "Cliente (aceite)" };
+
+function FluxoAssinaturas({ id, cliente, clienteEmail, onChange }) {
+  const [chain, setChain] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ elaboradorNome: "", elaboradorEmail: "", inspetorNome: "", inspetorEmail: "", rtEmail: "", clienteNome: cliente || "", clienteEmail: clienteEmail || "" });
+  const [iniciando, setIniciando] = useState(false);
+  const [reenviando, setReenviando] = useState(0);
+
+  const carregarChain = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/qualidade/data-books/${id}/assinaturas`);
+      const j = await r.json();
+      if (j.success) setChain(j.assinaturas);
+    } catch { /* silencioso */ } finally { setLoading(false); }
+  }, [id]);
+  useEffect(() => { carregarChain(); }, [carregarChain]);
+
+  const upd = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const fmtDH = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
+
+  async function iniciar() {
+    for (const k of ["elaboradorEmail", "inspetorEmail", "rtEmail", "clienteEmail"]) {
+      if (!/^\S+@\S+\.\S+$/.test((form[k] || "").trim())) { alert("Preencha os 4 e-mails: elaborador, inspetor, responsável técnico e cliente."); return; }
+    }
+    if (!confirm("Iniciar o fluxo de assinaturas? O elaborador recebe o link por e-mail; ao assinar, o próximo é acionado automaticamente, até o cliente.")) return;
+    setIniciando(true);
+    try {
+      const r = await fetch(`/api/qualidade/data-books/${id}/assinaturas`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      setChain(j.assinaturas);
+      if (!j.enviado) alert("Fluxo iniciado, mas o e-mail ao elaborador falhou agora — use 'reenviar'.");
+      onChange?.();
+    } catch (e) { alert(e.message); } finally { setIniciando(false); }
+  }
+  async function reenviar(ordem) {
+    setReenviando(ordem);
+    try {
+      const r = await fetch(`/api/qualidade/data-books/${id}/assinaturas`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ordem }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      alert(j.enviado ? "E-mail reenviado." : "Não foi possível enviar o e-mail agora.");
+      await carregarChain();
+    } catch (e) { alert(e.message); } finally { setReenviando(0); }
+  }
+
+  const temChain = chain && chain.length > 0;
+  const atualOrdem = temChain ? (chain.find((a) => a.status !== "ASSINADO")?.ordem ?? 0) : 0;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+      <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5 mb-2"><Users size={15} className="text-torg-blue" /> Fluxo de assinaturas</h2>
+      {loading ? (
+        <p className="text-[12px] text-torg-gray inline-flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> carregando…</p>
+      ) : temChain ? (
+        <div className="space-y-1.5">
+          <p className="text-[11px] text-torg-gray mb-1">Sequência: Elaborador → Inspetor → Responsável Técnico → Cliente. Cada um assina por link (e-mail); o próximo é acionado ao assinar. Ao fim, o cliente recebe o link de download.</p>
+          {chain.map((a) => {
+            const assinado = a.status === "ASSINADO";
+            const atual = a.ordem === atualOrdem;
+            return (
+              <div key={a.ordem} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] border ${atual ? "border-torg-blue bg-torg-blue-50/40" : "border-gray-100"}`}>
+                {assinado ? <CheckCircle2 size={15} className="text-emerald-600 shrink-0" /> : <span className="w-[15px] text-center text-torg-gray shrink-0 font-mono">{a.ordem}</span>}
+                <div className="min-w-0 flex-1">
+                  <span className="font-medium text-torg-dark">{PAPEL_LABEL_UI[a.papel] || a.papel}</span>
+                  <span className="text-torg-gray"> · {assinado ? a.assinadoNome : (a.email || a.nome || "—")}</span>
+                </div>
+                <span className="text-[11px] text-torg-gray whitespace-nowrap">{assinado ? `assinou ${fmtDH(a.assinadoEm)}` : atual ? (a.status === "ENVIADO" ? "enviado · aguardando" : "a enviar") : "aguardando"}</span>
+                {!assinado && atual && (
+                  <button onClick={() => reenviar(a.ordem)} disabled={reenviando === a.ordem} className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1 disabled:opacity-50">
+                    {reenviando === a.ordem ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />} reenviar
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[11px] text-torg-gray">Informe os e-mails de cada responsável. O fluxo dispara na ordem e o data book final (com todas as assinaturas) é enviado ao cliente para download após o aceite.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Campo label="Elaborador — e-mail" v={form.elaboradorEmail} onChange={(v) => upd("elaboradorEmail", v)} type="email" />
+            <Campo label="Elaborador — nome (opcional)" v={form.elaboradorNome} onChange={(v) => upd("elaboradorNome", v)} />
+            <Campo label="Inspetor responsável — e-mail" v={form.inspetorEmail} onChange={(v) => upd("inspetorEmail", v)} type="email" />
+            <Campo label="Inspetor — nome (opcional)" v={form.inspetorNome} onChange={(v) => upd("inspetorNome", v)} />
+            <Campo label="Responsável Técnico — e-mail (Guilherme)" v={form.rtEmail} onChange={(v) => upd("rtEmail", v)} type="email" />
+            <div className="hidden sm:block" />
+            <Campo label="Cliente — e-mail" v={form.clienteEmail} onChange={(v) => upd("clienteEmail", v)} type="email" />
+            <Campo label="Cliente — nome (opcional)" v={form.clienteNome} onChange={(v) => upd("clienteNome", v)} />
+          </div>
+          <button onClick={iniciar} disabled={iniciando} className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
+            {iniciando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Iniciar fluxo de assinaturas
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Campo({ label, v, onChange, type = "text" }) {
+  return (
+    <label className="block">
+      <span className="block text-[10px] font-medium text-torg-gray mb-0.5">{label}</span>
+      <input type={type} value={v} onChange={(e) => onChange(e.target.value)} className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
+    </label>
   );
 }
 

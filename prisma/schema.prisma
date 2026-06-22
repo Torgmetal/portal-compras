@@ -1196,8 +1196,32 @@ model DataBookQualidade {
   updatedAt   DateTime        @updatedAt
   secoes      DataBookSecao[]
   aprovacoes  DataBookAprovacao[]
+  assinaturas DataBookAssinatura[]
 
   @@index([opNumero])
+}
+
+// Cadeia sequencial de assinaturas do data book (assinatura digital por link/e-mail,
+// sem login). Ordem: 1 Elaborador → 2 Inspetor → 3 Resp. Técnico → 4 Cliente.
+// Cada etapa recebe um e-mail com link; ao assinar (digita o nome), envia a próxima.
+model DataBookAssinatura {
+  id           String            @id @default(cuid())
+  dataBookId   String
+  ordem        Int // 1..4
+  papel        String // ELABORADOR | INSPETOR | RESP_TECNICO | CLIENTE
+  nome         String? // pré-preenchido (RT) ou definido na configuração
+  email        String?
+  token        String            @unique
+  status       String            @default("PENDENTE") // PENDENTE | ENVIADO | ASSINADO
+  enviadoEm    DateTime?
+  assinadoEm   DateTime?
+  assinadoNome String?
+  ip           String?
+  criadoEm     DateTime          @default(now())
+  dataBook     DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+
+  @@unique([dataBookId, ordem])
+  @@index([dataBookId])
 }
 
 // Aprovação interna do data book (inspetor + envolvidos) antes do envio ao cliente.
