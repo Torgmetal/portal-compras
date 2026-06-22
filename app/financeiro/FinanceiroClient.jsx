@@ -28,6 +28,7 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
   const router = useRouter();
   const [modalFluxo, setModalFluxo] = useState(null);
   const [modalImport, setModalImport] = useState(false);
+  const [bancoFiltro, setBancoFiltro] = useState("");
 
   // Receita gerada por Romaneios (peso real produzido × valorPorKg)
   const receitaPorSemana = useMemo(() => {
@@ -109,6 +110,16 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
     return total;
   }, [fluxos]);
 
+  // Bancos (contas correntes) disponíveis nos lançamentos + filtro
+  const bancos = useMemo(
+    () => [...new Set(fluxos.map((f) => f.contaCorrente).filter(Boolean))].sort(),
+    [fluxos]
+  );
+  const fluxosFiltrados = useMemo(
+    () => (bancoFiltro ? fluxos.filter((f) => f.contaCorrente === bancoFiltro) : fluxos),
+    [fluxos, bancoFiltro]
+  );
+
   const maxKg = Math.max(...receitaPorSemana.map((s) => s.kg), 1);
   const maxValor = Math.max(...receitaPorSemana.map((s) => s.valor), 1);
 
@@ -169,6 +180,99 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
         />
       </div>
 
+      {/* Tabela: fluxo de caixa (topo) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark">Fluxo de caixa</h3>
+            <p className="text-xs text-torg-gray mt-0.5">
+              Entradas e saídas previstas e realizadas (Omie + lançamentos manuais).
+            </p>
+          </div>
+          {bancos.length > 0 && (
+            <label className="text-xs text-torg-gray flex items-center gap-2">
+              Banco:
+              <select
+                value={bancoFiltro}
+                onChange={(e) => setBancoFiltro(e.target.value)}
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-torg-dark"
+              >
+                <option value="">Todos</option>
+                {bancos.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
+        {fluxosFiltrados.length === 0 ? (
+          <p className="px-6 py-6 text-sm text-torg-gray text-center">
+            {bancoFiltro
+              ? `Nenhum lançamento para "${bancoFiltro}" no período.`
+              : 'Nenhum lançamento de fluxo. Clique em "Importar do Omie" ou "+ Lançamento de fluxo".'}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Banco</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Realizado</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {[...fluxosFiltrados].sort((a, b) => new Date(a.data) - new Date(b.data)).map((f) => (
+                  <tr key={f.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 text-xs text-torg-dark">{fmtData(f.data)}</td>
+                    <td className="px-4 py-2 text-xs">
+                      <span className={`px-2 py-0.5 rounded-full font-medium text-xs ${
+                        f.tipo === "ENTRADA"
+                          ? "bg-torg-blue-50 text-torg-blue"
+                          : "bg-torg-orange-50 text-torg-orange-700"
+                      }`}>
+                        {f.tipo === "ENTRADA" ? "↗ Entrada" : "↘ Saída"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-xs text-torg-gray">{f.contaCorrente || "—"}</td>
+                    <td className="px-4 py-2 text-xs text-torg-gray">
+                      {f.transferencia && <span className="text-[10px] mr-1 px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">transf.</span>}
+                      {labelCatFluxo(f.categoria)}
+                    </td>
+                    <td className="px-4 py-2 text-torg-dark text-xs max-w-[250px] truncate">{f.descricao}</td>
+                    <td className="px-4 py-2 text-xs font-mono text-torg-blue">{f.op?.numero || "—"}</td>
+                    <td className={`px-4 py-2 text-right font-medium tabular-nums ${
+                      f.tipo === "ENTRADA" ? "text-torg-blue" : "text-torg-orange-700"
+                    }`}>
+                      {f.tipo === "ENTRADA" ? "+" : "−"} {fmtMoeda(f.valor)}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {f.realizado ? (
+                        <span className="text-xs px-2 py-0.5 bg-torg-blue text-white rounded-full font-medium">✓ Sim</span>
+                      ) : (
+                        <span className="text-xs text-torg-gray">prev.</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        onClick={() => setModalFluxo(f)}
+                        className="text-xs text-torg-gray hover:text-torg-dark inline-flex items-center gap-1"
+                      >
+                        <Pencil size={12} /> Editar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Receita gerada por semana (baseada em Romaneios) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
@@ -208,77 +312,6 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
             })}
           </div>
         </div>
-      </div>
-
-      {/* Tabela: fluxo de caixa */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-torg-dark">Fluxo de caixa</h3>
-          <p className="text-xs text-torg-gray mt-0.5">
-            Entradas e saídas previstas e realizadas. Marque "realizado" quando entrar/sair de fato.
-          </p>
-        </div>
-        {fluxos.length === 0 ? (
-          <p className="px-6 py-6 text-sm text-torg-gray text-center">
-            Nenhum lançamento de fluxo. Clique em "+ Lançamento de fluxo" pra começar.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">OP</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
-                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Realizado</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {[...fluxos].sort((a, b) => new Date(a.data) - new Date(b.data)).map((f) => (
-                  <tr key={f.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-xs text-torg-dark">{fmtData(f.data)}</td>
-                    <td className="px-4 py-2 text-xs">
-                      <span className={`px-2 py-0.5 rounded-full font-medium text-xs ${
-                        f.tipo === "ENTRADA"
-                          ? "bg-torg-blue-50 text-torg-blue"
-                          : "bg-torg-orange-50 text-torg-orange-700"
-                      }`}>
-                        {f.tipo === "ENTRADA" ? "↗ Entrada" : "↘ Saída"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-xs text-torg-gray">{labelCatFluxo(f.categoria)}</td>
-                    <td className="px-4 py-2 text-torg-dark text-xs max-w-[250px] truncate">{f.descricao}</td>
-                    <td className="px-4 py-2 text-xs font-mono text-torg-blue">{f.op?.numero || "—"}</td>
-                    <td className={`px-4 py-2 text-right font-medium tabular-nums ${
-                      f.tipo === "ENTRADA" ? "text-torg-blue" : "text-torg-orange-700"
-                    }`}>
-                      {f.tipo === "ENTRADA" ? "+" : "−"} {fmtMoeda(f.valor)}
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      {f.realizado ? (
-                        <span className="text-xs px-2 py-0.5 bg-torg-blue text-white rounded-full font-medium">✓ Sim</span>
-                      ) : (
-                        <span className="text-xs text-torg-gray">prev.</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <button
-                        onClick={() => setModalFluxo(f)}
-                        className="text-xs text-torg-gray hover:text-torg-dark inline-flex items-center gap-1"
-                      >
-                        <Pencil size={12} /> Editar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {modalFluxo && (
