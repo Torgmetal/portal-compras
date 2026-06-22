@@ -289,6 +289,7 @@ model FluxoCaixa {
   // Origem Omie (extrato de conta corrente) — importados pelo /importar-omie.
   origemOmieId  String?   // ex: "EXT-<nCodCC>-<nCodLancamento>"; null = lançamento manual
   contaCorrente String?   // banco/conta de origem (ex: "Inter")
+  contraparte   String?   // fornecedor/cliente do movimento (do extrato Omie)
   transferencia Boolean   @default(false) // transferência entre contas próprias
   createdById   String?
   createdAt     DateTime  @default(now())

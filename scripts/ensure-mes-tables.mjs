@@ -39,6 +39,7 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "origemOmieId" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "contaCorrente" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "transferencia" BOOLEAN NOT NULL DEFAULT false`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "contraparte" TEXT`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "FluxoCaixa_origemOmieId_idx" ON "FluxoCaixa"("origemOmieId")`);
   console.log("[ensure-mes-tables] OK — colunas FluxoCaixa (Omie) garantidas.");
 

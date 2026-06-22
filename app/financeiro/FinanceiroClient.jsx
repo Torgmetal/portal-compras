@@ -28,7 +28,15 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
   const router = useRouter();
   const [modalFluxo, setModalFluxo] = useState(null);
   const [modalImport, setModalImport] = useState(false);
+  // Filtros do fluxo de caixa
+  const [fDe, setFDe] = useState("");
+  const [fAte, setFAte] = useState("");
   const [bancoFiltro, setBancoFiltro] = useState("");
+  const [catFiltro, setCatFiltro] = useState("");
+  const [fornFiltro, setFornFiltro] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState("");        // "" | ENTRADA | SAIDA
+  const [sitFiltro, setSitFiltro] = useState("");          // "" | real | prev
+  const limparFiltros = () => { setFDe(""); setFAte(""); setBancoFiltro(""); setCatFiltro(""); setFornFiltro(""); setTipoFiltro(""); setSitFiltro(""); };
 
   // Receita gerada por Romaneios (peso real produzido × valorPorKg)
   const receitaPorSemana = useMemo(() => {
@@ -110,15 +118,49 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
     return total;
   }, [fluxos]);
 
-  // Bancos (contas correntes) disponíveis nos lançamentos + filtro
-  const bancos = useMemo(
-    () => [...new Set(fluxos.map((f) => f.contaCorrente).filter(Boolean))].sort(),
-    [fluxos]
-  );
-  const fluxosFiltrados = useMemo(
-    () => (bancoFiltro ? fluxos.filter((f) => f.contaCorrente === bancoFiltro) : fluxos),
-    [fluxos, bancoFiltro]
-  );
+  // Opções de filtro derivadas dos lançamentos carregados
+  const bancos = useMemo(() => [...new Set(fluxos.map((f) => f.contaCorrente).filter(Boolean))].sort(), [fluxos]);
+  const categorias = useMemo(() => [...new Set(fluxos.map((f) => f.categoria).filter(Boolean))].sort(), [fluxos]);
+  const fornecedores = useMemo(() => [...new Set(fluxos.map((f) => f.contraparte).filter(Boolean))].sort(), [fluxos]);
+
+  const fluxosFiltrados = useMemo(() => {
+    const de = fDe ? new Date(fDe + "T00:00:00") : null;
+    const ate = fAte ? new Date(fAte + "T23:59:59") : null;
+    return fluxos.filter((f) => {
+      const d = new Date(f.data);
+      if (de && d < de) return false;
+      if (ate && d > ate) return false;
+      if (bancoFiltro && f.contaCorrente !== bancoFiltro) return false;
+      if (catFiltro && f.categoria !== catFiltro) return false;
+      if (fornFiltro && f.contraparte !== fornFiltro) return false;
+      if (tipoFiltro && f.tipo !== tipoFiltro) return false;
+      if (sitFiltro === "real" && !f.realizado) return false;
+      if (sitFiltro === "prev" && f.realizado) return false;
+      return true;
+    });
+  }, [fluxos, fDe, fAte, bancoFiltro, catFiltro, fornFiltro, tipoFiltro, sitFiltro]);
+
+  // Totais do filtro
+  const totaisFiltro = useMemo(() => {
+    let entradas = 0, saidas = 0;
+    for (const f of fluxosFiltrados) {
+      if (f.tipo === "ENTRADA") entradas += f.valor; else saidas += f.valor;
+    }
+    return { entradas, saidas, saldo: entradas - saidas, qtd: fluxosFiltrados.length };
+  }, [fluxosFiltrados]);
+
+  const temFiltro = !!(fDe || fAte || bancoFiltro || catFiltro || fornFiltro || tipoFiltro || sitFiltro);
+  const exportarUrl = useMemo(() => {
+    const p = new URLSearchParams();
+    if (fDe) p.set("de", fDe);
+    if (fAte) p.set("ate", fAte);
+    if (bancoFiltro) p.set("banco", bancoFiltro);
+    if (catFiltro) p.set("categoria", catFiltro);
+    if (fornFiltro) p.set("fornecedor", fornFiltro);
+    if (tipoFiltro) p.set("tipo", tipoFiltro);
+    if (sitFiltro) p.set("situacao", sitFiltro);
+    return `/api/financeiro/fluxo/exportar?${p.toString()}`;
+  }, [fDe, fAte, bancoFiltro, catFiltro, fornFiltro, tipoFiltro, sitFiltro]);
 
   const maxKg = Math.max(...receitaPorSemana.map((s) => s.kg), 1);
   const maxValor = Math.max(...receitaPorSemana.map((s) => s.valor), 1);
@@ -182,26 +224,99 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
 
       {/* Tabela: fluxo de caixa (topo) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-end justify-between gap-3 flex-wrap">
-          <div>
-            <h3 className="text-lg font-semibold text-torg-dark">Fluxo de caixa</h3>
-            <p className="text-xs text-torg-gray mt-0.5">
-              Entradas e saídas previstas e realizadas (Omie + lançamentos manuais).
-            </p>
+        <div className="px-6 py-4 border-b border-gray-100 space-y-3">
+          <div className="flex items-end justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="text-lg font-semibold text-torg-dark">Fluxo de caixa</h3>
+              <p className="text-xs text-torg-gray mt-0.5">
+                Entradas e saídas previstas e realizadas (Omie + lançamentos manuais).
+              </p>
+            </div>
+            <a
+              href={exportarUrl}
+              className="px-3 py-2 bg-white border border-torg-blue text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2"
+            >
+              <Download size={16} /> Exportar (Excel)
+            </a>
           </div>
-          {bancos.length > 0 && (
-            <label className="text-xs text-torg-gray flex items-center gap-2">
-              Banco:
-              <select
-                value={bancoFiltro}
-                onChange={(e) => setBancoFiltro(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-torg-dark"
-              >
+
+          {/* Filtros */}
+          <div className="flex flex-wrap items-end gap-2 text-xs">
+            <label className="flex flex-col gap-0.5">
+              <span className="text-torg-gray">De</span>
+              <input type="date" value={fDe} onChange={(e) => setFDe(e.target.value)}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-torg-dark" />
+            </label>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-torg-gray">Até</span>
+              <input type="date" value={fAte} onChange={(e) => setFAte(e.target.value)}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-torg-dark" />
+            </label>
+            <label className="flex flex-col gap-0.5">
+              <span className="text-torg-gray">Tipo</span>
+              <select value={tipoFiltro} onChange={(e) => setTipoFiltro(e.target.value)}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-torg-dark">
                 <option value="">Todos</option>
-                {bancos.map((b) => <option key={b} value={b}>{b}</option>)}
+                <option value="ENTRADA">Entradas</option>
+                <option value="SAIDA">Saídas</option>
               </select>
             </label>
-          )}
+            <label className="flex flex-col gap-0.5">
+              <span className="text-torg-gray">Situação</span>
+              <select value={sitFiltro} onChange={(e) => setSitFiltro(e.target.value)}
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-torg-dark">
+                <option value="">Todas</option>
+                <option value="real">Realizado</option>
+                <option value="prev">Previsto</option>
+              </select>
+            </label>
+            {bancos.length > 0 && (
+              <label className="flex flex-col gap-0.5">
+                <span className="text-torg-gray">Banco</span>
+                <select value={bancoFiltro} onChange={(e) => setBancoFiltro(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-torg-dark max-w-[160px]">
+                  <option value="">Todos</option>
+                  {bancos.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </label>
+            )}
+            {categorias.length > 0 && (
+              <label className="flex flex-col gap-0.5">
+                <span className="text-torg-gray">Categoria</span>
+                <select value={catFiltro} onChange={(e) => setCatFiltro(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-torg-dark max-w-[200px]">
+                  <option value="">Todas</option>
+                  {categorias.map((c) => <option key={c} value={c}>{labelCatFluxo(c)}</option>)}
+                </select>
+              </label>
+            )}
+            {fornecedores.length > 0 && (
+              <label className="flex flex-col gap-0.5">
+                <span className="text-torg-gray">Fornecedor / Cliente</span>
+                <select value={fornFiltro} onChange={(e) => setFornFiltro(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-torg-dark max-w-[220px]">
+                  <option value="">Todos</option>
+                  {fornecedores.map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </label>
+            )}
+            {temFiltro && (
+              <button onClick={limparFiltros}
+                className="px-2 py-1.5 text-xs text-torg-gray hover:text-torg-dark border border-gray-200 rounded-lg flex items-center gap-1">
+                <X size={12} /> Limpar
+              </button>
+            )}
+          </div>
+
+          {/* Totais do filtro */}
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs pt-1">
+            <span className="text-torg-gray">{totaisFiltro.qtd} lançamento(s)</span>
+            <span className="text-torg-blue font-medium">Entradas: {fmtMoeda(totaisFiltro.entradas)}</span>
+            <span className="text-torg-orange-700 font-medium">Saídas: {fmtMoeda(totaisFiltro.saidas)}</span>
+            <span className={`font-semibold ${totaisFiltro.saldo >= 0 ? "text-torg-dark" : "text-red-600"}`}>
+              Saldo: {fmtMoeda(totaisFiltro.saldo)}
+            </span>
+          </div>
         </div>
         {fluxosFiltrados.length === 0 ? (
           <p className="px-6 py-6 text-sm text-torg-gray text-center">
