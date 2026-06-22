@@ -6,7 +6,7 @@ import {
   Ban,
 } from "lucide-react";
 
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
 const NATUREZA_LABELS = {
   FISICO: "Físico",

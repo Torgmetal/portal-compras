@@ -21,7 +21,7 @@ const PRIORIDADE_LABELS = {
   BAIXA: { label: "Baixa", cor: "bg-blue-50 text-blue-600" },
 };
 
-const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
 function diasAberto(dataAbertura, dataFechamento) {
   const fim = dataFechamento ? new Date(dataFechamento) : new Date();

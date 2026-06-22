@@ -17,7 +17,7 @@ const tipoMap = Object.fromEntries(TIPOS.map((t) => [t.value, t]));
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d) =>
-  d ? new Date(d).toLocaleDateString("pt-BR") : "—";
+  d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—";
 
 const anoAtual = new Date().getFullYear();
 

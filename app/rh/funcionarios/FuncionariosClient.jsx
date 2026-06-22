@@ -10,7 +10,7 @@ import {
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d) =>
-  d ? new Date(d).toLocaleDateString("pt-BR") : "—";
+  d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—";
 
 const STATUS_LABELS = {
   ATIVO: { label: "Ativo", cor: "bg-emerald-100 text-emerald-800" },

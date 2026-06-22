@@ -58,7 +58,7 @@ const TIPO_LABEL = {};
 Object.values(TIPOS).flat().forEach((t) => { TIPO_LABEL[t.value] = t.label; });
 TIPO_LABEL.OUTRO = "Outro";
 
-const fmtData = (d) => d ? new Date(d).toLocaleDateString("pt-BR") : "—";
+const fmtData = (d) => d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—";
 
 function calcStatus(dataValidade) {
   if (!dataValidade) return { key: "SEM_VALIDADE", label: "Sem validade", cor: "bg-gray-100 text-gray-600", icon: null };
@@ -1001,7 +1001,7 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                 {item.documento && (
                   <span className="text-[10px] text-torg-gray hidden sm:block">
                     {item.documento.nome}
-                    {item.documento.dataValidade && <> · Val: {new Date(item.documento.dataValidade).toLocaleDateString("pt-BR")}</>}
+                    {item.documento.dataValidade && <> · Val: {new Date(item.documento.dataValidade).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</>}
                   </span>
                 )}
               </div>
@@ -1132,7 +1132,7 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                           </span>
                           {item.documento && item.documento.dataValidade && (
                             <span className="text-[10px] text-torg-gray tabular-nums hidden sm:block">
-                              Val: {new Date(item.documento.dataValidade).toLocaleDateString("pt-BR")}
+                              Val: {new Date(item.documento.dataValidade).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                             </span>
                           )}
                         </div>
