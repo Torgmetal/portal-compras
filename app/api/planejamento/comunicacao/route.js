@@ -19,7 +19,7 @@ const schema = z.object({
 
 export async function GET() {
   try {
-    await requireRole(["ADMIN", "PLANEJAMENTO"]);
+    await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }

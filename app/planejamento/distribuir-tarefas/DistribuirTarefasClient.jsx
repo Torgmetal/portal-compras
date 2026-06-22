@@ -1,12 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { upload } from "@vercel/blob/client";
-import { Sparkles, Loader2, AlertCircle, FileUp, FileText, Trash2, Send, CheckCircle2, X } from "lucide-react";
+import { Sparkles, Loader2, AlertCircle, FileUp, FileText, Trash2, Send, CheckCircle2, X, Mail } from "lucide-react";
 
 const SETORES = ["PRODUCAO", "PINTURA", "PCP", "EXPEDICAO", "COMERCIAL", "ENGENHARIA", "COMPRAS", "ALMOXARIFADO", "FINANCEIRO", "RH", "PLANEJAMENTO"];
+const LABEL = { PRODUCAO: "Produção", PINTURA: "Pintura", PCP: "PCP", EXPEDICAO: "Expedição", COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS: "Compras", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro", RH: "RH", PLANEJAMENTO: "Planejamento" };
 const PRIORIDADES = ["ALTA", "MEDIA", "BAIXA"];
 const PRIO_COR = { ALTA: "text-red-600", MEDIA: "text-amber-600", BAIXA: "text-torg-gray" };
+const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || "").trim().toLowerCase());
 
 function isoWeek(d) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -29,6 +31,38 @@ export default function DistribuirTarefasClient() {
   const [ano, setAno] = useState(sem.ano);
   const [distribuindo, setDistribuindo] = useState(false);
   const [resultado, setResultado] = useState(null);
+  const [matriz, setMatriz] = useState(null);
+  const [enviarEmail, setEnviarEmail] = useState(true);
+  const [destinatarios, setDestinatarios] = useState({}); // { SETOR: [email] }
+  const [novoEmail, setNovoEmail] = useState({}); // { SETOR: "digitando…" }
+
+  // carrega a matriz de comunicação (pré-seleção dos destinatários por setor)
+  useEffect(() => {
+    fetch("/api/planejamento/comunicacao").then((r) => (r.ok ? r.json() : null)).then((j) => j && setMatriz(j.matriz)).catch(() => {});
+  }, []);
+
+  // para cada setor presente ainda sem seleção, usa os contatos da matriz como padrão
+  useEffect(() => {
+    if (!matriz || !tarefas) return;
+    setDestinatarios((prev) => {
+      const next = { ...prev };
+      for (const t of tarefas) {
+        if (t.incluir && next[t.setor] == null) next[t.setor] = (matriz[t.setor]?.contatos || []).map((c) => c.email);
+      }
+      return next;
+    });
+  }, [matriz, tarefas]);
+
+  const toggleDest = (setor, email) => setDestinatarios((d) => {
+    const cur = d[setor] || [];
+    return { ...d, [setor]: cur.includes(email) ? cur.filter((e) => e !== email) : [...cur, email] };
+  });
+  const addDest = (setor) => {
+    const e = String(novoEmail[setor] || "").trim().toLowerCase();
+    if (!emailOk(e)) return;
+    setDestinatarios((d) => ({ ...d, [setor]: [...new Set([...(d[setor] || []), e])] }));
+    setNovoEmail((n) => ({ ...n, [setor]: "" }));
+  };
 
   function addFiles(e) {
     const novos = Array.from(e.target.files || []);
@@ -73,21 +107,27 @@ export default function DistribuirTarefasClient() {
     if (!incluidas.length) { setErro("Selecione ao menos uma tarefa para distribuir."); return; }
     setDistribuindo(true); setErro("");
     try {
+      const presentes = [...new Set(incluidas.map((t) => t.setor))];
+      const destPorSetor = {};
+      for (const s of presentes) destPorSetor[s] = destinatarios[s] || [];
       const r = await fetch("/api/planejamento/tarefas/distribuir", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           semanaIso, ano,
           tarefas: incluidas.map((t) => ({ titulo: t.titulo.trim(), descricao: t.descricao || null, setor: t.setor, prioridade: t.prioridade || "MEDIA", responsavel: t.responsavel || null, dataPrevista: t.dataPrevista || null, opNumero: t.opNumero || null })),
+          enviarEmail,
+          destinatariosPorSetor: enviarEmail ? destPorSetor : undefined,
         }),
       });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao distribuir");
       setResultado(j);
-      setTarefas(null); setTexto(""); setArquivos([]); setResumo("");
+      setTarefas(null); setTexto(""); setArquivos([]); setResumo(""); setDestinatarios({});
     } catch (e) { setErro(e.message); } finally { setDistribuindo(false); }
   }
 
   const incluidasCount = (tarefas || []).filter((t) => t.incluir).length;
+  const setoresPresentes = [...new Set((tarefas || []).filter((t) => t.incluir).map((t) => t.setor))];
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -102,7 +142,9 @@ export default function DistribuirTarefasClient() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 text-center">
           <CheckCircle2 size={40} className="mx-auto text-emerald-600 mb-3" />
           <p className="text-lg font-bold text-torg-dark">{resultado.criadas} tarefa(s) distribuída(s)</p>
-          <p className="text-sm text-torg-gray mt-1">Semana {semanaIso}/{ano} · {Object.entries(resultado.porSetor || {}).map(([s, n]) => `${s} (${n})`).join(" · ")}</p>
+          <p className="text-sm text-torg-gray mt-1">Semana {semanaIso}/{ano} · {Object.entries(resultado.porSetor || {}).map(([s, n]) => `${LABEL[s] || s} (${n})`).join(" · ")}</p>
+          {resultado.emails?.enviados > 0 && <p className="text-[13px] text-emerald-700 mt-1.5 inline-flex items-center gap-1.5"><Mail size={14} /> {resultado.emails.enviados} e-mail(s) enviado(s) aos setores</p>}
+          {resultado.emails?.falhas?.length > 0 && <p className="text-[12px] text-amber-600 mt-1">Falha no envio para: {resultado.emails.falhas.map((f) => LABEL[f.setor] || f.setor).join(", ")}</p>}
           <div className="flex items-center justify-center gap-3 mt-4">
             <Link href="/planejamento/tarefas" className="text-sm font-semibold text-white bg-torg-blue rounded-lg px-4 py-2 hover:bg-torg-dark">Ver no quadro de Tarefas</Link>
             <button onClick={() => setResultado(null)} className="text-sm text-torg-blue hover:underline">Analisar outra reunião</button>
@@ -152,6 +194,46 @@ export default function DistribuirTarefasClient() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-torg-dark cursor-pointer">
+              <input type="checkbox" checked={enviarEmail} onChange={(e) => setEnviarEmail(e.target.checked)} className="accent-torg-blue" />
+              <Mail size={15} className="text-torg-blue" /> Enviar e-mail aos setores ao distribuir
+            </label>
+            {enviarEmail && (
+              <div className="space-y-2">
+                {setoresPresentes.map((setor) => {
+                  const contatos = matriz?.[setor]?.contatos || [];
+                  const sel = destinatarios[setor] || [];
+                  const extras = sel.filter((e) => !contatos.some((c) => c.email === e));
+                  return (
+                    <div key={setor} className="border border-gray-100 rounded-lg p-3">
+                      <p className="text-[12px] font-semibold text-torg-dark mb-1.5">{LABEL[setor]} <span className="font-normal text-torg-gray">· {sel.length} destinatário(s)</span></p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {contatos.map((c) => (
+                          <label key={c.email} className="inline-flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
+                            <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggleDest(setor, c.email)} className="accent-torg-blue" />
+                            {c.nome ? `${c.nome} ` : ""}<span className="text-torg-gray">{c.email}</span>
+                          </label>
+                        ))}
+                        {extras.map((e) => (
+                          <label key={e} className="inline-flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
+                            <input type="checkbox" checked onChange={() => toggleDest(setor, e)} className="accent-torg-blue" />
+                            <span className="text-torg-gray">{e}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <input value={novoEmail[setor] || ""} onChange={(e) => setNovoEmail((n) => ({ ...n, [setor]: e.target.value }))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDest(setor); } }} placeholder="adicionar e-mail avulso" className="flex-1 text-[12px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue outline-none" />
+                        <button type="button" onClick={() => addDest(setor)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark">adicionar</button>
+                      </div>
+                      {contatos.length === 0 && extras.length === 0 && <p className="text-[11px] text-amber-600 mt-1">Sem contatos na matriz — adicione um e-mail avulso ou configure a <Link href="/planejamento/comunicacao" className="underline">Matriz de comunicação</Link>.</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-end justify-between gap-3 flex-wrap sticky bottom-3">
