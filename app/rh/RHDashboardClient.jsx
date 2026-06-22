@@ -7,8 +7,10 @@ import {
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
+// Datas de RH (nascimento/admissão) são date-only salvas em UTC meia-noite.
+// Formatar em UTC evita o deslocamento de -1 dia no fuso BR (ex.: 01/06 virar 31/05).
 const fmtData = (d) =>
-  d ? new Date(d).toLocaleDateString("pt-BR") : "—";
+  d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—";
 
 export default function RHDashboardClient() {
   const [data, setData] = useState(null);
