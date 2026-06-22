@@ -2615,6 +2615,15 @@ model TarefaPlanejamento {
   dataPrevista  DateTime?
   dataConcluida DateTime?
   observacao    String?
+  // Tarefa de responsabilidade do CLIENTE (ele fornece/aprova). Cobrança/confirmação
+  // por e-mail com resposta de 1 clique (token público, sem login).
+  doCliente          Boolean   @default(false)
+  clienteNome        String?
+  clienteEmail       String?
+  clienteToken       String?   @unique
+  clienteAvisadoEm   DateTime?
+  clienteRespostaEm  DateTime?
+  clienteResposta    String?
   createdById   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

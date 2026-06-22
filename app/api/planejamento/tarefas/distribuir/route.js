@@ -29,6 +29,9 @@ const schema = z.object({
     responsavel: z.string().nullable().optional(),
     dataPrevista: z.string().nullable().optional(),
     opNumero: z.string().nullable().optional(),
+    doCliente: z.boolean().optional(),
+    clienteNome: z.string().nullable().optional(),
+    clienteEmail: z.string().nullable().optional(),
   })).min(1).max(100),
   enviarEmail: z.boolean().optional(),
   destinatariosPorSetor: z.record(z.array(z.string())).optional(),
@@ -78,27 +81,36 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: "Dados inválidos: " + (e.issues?.[0]?.message || e.message) }, { status: 400 }); }
 
-  // resolve opId das OPs citadas (uma vez só)
+  // resolve opId + e-mail do cliente das OPs citadas (uma vez só)
   const numeros = [...new Set(body.tarefas.map((t) => t.opNumero).filter(Boolean))];
-  const ops = numeros.length ? await prisma.oP.findMany({ where: { numero: { in: numeros } }, select: { id: true, numero: true } }) : [];
-  const opIdPorNumero = new Map(ops.map((o) => [o.numero, o.id]));
+  const ops = numeros.length ? await prisma.oP.findMany({ where: { numero: { in: numeros } }, select: { id: true, numero: true, clienteEmail: true } }) : [];
+  const opPorNumero = new Map(ops.map((o) => [o.numero, o]));
+  const emailValido = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || "").trim().toLowerCase());
 
   let criadas = 0;
   const porSetor = {};
   const tarefasPorSetor = {};
   for (const t of body.tarefas) {
+    const op = t.opNumero ? opPorNumero.get(t.opNumero) : null;
+    // e-mail do cliente: o informado, senão o cadastrado na OP
+    const clienteEmail = t.doCliente
+      ? (emailValido(t.clienteEmail) ? String(t.clienteEmail).trim().toLowerCase() : (emailValido(op?.clienteEmail) ? op.clienteEmail.trim().toLowerCase() : null))
+      : null;
     const tarefa = await prisma.tarefaPlanejamento.create({
       data: {
         titulo: t.titulo,
         descricao: t.descricao || null,
         opNumero: t.opNumero || null,
-        opId: t.opNumero ? (opIdPorNumero.get(t.opNumero) || null) : null,
+        opId: op?.id || null,
         setor: t.setor,
         semanaIso: body.semanaIso,
         ano: body.ano,
         prioridade: t.prioridade || "MEDIA",
         responsavel: t.responsavel || null,
         dataPrevista: t.dataPrevista ? new Date(t.dataPrevista) : null,
+        doCliente: !!t.doCliente,
+        clienteNome: t.doCliente ? (t.clienteNome || null) : null,
+        clienteEmail,
         createdById: user.id,
       },
     });

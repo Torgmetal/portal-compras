@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { upload } from "@vercel/blob/client";
-import { Sparkles, Loader2, AlertCircle, FileUp, FileText, Trash2, Send, CheckCircle2, X, Mail } from "lucide-react";
+import { Sparkles, Loader2, AlertCircle, FileUp, FileText, Trash2, Send, CheckCircle2, X, Mail, Building2 } from "lucide-react";
 
 const SETORES = ["PRODUCAO", "PINTURA", "PCP", "EXPEDICAO", "COMERCIAL", "ENGENHARIA", "COMPRAS", "ALMOXARIFADO", "FINANCEIRO", "RH", "PLANEJAMENTO"];
 const LABEL = { PRODUCAO: "Produção", PINTURA: "Pintura", PCP: "PCP", EXPEDICAO: "Expedição", COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS: "Compras", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro", RH: "RH", PLANEJAMENTO: "Planejamento" };
@@ -103,7 +103,7 @@ export default function DistribuirTarefasClient() {
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao analisar");
       setResumo(j.resumo || "");
-      setTarefas((j.tarefas || []).map((t) => ({ ...t, incluir: true, dataPrevista: t.prazo || "" })));
+      setTarefas((j.tarefas || []).map((t) => ({ ...t, incluir: true, dataPrevista: t.prazo || "", clienteEmail: t.clienteEmail || "" })));
       if (!j.tarefas?.length) setErro("A IA não encontrou tarefas acionáveis nesse conteúdo.");
     } catch (e) { setErro(e.message); } finally { setAnalisando(false); }
   }
@@ -131,7 +131,7 @@ export default function DistribuirTarefasClient() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           semanaIso, ano,
-          tarefas: incluidas.map((t) => ({ titulo: t.titulo.trim(), descricao: t.descricao || null, setor: t.setor, prioridade: t.prioridade || "MEDIA", responsavel: t.responsavel || null, dataPrevista: t.dataPrevista || dataProgramada || null, opNumero: t.opNumero || null })),
+          tarefas: incluidas.map((t) => ({ titulo: t.titulo.trim(), descricao: t.descricao || null, setor: t.setor, prioridade: t.prioridade || "MEDIA", responsavel: t.responsavel || null, dataPrevista: t.dataPrevista || dataProgramada || null, opNumero: t.opNumero || null, doCliente: !!t.doCliente, clienteNome: t.clienteNome || null, clienteEmail: t.clienteEmail || null })),
           enviarEmail,
           destinatariosPorSetor: enviarEmail ? destPorSetor : undefined,
         }),
@@ -205,6 +205,15 @@ export default function DistribuirTarefasClient() {
                       </label>
                     </div>
                     <input value={t.responsavel || ""} onChange={(e) => upd(i, "responsavel", e.target.value)} placeholder="Responsável (opcional)" className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="inline-flex items-center gap-1.5 text-[11px] text-torg-dark cursor-pointer">
+                        <input type="checkbox" checked={!!t.doCliente} onChange={(e) => upd(i, "doCliente", e.target.checked)} className="accent-torg-orange" />
+                        <Building2 size={12} className="text-torg-orange" /> Tarefa do cliente
+                      </label>
+                      {t.doCliente && (
+                        <input value={t.clienteEmail || ""} onChange={(e) => upd(i, "clienteEmail", e.target.value)} placeholder={t.opNumero ? "e-mail do cliente (vazio = usa o da OP)" : "e-mail do cliente"} className="flex-1 min-w-[180px] text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue outline-none" />
+                      )}
+                    </div>
                     {t.descricao && <p className="text-[11px] text-torg-gray">{t.descricao}</p>}
                   </div>
                   <button onClick={() => remover(i)} className="text-torg-gray hover:text-red-600 mt-1" title="Remover"><Trash2 size={15} /></button>
