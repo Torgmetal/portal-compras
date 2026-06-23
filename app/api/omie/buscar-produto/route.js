@@ -18,6 +18,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const URL_ESTOQUE = "https://app.omie.com.br/api/v1/estoque/consulta/";
+const URL_PRODUTO = "https://app.omie.com.br/api/v1/geral/produtos/";
 
 function decodeEntities(s) {
   if (!s) return s;
@@ -150,11 +151,41 @@ export async function GET(req) {
       itens = itens.map((i) => ({ ...i, unidade: i.unidade || um.get(i.codigo) || "UN" }));
     }
 
-    return NextResponse.json({
-      itens: itens.map((i) => ({ codigo: i.codigo, descricao: decodeEntities(i.descricao), unidade: i.unidade || "UN", saldo: i.saldo })),
-      origem: "omie-posestoque",
-    });
+    if (itens.length > 0) {
+      return NextResponse.json({
+        itens: itens.map((i) => ({ codigo: i.codigo, descricao: decodeEntities(i.descricao), unidade: i.unidade || "UN", saldo: i.saldo })),
+        origem: "omie-posestoque",
+      });
+    }
   } catch (e) {
-    return NextResponse.json({ itens: [], origem: "omie-erro", erro: e?.message });
+    console.warn("[buscar-produto] posestoque falhou:", e?.message);
   }
+
+  // 3) Por CÓDIGO via ConsultarProduto — acha qualquer produto pelo código exato,
+  //    inclusive SEM estoque (a listagem ListarProdutos retorna 0 nesta conta Omie).
+  if (porCodigo) {
+    try {
+      const key = process.env.OMIE_APP_KEY, secret = process.env.OMIE_APP_SECRET;
+      const res = await fetch(URL_PRODUTO, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ call: "ConsultarProduto", app_key: key, app_secret: secret, param: [{ codigo: q }] }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const p = await res.json();
+      if (!p.faultstring && (p.descricao || p.codigo)) {
+        return NextResponse.json({
+          itens: [{
+            codigo: String(p.codigo || q),
+            descricao: decodeEntities(String(p.descricao || "").trim()),
+            unidade: String(p.unidade || "UN").trim().toUpperCase(),
+            saldo: Number(p.quantidade_estoque ?? 0),
+          }],
+          origem: "omie-consultaproduto",
+        });
+      }
+    } catch (e) { console.warn("[buscar-produto] ConsultarProduto falhou:", e?.message); }
+  }
+
+  return NextResponse.json({ itens: [], origem: "vazio" });
 }
