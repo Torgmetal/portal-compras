@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   ListOrdered, CalendarRange, Scissors, CheckCircle2, Loader2, AlertCircle,
   Play, Check, Undo2, X, ArrowUp, ArrowDown, ChevronsUp, Search,
@@ -53,6 +53,12 @@ export default function FilaCorteClient({ pecasIniciais }) {
   const [erro, setErro] = useState("");
   const [avisos, setAvisos] = useState([]);
   const [okMsg, setOkMsg] = useState("");
+
+  // Rede de segurança: ao abrir a fila de corte, dispara a reconciliação da baixa
+  // do Syneco (throttled no servidor) — mantém Fila/Montagem/Status em dia sem o cron.
+  useEffect(() => {
+    fetch("/api/pcp/reconciliar-corte?auto=1", { method: "POST" }).catch(() => {});
+  }, []);
 
   const hoje = hojeUTC();
 

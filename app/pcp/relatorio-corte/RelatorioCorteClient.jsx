@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Scissors, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, adicionarLegenda, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
 
@@ -25,6 +25,8 @@ export default function RelatorioCorteClient() {
   const [fMaquina, setFMaquina] = useState("");
   const [fSituacao, setFSituacao] = useState("");
   const [exportandoTodas, setExportandoTodas] = useState(false);
+  const [reconciliando, setReconciliando] = useState(false);
+  const [reconMsg, setReconMsg] = useState("");
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -45,6 +47,23 @@ export default function RelatorioCorteClient() {
   }, [obra, de, ate]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Reconciliação da baixa do corte (Syneco → peças) — manual + auto ao abrir.
+  const carregarRef = useRef(carregar);
+  useEffect(() => { carregarRef.current = carregar; }, [carregar]);
+  const reconciliar = useCallback(async (auto = false) => {
+    if (!auto) { setReconciliando(true); setReconMsg(""); }
+    try {
+      const r = await fetch(`/api/pcp/reconciliar-corte${auto ? "?auto=1" : ""}`, { method: "POST" });
+      const j = await r.json();
+      if (!r.ok || !j.ok) { if (!auto) setReconMsg(j.error || "Erro ao reconciliar"); return; }
+      if (j.skipped) return;
+      if (!auto) setReconMsg(`Baixa em dia — ${j.atualizadas} peça(s) atualizada(s)${j.promovidas ? `, ${j.promovidas} promovida(s) p/ CORTE` : ""}.`);
+      if (j.atualizadas > 0) carregarRef.current?.();
+    } catch (e) { if (!auto) setReconMsg(e.message); }
+    finally { if (!auto) setReconciliando(false); }
+  }, []);
+  useEffect(() => { reconciliar(true); }, [reconciliar]); // rede de segurança ao abrir
 
   // Filtros do detalhe (cliente): máquina + situação
   const itensDet = detalhe?.itens || [];
@@ -153,6 +172,11 @@ export default function RelatorioCorteClient() {
           <p className="text-xs text-torg-gray mt-0.5">Peças <strong>programadas</strong> e <strong>cortadas</strong> por obra — situação, data/hora, máquina e operador (Syneco).</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => reconciliar(false)} disabled={reconciliando}
+            title="Aplica a baixa do corte do Syneco em todas as OPs agora"
+            className="text-sm font-semibold text-torg-gray border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
+            {reconciliando ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} Reconciliar corte
+          </button>
           {!detalhe && (
             <button onClick={exportarTodas} disabled={exportandoTodas}
               className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
@@ -165,6 +189,8 @@ export default function RelatorioCorteClient() {
           </button>
         </div>
       </div>
+
+      {reconMsg && <div className="mb-3 text-[13px] bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-3 py-2 flex items-center gap-2">{reconMsg}<button onClick={() => setReconMsg("")} className="ml-auto text-emerald-700 hover:text-emerald-900 font-bold">✕</button></div>}
 
       <div className="flex items-center gap-3 flex-wrap mb-4 bg-white border border-gray-100 rounded-xl shadow-sm p-3">
         <select value={obra} onChange={(e) => setObra(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
