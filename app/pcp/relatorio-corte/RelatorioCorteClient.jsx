@@ -22,6 +22,9 @@ export default function RelatorioCorteClient() {
   const [detalhe, setDetalhe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [fMaquina, setFMaquina] = useState("");
+  const [fSituacao, setFSituacao] = useState("");
+  const [exportandoTodas, setExportandoTodas] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -43,6 +46,47 @@ export default function RelatorioCorteClient() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // Filtros do detalhe (cliente): máquina + situação
+  const itensDet = detalhe?.itens || [];
+  const maquinas = [...new Set(itensDet.map((i) => i.maquina).filter((m) => m && m !== "—"))].sort();
+  const itensFiltrados = itensDet.filter((i) => (!fMaquina || i.maquina === fMaquina) && (!fSituacao || i.situacao === fSituacao));
+
+  // Extrai TODAS as peças de todas as OPs num único Excel (respeita o período)
+  async function exportarTodas() {
+    setExportandoTodas(true);
+    try {
+      const p = new URLSearchParams({ todas: "1" });
+      if (de) p.set("de", de);
+      if (ate) p.set("ate", ate);
+      const res = await fetch(`/api/pcp/relatorio-corte?${p}`);
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Erro ao extrair");
+      const itens = j.itens || [];
+      const hoje = new Date().toISOString().split("T")[0];
+      const periodo = de || ate ? ` · período ${de || "início"} a ${ate || "hoje"}` : " · histórico completo";
+      const headers = ["OP / Frente", "Peça", "Descrição / Perfil", "Programado", "Cortado", "Saldo", "Situação", "Data do corte", "Máquina", "Operador"];
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: "Relatorio de Corte — Todas as pecas por OP",
+        subtitulo: `Pecas cortadas (Syneco)${periodo}`,
+        kpis: [`${itens.length} pecas/linhas  |  Cortado: ${itens.reduce((s, i) => s + (i.cortado || 0), 0).toLocaleString("pt-BR")} un`],
+        totalColunas: headers.length,
+        nomePlanilha: "Corte (todas as OPs)",
+        codigoDoc: "REL-PRD-005",
+      });
+      ws.columns = [{ width: 14 }, { width: 16 }, { width: 28 }, { width: 11 }, { width: 9 }, { width: 8 }, { width: 11 }, { width: 18 }, { width: 16 }, { width: 16 }];
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, headers); row++;
+      for (const i of itens) {
+        const fill = i.situacao === "Cortada" ? CORES.LIGHT_GREEN : i.situacao === "Parcial" ? CORES.LIGHT_ORANGE : undefined;
+        adicionarLinhaTabela(ws, row, [i.obra, i.peca, i.descricao, i.programado, i.cortado, i.saldo, i.situacao, fmtDataHora(i.data), i.maquina, i.operador], {
+          fillColor: fill, alinhamento: { 3: "right", 4: "right", 5: "right", 6: "center", 7: "center" },
+        });
+        row++;
+      }
+      await downloadWorkbook(workbook, `Torg_Corte_TodasOPs_${hoje}.xlsx`);
+    } catch (e) { setErro(e.message); } finally { setExportandoTodas(false); }
+  }
+
   async function exportarExcel() {
     const periodo = de || ate ? ` · período ${de || "início"} a ${ate || "hoje"}` : "";
     const hoje = new Date().toISOString().split("T")[0];
@@ -60,7 +104,7 @@ export default function RelatorioCorteClient() {
       let row = linhaInicio;
       adicionarHeaderTabela(ws, row, headers); row++;
       const first = row;
-      for (const i of detalhe.itens) {
+      for (const i of itensFiltrados) {
         const fill = i.situacao === "Cortada" ? CORES.LIGHT_GREEN : i.situacao === "Parcial" ? CORES.LIGHT_ORANGE : undefined;
         const corSit = i.situacao === "Cortada" ? "16A34A" : i.situacao === "Parcial" ? "EA580C" : "9CA3AF";
         adicionarLinhaTabela(ws, row, [i.peca, i.descricao, i.programado, i.cortado, i.saldo, i.situacao, fmtDataHora(i.data), i.maquina, i.operador], {
@@ -99,7 +143,7 @@ export default function RelatorioCorteClient() {
     }
   }
 
-  const vazio = detalhe ? !detalhe.itens?.length : !obras.length;
+  const vazio = detalhe ? !itensFiltrados.length : !obras.length;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -108,10 +152,18 @@ export default function RelatorioCorteClient() {
           <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2"><Scissors size={20} className="text-torg-blue" /> Relatório de Corte</h1>
           <p className="text-xs text-torg-gray mt-0.5">Peças <strong>programadas</strong> e <strong>cortadas</strong> por obra — situação, data/hora, máquina e operador (Syneco).</p>
         </div>
-        <button onClick={exportarExcel} disabled={loading || vazio}
-          className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50 shrink-0">
-          <Download size={15} /> Exportar
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {!detalhe && (
+            <button onClick={exportarTodas} disabled={exportandoTodas}
+              className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
+              {exportandoTodas ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Todas as peças (Excel)
+            </button>
+          )}
+          <button onClick={exportarExcel} disabled={loading || vazio}
+            className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
+            <Download size={15} /> Exportar {detalhe ? "OP" : "resumo"}
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap mb-4 bg-white border border-gray-100 rounded-xl shadow-sm p-3">
@@ -122,7 +174,21 @@ export default function RelatorioCorteClient() {
         <label className="text-xs text-torg-gray flex items-center gap-1">De <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
         <label className="text-xs text-torg-gray flex items-center gap-1">Até <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
         {(de || ate) && <button onClick={() => { setDe(""); setAte(""); }} className="text-xs text-torg-gray hover:text-torg-dark underline">limpar datas</button>}
-        {obra && <button onClick={() => setObra("")} className="text-xs text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 ml-auto"><ChevronLeft size={13} /> voltar ao resumo</button>}
+        {obra && (
+          <>
+            <select value={fMaquina} onChange={(e) => setFMaquina(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+              <option value="">Todas máquinas</option>
+              {maquinas.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select value={fSituacao} onChange={(e) => setFSituacao(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
+              <option value="">Todas situações</option>
+              <option value="Cortada">Cortada</option>
+              <option value="Parcial">Parcial</option>
+              <option value="Pendente">Pendente</option>
+            </select>
+          </>
+        )}
+        {obra && <button onClick={() => { setObra(""); setFMaquina(""); setFSituacao(""); }} className="text-xs text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 ml-auto"><ChevronLeft size={13} /> voltar ao resumo</button>}
       </div>
       {(de || ate) && <p className="text-[11px] text-torg-gray -mt-2 mb-3">Filtro de período mostra só o que foi <strong>cortado</strong> no intervalo (pendentes aparecem sem filtro de data).</p>}
 
@@ -154,7 +220,7 @@ export default function RelatorioCorteClient() {
                 <th className="px-3 py-2 font-medium">Operador</th>
               </tr></thead>
               <tbody className="divide-y divide-gray-50">
-                {detalhe.itens.map((i, idx) => (
+                {itensFiltrados.map((i, idx) => (
                   <tr key={idx} className="hover:bg-gray-50/50">
                     <td className="px-3 py-2 font-mono font-medium text-torg-dark whitespace-nowrap">{i.peca}</td>
                     <td className="px-3 py-2 text-torg-gray">{i.descricao}</td>
