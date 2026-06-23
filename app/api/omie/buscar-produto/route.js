@@ -1,14 +1,14 @@
 // GET /api/omie/buscar-produto?q=texto&limit=20
 // Autocomplete de produtos pra RM Interna.
 //
-// Fonte AO VIVO: estoque/consulta ListarPosEstoque — traz TODOS os produtos com
-// saldo atual (nSaldo), descrição e código. O endpoint geral/produtos
-// (ListarProdutos/Resumido) retorna 0 com a API key atual (sem permissão do
-// módulo Produtos), por isso usamos a posição de estoque, que funciona e já dá
-// o saldo correto pós-consumo + itens recém-cadastrados.
+// Arquitetura (rápida + fresca):
+// 1) Lê do espelho LOCAL EstoqueItem (instantâneo) — sincronizado de hora em hora
+//    pelo cron /api/cron/estoque-produtos (ListarPosEstoque: produtos novos + saldo).
+// 2) Fallback AO VIVO (estoque/consulta ListarPosEstoque, cache 60s) só quando o
+//    local não acha nada — cobre item recém-cadastrado entre as sincronizações.
 //
-// Cache de 60s da lista completa (poucos produtos) — evita o "consumo redundante"
-// do Omie ao digitar e mantém a resposta rápida. Fallback: EstoqueItem local.
+// Obs.: o endpoint geral/produtos (ListarProdutos/Resumido) retorna 0 com a API
+// key atual, por isso a fonte de produtos é a posição de estoque.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -48,7 +48,7 @@ async function omieEstoque(call, param) {
   return data;
 }
 
-// Cache da posição de estoque completa (TTL 60s) — evita consumo redundante.
+// Cache da posição de estoque completa (TTL 60s) — fallback de itens novos.
 let _cache = { ts: 0, lista: [] };
 async function getPosicaoEstoque() {
   if (Date.now() - _cache.ts < 60_000 && _cache.lista.length) return _cache.lista;
@@ -85,43 +85,7 @@ export async function GET(req) {
   const limit = Math.min(Number(searchParams.get("limit") || 20), 50);
   if (q.length < 2) return NextResponse.json({ itens: [], origem: "vazio" });
 
-  const qn = q.toLowerCase();
-  const qDigits = q.replace(/\D/g, "");
-
-  // 1) AO VIVO via posição de estoque (saldo atual + itens novos)
-  try {
-    const lista = await getPosicaoEstoque();
-    if (lista.length) {
-      let itens = lista
-        .filter((p) => p.descricao.toLowerCase().includes(qn) || (qDigits && p.codigo.includes(qDigits)) || p.codigo.includes(q))
-        .sort((a, b) => a.descricao.localeCompare(b.descricao))
-        .slice(0, limit);
-
-      // Enriquece unidade pelo espelho local (ListarPosEstoque nem sempre traz cUnidade)
-      if (itens.some((i) => !i.unidade)) {
-        const locais = await prisma.estoqueItem.findMany({
-          where: { codigoOmie: { in: itens.map((i) => i.codigo) } },
-          select: { codigoOmie: true, unidade: true },
-        });
-        const um = new Map(locais.map((l) => [l.codigoOmie, l.unidade]));
-        itens = itens.map((i) => ({ ...i, unidade: i.unidade || um.get(i.codigo) || "UN" }));
-      }
-
-      return NextResponse.json({
-        itens: itens.map((i) => ({
-          codigo: i.codigo,
-          descricao: decodeEntities(i.descricao),
-          unidade: i.unidade || "UN",
-          saldo: i.saldo,
-        })),
-        origem: "omie-posestoque",
-      });
-    }
-  } catch (e) {
-    console.warn("[buscar-produto] ListarPosEstoque falhou, usando local:", e?.message);
-  }
-
-  // 2) Fallback: EstoqueItem local (se o Omie estiver fora)
+  // 1) LOCAL (instantâneo) — espelho sincronizado de hora em hora
   try {
     const local = await prisma.estoqueItem.findMany({
       where: {
@@ -135,16 +99,50 @@ export async function GET(req) {
       select: { codigoOmie: true, descricao: true, unidade: true, qtdAtual: true },
       orderBy: { descricao: "asc" },
     });
+    if (local.length > 0) {
+      return NextResponse.json({
+        itens: local.map((p) => ({
+          codigo: p.codigoOmie,
+          descricao: decodeEntities(p.descricao),
+          unidade: p.unidade,
+          saldo: p.qtdAtual ?? null,
+        })),
+        origem: "estoque-local",
+      });
+    }
+  } catch (e) {
+    console.warn("[buscar-produto] local falhou:", e?.message);
+  }
+
+  // 2) Fallback AO VIVO — item recém-cadastrado ainda não sincronizado
+  try {
+    const lista = await getPosicaoEstoque();
+    const qn = q.toLowerCase();
+    const qDigits = q.replace(/\D/g, "");
+    let itens = lista
+      .filter((p) => p.descricao.toLowerCase().includes(qn) || (qDigits && p.codigo.includes(qDigits)) || p.codigo.includes(q))
+      .sort((a, b) => a.descricao.localeCompare(b.descricao))
+      .slice(0, limit);
+
+    if (itens.some((i) => !i.unidade)) {
+      const locais = await prisma.estoqueItem.findMany({
+        where: { codigoOmie: { in: itens.map((i) => i.codigo) } },
+        select: { codigoOmie: true, unidade: true },
+      });
+      const um = new Map(locais.map((l) => [l.codigoOmie, l.unidade]));
+      itens = itens.map((i) => ({ ...i, unidade: i.unidade || um.get(i.codigo) || "UN" }));
+    }
+
     return NextResponse.json({
-      itens: local.map((p) => ({
-        codigo: p.codigoOmie,
-        descricao: decodeEntities(p.descricao),
-        unidade: p.unidade,
-        saldo: p.qtdAtual ?? null,
+      itens: itens.map((i) => ({
+        codigo: i.codigo,
+        descricao: decodeEntities(i.descricao),
+        unidade: i.unidade || "UN",
+        saldo: i.saldo,
       })),
-      origem: "estoque-local-fallback",
+      origem: "omie-posestoque",
     });
   } catch (e) {
-    return NextResponse.json({ itens: [], origem: "erro", erro: e?.message });
+    return NextResponse.json({ itens: [], origem: "omie-erro", erro: e?.message });
   }
 }
