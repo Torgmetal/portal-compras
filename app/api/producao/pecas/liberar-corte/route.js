@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
+// Liberação em lote pode ter milhares de peças — dá folga além dos 10s padrão.
+export const maxDuration = 60;
+
 const MAQUINAS_VALIDAS = ["LASER_CHAPA", "LASER_PERFIL", "LASER_TUBO", "LASER_CANTONEIRA", "CORTE_MANUAL"];
 
 const schema = z.object({
@@ -40,16 +43,26 @@ export async function POST(req) {
     let atualizados = 0;
 
     if (!reverter && maquinas && Object.keys(maquinas).length > 0) {
-      // Liberar: atualiza maquina + status peça a peça (pra cada uma ter sua maquina correta)
+      // Liberar com máquina por peça: AGRUPA por máquina e faz UM updateMany por
+      // grupo (~5 máquinas + 1 sem máquina). Antes era 1 update por peça →
+      // milhares de round-trips ao Neon estouravam o timeout (504).
+      const porMaquina = new Map(); // maquina | null -> ids[]
       for (const id of ids) {
         const maq = maquinas[id] || null;
+        if (!porMaquina.has(maq)) porMaquina.set(maq, []);
+        porMaquina.get(maq).push(id);
+      }
+      const CHUNK = 500;
+      for (const [maq, grupoIds] of porMaquina) {
         const data = { status: statusPara };
         if (maq) data.maquina = maq;
-        const r = await prisma.pecaConjunto.updateMany({
-          where: { id, status: statusDe },
-          data,
-        });
-        atualizados += r.count;
+        for (let i = 0; i < grupoIds.length; i += CHUNK) {
+          const r = await prisma.pecaConjunto.updateMany({
+            where: { id: { in: grupoIds.slice(i, i + CHUNK) }, status: statusDe },
+            data,
+          });
+          atualizados += r.count;
+        }
       }
     } else {
       // Sem maquinas ou reverter: batch update só status
