@@ -87,6 +87,7 @@ export default function TarefasClient() {
   const [semana, setSemana] = useState(semanaInit);
   const [ano, setAno] = useState(anoInit);
   const [filtroSetor, setFiltroSetor] = useState("");
+  const [filtroOp, setFiltroOp] = useState("");
   const [modalNova, setModalNova] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -120,7 +121,9 @@ export default function TarefasClient() {
     setLoading(true);
     setErro("");
     try {
-      const params = new URLSearchParams({ semana, ano });
+      const params = new URLSearchParams();
+      if (filtroOp.trim()) params.set("op", filtroOp.trim());
+      else { params.set("semana", semana); params.set("ano", ano); }
       if (filtroSetor) params.set("setor", filtroSetor);
       const res = await fetch(`/api/planejamento/tarefas?${params}`);
       if (!res.ok) throw new Error("Erro ao carregar");
@@ -131,7 +134,7 @@ export default function TarefasClient() {
     } finally {
       setLoading(false);
     }
-  }, [semana, ano, filtroSetor]);
+  }, [semana, ano, filtroSetor, filtroOp]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -170,7 +173,7 @@ export default function TarefasClient() {
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">Tarefas</h2>
           <p className="text-xs text-torg-gray mt-0.5">
-            {aba === "semanais" ? `Acompanhamento por setor — Semana ${semana}/${ano}` : "Atividades dos cronogramas ativos"}
+            {aba === "semanais" ? (filtroOp.trim() ? `Tarefas da OP-${filtroOp.trim().padStart(3, "0")} — todas as semanas` : `Acompanhamento por setor — Semana ${semana}/${ano}`) : "Atividades dos cronogramas ativos"}
           </p>
         </div>
         {aba === "semanais" && (
@@ -212,22 +215,24 @@ export default function TarefasClient() {
       {/* Filtros */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
         <Filter size={14} className="text-torg-gray" />
-        <div className="flex items-center gap-1">
+        <div className={`flex items-center gap-1 ${filtroOp.trim() ? "opacity-40" : ""}`} title={filtroOp.trim() ? "Filtrando por OP — semana ignorada" : ""}>
           <label className="text-[10px] text-torg-gray">Semana:</label>
-          <input type="number" value={semana} onChange={(e) => setSemana(+e.target.value)} min={1} max={53}
-            className="w-14 px-2 py-1 border border-gray-300 rounded text-xs text-center" />
+          <input type="number" value={semana} onChange={(e) => setSemana(+e.target.value)} min={1} max={53} disabled={!!filtroOp.trim()}
+            className="w-14 px-2 py-1 border border-gray-300 rounded text-xs text-center disabled:bg-gray-50" />
           <span className="text-torg-gray">/</span>
-          <input type="number" value={ano} onChange={(e) => setAno(+e.target.value)} min={2024}
-            className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-center" />
+          <input type="number" value={ano} onChange={(e) => setAno(+e.target.value)} min={2024} disabled={!!filtroOp.trim()}
+            className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-center disabled:bg-gray-50" />
         </div>
         <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value)}
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white">
           <option value="">Todos setores</option>
           {SETORES.map((s) => <option key={s} value={s}>{SETOR_LABEL[s]}</option>)}
         </select>
-        <button onClick={() => { setSemana(semanaInit); setAno(anoInit); setFiltroSetor(""); }}
+        <input value={filtroOp} onChange={(e) => setFiltroOp(e.target.value.replace(/[^\dA-Za-z]/g, ""))} placeholder="Filtrar por OP (ex: 84)"
+          className="w-36 px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:border-torg-blue outline-none" />
+        <button onClick={() => { setSemana(semanaInit); setAno(anoInit); setFiltroSetor(""); setFiltroOp(""); }}
           className="text-xs text-torg-gray hover:text-torg-dark ml-auto">
-          Semana atual
+          Limpar
         </button>
         <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
           <button onClick={() => setVista("kanban")} title="Kanban"
