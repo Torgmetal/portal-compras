@@ -40,7 +40,7 @@ export async function POST(req) {
 
   const opNumero = parsed.opNumero;
   if (!opNumero) {
-    return NextResponse.json({ error: "Nao foi possivel detectar o numero da OP. Informe manualmente." }, { status: 400 });
+    return NextResponse.json({ error: "Não consegui detectar a OP pelas marcas (provavelmente seguem a nomenclatura do cliente). Selecione a OP na lista acima e importe de novo." }, { status: 400 });
   }
 
   const totalPecas = parsed.conjuntos.length + parsed.croquis.length + parsed.avulsas.length;

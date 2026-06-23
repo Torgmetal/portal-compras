@@ -2071,18 +2071,34 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
   const [opForcada, setOpForcada] = useState("");
   const [sobrescrever, setSobrescrever] = useState(false);
   const [resultado, setResultado] = useState(null);
+  const [rows, setRows] = useState(null);
+  const [importando, setImportando] = useState(false);
 
-  async function processar(file) {
+  // Passo 1: só lê a planilha pra memória (não importa ainda). Assim dá pra
+  // escolher a OP depois sem precisar subir o arquivo de novo.
+  async function lerArquivo(file) {
     if (!file) return;
-    setErro("");
-    setParsing(true);
-    setArquivoNome(file.name);
+    setErro(""); setResultado(null); setParsing(true); setArquivoNome(file.name);
     try {
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array", cellDates: true });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false });
+      setRows(XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, blankrows: false }));
+    } catch (e) {
+      setErro("Não consegui ler a planilha: " + e.message);
+      setRows(null);
+    } finally {
+      setParsing(false);
+    }
+  }
 
+  // Passo 2: importa de fato. Se a OP não foi escolhida e não dá pra detectar
+  // pela marca (LPC com marcação do cliente), o erro volta aqui e o arquivo
+  // continua carregado — é só escolher a OP e clicar de novo.
+  async function importar() {
+    if (!rows) { setErro("Selecione o arquivo LPC primeiro."); return; }
+    setErro(""); setImportando(true);
+    try {
       const res = await fetch("/api/producao/pecas/importar-lpc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2099,7 +2115,7 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
     } catch (e) {
       setErro(e.message);
     } finally {
-      setParsing(false);
+      setImportando(false);
     }
   }
 
@@ -2160,35 +2176,45 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
                 </p>
                 <button
                   onClick={() => fileRef.current?.click()}
-                  disabled={parsing}
+                  disabled={parsing || importando}
                   className="px-4 py-1.5 bg-torg-dark text-white text-xs rounded-lg hover:bg-torg-dark/90 font-medium inline-flex items-center gap-2 disabled:opacity-50"
                 >
                   {parsing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                  {parsing ? "Processando..." : "Selecionar arquivo"}
+                  {parsing ? "Lendo..." : rows ? "Trocar arquivo" : "Selecionar arquivo"}
                 </button>
                 <input
                   ref={fileRef}
                   type="file"
                   accept=".xlsx,.xls"
                   className="hidden"
-                  onChange={(e) => { processar(e.target.files?.[0]); e.target.value = ""; }}
+                  onChange={(e) => { lerArquivo(e.target.files?.[0]); e.target.value = ""; }}
                 />
                 {arquivoNome && (
-                  <p className="text-[11px] text-torg-gray mt-2 truncate">{arquivoNome}</p>
+                  <p className="text-[11px] text-torg-gray mt-2 truncate">
+                    {arquivoNome}{rows ? ` · ${rows.length} linhas lidas` : ""}
+                  </p>
                 )}
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-torg-dark mb-1">
-                  Forçar OP (opcional — o parser detecta automaticamente pela marca)
+                  OP desta LPC
                 </label>
-                <input
-                  type="text"
+                <select
                   value={opForcada}
-                  onChange={(e) => setOpForcada(e.target.value.toUpperCase())}
-                  placeholder="Ex: T82A"
-                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
-                />
+                  onChange={(e) => setOpForcada(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white"
+                >
+                  <option value="">Detectar automaticamente pela marca (T82A…)</option>
+                  {ops.map((o) => (
+                    <option key={o.id} value={o.numero}>
+                      {fmtOP(o.numero)}{o.cliente ? ` — ${o.cliente}` : ""}{o.obra ? ` · ${o.obra}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-torg-gray mt-1">
+                  Deixe em "detectar" para LPCs com marcação Torg. <strong>Selecione a OP</strong> quando as marcas seguem a nomenclatura do cliente (o parser não consegue adivinhar a OP).
+                </p>
               </div>
 
               <label className="flex items-start gap-2 text-xs text-torg-gray">
@@ -2203,10 +2229,20 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
             </>
           )}
         </div>
-        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end">
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">
             {resultado ? "Fechar" : "Cancelar"}
           </button>
+          {!resultado && (
+            <button
+              onClick={importar}
+              disabled={!rows || importando || parsing}
+              className="px-4 py-1.5 text-sm bg-torg-blue text-white rounded-lg hover:bg-torg-blue/90 font-medium inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {importando ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {importando ? "Importando..." : "Importar"}
+            </button>
+          )}
         </div>
       </div>
     </div>
