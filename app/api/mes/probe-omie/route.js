@@ -28,31 +28,29 @@ export async function GET(req) {
   if ((req.headers.get("authorization") || "").slice(7) !== process.env.MES_SYNC_API_KEY) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q") || "";
-  const out = { q, semFiltro: null, comFiltro: null, posicao: {} };
+  const out = { calls: {} };
+
+  // Testa várias chamadas pra isolar qual traz dados
+  const testes = [
+    { nome: "ProdResumido_min",  url: URL_PROD, call: "ListarProdutosResumido", param: { pagina: 1, registros_por_pagina: 5 } },
+    { nome: "ProdResumido_napi", url: URL_PROD, call: "ListarProdutosResumido", param: { pagina: 1, registros_por_pagina: 5, apenas_importado_api: "N" } },
+    { nome: "ListarProdutos",    url: URL_PROD, call: "ListarProdutos",          param: { pagina: 1, registros_por_pagina: 5 } },
+    { nome: "PosEstoque",        url: URL_ESTOQUE, call: "ListarPosEstoque",      param: { nPagina: 1, nRegPorPagina: 5, dDataPosicao: hojeBR() } },
+  ];
   let prod = null;
-
-  // 1) Lista SEM filtro — ver campos reais (codigo, codigo_produto, descricao)
-  try {
-    const r = await omie(URL_PROD, "ListarProdutosResumido", {
-      pagina: 1, registros_por_pagina: 5, apenas_importado_api: "N",
-    });
-    const lista = r.produto_servico_resumido || r.produto_resumido || [];
-    out.semFiltro = { faultstring: r.faultstring || null, total: r.total_de_registros, amostra: lista.slice(0, 3) };
-    prod = lista[0] || null;
-  } catch (e) { out.semFiltro = { erro: e.message }; }
-
-  // 2) Filtro por descrição parcial — usa q, ou uma palavra da 1a descrição
-  const termo = q || (prod?.descricao || "").trim().split(/\s+/)[0] || "";
-  if (termo) {
+  for (const t of testes) {
     try {
-      const r = await omie(URL_PROD, "ListarProdutosResumido", {
-        pagina: 1, registros_por_pagina: 5, apenas_importado_api: "N", filtrar_apenas_descricao: termo,
-      });
-      const lista = r.produto_servico_resumido || r.produto_resumido || [];
-      out.comFiltro = { termo, faultstring: r.faultstring || null, total: r.total_de_registros, amostra: lista.slice(0, 3) };
-    } catch (e) { out.comFiltro = { termo, erro: e.message }; }
+      const r = await omie(t.url, t.call, t.param);
+      const chaves = r && typeof r === "object" ? Object.keys(r) : [];
+      const lista = r.produto_servico_resumido || r.produto_resumido || r.produto_servico_cadastro || r.produtos || [];
+      out.calls[t.nome] = {
+        faultstring: r.faultstring || null,
+        total: r.total_de_registros ?? r.nTotRegistros ?? null,
+        chaves,
+        amostra: Array.isArray(lista) ? lista.slice(0, 2) : null,
+      };
+      if (!prod && Array.isArray(lista) && lista.length) prod = lista[0];
+    } catch (e) { out.calls[t.nome] = { erro: e.message }; }
   }
 
   // 2) Saldo ao vivo por produto — testa calls/params candidatos
