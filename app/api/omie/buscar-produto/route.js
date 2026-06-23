@@ -7,8 +7,9 @@
 // 2) Fallback AO VIVO (estoque/consulta ListarPosEstoque, cache 60s) só quando o
 //    local não acha nada — cobre item recém-cadastrado entre as sincronizações.
 //
-// Obs.: o endpoint geral/produtos (ListarProdutos/Resumido) retorna 0 com a API
-// key atual, por isso a fonte de produtos é a posição de estoque.
+// Matching por PALAVRAS (não substring exata): "lente proteção 25mm" casa com
+// "LENTE DE PROTEÇÃO - 25.4MM X 4MM". Tokens de dimensão (25mm, 34x5) são
+// ignorados no AND (variam). Busca por código só quando o texto é um código.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -26,6 +27,21 @@ function decodeEntities(s) {
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
     .replace(/&amp;/g, "&");
+}
+
+const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+// Texto parece um CÓDIGO (sem espaço, tem dígito) → busca por código.
+const ehCodigo = (q) => { const t = q.trim(); return /^[a-z0-9.\-/]{3,}$/i.test(t) && /\d/.test(t) && !/\s/.test(t); };
+// Tokens significativos: têm letra e não são dimensão pura (ex: 25mm, 25.4mm, 34x5).
+function tokensSig(q) {
+  const toks = norm(q).split(/[\s\-_,./]+/).filter((t) => t.length >= 2);
+  const sig = toks.filter((t) => /[a-z]/.test(t) && !/^\d+(?:[.,]\d+)?(?:mm|cm|m|kg|g|l|ml|pol|")?$/.test(t));
+  return sig.length ? sig : toks;
+}
+// Produto casa com a busca (por palavras na descrição).
+function casaDesc(descricao, sig) {
+  const d = norm(descricao);
+  return sig.every((t) => d.includes(t));
 }
 
 function hojeBR() {
@@ -85,27 +101,30 @@ export async function GET(req) {
   const limit = Math.min(Number(searchParams.get("limit") || 20), 50);
   if (q.length < 2) return NextResponse.json({ itens: [], origem: "vazio" });
 
-  // 1) LOCAL (instantâneo) — espelho sincronizado de hora em hora
+  const porCodigo = ehCodigo(q);
+  const sig = tokensSig(q);
+  const maiorToken = [...sig].sort((a, b) => b.length - a.length)[0] || q;
+
+  // 1) LOCAL (instantâneo)
   try {
-    const local = await prisma.estoqueItem.findMany({
-      where: {
-        ativo: true,
-        OR: [
-          { descricao: { contains: q, mode: "insensitive" } },
-          { codigoOmie: { contains: q } },
-        ],
-      },
-      take: limit,
-      select: { codigoOmie: true, descricao: true, unidade: true, qtdAtual: true },
-      orderBy: { descricao: "asc" },
-    });
-    if (local.length > 0) {
+    let candidatos;
+    if (porCodigo) {
+      candidatos = await prisma.estoqueItem.findMany({
+        where: { ativo: true, codigoOmie: { contains: q } },
+        take: limit, select: { codigoOmie: true, descricao: true, unidade: true, qtdAtual: true }, orderBy: { descricao: "asc" },
+      });
+    } else {
+      // Busca ampla pela maior palavra, depois filtra por TODAS as palavras em JS
+      const brutos = await prisma.estoqueItem.findMany({
+        where: { ativo: true, descricao: { contains: maiorToken, mode: "insensitive" } },
+        take: 300, select: { codigoOmie: true, descricao: true, unidade: true, qtdAtual: true }, orderBy: { descricao: "asc" },
+      });
+      candidatos = brutos.filter((p) => casaDesc(p.descricao, sig)).slice(0, limit);
+    }
+    if (candidatos.length > 0) {
       return NextResponse.json({
-        itens: local.map((p) => ({
-          codigo: p.codigoOmie,
-          descricao: decodeEntities(p.descricao),
-          unidade: p.unidade,
-          saldo: p.qtdAtual ?? null,
+        itens: candidatos.map((p) => ({
+          codigo: p.codigoOmie, descricao: decodeEntities(p.descricao), unidade: p.unidade, saldo: p.qtdAtual ?? null,
         })),
         origem: "estoque-local",
       });
@@ -117,10 +136,8 @@ export async function GET(req) {
   // 2) Fallback AO VIVO — item recém-cadastrado ainda não sincronizado
   try {
     const lista = await getPosicaoEstoque();
-    const qn = q.toLowerCase();
-    const qDigits = q.replace(/\D/g, "");
     let itens = lista
-      .filter((p) => p.descricao.toLowerCase().includes(qn) || (qDigits && p.codigo.includes(qDigits)) || p.codigo.includes(q))
+      .filter((p) => (porCodigo ? p.codigo.includes(q) : casaDesc(p.descricao, sig)))
       .sort((a, b) => a.descricao.localeCompare(b.descricao))
       .slice(0, limit);
 
@@ -134,12 +151,7 @@ export async function GET(req) {
     }
 
     return NextResponse.json({
-      itens: itens.map((i) => ({
-        codigo: i.codigo,
-        descricao: decodeEntities(i.descricao),
-        unidade: i.unidade || "UN",
-        saldo: i.saldo,
-      })),
+      itens: itens.map((i) => ({ codigo: i.codigo, descricao: decodeEntities(i.descricao), unidade: i.unidade || "UN", saldo: i.saldo })),
       origem: "omie-posestoque",
     });
   } catch (e) {
