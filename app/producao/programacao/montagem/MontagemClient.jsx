@@ -42,6 +42,9 @@ const fmtMm = (v) => {
   return `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} mm`;
 };
 
+// Ordenação NATURAL (numérica): 1,2,3,…,10,11 em vez de 1,10,11,12,2.
+const cmpNatural = (a, b) => String(a ?? "").localeCompare(String(b ?? ""), undefined, { numeric: true, sensitivity: "base" });
+
 // Prontidão do conjunto para MONTAGEM (regra do Vitor):
 //   PRONTO    = todos os croquis 100% cortados
 //   LIBERAVEL = todos os croquis com PELO MENOS METADE cortada — a montagem
@@ -88,6 +91,7 @@ function calcularProntidao(conjunto) {
     });
   }
 
+  itens.sort((a, b) => cmpNatural(a.marca, b.marca));
   const pct = total > 0 ? Math.round((atendidos / total) * 100) : 0;
   const pronto = atendidos === total && total > 0;
   const liberavel = !pronto && total > 0 && comMetade === total;
@@ -111,7 +115,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
   // OPs disponíveis (que têm conjuntos)
   const opsDisponiveis = useMemo(() => {
     const set = new Set(conjuntos.map((c) => c.opNumero));
-    return [...set].sort();
+    return [...set].sort(cmpNatural);
   }, [conjuntos]);
 
   // Enriquecer conjuntos com dados de prontidão
@@ -144,7 +148,7 @@ export default function MontagemClient({ conjuntosIniciais, userRole, apontament
         ) return false;
       }
       return true;
-    });
+    }).sort((a, b) => cmpNatural(a.opNumero, b.opNumero) || cmpNatural(a.marca, b.marca));
   }, [conjuntosEnriquecidos, filtroOp, filtroStatus, filtroProntidao, busca]);
 
   // Contadores
