@@ -245,10 +245,27 @@ model PlanejamentoCarga {
   op           OP                      @relation(fields: [opId], references: [id])
   romaneio     Romaneio?               @relation(fields: [romaneioId], references: [id])
   itens        PlanejamentoCargaItem[]
+  historico    PlanejamentoCargaHistorico[]
 
   @@index([opId])
   @@index([status])
   @@index([dataPrevista])
+}
+
+// Registro de mudanças de uma carga (data, quantidade por item, status).
+model PlanejamentoCargaHistorico {
+  id        String            @id @default(cuid())
+  cargaId   String
+  campo     String            // "data" | "qtd" | "status" | "criacao"
+  descricao String
+  de        String?
+  para      String?
+  userId    String?
+  userName  String?
+  createdAt DateTime          @default(now())
+  carga     PlanejamentoCarga @relation(fields: [cargaId], references: [id], onDelete: Cascade)
+
+  @@index([cargaId])
 }
 
 model PlanejamentoCargaItem {

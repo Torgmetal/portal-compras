@@ -38,6 +38,7 @@ export async function GET(req) {
         orderBy: { createdAt: "asc" },
       },
       romaneio: { select: { id: true, numero: true, data: true, pesoRealKg: true } },
+      historico: { orderBy: { createdAt: "desc" }, take: 100 },
     },
     orderBy: { dataPrevista: "desc" },
   });
