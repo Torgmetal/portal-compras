@@ -146,7 +146,7 @@ async function handle(req, { permitirImport }) {
       const wb = XLSX.read(buffer, { type: "buffer" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-      const parsed = parseLPC(rows);
+      const parsed = parseLPC(rows, { opNumeroForcado: item.obra });
       if (parsed.erro) { resultados.push({ obra: item.obra, nome: item.nome, erro: parsed.erro }); continue; }
       const res = await importarLpcParsed(parsed, { sobrescrever: true, userId: user.id });
       resultados.push({ obra: item.obra, nome: item.nome, ...res });

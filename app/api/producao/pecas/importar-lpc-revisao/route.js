@@ -153,7 +153,9 @@ export async function POST(req) {
   let parsed;
   try {
     const rows = await baixarLpcRows(driveId, item.id);
-    parsed = parseLPC(rows);
+    // Usa a obra que o usuário escolheu (não depende do auto-detect, que falha
+    // quando as marcas do arquivo não têm um prefixo comum claro).
+    parsed = parseLPC(rows, { opNumeroForcado: obra });
     if (parsed.erro) throw new Error(parsed.erro);
   } catch (e) {
     return NextResponse.json({ error: `Falha ao ler ${item.nome}: ${e.message}` }, { status: 422 });
