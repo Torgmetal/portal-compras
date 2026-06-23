@@ -65,6 +65,7 @@ function ordenarPorPrazo(arr) {
     return (ordem[a.prioridade] ?? 1) - (ordem[b.prioridade] ?? 1);
   });
 }
+const emailValido = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || "").trim());
 
 function getISOWeek() {
   const d = new Date();
@@ -91,30 +92,13 @@ export default function TarefasClient() {
   const [modalNova, setModalNova] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [enviandoLembrete, setEnviandoLembrete] = useState(null);
   const [toast, setToast] = useState(null);
   const [avisarTarefa, setAvisarTarefa] = useState(null);
+  const [lembreteTarefa, setLembreteTarefa] = useState(null);
 
   function showToast(msg, tipo = "sucesso") {
     setToast({ msg, tipo });
     setTimeout(() => setToast(null), 4000);
-  }
-
-  async function enviarLembrete(tarefa) {
-    setEnviandoLembrete(tarefa.id);
-    try {
-      const res = await fetch(`/api/planejamento/tarefas/${tarefa.id}/lembrete`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao enviar");
-      const nomes = data.destinatarios?.length > 0
-        ? data.destinatarios.join(", ")
-        : `${data.enviados} pessoa(s)`;
-      showToast(`Lembrete enviado para ${nomes}`, "sucesso");
-    } catch (e) {
-      showToast(e.message, "erro");
-    } finally {
-      setEnviandoLembrete(null);
-    }
   }
 
   const carregar = useCallback(async () => {
@@ -307,9 +291,7 @@ export default function TarefasClient() {
                             {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                           </select>
                           {t.doCliente && <button onClick={() => setAvisarTarefa(t)} className="text-gray-300 hover:text-torg-orange p-0.5" title="Avisar/cobrar cliente por e-mail"><Building2 size={12} /></button>}
-                          <button onClick={() => enviarLembrete(t)} disabled={enviandoLembrete === t.id} className="text-gray-300 hover:text-torg-blue p-0.5 disabled:opacity-50" title="Lembrete por e-mail">
-                            {enviandoLembrete === t.id ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />}
-                          </button>
+                          <button onClick={() => setLembreteTarefa(t)} className="text-gray-300 hover:text-torg-blue p-0.5" title="Enviar lembrete / escolher destinatários"><Bell size={12} /></button>
                           <button onClick={() => setConfirmDelete(t)} className="text-gray-300 hover:text-red-500 p-0.5" title="Excluir"><Trash2 size={12} /></button>
                         </div>
                       </div>
@@ -368,12 +350,11 @@ export default function TarefasClient() {
                           {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
                         <button
-                          onClick={() => enviarLembrete(t)}
-                          disabled={enviandoLembrete === t.id}
-                          className="text-gray-300 hover:text-torg-blue p-1 disabled:opacity-50"
-                          title="Enviar lembrete por e-mail"
+                          onClick={() => setLembreteTarefa(t)}
+                          className="text-gray-300 hover:text-torg-blue p-1"
+                          title="Enviar lembrete / escolher destinatários"
                         >
-                          {enviandoLembrete === t.id ? <Loader2 size={13} className="animate-spin" /> : <Bell size={13} />}
+                          <Bell size={13} />
                         </button>
                         <button onClick={() => setConfirmDelete(t)} className="text-gray-300 hover:text-red-500 p-1">
                           <Trash2 size={13} />
@@ -405,6 +386,15 @@ export default function TarefasClient() {
           tarefa={avisarTarefa}
           onClose={() => setAvisarTarefa(null)}
           onEnviado={(msg) => { setAvisarTarefa(null); showToast(msg, "sucesso"); carregar(); }}
+          onErro={(msg) => showToast(msg, "erro")}
+        />
+      )}
+
+      {lembreteTarefa && (
+        <ModalLembrete
+          tarefa={lembreteTarefa}
+          onClose={() => setLembreteTarefa(null)}
+          onEnviado={(msg) => { setLembreteTarefa(null); showToast(msg, "sucesso"); carregar(); }}
           onErro={(msg) => showToast(msg, "erro")}
         />
       )}
@@ -588,6 +578,119 @@ function ModalAvisarCliente({ tarefa, onClose, onEnviado, onErro }) {
           <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
           <button onClick={enviar} disabled={enviando || !email.includes("@")} className="px-4 py-1.5 bg-torg-orange text-white text-sm rounded-lg hover:opacity-90 font-medium flex items-center gap-1.5 disabled:opacity-50">
             {enviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} {enviando ? "Enviando..." : "Enviar ao cliente"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: enviar lembrete escolhendo destinatários (setor + cliente) ─────────
+function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
+  const [contatos, setContatos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sel, setSel] = useState([]);
+  const [avulso, setAvulso] = useState("");
+  const [mensagem, setMensagem] = useState("");
+  const [incluirCliente, setIncluirCliente] = useState(false);
+  const [clienteEmail, setClienteEmail] = useState(tarefa.clienteEmail || "");
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/planejamento/comunicacao")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { const cs = j?.matriz?.[tarefa.setor]?.contatos || []; setContatos(cs); setSel(cs.map((c) => c.email)); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [tarefa.setor]);
+
+  const toggle = (email) => setSel((s) => (s.includes(email) ? s.filter((e) => e !== email) : [...s, email]));
+  const addAvulso = () => {
+    const e = avulso.trim().toLowerCase();
+    if (!emailValido(e)) return;
+    if (!sel.includes(e)) setSel((s) => [...s, e]);
+    if (!contatos.some((c) => c.email === e)) setContatos((cs) => [...cs, { nome: "", email: e }]);
+    setAvulso("");
+  };
+
+  async function enviar() {
+    const emails = [...new Set(sel)];
+    const comCliente = incluirCliente && emailValido(clienteEmail);
+    if (emails.length === 0 && !comCliente) { onErro("Escolha ao menos um destinatário."); return; }
+    setEnviando(true);
+    try {
+      const partes = [];
+      if (emails.length) {
+        const r = await fetch(`/api/planejamento/tarefas/${tarefa.id}/lembrete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emails, mensagem: mensagem.trim() || undefined }) });
+        const j = await r.json();
+        if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao enviar lembrete");
+        partes.push(`${j.enviados} interno(s)`);
+      }
+      if (comCliente) {
+        const r = await fetch(`/api/planejamento/tarefas/${tarefa.id}/avisar-cliente`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clienteEmail: clienteEmail.trim(), mensagem: mensagem.trim() || undefined }) });
+        const j = await r.json();
+        if (!r.ok || !j.success) throw new Error(j.error || "Erro ao avisar cliente");
+        partes.push("cliente");
+      }
+      onEnviado(`Enviado para ${partes.join(" + ")}`);
+    } catch (e) { onErro(e.message); } finally { setEnviando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[88vh] overflow-y-auto">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><Bell size={15} className="text-torg-blue" /> Enviar lembrete</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-sm font-semibold text-torg-dark">{tarefa.titulo}</p>
+            <p className="text-[11px] text-torg-gray mt-0.5">{SETOR_LABEL[tarefa.setor] || tarefa.setor}{tarefa.opNumero ? ` · ${fmtOP(tarefa.opNumero)}` : ""}</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-torg-dark mb-1.5">Quem recebe — {SETOR_LABEL[tarefa.setor] || tarefa.setor}</label>
+            {loading ? (
+              <p className="text-[12px] text-torg-gray flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> carregando contatos…</p>
+            ) : (
+              <div className="space-y-1">
+                {contatos.map((c) => (
+                  <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
+                    <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
+                    {c.nome ? `${c.nome} ` : ""}<span className="text-torg-gray">{c.email}</span>
+                  </label>
+                ))}
+                {contatos.length === 0 && <p className="text-[11px] text-amber-600">Sem contatos na matriz deste setor — adicione um e-mail abaixo ou configure a <a href="/planejamento/comunicacao" className="underline">Matriz de comunicação</a>.</p>}
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-2">
+              <input value={avulso} onChange={(e) => setAvulso(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAvulso(); } }} placeholder="adicionar e-mail avulso" className="flex-1 text-[12px] border border-gray-300 rounded-lg px-2 py-1.5" />
+              <button type="button" onClick={addAvulso} disabled={!avulso.includes("@")} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark disabled:opacity-40">adicionar</button>
+            </div>
+          </div>
+
+          {tarefa.doCliente && (
+            <div className="border border-orange-200 bg-orange-50/50 rounded-lg p-3">
+              <label className="flex items-center gap-2 text-[12px] font-semibold text-torg-orange cursor-pointer">
+                <input type="checkbox" checked={incluirCliente} onChange={(e) => setIncluirCliente(e.target.checked)} className="accent-torg-orange" />
+                <Building2 size={13} /> Também avisar o cliente
+              </label>
+              {incluirCliente && (
+                <>
+                  <input value={clienteEmail} onChange={(e) => setClienteEmail(e.target.value)} placeholder="e-mail do cliente" className="w-full mt-2 text-[12px] border border-gray-300 rounded-lg px-2 py-1.5" />
+                  <p className="text-[10px] text-torg-gray mt-1">O cliente recebe um e-mail com botões de 1 clique (Já concluí / Informar nova data).</p>
+                </>
+              )}
+            </div>
+          )}
+
+          <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={2} placeholder="Mensagem (opcional)" className="w-full text-[12px] border border-gray-300 rounded-lg px-2 py-1.5" />
+        </div>
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 sticky bottom-0">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
+          <button onClick={enviar} disabled={enviando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50">
+            {enviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Enviar
           </button>
         </div>
       </div>
