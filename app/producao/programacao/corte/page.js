@@ -11,9 +11,12 @@ export default async function ProgramacaoCorte() {
 
   const [pecas, ops] = await Promise.all([
     prisma.pecaConjunto.findMany({
+      // só peças LPC ainda em produção (expedidas não se programam no corte) —
+      // mantém o conjunto enxuto e evita truncar OPs novas pelo limite.
+      where: { fonte: "LPC_IMPORT", status: { not: "EXPEDIDO" } },
       orderBy: [{ opNumero: "asc" }, { marca: "asc" }],
       include: { op: { select: { id: true, numero: true, cliente: true, obra: true } } },
-      take: 5000,
+      take: 15000,
     }),
     prisma.oP.findMany({
       where: { status: { notIn: ["ENCERRADA", "CANCELADA"] } },
