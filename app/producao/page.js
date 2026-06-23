@@ -16,10 +16,13 @@ const POS_CORTE = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDI
 export default async function PainelProducao() {
   await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO", "PCP", "PLANEJAMENTO"]);
 
-  // "Hoje"/mês no fuso da fábrica (Syneco grava 00:00 BRT = 03:00Z)
+  // "Hoje"/mês na janela do dia do Syneco. As datas do Syneco são gravadas como
+  // BRT sem offset (UTC-naïve) → o dia é [dia 00:00Z, dia+1 00:00Z), igual ao
+  // "Relatório do dia".
   const hojeIso = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-  const hojeBRT = new Date(hojeIso + "T03:00:00Z");
-  const inicioMes = new Date(hojeIso.slice(0, 7) + "-01T03:00:00Z");
+  const hojeBRT = new Date(hojeIso + "T00:00:00.000Z");
+  const hojeFim = new Date(hojeBRT.getTime() + 86400000);
+  const inicioMes = new Date(hojeIso.slice(0, 7) + "-01T00:00:00.000Z");
   const [ano, mes, dia] = hojeIso.split("-").map(Number);
   const diasNoMes = new Date(ano, mes, 0).getDate();
   // ~12 semanas atrás para a evolução
@@ -38,24 +41,25 @@ export default async function PainelProducao() {
       select: { setor: true, valorMensal: true },
     }),
 
-    // Syneco: apontado HOJE por setor
-    prisma.mesOrdem.groupBy({
+    // Syneco: APONTADO hoje por setor (apontamentos do dia — não o cumulativo das
+    // ordens; mesOrdem inflava setores com ordens de vários dias).
+    prisma.mesApontamento.groupBy({
       by: ["setor"],
-      where: { setor: { in: SETORES_SYNECO }, pesoProduzido: { gt: 0 }, dataFim: { gte: hojeBRT } },
-      _sum: { pesoProduzido: true, produzidoUn: true },
+      where: { setor: { in: SETORES_SYNECO }, produzidoUn: { gt: 0 }, dataFim: { gte: hojeBRT, lt: hojeFim } },
+      _sum: { produzidoKg: true, produzidoUn: true },
     }),
 
     // Syneco: apontado no MÊS por setor
-    prisma.mesOrdem.groupBy({
+    prisma.mesApontamento.groupBy({
       by: ["setor"],
-      where: { setor: { in: SETORES_SYNECO }, pesoProduzido: { gt: 0 }, dataFim: { gte: inicioMes } },
-      _sum: { pesoProduzido: true },
+      where: { setor: { in: SETORES_SYNECO }, produzidoUn: { gt: 0 }, dataFim: { gte: inicioMes } },
+      _sum: { produzidoKg: true },
     }),
 
     // Syneco: peso apontado (todos setores) nas últimas ~12 semanas → evolução
-    prisma.mesOrdem.findMany({
-      where: { pesoProduzido: { gt: 0 }, dataFim: { gte: inicio12sem } },
-      select: { dataFim: true, pesoProduzido: true },
+    prisma.mesApontamento.findMany({
+      where: { produzidoUn: { gt: 0 }, dataFim: { gte: inicio12sem } },
+      select: { dataFim: true, produzidoKg: true },
     }),
 
     listarFurosApontamento(),
@@ -92,9 +96,9 @@ export default async function PainelProducao() {
     const meta = metas.find((m) => m.setor === s);
     return {
       setor: s,
-      hojeKg: hoje?._sum.pesoProduzido || 0,
+      hojeKg: hoje?._sum.produzidoKg || 0,
       hojeUn: hoje?._sum.produzidoUn || 0,
-      mesKg: mesAgg?._sum.pesoProduzido || 0,
+      mesKg: mesAgg?._sum.produzidoKg || 0,
       metaKg: meta?.valorMensal || 0,
     };
   });
@@ -103,7 +107,7 @@ export default async function PainelProducao() {
   const semMap = {};
   for (const r of synSemanaRaw) {
     const wk = isoWeekString(new Date(r.dataFim));
-    semMap[wk] = (semMap[wk] || 0) + (r.pesoProduzido || 0);
+    semMap[wk] = (semMap[wk] || 0) + (r.produzidoKg || 0);
   }
   const semanas = Object.entries(semMap)
     .map(([semana, kg]) => ({ semana, kg }))
