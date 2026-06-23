@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { normalizeSetorSyneco, janelaDiaBRT } from "@/lib/syneco-dia";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,8 @@ export async function GET(req) {
   const url = new URL(req.url);
   const dataStr = url.searchParams.get("data") || new Date().toISOString().slice(0, 10);
 
-  // Limites do dia no fuso de Brasília (UTC-3)
-  const inicioDia = new Date(dataStr + "T00:00:00.000-03:00");
-  const fimDia   = new Date(dataStr + "T23:59:59.999-03:00");
+  // Limites do dia no fuso de Brasília (UTC-3) — lib compartilhada com o painel
+  const { inicio: inicioDia, fim: fimDia } = janelaDiaBRT(dataStr);
 
   // Mês/ano para buscar metas
   // Usar o dataStr diretamente para evitar confusão de timezone
@@ -65,19 +65,7 @@ export async function GET(req) {
 
   // 4) Resumo do dia por setor
   const SETORES = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
-  const normalize = (s) => {
-    if (!s) return null;
-    const up = s.toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-    // Mapeia variações do Syneco para setores do portal
-    if (up.includes("CORTE") || up.includes("SERRA") || up.includes("PLASMA") || up.includes("OXICO")) return "CORTE";
-    if (up.includes("MONTAG")) return "MONTAGEM";
-    if (up.includes("SOLDA") || up.includes("MIG") || up.includes("MAG") || up.includes("TIG")) return "SOLDA";
-    if (up.includes("ACABAMENTO") || up.includes("ESMERIL") || up.includes("LIXAMENTO")) return "ACABAMENTO";
-    if (up.includes("JATO") || up.includes("GRANALHA")) return "JATO";
-    if (up.includes("PINTURA") || up.includes("PRIMER")) return "PINTURA";
-    if (up.includes("EXPEDICAO") || up.includes("EXPEDIDO") || up.includes("CARREGAMENTO")) return "EXPEDICAO";
-    return up; // retorna original se não mapear
-  };
+  const normalize = normalizeSetorSyneco; // lib compartilhada com o painel
 
   const resumoDia = {};
   for (const s of SETORES) resumoDia[s] = { totalKg: 0, totalUn: 0, count: 0 };

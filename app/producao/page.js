@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/session";
 import { isoWeekString } from "@/lib/semana";
 import { listarFurosApontamento, resumoCorteAtivo } from "@/lib/conjuntos-setor";
 import { carregarSolicitacoes } from "@/lib/solicitacao-producao";
+import { normalizeSetorSyneco, janelaDiaBRT } from "@/lib/syneco-dia";
 import PainelProducaoClient from "./PainelProducaoClient";
 
 export const metadata = { title: "Workspace Torg — Painel de Produção" };
@@ -16,17 +17,17 @@ const POS_CORTE = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDI
 export default async function PainelProducao() {
   await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO", "PCP", "PLANEJAMENTO"]);
 
-  // "Hoje"/mês na janela do dia do Syneco. As datas do Syneco são gravadas como
-  // BRT sem offset (UTC-naïve) → o dia é [dia 00:00Z, dia+1 00:00Z), igual ao
-  // "Relatório do dia".
+  // "Hoje"/mês na MESMA janela do Relatório do dia (fuso de Brasília, por
+  // dataInicio). A lib compartilhada garante que painel e relatório batem.
   const hojeIso = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-  const hojeBRT = new Date(hojeIso + "T00:00:00.000Z");
-  const hojeFim = new Date(hojeBRT.getTime() + 86400000);
-  const inicioMes = new Date(hojeIso.slice(0, 7) + "-01T00:00:00.000Z");
+  const { inicio: inicioDia, fim: fimDia } = janelaDiaBRT(hojeIso);
   const [ano, mes, dia] = hojeIso.split("-").map(Number);
+  const mesStr = String(mes).padStart(2, "0");
   const diasNoMes = new Date(ano, mes, 0).getDate();
-  // ~12 semanas atrás para a evolução
-  const inicio12sem = new Date(hojeBRT);
+  const inicioMes = new Date(`${ano}-${mesStr}-01T00:00:00.000-03:00`);
+  const fimMes = new Date(`${ano}-${mesStr}-${String(diasNoMes).padStart(2, "0")}T23:59:59.999-03:00`);
+  // ~12 semanas atrás para a evolução (também por dataInicio, BRT)
+  const inicio12sem = new Date(inicioDia);
   inicio12sem.setUTCDate(inicio12sem.getUTCDate() - 84);
 
   const umDiaAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -41,25 +42,26 @@ export default async function PainelProducao() {
       select: { setor: true, valorMensal: true },
     }),
 
-    // Syneco: APONTADO hoje por setor (apontamentos do dia — não o cumulativo das
-    // ordens; mesOrdem inflava setores com ordens de vários dias).
+    // Syneco: apontado HOJE por setor — MESMA conta do Relatório do dia
+    // (mesApontamento por dataInicio, janela BRT). Os nomes crus do Syneco
+    // (Serra/Plasma→Corte, MIG/MAG/TIG→Solda…) são normalizados no JS abaixo.
     prisma.mesApontamento.groupBy({
       by: ["setor"],
-      where: { setor: { in: SETORES_SYNECO }, produzidoUn: { gt: 0 }, dataFim: { gte: hojeBRT, lt: hojeFim } },
+      where: { dataInicio: { gte: inicioDia, lte: fimDia } },
       _sum: { produzidoKg: true, produzidoUn: true },
     }),
 
-    // Syneco: apontado no MÊS por setor
+    // Syneco: apontado no MÊS por setor (idem relatório: dataInicio, janela BRT)
     prisma.mesApontamento.groupBy({
       by: ["setor"],
-      where: { setor: { in: SETORES_SYNECO }, produzidoUn: { gt: 0 }, dataFim: { gte: inicioMes } },
-      _sum: { produzidoKg: true },
+      where: { dataInicio: { gte: inicioMes, lte: fimMes } },
+      _sum: { produzidoKg: true, produzidoUn: true },
     }),
 
     // Syneco: peso apontado (todos setores) nas últimas ~12 semanas → evolução
     prisma.mesApontamento.findMany({
-      where: { produzidoUn: { gt: 0 }, dataFim: { gte: inicio12sem } },
-      select: { dataFim: true, produzidoKg: true },
+      where: { dataInicio: { gte: inicio12sem } },
+      select: { dataInicio: true, produzidoKg: true },
     }),
 
     listarFurosApontamento(),
@@ -89,24 +91,39 @@ export default async function PainelProducao() {
   // Corte: só croquis ainda não consumidos (conjunto subiu pra montagem → baixa)
   pipe.CORTE = { pecas: corteAtivo.count, kg: corteAtivo.kg };
 
-  // ── Syneco por setor (hoje/mês) + meta ──
+  // ── Syneco por setor (hoje/mês) + meta ── normaliza os nomes crus do Syneco
+  // para o setor canônico (igual ao Relatório do dia) e soma.
+  const hojeMap = {};
+  for (const r of synHojeRaw) {
+    const n = normalizeSetorSyneco(r.setor);
+    if (!n) continue;
+    (hojeMap[n] ||= { kg: 0, un: 0 });
+    hojeMap[n].kg += r._sum.produzidoKg || 0;
+    hojeMap[n].un += r._sum.produzidoUn || 0;
+  }
+  const mesMap = {};
+  for (const r of synMesRaw) {
+    const n = normalizeSetorSyneco(r.setor);
+    if (!n) continue;
+    mesMap[n] = (mesMap[n] || 0) + (r._sum.produzidoKg || 0);
+  }
   const setores = SETORES_SYNECO.map((s) => {
-    const hoje = synHojeRaw.find((r) => r.setor === s);
-    const mesAgg = synMesRaw.find((r) => r.setor === s);
+    const k = s.toUpperCase();
+    const h = hojeMap[k] || { kg: 0, un: 0 };
     const meta = metas.find((m) => m.setor === s);
     return {
       setor: s,
-      hojeKg: hoje?._sum.produzidoKg || 0,
-      hojeUn: hoje?._sum.produzidoUn || 0,
-      mesKg: mesAgg?._sum.produzidoKg || 0,
+      hojeKg: h.kg,
+      hojeUn: h.un,
+      mesKg: mesMap[k] || 0,
       metaKg: meta?.valorMensal || 0,
     };
   });
 
-  // ── Evolução semanal (peso apontado por semana ISO) ──
+  // ── Evolução semanal (peso apontado por semana ISO, por dataInicio) ──
   const semMap = {};
   for (const r of synSemanaRaw) {
-    const wk = isoWeekString(new Date(r.dataFim));
+    const wk = isoWeekString(new Date(r.dataInicio));
     semMap[wk] = (semMap[wk] || 0) + (r.produzidoKg || 0);
   }
   const semanas = Object.entries(semMap)
