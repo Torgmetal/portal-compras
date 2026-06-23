@@ -597,12 +597,12 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
-    fetch("/api/planejamento/comunicacao")
+    fetch(`/api/planejamento/tarefas/${tarefa.id}/lembrete`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { const cs = j?.matriz?.[tarefa.setor]?.contatos || []; setContatos(cs); setSel(cs.map((c) => c.email)); })
+      .then((j) => { const cs = j?.sugeridos || []; setContatos(cs); setSel(cs.map((c) => c.email)); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [tarefa.setor]);
+  }, [tarefa.id]);
 
   const toggle = (email) => setSel((s) => (s.includes(email) ? s.filter((e) => e !== email) : [...s, email]));
   const addAvulso = () => {
@@ -659,9 +659,10 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
                   <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
                     <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
                     {c.nome ? `${c.nome} ` : ""}<span className="text-torg-gray">{c.email}</span>
+                    {c.origem === "matriz" && <span className="text-[9px] text-torg-gray/70">· matriz</span>}
                   </label>
                 ))}
-                {contatos.length === 0 && <p className="text-[11px] text-amber-600">Sem contatos na matriz deste setor — adicione um e-mail abaixo ou configure a <a href="/planejamento/comunicacao" className="underline">Matriz de comunicação</a>.</p>}
+                {contatos.length === 0 && <p className="text-[11px] text-amber-600">Nenhuma pessoa no setor nem na matriz — adicione um e-mail abaixo ou configure a <a href="/planejamento/comunicacao" className="underline">Matriz de comunicação</a>.</p>}
               </div>
             )}
             <div className="flex items-center gap-2 mt-2">

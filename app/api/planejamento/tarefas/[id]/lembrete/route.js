@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { criarCompromissosDaTarefa } from "@/lib/compromissos";
+import { getContatosSetor } from "@/lib/comunicacao-setor";
 
 // Mapeamento setor da tarefa → modulo do sistema (para buscar usuarios)
 const SETOR_MODULO = {
@@ -35,6 +36,33 @@ const SETOR_LABEL = {
 };
 
 const PRIORIDADE_LABEL = { ALTA: "🔴 Alta", MEDIA: "🟡 Média", BAIXA: "🟢 Baixa" };
+
+// GET — destinatários sugeridos p/ o modal: pessoas do setor (usuários com o
+// módulo) + contatos da matriz, deduplicados. Assim dá pra escolher os internos.
+export async function GET(req, { params }) {
+  try {
+    await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ error: e.message }, { status });
+  }
+
+  const tarefa = await prisma.tarefaPlanejamento.findUnique({ where: { id: params.id }, select: { setor: true } });
+  if (!tarefa) return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 });
+
+  const modulo = SETOR_MODULO[tarefa.setor] || tarefa.setor;
+  const usuarios = await prisma.user.findMany({
+    where: { ativo: true, modulos: { some: { modulo } } },
+    select: { name: true, email: true },
+  });
+  const matriz = await getContatosSetor(tarefa.setor).catch(() => []);
+
+  const map = new Map();
+  for (const u of usuarios) if (u.email) map.set(u.email.toLowerCase(), { nome: u.name || "", email: u.email, origem: "setor" });
+  for (const c of matriz) if (c.email && !map.has(c.email.toLowerCase())) map.set(c.email.toLowerCase(), { nome: c.nome || "", email: c.email, origem: "matriz" });
+
+  return NextResponse.json({ setor: tarefa.setor, sugeridos: [...map.values()] });
+}
 
 export async function POST(req, { params }) {
   let user;
