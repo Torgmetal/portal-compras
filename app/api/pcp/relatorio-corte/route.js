@@ -19,7 +19,19 @@ function situacao(prog, prod) {
   return "Pendente";
 }
 
-const FIELDS = { op: true, descItem: true, planejadoUn: true, produzidoUn: true, saldoUn: true, pesoProduzido: true, dataInicio: true, dataFim: true, maquina: true, operador: true };
+const FIELDS = { obra: true, op: true, descItem: true, planejadoUn: true, produzidoUn: true, saldoUn: true, pesoProduzido: true, dataInicio: true, dataFim: true, maquina: true, operador: true };
+const mapItem = (r) => ({
+  obra: limpo(r.obra),
+  peca: limpo(r.op),
+  descricao: limpo(r.descItem),
+  programado: r.planejadoUn || 0,
+  cortado: r.produzidoUn || 0,
+  saldo: r.saldoUn || 0,
+  situacao: situacao(r.planejadoUn || 0, r.produzidoUn || 0),
+  data: r.dataFim,
+  maquina: limpo(r.maquina),
+  operador: limpo(r.operador),
+});
 
 export async function GET(req) {
   try {
@@ -32,6 +44,7 @@ export async function GET(req) {
   const obra = url.searchParams.get("obra");
   const de = url.searchParams.get("de");
   const ate = url.searchParams.get("ate");
+  const todas = url.searchParams.get("todas"); // extrai TODAS as peças de todas as OPs (flat)
 
   const base = { setor: { contains: "orte", mode: "insensitive" } };
   if (de || ate) {
@@ -40,55 +53,41 @@ export async function GET(req) {
     if (ate) base.dataFim.lte = new Date(`${ate}T23:59:59`);
   }
 
-  // Linhas de corte do Syneco para uma obra da LPC: tenta obra exata; senão, obra-pai
-  // (sem a sub-letra final) + marca começando com a obra (T82A → obra T82, op T82A*).
-  async function corteRows(o) {
-    let rows = await prisma.mesOrdem.findMany({ where: { ...base, obra: o }, select: FIELDS });
-    if (!rows.length) {
-      const pai = o.replace(/[A-Za-z]+$/, "");
-      if (pai && pai !== o) rows = await prisma.mesOrdem.findMany({ where: { ...base, obra: pai, op: { startsWith: o } }, select: FIELDS });
-    }
-    return rows;
+  // TODAS as peças de todas as OPs, em uma lista só (para extração geral)
+  if (todas) {
+    const rows = await prisma.mesOrdem.findMany({
+      where: base, select: FIELDS, take: 20000,
+      orderBy: [{ obra: "asc" }, { dataFim: "desc" }],
+    });
+    return NextResponse.json({ todas: true, total: rows.length, itens: rows.map(mapItem) });
   }
 
-  // Obras com lista no portal
-  const lpc = await prisma.pecaConjunto.findMany({ distinct: ["opNumero"], select: { opNumero: true } });
-  const lpcObras = lpc.map((x) => x.opNumero).filter(Boolean);
-
+  // Resumo por OP/frente — TODAS as obras que têm corte no Syneco
   if (!obra) {
-    const obras = [];
-    for (const o of lpcObras) {
-      const rows = await corteRows(o);
-      const prog = rows.reduce((s, r) => s + (r.planejadoUn || 0), 0);
-      const cort = rows.reduce((s, r) => s + (r.produzidoUn || 0), 0);
-      const peso = rows.reduce((s, r) => s + (r.pesoProduzido || 0), 0);
-      let ultima = null;
-      for (const r of rows) if (r.dataFim && (!ultima || r.dataFim > ultima)) ultima = r.dataFim;
-      obras.push({ obra: o, pecas: rows.length, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(peso), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima });
-    }
+    const grupos = await prisma.mesOrdem.groupBy({
+      by: ["obra"], where: base,
+      _sum: { planejadoUn: true, produzidoUn: true, pesoProduzido: true },
+      _count: { _all: true }, _max: { dataFim: true },
+    });
+    const obras = grupos.filter((g) => g.obra).map((g) => {
+      const prog = g._sum.planejadoUn || 0, cort = g._sum.produzidoUn || 0;
+      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim };
+    });
     obras.sort((a, b) => (b.ultima ? +new Date(b.ultima) : 0) - (a.ultima ? +new Date(a.ultima) : 0));
     return NextResponse.json({ obras });
   }
 
-  // Detalhe — só permite obras da LPC
-  if (!lpcObras.includes(obra)) {
-    return NextResponse.json({ obra, total: 0, cortadas: 0, parciais: 0, pendentes: 0, programadoUn: 0, cortadoUn: 0, itens: [] });
+  // Detalhe de uma OP — exata; senão obra-pai (T82A → obra T82, op T82A*)
+  let rows = await prisma.mesOrdem.findMany({ where: { ...base, obra }, select: FIELDS });
+  if (!rows.length) {
+    const pai = obra.replace(/[A-Za-z]+$/, "");
+    if (pai && pai !== obra) rows = await prisma.mesOrdem.findMany({ where: { ...base, obra: pai, op: { startsWith: obra } }, select: FIELDS });
   }
-  const rows = (await corteRows(obra)).sort((a, b) => {
+  rows.sort((a, b) => {
     const da = a.dataFim ? +new Date(a.dataFim) : -1, db = b.dataFim ? +new Date(b.dataFim) : -1;
     return db - da || String(a.op).localeCompare(String(b.op));
   });
-  const itens = rows.map((r) => ({
-    peca: limpo(r.op),
-    descricao: limpo(r.descItem),
-    programado: r.planejadoUn || 0,
-    cortado: r.produzidoUn || 0,
-    saldo: r.saldoUn || 0,
-    situacao: situacao(r.planejadoUn || 0, r.produzidoUn || 0),
-    data: r.dataFim,
-    maquina: limpo(r.maquina),
-    operador: limpo(r.operador),
-  }));
+  const itens = rows.map(mapItem);
   return NextResponse.json({
     obra,
     total: itens.length,
