@@ -2648,6 +2648,33 @@ model ComunicacaoSetor {
   updatedAt DateTime @updatedAt
 }
 
+// Lista Avançada de Expedição importada do SharePoint (1 por frente). marcasJson
+// guarda a tabela de marcas parseada (aba PROJETO). Atualizada a cada revisão.
+model ListaExpedicao {
+  id               String    @id @default(cuid())
+  frente           String    @unique // T36, T94A… (ou OP-94 quando o arquivo não tem prefixo)
+  opNumero         String?
+  opId             String?
+  arquivo          String
+  revisao          String?
+  itemId           String?   // id do arquivo no SharePoint (re-download)
+  fileModificado   DateTime?
+  hash             String?   // sha1 do conteúdo (detectar mudança)
+  marcas           Int       @default(0)
+  qtdItens         Int       @default(0)
+  pesoContratado   Float     @default(0)
+  pesoExpedido     Float     @default(0)
+  pesoFaltante     Float     @default(0)
+  expedidasArquivo Int       @default(0)
+  marcasJson       Json      @default("[]")
+  importadoEm      DateTime  @default(now())
+  importadoPorId   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([opNumero])
+}
+
 model NecessidadeSemanal {
   id          String   @id @default(cuid())
   semanaIso   Int
