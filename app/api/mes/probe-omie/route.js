@@ -29,19 +29,31 @@ export async function GET(req) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q") || "parafuso";
-  const out = { q, produtos: null, posicao: {} };
+  const q = searchParams.get("q") || "";
+  const out = { q, semFiltro: null, comFiltro: null, posicao: {} };
+  let prod = null;
 
-  // 1) Busca produtos por descricao (confirma que traz itens, inclusive novos)
+  // 1) Lista SEM filtro — ver campos reais (codigo, codigo_produto, descricao)
   try {
     const r = await omie(URL_PROD, "ListarProdutosResumido", {
-      pagina: 1, registros_por_pagina: 5, apenas_importado_api: "N", filtrar_apenas_descricao: q,
+      pagina: 1, registros_por_pagina: 5, apenas_importado_api: "N",
     });
     const lista = r.produto_servico_resumido || r.produto_resumido || [];
-    out.produtos = { faultstring: r.faultstring || null, total: r.total_de_registros, amostra: lista.slice(0, 3) };
-    // pega o 1o produto pra testar saldo
-    var prod = lista[0] || null;
-  } catch (e) { out.produtos = { erro: e.message }; }
+    out.semFiltro = { faultstring: r.faultstring || null, total: r.total_de_registros, amostra: lista.slice(0, 3) };
+    prod = lista[0] || null;
+  } catch (e) { out.semFiltro = { erro: e.message }; }
+
+  // 2) Filtro por descrição parcial — usa q, ou uma palavra da 1a descrição
+  const termo = q || (prod?.descricao || "").trim().split(/\s+/)[0] || "";
+  if (termo) {
+    try {
+      const r = await omie(URL_PROD, "ListarProdutosResumido", {
+        pagina: 1, registros_por_pagina: 5, apenas_importado_api: "N", filtrar_apenas_descricao: termo,
+      });
+      const lista = r.produto_servico_resumido || r.produto_resumido || [];
+      out.comFiltro = { termo, faultstring: r.faultstring || null, total: r.total_de_registros, amostra: lista.slice(0, 3) };
+    } catch (e) { out.comFiltro = { termo, erro: e.message }; }
+  }
 
   // 2) Saldo ao vivo por produto — testa calls/params candidatos
   if (prod) {
