@@ -15,20 +15,33 @@ export async function GET(req, { params }) {
   const lista = await prisma.listaExpedicao.findUnique({ where: { id: params.id } });
   if (!lista) return NextResponse.json({ error: "Lista não encontrada" }, { status: 404 });
 
-  // Cruza cada marca com a produção (onde a peça está na fábrica)
+  // Onde a peça está na fábrica: setor REAL derivado do Syneco ao vivo (setor mais
+  // avançado com apontamento) — o status armazenado fica só como fallback.
   const marcas = Array.isArray(lista.marcasJson) ? lista.marcasJson : [];
   const norm = (m) => String(m || "").trim().toUpperCase();
+  const SYN_SETOR = { "Corte": "CORTE", "Montagem": "MONTAGEM", "Solda": "SOLDA", "Acabamento": "ACABAMENTO", "Jato": "JATO", "Pintura": "PINTURA" };
+  const ORDEM = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
   const pecaPorMarca = new Map();
+  const synPorMarca = new Map();
   if (lista.opId) {
-    const pecas = await prisma.pecaConjunto.findMany({
-      where: { opId: lista.opId },
-      select: { marca: true, status: true, ultimoSetor: true },
-    });
+    const pecas = await prisma.pecaConjunto.findMany({ where: { opId: lista.opId }, select: { marca: true, status: true } });
     for (const p of pecas) if (p.marca) pecaPorMarca.set(norm(p.marca), p);
+    const syn = await prisma.mesOrdem.groupBy({ by: ["item", "setor"], where: { opId: lista.opId, produzidoUn: { gt: 0 }, setor: { in: Object.keys(SYN_SETOR) } }, _sum: { produzidoUn: true } });
+    for (const s of syn) {
+      const st = SYN_SETOR[s.setor]; if (!st) continue;
+      const k = norm(s.item);
+      const cur = synPorMarca.get(k);
+      if (cur === undefined || ORDEM.indexOf(st) > ORDEM.indexOf(cur)) synPorMarca.set(k, st);
+    }
   }
   const marcasJson = marcas.map((m) => {
-    const peca = pecaPorMarca.get(norm(m.marca));
-    const local = peca ? (peca.status || "SEM_STATUS") : (lista.opId ? "SEM_REGISTRO" : "SEM_OP");
+    const k = norm(m.marca);
+    const peca = pecaPorMarca.get(k);
+    let local;
+    if (peca?.status === "EXPEDIDO") local = "EXPEDIDO";       // expedido é do portal (pós-pintura)
+    else if (synPorMarca.has(k)) local = synPorMarca.get(k);   // setor real ao vivo do Syneco
+    else if (peca) local = peca.status || "SEM_STATUS";        // fallback: status armazenado
+    else local = lista.opId ? "SEM_REGISTRO" : "SEM_OP";
     return { ...m, local };
   });
 
