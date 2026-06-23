@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { criarCompromissosDaTarefa } from "@/lib/compromissos";
+import { getContatosSetor } from "@/lib/comunicacao-setor";
 
 // Mapeamento setor da tarefa → modulo do sistema (para buscar usuarios)
 const SETOR_MODULO = {
@@ -36,6 +37,33 @@ const SETOR_LABEL = {
 
 const PRIORIDADE_LABEL = { ALTA: "🔴 Alta", MEDIA: "🟡 Média", BAIXA: "🟢 Baixa" };
 
+// GET — destinatários sugeridos p/ o modal: pessoas do setor (usuários com o
+// módulo) + contatos da matriz, deduplicados. Assim dá pra escolher os internos.
+export async function GET(req, { params }) {
+  try {
+    await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : 403;
+    return NextResponse.json({ error: e.message }, { status });
+  }
+
+  const tarefa = await prisma.tarefaPlanejamento.findUnique({ where: { id: params.id }, select: { setor: true } });
+  if (!tarefa) return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 });
+
+  const modulo = SETOR_MODULO[tarefa.setor] || tarefa.setor;
+  const usuarios = await prisma.user.findMany({
+    where: { ativo: true, modulos: { some: { modulo } } },
+    select: { name: true, email: true },
+  });
+  const matriz = await getContatosSetor(tarefa.setor).catch(() => []);
+
+  const map = new Map();
+  for (const u of usuarios) if (u.email) map.set(u.email.toLowerCase(), { nome: u.name || "", email: u.email, origem: "setor" });
+  for (const c of matriz) if (c.email && !map.has(c.email.toLowerCase())) map.set(c.email.toLowerCase(), { nome: c.nome || "", email: c.email, origem: "matriz" });
+
+  return NextResponse.json({ setor: tarefa.setor, sugeridos: [...map.values()] });
+}
+
 export async function POST(req, { params }) {
   let user;
   try {
@@ -54,25 +82,31 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 });
   }
 
-  // Busca usuarios ativos que tem o modulo correspondente ao setor da tarefa
-  const modulo = SETOR_MODULO[tarefa.setor] || tarefa.setor;
-  const usuarios = await prisma.user.findMany({
-    where: {
-      ativo: true,
-      OR: [
-        { tipo: "ADMIN" },
-        { modulos: { some: { modulo } } },
-      ],
-    },
-    select: { email: true, name: true },
-  });
+  // Destinatários: e-mails escolhidos no modal (se vierem) OU broadcast pro setor
+  let body = {};
+  try { body = await req.json(); } catch {}
+  const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || "").trim().toLowerCase());
+  const mensagemExtra = (body?.mensagem || "").toString().slice(0, 500);
+  const manuais = Array.isArray(body?.emails) ? [...new Set(body.emails.map((e) => String(e).trim().toLowerCase()).filter(emailOk))] : [];
 
-  // Filtra somente quem tem email valido
-  const destinatarios = usuarios.map((u) => u.email).filter(Boolean);
+  let destinatarios, nomesDest;
+  if (manuais.length) {
+    destinatarios = manuais;
+    nomesDest = manuais;
+  } else {
+    // Busca usuarios ativos que tem o modulo correspondente ao setor da tarefa
+    const modulo = SETOR_MODULO[tarefa.setor] || tarefa.setor;
+    const usuarios = await prisma.user.findMany({
+      where: { ativo: true, OR: [{ tipo: "ADMIN" }, { modulos: { some: { modulo } } }] },
+      select: { email: true, name: true },
+    });
+    destinatarios = usuarios.map((u) => u.email).filter(Boolean);
+    nomesDest = usuarios.map((u) => u.name).filter(Boolean);
+  }
 
   if (destinatarios.length === 0) {
     return NextResponse.json(
-      { error: `Nenhum usuário ativo encontrado no setor ${SETOR_LABEL[tarefa.setor] || tarefa.setor}` },
+      { error: manuais.length ? "Nenhum e-mail válido selecionado." : `Nenhum usuário ativo encontrado no setor ${SETOR_LABEL[tarefa.setor] || tarefa.setor}` },
       { status: 400 }
     );
   }
@@ -120,6 +154,7 @@ export async function POST(req, { params }) {
             <td style="padding: 8px 0; color: #002945;">${tarefa.semanaIso}/${tarefa.ano}</td>
           </tr>
         </table>
+        ${mensagemExtra ? `<p style="font-size:13px;color:#002945;background:#eef6fb;border-radius:8px;padding:10px 14px;margin:16px 0 0;">${escapeHtml(mensagemExtra)}</p>` : ""}
         <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 12px; color: #576D7E; margin: 0;">
             Lembrete enviado por <strong>${escapeHtml(user.name || "Planejamento")}</strong> via Workspace Torg.
@@ -168,7 +203,7 @@ export async function POST(req, { params }) {
   return NextResponse.json({
     ok: true,
     enviados: destinatarios.length,
-    destinatarios: usuarios.map((u) => u.name).filter(Boolean),
+    destinatarios: nomesDest,
     compromissosCriados: compromissos.criados,
   });
 }

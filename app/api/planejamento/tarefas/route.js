@@ -23,9 +23,18 @@ export async function GET(req) {
   const semana = parseInt(searchParams.get("semana")) || null;
   const ano = parseInt(searchParams.get("ano")) || null;
   const setor = searchParams.get("setor");
+  const op = (searchParams.get("op") || "").trim();
 
   const where = {};
-  if (semana && ano) { where.semanaIso = semana; where.ano = ano; }
+  if (op) {
+    // filtro por OP: mostra TODAS as semanas dessa OP (ignora semana/ano)
+    const d = op.replace(/\D/g, "");
+    const cands = [...new Set([op, d, d.replace(/^0+/, ""), d.padStart(3, "0"), d.padStart(4, "0")].filter(Boolean))];
+    where.opNumero = { in: cands };
+  } else if (semana && ano) {
+    where.semanaIso = semana;
+    where.ano = ano;
+  }
   if (setor) where.setor = setor;
 
   const tarefas = await prisma.tarefaPlanejamento.findMany({

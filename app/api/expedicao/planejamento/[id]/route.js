@@ -30,6 +30,7 @@ export async function GET(_req, { params }) {
         orderBy: { createdAt: "asc" },
       },
       romaneio: { select: { id: true, numero: true, data: true, pesoRealKg: true } },
+      historico: { orderBy: { createdAt: "desc" }, take: 100 },
     },
   });
 
@@ -50,6 +51,7 @@ const patchSchema = z.object({
   // Atualizar itens individuais (array parcial)
   itens: z.array(z.object({
     id: z.string(),
+    qtdPlanejada: z.number().min(0).optional(),
     qtdCarregada: z.number().min(0).optional(),
     status: z.enum(["PLANEJADO", "CARREGADO", "PARCIAL", "NAO_ENVIADO", "REPROGRAMADO"]).optional(),
     motivoNaoEnvio: z.string().nullable().optional(),
@@ -108,6 +110,17 @@ export async function PATCH(req, { params }) {
     }
   }
 
+  // Histórico das mudanças (data / qtd por item / status)
+  const quem = { userId: user.id, userName: user.name || user.email || null };
+  const fmtD = (d) => new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" });
+  const hist = [];
+  if (updateData.dataPrevista && new Date(updateData.dataPrevista).getTime() !== new Date(atual.dataPrevista).getTime()) {
+    hist.push({ cargaId: params.id, campo: "data", de: fmtD(atual.dataPrevista), para: fmtD(updateData.dataPrevista), descricao: `Data prevista: ${fmtD(atual.dataPrevista)} → ${fmtD(updateData.dataPrevista)}`, ...quem });
+  }
+  if (updateData.status && updateData.status !== atual.status) {
+    hist.push({ cargaId: params.id, campo: "status", de: atual.status, para: updateData.status, descricao: `Status: ${atual.status} → ${updateData.status}`, ...quem });
+  }
+
   // Transacao: atualiza planejamento + itens
   const ops = [];
 
@@ -118,16 +131,26 @@ export async function PATCH(req, { params }) {
   if (body.itens) {
     for (const it of body.itens) {
       const itemUpdate = {};
+      if (it.qtdPlanejada !== undefined) itemUpdate.qtdPlanejada = it.qtdPlanejada;
       if (it.qtdCarregada !== undefined) itemUpdate.qtdCarregada = it.qtdCarregada;
       if (it.status) itemUpdate.status = it.status;
       if (it.motivoNaoEnvio !== undefined) itemUpdate.motivoNaoEnvio = it.motivoNaoEnvio;
       if (it.reprogramadoParaId !== undefined) itemUpdate.reprogramadoParaId = it.reprogramadoParaId;
+
+      if (it.qtdPlanejada !== undefined) {
+        const itAtual = atual.itens.find((x) => x.id === it.id);
+        if (itAtual && Number(itAtual.qtdPlanejada) !== Number(it.qtdPlanejada)) {
+          hist.push({ cargaId: params.id, campo: "qtd", de: String(itAtual.qtdPlanejada), para: String(it.qtdPlanejada), descricao: `Qtd "${itAtual.descricao}": ${itAtual.qtdPlanejada} → ${it.qtdPlanejada}`, ...quem });
+        }
+      }
 
       if (Object.keys(itemUpdate).length > 0) {
         ops.push(prisma.planejamentoCargaItem.update({ where: { id: it.id }, data: itemUpdate }));
       }
     }
   }
+
+  for (const h of hist) ops.push(prisma.planejamentoCargaHistorico.create({ data: h }));
 
   if (ops.length > 0) {
     await prisma.$transaction(ops);

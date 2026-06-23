@@ -4,6 +4,7 @@ import {
   Truck, Plus, Calendar, Package, Wrench, CheckCircle2, Clock,
   AlertTriangle, ChevronDown, ChevronRight, Loader2, X, Search,
   ClipboardList, CircleDot, AlertCircle, ShieldAlert, Ban,
+  Pencil, Save, History,
 } from "lucide-react";
 import { validarProntidaoExpedicao } from "@/lib/expedicao";
 
@@ -158,6 +159,7 @@ export default function PlanejamentoCargaSection({ opId, pecas, acessorios }) {
                         plan={plan}
                         aberto={detalhesAberto === plan.id}
                         onToggle={() => setDetalhesAberto(detalhesAberto === plan.id ? null : plan.id)}
+                        onChanged={carregarPlanejamentos}
                       />
                     ))}
                   </div>
@@ -184,38 +186,67 @@ export default function PlanejamentoCargaSection({ opId, pecas, acessorios }) {
 
 // ─── Card de planejamento individual ─────────────────────────
 
-function PlanCard({ plan, aberto, onToggle }) {
+function PlanCard({ plan, aberto, onToggle, onChanged }) {
   const st = STATUS_PLAN[plan.status] || STATUS_PLAN.PLANEJADO;
   const StIcon = st.Icon;
 
   const totalItens = plan.itens?.length || 0;
-  const carregados = plan.itens?.filter((i) => i.status === "CARREGADO").length || 0;
   const naoEnviados = plan.itens?.filter((i) => i.status === "NAO_ENVIADO").length || 0;
   const pesoEstimado = plan.itens?.reduce((s, i) => s + (i.pesoEstimadoKg || 0), 0) || 0;
+  const historico = plan.historico || [];
+  const podeEditar = plan.status !== "CANCELADO" && plan.status !== "CONCLUIDO";
+
+  const [editando, setEditando] = useState(false);
+  const [data, setData] = useState("");
+  const [qtds, setQtds] = useState({});
+  const [salvando, setSalvando] = useState(false);
+  const [erroEdit, setErroEdit] = useState("");
+  const [histAberto, setHistAberto] = useState(false);
+
+  function iniciarEdicao(e) {
+    e?.stopPropagation();
+    setData(new Date(plan.dataPrevista).toISOString().slice(0, 10));
+    setQtds(Object.fromEntries((plan.itens || []).map((i) => [i.id, i.qtdPlanejada])));
+    setErroEdit("");
+    setEditando(true);
+  }
+
+  async function salvar() {
+    setSalvando(true); setErroEdit("");
+    try {
+      const body = {};
+      const dataOrig = new Date(plan.dataPrevista).toISOString().slice(0, 10);
+      if (data && data !== dataOrig) body.dataPrevista = data;
+      const itensAlt = (plan.itens || [])
+        .filter((it) => qtds[it.id] !== "" && Number(qtds[it.id]) >= 0 && Number(qtds[it.id]) !== Number(it.qtdPlanejada))
+        .map((it) => ({ id: it.id, qtdPlanejada: Number(qtds[it.id]) }));
+      if (itensAlt.length) body.itens = itensAlt;
+      if (Object.keys(body).length === 0) { setEditando(false); return; }
+      const r = await fetch(`/api/expedicao/planejamento/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar");
+      setEditando(false);
+      onChanged?.();
+    } catch (e) { setErroEdit(e.message); } finally { setSalvando(false); }
+  }
 
   return (
     <div className="border border-gray-100 rounded-lg overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/50 text-left"
-      >
-        <div className="flex items-center gap-3">
+      <div className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50/50">
+        <button onClick={onToggle} className="flex items-center gap-3 text-left flex-1 min-w-0">
           {aberto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Calendar size={14} className="text-torg-gray" />
-              <span className="text-sm font-medium text-torg-dark">
-                {fmtData(plan.dataPrevista)}
-              </span>
+              <span className="text-sm font-medium text-torg-dark">{fmtData(plan.dataPrevista)}</span>
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${st.cor}`}>
                 <StIcon size={10} /> {st.label}
               </span>
+              {historico.length > 0 && <span className="text-[10px] text-torg-gray">· {historico.length} alteração(ões)</span>}
             </div>
-            {plan.descricao && (
-              <p className="text-xs text-torg-gray mt-0.5">{plan.descricao}</p>
-            )}
+            {plan.descricao && <p className="text-xs text-torg-gray mt-0.5">{plan.descricao}</p>}
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-3 text-xs text-torg-gray">
           <span>{totalItens} itens</span>
           {pesoEstimado > 0 && <span>{fmtKg(pesoEstimado)}</span>}
@@ -224,15 +255,55 @@ function PlanCard({ plan, aberto, onToggle }) {
               <AlertTriangle size={12} /> {naoEnviados} nao enviados
             </span>
           )}
-          {plan.romaneio && (
-            <span className="text-green-600 font-medium">
-              Rom. {plan.romaneio.numero}
-            </span>
+          {plan.romaneio && <span className="text-green-600 font-medium">Rom. {plan.romaneio.numero}</span>}
+          {podeEditar && !editando && (
+            <button onClick={iniciarEdicao} className="text-torg-blue hover:text-torg-dark flex items-center gap-1" title="Editar data / quantidades">
+              <Pencil size={12} /> Editar
+            </button>
           )}
         </div>
-      </button>
+      </div>
 
-      {aberto && plan.itens && (
+      {/* Edição: data + quantidade a expedir por peça */}
+      {editando && (
+        <div className="border-t border-gray-100 bg-torg-blue-50/30 px-4 py-3 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-xs text-torg-gray">Data prevista:</label>
+            <input type="date" value={data} onChange={(e) => setData(e.target.value)} className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-white/60"><tr>
+                <th className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-400">Item</th>
+                <th className="px-3 py-1.5 text-center text-[10px] font-medium text-gray-400">Qtd a expedir</th>
+                <th className="px-3 py-1.5 text-right text-[10px] font-medium text-gray-400">Peso</th>
+              </tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {(plan.itens || []).map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-3 py-2 text-xs text-torg-dark max-w-[260px] truncate">
+                      {item.descricao}{item.pecaConjunto && <span className="font-mono text-torg-blue ml-1">({item.pecaConjunto.marca})</span>}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input type="number" min={0} step="any" value={qtds[item.id] ?? ""} onChange={(e) => setQtds((q) => ({ ...q, [item.id]: e.target.value }))} className="w-20 text-xs text-center border border-gray-300 rounded px-1.5 py-1 focus:border-torg-blue outline-none" />
+                    </td>
+                    <td className="px-3 py-2 text-right text-xs">{item.pesoEstimadoKg ? fmtKg(item.pesoEstimadoKg) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {erroEdit && <p className="text-xs text-red-600">{erroEdit}</p>}
+          <div className="flex items-center justify-end gap-2">
+            <button onClick={() => setEditando(false)} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-100">Cancelar</button>
+            <button onClick={salvar} disabled={salvando} className="text-xs font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">
+              {salvando ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Salvar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {aberto && !editando && plan.itens && (
         <div className="border-t border-gray-100 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50/60">
@@ -286,6 +357,25 @@ function PlanCard({ plan, aberto, onToggle }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Histórico de mudanças */}
+      {aberto && !editando && historico.length > 0 && (
+        <div className="border-t border-gray-100 px-4 py-2">
+          <button onClick={() => setHistAberto(!histAberto)} className="text-[11px] text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
+            <History size={12} /> Histórico de mudanças ({historico.length}) {histAberto ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+          </button>
+          {histAberto && (
+            <ul className="mt-1.5 space-y-1">
+              {historico.map((h) => (
+                <li key={h.id} className="text-[11px] text-torg-gray flex items-start gap-1.5">
+                  <span className="text-gray-300">•</span>
+                  <span><span className="text-torg-dark">{h.descricao}</span> — {h.userName || "—"} · {new Date(h.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

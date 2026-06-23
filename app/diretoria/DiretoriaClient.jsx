@@ -15,6 +15,7 @@ const fmtOP = (n) => (n ? `OP-${String(n).padStart(3, "0")}` : "—");
 
 const ABAS_BASE = [
   { id: "resumo", label: "Resumo" },
+  { id: "tarefas", label: "Tarefas" },
   { id: "dre", label: "DRE Alvo × Real" },
   { id: "receber", label: "A receber" },
   { id: "pagar", label: "A pagar" },
@@ -178,6 +179,9 @@ export default function DiretoriaClient({ isDono, userNome }) {
         {/* ════════ RESUMO ════════ */}
         {aba === "resumo" && fin && <Resumo fin={fin} />}
 
+        {/* ════════ TAREFAS (acompanhamento / cobrança) ════════ */}
+        {aba === "tarefas" && <TarefasDiretoria />}
+
         {/* ════════ A PAGAR / A RECEBER ════════ */}
         {(aba === "pagar" || aba === "receber") && (
           <div className="space-y-6">
@@ -242,6 +246,119 @@ export default function DiretoriaClient({ isDono, userNome }) {
 }
 
 /* ─────────────────────── PONTOS DE RUPTURA ─────────────────────── */
+const SETOR_LABEL_DIR = { PRODUCAO: "Produção", PINTURA: "Pintura", PCP: "PCP", EXPEDICAO: "Expedição", COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS: "Compras", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro", RH: "RH", PLANEJAMENTO: "Planejamento" };
+
+// Tarefas do Planejamento na Diretoria — foco em cobrar atrasos (setor ou cliente)
+function TarefasDiretoria() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [filtro, setFiltro] = useState("atrasadas"); // "atrasadas" | "todas"
+  const [setor, setSetor] = useState("");
+
+  const carregar = useCallback(async () => {
+    setLoading(true); setErro("");
+    try {
+      const r = await fetch("/api/diretoria/tarefas");
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao carregar");
+      setData(j);
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const todas = data?.tarefas || [];
+  const resumo = data?.resumo || {};
+  const setores = [...new Set(todas.map((t) => t.setor))];
+  let lista = filtro === "atrasadas" ? todas.filter((t) => t.atrasada) : todas;
+  if (setor) lista = lista.filter((t) => t.setor === setor);
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-torg-dark">Tarefas para cobrar</h2>
+          <p className="text-[12px] text-torg-gray">Itens em aberto do Planejamento — atrasados primeiro, para você cobrar setor ou cliente.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/planejamento/tarefas" className="text-xs text-torg-blue hover:underline inline-flex items-center gap-1"><ExternalLink size={13} /> Quadro completo</Link>
+          <button onClick={carregar} className="p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100"><RefreshCw size={15} /></button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      {data && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="px-3 py-1.5 bg-red-50 text-red-700 text-[12px] font-semibold rounded-full border border-red-200 inline-flex items-center gap-1.5"><AlertTriangle size={13} /> {resumo.atrasadas || 0} atrasada(s)</span>
+          {resumo.atrasadasCliente > 0 && <span className="px-3 py-1.5 bg-orange-50 text-torg-orange text-[12px] font-semibold rounded-full border border-orange-200">{resumo.atrasadasCliente} do cliente</span>}
+          <span className="px-3 py-1.5 bg-gray-50 text-torg-gray text-[12px] font-medium rounded-full border border-gray-200">{resumo.total || 0} aberta(s) no total</span>
+        </div>
+      )}
+
+      {/* Filtros */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+          <button onClick={() => setFiltro("atrasadas")} className={`px-3 py-1 text-[12px] rounded ${filtro === "atrasadas" ? "bg-white shadow-sm text-torg-blue font-semibold" : "text-torg-gray"}`}>Só atrasadas</button>
+          <button onClick={() => setFiltro("todas")} className={`px-3 py-1 text-[12px] rounded ${filtro === "todas" ? "bg-white shadow-sm text-torg-blue font-semibold" : "text-torg-gray"}`}>Todas abertas</button>
+        </div>
+        <select value={setor} onChange={(e) => setSetor(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white">
+          <option value="">Todos setores</option>
+          {setores.map((s) => <option key={s} value={s}>{SETOR_LABEL_DIR[s] || s}</option>)}
+        </select>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-torg-gray text-sm"><Loader2 size={20} className="animate-spin mx-auto mb-2" /> Carregando…</div>
+      ) : erro ? (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={carregar} className="ml-auto text-xs underline">tentar de novo</button></div>
+      ) : lista.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-10 text-center">
+          <CheckCircle2 size={30} className="mx-auto text-emerald-500 mb-2" />
+          <p className="text-sm text-torg-gray">{filtro === "atrasadas" ? "Nenhuma tarefa atrasada. Tudo no prazo!" : "Nenhuma tarefa aberta."}</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50/60">
+              <tr>
+                <th className="px-4 py-2 text-left text-[10px] font-semibold text-torg-gray uppercase">Tarefa</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold text-torg-gray uppercase">Responsável</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">OP</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Prazo</th>
+                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Atraso</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {lista.map((t) => (
+                <tr key={t.id} className={`hover:bg-gray-50/50 ${t.atrasada ? "bg-red-50/30" : ""}`}>
+                  <td className="px-4 py-2.5">
+                    <p className="text-[13px] font-medium text-torg-dark">{t.titulo}</p>
+                    {t.responsavel && <p className="text-[10px] text-torg-gray">{t.responsavel}</p>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {t.doCliente ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 text-torg-orange text-[10px] font-semibold rounded border border-orange-200">CLIENTE{t.clienteNome ? ` · ${t.clienteNome}` : ""}</span>
+                    ) : (
+                      <span className="text-[11px] text-torg-dark">{SETOR_LABEL_DIR[t.setor] || t.setor}</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-center"><span className="text-[11px] font-mono text-torg-blue">{t.opNumero ? fmtOP(t.opNumero) : "—"}</span></td>
+                  <td className="px-3 py-2.5 text-center"><span className={`text-[11px] ${t.atrasada ? "text-red-600 font-semibold" : "text-torg-dark"}`}>{fmtDia(t.dataPrevista)}</span></td>
+                  <td className="px-3 py-2.5 text-center">
+                    {t.atrasada
+                      ? <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-bold rounded-full border border-red-200"><AlertTriangle size={10} /> {t.diasAtraso}d</span>
+                      : <span className="text-[10px] text-torg-gray">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Ruptura({ fin, onRefresh }) {
   const { ruptura, previsao } = fin;
   return (
