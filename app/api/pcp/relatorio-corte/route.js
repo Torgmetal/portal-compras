@@ -77,7 +77,9 @@ export async function GET(req) {
       const prog = g._sum.planejadoUn || 0, cort = g._sum.produzidoUn || 0;
       return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra) };
     });
-    obras.sort((a, b) => (b.ultima ? +new Date(b.ultima) : 0) - (a.ultima ? +new Date(a.ultima) : 0));
+    // Ordem numérica da obra, da maior para a menor (T95, T90, T88… ; "1000" no topo).
+    const numObra = (s) => { const m = String(s || "").match(/\d+/); return m ? parseInt(m[0], 10) : -1; };
+    obras.sort((a, b) => numObra(b.obra) - numObra(a.obra) || String(a.obra).localeCompare(String(b.obra), undefined, { numeric: true }));
     return NextResponse.json({ obras });
   }
 
