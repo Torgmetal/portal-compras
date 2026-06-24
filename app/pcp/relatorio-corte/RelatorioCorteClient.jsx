@@ -257,6 +257,19 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
               {exportandoTodas ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Todas as peças (Excel)
             </button>
           )}
+          {isAdmin && detalhe && (detalhe.concluida ? (
+            <button onClick={() => toggleConcluir(detalhe.obra, false)}
+              title="Reabrir — volta a usar o apontamento do Syneco"
+              className="text-sm font-semibold text-amber-700 border border-amber-300 hover:bg-amber-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+              <RotateCcw size={15} /> Reabrir baixa
+            </button>
+          ) : (
+            <button onClick={() => toggleConcluir(detalhe.obra, true)}
+              title="Marca esta OP como 100% concluída no relatório (não altera o Syneco)"
+              className="text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+              <CheckCircle2 size={15} /> Dar baixa (100%)
+            </button>
+          ))}
           <button onClick={exportarExcel} disabled={loading || vazio}
             className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
             <Download size={15} /> Exportar {detalhe ? "OP" : "resumo"}
