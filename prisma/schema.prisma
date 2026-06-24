@@ -3010,12 +3010,15 @@ model Compromisso {
   @@index([tarefaId])
 }
 
-// Obras ocultadas do Relatório de Corte (ex.: OPs já finalizadas). Só some da
-// VISÃO do relatório — nenhum dado de corte é apagado. Toggle restrito ao ADMIN.
+// Obras ocultadas do Relatório de Produção POR SETOR (ex.: OPs já finalizadas
+// num setor). Só some da VISÃO do relatório — nenhum dado é apagado. ADMIN-only.
 model RelatorioCorteObraOculta {
   id           String   @id @default(cuid())
-  obra         String   @unique
+  obra         String
+  setor        String   @default("CORTE")
   ocultadoPor  String?
   ocultadoNome String?
   criadoEm     DateTime @default(now())
+
+  @@unique([obra, setor])
 }

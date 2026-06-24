@@ -17,7 +17,7 @@ const menu = [
   { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
   { href: "/pcp/terceirizados", label: "Terceirizados",   icon: Truck },
   { href: "/pcp/carga-corte",  label: "Carga do Corte",   icon: Gauge },
-  { href: "/pcp/relatorio-corte", label: "Relatório de Corte", icon: FileText },
+  { href: "/pcp/relatorio-corte", label: "Relatório de Produção", icon: FileText },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
   { href: "/pcp/solda",        label: "Solda",            icon: Flame },
   { href: "/pcp/acabamento",   label: "Acabamento",       icon: Sparkles },

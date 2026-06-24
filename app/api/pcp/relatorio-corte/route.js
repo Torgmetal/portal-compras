@@ -1,37 +1,47 @@
-// GET /api/pcp/relatorio-corte?obra=&de=&ate=
-// Relatório de corte: peças PROGRAMADAS e CORTADAS — APENAS das obras que têm lista
-// (LPC / PecaConjunto) no portal. Dados reais do Syneco (MesOrdem, setor Corte):
-// planejado × produzido, situação, data/máquina/operador.
-//   - sem obra → resumo das obras com LPC
+// GET /api/pcp/relatorio-corte?setor=&obra=&de=&ate=
+// Relatório de produção por setor: peças PROGRAMADAS e PRODUZIDAS no setor —
+// dados reais do Syneco (MesOrdem): planejado × produzido, situação, data/máquina/operador.
+//   - setor: CORTE (padrão) | MONTAGEM | SOLDA | ACABAMENTO | JATO | PINTURA
+//   - sem obra → resumo das obras com apontamento no setor
 //   - com obra → detalhe por peça
 // Casamento Syneco: obra exata (T60B) ou obra-pai + marca (T82A → obra T82, op T82A*).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { whereSetorSyneco } from "@/lib/syneco-dia";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
+const SETORES = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
+// Particípio de "concluído no setor" usado na situação da peça.
+const VERBO_SETOR = { CORTE: "Cortada", MONTAGEM: "Montada", SOLDA: "Soldada", ACABAMENTO: "Acabada", JATO: "Jateada", PINTURA: "Pintada" };
+const LABEL_ESTADO = { PARCIAL: "Parcial", PENDENTE: "Pendente" };
+
 const limpo = (v) => (!v || v === "---" ? "—" : v);
-function situacao(prog, prod) {
-  if (prog > 0 && prod >= prog) return "Cortada";
-  if (prod > 0) return "Parcial";
-  return "Pendente";
+function estadoDe(prog, prod) {
+  if (prog > 0 && prod >= prog) return "FEITO";
+  if (prod > 0) return "PARCIAL";
+  return "PENDENTE";
 }
 
 const FIELDS = { obra: true, op: true, descItem: true, planejadoUn: true, produzidoUn: true, saldoUn: true, pesoProduzido: true, dataInicio: true, dataFim: true, maquina: true, operador: true };
-const mapItem = (r) => ({
-  obra: limpo(r.obra),
-  peca: limpo(r.op),
-  descricao: limpo(r.descItem),
-  programado: r.planejadoUn || 0,
-  cortado: r.produzidoUn || 0,
-  saldo: r.saldoUn || 0,
-  situacao: situacao(r.planejadoUn || 0, r.produzidoUn || 0),
-  data: r.dataFim,
-  maquina: limpo(r.maquina),
-  operador: limpo(r.operador),
-});
+const mapItem = (r, verbo) => {
+  const estado = estadoDe(r.planejadoUn || 0, r.produzidoUn || 0);
+  return {
+    obra: limpo(r.obra),
+    peca: limpo(r.op),
+    descricao: limpo(r.descItem),
+    programado: r.planejadoUn || 0,
+    cortado: r.produzidoUn || 0, // produzido no setor (nome mantido p/ o client)
+    saldo: r.saldoUn || 0,
+    estado,
+    situacao: estado === "FEITO" ? verbo : LABEL_ESTADO[estado],
+    data: r.dataFim,
+    maquina: limpo(r.maquina),
+    operador: limpo(r.operador),
+  };
+};
 
 export async function GET(req) {
   try {
@@ -41,12 +51,15 @@ export async function GET(req) {
   }
 
   const url = new URL(req.url);
+  const setorParam = (url.searchParams.get("setor") || "CORTE").toUpperCase();
+  const setor = SETORES.includes(setorParam) ? setorParam : "CORTE";
+  const verbo = VERBO_SETOR[setor];
   const obra = url.searchParams.get("obra");
   const de = url.searchParams.get("de");
   const ate = url.searchParams.get("ate");
   const todas = url.searchParams.get("todas"); // extrai TODAS as peças de todas as OPs (flat)
 
-  const base = { setor: { contains: "orte", mode: "insensitive" } };
+  const base = whereSetorSyneco(setor);
   if (de || ate) {
     base.dataFim = {};
     if (de) base.dataFim.gte = new Date(`${de}T00:00:00`);
@@ -59,10 +72,10 @@ export async function GET(req) {
       where: base, select: FIELDS, take: 20000,
       orderBy: [{ obra: "asc" }, { dataFim: "desc" }],
     });
-    return NextResponse.json({ todas: true, total: rows.length, itens: rows.map(mapItem) });
+    return NextResponse.json({ todas: true, setor, total: rows.length, itens: rows.map((r) => mapItem(r, verbo)) });
   }
 
-  // Resumo por OP/frente — TODAS as obras que têm corte no Syneco
+  // Resumo por OP/frente — TODAS as obras que têm apontamento no setor
   if (!obra) {
     const [grupos, ocultasRows] = await Promise.all([
       prisma.mesOrdem.groupBy({
@@ -70,7 +83,7 @@ export async function GET(req) {
         _sum: { planejadoUn: true, produzidoUn: true, pesoProduzido: true },
         _count: { _all: true }, _max: { dataFim: true },
       }),
-      prisma.relatorioCorteObraOculta.findMany({ select: { obra: true } }),
+      prisma.relatorioCorteObraOculta.findMany({ where: { setor }, select: { obra: true } }),
     ]);
     const ocultas = new Set(ocultasRows.map((o) => o.obra));
     const obras = grupos.filter((g) => g.obra).map((g) => {
@@ -80,7 +93,7 @@ export async function GET(req) {
     // Ordem numérica da obra, da maior para a menor (T95, T90, T88… ; "1000" no topo).
     const numObra = (s) => { const m = String(s || "").match(/\d+/); return m ? parseInt(m[0], 10) : -1; };
     obras.sort((a, b) => numObra(b.obra) - numObra(a.obra) || String(a.obra).localeCompare(String(b.obra), undefined, { numeric: true }));
-    return NextResponse.json({ obras });
+    return NextResponse.json({ setor, obras });
   }
 
   // Detalhe de uma OP — exata; senão obra-pai (T82A → obra T82, op T82A*)
@@ -93,13 +106,14 @@ export async function GET(req) {
     const da = a.dataFim ? +new Date(a.dataFim) : -1, db = b.dataFim ? +new Date(b.dataFim) : -1;
     return db - da || String(a.op).localeCompare(String(b.op));
   });
-  const itens = rows.map(mapItem);
+  const itens = rows.map((r) => mapItem(r, verbo));
   return NextResponse.json({
+    setor,
     obra,
     total: itens.length,
-    cortadas: itens.filter((i) => i.situacao === "Cortada").length,
-    parciais: itens.filter((i) => i.situacao === "Parcial").length,
-    pendentes: itens.filter((i) => i.situacao === "Pendente").length,
+    cortadas: itens.filter((i) => i.estado === "FEITO").length,
+    parciais: itens.filter((i) => i.estado === "PARCIAL").length,
+    pendentes: itens.filter((i) => i.estado === "PENDENTE").length,
     programadoUn: itens.reduce((s, i) => s + i.programado, 0),
     cortadoUn: itens.reduce((s, i) => s + i.cortado, 0),
     itens,
