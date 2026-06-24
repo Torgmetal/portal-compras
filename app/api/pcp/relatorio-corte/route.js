@@ -4,7 +4,8 @@
 //   - setor: CORTE (padrão) | MONTAGEM | SOLDA | ACABAMENTO | JATO | PINTURA
 //   - sem obra → resumo das obras com apontamento no setor
 //   - com obra → detalhe por peça
-// Casamento Syneco: obra exata (T60B) ou obra-pai + marca (T82A → obra T82, op T82A*).
+// Obras marcadas como CONCLUÍDAS (baixa manual de ADM) são forçadas a 100% só na
+// visão (não altera o Syneco/mesOrdem). Casamento: obra exata ou obra-pai + marca.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -26,15 +27,18 @@ function estadoDe(prog, prod) {
 }
 
 const FIELDS = { obra: true, op: true, descItem: true, planejadoUn: true, produzidoUn: true, saldoUn: true, pesoProduzido: true, dataInicio: true, dataFim: true, maquina: true, operador: true };
-const mapItem = (r, verbo) => {
-  const estado = estadoDe(r.planejadoUn || 0, r.produzidoUn || 0);
+const mapItem = (r, verbo, concluidas) => {
+  const concl = concluidas.has(r.obra);
+  const planj = r.planejadoUn || 0;
+  const prod = concl && planj > 0 ? planj : (r.produzidoUn || 0); // baixa manual → 100%
+  const estado = estadoDe(planj, prod);
   return {
     obra: limpo(r.obra),
     peca: limpo(r.op),
     descricao: limpo(r.descItem),
-    programado: r.planejadoUn || 0,
-    cortado: r.produzidoUn || 0, // produzido no setor (nome mantido p/ o client)
-    saldo: r.saldoUn || 0,
+    programado: planj,
+    cortado: prod, // produzido no setor (nome mantido p/ o client)
+    saldo: concl ? Math.max(0, planj - prod) : (r.saldoUn || 0),
     estado,
     situacao: estado === "FEITO" ? verbo : LABEL_ESTADO[estado],
     data: r.dataFim,
@@ -66,13 +70,17 @@ export async function GET(req) {
     if (ate) base.dataFim.lte = new Date(`${ate}T23:59:59`);
   }
 
+  // Obras marcadas como concluídas (baixa manual) neste setor.
+  const concluidasRows = await prisma.relatorioObraConcluida.findMany({ where: { setor }, select: { obra: true } });
+  const concluidas = new Set(concluidasRows.map((o) => o.obra));
+
   // TODAS as peças de todas as OPs, em uma lista só (para extração geral)
   if (todas) {
     const rows = await prisma.mesOrdem.findMany({
       where: base, select: FIELDS, take: 20000,
       orderBy: [{ obra: "asc" }, { dataFim: "desc" }],
     });
-    return NextResponse.json({ todas: true, setor, total: rows.length, itens: rows.map((r) => mapItem(r, verbo)) });
+    return NextResponse.json({ todas: true, setor, total: rows.length, itens: rows.map((r) => mapItem(r, verbo, concluidas)) });
   }
 
   // Resumo por OP/frente — TODAS as obras que têm apontamento no setor
@@ -87,8 +95,10 @@ export async function GET(req) {
     ]);
     const ocultas = new Set(ocultasRows.map((o) => o.obra));
     const obras = grupos.filter((g) => g.obra).map((g) => {
-      const prog = g._sum.planejadoUn || 0, cort = g._sum.produzidoUn || 0;
-      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra) };
+      const concl = concluidas.has(g.obra);
+      const prog = g._sum.planejadoUn || 0;
+      const cort = concl && prog > 0 ? prog : (g._sum.produzidoUn || 0); // baixa manual → 100%
+      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra), concluida: concl };
     });
     // Ordem numérica da obra, da maior para a menor (T95, T90, T88… ; "1000" no topo).
     const numObra = (s) => { const m = String(s || "").match(/\d+/); return m ? parseInt(m[0], 10) : -1; };
@@ -106,10 +116,11 @@ export async function GET(req) {
     const da = a.dataFim ? +new Date(a.dataFim) : -1, db = b.dataFim ? +new Date(b.dataFim) : -1;
     return db - da || String(a.op).localeCompare(String(b.op));
   });
-  const itens = rows.map((r) => mapItem(r, verbo));
+  const itens = rows.map((r) => mapItem(r, verbo, concluidas));
   return NextResponse.json({
     setor,
     obra,
+    concluida: concluidas.has(obra),
     total: itens.length,
     cortadas: itens.filter((i) => i.estado === "FEITO").length,
     parciais: itens.filter((i) => i.estado === "PARCIAL").length,

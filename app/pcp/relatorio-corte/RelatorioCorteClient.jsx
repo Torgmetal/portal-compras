@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Factory, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox, EyeOff, Eye } from "lucide-react";
+import { Factory, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox, EyeOff, Eye, CheckCircle2, RotateCcw } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, adicionarLegenda, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR")} kg`;
@@ -112,6 +112,26 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
     } catch (e) {
       setObras((prev) => prev.map((o) => (o.obra === obraAlvo ? { ...o, oculto: !ocultar } : o)));
       setErro(e.message);
+    }
+  }
+
+  // Baixa manual: marca a OP como 100% concluída no relatório (não toca no Syneco).
+  async function toggleConcluir(obraAlvo, concluir) {
+    setObras((prev) => prev.map((o) => (o.obra === obraAlvo
+      ? { ...o, concluida: concluir, ...(concluir && o.programadoUn > 0 ? { cortadoUn: o.programadoUn, pct: 100 } : {}) }
+      : o)));
+    try {
+      const r = await fetch("/api/pcp/relatorio-corte/concluir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ obra: obraAlvo, setor, concluir }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao dar baixa");
+      carregar(); // recarrega p/ refletir números exatos (e o detalhe, se aberto)
+    } catch (e) {
+      setErro(e.message);
+      carregar();
     }
   }
 
@@ -291,6 +311,11 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
         <div className="text-center py-16 text-torg-gray"><Inbox size={28} className="mx-auto mb-2 opacity-50" /><p className="text-sm">Nenhum apontamento de {info.nome.toLowerCase()}{(de || ate) ? " no período." : "."}</p></div>
       ) : detalhe ? (
         <>
+          {detalhe.concluida && (
+            <div className="mb-3 text-[13px] bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-3 py-2">
+              ✓ OP marcada como <strong>concluída (baixa manual)</strong> — apontamento forçado a 100% no relatório. O Syneco não é alterado.
+            </div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <Kpi label="Programado" valor={`${detalhe.programadoUn.toLocaleString("pt-BR")} un`} />
             <Kpi label={info.acao} valor={`${detalhe.cortadoUn.toLocaleString("pt-BR")} un`} cor="text-emerald-700" />
@@ -344,16 +369,24 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
                 <tr key={o.obra} className={`hover:bg-gray-50/50 ${o.oculto ? "opacity-50" : ""}`}>
                   <td className="px-3 py-2 font-mono font-semibold text-torg-dark whitespace-nowrap">
                     {o.obra}
+                    {o.concluida && <span className="ml-2 align-middle text-[10px] font-sans font-medium text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">✓ baixa manual</span>}
                     {o.oculto && <span className="ml-2 align-middle text-[10px] font-sans font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">oculta</span>}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-torg-gray">{o.pecas}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{o.programadoUn.toLocaleString("pt-BR")}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-emerald-700">{o.cortadoUn.toLocaleString("pt-BR")}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-medium">{o.pct}%</td>
+                  <td className={`px-3 py-2 text-right tabular-nums font-medium ${o.concluida ? "text-emerald-700" : ""}`}>{o.pct}%</td>
                   <td className="px-3 py-2 text-right tabular-nums text-torg-gray">{fmtKg(o.pesoCortado)}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-torg-gray">{fmtData(o.ultima)}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button onClick={() => setObra(o.obra)} className="text-[12px] text-torg-blue hover:text-torg-dark font-medium">ver peças →</button>
+                    {isAdmin && (o.concluida ? (
+                      <button onClick={() => toggleConcluir(o.obra, false)} title="Reabrir — volta a usar o apontamento do Syneco"
+                        className="ml-3 text-[12px] text-amber-700 hover:text-amber-900 font-medium inline-flex items-center gap-1"><RotateCcw size={13} /> reabrir</button>
+                    ) : (
+                      <button onClick={() => toggleConcluir(o.obra, true)} title="Dar baixa — marca a OP como 100% concluída no relatório (não altera o Syneco)"
+                        className="ml-3 text-[12px] text-emerald-700 hover:text-emerald-900 font-medium inline-flex items-center gap-1"><CheckCircle2 size={13} /> baixa 100%</button>
+                    ))}
                     {isAdmin && (o.oculto ? (
                       <button onClick={() => toggleOcultar(o.obra, false)} title="Restaurar no relatório"
                         className="ml-3 text-[12px] text-emerald-700 hover:text-emerald-900 font-medium inline-flex items-center gap-1"><Eye size={13} /> restaurar</button>

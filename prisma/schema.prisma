@@ -3022,3 +3022,17 @@ model RelatorioCorteObraOculta {
 
   @@unique([obra, setor])
 }
+
+// Baixa manual no Relatório de Produção: OP já finalizada cujo apontamento no
+// Syneco ficou incompleto. Marca a obra/setor como 100% concluída SÓ na visão
+// do relatório (não altera o Syneco nem o mesOrdem; sobrevive ao sync). ADMIN-only.
+model RelatorioObraConcluida {
+  id            String   @id @default(cuid())
+  obra          String
+  setor         String   @default("CORTE")
+  concluidoPor  String?
+  concluidoNome String?
+  criadoEm      DateTime @default(now())
+
+  @@unique([obra, setor])
+}
