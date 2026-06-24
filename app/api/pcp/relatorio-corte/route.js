@@ -64,14 +64,18 @@ export async function GET(req) {
 
   // Resumo por OP/frente — TODAS as obras que têm corte no Syneco
   if (!obra) {
-    const grupos = await prisma.mesOrdem.groupBy({
-      by: ["obra"], where: base,
-      _sum: { planejadoUn: true, produzidoUn: true, pesoProduzido: true },
-      _count: { _all: true }, _max: { dataFim: true },
-    });
+    const [grupos, ocultasRows] = await Promise.all([
+      prisma.mesOrdem.groupBy({
+        by: ["obra"], where: base,
+        _sum: { planejadoUn: true, produzidoUn: true, pesoProduzido: true },
+        _count: { _all: true }, _max: { dataFim: true },
+      }),
+      prisma.relatorioCorteObraOculta.findMany({ select: { obra: true } }),
+    ]);
+    const ocultas = new Set(ocultasRows.map((o) => o.obra));
     const obras = grupos.filter((g) => g.obra).map((g) => {
       const prog = g._sum.planejadoUn || 0, cort = g._sum.produzidoUn || 0;
-      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim };
+      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra) };
     });
     obras.sort((a, b) => (b.ultima ? +new Date(b.ultima) : 0) - (a.ultima ? +new Date(a.ultima) : 0));
     return NextResponse.json({ obras });

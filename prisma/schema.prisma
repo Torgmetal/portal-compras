@@ -3009,3 +3009,13 @@ model Compromisso {
   @@index([userId, concluido])
   @@index([tarefaId])
 }
+
+// Obras ocultadas do Relatório de Corte (ex.: OPs já finalizadas). Só some da
+// VISÃO do relatório — nenhum dado de corte é apagado. Toggle restrito ao ADMIN.
+model RelatorioCorteObraOculta {
+  id           String   @id @default(cuid())
+  obra         String   @unique
+  ocultadoPor  String?
+  ocultadoNome String?
+  criadoEm     DateTime @default(now())
+}

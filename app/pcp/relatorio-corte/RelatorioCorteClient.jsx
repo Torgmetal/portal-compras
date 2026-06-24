@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Scissors, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox } from "lucide-react";
+import { Scissors, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox, EyeOff, Eye } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, adicionarLegenda, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR")} kg`;
@@ -14,7 +14,7 @@ const SIT_COR = {
   Pendente: "bg-gray-100 text-gray-500",
 };
 
-export default function RelatorioCorteClient() {
+export default function RelatorioCorteClient({ isAdmin = false }) {
   const [obras, setObras] = useState([]);
   const [obra, setObra] = useState("");
   const [de, setDe] = useState("");
@@ -27,6 +27,7 @@ export default function RelatorioCorteClient() {
   const [exportandoTodas, setExportandoTodas] = useState(false);
   const [reconciliando, setReconciliando] = useState(false);
   const [reconMsg, setReconMsg] = useState("");
+  const [mostrarOcultas, setMostrarOcultas] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -69,6 +70,30 @@ export default function RelatorioCorteClient() {
   const itensDet = detalhe?.itens || [];
   const maquinas = [...new Set(itensDet.map((i) => i.maquina).filter((m) => m && m !== "—"))].sort();
   const itensFiltrados = itensDet.filter((i) => (!fMaquina || i.maquina === fMaquina) && (!fSituacao || i.situacao === fSituacao));
+
+  // Resumo: obras visíveis × ocultas. ADM pode ocultar OPs já finalizadas do
+  // relatório (só some da visão — nada é apagado).
+  const obrasOcultas = obras.filter((o) => o.oculto);
+  const obrasVisiveis = obras.filter((o) => !o.oculto);
+  const listaExibida = isAdmin && mostrarOcultas ? obras : obrasVisiveis;
+
+  async function toggleOcultar(obraAlvo, ocultar) {
+    // otimista
+    setObras((prev) => prev.map((o) => (o.obra === obraAlvo ? { ...o, oculto: ocultar } : o)));
+    try {
+      const r = await fetch("/api/pcp/relatorio-corte/ocultar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ obra: obraAlvo, ocultar }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao ocultar");
+    } catch (e) {
+      // reverte
+      setObras((prev) => prev.map((o) => (o.obra === obraAlvo ? { ...o, oculto: !ocultar } : o)));
+      setErro(e.message);
+    }
+  }
 
   // Extrai TODAS as peças de todas as OPs num único Excel (respeita o período)
   async function exportarTodas() {
@@ -150,7 +175,7 @@ export default function RelatorioCorteClient() {
       let row = linhaInicio;
       adicionarHeaderTabela(ws, row, headers); row++;
       const first = row;
-      for (const o of obras) {
+      for (const o of listaExibida) {
         adicionarLinhaTabela(ws, row, [o.obra, o.pecas, o.programadoUn, o.cortadoUn, `${o.pct}%`, o.pesoCortado, fmtData(o.ultima)], {
           alinhamento: { 1: "right", 2: "right", 3: "right", 4: "center", 5: "right" },
         });
@@ -162,7 +187,7 @@ export default function RelatorioCorteClient() {
     }
   }
 
-  const vazio = detalhe ? !itensFiltrados.length : !obras.length;
+  const vazio = detalhe ? !itensFiltrados.length : !listaExibida.length;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -177,6 +202,13 @@ export default function RelatorioCorteClient() {
             className="text-sm font-semibold text-torg-gray border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
             {reconciliando ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} Reconciliar corte
           </button>
+          {isAdmin && !detalhe && obrasOcultas.length > 0 && (
+            <button onClick={() => setMostrarOcultas((v) => !v)}
+              title="Mostrar/esconder as obras ocultadas do relatório"
+              className="text-sm font-semibold text-torg-gray border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+              {mostrarOcultas ? <Eye size={15} /> : <EyeOff size={15} />} {mostrarOcultas ? "Esconder ocultas" : `Ocultas (${obrasOcultas.length})`}
+            </button>
+          )}
           {!detalhe && (
             <button onClick={exportarTodas} disabled={exportandoTodas}
               className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
@@ -195,7 +227,7 @@ export default function RelatorioCorteClient() {
       <div className="flex items-center gap-3 flex-wrap mb-4 bg-white border border-gray-100 rounded-xl shadow-sm p-3">
         <select value={obra} onChange={(e) => setObra(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white">
           <option value="">Todas as obras (resumo)</option>
-          {obras.map((o) => <option key={o.obra} value={o.obra}>{o.obra}</option>)}
+          {listaExibida.map((o) => <option key={o.obra} value={o.obra}>{o.obra}{o.oculto ? " (oculta)" : ""}</option>)}
         </select>
         <label className="text-xs text-torg-gray flex items-center gap-1">De <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
         <label className="text-xs text-torg-gray flex items-center gap-1">Até <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="px-2 py-1 border border-gray-300 rounded-lg text-sm" /></label>
@@ -276,17 +308,27 @@ export default function RelatorioCorteClient() {
               <th className="px-3 py-2 font-medium text-right">Ações</th>
             </tr></thead>
             <tbody className="divide-y divide-gray-50">
-              {obras.map((o) => (
-                <tr key={o.obra} className="hover:bg-gray-50/50">
-                  <td className="px-3 py-2 font-mono font-semibold text-torg-dark">{o.obra}</td>
+              {listaExibida.map((o) => (
+                <tr key={o.obra} className={`hover:bg-gray-50/50 ${o.oculto ? "opacity-50" : ""}`}>
+                  <td className="px-3 py-2 font-mono font-semibold text-torg-dark whitespace-nowrap">
+                    {o.obra}
+                    {o.oculto && <span className="ml-2 align-middle text-[10px] font-sans font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">oculta</span>}
+                  </td>
                   <td className="px-3 py-2 text-right tabular-nums text-torg-gray">{o.pecas}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{o.programadoUn.toLocaleString("pt-BR")}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-emerald-700">{o.cortadoUn.toLocaleString("pt-BR")}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-medium">{o.pct}%</td>
                   <td className="px-3 py-2 text-right tabular-nums text-torg-gray">{fmtKg(o.pesoCortado)}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-torg-gray">{fmtData(o.ultima)}</td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button onClick={() => setObra(o.obra)} className="text-[12px] text-torg-blue hover:text-torg-dark font-medium">ver peças →</button>
+                    {isAdmin && (o.oculto ? (
+                      <button onClick={() => toggleOcultar(o.obra, false)} title="Restaurar no relatório"
+                        className="ml-3 text-[12px] text-emerald-700 hover:text-emerald-900 font-medium inline-flex items-center gap-1"><Eye size={13} /> restaurar</button>
+                    ) : (
+                      <button onClick={() => toggleOcultar(o.obra, true)} title="Ocultar do relatório (ex.: OP finalizada)"
+                        className="ml-3 text-[12px] text-torg-gray hover:text-red-600 font-medium inline-flex items-center gap-1"><EyeOff size={13} /> ocultar</button>
+                    ))}
                   </td>
                 </tr>
               ))}
