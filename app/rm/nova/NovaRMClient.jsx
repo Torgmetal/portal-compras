@@ -267,6 +267,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
       comprimento: it.comprimento || null,
       largura: it.largura || null,
       tratamento: it.tratamento || null,
+      observacao: it.observacao?.trim() || null,
       peso: Number(it.peso) || null,
       pesoLinear: Number(it.pesoLinear) || null,
       valorDiaria: Number(it.valorDiaria) || null,
@@ -808,15 +809,16 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                   <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase w-8">#</th>
                   <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase min-w-[220px]">Descrição *</th>
                   <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Cód.</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Material</th>
+                  {!ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Material</th>}
                   <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase">Qtd</th>
                   <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Un.</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Comp.</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Larg.</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Tratamento</th>
-                  <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase">Peso (kg)</th>
-                  <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase" title="OP destino (multi-OP)">OP dest.</th>
-                  <th className="px-2 py-2 text-center font-medium text-gray-500 uppercase" title="Vai pro estoque (categoria 3.1)?">Estq.</th>
+                  {!ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Comp.</th>}
+                  {!ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Larg.</th>}
+                  {!ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Tratamento</th>}
+                  {!ehInterna && <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase">Peso (kg)</th>}
+                  {!ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase" title="OP destino (multi-OP)">OP dest.</th>}
+                  {!ehInterna && <th className="px-2 py-2 text-center font-medium text-gray-500 uppercase" title="Vai pro estoque (categoria 3.1)?">Estq.</th>}
+                  {ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase min-w-[200px]">Observação</th>}
                   <th className="w-8"></th>
                 </tr>
               </thead>
@@ -840,6 +842,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                         className="w-20 border border-gray-200 rounded px-2 py-1 text-xs font-mono focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>
+                    {!ehInterna && (
                     <td className="px-2 py-1.5">
                       <input
                         type="text" value={it.material || ""}
@@ -848,6 +851,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                         className="w-24 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>
+                    )}
                     <td className="px-2 py-1.5 text-right">
                       <input
                         type="number" step="0.01" min="0" value={it.qtd || ""}
@@ -863,6 +867,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                         className="w-12 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>
+                    {!ehInterna && (
                     <td className="px-2 py-1.5">
                       <input
                         type="text" value={it.comprimento || ""}
@@ -871,6 +876,8 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                         className="w-16 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>
+                    )}
+                    {!ehInterna && (
                     <td className="px-2 py-1.5">
                       <input
                         type="text" value={it.largura || ""}
@@ -879,6 +886,8 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                         className="w-16 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>
+                    )}
+                    {!ehInterna && (
                     <td className="px-2 py-1.5">
                       <input
                         type="text" value={it.tratamento || ""}
@@ -887,6 +896,8 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                         className="w-24 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>
+                    )}
+                    {!ehInterna && (
                     <td className="px-2 py-1.5 text-right">
                       <input
                         type="number" step="0.01" min="0" value={it.peso || ""}
@@ -895,6 +906,8 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                         className="w-20 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>
+                    )}
+                    {!ehInterna && (
                     <td className="px-2 py-1.5">
                       <select
                         value={it.opDestinoId || opSelecionada || ""}
@@ -908,6 +921,8 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                         ))}
                       </select>
                     </td>
+                    )}
+                    {!ehInterna && (
                     <td className="px-2 py-1.5 text-center">
                       <input
                         type="checkbox"
@@ -917,6 +932,17 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                         title="Marcar quando o item vai pro estoque (matéria prima padrão — categoria 3.1)"
                       />
                     </td>
+                    )}
+                    {ehInterna && (
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text" value={it.observacao || ""}
+                        onChange={(e) => editarItem(i, "observacao", e.target.value)}
+                        placeholder="Observação (opcional)"
+                        className="w-full min-w-[180px] border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
+                      />
+                    </td>
+                    )}
                     <td className="px-2 py-1.5">
                       <button
                         type="button"

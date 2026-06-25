@@ -677,6 +677,7 @@ model RMItem {
   pesoLinear             Float?
   codigo                 String?
   tratamento             String?
+  observacao             String?
   aditivoItemId          String?
   canceladoEm            DateTime?
   canceladoMotivo        String?

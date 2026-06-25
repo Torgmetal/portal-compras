@@ -27,6 +27,8 @@ const itemSchema = z.object({
   comprimento: z.string().optional().nullable(),
   largura: z.string().optional().nullable(),
   tratamento: z.string().optional().nullable(),
+  // Observação por item (usado nas RMs Internas)
+  observacao: z.string().optional().nullable(),
   peso: z.number().optional().nullable(),
   pesoLinear: z.number().optional().nullable(),
   valorDiaria: z.number().optional().nullable(),
@@ -153,6 +155,7 @@ export async function POST(req) {
           comprimento: it.comprimento || null,
           largura: it.largura || null,
           tratamento: it.tratamento || null,
+          observacao: it.observacao || null,
           peso: it.peso ?? null,
           pesoLinear: it.pesoLinear ?? null,
           valorDiaria: it.valorDiaria ?? null,
