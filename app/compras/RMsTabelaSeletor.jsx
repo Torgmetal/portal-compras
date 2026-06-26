@@ -54,28 +54,43 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
   const [filtroCat, setFiltroCat] = useState(null);
   // Toggle entre tabela e kanban
   const [viewMode, setViewMode] = useState("tabela"); // "tabela" | "kanban"
+  const [filtroOp, setFiltroOp] = useState(""); // OP.numero ("" = todas)
+
+  // Base: aplica o filtro de OP (se houver) antes de tudo — cards, lista e seleção.
+  const rmsBase = useMemo(
+    () => (filtroOp ? rms.filter((r) => (r.op?.numero || "") === filtroOp) : rms),
+    [rms, filtroOp]
+  );
+
+  // OPs disponíveis para o filtro (uma por OP, com cliente) — maior número primeiro
+  const opsRM = useMemo(() => {
+    const m = new Map();
+    for (const r of rms) if (r.op?.numero && !m.has(r.op.numero)) m.set(r.op.numero, r.op.cliente || "");
+    const num = (s) => parseInt(String(s).match(/\d+/)?.[0] || "0", 10);
+    return [...m.entries()].sort((a, b) => num(b[0]) - num(a[0]));
+  }, [rms]);
 
   // Só permite cotar RMs que ainda estão em fluxo ativo
   const cotaveis = useMemo(
-    () => rms.filter((r) => ["ABERTA", "EM_COTACAO", "COTADA"].includes(r.status)),
-    [rms]
+    () => rmsBase.filter((r) => ["ABERTA", "EM_COTACAO", "COTADA"].includes(r.status)),
+    [rmsBase]
   );
 
   // KPIs agregados por categoria de ação
   const stats = useMemo(() => {
     const acc = { ABERTA: 0, EM_COTACAO: 0, PARCIAL: 0, PRONTA: 0 };
     let atrasadas = 0;
-    for (const r of rms) {
+    for (const r of rmsBase) {
       const cat = categoriaRM(r);
       if (acc[cat] != null) acc[cat]++;
       if ((r.atrasadas || 0) > 0) atrasadas++;
     }
     return { ...acc, atrasadas };
-  }, [rms]);
+  }, [rmsBase]);
 
   // RMs filtradas pelos KPI cards, ordenadas por prioridade (PRONTA primeiro)
   const rmsExibidas = useMemo(() => {
-    const filtrada = filtroCat ? rms.filter((r) => categoriaRM(r) === filtroCat) : rms;
+    const filtrada = filtroCat ? rmsBase.filter((r) => categoriaRM(r) === filtroCat) : rmsBase;
     return [...filtrada].sort((a, b) => {
       const pa = PRIORIDADE_CAT[categoriaRM(a)] || 99;
       const pb = PRIORIDADE_CAT[categoriaRM(b)] || 99;
@@ -83,7 +98,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
       // Empate: mais recente primeiro
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [rms, filtroCat]);
+  }, [rmsBase, filtroCat]);
 
   const toggle = (id) => {
     setSelecionadas((prev) => {
@@ -146,17 +161,28 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
 
       {/* Toggle de visualizacao + filtro ativo */}
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <div className="flex items-center gap-2 text-xs">
-          {filtroCat && (
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+          <select
+            value={filtroOp}
+            onChange={(e) => setFiltroOp(e.target.value)}
+            className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-torg-dark font-medium"
+            title="Filtrar RMs por OP"
+          >
+            <option value="">Todas as OPs</option>
+            {opsRM.map(([num, cliente]) => (
+              <option key={num} value={num}>{fmtOP(num)}{cliente ? ` — ${cliente}` : ""}</option>
+            ))}
+          </select>
+          {(filtroCat || filtroOp) && (
             <button
-              onClick={() => setFiltroCat(null)}
+              onClick={() => { setFiltroCat(null); setFiltroOp(""); }}
               className="text-torg-blue font-medium hover:underline inline-flex items-center gap-1"
             >
-              <X size={12} /> Limpar filtro
+              <X size={12} /> Limpar filtros
             </button>
           )}
           <span className="text-torg-gray">
-            Mostrando {rmsExibidas.length} de {rms.length} RM{rms.length !== 1 ? "s" : ""}
+            Mostrando {rmsExibidas.length} de {rmsBase.length} RM{rmsBase.length !== 1 ? "s" : ""}
           </span>
         </div>
         <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
