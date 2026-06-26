@@ -83,12 +83,22 @@ export default function CargaCorteClient() {
         </div>
       </div>
 
-      {/* Aguardando liberação (sem máquina) */}
+      {/* Aguardando liberação (ainda nem foi pro corte) */}
       {dados.pendentes.pecas > 0 && (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center gap-2.5 text-sm">
           <PackageSearch size={16} className="text-torg-gray" />
           <span className="text-torg-dark">
             <span className="font-semibold">{dados.pendentes.pecas} peças</span> aguardando liberação ({fmtKg(dados.pendentes.kg)}) — ainda sem máquina definida.
+          </span>
+        </div>
+      )}
+
+      {/* Em CORTE mas SEM máquina definida — não entram em nenhum card abaixo */}
+      {dados.semMaquina?.pecas > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2.5 text-sm">
+          <AlertCircle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+          <span className="text-torg-dark">
+            <span className="font-semibold">{dados.semMaquina.pecas} peças</span> liberadas para corte <span className="font-semibold">sem máquina definida</span> ({fmtKg(dados.semMaquina.kg)} · ~{dados.semMaquina.diasCarga} dias) — não aparecem em nenhuma máquina abaixo. Defina a máquina na Programação (ou dê baixa) para alocar/encerrar.
           </span>
         </div>
       )}

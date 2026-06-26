@@ -114,10 +114,19 @@ export async function GET() {
       };
     }).sort((x, y) => (y.diasCarga || 0) - (x.diasCarga || 0));
 
-    const totalBacklogKg = maquinas.reduce((s, m) => s + m.backlogKg, 0);
+    // Peças em CORTE SEM máquina definida — não entram em card de máquina nenhum.
+    // Antes sumiam da tela inteira (a fila ficava subestimada); agora são expostas,
+    // igual ao "sem máquina" do Dashboard.
+    const sm = backlog["SEM_MAQUINA"] || { pecas: 0, kg: 0, iniciadas: 0 };
+    const semMaquina = {
+      pecas: sm.pecas, kg: sm.kg, iniciadas: sm.iniciadas,
+      diasCarga: Math.round((sm.kg / META_PREPARACAO_KG_DIA) * 10) / 10,
+    };
+    const totalBacklogKg = maquinas.reduce((s, m) => s + m.backlogKg, 0) + semMaquina.kg;
 
     return NextResponse.json({
       maquinas,
+      semMaquina,
       metaKgDia: META_PREPARACAO_KG_DIA,
       preparacao: {
         backlogKg: totalBacklogKg,
