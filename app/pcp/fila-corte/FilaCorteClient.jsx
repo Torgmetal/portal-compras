@@ -62,11 +62,14 @@ export default function FilaCorteClient({ pecasIniciais }) {
 
   const hoje = hojeUTC();
 
+  // Número da OP a partir do opNumero (frente). T67/T67B/T67F… e "085" → "67"/"85".
+  const opNum = (s) => { const m = String(s || "").match(/\d+/); return m ? String(parseInt(m[0], 10)) : ""; };
+
   // ── filtros ──────────────────────────────────────────────────
   const filtradas = useMemo(() => {
     const q = busca.trim().toUpperCase();
     return pecas.filter((p) => {
-      if (filtroOp && p.opNumero !== filtroOp) return false;
+      if (filtroOp && opNum(p.opNumero) !== filtroOp) return false;
       if (q && !`${p.marca} ${p.perfil || ""} ${p.material || ""} ${p.descricao || ""}`.toUpperCase().includes(q)) return false;
       return true;
     });
@@ -79,10 +82,14 @@ export default function FilaCorteClient({ pecasIniciais }) {
     return c;
   }, [filtradas]);
 
+  // Uma entrada por NÚMERO de OP (agrupa as frentes T67/T67B/T67F… numa "OP-67").
   const ops = useMemo(() => {
     const m = new Map();
-    for (const p of pecas) if (!m.has(p.opNumero)) m.set(p.opNumero, p.op?.cliente || "");
-    return [...m.entries()].sort();
+    for (const p of pecas) {
+      const num = opNum(p.opNumero);
+      if (num && !m.has(num)) m.set(num, p.op?.cliente || "");
+    }
+    return [...m.entries()].sort((a, b) => Number(b[0]) - Number(a[0]));
   }, [pecas]);
 
   const somaKg = (arr) => arr.reduce((s, p) => s + (Number(p.pesoTotalKg) || 0), 0);
@@ -217,7 +224,7 @@ export default function FilaCorteClient({ pecasIniciais }) {
         <select value={filtroOp} onChange={(e) => setFiltroOp(e.target.value)}
           className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white">
           <option value="">Todas as OPs</option>
-          {ops.map(([num, cliente]) => <option key={num} value={num}>OP {fmtOP(num)}{cliente ? ` — ${cliente}` : ""}</option>)}
+          {ops.map(([num, cliente]) => <option key={num} value={num}>{fmtOP(num)}{cliente ? ` — ${cliente}` : ""}</option>)}
         </select>
         {!reordenavel && (
           <span className="text-[10px] text-torg-gray italic">limpe os filtros para reordenar a fila</span>
