@@ -6,6 +6,6 @@ export const metadata = {
 };
 
 export default async function PCPDashboard() {
-  await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
-  return <PCPDashboardClient />;
+  const user = await requireRole(["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO"]);
+  return <PCPDashboardClient isAdmin={user.tipo === "ADMIN"} />;
 }

@@ -3037,3 +3037,14 @@ model RelatorioObraConcluida {
 
   @@unique([obra, setor])
 }
+
+// Baixa da carteira do Dashboard do PCP: obra/frente (opNumero da PecaConjunto)
+// já finalizada, removida da "Necessidade por obra". Só esconde da VISÃO do
+// dashboard — não altera o status das peças. Reversível, ADMIN-only.
+model PcpCarteiraObraBaixa {
+  id          String   @id @default(cuid())
+  opNumero    String   @unique
+  baixadoPor  String?
+  baixadoNome String?
+  criadoEm    DateTime @default(now())
+}

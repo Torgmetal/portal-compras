@@ -18,7 +18,7 @@ const ESTOQUE_LABEL = {
   NAO_CONFERIDO: { label: "Não conferido", cor: "text-gray-600 bg-gray-100" },
 };
 
-export default function PCPDashboardClient() {
+export default function PCPDashboardClient({ isAdmin = false }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -27,6 +27,9 @@ export default function PCPDashboardClient() {
   const [editandoMeta, setEditandoMeta] = useState(false);
   const [metaKgInput, setMetaKgInput] = useState("");
   const [salvandoMeta, setSalvandoMeta] = useState(false);
+  // baixa da carteira (esconde obra finalizada do dashboard)
+  const [mostrarBaixadas, setMostrarBaixadas] = useState(false);
+  const [baixando, setBaixando] = useState("");
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -67,6 +70,25 @@ export default function PCPDashboardClient() {
       alert(e.message);
     } finally {
       setSalvandoMeta(false);
+    }
+  };
+
+  // Baixa da carteira: esconde a obra finalizada do dashboard (não toca nas peças).
+  const toggleBaixa = async (opNumero, baixar) => {
+    setBaixando(opNumero);
+    try {
+      const res = await fetch("/api/pcp/painel-corte/baixa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero, baixar }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao dar baixa");
+      await carregar();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBaixando("");
     }
   };
 
@@ -123,6 +145,7 @@ export default function PCPDashboardClient() {
   if (!data) return null;
 
   const { meta, mes, carteira, cargaMaquinas, semMaquina, obras } = data;
+  const baixadas = data.baixadas || [];
   const projetaAcima = mes.projecaoKg >= meta.kgMes;
 
   return (
@@ -311,9 +334,16 @@ export default function PCPDashboardClient() {
           <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
             <Factory size={15} className="text-torg-blue" />
             <h3 className="text-sm font-bold text-torg-dark">Necessidade por obra</h3>
-            <span className="text-[10px] text-torg-gray ml-auto">kg que ainda falta cortar de cada obra</span>
+            {isAdmin && baixadas.length > 0 ? (
+              <button onClick={() => setMostrarBaixadas((v) => !v)}
+                className="ml-auto text-[10px] font-semibold text-torg-gray border border-gray-200 rounded px-2 py-1 hover:bg-gray-50">
+                {mostrarBaixadas ? "ocultar baixadas" : `com baixa (${baixadas.length})`}
+              </button>
+            ) : (
+              <span className="text-[10px] text-torg-gray ml-auto">kg que ainda falta cortar de cada obra</span>
+            )}
           </div>
-          {obras.length === 0 ? (
+          {obras.length === 0 && !(mostrarBaixadas && baixadas.length) ? (
             <p className="px-5 py-8 text-sm text-torg-gray text-center">Nenhuma obra com peças em aberto.</p>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -335,6 +365,33 @@ export default function PCPDashboardClient() {
                     <p className="text-sm font-bold text-torg-dark tabular-nums">{fmtKg(o.kgAberto)}</p>
                     <p className="text-[10px] text-torg-gray tabular-nums">{o.pecasAbertas} pç em aberto</p>
                   </div>
+                  {isAdmin && (
+                    <button onClick={() => toggleBaixa(o.opNumero, true)} disabled={baixando === o.opNumero}
+                      title="Dar baixa — esconde esta obra do dashboard (não altera as peças)"
+                      className="shrink-0 text-[10px] font-semibold text-emerald-700 border border-emerald-200 rounded px-2 py-1 hover:bg-emerald-50 disabled:opacity-50">
+                      {baixando === o.opNumero ? "…" : "dar baixa"}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {mostrarBaixadas && baixadas.map((o) => (
+                <div key={o.opNumero} className="px-5 py-2.5 flex items-center gap-3 opacity-60 bg-gray-50/40">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-torg-dark font-mono">{fmtOP(o.opNumero)}
+                      <span className="ml-2 text-[10px] font-sans font-medium text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">baixada</span>
+                      {o.cliente && <span className="font-sans font-normal text-xs text-torg-gray ml-2">{o.cliente}</span>}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-[10px] text-torg-gray tabular-nums">{fmtKg(o.kgAberto)} · {o.pecasAbertas} pç</p>
+                  </div>
+                  {isAdmin && (
+                    <button onClick={() => toggleBaixa(o.opNumero, false)} disabled={baixando === o.opNumero}
+                      title="Restaurar na carteira"
+                      className="shrink-0 text-[10px] font-semibold text-torg-blue border border-torg-blue-200 rounded px-2 py-1 hover:bg-torg-blue-50 disabled:opacity-50">
+                      {baixando === o.opNumero ? "…" : "restaurar"}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

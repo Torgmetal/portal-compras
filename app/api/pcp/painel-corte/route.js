@@ -188,7 +188,10 @@ export async function GET() {
       abertoPorObra.set(p.opNumero, acc);
     }
     const totalObraMap = new Map(totalPorOp.map((t) => [t.opNumero, t._sum.pesoTotalKg || 0]));
-    const obras = [...abertoPorObra.entries()]
+    // Obras "baixadas" da carteira (ADM marcou como finalizadas) — saem da visão.
+    const baixadasRows = await prisma.pcpCarteiraObraBaixa.findMany({ select: { opNumero: true } });
+    const baixadasSet = new Set(baixadasRows.map((b) => b.opNumero));
+    const todasObras = [...abertoPorObra.entries()]
       .map(([opNumero, aberto]) => {
         const total = totalObraMap.get(opNumero) || 0;
         return {
@@ -197,17 +200,20 @@ export async function GET() {
           kgAberto: aberto.kg,
           kgTotal: total,
           pctAvancado: total > 0 ? Math.round(((total - aberto.kg) / total) * 100) : 0,
+          baixada: baixadasSet.has(opNumero),
         };
       })
-      .sort((a, b) => b.kgAberto - a.kgAberto)
-      .slice(0, 12);
+      .sort((a, b) => b.kgAberto - a.kgAberto);
+    const obras = todasObras.filter((o) => !o.baixada).slice(0, 12);
+    const baixadas = todasObras.filter((o) => o.baixada);
     // cliente das obras (best-effort — obra pode não estar cadastrada como OP)
     const opsInfo = await prisma.oP.findMany({
-      where: { numero: { in: obras.map((o) => o.opNumero) } },
+      where: { numero: { in: [...obras, ...baixadas].map((o) => o.opNumero) } },
       select: { numero: true, cliente: true },
     });
     const clienteMap = new Map(opsInfo.map((o) => [o.numero, o.cliente]));
     for (const o of obras) o.cliente = clienteMap.get(o.opNumero) || null;
+    for (const o of baixadas) o.cliente = clienteMap.get(o.opNumero) || null;
 
     // Carimbo da baixa automática (cron) — "última baixa" no painel.
     const ultBaixa = await prisma.auditLog.findFirst({
@@ -232,6 +238,7 @@ export async function GET() {
       cargaMaquinas,
       semMaquina,
       obras,
+      baixadas,
       syneco: {
         emCorteAgora: emProducaoRaw.map((a) => ({
           id: a.id, obra: a.obra, op: a.op, peca: a.descItem, maquina: a.maquina,
