@@ -1268,6 +1268,17 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                 Enviar para as máquinas
               </button>
             )}
+            {filtroStatus === "PENDENTE" && (
+              <button
+                onClick={() => { if (window.confirm(`Marcar ${selecionados.size} peça(s) como CONJUNTO? Elas saem do corte e vão direto para a montagem.`)) marcarConjunto(); }}
+                disabled={marcandoConjunto}
+                title="Não cortam — começam na montagem"
+                className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {marcandoConjunto ? <Loader2 size={13} className="animate-spin" /> : <Package size={13} />}
+                Marcar como conjunto
+              </button>
+            )}
             {filtroStatus === "CORTE" && (
               <button
                 onClick={reverterSelecionados}
