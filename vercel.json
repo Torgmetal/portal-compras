@@ -50,6 +50,10 @@
     {
       "path": "/api/cron/reconciliar-syneco-corte",
       "schedule": "15 6-20 * * *"
+    },
+    {
+      "path": "/api/cron/monitor",
+      "schedule": "0 10 * * *"
     }
   ]
 }

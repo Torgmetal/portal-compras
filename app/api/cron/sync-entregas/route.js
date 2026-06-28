@@ -1,22 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncEntregas } from "@/lib/omie-recebimento";
+import { registrarExecucao } from "@/lib/cron-monitor";
 
-export const maxDuration = 60;
+export const maxDuration = 300; // a varredura de NFs + consulta por pedido no Omie passava de 60s (504)
 
-// GET — Cron job que roda a cada 6h pra sincronizar entregas com o Omie.
-// Protegido pelo CRON_SECRET da Vercel.
+// GET — Cron job (diário) que sincroniza entregas com o Omie.
+// Auth: user-agent vercel-cron OU Bearer CRON_SECRET (igual aos outros crons) —
+// antes só checava o Bearer; sem CRON_SECRET setado a rota ficava aberta.
 export async function GET(req) {
-  const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  // Em producao, Vercel envia Authorization: Bearer <CRON_SECRET>
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  const auth = req.headers.get("authorization") || "";
+  const ua = req.headers.get("user-agent") || "";
+  const isCron = ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
+  if (!isCron && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const t0 = Date.now();
   try {
     const resultado = await syncEntregas(prisma);
+    await registrarExecucao("sync-entregas", { ok: true, duracaoMs: Date.now() - t0, mensagem: `${resultado.sincronizados}/${resultado.total} sincronizados` });
 
     // Log de auditoria do cron (sem usuario)
     if (resultado.sincronizados > 0) {
@@ -43,6 +46,7 @@ export async function GET(req) {
     });
   } catch (e) {
     console.error("[cron/sync-entregas] Erro:", e.message);
+    await registrarExecucao("sync-entregas", { ok: false, mensagem: e.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
   }
 }

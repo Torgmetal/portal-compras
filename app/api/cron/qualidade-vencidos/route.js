@@ -8,6 +8,7 @@ import { sendEmail } from "@/lib/email";
 import { calcStatusValidade, diasAlertaCategoria } from "@/lib/qualidade-status";
 import { requireRole } from "@/lib/session";
 import { montarEmailVencidos } from "@/lib/qualidade-alerta-email";
+import { registrarExecucao } from "@/lib/cron-monitor";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -40,6 +41,8 @@ export async function GET(req) {
       return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
     }
   }
+
+  if (isCron) await registrarExecucao("qualidade-vencidos", { ok: true }); // heartbeat: o cron semanal disparou
 
   const to = admin ? [admin.email].filter(Boolean) : await destinatarios();
   if (!to.length) {

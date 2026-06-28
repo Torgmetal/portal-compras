@@ -3048,3 +3048,16 @@ model PcpCarteiraObraBaixa {
   baixadoNome String?
   criadoEm    DateTime @default(now())
 }
+
+// Heartbeat dos crons — cada cron registra sua última execução (ok/erro/duração).
+// O cron "monitor" lê isto e alerta (e-mail) se algum cron não roda há tempo
+// demais ou falhou. Guarda-corpo contra cron morrer silenciosamente.
+model CronHeartbeat {
+  job       String   @id // ex.: "sync-entregas", "estoque-produtos"
+  lastRunAt DateTime @default(now())
+  lastOkAt  DateTime?
+  ok        Boolean  @default(true)
+  mensagem  String?
+  duracaoMs Int?
+  updatedAt DateTime @updatedAt
+}

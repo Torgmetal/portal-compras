@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { reconciliarSynecoCorte } from "@/lib/reconciliar-syneco-corte";
+import { registrarExecucao } from "@/lib/cron-monitor";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,15 +18,18 @@ export async function GET(req) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const t0 = Date.now();
   try {
     const r = await reconciliarSynecoCorte();
     // Carimbo (sempre grava, mesmo com 0 mudanças — é o "rodou às HH:MM" do painel).
     await prisma.auditLog
       .create({ data: { userId: null, action: "RECONCILIAR_SYNECO_AUTO", entity: "PecaConjunto", entityId: "CRON", diff: r } })
       .catch(() => {});
+    await registrarExecucao("reconciliar-syneco-corte", { ok: true, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     console.error("[cron reconciliar-syneco-corte] erro:", e?.message);
+    await registrarExecucao("reconciliar-syneco-corte", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 });
   }
 }

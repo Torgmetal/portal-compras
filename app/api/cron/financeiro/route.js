@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { sincronizarContasPagar } from "@/lib/omie-contas-pagar";
 import { sincronizarContasReceber } from "@/lib/omie-contas-receber";
+import { registrarExecucao } from "@/lib/cron-monitor";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // pagar+receber juntos chegam a ~60s; folga p/ não cortar
@@ -30,5 +31,6 @@ export async function GET(req) {
     out.receberErro = e?.message;
     console.error("[cron financeiro] receber:", e?.message);
   }
+  await registrarExecucao("financeiro", { ok: !out.pagarErro && !out.receberErro, mensagem: out.pagarErro || out.receberErro || null });
   return NextResponse.json(out);
 }

@@ -10,6 +10,7 @@ import { requireRole } from "@/lib/session";
 import { downloadPlanilhaProducao, getMesNomePt } from "@/lib/sharepoint";
 import { parseEapProducao } from "@/lib/parse-pcp-eap";
 import { isoWeekString, semanaInicio, semanaFim, parseSemana } from "@/lib/semana";
+import { registrarExecucao } from "@/lib/cron-monitor";
 
 function rangeDaSemana(date) {
   const semana = isoWeekString(date);
@@ -146,13 +147,14 @@ export async function POST(req) {
 
 // GET: sync via Vercel Cron
 export async function GET(req) {
-  // Vercel Cron envia "Authorization: Bearer {CRON_SECRET}" se configurado.
-  if (process.env.CRON_SECRET) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+  // Auth: user-agent vercel-cron OU Bearer CRON_SECRET (padrão dos crons).
+  const auth = req.headers.get("authorization") || "";
+  const ua = req.headers.get("user-agent") || "";
+  const isCron = ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
+  if (!isCron && process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const result = await executarSync();
+  await registrarExecucao("sync-sharepoint", { ok: !!result.ok, mensagem: result.ok ? null : result.error });
   return NextResponse.json(result, { status: result.ok ? 200 : 500 });
 }
