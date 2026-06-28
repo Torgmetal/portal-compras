@@ -514,23 +514,43 @@ function Resumo({ fin }) {
 }
 
 /* ─────────────────────── A PAGAR / A RECEBER ─────────────────────── */
+// Campo rotulado usado no detalhe expandido de uma conta a pagar.
+function Det({ label, v }) {
+  return (
+    <div>
+      <span className="text-torg-gray uppercase tracking-wide text-[10px] block">{label}</span>
+      <span className="text-torg-dark break-words">{v || "—"}</span>
+    </div>
+  );
+}
+
 function ContasView({ tipo, data, loading, erro, onRetry }) {
   const [busca, setBusca] = useState("");
   const [soVencidos, setSoVencidos] = useState(false);
+  const [filtroForn, setFiltroForn] = useState("");
+  const [expandId, setExpandId] = useState(null);
   const LIMITE = 500;
+  const ehPagar = tipo === "pagar";
+
+  // Lista de fornecedores/clientes para o filtro (distintos, ordenados)
+  const fornecedores = useMemo(() => {
+    if (!data?.itens) return [];
+    return [...new Set(data.itens.map((i) => i.nome).filter((n) => n && n !== "—"))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [data]);
 
   const filtrados = useMemo(() => {
     if (!data?.itens) return [];
     const q = busca.trim().toLowerCase();
     return data.itens.filter((i) => {
       if (soVencidos && !i.vencido) return false;
+      if (filtroForn && i.nome !== filtroForn) return false;
       if (!q) return true;
-      return (i.nome || "").toLowerCase().includes(q) || (i.doc || "").toLowerCase().includes(q) || (i.categoria || "").toLowerCase().includes(q);
+      return (i.nome || "").toLowerCase().includes(q) || (i.doc || "").toLowerCase().includes(q) || (i.categoria || "").toLowerCase().includes(q)
+        || (i.pedido || "").toLowerCase().includes(q) || (i.projeto || "").toLowerCase().includes(q) || (i.obs || "").toLowerCase().includes(q);
     });
-  }, [data, busca, soVencidos]);
+  }, [data, busca, soVencidos, filtroForn]);
 
   const totalFiltrado = useMemo(() => filtrados.reduce((s, i) => s + i.saldo, 0), [filtrados]);
-  const ehPagar = tipo === "pagar";
 
   if (loading) return <div className="text-center py-16 text-torg-gray text-sm"><Loader2 size={22} className="animate-spin mx-auto mb-2" /> Carregando títulos…</div>;
   if (erro) return (
@@ -548,20 +568,26 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
           <p className="text-[11px] text-torg-gray">{data.qtd} título(s) em aberto · total {fmtR$(data.total)}{ehPagar ? "" : " · aguardando recebimento"}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <select value={filtroForn} onChange={(e) => { setFiltroForn(e.target.value); setExpandId(null); }}
+            title={ehPagar ? "Filtrar por fornecedor" : "Filtrar por cliente"}
+            className="text-sm border border-gray-200 rounded-lg px-2.5 py-2 bg-white max-w-[230px] focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none">
+            <option value="">{ehPagar ? "Todos os fornecedores" : "Todos os clientes"}</option>
+            {fornecedores.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
           <button onClick={() => setSoVencidos((v) => !v)}
             className={`text-xs px-3 py-2 rounded-lg border font-medium ${soVencidos ? "bg-red-600 text-white border-red-600" : "bg-white text-torg-gray border-gray-200 hover:border-red-300"}`}>
             Só vencidos
           </button>
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
-            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={ehPagar ? "fornecedor, doc…" : "cliente, doc…"}
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={ehPagar ? "fornecedor, pedido, NF, obs…" : "cliente, doc…"}
               className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none w-56" />
           </div>
         </div>
       </div>
 
-      {(busca || soVencidos) && (
-        <p className="text-xs text-torg-gray">{filtrados.length} resultado(s) · total filtrado <span className="font-semibold text-torg-dark">{fmtR$(totalFiltrado)}</span></p>
+      {(busca || soVencidos || filtroForn) && (
+        <p className="text-xs text-torg-gray">{filtrados.length} resultado(s) · total filtrado <span className="font-semibold text-torg-dark">{fmtR$(totalFiltrado)}</span>{filtroForn ? ` · ${filtroForn}` : ""}</p>
       )}
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
@@ -578,17 +604,46 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
           <tbody className="divide-y divide-gray-50">
             {filtrados.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-10 text-center text-torg-gray text-sm">Nenhum título encontrado.</td></tr>
-            ) : filtrados.slice(0, LIMITE).map((i) => (
-              <tr key={i.id} className={`hover:bg-gray-50/50 ${i.vencido ? "bg-red-50/30" : ""}`}>
-                <td className="px-4 py-2 text-torg-dark max-w-[260px] truncate" title={i.nome}>{i.nome}</td>
-                <td className="px-4 py-2 text-torg-gray whitespace-nowrap">{i.doc || "—"}</td>
-                <td className="px-4 py-2 text-torg-gray max-w-[160px] truncate" title={i.categoria}>{i.categoria || "—"}</td>
-                <td className="px-4 py-2 text-center whitespace-nowrap">
-                  <span className={i.vencido ? "text-red-600 font-semibold" : "text-torg-gray"}>{fmtDia(i.vencimento)}{i.vencido ? " ⚠" : ""}</span>
-                </td>
-                <td className="px-4 py-2 text-right tabular-nums font-medium text-torg-dark whitespace-nowrap">{fmtR$(i.saldo)}</td>
-              </tr>
-            ))}
+            ) : filtrados.slice(0, LIMITE).map((i) => {
+              const aberto = expandId === i.id;
+              return (
+                <Fragment key={i.id}>
+                  <tr className={`hover:bg-gray-50/50 ${i.vencido ? "bg-red-50/30" : ""} ${ehPagar ? "cursor-pointer" : ""}`}
+                    onClick={ehPagar ? () => setExpandId(aberto ? null : i.id) : undefined}>
+                    <td className="px-4 py-2 text-torg-dark max-w-[260px] truncate" title={i.nome}>
+                      {ehPagar && <ChevronDown size={13} className={`inline-block mr-1 text-torg-gray transition-transform ${aberto ? "" : "-rotate-90"}`} />}
+                      {i.nome}
+                    </td>
+                    <td className="px-4 py-2 text-torg-gray whitespace-nowrap">{i.doc || "—"}</td>
+                    <td className="px-4 py-2 text-torg-gray max-w-[160px] truncate" title={i.categoria}>{i.categoria || "—"}</td>
+                    <td className="px-4 py-2 text-center whitespace-nowrap">
+                      <span className={i.vencido ? "text-red-600 font-semibold" : "text-torg-gray"}>{fmtDia(i.vencimento)}{i.vencido ? " ⚠" : ""}</span>
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums font-medium text-torg-dark whitespace-nowrap">{fmtR$(i.saldo)}</td>
+                  </tr>
+                  {ehPagar && aberto && (
+                    <tr className="bg-torg-blue-50/30">
+                      <td colSpan={5} className="px-4 py-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-2 text-xs">
+                          <Det label="Pedido de compra" v={i.pedido} />
+                          <Det label="NF" v={i.nf} />
+                          <Det label="Projeto" v={i.projeto} />
+                          <Det label="Parcela" v={i.parcela} />
+                          <Det label="Documento" v={i.documento} />
+                          <Det label="Valor total" v={fmtR$(i.valor)} />
+                          <Det label="Status" v={i.status} />
+                        </div>
+                        <div className="mt-2.5 text-xs">
+                          <span className="text-torg-gray uppercase tracking-wide text-[10px]">Observação</span>
+                          <p className="text-torg-dark mt-0.5 whitespace-pre-wrap break-words">{i.obs || "—"}</p>
+                        </div>
+                        {!i.detalheCarregado && <p className="text-[10px] text-amber-600 mt-1.5">⚠ Pedido / projeto / observação ainda não sincronizados do Omie para este título.</p>}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

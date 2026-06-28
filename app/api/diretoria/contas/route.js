@@ -38,7 +38,11 @@ export async function GET(req) {
 
   const rows = await prisma.contaPagar.findMany({
     where: { status: { notIn: ["PAGO", "CANCELADO", "LIQUIDADO"] } },
-    select: { id: true, fornecedorNome: true, valor: true, valorPago: true, dataVencimento: true, status: true, numeroDocumento: true, numeroDocFiscal: true, categoriaNome: true },
+    select: {
+      id: true, fornecedorNome: true, valor: true, valorPago: true, dataVencimento: true, status: true,
+      numeroDocumento: true, numeroDocFiscal: true, categoriaNome: true,
+      numeroPedidoCompra: true, numeroParcela: true, projetoCodigo: true, observacao: true, detalheCarregado: true,
+    },
     orderBy: { dataVencimento: "asc" },
   });
   const itens = rows
@@ -46,6 +50,10 @@ export async function GET(req) {
       id: c.id, nome: c.fornecedorNome || "—", valor: r2(c.valor), saldo: r2(Math.max(0, (c.valor || 0) - (c.valorPago || 0))),
       vencimento: c.dataVencimento, status: c.status, vencido: venc(c.dataVencimento),
       doc: c.numeroDocFiscal || c.numeroDocumento || "", categoria: c.categoriaNome || "",
+      // Detalhes do título (pedido/projeto/observação vêm do detalhe do Omie)
+      pedido: c.numeroPedidoCompra || "", nf: c.numeroDocFiscal || "", documento: c.numeroDocumento || "",
+      projeto: c.projetoCodigo || "", parcela: c.numeroParcela || "", obs: c.observacao || "",
+      detalheCarregado: !!c.detalheCarregado,
     }))
     .filter((i) => i.saldo > 0.005);
   return NextResponse.json({ tipo, total: r2(itens.reduce((s, i) => s + i.saldo, 0)), qtd: itens.length, itens });
