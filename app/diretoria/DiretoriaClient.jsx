@@ -528,6 +528,7 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
   const [busca, setBusca] = useState("");
   const [soVencidos, setSoVencidos] = useState(false);
   const [filtroForn, setFiltroForn] = useState("");
+  const [filtroOp, setFiltroOp] = useState("");
   const [expandId, setExpandId] = useState(null);
   const LIMITE = 500;
   const ehPagar = tipo === "pagar";
@@ -538,17 +539,26 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
     return [...new Set(data.itens.map((i) => i.nome).filter((n) => n && n !== "—"))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [data]);
 
+  // OPs presentes nas contas (resolvidas pelo projeto do Omie) — maior nº primeiro
+  const ops = useMemo(() => {
+    if (!data?.itens) return [];
+    return [...new Set(data.itens.map((i) => i.op).filter(Boolean))]
+      .sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0));
+  }, [data]);
+
   const filtrados = useMemo(() => {
     if (!data?.itens) return [];
     const q = busca.trim().toLowerCase();
     return data.itens.filter((i) => {
       if (soVencidos && !i.vencido) return false;
       if (filtroForn && i.nome !== filtroForn) return false;
+      if (filtroOp && i.op !== filtroOp) return false;
       if (!q) return true;
       return (i.nome || "").toLowerCase().includes(q) || (i.doc || "").toLowerCase().includes(q) || (i.categoria || "").toLowerCase().includes(q)
-        || (i.pedido || "").toLowerCase().includes(q) || (i.projeto || "").toLowerCase().includes(q) || (i.obs || "").toLowerCase().includes(q);
+        || (i.pedido || "").toLowerCase().includes(q) || (i.projeto || "").toLowerCase().includes(q) || (i.obs || "").toLowerCase().includes(q)
+        || (i.obra || "").toLowerCase().includes(q) || `op-${i.op}`.includes(q);
     });
-  }, [data, busca, soVencidos, filtroForn]);
+  }, [data, busca, soVencidos, filtroForn, filtroOp]);
 
   const totalFiltrado = useMemo(() => filtrados.reduce((s, i) => s + i.saldo, 0), [filtrados]);
 
@@ -574,6 +584,14 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
             <option value="">{ehPagar ? "Todos os fornecedores" : "Todos os clientes"}</option>
             {fornecedores.map((f) => <option key={f} value={f}>{f}</option>)}
           </select>
+          {ehPagar && ops.length > 0 && (
+            <select value={filtroOp} onChange={(e) => { setFiltroOp(e.target.value); setExpandId(null); }}
+              title="Filtrar por OP"
+              className="text-sm border border-gray-200 rounded-lg px-2.5 py-2 bg-white focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none">
+              <option value="">Todas as OPs</option>
+              {ops.map((o) => <option key={o} value={o}>{fmtOP(o)}</option>)}
+            </select>
+          )}
           <button onClick={() => setSoVencidos((v) => !v)}
             className={`text-xs px-3 py-2 rounded-lg border font-medium ${soVencidos ? "bg-red-600 text-white border-red-600" : "bg-white text-torg-gray border-gray-200 hover:border-red-300"}`}>
             Só vencidos
@@ -586,14 +604,15 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
         </div>
       </div>
 
-      {(busca || soVencidos || filtroForn) && (
-        <p className="text-xs text-torg-gray">{filtrados.length} resultado(s) · total filtrado <span className="font-semibold text-torg-dark">{fmtR$(totalFiltrado)}</span>{filtroForn ? ` · ${filtroForn}` : ""}</p>
+      {(busca || soVencidos || filtroForn || filtroOp) && (
+        <p className="text-xs text-torg-gray">{filtrados.length} resultado(s) · total filtrado <span className="font-semibold text-torg-dark">{fmtR$(totalFiltrado)}</span>{filtroOp ? ` · ${fmtOP(filtroOp)}` : ""}{filtroForn ? ` · ${filtroForn}` : ""}</p>
       )}
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50/60 text-left text-[11px] uppercase tracking-wide text-torg-gray">
             <tr>
+              {ehPagar && <th className="px-4 py-2.5">OP</th>}
               <th className="px-4 py-2.5">{ehPagar ? "Fornecedor" : "Cliente"}</th>
               <th className="px-4 py-2.5">Documento</th>
               <th className="px-4 py-2.5">Categoria</th>
@@ -603,17 +622,20 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {filtrados.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-torg-gray text-sm">Nenhum título encontrado.</td></tr>
+              <tr><td colSpan={ehPagar ? 6 : 5} className="px-4 py-10 text-center text-torg-gray text-sm">Nenhum título encontrado.</td></tr>
             ) : filtrados.slice(0, LIMITE).map((i) => {
               const aberto = expandId === i.id;
               return (
                 <Fragment key={i.id}>
                   <tr className={`hover:bg-gray-50/50 ${i.vencido ? "bg-red-50/30" : ""} ${ehPagar ? "cursor-pointer" : ""}`}
                     onClick={ehPagar ? () => setExpandId(aberto ? null : i.id) : undefined}>
-                    <td className="px-4 py-2 text-torg-dark max-w-[260px] truncate" title={i.nome}>
-                      {ehPagar && <ChevronDown size={13} className={`inline-block mr-1 text-torg-gray transition-transform ${aberto ? "" : "-rotate-90"}`} />}
-                      {i.nome}
-                    </td>
+                    {ehPagar && (
+                      <td className="px-4 py-2 whitespace-nowrap font-mono text-torg-blue font-medium">
+                        <ChevronDown size={13} className={`inline-block mr-1 text-torg-gray transition-transform ${aberto ? "" : "-rotate-90"}`} />
+                        {i.op ? fmtOP(i.op) : "—"}
+                      </td>
+                    )}
+                    <td className="px-4 py-2 text-torg-dark max-w-[260px] truncate" title={i.obra ? `${i.nome} · ${i.obra}` : i.nome}>{i.nome}</td>
                     <td className="px-4 py-2 text-torg-gray whitespace-nowrap">{i.doc || "—"}</td>
                     <td className="px-4 py-2 text-torg-gray max-w-[160px] truncate" title={i.categoria}>{i.categoria || "—"}</td>
                     <td className="px-4 py-2 text-center whitespace-nowrap">
@@ -623,13 +645,15 @@ function ContasView({ tipo, data, loading, erro, onRetry }) {
                   </tr>
                   {ehPagar && aberto && (
                     <tr className="bg-torg-blue-50/30">
-                      <td colSpan={5} className="px-4 py-3">
+                      <td colSpan={6} className="px-4 py-3">
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-2 text-xs">
+                          <Det label="OP" v={i.op ? fmtOP(i.op) : "—"} />
+                          <Det label="Obra" v={i.obra} />
                           <Det label="Pedido de compra" v={i.pedido} />
                           <Det label="NF" v={i.nf} />
-                          <Det label="Projeto" v={i.projeto} />
                           <Det label="Parcela" v={i.parcela} />
                           <Det label="Documento" v={i.documento} />
+                          <Det label="Projeto (Omie)" v={i.projeto} />
                           <Det label="Valor total" v={fmtR$(i.valor)} />
                           <Det label="Status" v={i.status} />
                         </div>

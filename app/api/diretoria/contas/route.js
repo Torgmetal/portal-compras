@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireDiretoria } from "@/lib/diretoria";
+import { getProjetosInfo } from "@/lib/omie-pedidos-abertos";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -45,16 +46,26 @@ export async function GET(req) {
     },
     orderBy: { dataVencimento: "asc" },
   });
+  // Mapa projeto Omie (código → { nome da obra, numeroOp }) — resolve a OP de
+  // cada título pelo projetoCodigo (os "projetos" do Omie são as OPs). Não-fatal.
+  let projInfo = new Map();
+  try { projInfo = await getProjetosInfo(); } catch { /* sem OP — segue sem vínculo */ }
+
   const itens = rows
-    .map((c) => ({
-      id: c.id, nome: c.fornecedorNome || "—", valor: r2(c.valor), saldo: r2(Math.max(0, (c.valor || 0) - (c.valorPago || 0))),
-      vencimento: c.dataVencimento, status: c.status, vencido: venc(c.dataVencimento),
-      doc: c.numeroDocFiscal || c.numeroDocumento || "", categoria: c.categoriaNome || "",
-      // Detalhes do título (pedido/projeto/observação vêm do detalhe do Omie)
-      pedido: c.numeroPedidoCompra || "", nf: c.numeroDocFiscal || "", documento: c.numeroDocumento || "",
-      projeto: c.projetoCodigo || "", parcela: c.numeroParcela || "", obs: c.observacao || "",
-      detalheCarregado: !!c.detalheCarregado,
-    }))
+    .map((c) => {
+      const pi = c.projetoCodigo ? projInfo.get(String(c.projetoCodigo)) : null;
+      return {
+        id: c.id, nome: c.fornecedorNome || "—", valor: r2(c.valor), saldo: r2(Math.max(0, (c.valor || 0) - (c.valorPago || 0))),
+        vencimento: c.dataVencimento, status: c.status, vencido: venc(c.dataVencimento),
+        doc: c.numeroDocFiscal || c.numeroDocumento || "", categoria: c.categoriaNome || "",
+        // OP/obra resolvidas pelo projeto do Omie
+        op: pi?.numeroOp || "", obra: pi?.nome || "",
+        // Detalhes do título (pedido/projeto/observação vêm do detalhe do Omie)
+        pedido: c.numeroPedidoCompra || "", nf: c.numeroDocFiscal || "", documento: c.numeroDocumento || "",
+        projeto: c.projetoCodigo || "", parcela: c.numeroParcela || "", obs: c.observacao || "",
+        detalheCarregado: !!c.detalheCarregado,
+      };
+    })
     .filter((i) => i.saldo > 0.005);
   return NextResponse.json({ tipo, total: r2(itens.reduce((s, i) => s + i.saldo, 0)), qtd: itens.length, itens });
 }
