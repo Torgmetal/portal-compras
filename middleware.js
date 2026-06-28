@@ -44,6 +44,11 @@ export default withAuth(
           path.startsWith("/api/mes/") ||
           // Sync LPC SharePoint — auth própria (Bearer MES_SYNC_API_KEY ou sessão no handler)
           path.startsWith("/api/producao/pecas/sync-lpc-sharepoint") ||
+          // Crons da Vercel — chegam SEM sessão NextAuth; cada rota valida o
+          // CRON_SECRET no handler. Sem isto o middleware redirecionava o cron
+          // pro /entrar e NENHUM cron rodava (ex.: conciliação de recebimento).
+          path.startsWith("/api/cron/") ||
+          path.startsWith("/api/producao/sync-sharepoint") ||
           // Resposta de cobranca de cronograma — publico via token
           path.startsWith("/planejamento/cronogramas/resposta/") ||
           path.startsWith("/api/planejamento/cronogramas/cobranca/") ||
