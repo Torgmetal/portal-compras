@@ -23,6 +23,7 @@ model User {
   funcionarioId            String?               @unique
   funcionario              Funcionario?          @relation("UsuarioFuncionario", fields: [funcionarioId], references: [id])
   lotesHoleriteCriados     LoteHolerite[]        @relation("LoteHoleriteCriadoPor")
+  folhasCriadas            FolhaCompetencia[]    @relation("FolhaCriadaPor")
   aditivos                 Aditivo[]
   ajustesPrazoCriados      AjustePrazo[]         @relation("AjustePrazoCreatedBy")
   auditLogs                AuditLog[]
@@ -997,6 +998,7 @@ model Funcionario {
   documentos            Documento[]
   ferias                Ferias[]
   holerites             Holerite[]
+  folhaItens            FolhaItem[]
   usuario               User?                     @relation("UsuarioFuncionario")
   cargo                 Cargo                     @relation(fields: [cargoId], references: [id])
   setor                 Setor                     @relation("FuncionarioSetor", fields: [setorId], references: [id])
@@ -1201,6 +1203,57 @@ model Holerite {
   @@index([competencia])
   @@index([status])
   @@index([funcionarioId])
+}
+
+// Folha de Pagamento — substitui a planilha de fechamento. Uma FolhaCompetencia
+// por mês (AAAA-MM); cada FolhaItem é um funcionário com snapshot do cadastro +
+// os valores digitados pelo RH. Os derivados (Base INSS, FGTS, INSS Patronal...)
+// são calculados em lib/folha-calc.js (não persistidos — fonte única de cálculo).
+model FolhaCompetencia {
+  id          String      @id @default(cuid())
+  competencia String      @unique // "AAAA-MM"
+  status      String      @default("ABERTA") // ABERTA | FECHADA
+  criadoPorId String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  criadoPor   User?       @relation("FolhaCriadaPor", fields: [criadoPorId], references: [id])
+  itens       FolhaItem[]
+
+  @@index([competencia])
+}
+
+model FolhaItem {
+  id            String           @id @default(cuid())
+  folhaId       String
+  funcionarioId String?
+  // Snapshot do cadastro no momento da competência (cadastro muda mês a mês)
+  nome          String
+  cpf           String?
+  empresa       String?
+  centroCusto   String?
+  tipoContrato  String           @default("CLT") // CLT | PJ
+  salarioBase   Float            @default(0)
+  // Digitados pelo RH (vêm do sistema de folha)
+  horasExtras   Float            @default(0)
+  adicionais    Float            @default(0)
+  descontos     Float            @default(0)
+  inss          Float            @default(0)
+  irrf          Float            @default(0)
+  liquido       Float            @default(0)
+  vr            Float            @default(0)
+  ifood         Float            @default(0)
+  kr            Float            @default(0)
+  rescisao      Float            @default(0)
+  observacao    String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  folha         FolhaCompetencia @relation(fields: [folhaId], references: [id], onDelete: Cascade)
+  funcionario   Funcionario?     @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
+
+  @@unique([folhaId, funcionarioId])
+  @@index([folhaId])
+  @@index([empresa])
+  @@index([centroCusto])
 }
 
 // Portal da Qualidade — Módulo 1 (Controle de Documentos). Espelha o padrão dos
@@ -2294,7 +2347,7 @@ model CatalogoProdutoAcessorio {
 
 model MesApontamento {
   id            String    @id @default(cuid())
-  productionId  Int       // NÃO é único por evento — o SKA reaproveita o ProductionID
+  productionId  Int // NÃO é único por evento — o SKA reaproveita o ProductionID
   dataInicio    DateTime
   dataFim       DateTime?
   obra          String

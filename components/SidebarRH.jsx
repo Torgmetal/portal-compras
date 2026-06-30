@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Building2, Briefcase, Clock,
   CalendarDays, Heart, Network, Award, FileText,
-  UserPlus, ShieldAlert, GraduationCap, BedDouble, Map, Receipt,
+  UserPlus, ShieldAlert, GraduationCap, BedDouble, Map, Receipt, Wallet,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -22,6 +22,7 @@ const menu = [
   { href: "/rh/acidentes", label: "Acidentes", icon: ShieldAlert },
   { href: "/rh/treinamentos", label: "Treinamentos", icon: GraduationCap },
   { href: "/rh/holerite", label: "Holerite", icon: Receipt },
+  { href: "/rh/folha", label: "Folha de Pagamento", icon: Wallet },
   { href: "/rh/ponto", label: "Controle de Ponto", icon: Clock },
   { href: "/rh/ferias", label: "Férias", icon: CalendarDays },
   { href: "/rh/beneficios", label: "Benefícios", icon: Heart },
