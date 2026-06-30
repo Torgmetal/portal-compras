@@ -4,9 +4,8 @@ import {
   Users, Search, PlusCircle, Loader2, AlertCircle, X,
   ChevronDown, Edit, UserX, UserCheck, Download, Upload,
   FileSpreadsheet, CheckCircle2, XCircle, UserMinus, MoreVertical,
-  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown, GitCompareArrows,
+  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown,
 } from "lucide-react";
-import Link from "next/link";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -400,10 +399,6 @@ export default function FuncionariosClient() {
           <p className="text-sm text-torg-gray mt-1">{funcionarios.length} cadastrados</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Link href="/rh/funcionarios/reconciliar"
-            className="px-3 py-2 text-sm text-torg-dark border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 font-medium">
-            <GitCompareArrows size={15} /> Reconciliar planilha
-          </Link>
           <button onClick={baixarModelo}
             className="px-3 py-2 text-sm text-torg-blue border border-torg-blue/30 rounded-lg hover:bg-torg-blue/5 inline-flex items-center gap-2 font-medium">
             <Download size={15} /> Baixar modelo
