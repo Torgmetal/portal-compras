@@ -36,10 +36,11 @@ export async function GET(req) {
 
   const inicio = new Date();
   inicio.setDate(inicio.getDate() - dias);
-  // "Hoje" no fuso da fábrica (America/Sao_Paulo) — o Syneco grava o dia
-  // como 00:00 BRT (= 03:00Z); meia-noite UTC pegaria a noite de ontem.
+  // "Hoje" no dia-calendário do Syneco. As datas do Syneco são UTC-naïve (relógio
+  // BRT escrito como se UTC), então o início do dia é 00:00Z — NÃO 03:00Z: o
+  // offset jogava o corte da madrugada (00:00–03:00) pro dia anterior.
   const hojeBRT = new Date(
-    new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }) + "T03:00:00Z"
+    new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }) + "T00:00:00Z"
   );
 
   // Status de PecaConjunto correspondente ao setor

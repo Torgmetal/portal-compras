@@ -15,9 +15,10 @@ export default async function MesPage() {
     .format(new Date()); // retorna "YYYY-MM-DD"
 
   // Default: SÓ O DIA DE HOJE (início = fim = hoje). Pra ver dias anteriores,
-  // o usuário ajusta o filtro de datas na tela. Fronteiras em BRT (-03:00).
-  const de  = new Date(hojeStr + "T00:00:00.000-03:00");
-  const ate = new Date(hojeStr + "T23:59:59.999-03:00");
+  // o usuário ajusta o filtro na tela. Datas do Syneco são UTC-naïve → janela
+  // em 00:00Z/23:59Z (sem offset -03:00, senão a madrugada vaza pro dia anterior).
+  const de  = new Date(hojeStr + "T00:00:00.000Z");
+  const ate = new Date(hojeStr + "T23:59:59.999Z");
 
   const [grupos0, totais0, statusGrupos, opsDb, ultimoSync, totalGeral] = await Promise.all([
     prisma.mesOrdem.groupBy({

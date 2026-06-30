@@ -23,10 +23,12 @@ export async function GET() {
   }
 
   try {
-    // "Hoje"/mês no fuso da fábrica (Syneco grava 00:00 BRT = 03:00Z)
+    // "Hoje"/mês no dia-calendário do Syneco. Datas do Syneco são UTC-naïve
+    // (relógio BRT escrito como UTC) → início em 00:00Z, NÃO 03:00Z (o offset
+    // jogava o corte da madrugada 00:00–03:00 pro dia/mês anterior).
     const hojeIso = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-    const hojeBRT = new Date(hojeIso + "T03:00:00Z");
-    const inicioMes = new Date(hojeIso.slice(0, 7) + "-01T03:00:00Z");
+    const hojeBRT = new Date(hojeIso + "T00:00:00Z");
+    const inicioMes = new Date(hojeIso.slice(0, 7) + "-01T00:00:00Z");
     const [ano, mesNum, diaHoje] = hojeIso.split("-").map(Number);
     const diasNoMes = new Date(ano, mesNum, 0).getDate();
 

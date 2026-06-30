@@ -66,8 +66,10 @@ export async function GET(req) {
   const base = whereSetorSyneco(setor);
   if (de || ate) {
     base.dataFim = {};
-    if (de) base.dataFim.gte = new Date(`${de}T00:00:00`);
-    if (ate) base.dataFim.lte = new Date(`${ate}T23:59:59`);
+    // Datas do Syneco são UTC-naïve → janela em 00:00Z/23:59Z (explícito p/ não
+    // depender do fuso do servidor).
+    if (de) base.dataFim.gte = new Date(`${de}T00:00:00.000Z`);
+    if (ate) base.dataFim.lte = new Date(`${ate}T23:59:59.999Z`);
   }
 
   // Obras marcadas como concluídas (baixa manual) neste setor.

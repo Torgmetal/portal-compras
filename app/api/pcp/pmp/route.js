@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
-import { diaBRT } from "@/lib/data-br";
+import { diaSyneco } from "@/lib/syneco-dia";
 import { carregarSolicitacoes } from "@/lib/solicitacao-producao";
 
 // Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
@@ -73,7 +73,7 @@ export async function GET(req) {
   const realizadoCorteDia = {}; // "YYYY-MM-DD|obraNorm" → { pecas, pesoKg }
   const realizadoCorteObras = {}; // obraNorm → nome original no Syneco
   for (const a of cortadasSemana) {
-    const dia = diaBRT(a.dataFim); // dia-calendário BRT (turno noturno não vaza pro dia seguinte)
+    const dia = diaSyneco(a.dataFim); // dia-calendário do Syneco (UTC-naïve; madrugada não vaza pro dia anterior)
     if (!dia) continue;
     const norm = normObra(a.obra);
     const key = `${dia}|${norm}`;

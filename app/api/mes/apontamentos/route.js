@@ -39,10 +39,11 @@ export async function GET(req) {
   if (setor)  where.setor  = { contains: setor, mode: "insensitive" };
   if (status) where.status = status;
   if (de || ate) {
-    // Datas do Syneco são BRT (UTC-3) → o dia do filtro também é em BRT.
+    // Datas do Syneco são UTC-naïve (relógio BRT escrito como UTC) → janela do
+    // filtro em 00:00Z/23:59Z (sem offset -03:00, senão a madrugada vaza p/ ontem).
     where.dataInicio = {};
-    if (de)  where.dataInicio.gte = new Date(de  + "T00:00:00.000-03:00");
-    if (ate) where.dataInicio.lte = new Date(ate + "T23:59:59.999-03:00");
+    if (de)  where.dataInicio.gte = new Date(de  + "T00:00:00.000Z");
+    if (ate) where.dataInicio.lte = new Date(ate + "T23:59:59.999Z");
   }
   if (peca) {
     where.OR = [

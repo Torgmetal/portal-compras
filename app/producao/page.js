@@ -24,8 +24,8 @@ export default async function PainelProducao() {
   const [ano, mes, dia] = hojeIso.split("-").map(Number);
   const mesStr = String(mes).padStart(2, "0");
   const diasNoMes = new Date(ano, mes, 0).getDate();
-  const inicioMes = new Date(`${ano}-${mesStr}-01T00:00:00.000-03:00`);
-  const fimMes = new Date(`${ano}-${mesStr}-${String(diasNoMes).padStart(2, "0")}T23:59:59.999-03:00`);
+  const inicioMes = new Date(`${ano}-${mesStr}-01T00:00:00.000Z`);
+  const fimMes = new Date(`${ano}-${mesStr}-${String(diasNoMes).padStart(2, "0")}T23:59:59.999Z`);
   // ~12 semanas atrás para a evolução (também por dataInicio, BRT)
   const inicio12sem = new Date(inicioDia);
   inicio12sem.setUTCDate(inicio12sem.getUTCDate() - 84);

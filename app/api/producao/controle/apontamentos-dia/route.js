@@ -23,9 +23,9 @@ export async function GET(req) {
   const [anoStr, mesStr] = dataStr.split("-");
   const ano = Number(anoStr);
   const mes = Number(mesStr);
-  const inicioMes = new Date(`${ano}-${mesStr}-01T00:00:00.000-03:00`);
+  const inicioMes = new Date(`${ano}-${mesStr}-01T00:00:00.000Z`);
   const ultimoDia = new Date(ano, mes, 0).getDate(); // último dia do mês
-  const fimMes = new Date(`${ano}-${mesStr}-${String(ultimoDia).padStart(2, "0")}T23:59:59.999-03:00`);
+  const fimMes = new Date(`${ano}-${mesStr}-${String(ultimoDia).padStart(2, "0")}T23:59:59.999Z`);
 
   // 1) Apontamentos do dia (MesApontamento)
   const apontamentos = await prisma.mesApontamento.findMany({
