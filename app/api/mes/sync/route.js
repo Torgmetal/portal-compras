@@ -141,7 +141,10 @@ export async function POST(req) {
           };
 
           const result = await prisma.mesApontamento.upsert({
-            where:  { productionId: ap.productionId },
+            // Chave por EVENTO: (ProductionID + dataInicio). O SKA reaproveita o
+            // ProductionID, então só por ele o upsert sobrescrevia apontamentos
+            // diferentes (mesmo pid, horários distintos) → peças sumiam.
+            where:  { productionId_dataInicio: { productionId: ap.productionId, dataInicio: dataInicioDate } },
             create: data,
             update: {
               // Atualiza TODOS os campos a cada sync — garante que mudanças

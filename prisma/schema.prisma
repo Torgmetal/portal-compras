@@ -2293,7 +2293,7 @@ model CatalogoProdutoAcessorio {
 
 model MesApontamento {
   id            String    @id @default(cuid())
-  productionId  Int       @unique
+  productionId  Int       // NÃO é único por evento — o SKA reaproveita o ProductionID
   dataInicio    DateTime
   dataFim       DateTime?
   obra          String
@@ -2315,11 +2315,17 @@ model MesApontamento {
   updatedAt     DateTime  @updatedAt
   op            OP?       @relation("MesApontamentosOP", fields: [opId], references: [id])
 
+  // Chave de upsert: (ProductionID + dataInicio). O ProductionID sozinho NÃO
+  // identifica o evento — o SKA o reaproveita (mesmo número vira outro
+  // apontamento em horário diferente), e o upsert por ProductionID sobrescrevia
+  // o anterior → peças sumiam (ex.: corte 1.176kg às 02:11 virava 420kg às 09:02).
+  @@unique([productionId, dataInicio])
   @@index([opId])
   @@index([obra])
   @@index([dataInicio])
   @@index([setor])
   @@index([status])
+  @@index([productionId])
 }
 
 model MesOrdem {
