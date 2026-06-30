@@ -73,6 +73,16 @@ export default withAuth(
         // Demais rotas: precisa estar logado
         if (!token) return false;
 
+        // Funcionário (autoatendimento): só enxerga /meu-rh (+ sua API). Bloqueado
+        // em todo o resto do portal interno. Usuários internos não usam /meu-rh.
+        const isFuncionario = token.tipo === "FUNCIONARIO";
+        if (isFuncionario) {
+          return path.startsWith("/meu-rh") || path.startsWith("/api/meu-rh");
+        }
+        if (path.startsWith("/meu-rh") || path.startsWith("/api/meu-rh")) {
+          return false; // área exclusiva do funcionário
+        }
+
         // Gates por tipo/módulo
         const isAdmin = token.tipo === "ADMIN";
         const modulos = token.modulos ?? [];

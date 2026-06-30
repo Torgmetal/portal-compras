@@ -19,6 +19,10 @@ model User {
   updatedAt                DateTime              @updatedAt
   podeAlterarVerba         Boolean               @default(false)
   tipo                     TipoUsuario
+  // Self-service: quando tipo=FUNCIONARIO, vincula 1:1 ao registro de RH
+  funcionarioId            String?               @unique
+  funcionario              Funcionario?          @relation("UsuarioFuncionario", fields: [funcionarioId], references: [id])
+  lotesHoleriteCriados     LoteHolerite[]        @relation("LoteHoleriteCriadoPor")
   aditivos                 Aditivo[]
   ajustesPrazoCriados      AjustePrazo[]         @relation("AjustePrazoCreatedBy")
   auditLogs                AuditLog[]
@@ -119,8 +123,8 @@ model OP {
   clienteUF            String?
   valorTotalContrato   Float?
   // Definidos na abertura da OP
-  estoqueMaterial      String?              // "PROPRIO_TORG" | "CLIENTE_TERCEIRO"
-  tipoDataBook         String?              // "PADRAO_TORG" | "SNQC" | "RELATORIO_ACOMPANHAMENTO"
+  estoqueMaterial      String? // "PROPRIO_TORG" | "CLIENTE_TERCEIRO"
+  tipoDataBook         String? // "PADRAO_TORG" | "SNQC" | "RELATORIO_ACOMPANHAMENTO"
   aditivos             Aditivo[]
   ajustesPrazo         AjustePrazo[]
   cronogramas          Cronograma[]
@@ -197,8 +201,8 @@ model Romaneio {
   // Controle de NF (a própria Expedição emite/registra — controle interno)
   nfStatus          String?            @default("PENDENTE") // PENDENTE | SOLICITADA | EMITIDA
   nfNumero          String?
-  nfSerie           String?            // série da NF-e (vinda do Omie)
-  nfChave           String?            // chave de acesso (44 díg., vinda do Omie)
+  nfSerie           String? // série da NF-e (vinda do Omie)
+  nfChave           String? // chave de acesso (44 díg., vinda do Omie)
   nfSolicitadaEm    DateTime?
   nfEmitidaEm       DateTime?
   createdById       String?
@@ -233,17 +237,17 @@ model RomaneioItem {
 }
 
 model PlanejamentoCarga {
-  id           String                  @id @default(cuid())
+  id           String                       @id @default(cuid())
   opId         String
   dataPrevista DateTime
   descricao    String?
-  status       String                  @default("PLANEJADO")
-  romaneioId   String?                 @unique
+  status       String                       @default("PLANEJADO")
+  romaneioId   String?                      @unique
   createdById  String?
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
-  op           OP                      @relation(fields: [opId], references: [id])
-  romaneio     Romaneio?               @relation(fields: [romaneioId], references: [id])
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+  op           OP                           @relation(fields: [opId], references: [id])
+  romaneio     Romaneio?                    @relation(fields: [romaneioId], references: [id])
   itens        PlanejamentoCargaItem[]
   historico    PlanejamentoCargaHistorico[]
 
@@ -256,7 +260,7 @@ model PlanejamentoCarga {
 model PlanejamentoCargaHistorico {
   id        String            @id @default(cuid())
   cargaId   String
-  campo     String            // "data" | "qtd" | "status" | "criacao"
+  campo     String // "data" | "qtd" | "status" | "criacao"
   descricao String
   de        String?
   para      String?
@@ -304,9 +308,9 @@ model FluxoCaixa {
   opId          String?
   observacao    String?
   // Origem Omie (extrato de conta corrente) — importados pelo /importar-omie.
-  origemOmieId  String?   // ex: "EXT-<nCodCC>-<nCodLancamento>"; null = lançamento manual
-  contaCorrente String?   // banco/conta de origem (ex: "Inter")
-  contraparte   String?   // fornecedor/cliente do movimento (do extrato Omie)
+  origemOmieId  String? // ex: "EXT-<nCodCC>-<nCodLancamento>"; null = lançamento manual
+  contaCorrente String? // banco/conta de origem (ex: "Inter")
+  contraparte   String? // fornecedor/cliente do movimento (do extrato Omie)
   transferencia Boolean   @default(false) // transferência entre contas próprias
   createdById   String?
   createdAt     DateTime  @default(now())
@@ -348,27 +352,27 @@ model OPMedicao {
 }
 
 model OPReceita {
-  id            String   @id @default(cuid())
-  opId          String
-  ordem         Int      @default(0)
-  categoria     String
-  descricao     String
-  cfop          String?
-  codigoServico String?
-  valor         Float
-  icmsPct       Float?
-  ipiPct        Float?
-  pisPct        Float?
-  cofinsPct     Float?
-  issPct        Float?
-  irrfPct       Float?
-  csllPct       Float?
-  observacao    String?
+  id                  String   @id @default(cuid())
+  opId                String
+  ordem               Int      @default(0)
+  categoria           String
+  descricao           String
+  cfop                String?
+  codigoServico       String?
+  valor               Float
+  icmsPct             Float?
+  ipiPct              Float?
+  pisPct              Float?
+  cofinsPct           Float?
+  issPct              Float?
+  irrfPct             Float?
+  csllPct             Float?
+  observacao          String?
   enderecoFaturamento String? // endereço de entrega/faturamento da linha (obra com múltiplos endereços)
-  createdById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  op            OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+  createdById         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  op                  OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
 
   @@index([opId])
   @@index([categoria])
@@ -379,59 +383,59 @@ model OPReceita {
 // não existem no banco (entrega, inspeção, pedido do cliente) são manuais ou
 // extraídos do PDF da proposta via IA.
 model OPKickOff {
-  id                  String    @id @default(cuid())
-  opId                String    @unique
+  id                     String          @id @default(cuid())
+  opId                   String          @unique
   // Pedido do cliente
-  pedidoCompraCliente String?
+  pedidoCompraCliente    String?
   // Entrega
-  entregaEndereco     String?   // endereço de ENTREGA da obra (≠ endereço fiscal)
-  frete               String?   // "TORG" (CIF, por nossa conta) | "CLIENTE" (FOB)
+  entregaEndereco        String? // endereço de ENTREGA da obra (≠ endereço fiscal)
+  frete                  String? // "TORG" (CIF, por nossa conta) | "CLIENTE" (FOB)
   // Técnica
-  padraoPintura       String?
-  inspecao            String?
+  padraoPintura          String?
+  inspecao               String?
   // Fiscal
-  notaRetorno         Boolean   @default(false)
-  notaRetornoObs      String?
-  fiscalObservacao    String?   // como será o faturamento (complementa a tabela de linhas FD)
+  notaRetorno            Boolean         @default(false)
+  notaRetornoObs         String?
+  fiscalObservacao       String? // como será o faturamento (complementa a tabela de linhas FD)
   // Conteúdo
-  escopo              String?   // resumo curto do fornecimento
-  escopoIncluso       String?   // um item por linha (lista do que ESTÁ incluído)
-  escopoExcluso       String?   // um item por linha (lista do que NÃO está)
-  pontosAtencao       String?   // um por linha
-  observacoes         String?
+  escopo                 String? // resumo curto do fornecimento
+  escopoIncluso          String? // um item por linha (lista do que ESTÁ incluído)
+  escopoExcluso          String? // um item por linha (lista do que NÃO está)
+  pontosAtencao          String? // um por linha
+  observacoes            String?
   // Cronograma prévio acordado com o cliente (marcos por setor/fase)
-  dataEntregaAcordada DateTime?
-  cronograma          Json?     // [{fase, data:"YYYY-MM-DD", obs}]
+  dataEntregaAcordada    DateTime?
+  cronograma             Json? // [{fase, data:"YYYY-MM-DD", obs}]
   // Prioridades de fase/peça/entrega (opcional — só obras que têm)
-  prioridades         Json?     // [{ordem, descricao, data:"YYYY-MM-DD"|null}]
+  prioridades            Json? // [{ordem, descricao, data:"YYYY-MM-DD"|null}]
   // Resumo de pesos da planilha comercial (sem valores em R$)
-  pesoResumo          Json?     // [{descricao, qtd, pesoKg}]
+  pesoResumo             Json? // [{descricao, qtd, pesoKg}]
   // Propostas (PDF) + extração IA — comercial e técnica
-  propostaPdfUrl      String?   // proposta COMERCIAL
-  propostaPdfNome     String?
+  propostaPdfUrl         String? // proposta COMERCIAL
+  propostaPdfNome        String?
   propostaTecnicaPdfUrl  String?
   propostaTecnicaPdfNome String?
-  extraidoIA          Json?
+  extraidoIA             Json?
   // Anexos técnicos: PLP (plano de pintura) e documento de inspeção (ITP)
-  pinturaPlpUrl       String?
-  pinturaPlpNome      String?
-  inspecaoArquivoUrl  String?
-  inspecaoArquivoNome String?
+  pinturaPlpUrl          String?
+  pinturaPlpNome         String?
+  inspecaoArquivoUrl     String?
+  inspecaoArquivoNome    String?
   // Fiscal estruturado
-  tipoFaturamento     String?   // como definido na proposta (medições, eventos, à vista...)
-  faturamentoEventos  Json?     // [{descricao, percentual, valor, prazoPagamento, medicao, obsNF}]
-  retencaoContratual  String?   // ex: "5% — liberação após CND"
-  segurosObrigatorios String?
-  aceites             KickoffAceite[]
+  tipoFaturamento        String? // como definido na proposta (medições, eventos, à vista...)
+  faturamentoEventos     Json? // [{descricao, percentual, valor, prazoPagamento, medicao, obsNF}]
+  retencaoContratual     String? // ex: "5% — liberação após CND"
+  segurosObrigatorios    String?
+  aceites                KickoffAceite[]
   // Reuniões e divulgação
-  kickoffComercialEm  DateTime?
-  kickoffSetoresEm    DateTime?
-  enviadoPara         String?
-  enviadoEm           DateTime?
-  createdById         String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  op                  OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+  kickoffComercialEm     DateTime?
+  kickoffSetoresEm       DateTime?
+  enviadoPara            String?
+  enviadoEm              DateTime?
+  createdById            String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  op                     OP              @relation(fields: [opId], references: [id], onDelete: Cascade)
 }
 
 // Aceite dos setores ao Kick Off divulgado — cada destinatário recebe um link
@@ -753,25 +757,25 @@ model Cotacao {
 }
 
 model CotacaoItem {
-  id           String    @id @default(cuid())
-  cotacaoId    String
-  rmItemId     String
-  precoUnit    Float
-  qtdCotada    Float
-  qtdProposta  Float?
+  id                String    @id @default(cuid())
+  cotacaoId         String
+  rmItemId          String
+  precoUnit         Float
+  qtdCotada         Float
+  qtdProposta       Float?
   // Abatimento por estoque (consulta respondida pela Produção/Engenharia em barras):
   // qtdPecasCotada = nº de barras/peças LÍQUIDO enviado ao fornecedor;
   // estoqueAbatidoQtd = nº de barras/peças abatidas do estoque. Null = sem abatimento.
   qtdPecasCotada    Float?
   estoqueAbatidoQtd Float?
-  icmsPct      Float?
-  ipiPct       Float?
-  observacao   String?
-  vencedor     Boolean   @default(false)
-  prazoEntrega DateTime?
-  semEstoque   Boolean   @default(false)
-  cotacao      Cotacao   @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
-  rmItem       RMItem    @relation(fields: [rmItemId], references: [id])
+  icmsPct           Float?
+  ipiPct            Float?
+  observacao        String?
+  vencedor          Boolean   @default(false)
+  prazoEntrega      DateTime?
+  semEstoque        Boolean   @default(false)
+  cotacao           Cotacao   @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+  rmItem            RMItem    @relation(fields: [rmItemId], references: [id])
 
   @@index([cotacaoId])
   @@index([rmItemId])
@@ -957,6 +961,7 @@ model Funcionario {
   id                    String                    @id @default(cuid())
   nome                  String
   cpf                   String?                   @unique
+  pis                   String? // PIS/PASEP — usado p/ casar marcações do ACJEF (ponto)
   rg                    String?
   dataNascimento        DateTime?
   email                 String?
@@ -985,6 +990,8 @@ model Funcionario {
   dependentes           Dependente[]
   documentos            Documento[]
   ferias                Ferias[]
+  holerites             Holerite[]
+  usuario               User?                     @relation("UsuarioFuncionario")
   cargo                 Cargo                     @relation(fields: [cargoId], references: [id])
   setor                 Setor                     @relation("FuncionarioSetor", fields: [setorId], references: [id])
   beneficios            FuncionarioBeneficio[]
@@ -1111,30 +1118,30 @@ model FuncionarioCompetencia {
 }
 
 model Documento {
-  id              String       @id @default(cuid())
-  nome            String
-  tipo            String
-  categoria       String
-  descricao       String?
-  funcionarioId   String?
-  dataEmissao     DateTime?
-  dataValidade    DateTime?
-  orgaoEmissor    String?
-  numeroDocumento String?
-  observacao      String?
-  ativo           Boolean      @default(true)
+  id               String       @id @default(cuid())
+  nome             String
+  tipo             String
+  categoria        String
+  descricao        String?
+  funcionarioId    String?
+  dataEmissao      DateTime?
+  dataValidade     DateTime?
+  orgaoEmissor     String?
+  numeroDocumento  String?
+  observacao       String?
+  ativo            Boolean      @default(true)
   // Arquivo anexado (Vercel Blob) + cópia de backup no SharePoint (controle ISO)
-  arquivoUrl      String?      // URL do Blob (privada: só servida via proxy autenticado)
-  arquivoNome     String?
-  arquivoTamanho  Int?
-  arquivoTipo     String?
-  sharepointUrl   String?      // webUrl da cópia no SharePoint (backup ISO)
+  arquivoUrl       String? // URL do Blob (privada: só servida via proxy autenticado)
+  arquivoNome      String?
+  arquivoTamanho   Int?
+  arquivoTipo      String?
+  sharepointUrl    String? // webUrl da cópia no SharePoint (backup ISO)
   // Quando setado, o arquivo é servido direto do SharePoint (sem cópia no Blob) —
   // usado pela importação em massa dos documentos de RH já existentes no SP.
-  sharepointItemId String?     @unique
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  funcionario     Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  sharepointItemId String?      @unique
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  funcionario      Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
 
   @@index([funcionarioId])
   @@index([categoria])
@@ -1142,43 +1149,91 @@ model Documento {
   @@index([tipo])
 }
 
+// Lote de importação de holerites — um PDF multipágina (1 holerite/página) que a
+// contabilidade envia por competência. Mantém o arquivo original e rastreia o split.
+model LoteHolerite {
+  id                  String     @id @default(cuid())
+  competencia         String // "AAAA-MM" (ex: "2026-05")
+  empresa             String? // razão social predominante (TORG Metal, VMI...)
+  cnpj                String?
+  arquivoOriginalUrl  String? // Blob privado do PDF completo enviado
+  arquivoOriginalNome String?
+  totalPaginas        Int        @default(0)
+  criadoPorId         String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  criadoPor           User?      @relation("LoteHoleriteCriadoPor", fields: [criadoPorId], references: [id])
+  holerites           Holerite[]
+
+  @@index([competencia])
+}
+
+// Holerite individual de um funcionário numa competência. Arquivo (página única)
+// no Blob privado, servido via proxy autenticado (mesmo padrão de Documento).
+model Holerite {
+  id             String        @id @default(cuid())
+  funcionarioId  String
+  loteId         String?
+  competencia    String // "AAAA-MM"
+  empresa        String?
+  tipo           String        @default("MENSAL") // MENSAL | DECIMO_TERCEIRO | FERIAS | RESCISAO
+  valorLiquido   Float? // parse best-effort do PDF
+  arquivoUrl     String? // Blob privado da página individual
+  arquivoNome    String?
+  arquivoTamanho Int?
+  status         String        @default("PENDENTE") // PENDENTE | ENVIADO | VISUALIZADO | CONFIRMADO
+  enviadoEm      DateTime?
+  visualizadoEm  DateTime?
+  confirmadoEm   DateTime?
+  confirmadoIp   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  funcionario    Funcionario   @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  lote           LoteHolerite? @relation(fields: [loteId], references: [id], onDelete: SetNull)
+
+  @@unique([funcionarioId, competencia, tipo])
+  @@index([competencia])
+  @@index([status])
+  @@index([funcionarioId])
+}
+
 // Portal da Qualidade — Módulo 1 (Controle de Documentos). Espelha o padrão dos
 // documentos de RH (arquivo no Blob privado + backup ISO no SharePoint + proxy
 // de download), com camada de VALIDAÇÃO da informação e amarração a norma +
 // validade. Status (vigente/vencendo/vencido) é SEMPRE calculado (lib/qualidade-status).
 model DocumentoQualidade {
-  id              String    @id @default(cuid())
-  nome            String
-  categoria       String    // EQUIPAMENTOS | FUNCIONARIOS | SISTEMA | INSPETORES
-  tipo            String?   // tipo específico (MTC, ASO, calibração, WPS...)
-  norma           String?   // AWS D1.1 · NR-35 · ISO 2808 · NBR 16775
-  vinculo         String?   // texto livre: OP-083 · Soldador João · Munck 01 · TORG
-  opNumero        String?   // vínculo estruturado opcional (alimenta o Data Book)
-  numeroCorrida   String?   // heat — certificados de material (rastreabilidade)
-  numeroDocumento String?   // nº do certificado (ex.: importação CMR)
-  fornecedor      String?   // fornecedor do material (importação CMR)
-  importRef       String?   // índice na planilha de origem (dedupe do import, em código)
-  dataEmissao     DateTime?
-  dataValidade    DateTime? // null = sem validade
-  responsavel     String?
-  observacao      String?
-  origem          String    @default("registro_manual") // registro_manual | importacao_planilha
+  id               String    @id @default(cuid())
+  nome             String
+  categoria        String // EQUIPAMENTOS | FUNCIONARIOS | SISTEMA | INSPETORES
+  tipo             String? // tipo específico (MTC, ASO, calibração, WPS...)
+  norma            String? // AWS D1.1 · NR-35 · ISO 2808 · NBR 16775
+  vinculo          String? // texto livre: OP-083 · Soldador João · Munck 01 · TORG
+  opNumero         String? // vínculo estruturado opcional (alimenta o Data Book)
+  numeroCorrida    String? // heat — certificados de material (rastreabilidade)
+  numeroDocumento  String? // nº do certificado (ex.: importação CMR)
+  fornecedor       String? // fornecedor do material (importação CMR)
+  importRef        String? // índice na planilha de origem (dedupe do import, em código)
+  dataEmissao      DateTime?
+  dataValidade     DateTime? // null = sem validade
+  responsavel      String?
+  observacao       String?
+  origem           String    @default("registro_manual") // registro_manual | importacao_planilha
   // Validação da informação (camada de revisão antes de valer no data book)
-  validado        Boolean   @default(false)
-  validadoPorId   String?
-  validadoEm      DateTime?
+  validado         Boolean   @default(false)
+  validadoPorId    String?
+  validadoEm       DateTime?
   // Arquivo (Vercel Blob privado) + backup ISO no SharePoint (mesmo padrão do RH)
   arquivoUrl       String?
   arquivoNome      String?
   arquivoTamanho   Int?
   arquivoTipo      String?
-  sharepointUrl    String?  // webUrl da cópia/origem no SharePoint
-  sharepointItemId String?  // item do SharePoint servido via proxy (1 PDF de faixa pode atender vários docs)
-  ativo            Boolean  @default(true) // soft delete
+  sharepointUrl    String? // webUrl da cópia/origem no SharePoint
+  sharepointItemId String? // item do SharePoint servido via proxy (1 PDF de faixa pode atender vários docs)
+  ativo            Boolean   @default(true) // soft delete
   invalidadoMotivo String?
   createdById      String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([categoria])
   @@index([dataValidade])
@@ -1192,30 +1247,30 @@ model DocumentoQualidade {
 // Uma por OP, com as 20 seções (template em lib/databook-secoes). Seções de
 // fonte "modulo1" puxam documentos do Controle de Documentos pelo vínculo de OP.
 model DataBookQualidade {
-  id          String          @id @default(cuid())
-  opNumero    String          @unique
-  opId        String?
-  cliente     String?
-  obra        String?
-  pesoTotalKg Float?
-  pecas       Int?
-  tipo        String?         // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
-  observacao  String?
-  status      String          @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | ENVIADO_CLIENTE | ACEITO
-  emitidoEm   DateTime?
+  id               String               @id @default(cuid())
+  opNumero         String               @unique
+  opId             String?
+  cliente          String?
+  obra             String?
+  pesoTotalKg      Float?
+  pecas            Int?
+  tipo             String? // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
+  observacao       String?
+  status           String               @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | ENVIADO_CLIENTE | ACEITO
+  emitidoEm        DateTime?
   // Envio e aceite pelo cliente (link público por token, sem login)
-  tokenCliente     String?    @unique
+  tokenCliente     String?              @unique
   clienteEmail     String?
   enviadoClienteEm DateTime?
   aceiteEm         DateTime?
   aceiteNome       String?
   aceiteIp         String?
-  criadoPorId String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  secoes      DataBookSecao[]
-  aprovacoes  DataBookAprovacao[]
-  assinaturas DataBookAssinatura[]
+  criadoPorId      String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  secoes           DataBookSecao[]
+  aprovacoes       DataBookAprovacao[]
+  assinaturas      DataBookAssinatura[]
 
   @@index([opNumero])
 }
@@ -1249,7 +1304,7 @@ model DataBookAprovacao {
   dataBookId String
   userId     String?
   nome       String
-  papel      String?           // INSPETOR | QUALIDADE | RESP_TECNICO | OUTRO
+  papel      String? // INSPETOR | QUALIDADE | RESP_TECNICO | OUTRO
   aprovadoEm DateTime          @default(now())
   dataBook   DataBookQualidade @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
 
@@ -1261,14 +1316,14 @@ model DataBookAprovacao {
 // compartilhados com ele num portal público (link por token, sem login).
 model Auditoria {
   id                 String         @id @default(cuid())
-  empresa            String         // empresa do cliente/auditor
-  contato            String?        // pessoa de contato no cliente
-  titulo             String?        // ex.: "Auditoria de Qualificação 2026"
+  empresa            String // empresa do cliente/auditor
+  contato            String? // pessoa de contato no cliente
+  titulo             String? // ex.: "Auditoria de Qualificação 2026"
   mensagemBoasVindas String?
-  capaUrl            String?        // foto de capa do hero do portal (Blob)
-  dataBookModeloUrl  String?        // PDF de Data Book modelo (exemplo p/ o cliente ver)
-  checklistJson      Json?          // status dos requisitos do GQ-FQ-003 { reqId: status }
-  solicitacoes       String?        // o que o cliente pediu (texto / e-mail colado)
+  capaUrl            String? // foto de capa do hero do portal (Blob)
+  dataBookModeloUrl  String? // PDF de Data Book modelo (exemplo p/ o cliente ver)
+  checklistJson      Json? // status dos requisitos do GQ-FQ-003 { reqId: status }
+  solicitacoes       String? // o que o cliente pediu (texto / e-mail colado)
   token              String?        @unique
   status             String         @default("RASCUNHO") // RASCUNHO | PUBLICADO
   publicadoEm        DateTime?
@@ -1288,14 +1343,14 @@ model AuditoriaDoc {
   id               String    @id @default(cuid())
   auditoriaId      String
   tipo             String    @default("EVIDENCIA") // SOLICITACAO (pedido do cliente) | EVIDENCIA (compartilhado)
-  secao            String?   // área do GQ-FQ-003 (aba no portal)
-  requisito        String?   // id do requisito/linha do GQ-FQ-003 que o documento atende
+  secao            String? // área do GQ-FQ-003 (aba no portal)
+  requisito        String? // id do requisito/linha do GQ-FQ-003 que o documento atende
   nome             String
   arquivoUrl       String?
   arquivoTipo      String?
   arquivoTamanho   Int?
   sharepointItemId String?
-  documentoId      String?   // vínculo opcional a um DocumentoQualidade existente
+  documentoId      String? // vínculo opcional a um DocumentoQualidade existente
   createdAt        DateTime  @default(now())
   auditoria        Auditoria @relation(fields: [auditoriaId], references: [id], onDelete: Cascade)
 
@@ -1303,18 +1358,18 @@ model AuditoriaDoc {
 }
 
 model DataBookSecao {
-  id         String             @id @default(cuid())
-  dataBookId String
-  numero     String             // "01".."20"
-  titulo     String
-  norma      String?
-  fonte      String             // sistema | upload | modulo1 | entrada_a | misto
-  estado     String             @default("PENDENTE") // PENDENTE | ANEXADO | NA
-  observacao String?
-  conteudoJson Json?            // conteúdo gerado no portal (ex.: tabela do PIT da §10)
-  ordem      Int
-  dataBook   DataBookQualidade  @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
-  documentos DataBookSecaoDoc[]
+  id           String             @id @default(cuid())
+  dataBookId   String
+  numero       String // "01".."20"
+  titulo       String
+  norma        String?
+  fonte        String // sistema | upload | modulo1 | entrada_a | misto
+  estado       String             @default("PENDENTE") // PENDENTE | ANEXADO | NA
+  observacao   String?
+  conteudoJson Json? // conteúdo gerado no portal (ex.: tabela do PIT da §10)
+  ordem        Int
+  dataBook     DataBookQualidade  @relation(fields: [dataBookId], references: [id], onDelete: Cascade)
+  documentos   DataBookSecaoDoc[]
 
   @@unique([dataBookId, numero])
   @@index([dataBookId])
@@ -1481,7 +1536,7 @@ model LpcRevisao {
 // uma vez (evita a busca automática pegar o arquivo/pasta errado).
 model OpLpcPasta {
   opPasta    String   @id // nome da pasta da OP ("OP-067 - Danpower …")
-  pastaPath  String       // caminho relativo do folder onde ficam os LPC
+  pastaPath  String // caminho relativo do folder onde ficam os LPC
   salvoEm    DateTime @default(now())
   salvoPorId String?
 }
@@ -1628,32 +1683,32 @@ model PecaConjunto {
   precoTotal             Float                   @default(0)
   precoUnitario          Float                   @default(0)
   // Campos LPC — conjunto/croqui
-  tipoPeca               String?                 // "CONJUNTO" | "CROQUI" | null (legado LE)
-  material               String?                 // "A36", "A572-GR.50"
-  perfil                 String?                 // "W410X46.1", "CH4.80X70"
-  comprimentoMm          Float?                  // comprimento em mm
-  areaPinturaM2          Float?                  // area de pintura m²
-  statusPrep             String?                 // "PENDENTE" | "PREPARADO" (so croquis)
-  maquina                String?                 // maquina de corte atribuida (LASER_CHAPA, LASER_PERFIL, LASER_TUBO, LASER_CANTONEIRA)
-  statusEstoque          String?                 // "DISPONIVEL" | "PARCIAL" | "INDISPONIVEL" | null (nao conferido)
-  prioridade             Int?                    // prioridade manual na Programação (vazia = sem prioridade); preservada na reimportação LPC
-  ordemCampo             Int?                    // ordem de envio a campo (1 = primeiro); vazio = sem prioridade
+  tipoPeca               String? // "CONJUNTO" | "CROQUI" | null (legado LE)
+  material               String? // "A36", "A572-GR.50"
+  perfil                 String? // "W410X46.1", "CH4.80X70"
+  comprimentoMm          Float? // comprimento em mm
+  areaPinturaM2          Float? // area de pintura m²
+  statusPrep             String? // "PENDENTE" | "PREPARADO" (so croquis)
+  maquina                String? // maquina de corte atribuida (LASER_CHAPA, LASER_PERFIL, LASER_TUBO, LASER_CANTONEIRA)
+  statusEstoque          String? // "DISPONIVEL" | "PARCIAL" | "INDISPONIVEL" | null (nao conferido)
+  prioridade             Int? // prioridade manual na Programação (vazia = sem prioridade); preservada na reimportação LPC
+  ordemCampo             Int? // ordem de envio a campo (1 = primeiro); vazio = sem prioridade
   // Serviço terceirizado — peça fabricada por terceiros: NÃO passa pelo corte; fica em
   // espera (status TERCEIRIZADO) até o Compras receber, então é liberada pro destino.
   terceirizado           Boolean                 @default(false)
-  destinoTerceirizado    String?                 // "MONTAGEM" | "PINTURA" | "EXPEDICAO"
+  destinoTerceirizado    String? // "MONTAGEM" | "PINTURA" | "EXPEDICAO"
   terceirizadoRecebidoEm DateTime?
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.
-  corteOrdem             Int?                    // posição na fila (menor = corta primeiro)
+  corteOrdem             Int? // posição na fila (menor = corta primeiro)
   corteDataMetaInicio    DateTime?               @db.Date
   corteDataMetaFim       DateTime?               @db.Date
-  corteIniciadoEm        DateTime?               // real início do corte
-  corteConcluidoEm       DateTime?               // real fim do corte
+  corteIniciadoEm        DateTime? // real início do corte
+  corteConcluidoEm       DateTime? // real fim do corte
   // Campos de produção (populados pelo Syneco)
   qteProduzida           Int                     @default(0)
   pesoProduzido          Float                   @default(0)
-  dataProducao           DateTime?               // data fim da produção (Syneco)
+  dataProducao           DateTime? // data fim da produção (Syneco)
   op                     OP?                     @relation(fields: [opId], references: [id])
   planejamentos          PecaPlanejamento[]
   planejamentoCargaItens PlanejamentoCargaItem[]
@@ -1675,7 +1730,7 @@ model PecaConjunto {
 model ConjuntoEntrega {
   id             String       @id @default(cuid())
   pecaConjuntoId String
-  destino        String       // local/endereço de entrega
+  destino        String // local/endereço de entrega
   quantidade     Int          @default(0)
   createdAt      DateTime     @default(now())
   pecaConjunto   PecaConjunto @relation(fields: [pecaConjuntoId], references: [id], onDelete: Cascade)
@@ -1685,12 +1740,12 @@ model ConjuntoEntrega {
 
 // Relacao many-to-many: qual croqui pertence a qual conjunto
 model ConjuntoCroqui {
-  id             String       @id @default(cuid())
-  conjuntoId     String
-  croquiId       String
-  qtdNoConjunto  Int          @default(1)
-  conjunto       PecaConjunto @relation("ConjuntoCroquis_conjunto", fields: [conjuntoId], references: [id], onDelete: Cascade)
-  croqui         PecaConjunto @relation("ConjuntoCroquis_croqui", fields: [croquiId], references: [id], onDelete: Cascade)
+  id            String       @id @default(cuid())
+  conjuntoId    String
+  croquiId      String
+  qtdNoConjunto Int          @default(1)
+  conjunto      PecaConjunto @relation("ConjuntoCroquis_conjunto", fields: [conjuntoId], references: [id], onDelete: Cascade)
+  croqui        PecaConjunto @relation("ConjuntoCroquis_croqui", fields: [croquiId], references: [id], onDelete: Cascade)
 
   @@unique([conjuntoId, croquiId])
   @@index([conjuntoId])
@@ -1892,20 +1947,20 @@ model CronogramaItem {
 }
 
 model MontagemItem {
-  id            String         @id @default(cuid())
-  estudoId      String
-  secao         String
-  descricao     String
-  quantidade    Int            @default(1)
-  dias          Float          @default(0)
-  custoDiario   Float          @default(0)
-  custoFixo     Float          @default(0)
-  custoTotal    Float          @default(0)
-  observacao    String?
-  ordem         Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  estudo        PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
+  id          String         @id @default(cuid())
+  estudoId    String
+  secao       String
+  descricao   String
+  quantidade  Int            @default(1)
+  dias        Float          @default(0)
+  custoDiario Float          @default(0)
+  custoFixo   Float          @default(0)
+  custoTotal  Float          @default(0)
+  observacao  String?
+  ordem       Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  estudo      PropostaEstudo @relation(fields: [estudoId], references: [id], onDelete: Cascade)
 
   @@index([estudoId])
   @@index([estudoId, secao])
@@ -2202,9 +2257,9 @@ model BDMPerfil {
 
 model CatalogoPerfilEstrutura {
   id        String   @id @default(cuid())
-  categoria String   // VIGAS_W, PERFIL_HP, TUBO_REDONDO, etc.
-  perfil    String   // nome do perfil (ex: "W 200 x 26,6")
-  pesoKgM   Float    // peso kg/m
+  categoria String // VIGAS_W, PERFIL_HP, TUBO_REDONDO, etc.
+  perfil    String // nome do perfil (ex: "W 200 x 26,6")
+  pesoKgM   Float // peso kg/m
   ativo     Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2216,7 +2271,7 @@ model CatalogoPerfilEstrutura {
 
 model CatalogoProdutoAcessorio {
   id                   String   @id @default(cuid())
-  categoria            String   // TELHAS, GRADES_DE_PISO, STEEL_DECK, PAINEIS_ISO
+  categoria            String // TELHAS, GRADES_DE_PISO, STEEL_DECK, PAINEIS_ISO
   nome                 String
   pesoM2               Float
   espessuraMm          Float?
@@ -2382,18 +2437,18 @@ model LancamentoConferencia {
 // Vínculo manual de uma NFS-e emitida na prefeitura (SigissWeb/Conchal), que não
 // está no Omie, com um projeto/obra do Omie — para somar no faturado da obra.
 model NfseConchalVinculo {
-  id          String    @id @default(cuid())
-  numero      String // NUM_DOCU_FISCAL
-  serie       String // SERIE_DOCU_FISCAL
-  codProj     String // projeto Omie vinculado (= obra na tela Faturamento). String: o codProj do Omie estoura INT4.
-  projetoNome String?
-  valor       Float     @default(0)
-  data        DateTime?
-  tomadorNome String?
-  descricao   String?
+  id           String    @id @default(cuid())
+  numero       String // NUM_DOCU_FISCAL
+  serie        String // SERIE_DOCU_FISCAL
+  codProj      String // projeto Omie vinculado (= obra na tela Faturamento). String: o codProj do Omie estoura INT4.
+  projetoNome  String?
+  valor        Float     @default(0)
+  data         DateTime?
+  tomadorNome  String?
+  descricao    String?
   vinculadoPor String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([numero, serie])
   @@index([codProj])
@@ -2519,7 +2574,7 @@ model Cronograma {
   sharepointPath String               @unique
   dataInicio     DateTime?
   dataFim        DateTime?
-  dataBase       DateTime?            // Data base (baseline) — referencia do cronograma
+  dataBase       DateTime? // Data base (baseline) — referencia do cronograma
   tipoDias       String               @default("DU") // DU = dias uteis, DC = dias corridos
   ultimoSync     DateTime             @default(now())
   ativo          Boolean              @default(true)
@@ -2542,8 +2597,8 @@ model CronogramaTarefa {
   departamento        DepartamentoCronograma?
   dataInicioPrevista  DateTime?
   dataFimPrevista     DateTime?
-  dataInicioBase      DateTime?               // Baseline start (snapshot na data base)
-  dataFimBase         DateTime?               // Baseline end (snapshot na data base)
+  dataInicioBase      DateTime? // Baseline start (snapshot na data base)
+  dataFimBase         DateTime? // Baseline end (snapshot na data base)
   percentualPrevisto  Float                   @default(0)
   percentualRealizado Float                   @default(0)
   qtdePlanejada       Float                   @default(0)
@@ -2551,10 +2606,10 @@ model CronogramaTarefa {
   isSummary           Boolean                 @default(false)
   outlineLevel        Int                     @default(0)
   parentUid           Int?
-  antecessoraIds      String[]  @default([])  // IDs de tarefas predecessoras (finish-to-start)
+  antecessoraIds      String[]                @default([]) // IDs de tarefas predecessoras (finish-to-start)
   duracaoDias         Int                     @default(0) // Duracao em dias (DU ou DC conforme cronograma)
-  dataLiberacao       DateTime?               // Data em que a tarefa foi liberada (desbloqueio externo)
-  motivoBloqueio      String?                 // Ex: "Aguardando assinatura do aditivo"
+  dataLiberacao       DateTime? // Data em que a tarefa foi liberada (desbloqueio externo)
+  motivoBloqueio      String? // Ex: "Aguardando assinatura do aditivo"
   observacao          String?
   dataRealizacao      DateTime?
   // Execução REAL — não altera as datas previstas/base; o atraso é derivado
@@ -2583,15 +2638,15 @@ model CronogramaRegistro {
 
 // Linha de controle — cada alteracao no cronograma gera uma revisao
 model CronogramaRevisao {
-  id            String     @id @default(cuid())
-  cronogramaId  String
-  tipo          String     // BASELINE_DEFINIDA, TAREFA_ALTERADA, SYNC_SHAREPOINT, DATA_ALTERADA
-  descricao     String     // Descricao legivel da alteracao
-  diff          Json?      // { campo, antes, depois } ou snapshot
-  createdById   String
-  createdAt     DateTime   @default(now())
-  cronograma    Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
-  createdBy     User       @relation("CronogramaRevisaoCreatedBy", fields: [createdById], references: [id])
+  id           String     @id @default(cuid())
+  cronogramaId String
+  tipo         String // BASELINE_DEFINIDA, TAREFA_ALTERADA, SYNC_SHAREPOINT, DATA_ALTERADA
+  descricao    String // Descricao legivel da alteracao
+  diff         Json? // { campo, antes, depois } ou snapshot
+  createdById  String
+  createdAt    DateTime   @default(now())
+  cronograma   Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+  createdBy    User       @relation("CronogramaRevisaoCreatedBy", fields: [createdById], references: [id])
 
   @@index([cronogramaId])
   @@index([createdAt])
@@ -2599,55 +2654,55 @@ model CronogramaRevisao {
 
 // Cobranca por email — cada envio gera um token publico para o setor responder com novas datas
 model CronogramaCobranca {
-  id              String     @id @default(cuid())
-  token           String     @unique @default(cuid())
-  cronogramaId    String
-  departamento    String
-  emailsEnviados  String[]   // Para quem foi enviado
-  tarefaIds       String[]   // IDs das tarefas cobradas (atrasadas no momento do envio)
-  respondido      Boolean    @default(false)
-  respostas       Json?      // [{ tarefaId, novaData, comentario }]
-  createdById     String
-  createdAt       DateTime   @default(now())
-  respondidoAt    DateTime?
-  respondidoPor   String?    // Nome/email de quem respondeu
-  cronograma      Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
-  createdBy       User       @relation("CobrancaCreatedBy", fields: [createdById], references: [id])
+  id             String     @id @default(cuid())
+  token          String     @unique @default(cuid())
+  cronogramaId   String
+  departamento   String
+  emailsEnviados String[] // Para quem foi enviado
+  tarefaIds      String[] // IDs das tarefas cobradas (atrasadas no momento do envio)
+  respondido     Boolean    @default(false)
+  respostas      Json? // [{ tarefaId, novaData, comentario }]
+  createdById    String
+  createdAt      DateTime   @default(now())
+  respondidoAt   DateTime?
+  respondidoPor  String? // Nome/email de quem respondeu
+  cronograma     Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+  createdBy      User       @relation("CobrancaCreatedBy", fields: [createdById], references: [id])
 
   @@index([cronogramaId])
   @@index([token])
 }
 
 model TarefaPlanejamento {
-  id            String    @id @default(cuid())
-  titulo        String
-  descricao     String?
-  opNumero      String?
-  opId          String?
-  setor         String
-  semanaIso     Int
-  ano           Int
-  status        String    @default("PENDENTE")
-  prioridade    String    @default("MEDIA")
-  responsavel   String?
-  dataPrevista  DateTime?
-  dataConcluida DateTime?
-  observacao    String?
+  id                String        @id @default(cuid())
+  titulo            String
+  descricao         String?
+  opNumero          String?
+  opId              String?
+  setor             String
+  semanaIso         Int
+  ano               Int
+  status            String        @default("PENDENTE")
+  prioridade        String        @default("MEDIA")
+  responsavel       String?
+  dataPrevista      DateTime?
+  dataConcluida     DateTime?
+  observacao        String?
   // Tarefa de responsabilidade do CLIENTE (ele fornece/aprova). Cobrança/confirmação
   // por e-mail com resposta de 1 clique (token público, sem login).
-  doCliente          Boolean   @default(false)
-  clienteNome        String?
-  clienteEmail       String?
-  clienteToken       String?   @unique
-  clienteAvisadoEm   DateTime?
-  clienteRespostaEm  DateTime?
-  clienteResposta    String?
-  createdById   String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  createdBy     User?     @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id])
-  op            OP?       @relation(fields: [opId], references: [id])
-  compromissos  Compromisso[]
+  doCliente         Boolean       @default(false)
+  clienteNome       String?
+  clienteEmail      String?
+  clienteToken      String?       @unique
+  clienteAvisadoEm  DateTime?
+  clienteRespostaEm DateTime?
+  clienteResposta   String?
+  createdById       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  createdBy         User?         @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id])
+  op                OP?           @relation(fields: [opId], references: [id])
+  compromissos      Compromisso[]
 
   @@index([semanaIso, ano])
   @@index([setor])
@@ -2675,9 +2730,9 @@ model ListaExpedicao {
   opId             String?
   arquivo          String
   revisao          String?
-  itemId           String?   // id do arquivo no SharePoint (re-download)
+  itemId           String? // id do arquivo no SharePoint (re-download)
   fileModificado   DateTime?
-  hash             String?   // sha1 do conteúdo (detectar mudança)
+  hash             String? // sha1 do conteúdo (detectar mudança)
   marcas           Int       @default(0)
   qtdItens         Int       @default(0)
   pesoContratado   Float     @default(0)
@@ -2729,6 +2784,7 @@ model ConfigAssistente {
 enum TipoUsuario {
   ADMIN
   USUARIO
+  FUNCIONARIO // acesso de autoatendimento (portal /meu-rh); não passa em módulos internos
 }
 
 enum Modulo {
@@ -2819,7 +2875,7 @@ model SolicitacaoProducao {
   cronogramaId   String?
   dataEntrega    DateTime? @db.Date
   datasSetor     Json      @default("{}")
-  hhPorTonManual Float?    // produtividade informada no Planejamento (sobrepõe o comercial)
+  hhPorTonManual Float? // produtividade informada no Planejamento (sobrepõe o comercial)
   prioridade     String    @default("MEDIA") // ALTA | MEDIA | BAIXA
   status         String    @default("SOLICITADA") // SOLICITADA | EM_PRODUCAO | ATRASADA | CONCLUIDA
   liberadoLpcLe  Boolean   @default(false)
@@ -2969,11 +3025,11 @@ enum DepartamentoCronograma {
 // Visao semanal = SUM(metas da semana).
 model PmpMeta {
   id          String   @id @default(cuid())
-  data        DateTime @db.Date          // dia-alvo
-  setor       String                     // CORTE, MONTAGEM, SOLDA, ACABAMENTO, JATO, PINTURA, EXPEDIDO
-  opNumero    String                     // OP
-  metaPecas   Int      @default(0)       // meta em pecas
-  metaPesoKg  Float    @default(0)       // meta em kg
+  data        DateTime @db.Date // dia-alvo
+  setor       String // CORTE, MONTAGEM, SOLDA, ACABAMENTO, JATO, PINTURA, EXPEDIDO
+  opNumero    String // OP
+  metaPecas   Int      @default(0) // meta em pecas
+  metaPesoKg  Float    @default(0) // meta em kg
   observacao  String?
   criadoPorId String
   criadoPor   User     @relation("PmpMetaCriador", fields: [criadoPorId], references: [id])
@@ -2988,23 +3044,23 @@ model PmpMeta {
 }
 
 model Compromisso {
-  id          String    @id @default(cuid())
+  id          String              @id @default(cuid())
   titulo      String
   descricao   String?
   data        DateTime
-  concluido   Boolean   @default(false)
+  concluido   Boolean             @default(false)
   concluidoEm DateTime?
   userId      String
   tarefaId    String?
   opNumero    String?
   setor       String?
-  prioridade  String    @default("MEDIA")
+  prioridade  String              @default("MEDIA")
   criadoPorId String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  user        User      @relation("CompromissoUser", fields: [userId], references: [id])
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  user        User                @relation("CompromissoUser", fields: [userId], references: [id])
   tarefa      TarefaPlanejamento? @relation(fields: [tarefaId], references: [id])
-  criadoPor   User?     @relation("CompromissoCriadoPor", fields: [criadoPorId], references: [id])
+  criadoPor   User?               @relation("CompromissoCriadoPor", fields: [criadoPorId], references: [id])
 
   @@index([userId, data])
   @@index([userId, concluido])
