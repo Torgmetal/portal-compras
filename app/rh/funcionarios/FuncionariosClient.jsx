@@ -4,7 +4,7 @@ import {
   Users, Search, PlusCircle, Loader2, AlertCircle, X,
   ChevronDown, Edit, UserX, UserCheck, Download, Upload,
   FileSpreadsheet, CheckCircle2, XCircle, UserMinus, MoreVertical,
-  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil,
+  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -41,6 +41,8 @@ export default function FuncionariosClient() {
   const [busca, setBusca] = useState("");
   const [filtroSetor, setFiltroSetor] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroEmpresa, setFiltroEmpresa] = useState("");
+  const [ordenacao, setOrdenacao] = useState({ campo: "nome", dir: "asc" });
   const [modalAberto, setModalAberto] = useState(false);
   const [editandoId, setEditandoId] = useState(null); // null = novo; id = editando
   const [salvando, setSalvando] = useState(false);
@@ -101,18 +103,45 @@ export default function FuncionariosClient() {
   useEffect(() => { carregar(); }, []);
 
   // Filtros
+  // Empresas distintas p/ o filtro
+  const empresas = useMemo(
+    () => [...new Set(funcionarios.map((f) => (f.empresa || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [funcionarios]
+  );
+
+  // Clique no cabeçalho: alterna asc/desc; salário e admissão começam em desc (maior→menor / mais recente)
+  const ordenarPor = (campo) =>
+    setOrdenacao((o) =>
+      o.campo === campo
+        ? { campo, dir: o.dir === "asc" ? "desc" : "asc" }
+        : { campo, dir: campo === "nome" ? "asc" : "desc" }
+    );
+
   const filtrados = useMemo(() => {
-    return funcionarios.filter((f) => {
+    const arr = funcionarios.filter((f) => {
       if (filtroSetor && f.setor?.id !== filtroSetor) return false;
       if (filtroStatus && f.status !== filtroStatus) return false;
+      if (filtroEmpresa && (f.empresa || "").trim() !== filtroEmpresa) return false;
       if (busca) {
         const b = busca.toLowerCase();
-        const hay = `${f.nome} ${f.cpf || ""} ${f.matricula || ""} ${f.email || ""} ${f.cargo?.nome || ""} ${f.setor?.nome || ""}`.toLowerCase();
+        const hay = `${f.nome} ${f.cpf || ""} ${f.matricula || ""} ${f.email || ""} ${f.telefone || ""} ${f.empresa || ""} ${f.cargo?.nome || ""} ${f.setor?.nome || ""}`.toLowerCase();
         if (!hay.includes(b)) return false;
       }
       return true;
     });
-  }, [funcionarios, busca, filtroSetor, filtroStatus]);
+    const { campo, dir } = ordenacao;
+    const mult = dir === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      if (campo === "salario") return ((a.salario ?? -Infinity) - (b.salario ?? -Infinity)) * mult;
+      if (campo === "dataAdmissao") {
+        const va = a.dataAdmissao ? new Date(a.dataAdmissao).getTime() : 0;
+        const vb = b.dataAdmissao ? new Date(b.dataAdmissao).getTime() : 0;
+        return (va - vb) * mult;
+      }
+      return (a.nome || "").localeCompare(b.nome || "", "pt-BR") * mult;
+    });
+    return arr;
+  }, [funcionarios, busca, filtroSetor, filtroStatus, filtroEmpresa, ordenacao]);
 
   // Abrir modal novo
   const abrirNovo = () => {
@@ -430,8 +459,18 @@ export default function FuncionariosClient() {
             </select>
             <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
           </div>
-          {(busca || filtroSetor || filtroStatus) && (
-            <button onClick={() => { setBusca(""); setFiltroSetor(""); setFiltroStatus(""); }}
+          {empresas.length > 0 && (
+            <div className="relative">
+              <select value={filtroEmpresa} onChange={(e) => setFiltroEmpresa(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white">
+                <option value="">Todas as empresas</option>
+                {empresas.map((emp) => <option key={emp} value={emp}>{emp}</option>)}
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
+            </div>
+          )}
+          {(busca || filtroSetor || filtroStatus || filtroEmpresa) && (
+            <button onClick={() => { setBusca(""); setFiltroSetor(""); setFiltroStatus(""); setFiltroEmpresa(""); }}
               className="inline-flex items-center gap-1 px-3 py-2 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
               <X size={12} /> Limpar
             </button>
@@ -454,13 +493,13 @@ export default function FuncionariosClient() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50/60 border-b border-gray-100">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                  <ThOrd label="Nome" campo="nome" ordenacao={ordenacao} onSort={ordenarPor} />
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cargo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Setor</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contrato</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Admissão</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Salário</th>
+                  <ThOrd label="Admissão" campo="dataAdmissao" ordenacao={ordenacao} onSort={ordenarPor} right />
+                  <ThOrd label="Salário" campo="salario" ordenacao={ordenacao} onSort={ordenarPor} right />
                   <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase w-16">Ações</th>
                 </tr>
               </thead>
@@ -474,7 +513,9 @@ export default function FuncionariosClient() {
                           <span className="font-medium text-torg-dark">{f.nome}</span>
                           {f.matricula && <span className="text-[10px] text-torg-gray ml-2">#{f.matricula}</span>}
                         </div>
-                        {f.email && <p className="text-[10px] text-torg-gray">{f.email}</p>}
+                        {(f.email || f.telefone) && (
+                          <p className="text-[10px] text-torg-gray">{[f.email, f.telefone].filter(Boolean).join(" · ")}</p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-torg-dark">{f.cargo?.nome || "—"}</td>
                       <td className="px-4 py-3">
@@ -876,6 +917,21 @@ export default function FuncionariosClient() {
         </div>
       )}
     </div>
+  );
+}
+
+// Cabeçalho de coluna ordenável (clique alterna asc/desc).
+function ThOrd({ label, campo, ordenacao, onSort, right = false }) {
+  const ativo = ordenacao.campo === campo;
+  const Icon = !ativo ? ArrowUpDown : ordenacao.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th className={`px-4 py-3 text-xs font-medium text-gray-500 uppercase ${right ? "text-right" : "text-left"}`}>
+      <button onClick={() => onSort(campo)}
+        className={`inline-flex items-center gap-1 select-none hover:text-torg-dark ${right ? "flex-row-reverse" : ""} ${ativo ? "text-torg-blue" : ""}`}
+        title="Ordenar">
+        {label}<Icon size={12} className={ativo ? "" : "text-gray-300"} />
+      </button>
+    </th>
   );
 }
 
