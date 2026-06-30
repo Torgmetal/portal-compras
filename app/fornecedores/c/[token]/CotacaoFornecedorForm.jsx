@@ -80,6 +80,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [enviadoAgora, setEnviadoAgora] = useState(false);
+  const [enviadoEm, setEnviadoEm] = useState("");
   // Declinar a cotação (não vai cotar) — evita ficar em aberto e prejudicar o scorecard
   const [declinando, setDeclinando] = useState(false);
   const [declinado, setDeclinado] = useState(false);
@@ -379,8 +380,14 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao enviar");
+      setEnviadoEm(
+        new Date().toLocaleString("pt-BR", {
+          day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+        })
+      );
       setEnviadoAgora(true);
       setEnviando(false);
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "auto" });
       // Refresh em segundo plano pra sincronizar com novo numero de revisao
       router.refresh();
     } catch (e) {
@@ -438,6 +445,73 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     );
   }
 
+  // Tela de confirmação após ENVIAR a proposta — clara e inequívoca.
+  // Substitui o formulário inteiro: o fornecedor não fica em dúvida se enviou.
+  if (enviadoAgora) {
+    const totalEnviado =
+      (valorTotalProposta && (parseFloat(String(valorTotalProposta).replace(",", ".")) || 0)) ||
+      totalComIPI || total;
+    return (
+      <div className="min-h-screen bg-torg-blue-50/30">
+        <header className="bg-white border-b border-torg-blue-100">
+          <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-3">
+            <TorgLogo size="sm" />
+            <span className="text-xs text-torg-gray hidden sm:inline">Portal de Cotações</span>
+          </div>
+        </header>
+        <div className="max-w-2xl mx-auto px-6 py-12">
+          <div className="bg-white rounded-2xl shadow-sm border-2 border-emerald-300 p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 size={34} className="text-emerald-600" />
+            </div>
+            <h1 className="text-2xl font-extrabold text-torg-dark">Proposta enviada com sucesso!</h1>
+            <p className="text-sm text-torg-gray mt-2 max-w-md mx-auto">
+              A <strong>Torg Metal</strong> recebeu sua proposta para a <strong>RM {cotacao.rm.numero}</strong>.
+              Está tudo certo — você já pode fechar esta página.
+            </p>
+
+            {/* Comprovante */}
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4 mt-6 text-left max-w-sm mx-auto space-y-2">
+              <p className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide text-center -mb-0.5">
+                Comprovante de envio
+              </p>
+              <div className="flex justify-between text-sm gap-3">
+                <span className="text-torg-gray">Nº da proposta</span>
+                <span className="font-semibold text-torg-dark text-right">{numeroProposta || "—"}</span>
+              </div>
+              <div className="flex justify-between text-sm gap-3">
+                <span className="text-torg-gray">Valor total</span>
+                <span className="font-semibold text-torg-dark text-right">{fmtMoeda(totalEnviado)}</span>
+              </div>
+              <div className="flex justify-between text-sm gap-3">
+                <span className="text-torg-gray">Enviada em</span>
+                <span className="font-semibold text-torg-dark text-right">{enviadoEm || fmtData(new Date())}</span>
+              </div>
+              {anexosCotacao.length > 0 && (
+                <div className="flex justify-between text-sm gap-3">
+                  <span className="text-torg-gray">Anexos</span>
+                  <span className="font-semibold text-torg-dark text-right">{anexosCotacao.length} arquivo(s)</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-torg-gray mt-5 max-w-md mx-auto">
+              Guarde o número da proposta. Se precisar corrigir algum valor, dá pra revisar e reenviar —
+              a Torg sempre considera a <strong>versão mais recente</strong>.
+            </p>
+            <button
+              type="button"
+              onClick={() => setEnviadoAgora(false)}
+              className="mt-4 px-5 py-2.5 border border-torg-blue text-torg-blue rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-2"
+            >
+              <RotateCcw size={16} /> Revisar / reenviar proposta
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-torg-blue-50/30">
       {/* Header */}
@@ -476,7 +550,13 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             </div>
             <div>
               <p className="text-xs text-torg-gray">Status</p>
-              <p className="font-medium text-torg-blue">Aguardando proposta</p>
+              {jaEnviou ? (
+                <p className="font-medium text-emerald-600 inline-flex items-center gap-1">
+                  <CheckCircle2 size={14} /> Proposta recebida
+                </p>
+              ) : (
+                <p className="font-medium text-torg-blue">Aguardando proposta</p>
+              )}
             </div>
           </div>
         </div>
@@ -592,19 +672,6 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
               </p>
               <p className="text-xs text-torg-gray">
                 Os valores abaixo são os que você nos enviou. Pode editar e reenviar — a Torg vai considerar a versão mais recente.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {enviadoAgora && (
-          <div className="bg-torg-orange-50 border border-torg-orange-200 rounded-lg p-4 text-sm text-torg-dark flex items-start gap-2">
-            <CheckCircle2 size={18} className="mt-0.5 flex-shrink-0 text-torg-orange" />
-            <div>
-              <p className="font-medium">Proposta {jaEnviou ? "atualizada" : "enviada"} com sucesso</p>
-              <p className="text-xs text-torg-gray">
-                Total: <strong>{fmtMoeda(linhas.reduce((s, l) => s + (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0), 0))}</strong>.
-                Você pode revisar novamente se precisar — basta editar e clicar em "Atualizar proposta".
               </p>
             </div>
           </div>
