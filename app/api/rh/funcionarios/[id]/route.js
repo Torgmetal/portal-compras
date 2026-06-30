@@ -8,6 +8,12 @@ import { z } from "zod";
 const schema = z.object({
   nome: z.string().min(2, "Nome obrigatório"),
   cpf: z.string().optional().nullable(),
+  pis: z.string().optional().nullable(),
+  empresa: z.string().optional().nullable(),
+  banco: z.string().optional().nullable(),
+  agencia: z.string().optional().nullable(),
+  conta: z.string().optional().nullable(),
+  pixChave: z.string().optional().nullable(),
   rg: z.string().optional().nullable(),
   dataNascimento: z.string().optional().nullable(),
   email: z.union([z.string().email("Email inválido"), z.literal(""), z.null()]).optional(),
@@ -67,6 +73,12 @@ export async function PATCH(req, { params }) {
       data: {
         nome: data.nome,
         cpf: data.cpf || null,
+        pis: data.pis || null,
+        empresa: data.empresa || null,
+        banco: data.banco || null,
+        agencia: data.agencia || null,
+        conta: data.conta || null,
+        pixChave: data.pixChave || null,
         rg: data.rg || null,
         // datas date-only → UTC meia-noite (evita deslocar 1 dia no fuso BR)
         dataNascimento: data.dataNascimento ? new Date(data.dataNascimento) : null,

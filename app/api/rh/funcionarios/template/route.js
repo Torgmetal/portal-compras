@@ -22,6 +22,7 @@ export async function GET() {
       "Endereço", "Cidade/UF", "Matrícula", "Data Admissão",
       "Setor", "Cargo", "Salário", "Tipo Contrato", "Jornada (h/sem)",
       "Turno", "Observação",
+      "PIS", "Empresa", "Banco", "Agência", "Conta", "Chave PIX",
     ];
 
     // Linha de exemplo
@@ -30,6 +31,7 @@ export async function GET() {
       "joao@email.com", "(11) 99999-0000", "Rua A, 123", "São Paulo/SP",
       "001", "02/01/2024", "Produção", "Soldador", "3500",
       "CLT", "44", "Produção 1", "",
+      "123.45678.90-1", "TORG Metal", "Banco do Brasil", "1234-5", "12345-6", "joao@email.com",
     ];
 
     const wsFuncs = XLSX.utils.aoa_to_sheet([header, exemplo]);
@@ -53,6 +55,12 @@ export async function GET() {
       { wch: 14 }, // Jornada
       { wch: 16 }, // Turno
       { wch: 25 }, // Observação
+      { wch: 16 }, // PIS
+      { wch: 16 }, // Empresa
+      { wch: 18 }, // Banco
+      { wch: 10 }, // Agência
+      { wch: 12 }, // Conta
+      { wch: 20 }, // Chave PIX
     ];
 
     XLSX.utils.book_append_sheet(wb, wsFuncs, "Funcionários");
@@ -79,6 +87,12 @@ export async function GET() {
       ["Jornada", "Não", "Número", "Horas semanais (padrão: 44)"],
       ["Turno", "Não", "Texto", "Administrativo, Produção 1, Produção 2, Noturno"],
       ["Observação", "Não", "Texto", ""],
+      ["PIS", "Não", "Número", "PIS/PASEP — necessário p/ o Controle de Ponto (casa as marcações do ACJEF)"],
+      ["Empresa", "Não", "Texto", "Empresa empregadora (ex: TORG Metal, VMI)"],
+      ["Banco", "Não", "Texto", "Dados bancários (opcional)"],
+      ["Agência", "Não", "Texto", ""],
+      ["Conta", "Não", "Texto", ""],
+      ["Chave PIX", "Não", "Texto", "CPF, e-mail, telefone ou chave aleatória"],
     ];
 
     const wsInst = XLSX.utils.aoa_to_sheet(instrucoes);

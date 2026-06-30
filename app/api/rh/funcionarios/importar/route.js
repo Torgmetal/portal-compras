@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { syncContratacaoLote } from "@/lib/sharepoint-rh";
 import * as XLSX from "xlsx";
 
 export const maxDuration = 60;
@@ -93,6 +94,12 @@ export async function POST(req) {
       return {
         nome: find("nome"),
         cpf: find("cpf"),
+        pis: find("pis", "pasep", "pis/pasep"),
+        empresa: find("empresa", "empregador"),
+        banco: find("banco"),
+        agencia: find("agencia", "agência"),
+        conta: find("conta"),
+        pixChave: find("pix", "chave pix"),
         rg: find("rg"),
         dataNascimento: find("nascimento", "data nasc"),
         email: find("email", "e-mail"),
@@ -119,6 +126,7 @@ export async function POST(req) {
 
     // Processar cada linha
     const resultados = [];
+    const paraSincronizar = []; // funcionários criados → push em lote pro SharePoint
     let criados = 0;
     let erros = 0;
     let setoresCriados = 0;
@@ -204,12 +212,20 @@ export async function POST(req) {
       const jornadaHoras = parseInt(raw.jornadaHoras) || 44;
 
       try {
+        const cpfFmt = cpf ? cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : null;
+        const dataNascimento = parseData(raw.dataNascimento);
         await prisma.funcionario.create({
           data: {
             nome,
-            cpf: cpf ? cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : null,
+            cpf: cpfFmt,
+            pis: String(raw.pis).replace(/\D/g, "") || null,
+            empresa: String(raw.empresa).trim() || null,
+            banco: String(raw.banco).trim() || null,
+            agencia: String(raw.agencia).trim() || null,
+            conta: String(raw.conta).trim() || null,
+            pixChave: String(raw.pixChave).trim() || null,
             rg: String(raw.rg).trim() || null,
-            dataNascimento: parseData(raw.dataNascimento),
+            dataNascimento,
             email: String(raw.email).trim() || null,
             telefone: String(raw.telefone).trim() || null,
             endereco: String(raw.endereco).trim() || null,
@@ -226,6 +242,12 @@ export async function POST(req) {
           },
         });
         criados++;
+        // Coleta p/ empurrar pro SharePoint em lote (mapeia nomes de setor/cargo)
+        paraSincronizar.push({
+          matricula, nome, cpf: cpfFmt, salario, email: String(raw.email).trim() || null,
+          dataAdmissao, dataNascimento, tipoContrato,
+          cargo: { nome: cargoNome }, setor: { nome: setorNome },
+        });
         resultados.push({ linha: lineNum, nome, ok: true });
       } catch (e) {
         erros++;
@@ -244,6 +266,13 @@ export async function POST(req) {
       },
     });
 
+    // Empurra os criados pra planilha BASE FUNCIONÁRIOS do SharePoint (em lote,
+    // 1 download/upload só). Não derruba a importação se o SharePoint falhar.
+    let sharepoint = null;
+    if (paraSincronizar.length > 0) {
+      sharepoint = await syncContratacaoLote(paraSincronizar).catch((e) => ({ success: false, error: e?.message }));
+    }
+
     return NextResponse.json({
       success: true,
       total: rows.length,
@@ -251,6 +280,7 @@ export async function POST(req) {
       erros,
       setoresCriados,
       cargosCriados,
+      sharepoint, // { success, total } ou { success:false, error }
       detalhes: resultados,
     });
   } catch (e) {

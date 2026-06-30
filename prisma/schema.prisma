@@ -962,6 +962,11 @@ model Funcionario {
   nome                  String
   cpf                   String?                   @unique
   pis                   String? // PIS/PASEP — usado p/ casar marcações do ACJEF (ponto)
+  empresa               String? // empresa empregadora (TORG Metal / VMI) — holerite/ponto multi-CNPJ
+  banco                 String? // dados bancários (cadastro completo)
+  agencia               String?
+  conta                 String?
+  pixChave              String?
   rg                    String?
   dataNascimento        DateTime?
   email                 String?
@@ -3109,11 +3114,11 @@ model PcpCarteiraObraBaixa {
 // O cron "monitor" lê isto e alerta (e-mail) se algum cron não roda há tempo
 // demais ou falhou. Guarda-corpo contra cron morrer silenciosamente.
 model CronHeartbeat {
-  job       String   @id // ex.: "sync-entregas", "estoque-produtos"
-  lastRunAt DateTime @default(now())
+  job       String    @id // ex.: "sync-entregas", "estoque-produtos"
+  lastRunAt DateTime  @default(now())
   lastOkAt  DateTime?
-  ok        Boolean  @default(true)
+  ok        Boolean   @default(true)
   mensagem  String?
   duracaoMs Int?
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime  @updatedAt
 }

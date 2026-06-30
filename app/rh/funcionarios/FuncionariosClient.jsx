@@ -119,10 +119,11 @@ export default function FuncionariosClient() {
     setEditandoId(null);
     setErro("");
     setForm({
-      nome: "", cpf: "", rg: "", dataNascimento: "", email: "", telefone: "",
-      endereco: "", cidadeUF: "", matricula: "", dataAdmissao: "",
+      nome: "", cpf: "", pis: "", rg: "", dataNascimento: "", email: "", telefone: "",
+      endereco: "", cidadeUF: "", matricula: "", empresa: "", dataAdmissao: "",
       setorId: setores[0]?.id || "", cargoId: cargos[0]?.id || "",
       salario: "", tipoContrato: "CLT", jornadaHoras: 44, turno: "", observacao: "",
+      banco: "", agencia: "", conta: "", pixChave: "",
     });
     setModalAberto(true);
   };
@@ -136,10 +137,11 @@ export default function FuncionariosClient() {
     setEditandoId(func.id);
     setErro("");
     setForm({
-      nome: func.nome || "", cpf: func.cpf || "", rg: "", dataNascimento: "", email: func.email || "",
-      telefone: func.telefone || "", endereco: "", cidadeUF: "", matricula: func.matricula || "",
+      nome: func.nome || "", cpf: func.cpf || "", pis: func.pis || "", rg: "", dataNascimento: "", email: func.email || "",
+      telefone: func.telefone || "", endereco: "", cidadeUF: "", matricula: func.matricula || "", empresa: func.empresa || "",
       dataAdmissao: soData(func.dataAdmissao), setorId: func.setor?.id || "", cargoId: func.cargo?.id || "",
       salario: func.salario ?? "", tipoContrato: func.tipoContrato || "CLT", jornadaHoras: 44, turno: "", observacao: "",
+      banco: "", agencia: "", conta: "", pixChave: "",
     });
     setModalAberto(true);
     try {
@@ -148,11 +150,12 @@ export default function FuncionariosClient() {
       if (res.ok && j.success) {
         const f = j.data;
         setForm({
-          nome: f.nome || "", cpf: f.cpf || "", rg: f.rg || "", dataNascimento: soData(f.dataNascimento),
+          nome: f.nome || "", cpf: f.cpf || "", pis: f.pis || "", rg: f.rg || "", dataNascimento: soData(f.dataNascimento),
           email: f.email || "", telefone: f.telefone || "", endereco: f.endereco || "", cidadeUF: f.cidadeUF || "",
-          matricula: f.matricula || "", dataAdmissao: soData(f.dataAdmissao), setorId: f.setor?.id || "", cargoId: f.cargo?.id || "",
+          matricula: f.matricula || "", empresa: f.empresa || "", dataAdmissao: soData(f.dataAdmissao), setorId: f.setor?.id || "", cargoId: f.cargo?.id || "",
           salario: f.salario ?? "", tipoContrato: f.tipoContrato || "CLT", jornadaHoras: f.jornadaHoras || 44,
           turno: f.turno || "", observacao: f.observacao || "",
+          banco: f.banco || "", agencia: f.agencia || "", conta: f.conta || "", pixChave: f.pixChave || "",
         });
       }
     } catch { /* mantém o preenchimento parcial da linha */ }
@@ -168,6 +171,12 @@ export default function FuncionariosClient() {
         salario: form.salario ? Number(form.salario) : null,
         jornadaHoras: Number(form.jornadaHoras) || 44,
         cpf: form.cpf || null,
+        pis: form.pis || null,
+        empresa: form.empresa || null,
+        banco: form.banco || null,
+        agencia: form.agencia || null,
+        conta: form.conta || null,
+        pixChave: form.pixChave || null,
         rg: form.rg || null,
         dataNascimento: form.dataNascimento || null,
         email: form.email || null,
@@ -545,6 +554,7 @@ export default function FuncionariosClient() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Campo label="Nome completo *" value={form.nome} onChange={(v) => setForm({ ...form, nome: v })} />
                 <Campo label="CPF" value={form.cpf} onChange={(v) => setForm({ ...form, cpf: v })} placeholder="000.000.000-00" />
+                <Campo label="PIS/PASEP" value={form.pis} onChange={(v) => setForm({ ...form, pis: v })} placeholder="Usado no Controle de Ponto" />
                 <Campo label="RG" value={form.rg} onChange={(v) => setForm({ ...form, rg: v })} />
                 <Campo label="Data de nascimento" type="date" value={form.dataNascimento} onChange={(v) => setForm({ ...form, dataNascimento: v })} />
                 <Campo label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
@@ -557,6 +567,7 @@ export default function FuncionariosClient() {
               <p className="text-xs font-bold text-torg-gray uppercase tracking-wider pt-2">Vínculo Empregatício</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Campo label="Matrícula" value={form.matricula} onChange={(v) => setForm({ ...form, matricula: v })} />
+                <Campo label="Empresa empregadora" value={form.empresa} onChange={(v) => setForm({ ...form, empresa: v })} placeholder="Ex: TORG Metal, VMI" />
                 <Campo label="Data de admissão *" type="date" value={form.dataAdmissao} onChange={(v) => setForm({ ...form, dataAdmissao: v })} />
                 <Select label="Setor *" value={form.setorId} onChange={(v) => setForm({ ...form, setorId: v })}
                   options={setores.map((s) => ({ value: s.id, label: s.nome }))} />
@@ -574,6 +585,15 @@ export default function FuncionariosClient() {
                     { value: "PRODUCAO_2", label: "Produção 2º turno" },
                     { value: "NOTURNO", label: "Noturno" },
                   ]} />
+              </div>
+
+              {/* Dados bancários */}
+              <p className="text-xs font-bold text-torg-gray uppercase tracking-wider pt-2">Dados Bancários</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Campo label="Banco" value={form.banco} onChange={(v) => setForm({ ...form, banco: v })} />
+                <Campo label="Agência" value={form.agencia} onChange={(v) => setForm({ ...form, agencia: v })} />
+                <Campo label="Conta" value={form.conta} onChange={(v) => setForm({ ...form, conta: v })} />
+                <Campo label="Chave PIX" value={form.pixChave} onChange={(v) => setForm({ ...form, pixChave: v })} placeholder="CPF, e-mail, telefone…" />
               </div>
 
               <div>
