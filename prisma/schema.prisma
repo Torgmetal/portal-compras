@@ -963,6 +963,7 @@ model Funcionario {
   cpf                   String?                   @unique
   pis                   String? // PIS/PASEP — usado p/ casar marcações do ACJEF (ponto)
   empresa               String? // empresa empregadora (TORG Metal / VMI) — holerite/ponto multi-CNPJ
+  centroCusto           String? // classificação de custo: MOD, MOI, DP, TST, TERCEIRO...
   banco                 String? // dados bancários (cadastro completo)
   agencia               String?
   conta                 String?

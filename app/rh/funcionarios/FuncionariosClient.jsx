@@ -4,8 +4,9 @@ import {
   Users, Search, PlusCircle, Loader2, AlertCircle, X,
   ChevronDown, Edit, UserX, UserCheck, Download, Upload,
   FileSpreadsheet, CheckCircle2, XCircle, UserMinus, MoreVertical,
-  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown,
+  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown, GitCompareArrows,
 } from "lucide-react";
+import Link from "next/link";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -149,7 +150,7 @@ export default function FuncionariosClient() {
     setErro("");
     setForm({
       nome: "", cpf: "", pis: "", rg: "", dataNascimento: "", email: "", telefone: "",
-      endereco: "", cidadeUF: "", matricula: "", empresa: "", dataAdmissao: "",
+      endereco: "", cidadeUF: "", matricula: "", empresa: "", centroCusto: "", dataAdmissao: "",
       setorId: setores[0]?.id || "", cargoId: cargos[0]?.id || "",
       salario: "", tipoContrato: "CLT", jornadaHoras: 44, turno: "", observacao: "",
       banco: "", agencia: "", conta: "", pixChave: "",
@@ -167,7 +168,7 @@ export default function FuncionariosClient() {
     setErro("");
     setForm({
       nome: func.nome || "", cpf: func.cpf || "", pis: func.pis || "", rg: "", dataNascimento: "", email: func.email || "",
-      telefone: func.telefone || "", endereco: "", cidadeUF: "", matricula: func.matricula || "", empresa: func.empresa || "",
+      telefone: func.telefone || "", endereco: "", cidadeUF: "", matricula: func.matricula || "", empresa: func.empresa || "", centroCusto: func.centroCusto || "",
       dataAdmissao: soData(func.dataAdmissao), setorId: func.setor?.id || "", cargoId: func.cargo?.id || "",
       salario: func.salario ?? "", tipoContrato: func.tipoContrato || "CLT", jornadaHoras: 44, turno: "", observacao: "",
       banco: "", agencia: "", conta: "", pixChave: "",
@@ -181,7 +182,7 @@ export default function FuncionariosClient() {
         setForm({
           nome: f.nome || "", cpf: f.cpf || "", pis: f.pis || "", rg: f.rg || "", dataNascimento: soData(f.dataNascimento),
           email: f.email || "", telefone: f.telefone || "", endereco: f.endereco || "", cidadeUF: f.cidadeUF || "",
-          matricula: f.matricula || "", empresa: f.empresa || "", dataAdmissao: soData(f.dataAdmissao), setorId: f.setor?.id || "", cargoId: f.cargo?.id || "",
+          matricula: f.matricula || "", empresa: f.empresa || "", centroCusto: f.centroCusto || "", dataAdmissao: soData(f.dataAdmissao), setorId: f.setor?.id || "", cargoId: f.cargo?.id || "",
           salario: f.salario ?? "", tipoContrato: f.tipoContrato || "CLT", jornadaHoras: f.jornadaHoras || 44,
           turno: f.turno || "", observacao: f.observacao || "",
           banco: f.banco || "", agencia: f.agencia || "", conta: f.conta || "", pixChave: f.pixChave || "",
@@ -202,6 +203,7 @@ export default function FuncionariosClient() {
         cpf: form.cpf || null,
         pis: form.pis || null,
         empresa: form.empresa || null,
+        centroCusto: form.centroCusto || null,
         banco: form.banco || null,
         agencia: form.agencia || null,
         conta: form.conta || null,
@@ -398,6 +400,10 @@ export default function FuncionariosClient() {
           <p className="text-sm text-torg-gray mt-1">{funcionarios.length} cadastrados</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/rh/funcionarios/reconciliar"
+            className="px-3 py-2 text-sm text-torg-dark border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 font-medium">
+            <GitCompareArrows size={15} /> Reconciliar planilha
+          </Link>
           <button onClick={baixarModelo}
             className="px-3 py-2 text-sm text-torg-blue border border-torg-blue/30 rounded-lg hover:bg-torg-blue/5 inline-flex items-center gap-2 font-medium">
             <Download size={15} /> Baixar modelo
@@ -609,6 +615,7 @@ export default function FuncionariosClient() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Campo label="Matrícula" value={form.matricula} onChange={(v) => setForm({ ...form, matricula: v })} />
                 <Campo label="Empresa empregadora" value={form.empresa} onChange={(v) => setForm({ ...form, empresa: v })} placeholder="Ex: TORG Metal, VMI" />
+                <Campo label="Centro de Custo" value={form.centroCusto} onChange={(v) => setForm({ ...form, centroCusto: v.toUpperCase() })} placeholder="MOD, MOI, DP, TST, TERCEIRO" />
                 <Campo label="Data de admissão *" type="date" value={form.dataAdmissao} onChange={(v) => setForm({ ...form, dataAdmissao: v })} />
                 <Select label="Setor *" value={form.setorId} onChange={(v) => setForm({ ...form, setorId: v })}
                   options={setores.map((s) => ({ value: s.id, label: s.nome }))} />
