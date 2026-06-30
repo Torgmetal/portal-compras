@@ -13,7 +13,11 @@ const limiter = createRateLimiter({ name: "parse-cotacao-ai", maxRequests: 8, wi
 const MAX_B64_LEN = 16 * 1024 * 1024; // ~12MB por anexo
 const MAX_TEXT_LEN = 200_000;         // ~200k chars de texto colado
 // Modelo é FIXO no servidor — nunca aceitar do cliente (evita forçar modelo caro).
-const MODELO_FIXO = "claude-haiku-4-5-20251001";
+// Sonnet (não Haiku): ler PREÇO UNITÁRIO × TOTAL em tabelas de cotação e a notação
+// brasileira (1.234,56) exige precisão — preço errado vira pedido de compra errado.
+// O volume é baixo (fornecedor subindo a própria proposta), então a acurácia compensa
+// os centavos extras por leitura.
+const MODELO_FIXO = "claude-sonnet-4-6";
 
 const SYSTEM_PROMPT = `Você é um assistente de compras de uma siderúrgica (Torg Metal). Seu trabalho é extrair os itens cotados em propostas de fornecedores brasileiros (aço, perfis, chapas, cantoneiras, tubos) e casá-los com os itens de uma RM (Requisição de Materiais).
 

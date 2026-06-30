@@ -124,6 +124,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       if (itPdf.icmsPct != null) l.icmsPct = String(itPdf.icmsPct);
       if (itPdf.ipiPct != null) l.ipiPct = String(itPdf.ipiPct);
       if (itPdf.observacao && !l.observacao) l.observacao = itPdf.observacao;
+      // Guarda o total que a IA leu no PDF p/ esta linha — usado pra mostrar
+      // "PDF: R$ X" e flagrar em vermelho quando não bate com preço × qtd.
+      l.pdfTotalBruto = itPdf.totalBruto != null ? Number(itPdf.totalBruto) : null;
       idsAuto.add(l.id);
       casados++;
     }
@@ -163,6 +166,8 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         if (itPdf.qtd) l.qtdCotada = itPdf.qtd;
         if (itPdf.icmsPct != null) l.icmsPct = String(itPdf.icmsPct);
         if (itPdf.ipiPct != null) l.ipiPct = String(itPdf.ipiPct);
+        l.pdfTotalBruto = itPdf.totalBruto != null ? Number(itPdf.totalBruto)
+          : (itPdf.total != null ? Number(itPdf.total) : null);
         idsAuto.add(l.id);
       }
     }
@@ -782,7 +787,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                 )}
                 {parseInfo.match > 0 && autoFilled.size > 0 && (
                   <p className="text-[11px] text-torg-gray mt-1">
-                    💡 Linhas em laranja = preenchidas pela IA. Clique no aviso da linha pra confirmar, edite o valor pra ajustar, ou clique &quot;Conferi todos&quot; se está tudo certo.
+                    💡 Linhas em laranja = preenchidas pela IA. Em cada uma, &quot;PDF: R$ X&quot; (na coluna Total) mostra o total que lemos no seu PDF — se vier em <span className="text-red-600 font-medium">vermelho</span>, o cálculo não bateu: confira preço e quantidade. Clique no aviso da linha pra confirmar, edite pra ajustar, ou &quot;Conferi todos&quot; se está tudo certo.
                   </p>
                 )}
               </div>
@@ -822,6 +827,10 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                     const totalBruto = (parseFloat(String(l.precoUnit).replace(",", ".")) || 0) * (parseFloat(String(l.qtdCotada).replace(",", ".")) || 0);
                     const isAuto = autoFilled.has(l.id);
                     const isRevisado = revisado.has(l.id);
+                    // Total que a IA leu no PDF p/ esta linha (referência de conferência)
+                    const pdfTotal = l.pdfTotalBruto != null ? Number(l.pdfTotalBruto) : null;
+                    const divergePdf = isAuto && pdfTotal != null && pdfTotal > 0 && totalBruto > 0 &&
+                      Math.abs(pdfTotal - totalBruto) > Math.max(pdfTotal * 0.01, 0.5);
                     const inputCls = isAuto
                       ? "border-torg-orange-300 bg-torg-orange-50/40"
                       : isRevisado
@@ -946,6 +955,14 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
                             ? <span className="text-red-400 text-[10px]">s/ estoque</span>
                             : totalBruto > 0 ? fmtMoeda(totalBruto) : "—"
                           }
+                          {!l.semEstoque && pdfTotal != null && pdfTotal > 0 && (
+                            <p
+                              className={`text-[10px] mt-0.5 whitespace-nowrap ${divergePdf ? "text-red-600 font-semibold" : "text-torg-gray"}`}
+                              title="Total desta linha que a IA leu no seu PDF — compare com o calculado ao lado. Em vermelho = não bateu, confira preço e quantidade."
+                            >
+                              {divergePdf ? "⚠ " : ""}PDF: {fmtMoeda(pdfTotal)}
+                            </p>
+                          )}
                         </td>
                       </tr>
                     );
