@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, requireUser } from "@/lib/session";
 import { z } from "zod";
 
 const schemaUpdate = z.object({
@@ -14,7 +14,9 @@ const schemaUpdate = z.object({
 
 export async function PATCH(req, { params }) {
   try {
-    await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
+    // Qualquer setor logado responde/atualiza a sua tarefa (status, observação…).
+    // Excluir (DELETE) segue só Planejamento/ADMIN.
+    await requireUser();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: e.message }, { status });

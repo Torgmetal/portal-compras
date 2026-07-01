@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, requireUser } from "@/lib/session";
 import { z } from "zod";
 import { criarCompromissosDaTarefa } from "@/lib/compromissos";
 
@@ -13,7 +13,9 @@ const PRIORIDADES = ["ALTA", "MEDIA", "BAIXA"];
 
 export async function GET(req) {
   try {
-    await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
+    // Qualquer usuário logado lê as tarefas (o board é compartilhado entre setores;
+    // filtra por setor abaixo). Criar/editar continua restrito a Planejamento.
+    await requireUser();
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: e.message }, { status });

@@ -104,6 +104,11 @@ export default withAuth(
         // /rm aberto para todos os modulos (historico visivel para todos)
         if (path.startsWith("/rm")         && !token)  return false;
         if (path.startsWith("/rh")         && !temModulo("RH"))            return false;
+        // Board de tarefas do Planejamento é compartilhado: QUALQUER setor logado
+        // vê e responde as tarefas do seu setor (a lista filtra por setor). Sem
+        // isto, quem não tem PLANEJAMENTO/PRODUCAO era rebatido pro /entrar e não
+        // conseguia responder às tarefas distribuídas.
+        if (path.startsWith("/planejamento/tarefas")) return true;
         if (path.startsWith("/planejamento") && !temModulo("PLANEJAMENTO", "PRODUCAO")) return false;
         if (path.startsWith("/pcp")        && !temModulo("PCP", "PLANEJAMENTO", "PRODUCAO")) return false;
         if (path.startsWith("/qualidade")  && !temModulo("QUALIDADE"))   return false;
