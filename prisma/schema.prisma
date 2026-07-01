@@ -1059,6 +1059,7 @@ model Ferias {
   dataFim            DateTime?
   diasGozo           Int?
   diasVendidos       Int         @default(0)
+  valorEstimado      Float? // (salário/30 × (gozo+vendidos)) × 4/3 — snapshot na programação
   status             String      @default("PENDENTE")
   observacao         String?
   createdAt          DateTime    @default(now())
