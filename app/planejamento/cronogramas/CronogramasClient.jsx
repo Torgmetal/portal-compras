@@ -2272,9 +2272,19 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
             </span>
           )}
 
+          {!readOnly && !editing && !t.isSummary && (
+            <button
+              onClick={() => setEditing(true)}
+              className="px-2 py-0.5 text-[10px] font-semibold text-torg-blue bg-torg-blue-50 border border-torg-blue-100 rounded hover:bg-torg-blue-100 flex items-center gap-1"
+              title="Editar atividade — nome, datas, duração e antecessoras"
+            >
+              <Pencil size={10} /> Editar
+            </button>
+          )}
           {!readOnly && !editing ? (
             <button
               onClick={() => setEditing(true)}
+              title="Clique para editar (progresso, datas, antecessoras)"
               className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
                 concluida ? "bg-emerald-100 text-emerald-700"
                 : atrasada ? "bg-red-100 text-red-700"
