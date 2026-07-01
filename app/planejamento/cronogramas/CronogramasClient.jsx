@@ -1059,6 +1059,11 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const [viewMode, setViewMode] = useState("lista"); // "lista" | "gantt"
   const [recalculando, setRecalculando] = useState(false);
   const [recalcMsg, setRecalcMsg] = useState(null);
+  // Gerar datas automaticamente (a partir de início + duração + antecessoras)
+  const [showGerar, setShowGerar] = useState(false);
+  const [gerarInicio, setGerarInicio] = useState("");
+  const [gerarPreview, setGerarPreview] = useState(null);
+  const [gerando, setGerando] = useState(false);
 
   const now = new Date();
   const tarefas = detail.tarefas || [];
@@ -1076,6 +1081,45 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
       setRecalcMsg({ ok: false, msg: e.message });
     } finally {
       setRecalculando(false);
+    }
+  };
+
+  const abrirGerar = () => {
+    setGerarInicio(
+      detail.dataInicio
+        ? new Date(detail.dataInicio).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10)
+    );
+    setGerarPreview(null);
+    setRecalcMsg(null);
+    setShowGerar(true);
+  };
+
+  const gerarDatas = async (aplicar) => {
+    setGerando(true);
+    try {
+      const body = { aplicar };
+      if (gerarInicio) body.dataInicioProjeto = new Date(gerarInicio + "T12:00:00Z").toISOString();
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/gerar-datas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao gerar datas");
+      if (aplicar) {
+        setShowGerar(false);
+        setGerarPreview(null);
+        setRecalcMsg({ ok: true, msg: `${data.aplicadas} tarefa${data.aplicadas > 1 ? "s" : ""} com datas geradas.` });
+        onRefresh();
+      } else {
+        setGerarPreview(data.preview || []);
+      }
+    } catch (e) {
+      if (aplicar) setRecalcMsg({ ok: false, msg: e.message });
+      else setGerarPreview({ erro: e.message });
+    } finally {
+      setGerando(false);
     }
   };
 
@@ -1143,6 +1187,16 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
             </button>
           </div>
           <div className="flex items-center gap-2">
+            {/* Gerar datas automaticamente (início + duração + antecessoras) */}
+            {!readOnly && (
+              <button
+                onClick={abrirGerar}
+                className="px-3 py-1.5 text-[10px] font-medium text-torg-blue bg-torg-blue-50 border border-torg-blue-200 rounded-lg hover:bg-torg-blue-100 flex items-center gap-1.5"
+                title="Gera as datas de todas as tarefas a partir de uma data de início + a duração de cada uma, seguindo as antecessoras. Mostra uma prévia antes de aplicar."
+              >
+                <Calendar size={11} /> Gerar Datas
+              </button>
+            )}
             {/* Recalcular datas */}
             <button
               onClick={recalcular}
@@ -1181,6 +1235,105 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
           {recalcMsg.ok ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
           {recalcMsg.msg}
           <button onClick={() => setRecalcMsg(null)} className="ml-auto p-0.5 hover:opacity-70"><X size={10} /></button>
+        </div>
+      )}
+
+      {/* Modal: Gerar datas automaticamente (prévia + aplicar) */}
+      {showGerar && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => { if (!gerando) setShowGerar(false); }}
+        >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar size={16} className="text-torg-blue" />
+                <h3 className="font-semibold text-torg-dark text-sm">Gerar datas automaticamente</h3>
+              </div>
+              <button onClick={() => setShowGerar(false)} disabled={gerando} className="text-gray-400 hover:text-gray-600 disabled:opacity-50"><X size={16} /></button>
+            </div>
+
+            <div className="px-5 py-4 space-y-3 overflow-y-auto">
+              <p className="text-xs text-torg-gray">
+                Calcula início e fim de cada tarefa a partir da data de início do projeto + a <strong>duração</strong> de cada uma,
+                seguindo as <strong>antecessoras</strong> (inclusive de outros setores). Revise a prévia e clique em <strong>Aplicar</strong>.
+              </p>
+              <div className="flex items-end gap-2 flex-wrap">
+                <div>
+                  <label className="block text-[11px] text-torg-gray mb-1">
+                    Início do projeto ({(detail.tipoDias || "DU") === "DU" ? "dias úteis" : "dias corridos"})
+                  </label>
+                  <input type="date" value={gerarInicio} onChange={(e) => setGerarInicio(e.target.value)} className="text-xs px-2 py-1.5 border border-gray-200 rounded focus:ring-1 focus:ring-torg-blue" />
+                </div>
+                <button
+                  onClick={() => gerarDatas(false)}
+                  disabled={gerando || !gerarInicio}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-torg-blue rounded-lg hover:bg-torg-blue-700 flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {gerando ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Calcular prévia
+                </button>
+              </div>
+
+              {gerarPreview?.erro && (
+                <div className="px-3 py-2 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-1.5">
+                  <AlertCircle size={12} /> {gerarPreview.erro}
+                </div>
+              )}
+
+              {Array.isArray(gerarPreview) && (
+                <div className="border border-gray-100 rounded-lg overflow-hidden">
+                  {gerarPreview.some((p) => p.semDuracao) && (
+                    <div className="px-3 py-2 bg-amber-50 text-amber-700 text-[11px] flex items-start gap-1.5">
+                      <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                      <span>{gerarPreview.filter((p) => p.semDuracao).length} tarefa(s) <strong>sem duração</strong> ficaram com início = fim. Preencha a duração delas (coluna DU/DC na tarefa) pra estenderem o prazo, depois gere de novo.</span>
+                    </div>
+                  )}
+                  <div className="max-h-[45vh] overflow-y-auto">
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-500">Setor</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-500">Tarefa</th>
+                          <th className="px-2 py-1.5 text-center font-medium text-gray-500">Início</th>
+                          <th className="px-2 py-1.5 text-center font-medium text-gray-500">Fim</th>
+                          <th className="px-2 py-1.5 text-center font-medium text-gray-500">Dur.</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {gerarPreview.map((p) => (
+                          <tr key={p.id} className={p.semDuracao ? "bg-amber-50/40" : ""}>
+                            <td className="px-2 py-1 text-torg-gray whitespace-nowrap">{DEPT_LABEL[p.departamento] || p.departamento || "—"}</td>
+                            <td className="px-2 py-1 text-torg-dark">{p.nome}</td>
+                            <td className="px-2 py-1 text-center tabular-nums whitespace-nowrap">{new Date(p.inicio).toLocaleDateString("pt-BR")}</td>
+                            <td className="px-2 py-1 text-center tabular-nums whitespace-nowrap">{new Date(p.fim).toLocaleDateString("pt-BR")}</td>
+                            <td className={`px-2 py-1 text-center tabular-nums ${p.semDuracao ? "text-amber-600 font-semibold" : ""}`}>{p.duracaoDias}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-torg-gray">
+                {Array.isArray(gerarPreview) && gerarPreview.length > 0
+                  ? `${gerarPreview.length} tarefas · término previsto ${new Date(Math.max(...gerarPreview.map((p) => new Date(p.fim).getTime()))).toLocaleDateString("pt-BR")}`
+                  : "Calcule a prévia primeiro."}
+              </span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowGerar(false)} disabled={gerando} className="px-3 py-1.5 text-xs text-torg-gray hover:text-torg-dark disabled:opacity-50">Cancelar</button>
+                <button
+                  onClick={() => gerarDatas(true)}
+                  disabled={gerando || !Array.isArray(gerarPreview) || gerarPreview.length === 0}
+                  className="px-4 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {gerando ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Aplicar ao cronograma
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
