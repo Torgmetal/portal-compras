@@ -53,28 +53,37 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: "PDF ilegível: " + (e?.message || "erro") }, { status: 422 });
   }
 
-  // Sobe cada página individual no Blob (privada, sufixo aleatório) e monta a proposta
-  const itens = [];
-  for (const p of paginas) {
-    const texto = textos[p.index] || "";
-    const info = parseHolerite(texto);
-    const sugestao = matchFuncionario(info, funcionarios);
-    const nomeArq = `holerite-${parsed.data.competencia}-p${String(p.index + 1).padStart(2, "0")}.pdf`;
-    const blob = await put(`holerites/${parsed.data.competencia}/${nomeArq}`, Buffer.from(p.bytes), {
-      access: "public", // URL com sufixo aleatório; servida só via proxy autenticado
-      addRandomSuffix: true,
-      contentType: "application/pdf",
-    });
-    itens.push({
-      pagina: p.index + 1,
-      arquivoUrl: blob.url,
-      arquivoNome: nomeArq,
-      arquivoTamanho: p.bytes.length,
-      parse: info,
-      funcionarioId: sugestao.confianca >= 0.5 ? sugestao.funcionarioId : null,
-      confianca: Number(sugestao.confianca.toFixed(2)),
-      motivo: sugestao.motivo,
-    });
+  // Sobe cada página individual no Blob (privada, sufixo aleatório) e monta a
+  // proposta. EM PARALELO (lotes) — um holerite mensal tem 1 página por
+  // funcionário (dezenas), e uploads sequenciais estouravam o limite de tempo.
+  const itens = new Array(paginas.length);
+  const CONCORRENCIA = 8;
+  try {
+    for (let inicio = 0; inicio < paginas.length; inicio += CONCORRENCIA) {
+      const lote = paginas.slice(inicio, inicio + CONCORRENCIA);
+      await Promise.all(lote.map(async (p) => {
+        const info = parseHolerite(textos[p.index] || "");
+        const sugestao = matchFuncionario(info, funcionarios);
+        const nomeArq = `holerite-${parsed.data.competencia}-p${String(p.index + 1).padStart(2, "0")}.pdf`;
+        const blob = await put(`holerites/${parsed.data.competencia}/${nomeArq}`, Buffer.from(p.bytes), {
+          access: "public", // URL com sufixo aleatório; servida só via proxy autenticado
+          addRandomSuffix: true,
+          contentType: "application/pdf",
+        });
+        itens[p.index] = {
+          pagina: p.index + 1,
+          arquivoUrl: blob.url,
+          arquivoNome: nomeArq,
+          arquivoTamanho: p.bytes.length,
+          parse: info,
+          funcionarioId: sugestao.confianca >= 0.5 ? sugestao.funcionarioId : null,
+          confianca: Number(sugestao.confianca.toFixed(2)),
+          motivo: sugestao.motivo,
+        };
+      }));
+    }
+  } catch (e) {
+    return NextResponse.json({ success: false, error: "Falha ao subir as páginas: " + (e?.message || "erro") }, { status: 502 });
   }
 
   return NextResponse.json({

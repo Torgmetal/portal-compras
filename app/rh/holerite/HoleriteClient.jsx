@@ -33,6 +33,21 @@ function competenciaExtenso(c) {
   return `${nomes[Number(mes)] || mes}/${ano}`;
 }
 
+// Lê a resposta com tolerância: se o corpo vier vazio (timeout/504) ou não-JSON,
+// devolve um erro legível em vez de estourar "Unexpected end of JSON input".
+async function lerResposta(r) {
+  const txt = await r.text();
+  try { return JSON.parse(txt); }
+  catch {
+    return {
+      success: false,
+      error: !txt || r.status === 504
+        ? "O servidor demorou demais para responder (PDF muito grande?). Tente de novo."
+        : `Erro ${r.status}: ${txt.slice(0, 120)}`,
+    };
+  }
+}
+
 export default function HoleriteClient() {
   const { showToast } = useStore();
   const [competencia, setCompetencia] = useState(mesAtual());
@@ -53,7 +68,7 @@ export default function HoleriteClient() {
     setCarregando(true); setErro("");
     try {
       const r = await fetch(`/api/rh/holerite?competencia=${competencia}`);
-      const d = await r.json();
+      const d = await lerResposta(r);
       if (!r.ok) throw new Error(d.error || "Falha ao carregar");
       setHolerites(d.holerites || []);
       setCompetencias(d.competencias || []);
@@ -81,7 +96,7 @@ export default function HoleriteClient() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ blobUrl: blob.url, competencia }),
       });
-      const d = await r.json();
+      const d = await lerResposta(r);
       if (!r.ok) throw new Error(d.error || "Falha ao preparar o lote");
       const empresa = d.itens.find((i) => i.parse?.empresa)?.parse.empresa || null;
       setRevisao({
@@ -120,7 +135,7 @@ export default function HoleriteClient() {
           })),
         }),
       });
-      const d = await r.json();
+      const d = await lerResposta(r);
       if (!r.ok) throw new Error(d.error || "Falha ao salvar");
       showToast(`${d.total} holerites importados${semVinculo ? ` (${semVinculo} sem vínculo ignorados)` : ""}`, "success");
       setRevisao(null);
@@ -140,7 +155,7 @@ export default function HoleriteClient() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ competencia, soParaMim }),
       });
-      const d = await r.json();
+      const d = await lerResposta(r);
       if (!r.ok) throw new Error(d.error || "Falha no disparo");
       if (soParaMim) showToast(`Amostra enviada para ${d.para}`, "success");
       else {
@@ -157,7 +172,7 @@ export default function HoleriteClient() {
   const habilitarAcesso = async (funcionarioId) => {
     try {
       const r = await fetch(`/api/rh/funcionarios/${funcionarioId}/acesso`, { method: "POST" });
-      const d = await r.json();
+      const d = await lerResposta(r);
       if (!r.ok) throw new Error(d.error || "Falha ao habilitar acesso");
       // Mostra a senha temporária num prompt copiável (aparece só aqui).
       window.prompt(`Acesso ${d.modo === "reset" ? "resetado" : "criado"} para ${d.email}. Senha temporária (copie e entregue ao funcionário):`, d.senhaTemporaria);
