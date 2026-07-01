@@ -24,6 +24,7 @@ model User {
   funcionario              Funcionario?          @relation("UsuarioFuncionario", fields: [funcionarioId], references: [id])
   lotesHoleriteCriados     LoteHolerite[]        @relation("LoteHoleriteCriadoPor")
   folhasCriadas            FolhaCompetencia[]    @relation("FolhaCriadaPor")
+  pontosCriados            PontoCompetencia[]    @relation("PontoCriadaPor")
   aditivos                 Aditivo[]
   ajustesPrazoCriados      AjustePrazo[]         @relation("AjustePrazoCreatedBy")
   auditLogs                AuditLog[]
@@ -999,6 +1000,7 @@ model Funcionario {
   ferias                Ferias[]
   holerites             Holerite[]
   folhaItens            FolhaItem[]
+  pontoItens            PontoItem[]
   usuario               User?                     @relation("UsuarioFuncionario")
   cargo                 Cargo                     @relation(fields: [cargoId], references: [id])
   setor                 Setor                     @relation("FuncionarioSetor", fields: [setorId], references: [id])
@@ -1254,6 +1256,48 @@ model FolhaItem {
   @@index([folhaId])
   @@index([empresa])
   @@index([centroCusto])
+}
+
+// Controle de Ponto — importa o arquivo ACJEF (Portaria 1510) por competência.
+// PontoItem = um funcionário no mês, com as marcações importadas (Json, referência)
+// e os totais que o RH confere/preenche pra contabilidade.
+model PontoCompetencia {
+  id          String      @id @default(cuid())
+  competencia String      @unique // "AAAA-MM"
+  empresa     String?
+  status      String      @default("ABERTA") // ABERTA | FECHADA
+  criadoPorId String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  criadoPor   User?       @relation("PontoCriadaPor", fields: [criadoPorId], references: [id])
+  itens       PontoItem[]
+
+  @@index([competencia])
+}
+
+model PontoItem {
+  id               String           @id @default(cuid())
+  pontoId          String
+  funcionarioId    String?
+  pisArquivo       String // PIS como veio no ACJEF (12 chars)
+  nome             String? // preenchido quando casa/mapeia o funcionário
+  marcacoes        Json? // [{ data, marcacoes[], raw }] — referência
+  horasExtras50    Float            @default(0)
+  horasExtras100   Float            @default(0)
+  faltas           Float            @default(0)
+  atrasos          Float            @default(0)
+  adicionalNoturno Float            @default(0)
+  dsr              Float            @default(0)
+  ajudaCusto       Float            @default(0)
+  observacao       String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  ponto            PontoCompetencia @relation(fields: [pontoId], references: [id], onDelete: Cascade)
+  funcionario      Funcionario?     @relation(fields: [funcionarioId], references: [id], onDelete: SetNull)
+
+  @@unique([pontoId, pisArquivo])
+  @@index([pontoId])
+  @@index([funcionarioId])
 }
 
 // Portal da Qualidade — Módulo 1 (Controle de Documentos). Espelha o padrão dos
