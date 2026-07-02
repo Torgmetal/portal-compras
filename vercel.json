@@ -2,14 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/:path((?!api/).*)",
       "has": [
         {
           "type": "host",
           "value": "(?!workspace\\.torg\\.com\\.br$).*\\.vercel\\.app$"
         }
       ],
-      "destination": "https://workspace.torg.com.br/:path*",
+      "destination": "https://workspace.torg.com.br/:path",
       "permanent": true
     }
   ],
