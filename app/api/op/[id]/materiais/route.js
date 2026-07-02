@@ -78,7 +78,15 @@ export async function GET(req, { params }) {
     for (const rm of op.rms) {
       for (const it of rm.itens) {
         const ped = it.pedidoOmie;
-        const pedidoRecebido = ped?.statusEntrega === "RECEBIDO" || !!ped?.recebidoEm;
+        // Recebido = o sync de entregas (syncEntregas) marcou o pedido como
+        // entregue. Ele grava `dataEntregaReal` + statusEntrega "ENTREGUE"/
+        // "ATRASADO" (NUNCA "RECEBIDO", e não usa `recebidoEm`). A checagem
+        // antiga (statusEntrega==="RECEBIDO" || recebidoEm) nunca dava true →
+        // todo item ficava "Aguardando entrega" mesmo com o pedido já entregue.
+        const pedidoRecebido =
+          !!ped?.dataEntregaReal ||
+          !!ped?.recebidoEm ||
+          ["ENTREGUE", "ATRASADO", "RECEBIDO"].includes(ped?.statusEntrega);
         const pedidoRevertido = ped?.status === "REVERTIDO";
 
         // Status derivado
