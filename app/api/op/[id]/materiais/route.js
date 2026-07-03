@@ -17,6 +17,8 @@ export async function GET(req, { params }) {
       where: { id },
       select: {
         id: true,
+        numero: true,
+        cliente: true,
         rms: {
           orderBy: { numero: "asc" },
           select: {
@@ -133,7 +135,7 @@ export async function GET(req, { params }) {
 
     return NextResponse.json({
       success: true,
-      data: { itens, resumo },
+      data: { itens, resumo, numero: op.numero, cliente: op.cliente },
     });
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
