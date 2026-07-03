@@ -335,11 +335,12 @@ export default function MateriaisOPSection({ opId }) {
                         {item.fornecedor || "—"}
                       </td>
                       <td className="px-4 py-2 text-xs text-torg-gray whitespace-nowrap">
-                        {st === "RECEBIDO" && item.nfNumero && (
-                          <span>NF {item.nfNumero} • {fmtData(item.recebidoEm)}</span>
-                        )}
-                        {st === "COMPRADO" && item.pedidoNumero && (
-                          <span>Pedido #{item.pedidoNumero}</span>
+                        {(st === "RECEBIDO" || st === "COMPRADO") && (item.pedidoNumero || item.nfNumero) && (
+                          <span>
+                            {item.pedidoNumero ? `Pedido #${item.pedidoNumero}` : ""}
+                            {st === "RECEBIDO" && item.nfNumero ? `${item.pedidoNumero ? " • " : ""}NF ${item.nfNumero}` : ""}
+                            {st === "RECEBIDO" && item.recebidoEm ? ` • ${fmtData(item.recebidoEm)}` : ""}
+                          </span>
                         )}
                         {st === "ESTOQUE" && (
                           <span>

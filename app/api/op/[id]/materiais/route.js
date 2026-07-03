@@ -41,6 +41,12 @@ export async function GET(req, { params }) {
                 atendidoEstoquePreco: true,
                 atendidoEstoqueTotal: true,
                 atendidoEstoqueObs: true,
+                // Recebimentos do proprio item (baixa por item — cobre pedido
+                // parcial, onde so parte dos itens chegou).
+                recebimentos: {
+                  select: { qtdRecebida: true, nfNumero: true, dataRecebimento: true },
+                  orderBy: { dataRecebimento: "desc" },
+                },
                 pedidoOmie: {
                   select: {
                     id: true,
@@ -80,16 +86,22 @@ export async function GET(req, { params }) {
     for (const rm of op.rms) {
       for (const it of rm.itens) {
         const ped = it.pedidoOmie;
-        // Recebido = o sync de entregas (syncEntregas) marcou o pedido como
-        // entregue. Ele grava `dataEntregaReal` + statusEntrega "ENTREGUE"/
-        // "ATRASADO" (NUNCA "RECEBIDO", e não usa `recebidoEm`). A checagem
-        // antiga (statusEntrega==="RECEBIDO" || recebidoEm) nunca dava true →
-        // todo item ficava "Aguardando entrega" mesmo com o pedido já entregue.
+        // Recebido POR ITEM: soma dos recebimentos do proprio item (o sync cria
+        // um Recebimento por item — no pedido completo baixa todos, no parcial so
+        // os que chegaram). Cobre o caso de pedido parcialmente recebido.
+        const qtdEfetiva = it.peso > 0 ? Number(it.peso) : it.qtd;
+        const recebidoQtd = (it.recebimentos || []).reduce((s, r) => s + r.qtdRecebida, 0);
+        const itemRecebido = qtdEfetiva > 0 && recebidoQtd >= qtdEfetiva * (1 - 0.02);
+        // Fallback pelo pedido: syncEntregas grava dataEntregaReal + statusEntrega
+        // "ENTREGUE"/"ATRASADO" (NUNCA "RECEBIDO", nao usa `recebidoEm`) no
+        // recebimento completo. (statusEntrega "PARCIAL" NAO conta aqui — quem
+        // decide o item parcial e o recebimento por item acima.)
         const pedidoRecebido =
+          itemRecebido ||
           !!ped?.dataEntregaReal ||
-          !!ped?.recebidoEm ||
           ["ENTREGUE", "ATRASADO", "RECEBIDO"].includes(ped?.statusEntrega);
         const pedidoRevertido = ped?.status === "REVERTIDO";
+        const ultimoReceb = (it.recebimentos || [])[0] || null;
 
         // Status derivado
         let statusDerivado;
@@ -119,8 +131,8 @@ export async function GET(req, { params }) {
           pedidoRecebido,
           pedidoNumero: ped?.numeroPedido || null,
           fornecedor: ped?.fornecedorNome || null,
-          nfNumero: ped?.nfNumero || null,
-          recebidoEm: ped?.recebidoEm || ped?.dataEntregaReal || null,
+          nfNumero: ultimoReceb?.nfNumero || ped?.nfNumero || null,
+          recebidoEm: ultimoReceb?.dataRecebimento || ped?.recebidoEm || ped?.dataEntregaReal || null,
           // Dados de estoque
           estoquePreco: it.atendidoEstoquePreco || null,
           estoqueTotal: it.atendidoEstoqueTotal || null,
