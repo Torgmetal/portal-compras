@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Users, Building2, Briefcase, UserPlus, Cake, CalendarDays,
-  Loader2, AlertCircle, DollarSign,
+  Loader2, AlertCircle, DollarSign, Bell, ChevronRight,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -14,6 +15,7 @@ const fmtData = (d) =>
 
 export default function RHDashboardClient() {
   const [data, setData] = useState(null);
+  const [ferias, setFerias] = useState(null); // { resumo, linhas }
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
@@ -26,7 +28,18 @@ export default function RHDashboardClient() {
       })
       .catch((e) => setErro(e.message))
       .finally(() => setCarregando(false));
+    // Notificações de férias (best-effort — não derruba o dashboard se falhar)
+    fetch("/api/rh/ferias")
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setFerias(d); })
+      .catch(() => {});
   }, []);
+
+  // Alertas de vencimento de férias: vencidas + vencendo em ≤90 dias
+  const alertasFerias = (ferias?.linhas || [])
+    .filter((l) => l.periodo && (l.periodo.situacao === "VENCIDA" || (l.periodo.situacao === "A_GOZAR" && l.periodo.diasParaVencer <= 90)))
+    .sort((a, b) => a.periodo.diasParaVencer - b.periodo.diasParaVencer);
+  const nVencidas = ferias?.resumo?.VENCIDA || 0;
 
   if (carregando) {
     return (
@@ -67,6 +80,43 @@ export default function RHDashboardClient() {
         <KPICard icon={AlertCircle} label="Afastados" value={data.totalAfastados} cor="text-red-600" borda="border-red-100" />
         <KPICard icon={DollarSign} label="Folha mensal" value={fmtMoeda(data.custoTotal)} cor="text-torg-dark" borda="border-gray-100" small />
       </div>
+
+      {/* Notificações — vencimentos de férias */}
+      {alertasFerias.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-torg-dark flex items-center gap-2">
+              <Bell size={16} className="text-amber-500" /> Notificações — Férias
+              <span className="ml-1 text-[11px] font-medium text-torg-gray">
+                {nVencidas > 0 && <span className="text-red-600">{nVencidas} vencida{nVencidas !== 1 ? "s" : ""}</span>}
+                {nVencidas > 0 && alertasFerias.length - nVencidas > 0 && " · "}
+                {alertasFerias.length - nVencidas > 0 && <span className="text-amber-600">{alertasFerias.length - nVencidas} vencendo</span>}
+              </span>
+            </h3>
+            <Link href="/rh/ferias" className="text-xs text-torg-blue hover:underline inline-flex items-center gap-1">Ver todas <ChevronRight size={13} /></Link>
+          </div>
+          <div className="space-y-1.5">
+            {alertasFerias.slice(0, 6).map((l) => {
+              const venc = l.periodo.situacao === "VENCIDA";
+              return (
+                <div key={l.id} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full ${venc ? "bg-red-500" : "bg-amber-500"}`} />
+                    <span className="text-sm font-medium text-torg-dark">{l.nome}</span>
+                    <span className="text-[10px] text-torg-gray">{l.setor || ""}</span>
+                  </div>
+                  <span className={`text-xs ${venc ? "text-red-600" : "text-amber-600"}`}>
+                    {venc ? `venceu há ${-l.periodo.diasParaVencer}d` : `vence em ${l.periodo.diasParaVencer}d`} · {fmtData(l.periodo.vencimento)}
+                  </span>
+                </div>
+              );
+            })}
+            {alertasFerias.length > 6 && (
+              <p className="text-[11px] text-torg-gray pt-1">+ {alertasFerias.length - 6} outros — <Link href="/rh/ferias" className="text-torg-blue hover:underline">ver painel de férias</Link></p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Funcionários por Setor */}

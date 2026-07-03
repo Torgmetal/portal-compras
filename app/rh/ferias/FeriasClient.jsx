@@ -12,7 +12,7 @@ const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: 
 
 const SIT = {
   VENCIDA: { label: "Vencida", cor: "bg-red-100 text-red-700" },
-  A_GOZAR: { label: "A gozar", cor: "bg-green-100 text-green-700" },
+  A_GOZAR: { label: "Disponível", cor: "bg-green-100 text-green-700" },
   EM_AQUISICAO: { label: "Em aquisição", cor: "bg-gray-100 text-gray-600" },
 };
 const STATUS_F = { PROGRAMADA: "bg-blue-100 text-blue-700", GOZADA: "bg-green-100 text-green-700", CANCELADA: "bg-gray-100 text-gray-500", PENDENTE: "bg-amber-100 text-amber-700" };

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import {
   Clock, Loader2, AlertCircle, RefreshCw, Inbox, Upload, Save, Download,
-  Lock, LockOpen, ChevronRight, Link2, CheckCircle2,
+  Lock, LockOpen, ChevronRight, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -131,6 +131,20 @@ export default function PontoClient() {
     }
   };
 
+  const excluirImportacao = async () => {
+    if (!confirm(`Excluir a importação de ponto de ${extenso(ponto.competencia)}? Isso apaga tudo para você reimportar o arquivo.`)) return;
+    try {
+      const r = await fetch(`/api/rh/ponto/${ponto.id}`, { method: "DELETE" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao excluir");
+      showToast("Importação excluída — pode reimportar", "success");
+      setPonto(null); setItens([]);
+      await carregar();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  };
+
   const fechada = ponto?.status === "FECHADA";
   const naoVinculados = itens.filter((it) => !it.funcionarioId).length;
 
@@ -191,6 +205,11 @@ export default function PontoClient() {
               {dirty.size > 0 && <span className="text-xs text-amber-600">{dirty.size} não salvos</span>}
             </div>
             <div className="flex items-center gap-2">
+              <button onClick={excluirImportacao}
+                className="px-3 py-2 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 inline-flex items-center gap-1.5"
+                title="Excluir a importação para reimportar o arquivo">
+                <Trash2 size={14} /> Excluir importação
+              </button>
               <a href={`/api/rh/ponto/${ponto.id}/export`} className="px-3 py-2 text-xs text-torg-dark border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-1.5"><Download size={14} /> Exportar</a>
               {fechada ? (
                 <button onClick={() => mudarStatus("ABERTA")} className="px-3 py-2 text-xs text-torg-blue border border-torg-blue-200 rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1.5"><LockOpen size={14} /> Reabrir</button>

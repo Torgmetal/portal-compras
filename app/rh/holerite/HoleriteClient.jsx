@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { upload } from "@vercel/blob/client";
 import {
   Receipt, Upload, Loader2, CheckCircle2, AlertCircle, Send, KeyRound,
-  MessageCircle, RefreshCw, Inbox, X,
+  MessageCircle, RefreshCw, Inbox, X, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -63,6 +63,7 @@ export default function HoleriteClient() {
   const [revisao, setRevisao] = useState(null); // { itens, funcionarios, arquivoOriginalUrl, arquivoOriginalNome, empresa }
   const [salvando, setSalvando] = useState(false);
   const [disparando, setDisparando] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro("");
@@ -166,6 +167,22 @@ export default function HoleriteClient() {
       showToast(e.message, "error");
     } finally {
       setDisparando(false);
+    }
+  };
+
+  const cancelarImportacao = async () => {
+    if (!confirm(`Excluir TODOS os holerites importados de ${competenciaExtenso(competencia)}? Isso apaga a importação para você subir o arquivo de novo.`)) return;
+    setCancelando(true);
+    try {
+      const r = await fetch(`/api/rh/holerite?competencia=${competencia}`, { method: "DELETE" });
+      const d = await lerResposta(r);
+      if (!r.ok) throw new Error(d.error || "Falha ao cancelar");
+      showToast(`Importação cancelada — ${d.apagados} holerites removidos`, "success");
+      await carregar();
+    } catch (e) {
+      showToast(e.message, "error");
+    } finally {
+      setCancelando(false);
     }
   };
 
@@ -305,6 +322,13 @@ export default function HoleriteClient() {
               className="px-3 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50">
               {disparando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Disparar pendentes
             </button>
+            {holerites.length > 0 && (
+              <button onClick={cancelarImportacao} disabled={cancelando}
+                className="px-3 py-2 bg-white border border-red-200 text-red-600 text-sm rounded-lg hover:bg-red-50 font-medium flex items-center gap-2 disabled:opacity-50"
+                title="Excluir a importação desta competência para reimportar">
+                {cancelando ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Cancelar importação
+              </button>
+            )}
           </div>
         </div>
 

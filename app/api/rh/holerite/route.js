@@ -116,3 +116,34 @@ export async function POST(req) {
 
   return NextResponse.json({ success: true, loteId: lote.id, total: itens.length });
 }
+
+// DELETE /api/rh/holerite?competencia=AAAA-MM
+// Cancela a importação de uma competência (apaga holerites + lotes) p/ reimportar.
+// Bloqueia se algum holerite já foi CONFIRMADO (ciência do funcionário — não perder o registro).
+export async function DELETE(req) {
+  let user;
+  try {
+    user = await requireRole(["ADMIN", "RH"]);
+  } catch (e) {
+    return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
+  }
+
+  const competencia = new URL(req.url).searchParams.get("competencia");
+  if (!competencia || !/^\d{4}-\d{2}$/.test(competencia)) {
+    return NextResponse.json({ success: false, error: "Informe a competência (AAAA-MM)" }, { status: 400 });
+  }
+
+  const confirmados = await prisma.holerite.count({ where: { competencia, status: "CONFIRMADO" } });
+  if (confirmados > 0) {
+    return NextResponse.json({ success: false, error: `${confirmados} holerite(s) já confirmados pelo funcionário — não é possível excluir a competência.` }, { status: 409 });
+  }
+
+  const del = await prisma.holerite.deleteMany({ where: { competencia } });
+  await prisma.loteHolerite.deleteMany({ where: { competencia } });
+
+  await prisma.auditLog.create({
+    data: { userId: user.id, action: "CANCELAR_HOLERITE_IMPORTACAO", entity: "Holerite", entityId: competencia, diff: { competencia, apagados: del.count } },
+  }).catch(() => {});
+
+  return NextResponse.json({ success: true, apagados: del.count });
+}
