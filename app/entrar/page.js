@@ -15,6 +15,7 @@ function homePorRole(role) {
     case "COMPRAS":
       return "/compras";
     case "ENGENHARIA":
+      return "/engenharia";
     case "ALMOXARIFADO":
       return "/rm";
     case "PRODUCAO":
