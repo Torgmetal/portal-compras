@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   Activity, Trophy, TrendingUp, Package, Clock, ShoppingCart,
   BarChart3, ChevronDown, ChevronRight, Target, DollarSign, Zap, Users, Briefcase,
-  UserMinus, BedDouble, ShieldAlert, GraduationCap, Timer,
+  UserMinus, BedDouble, ShieldAlert, GraduationCap, Timer, CalendarRange,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
@@ -18,6 +18,7 @@ const setores = [
     base: "/indicadores/compras",
     sub: [
       { href: "/indicadores/compras", label: "Dashboard", icon: Activity, exact: true },
+      { href: "/indicadores/compras/mensal", label: "Evolução Mensal", icon: CalendarRange },
       { href: "/indicadores/compras/scorecard", label: "Scorecard Fornecedores", icon: Trophy },
       { href: "/indicadores/compras/savings", label: "Savings por Obra", icon: TrendingUp },
       { href: "/indicadores/compras/otif", label: "OTIF", icon: Package },
