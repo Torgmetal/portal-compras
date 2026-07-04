@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
   FolderKanban,
+  PencilRuler,
   ShoppingCart,
   RailSymbol,
   Factory,
@@ -32,6 +33,14 @@ const MODULOS = [
     icon: FolderKanban,
     cor: "bg-blue-100 text-blue-700",
     modulos: ["COMERCIAL"], // null = liberado pra todos; array = requer um desses módulos ou ADMIN
+  },
+  {
+    href: "/engenharia",
+    label: "Engenharia",
+    desc: "Detalhamento, marcas e reconciliação de peso",
+    icon: PencilRuler,
+    cor: "bg-sky-100 text-sky-700",
+    modulos: ["ENGENHARIA"],
   },
   {
     href: "/compras",

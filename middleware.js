@@ -92,6 +92,7 @@ export default withAuth(
           isAdmin || requeridos.some(m => modulos.includes(m));
 
         if (path.startsWith("/comercial")  && !temModulo("COMERCIAL"))  return false;
+        if (path.startsWith("/engenharia") && !temModulo("ENGENHARIA")) return false;
         if (path.startsWith("/compras")    && !temModulo("COMPRAS"))     return false;
         if (path.startsWith("/indicadores") && !temModulo("COMPRAS", "COMERCIAL", "RH"))    return false;
         if (path.startsWith("/financeiro") && !temModulo("FINANCEIRO"))  return false;
