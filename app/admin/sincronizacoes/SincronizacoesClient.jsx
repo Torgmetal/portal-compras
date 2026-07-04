@@ -20,22 +20,25 @@ export default function SincronizacoesClient() {
   const { showToast } = useStore();
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState("");
   const [forcando, setForcando] = useState(null);
 
   const carregar = useCallback(async () => {
-    setErro("");
+    setErro(""); setAtualizando(true);
     try {
-      const r = await fetch("/api/admin/sincronizacoes");
+      const r = await fetch("/api/admin/sincronizacoes", { cache: "no-store" });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao carregar");
       setDados(d);
     } catch (e) {
       setErro(e.message);
     } finally {
-      setCarregando(false);
+      setCarregando(false); setAtualizando(false);
     }
   }, []);
+
+  const atualizarManual = async () => { await carregar(); showToast("Status atualizado", "success"); };
 
   useEffect(() => { carregar(); }, [carregar]);
   // Auto-refresh leve a cada 30s
@@ -84,8 +87,8 @@ export default function SincronizacoesClient() {
               <strong className="text-green-700">{dados.resumo.ok}</strong> ok · <strong className={dados.resumo.problemas ? "text-red-600" : "text-torg-gray"}>{dados.resumo.problemas}</strong> com problema
             </span>
           )}
-          <button onClick={carregar} className="px-3 py-2 text-sm text-torg-dark border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-2">
-            <RefreshCw size={15} className={carregando ? "animate-spin" : ""} /> Atualizar
+          <button onClick={atualizarManual} disabled={atualizando} className="px-3 py-2 text-sm text-torg-dark border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-2 disabled:opacity-60">
+            <RefreshCw size={15} className={atualizando ? "animate-spin" : ""} /> Atualizar
           </button>
         </div>
       </div>
