@@ -250,7 +250,7 @@ export default function PontoClient() {
                                 {funcionarios.map((f) => <option key={f.id} value={f.id}>{f.nome}{f.matricula ? ` (${f.matricula})` : ""}</option>)}
                               </select>
                             )}
-                            <div className="text-[10px] text-torg-gray font-mono">{it.pisArquivo}</div>
+                            <div className="text-[10px] text-torg-gray font-mono">{it.pisArquivo}{it.empresa ? ` · ${it.empresa}` : ""}</div>
                           </td>
                           <td className="px-2 py-1 text-center">
                             <button onClick={() => setExpandido(expandido === it.id ? null : it.id)} className="inline-flex items-center gap-0.5 text-torg-blue hover:underline">

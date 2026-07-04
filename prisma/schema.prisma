@@ -1281,6 +1281,7 @@ model PontoItem {
   pontoId          String
   funcionarioId    String?
   pisArquivo       String // PIS como veio no ACJEF (12 chars)
+  empresa          String? // empresa do arquivo (TORG/VMI) — multi-empresa por competência
   nome             String? // preenchido quando casa/mapeia o funcionário
   marcacoes        Json? // [{ data, marcacoes[], raw }] — referência
   horasExtras50    Float            @default(0)

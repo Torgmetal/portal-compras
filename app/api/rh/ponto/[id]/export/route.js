@@ -23,16 +23,16 @@ export async function GET(_req, { params }) {
   });
   if (!ponto) return NextResponse.json({ error: "Competência não encontrada" }, { status: 404 });
 
-  const head = ["PIS", "Funcionário", "Dias", "HE 50%", "HE 100%", "Faltas", "Atrasos", "Adic. Noturno", "DSR", "Ajuda de Custo", "Observação"];
+  const head = ["PIS", "Empresa", "Funcionário", "Dias", "HE 50%", "HE 100%", "Faltas", "Atrasos", "Adic. Noturno", "DSR", "Ajuda de Custo", "Observação"];
   const linhas = ponto.itens.map((it) => [
-    it.pisArquivo, it.nome || "(não vinculado)", Array.isArray(it.marcacoes) ? it.marcacoes.length : "",
+    it.pisArquivo, it.empresa || "", it.nome || "(não vinculado)", Array.isArray(it.marcacoes) ? it.marcacoes.length : "",
     r2(it.horasExtras50), r2(it.horasExtras100), r2(it.faltas), r2(it.atrasos),
     r2(it.adicionalNoturno), r2(it.dsr), r2(it.ajudaCusto), it.observacao || "",
   ]);
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([[`PONTO ${ponto.competencia}${ponto.empresa ? " — " + ponto.empresa : ""}`], head, ...linhas]);
-  ws["!cols"] = [{ wch: 16 }, { wch: 30 }, { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 8 }, { wch: 14 }, { wch: 30 }];
+  ws["!cols"] = [{ wch: 16 }, { wch: 14 }, { wch: 30 }, { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 8 }, { wch: 14 }, { wch: 30 }];
   XLSX.utils.book_append_sheet(wb, ws, "Ponto");
 
   const buf = Buffer.from(XLSX.write(wb, { type: "array", bookType: "xlsx" }));
