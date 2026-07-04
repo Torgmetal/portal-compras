@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Activity, RefreshCw, Loader2, AlertCircle, CheckCircle2, XCircle, Clock,
-  Play, Plug, AlertTriangle,
+  Play, Plug,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -90,12 +90,6 @@ export default function SincronizacoesClient() {
         </div>
       </div>
 
-      {dados && !dados.cronSecretConfigurado && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-3 py-2 flex items-center gap-2">
-          <AlertTriangle size={15} /> <code>CRON_SECRET</code> não configurado — o botão de forçar não vai funcionar até definir a env.
-        </div>
-      )}
-
       {/* Sincronizações agendadas */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100"><h3 className="text-sm font-bold text-torg-dark">Sincronizações agendadas (crons)</h3></div>
@@ -129,7 +123,7 @@ export default function SincronizacoesClient() {
                     <td className="px-4 py-2.5 text-xs text-torg-gray tabular-nums">{fmtDataHora(c.lastOkAt)}</td>
                     <td className="px-4 py-2.5 text-right text-xs text-torg-gray tabular-nums">{fmtDur(c.duracaoMs)}</td>
                     <td className="px-4 py-2.5 text-center">
-                      <button onClick={() => forcar(c.job)} disabled={forcando === c.job || !dados.cronSecretConfigurado}
+                      <button onClick={() => forcar(c.job)} disabled={forcando === c.job}
                         className="px-2.5 py-1.5 text-xs text-torg-blue border border-torg-blue-200 rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1.5 disabled:opacity-50">
                         {forcando === c.job ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} Forçar
                       </button>
