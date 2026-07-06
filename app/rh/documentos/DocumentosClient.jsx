@@ -645,7 +645,7 @@ export default function DocumentosClient() {
 
       {/* Modal Novo Documento */}
       {modalAberto && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !salvando && setModalAberto(false)}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-lg font-bold text-torg-dark">{editandoId ? "Editar Documento" : "Novo Documento"}</h3>
@@ -807,7 +807,7 @@ export default function DocumentosClient() {
       />
 
       {enviarDoc && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !enviando && setEnviarDoc(null)}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-base font-bold text-torg-dark flex items-center gap-2"><Send size={16} className="text-torg-blue" /> Enviar documento</h3>

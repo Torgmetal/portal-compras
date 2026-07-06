@@ -193,8 +193,8 @@ export default function FeriasClient() {
 
       {/* Modal Programar */}
       {modal && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => setModal(null)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-lg font-bold text-torg-dark">Programar férias — {modal.funcionario.nome}</h3>
               <button onClick={() => setModal(null)} className="text-gray-400 hover:text-red-500"><X size={18} /></button>
