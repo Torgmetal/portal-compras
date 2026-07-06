@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Wallet, Loader2, AlertCircle, RefreshCw, Inbox, Play, Save, Download,
-  Lock, LockOpen, Table2, PieChart,
+  Lock, LockOpen, Table2, PieChart, Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { calcDerivados, resumo as calcResumo } from "@/lib/folha-calc";
@@ -115,6 +115,20 @@ export default function FolhaClient() {
     }
   };
 
+  const excluirFolha = async () => {
+    if (!confirm(`Excluir a folha de ${extenso(folha.competencia)}? Isso apaga TODOS os valores lançados desta competência para você refazer.`)) return;
+    try {
+      const r = await fetch(`/api/rh/folha/${folha.id}`, { method: "DELETE" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao excluir");
+      showToast("Folha excluída — pode iniciar de novo", "success");
+      setFolha(null); setItens([]);
+      await carregar();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  };
+
   const fechada = folha?.status === "FECHADA";
   const resumo = useMemo(() => calcResumo(itens), [itens]);
 
@@ -174,6 +188,11 @@ export default function FolhaClient() {
                 <button onClick={() => setAba("folha")} className={`px-3 py-1.5 text-xs inline-flex items-center gap-1.5 ${aba === "folha" ? "bg-torg-blue text-white" : "text-torg-gray"}`}><Table2 size={13} /> Folha</button>
                 <button onClick={() => setAba("resumo")} className={`px-3 py-1.5 text-xs inline-flex items-center gap-1.5 ${aba === "resumo" ? "bg-torg-blue text-white" : "text-torg-gray"}`}><PieChart size={13} /> Resumo</button>
               </div>
+              {!fechada && (
+                <button onClick={excluirFolha} className="px-3 py-2 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 inline-flex items-center gap-1.5" title="Excluir a folha para refazer">
+                  <Trash2 size={14} /> Excluir folha
+                </button>
+              )}
               <a href={`/api/rh/folha/${folha.id}/export`} className="px-3 py-2 text-xs text-torg-dark border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-1.5"><Download size={14} /> Exportar</a>
               {fechada ? (
                 <button onClick={() => mudarStatus("ABERTA")} className="px-3 py-2 text-xs text-torg-blue border border-torg-blue-200 rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1.5"><LockOpen size={14} /> Reabrir</button>
