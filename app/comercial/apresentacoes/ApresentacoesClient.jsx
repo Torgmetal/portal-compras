@@ -76,6 +76,18 @@ function Apresentacoes({ toast }) {
     } catch (e) { toast(false, e.message); } finally { setCriando(false); }
   }
 
+  async function excluir(a) {
+    if (!confirm(`Excluir a apresentação de "${a.empresa}"? Esta ação não pode ser desfeita — o link deixa de funcionar e o registro some.`)) return;
+    try {
+      const r = await fetch(`/api/comercial/apresentacoes/${a.id}`, { method: "DELETE" });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error);
+      setLista((prev) => prev.filter((x) => x.id !== a.id));
+      if (editId === a.id) setEditId(null);
+      toast(true, "Apresentação excluída");
+    } catch (e) { toast(false, e.message); }
+  }
+
   if (erro) return <p className="text-sm text-red-600">{erro}</p>;
   if (!lista) return <div className="py-10 text-center"><Loader2 className="animate-spin text-torg-blue mx-auto" /></div>;
 
@@ -100,6 +112,7 @@ function Apresentacoes({ toast }) {
                   <p className="text-xs text-torg-gray">{a.contato}{a.clienteEmail ? ` · ${a.clienteEmail}` : ""} · {a._count.documentos} extra(s){a.status === "PUBLICADO" ? ` · ${a.acessos} acesso(s)` : ""}</p>
                 </div>
                 <button onClick={() => setEditId(editId === a.id ? null : a.id)} className="text-sm font-semibold text-torg-blue border border-torg-blue/30 hover:bg-torg-blue-50 rounded-lg px-3 py-1.5">{editId === a.id ? "Fechar" : "Editar"}</button>
+                <button onClick={() => excluir(a)} title="Excluir apresentação" className="text-sm font-semibold text-red-600 border border-red-200 hover:bg-red-50 rounded-lg px-2.5 py-1.5"><Trash2 size={15} /></button>
               </div>
               {editId === a.id && <Editor id={a.id} toast={toast} onChange={carregar} />}
             </div>
