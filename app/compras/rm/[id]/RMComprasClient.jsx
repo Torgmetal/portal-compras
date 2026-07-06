@@ -625,7 +625,7 @@ function PedidosGerados({ pedidos, rmId, onRevertido, isAdmin, userRole }) {
   const podeReceber = isAdmin || userRole === "COMPRAS";
   const pedidosAtivos = pedidos.filter((p) => p.status === "CRIADO");
   const pedidosRevertidos = pedidos.filter((p) => p.status === "REVERTIDO");
-  const qtdRecebidos = pedidosAtivos.filter((p) => p.statusEntrega === "RECEBIDO").length;
+  const qtdRecebidos = pedidosAtivos.filter((p) => ["ENTREGUE", "ATRASADO", "RECEBIDO"].includes(p.statusEntrega)).length;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -654,7 +654,7 @@ function PedidosGerados({ pedidos, rmId, onRevertido, isAdmin, userRole }) {
 
       <ul className="divide-y divide-gray-100">
         {pedidosAtivos.map((p) => {
-          const recebido = p.statusEntrega === "RECEBIDO";
+          const recebido = ["ENTREGUE", "ATRASADO", "RECEBIDO"].includes(p.statusEntrega);
           return (
             <li key={p.id} className={`px-6 py-4 ${recebido ? "bg-emerald-50/30" : ""}`}>
               <div className="flex items-center gap-3 flex-wrap">
