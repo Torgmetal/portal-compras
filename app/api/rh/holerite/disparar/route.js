@@ -34,10 +34,10 @@ function montarEmail({ nome, competencia, link }) {
       <p>Olá, ${escapeHtml(nome)}.</p>
       <p>Seu holerite referente a <strong>${escapeHtml(ref)}</strong> já está disponível no portal.</p>
       <p><a href="${link}" style="display:inline-block;background:#006EAB;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Acessar meu holerite</a></p>
-      <p style="color:#576D7E;font-size:13px">Após visualizar, confirme o recebimento na própria página.</p>
+      <p style="color:#576D7E;font-size:13px">Entre com seu <strong>CPF</strong> e senha. Após visualizar, confirme o recebimento na própria página.</p>
       <p style="color:#576D7E;font-size:12px">Workspace Torg — uso interno / confidencial.</p>
     </div>`;
-  return { subject, html, text: `Seu holerite de ${ref} está disponível. Acesse: ${link}` };
+  return { subject, html, text: `Seu holerite de ${ref} está disponível. Entre com seu CPF e senha: ${link}` };
 }
 
 export async function POST(req) {

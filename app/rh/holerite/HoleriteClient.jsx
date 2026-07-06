@@ -203,7 +203,12 @@ export default function HoleriteClient() {
     const num = (telefone || "").replace(/\D/g, "");
     if (!num) return null;
     const full = num.length <= 11 ? `55${num}` : num;
-    const txt = encodeURIComponent(`Olá, ${nome}! Seu holerite de ${competenciaExtenso(competencia)} está disponível no portal. Acesse com seu login para visualizar e confirmar o recebimento.`);
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const link = `${origin}/meu-rh`;
+    const txt = encodeURIComponent(
+      `Olá, ${nome}! Seu holerite de ${competenciaExtenso(competencia)} já está disponível no portal da Torg.\n\n` +
+      `Acesse com seu CPF e senha para visualizar e confirmar o recebimento:\n${link}`
+    );
     return `https://wa.me/${full}?text=${txt}`;
   };
 
