@@ -1308,6 +1308,39 @@ model PontoItem {
   @@index([funcionarioId])
 }
 
+// Mural do portal do funcionário: comunicados/avisos que o RH publica para todos
+// (opcionalmente disparados por e-mail). Sem relações — nomes denormalizados.
+model MuralAviso {
+  id                 String    @id @default(cuid())
+  titulo             String
+  corpo              String
+  fixado             Boolean   @default(false)
+  emailEnviadoEm     DateTime?
+  emailDestinatarios Int?
+  criadoPorId        String?
+  criadoPorNome      String?
+  ativo              Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([ativo, createdAt])
+}
+
+// Sugestões/feedback que o funcionário envia para o RH (portal /meu-rh).
+model FeedbackRH {
+  id              String    @id @default(cuid())
+  funcionarioId   String?
+  funcionarioNome String?
+  anonimo         Boolean   @default(false)
+  categoria       String? // SUGESTAO | RECLAMACAO | ELOGIO | DUVIDA | OUTRO
+  mensagem        String
+  status          String    @default("NOVO") // NOVO | LIDO | RESOLVIDO
+  lidoEm          DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([status, createdAt])
+}
+
 // Portal da Qualidade — Módulo 1 (Controle de Documentos). Espelha o padrão dos
 // documentos de RH (arquivo no Blob privado + backup ISO no SharePoint + proxy
 // de download), com camada de VALIDAÇÃO da informação e amarração a norma +
