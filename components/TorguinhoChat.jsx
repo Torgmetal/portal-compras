@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Send, Loader2, MessageCircle, ChevronDown, Paperclip, Download, FileSpreadsheet, FileText, Image as ImageIcon } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import { fraseDoDia } from "@/lib/torguinho-frases";
 
 // ─── Renderiza markdown simples (negrito, listas, emojis) ─────────────────────
@@ -112,6 +113,7 @@ function IconeAnexo({ tipo }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function TorguinhoChat() {
   const { data: session, status } = useSession();
+  const pathname = usePathname();
   const [aberto,     setAberto]     = useState(false);
   const [mensagens,  setMensagens]  = useState([]);
   const [input,      setInput]      = useState("");
@@ -165,6 +167,8 @@ export default function TorguinhoChat() {
     user?.tipo === "ADMIN" ||
     (user?.modulos ?? []).some(m => config.modulosHabilitados.includes(m));
 
+  // Portal do funcionário (/meu-rh) não exibe o Torguinho — é ferramenta interna do time.
+  if (pathname?.startsWith("/meu-rh")) return null;
   if (status !== "authenticated" || !config || !config.ativo || !temAcesso) return null;
 
   const nome = user?.name?.split(" ")[0] || "colega";
