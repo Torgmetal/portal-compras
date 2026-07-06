@@ -19,6 +19,10 @@ model User {
   updatedAt                DateTime              @updatedAt
   podeAlterarVerba         Boolean               @default(false)
   tipo                     TipoUsuario
+  // Troca de senha: força a definição de nova senha (1º acesso do funcionário
+  // com senha provisória) e expiração periódica (90 dias — ver lib/auth.js).
+  deveTrocarSenha          Boolean               @default(false)
+  senhaAlteradaEm          DateTime?
   // Self-service: quando tipo=FUNCIONARIO, vincula 1:1 ao registro de RH
   funcionarioId            String?               @unique
   funcionario              Funcionario?          @relation("UsuarioFuncionario", fields: [funcionarioId], references: [id])

@@ -55,15 +55,16 @@ function LoginForm() {
         setCarregando(false);
         return;
       }
-      // Lê a sessão pra descobrir o role e redirecionar pro portal certo
+      // Lê a sessão pra descobrir o tipo/role e redirecionar pro portal certo.
+      // Funcionário (autoatendimento) sempre vai pro /meu-rh — nunca pro portal
+      // interno, mesmo que tenha vindo com callbackUrl de uma página interna.
       let destino = callbackUrl;
-      if (!destino) {
-        try {
-          const s = await fetch("/api/auth/session").then((r) => r.json());
-          destino = homePorRole(s?.user?.role);
-        } catch {
-          destino = "/";
-        }
+      try {
+        const s = await fetch("/api/auth/session").then((r) => r.json());
+        if (s?.user?.tipo === "FUNCIONARIO") destino = "/meu-rh";
+        else if (!destino) destino = homePorRole(s?.user?.role);
+      } catch {
+        if (!destino) destino = "/";
       }
       // Hard redirect — garante que o cookie de sessão esteja disponível
       // e evita problemas de soft navigation do App Router
@@ -110,7 +111,7 @@ function LoginForm() {
         <form onSubmit={submit} className="w-full max-w-md bg-white rounded-2xl border border-torg-blue-100 shadow-sm p-7 space-y-5">
           <div>
             <h2 className="text-2xl font-extrabold text-torg-dark tracking-tight">Entrar</h2>
-            <p className="text-sm text-torg-gray mt-1">Use seu email e senha cadastrados.</p>
+            <p className="text-sm text-torg-gray mt-1">Interno: e-mail e senha. Funcionário: CPF e senha.</p>
           </div>
 
           {erro && (
@@ -121,14 +122,15 @@ function LoginForm() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Email</label>
+            <label className="block text-sm font-medium text-torg-dark mb-1">E-mail ou CPF</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
-              autoComplete="email"
+              autoComplete="username"
+              placeholder="seu@email.com ou CPF (só funcionários)"
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
             />
           </div>

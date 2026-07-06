@@ -4,7 +4,7 @@ import {
   Users, Search, PlusCircle, Loader2, AlertCircle, X,
   ChevronDown, Edit, UserX, UserCheck, Download, Upload,
   FileSpreadsheet, CheckCircle2, XCircle, UserMinus, MoreVertical,
-  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown,
+  ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown, KeyRound,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -72,6 +72,10 @@ export default function FuncionariosClient() {
 
   // Menu de ações por funcionário
   const [menuAberto, setMenuAberto] = useState(null);
+
+  // Acesso do funcionário (login por CPF + senha provisória)
+  const [acessoLoading, setAcessoLoading] = useState(null); // id em processamento
+  const [senhaAcesso, setSenhaAcesso] = useState(null); // { nome, login, senha, modo }
 
   // Import Excel
   const fileRef = useRef(null);
@@ -307,6 +311,25 @@ export default function FuncionariosClient() {
       setErro(e.message);
     } finally {
       setDesligando(false);
+    }
+  };
+
+  // Habilita acesso (login por CPF) ou reseta a senha — gera senha provisória
+  const habilitarAcesso = async (func) => {
+    setMenuAberto(null);
+    setErro("");
+    setAcessoLoading(func.id);
+    try {
+      const res = await fetch(`/api/rh/funcionarios/${func.id}/acesso`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Erro ao habilitar acesso");
+      setSenhaAcesso({ nome: func.nome, login: data.login, senha: data.senhaTemporaria, modo: data.modo });
+      // Marca o acesso como habilitado na lista (update otimista)
+      setFuncionarios((prev) => prev.map((f) => (f.id === func.id ? { ...f, usuario: f.usuario || { id: "novo" } } : f)));
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setAcessoLoading(null);
     }
   };
 
@@ -558,6 +581,16 @@ export default function FuncionariosClient() {
                                   >
                                     <ArrowUpDown size={14} className="text-torg-blue" />
                                     Ajuste / Movimentação
+                                  </button>
+                                  <button
+                                    onClick={() => habilitarAcesso(f)}
+                                    disabled={acessoLoading === f.id}
+                                    className="w-full px-3 py-2 text-sm text-left text-torg-dark hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
+                                  >
+                                    {acessoLoading === f.id
+                                      ? <Loader2 size={14} className="text-torg-blue animate-spin" />
+                                      : <KeyRound size={14} className="text-torg-blue" />}
+                                    {f.usuario ? "Resetar senha de acesso" : "Habilitar acesso (CPF)"}
                                   </button>
                                   <div className="border-t border-gray-100 my-1" />
                                   <button
@@ -828,6 +861,48 @@ export default function FuncionariosClient() {
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
                 {ajustando ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                 {ajustando ? "Salvando…" : "Confirmar Ajuste"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Senha de acesso gerada (login por CPF) */}
+      {senhaAcesso && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSenhaAcesso(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex items-center gap-3">
+              <CheckCircle2 size={20} className="text-emerald-500" />
+              <h3 className="text-lg font-bold text-torg-dark">
+                {senhaAcesso.modo === "reset" ? "Senha redefinida" : "Acesso habilitado"}
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-torg-gray">
+                Acesso de autoatendimento de <span className="font-semibold text-torg-dark">{senhaAcesso.nome}</span>.
+                O funcionário entra em <span className="font-semibold text-torg-dark">workspace.torg.com.br</span> pelo
+                {" "}<span className="font-semibold text-torg-dark">CPF</span> e será obrigado a trocar a senha no 1º acesso.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold text-torg-gray uppercase tracking-wide">Login (CPF)</p>
+                  <code className="text-sm font-mono text-torg-dark select-all">{senhaAcesso.login}</code>
+                </div>
+                <div className="rounded-lg border border-torg-blue/25 bg-torg-blue-50/40 px-3 py-2">
+                  <p className="text-[10px] font-semibold text-torg-gray uppercase tracking-wide">Senha provisória</p>
+                  <code className="text-sm font-mono tracking-widest text-torg-dark select-all">{senhaAcesso.senha}</code>
+                </div>
+              </div>
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5">
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  <span className="font-semibold">Anote e repasse agora.</span> Esta senha não será exibida novamente.
+                </p>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button onClick={() => setSenhaAcesso(null)}
+                className="px-5 py-2 text-sm font-medium bg-torg-blue hover:bg-torg-blue-700 text-white rounded-lg">
+                Entendido, fechar
               </button>
             </div>
           </div>
