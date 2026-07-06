@@ -12,7 +12,7 @@ import { splitPaginas, extrairTextos, parseHolerite, matchFuncionario } from "@/
 import { z } from "zod";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // PDFs grandes (até 50MB / dezenas de páginas): split + extração + upload por página
 
 const schema = z.object({
   blobUrl: z.string().url(),
@@ -57,7 +57,7 @@ export async function POST(req) {
   // proposta. EM PARALELO (lotes) — um holerite mensal tem 1 página por
   // funcionário (dezenas), e uploads sequenciais estouravam o limite de tempo.
   const itens = new Array(paginas.length);
-  const CONCORRENCIA = 8;
+  const CONCORRENCIA = 20; // uploads são I/O-bound — mais paralelismo derruba o tempo total
   try {
     for (let inicio = 0; inicio < paginas.length; inicio += CONCORRENCIA) {
       const lote = paginas.slice(inicio, inicio + CONCORRENCIA);

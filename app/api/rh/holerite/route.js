@@ -11,7 +11,7 @@ import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const itemSchema = z.object({
   funcionarioId: z.string().min(1),

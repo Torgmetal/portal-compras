@@ -16,6 +16,9 @@
   "functions": {
     "app/api/qualidade/documentos/importar/route.js": {
       "memory": 3009
+    },
+    "app/api/rh/holerite/preparar/route.js": {
+      "memory": 3009
     }
   },
   "crons": [
