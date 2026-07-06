@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 export async function PATCH(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const body = await req.json();
     const data = {};
@@ -24,7 +24,7 @@ export async function PATCH(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     await prisma.documentoInstitucional.delete({ where: { id } });
     return NextResponse.json({ success: true });

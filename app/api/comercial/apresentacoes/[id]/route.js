@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function GET(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const [apresentacao, biblioteca] = await Promise.all([
       prisma.apresentacaoCliente.findUnique({ where: { id }, include: { documentos: { orderBy: { ordem: "asc" } } } }),
@@ -24,7 +24,7 @@ export async function GET(req, { params }) {
 export async function PATCH(req, { params }) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "COMPRAS"]);
+    user = await requireRole(["ADMIN", "COMERCIAL"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });
@@ -58,7 +58,7 @@ export async function PATCH(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     await prisma.apresentacaoCliente.delete({ where: { id } });
     return NextResponse.json({ success: true });

@@ -55,7 +55,7 @@ function Apresentacoes({ toast }) {
   const [editId, setEditId] = useState(null);
 
   const carregar = useCallback(() => {
-    fetch("/api/compras/apresentacoes").then((r) => r.json())
+    fetch("/api/comercial/apresentacoes").then((r) => r.json())
       .then((j) => j.success ? setLista(j.apresentacoes) : setErro(j.error))
       .catch((e) => setErro(e.message));
   }, []);
@@ -66,7 +66,7 @@ function Apresentacoes({ toast }) {
     if (!nova.contato.trim() || !nova.empresa.trim()) return;
     setCriando(true);
     try {
-      const r = await fetch("/api/compras/apresentacoes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nova) });
+      const r = await fetch("/api/comercial/apresentacoes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nova) });
       const j = await r.json();
       if (!j.success) throw new Error(j.error);
       setNova({ contato: "", empresa: "", clienteEmail: "" });
@@ -117,7 +117,7 @@ function Editor({ id, toast, onChange }) {
   const [subindo, setSubindo] = useState("");
 
   const carregar = useCallback(() => {
-    fetch(`/api/compras/apresentacoes/${id}`).then((r) => r.json()).then((j) => j.success && setD(j));
+    fetch(`/api/comercial/apresentacoes/${id}`).then((r) => r.json()).then((j) => j.success && setD(j));
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -128,7 +128,7 @@ function Editor({ id, toast, onChange }) {
   async function patch(body, aviso) {
     setSalvando(true);
     try {
-      const r = await fetch(`/api/compras/apresentacoes/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const r = await fetch(`/api/comercial/apresentacoes/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json();
       if (!j.success) throw new Error(j.error);
       if (aviso) toast(true, aviso);
@@ -145,13 +145,13 @@ function Editor({ id, toast, onChange }) {
     if (!file) return; setSubindo("extra");
     try {
       const up = await uploadArquivo(file);
-      const r = await fetch(`/api/compras/apresentacoes/${id}/docs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: up.nomeArquivo, tipo: "OUTRO", arquivoUrl: up.url, arquivoTipo: up.tipo, arquivoTamanho: up.tamanho }) });
+      const r = await fetch(`/api/comercial/apresentacoes/${id}/docs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: up.nomeArquivo, tipo: "OUTRO", arquivoUrl: up.url, arquivoTipo: up.tipo, arquivoTamanho: up.tamanho }) });
       const j = await r.json(); if (!j.success) throw new Error(j.error);
       toast(true, "Documento adicionado"); carregar();
     } catch (e) { toast(false, e.message); } finally { setSubindo(""); }
   }
   async function removerExtra(docId) {
-    await fetch(`/api/compras/apresentacoes/${id}/docs?docId=${docId}`, { method: "DELETE" }); carregar();
+    await fetch(`/api/comercial/apresentacoes/${id}/docs?docId=${docId}`, { method: "DELETE" }); carregar();
   }
   function toggleDoc(docId) {
     const novo = new Set(selecionados); novo.has(docId) ? novo.delete(docId) : novo.add(docId);
@@ -162,7 +162,7 @@ function Editor({ id, toast, onChange }) {
     if (!email) return;
     setSalvando(true);
     try {
-      const r = await fetch(`/api/compras/apresentacoes/${id}/enviar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      const r = await fetch(`/api/comercial/apresentacoes/${id}/enviar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
       const j = await r.json(); if (!j.success) throw new Error(j.error);
       toast(true, "E-mail enviado ao cliente"); carregar(); onChange();
     } catch (e) { toast(false, e.message); } finally { setSalvando(false); }
@@ -258,20 +258,20 @@ function Biblioteca({ toast }) {
   const [subindo, setSubindo] = useState(false);
   const [tipo, setTipo] = useState("CADASTRAL");
 
-  const carregar = useCallback(() => { fetch("/api/compras/documentos-institucionais?todos=1").then((r) => r.json()).then((j) => j.success && setDocs(j.docs)); }, []);
+  const carregar = useCallback(() => { fetch("/api/comercial/documentos-institucionais?todos=1").then((r) => r.json()).then((j) => j.success && setDocs(j.docs)); }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
   async function subir(file) {
     if (!file) return; setSubindo(true);
     try {
       const up = await uploadArquivo(file);
-      const r = await fetch("/api/compras/documentos-institucionais", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: up.nomeArquivo, tipo, arquivoUrl: up.url, arquivoTipo: up.tipo, arquivoTamanho: up.tamanho }) });
+      const r = await fetch("/api/comercial/documentos-institucionais", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: up.nomeArquivo, tipo, arquivoUrl: up.url, arquivoTipo: up.tipo, arquivoTamanho: up.tamanho }) });
       const j = await r.json(); if (!j.success) throw new Error(j.error);
       toast(true, "Documento adicionado à biblioteca"); carregar();
     } catch (e) { toast(false, e.message); } finally { setSubindo(false); }
   }
-  async function remover(id) { await fetch(`/api/compras/documentos-institucionais/${id}`, { method: "DELETE" }); carregar(); }
-  async function toggle(id, ativo) { await fetch(`/api/compras/documentos-institucionais/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ativo: !ativo }) }); carregar(); }
+  async function remover(id) { await fetch(`/api/comercial/documentos-institucionais/${id}`, { method: "DELETE" }); carregar(); }
+  async function toggle(id, ativo) { await fetch(`/api/comercial/documentos-institucionais/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ativo: !ativo }) }); carregar(); }
 
   if (!docs) return <div className="py-10 text-center"><Loader2 className="animate-spin text-torg-blue mx-auto" /></div>;
 

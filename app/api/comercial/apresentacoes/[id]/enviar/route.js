@@ -11,7 +11,7 @@ const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 export async function POST(req, { params }) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "COMPRAS"]);
+    user = await requireRole(["ADMIN", "COMERCIAL"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });

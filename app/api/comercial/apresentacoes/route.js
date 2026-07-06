@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    await requireRole(["ADMIN", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
     const apresentacoes = await prisma.apresentacaoCliente.findMany({
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { documentos: true } } },
@@ -30,7 +30,7 @@ const schema = z.object({
 export async function POST(req) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "COMPRAS"]);
+    user = await requireRole(["ADMIN", "COMERCIAL"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ success: false, error: e.message }, { status });

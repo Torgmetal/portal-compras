@@ -16,7 +16,7 @@ const schema = z.object({
 // Adiciona um documento EXTRA (específico deste cliente) à apresentação.
 export async function POST(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
     const { id } = await params;
     const body = schema.parse(await req.json());
     const doc = await prisma.apresentacaoDoc.create({
@@ -31,7 +31,7 @@ export async function POST(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMPRAS"]);
+    await requireRole(["ADMIN", "COMERCIAL"]);
     await params; // id da apresentação (não precisa aqui)
     const docId = new URL(req.url).searchParams.get("docId");
     if (!docId) return NextResponse.json({ success: false, error: "docId obrigatório" }, { status: 400 });
