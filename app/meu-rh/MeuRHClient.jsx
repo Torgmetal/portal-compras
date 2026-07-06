@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import {
   Receipt, Loader2, AlertCircle, RefreshCw, Inbox, LogOut, FileText, CheckCircle2,
-  CalendarDays, Palmtree, KeyRound, Download,
+  CalendarDays, Palmtree, KeyRound, Download, Megaphone, MessageSquarePlus, Pin, Send, X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -68,7 +68,19 @@ function MesCalendario({ ano, mes, inicio, fim }) {
 }
 
 export default function MeuRHClient({ nome }) {
-  const [aba, setAba] = useState("holerites");
+  const [aba, setAba] = useState("mural");
+
+  // Mural (comunicados do RH)
+  const [avisos, setAvisos] = useState([]);
+  const [carregandoMural, setCarregandoMural] = useState(true);
+  const [erroMural, setErroMural] = useState("");
+
+  // Feedback / sugestão ao RH
+  const [fbAberto, setFbAberto] = useState(false);
+  const [fbCategoria, setFbCategoria] = useState("SUGESTAO");
+  const [fbMensagem, setFbMensagem] = useState("");
+  const [fbAnonimo, setFbAnonimo] = useState(false);
+  const [fbEnviando, setFbEnviando] = useState(false);
 
   // Holerites
   const [holerites, setHolerites] = useState([]);
@@ -112,7 +124,34 @@ export default function MeuRHClient({ nome }) {
     }
   }, []);
 
-  useEffect(() => { carregar(); carregarFerias(); }, [carregar, carregarFerias]);
+  const carregarMural = useCallback(async () => {
+    setCarregandoMural(true); setErroMural("");
+    try {
+      const r = await fetch("/api/meu-rh/mural");
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao carregar");
+      setAvisos(d.avisos || []);
+    } catch (e) { setErroMural(e.message); } finally { setCarregandoMural(false); }
+  }, []);
+
+  useEffect(() => { carregarMural(); carregar(); carregarFerias(); }, [carregarMural, carregar, carregarFerias]);
+
+  const enviarFeedback = async () => {
+    if (fbMensagem.trim().length < 3) return;
+    setFbEnviando(true);
+    try {
+      const r = await fetch("/api/meu-rh/feedback", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mensagem: fbMensagem, categoria: fbCategoria, anonimo: fbAnonimo }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao enviar");
+      setFbAberto(false); setFbMensagem(""); setFbAnonimo(false); setFbCategoria("SUGESTAO");
+      alert("Enviado! O RH recebeu sua mensagem. Obrigado. 🙌");
+    } catch (e) {
+      alert(e.message || "Não foi possível enviar. Tente novamente.");
+    } finally { setFbEnviando(false); }
+  };
 
   const abrir = (id) => {
     window.open(`/api/meu-rh/holerite/${id}/arquivo`, "_blank", "noopener");
@@ -173,6 +212,7 @@ export default function MeuRHClient({ nome }) {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <button onClick={() => setFbAberto(true)} className="text-sm text-torg-blue hover:text-torg-blue-700 inline-flex items-center gap-1.5 font-medium"><MessageSquarePlus size={16} /> Enviar sugestão</button>
           <Link href="/meu-rh/trocar-senha" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5"><KeyRound size={16} /> Trocar senha</Link>
           <button onClick={() => signOut({ callbackUrl: "/entrar" })}
             className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5"><LogOut size={16} /> Sair</button>
@@ -181,6 +221,10 @@ export default function MeuRHClient({ nome }) {
 
       {/* Abas */}
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+        <button onClick={() => setAba("mural")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2 transition-colors ${aba === "mural" ? "bg-white text-torg-dark shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>
+          <Megaphone size={15} /> Mural
+        </button>
         <button onClick={() => setAba("holerites")}
           className={`px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2 transition-colors ${aba === "holerites" ? "bg-white text-torg-dark shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>
           <Receipt size={15} /> Holerites
@@ -190,6 +234,37 @@ export default function MeuRHClient({ nome }) {
           <Palmtree size={15} /> Férias
         </button>
       </div>
+
+      {aba === "mural" && (
+        carregandoMural ? (
+          <div className="py-16 text-center text-torg-gray"><Loader2 size={28} className="mx-auto animate-spin mb-2" /> Carregando...</div>
+        ) : erroMural ? (
+          <div className="py-16 text-center">
+            <AlertCircle size={28} className="mx-auto text-red-400 mb-2" />
+            <p className="text-sm text-red-600 mb-3">{erroMural}</p>
+            <button onClick={carregarMural} className="px-3 py-1.5 text-sm bg-torg-blue text-white rounded-lg inline-flex items-center gap-2"><RefreshCw size={14} /> Tentar novamente</button>
+          </div>
+        ) : avisos.length === 0 ? (
+          <div className="py-16 text-center">
+            <Megaphone size={40} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-torg-gray">Nenhum comunicado no momento.</p>
+            <p className="text-sm text-torg-gray mt-1">Avisos e atualizações do RH aparecem aqui.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {avisos.map((a) => (
+              <div key={a.id} className={`bg-white rounded-xl border shadow-sm p-4 ${a.fixado ? "border-torg-blue-200 bg-torg-blue-50/30" : "border-gray-100"}`}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {a.fixado && <Pin size={14} className="text-torg-blue shrink-0" />}
+                  <span className="font-semibold text-torg-dark">{a.titulo}</span>
+                </div>
+                <p className="text-sm text-torg-dark/80 mt-1.5 whitespace-pre-wrap">{a.corpo}</p>
+                <p className="text-[11px] text-torg-gray mt-2">{a.criadoPorNome ? `${a.criadoPorNome} · ` : "RH · "}{new Date(a.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+              </div>
+            ))}
+          </div>
+        )
+      )}
 
       {aba === "holerites" && (
         carregando ? (
@@ -326,6 +401,40 @@ export default function MeuRHClient({ nome }) {
             )}
           </div>
         )
+      )}
+
+      {fbAberto && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !fbEnviando && setFbAberto(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-torg-dark flex items-center gap-2"><MessageSquarePlus size={18} className="text-torg-blue" /> Enviar sugestão ao RH</h3>
+              <button onClick={() => setFbAberto(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <label className="text-xs text-torg-gray">Tipo</label>
+            <select value={fbCategoria} onChange={(e) => setFbCategoria(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 mt-1 focus:ring-2 focus:ring-torg-blue">
+              <option value="SUGESTAO">Sugestão</option>
+              <option value="RECLAMACAO">Reclamação</option>
+              <option value="ELOGIO">Elogio</option>
+              <option value="DUVIDA">Dúvida</option>
+              <option value="OUTRO">Outro</option>
+            </select>
+            <textarea value={fbMensagem} onChange={(e) => setFbMensagem(e.target.value)} rows={5} maxLength={4000}
+              placeholder="Escreva sua sugestão, ideia ou feedback para o RH…"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue resize-y" />
+            <label className="text-sm text-torg-gray inline-flex items-center gap-1.5 cursor-pointer select-none mt-2">
+              <input type="checkbox" checked={fbAnonimo} onChange={(e) => setFbAnonimo(e.target.checked)} className="accent-torg-blue" />
+              Enviar de forma anônima (o RH não verá seu nome)
+            </label>
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button onClick={() => setFbAberto(false)} className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark">Cancelar</button>
+              <button onClick={enviarFeedback} disabled={fbEnviando || fbMensagem.trim().length < 3}
+                className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-2 disabled:opacity-50">
+                {fbEnviando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <p className="text-center text-[11px] text-gray-400 mt-8">Workspace Torg — uso interno / confidencial</p>
