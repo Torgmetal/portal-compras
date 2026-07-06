@@ -13,6 +13,7 @@ const schema = z.object({
   dataInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   diasGozo: z.number().int().min(1).max(30).optional(),
   diasVendidos: z.number().int().min(0).max(10).optional(),
+  descontos: z.number().min(0).optional(),
   status: z.enum(["PENDENTE", "PROGRAMADA", "GOZADA", "CANCELADA"]).optional(),
   observacao: z.string().max(500).optional().nullable(),
 });
@@ -32,21 +33,22 @@ export async function PATCH(req, { params }) {
 
   const atual = await prisma.ferias.findUnique({
     where: { id: params.id },
-    select: { id: true, diasGozo: true, diasVendidos: true, dataInicio: true, funcionario: { select: { salario: true } } },
+    select: { id: true, diasGozo: true, diasVendidos: true, descontos: true, dataInicio: true, funcionario: { select: { salario: true } } },
   });
   if (!atual) return NextResponse.json({ success: false, error: "Programação não encontrada" }, { status: 404 });
 
   const d = parsed.data;
   const diasGozo = d.diasGozo ?? atual.diasGozo ?? 30;
   const diasVendidos = d.diasVendidos ?? atual.diasVendidos ?? 0;
+  const descontos = d.descontos ?? atual.descontos ?? 0;
   if (diasGozo + diasVendidos > 30) return NextResponse.json({ success: false, error: "Gozo + vendidos não pode passar de 30 dias" }, { status: 400 });
   const dataInicioStr = d.dataInicio ?? (atual.dataInicio ? new Date(atual.dataInicio).toISOString().slice(0, 10) : null);
 
   const data = {
     ...(d.status ? { status: d.status } : {}),
     ...(d.observacao !== undefined ? { observacao: d.observacao || null } : {}),
-    diasGozo, diasVendidos,
-    valorEstimado: valorFerias(atual.funcionario?.salario, diasGozo, diasVendidos).total,
+    diasGozo, diasVendidos, descontos,
+    valorEstimado: valorFerias(atual.funcionario?.salario, diasGozo, diasVendidos, descontos).total,
     ...(dataInicioStr ? { dataInicio: new Date(dataInicioStr), dataFim: new Date(fimGozo(dataInicioStr, diasGozo)) } : {}),
   };
 

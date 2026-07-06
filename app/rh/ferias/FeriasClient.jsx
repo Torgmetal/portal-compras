@@ -26,7 +26,7 @@ export default function FeriasClient() {
   const [filtro, setFiltro] = useState("");
   const [expandido, setExpandido] = useState(null);
   const [modal, setModal] = useState(null); // { funcionario }
-  const [form, setForm] = useState({ dataInicio: "", diasGozo: 30, diasVendidos: 0, observacao: "" });
+  const [form, setForm] = useState({ dataInicio: "", diasGozo: 30, diasVendidos: 0, descontos: 0, status: "PROGRAMADA", observacao: "" });
   const [salvando, setSalvando] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -46,7 +46,7 @@ export default function FeriasClient() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  const abrir = (func) => { setForm({ dataInicio: "", diasGozo: 30, diasVendidos: 0, observacao: "" }); setModal({ funcionario: func }); };
+  const abrir = (func) => { setForm({ dataInicio: "", diasGozo: 30, diasVendidos: 0, descontos: 0, status: "PROGRAMADA", observacao: "" }); setModal({ funcionario: func }); };
 
   const salvar = async () => {
     if (!form.dataInicio) { showToast("Informe a data de início", "error"); return; }
@@ -54,7 +54,7 @@ export default function FeriasClient() {
     try {
       const r = await fetch("/api/rh/ferias", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ funcionarioId: modal.funcionario.id, dataInicio: form.dataInicio, diasGozo: Number(form.diasGozo), diasVendidos: Number(form.diasVendidos), observacao: form.observacao || null }),
+        body: JSON.stringify({ funcionarioId: modal.funcionario.id, dataInicio: form.dataInicio, diasGozo: Number(form.diasGozo), diasVendidos: Number(form.diasVendidos), descontos: Number(form.descontos) || 0, status: form.status, observacao: form.observacao || null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao programar");
@@ -88,7 +88,7 @@ export default function FeriasClient() {
     </button>
   );
 
-  const val = modal ? valorFerias(modal.funcionario.salario, Number(form.diasGozo) || 0, Number(form.diasVendidos) || 0) : null;
+  const val = modal ? valorFerias(modal.funcionario.salario, Number(form.diasGozo) || 0, Number(form.diasVendidos) || 0, Number(form.descontos) || 0) : null;
 
   return (
     <div className="space-y-6 max-w-[1500px]">
@@ -222,6 +222,19 @@ export default function FeriasClient() {
                   <input type="number" min="0" max="10" value={form.diasVendidos} onChange={(e) => setForm({ ...form, diasVendidos: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
                 </div>
+                <div>
+                  <label className="block text-xs font-medium text-torg-gray mb-1">Descontos (empréstimos etc.)</label>
+                  <input type="number" min="0" step="0.01" value={form.descontos} onChange={(e) => setForm({ ...form, descontos: e.target.value })}
+                    placeholder="0,00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-torg-gray mb-1">Situação</label>
+                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white">
+                    <option value="PROGRAMADA">Programar (futura)</option>
+                    <option value="GOZADA">Já gozada (registrar histórico)</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-torg-gray mb-1">Observação</label>
@@ -233,9 +246,11 @@ export default function FeriasClient() {
                 <div className="flex justify-between text-torg-gray"><span>Férias ({form.diasGozo}d)</span><span className="tabular-nums">R$ {fmt(val?.ferias)}</span></div>
                 {Number(form.diasVendidos) > 0 && <div className="flex justify-between text-torg-gray"><span>Abono ({form.diasVendidos}d)</span><span className="tabular-nums">R$ {fmt(val?.abono)}</span></div>}
                 <div className="flex justify-between text-torg-gray"><span>1/3 constitucional</span><span className="tabular-nums">R$ {fmt(val?.terco)}</span></div>
-                <div className="flex justify-between font-bold text-torg-dark border-t border-torg-blue-100 mt-1 pt-1"><span>Total estimado</span><span className="tabular-nums">R$ {fmt(val?.total)}</span></div>
+                <div className="flex justify-between text-torg-gray border-t border-torg-blue-100 mt-1 pt-1"><span>Subtotal (bruto)</span><span className="tabular-nums">R$ {fmt(val?.bruto)}</span></div>
+                {Number(form.descontos) > 0 && <div className="flex justify-between text-red-600"><span>− Descontos</span><span className="tabular-nums">R$ {fmt(val?.descontos)}</span></div>}
+                <div className="flex justify-between font-bold text-torg-dark border-t border-torg-blue-100 mt-1 pt-1"><span>Total líquido estimado</span><span className="tabular-nums">R$ {fmt(val?.total)}</span></div>
               </div>
-              <p className="text-[11px] text-torg-gray flex items-center gap-1"><Clock size={12} /> Valor é estimativa (salário + 1/3 + abono) — não substitui o cálculo da folha.</p>
+              <p className="text-[11px] text-torg-gray flex items-center gap-1"><Clock size={12} /> Estimativa (salário + 1/3 + abono − descontos) — não substitui o cálculo da folha.</p>
             </div>
             <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
               <button onClick={() => setModal(null)} className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
