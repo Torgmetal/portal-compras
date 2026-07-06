@@ -75,6 +75,7 @@ export default function MeuRHClient({ nome }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [confirmando, setConfirmando] = useState(null);
+  const [baixando, setBaixando] = useState(null);
 
   // Férias
   const [ferias, setFerias] = useState([]);
@@ -116,6 +117,31 @@ export default function MeuRHClient({ nome }) {
   const abrir = (id) => {
     window.open(`/api/meu-rh/holerite/${id}/arquivo`, "_blank", "noopener");
     setTimeout(carregar, 1500);
+  };
+
+  // Baixa o PDF direto (blob + <a download>) — força o download em qualquer
+  // navegador, inclusive mobile, onde o Content-Disposition sozinho às vezes
+  // abre o PDF inline em vez de salvar.
+  const baixar = async (h) => {
+    setBaixando(h.id);
+    try {
+      const r = await fetch(`/api/meu-rh/holerite/${h.id}/arquivo?download=1`);
+      if (!r.ok) throw new Error("Falha ao baixar");
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `holerite-${h.competencia}-${(h.tipo || "MENSAL").toLowerCase()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      carregar();
+    } catch {
+      alert("Não foi possível baixar o holerite. Tente novamente.");
+    } finally {
+      setBaixando(null);
+    }
   };
 
   const confirmar = async (id) => {
@@ -197,10 +223,10 @@ export default function MeuRHClient({ nome }) {
                       className="px-3 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2">
                       <FileText size={15} /> Ver holerite
                     </button>
-                    <a href={`/api/meu-rh/holerite/${h.id}/arquivo?download=1`}
-                      className="px-3 py-2 bg-white border border-gray-200 text-torg-gray text-sm rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2" title="Baixar PDF">
-                      <Download size={15} /> Baixar
-                    </a>
+                    <button onClick={() => baixar(h)} disabled={baixando === h.id}
+                      className="px-3 py-2 bg-white border border-gray-200 text-torg-gray text-sm rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 disabled:opacity-50" title="Baixar PDF">
+                      {baixando === h.id ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Baixar
+                    </button>
                     {confirmado ? (
                       <span className="px-3 py-2 text-sm text-green-700 bg-green-50 rounded-lg font-medium flex items-center gap-2"><CheckCircle2 size={15} /> Recebido</span>
                     ) : (
