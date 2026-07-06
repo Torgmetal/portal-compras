@@ -66,7 +66,10 @@ export default withAuth(
           path.startsWith("/api/qualidade/auditorias/portal/") ||
           // Resposta do cliente a tarefas do Planejamento — publico via token unico
           path.startsWith("/cliente/tarefa/") ||
-          path.startsWith("/api/cliente/tarefa/")
+          path.startsWith("/api/cliente/tarefa/") ||
+          // Apresentacao ao cliente (Compras) — pagina publica via token unico
+          path.startsWith("/apresentacao/") ||
+          path.startsWith("/api/apresentacao/")
         ) {
           return true;
         }

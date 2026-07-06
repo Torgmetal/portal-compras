@@ -1463,6 +1463,66 @@ model AuditoriaDoc {
   @@index([auditoriaId])
 }
 
+// ── Portal de Apresentação ao Cliente (Compras) ──────────────────
+// Biblioteca fixa de documentos institucionais da Torg (cadastra 1x, reusa em
+// toda apresentação): cadastrais, portfólio, etc.
+model DocumentoInstitucional {
+  id             String   @id @default(cuid())
+  tipo           String   @default("CADASTRAL") // CADASTRAL | PORTFOLIO | OUTRO
+  nome           String
+  arquivoUrl     String
+  arquivoTipo    String?
+  arquivoTamanho Int?
+  ordem          Int      @default(0)
+  ativo          Boolean  @default(true)
+  criadoPorId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([ativo])
+}
+
+// Página de apresentação personalizada por cliente (link público por token).
+model ApresentacaoCliente {
+  id                    String            @id @default(cuid())
+  contato               String // nome da pessoa
+  empresa               String // empresa onde trabalha
+  mensagemBoasVindas    String?
+  capaUrl               String? // imagem de capa do hero (Blob)
+  clienteEmail          String?
+  docsInstitucionaisIds Json? // ids da biblioteca a incluir (null/vazio = todos os ativos)
+  token                 String?           @unique
+  status                String            @default("RASCUNHO") // RASCUNHO | PUBLICADO
+  publicadoEm           DateTime?
+  enviadoEmailEm        DateTime?
+  primeiroAcessoEm      DateTime?
+  ultimoAcessoEm        DateTime?
+  acessos               Int               @default(0)
+  criadoPorId           String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  documentos            ApresentacaoDoc[]
+
+  @@index([status])
+}
+
+// Documentos extras específicos de uma apresentação (além da biblioteca fixa).
+model ApresentacaoDoc {
+  id             String              @id @default(cuid())
+  apresentacaoId String
+  tipo           String              @default("OUTRO") // CADASTRAL | PORTFOLIO | OUTRO
+  nome           String
+  arquivoUrl     String
+  arquivoTipo    String?
+  arquivoTamanho Int?
+  ordem          Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  apresentacao   ApresentacaoCliente @relation(fields: [apresentacaoId], references: [id], onDelete: Cascade)
+
+  @@index([apresentacaoId])
+}
+
 model DataBookSecao {
   id           String             @id @default(cuid())
   dataBookId   String
