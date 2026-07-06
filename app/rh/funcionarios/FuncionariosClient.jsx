@@ -5,6 +5,7 @@ import {
   ChevronDown, Edit, UserX, UserCheck, Download, Upload,
   FileSpreadsheet, CheckCircle2, XCircle, UserMinus, MoreVertical,
   ArrowUpDown, ArrowRightLeft, DollarSign, Pencil, ArrowUp, ArrowDown, KeyRound,
+  Lock, Unlock,
 } from "lucide-react";
 
 const fmtMoeda = (v) =>
@@ -333,6 +334,27 @@ export default function FuncionariosClient() {
     }
   };
 
+  // Bloqueia/desbloqueia o acesso do funcionário (sem mexer na senha)
+  const toggleAcesso = async (func, ativo) => {
+    setMenuAberto(null);
+    setErro("");
+    setAcessoLoading(func.id);
+    try {
+      const res = await fetch(`/api/rh/funcionarios/${func.id}/acesso`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ativo }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Erro ao alterar o acesso");
+      setFuncionarios((prev) => prev.map((f) => (f.id === func.id ? { ...f, usuario: f.usuario ? { ...f.usuario, ativo } : f.usuario } : f)));
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setAcessoLoading(null);
+    }
+  };
+
   const abrirDesligamento = (func) => {
     setMenuAberto(null);
     setFormDeslig({
@@ -533,9 +555,14 @@ export default function FuncionariosClient() {
                   return (
                     <tr key={f.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
-                        <div>
+                        <div className="flex items-center gap-2">
                           <span className="font-medium text-torg-dark">{f.nome}</span>
-                          {f.matricula && <span className="text-[10px] text-torg-gray ml-2">#{f.matricula}</span>}
+                          {f.matricula && <span className="text-[10px] text-torg-gray">#{f.matricula}</span>}
+                          {f.usuario && f.usuario.ativo === false && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700" title="Acesso ao portal bloqueado">
+                              <Lock size={9} /> Acesso bloqueado
+                            </span>
+                          )}
                         </div>
                         {(f.email || f.telefone) && (
                           <p className="text-[10px] text-torg-gray">{[f.email, f.telefone].filter(Boolean).join(" · ")}</p>
@@ -592,6 +619,25 @@ export default function FuncionariosClient() {
                                       : <KeyRound size={14} className="text-torg-blue" />}
                                     {f.usuario ? "Resetar senha de acesso" : "Habilitar acesso (CPF)"}
                                   </button>
+                                  {f.usuario && (
+                                    f.usuario.ativo === false ? (
+                                      <button
+                                        onClick={() => toggleAcesso(f, true)}
+                                        disabled={acessoLoading === f.id}
+                                        className="w-full px-3 py-2 text-sm text-left text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 disabled:opacity-50"
+                                      >
+                                        <Unlock size={14} /> Desbloquear acesso
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => toggleAcesso(f, false)}
+                                        disabled={acessoLoading === f.id}
+                                        className="w-full px-3 py-2 text-sm text-left text-amber-700 hover:bg-amber-50 flex items-center gap-2 disabled:opacity-50"
+                                      >
+                                        <Lock size={14} /> Bloquear acesso
+                                      </button>
+                                    )
+                                  )}
                                   <div className="border-t border-gray-100 my-1" />
                                   <button
                                     onClick={() => abrirDesligamento(f)}

@@ -6,11 +6,49 @@
 // trocar a senha no 1º acesso (deveTrocarSenha=true). Só ADMIN/RH.
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarSenhaTemporaria } from "@/lib/gerar-senha";
 
 export const runtime = "nodejs";
+
+// PATCH /api/rh/funcionarios/[id]/acesso  { ativo: boolean }
+// Bloqueia (ativo=false) ou desbloqueia (ativo=true) o acesso do funcionário,
+// sem mexer na senha. Login barra usuário com ativo=false (ver lib/auth.js).
+const patchSchema = z.object({ ativo: z.boolean() });
+
+export async function PATCH(req, { params }) {
+  let user;
+  try {
+    user = await requireRole(["ADMIN", "RH"]);
+  } catch (e) {
+    return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
+  }
+
+  let body;
+  try { body = await req.json(); } catch { return NextResponse.json({ success: false, error: "Body inválido" }, { status: 400 }); }
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
+
+  const func = await prisma.funcionario.findUnique({
+    where: { id: params.id },
+    select: { id: true, nome: true, usuario: { select: { id: true, ativo: true } } },
+  });
+  if (!func) return NextResponse.json({ success: false, error: "Funcionário não encontrado" }, { status: 404 });
+  if (!func.usuario) return NextResponse.json({ success: false, error: "Funcionário não tem acesso habilitado." }, { status: 400 });
+
+  await prisma.user.update({ where: { id: func.usuario.id }, data: { ativo: parsed.data.ativo } });
+  await prisma.auditLog.create({
+    data: {
+      userId: user.id,
+      action: parsed.data.ativo ? "DESBLOQUEAR_ACESSO_FUNCIONARIO" : "BLOQUEAR_ACESSO_FUNCIONARIO",
+      entity: "Funcionario", entityId: func.id, diff: { antes: func.usuario.ativo, depois: parsed.data.ativo },
+    },
+  }).catch(() => {});
+
+  return NextResponse.json({ success: true, ativo: parsed.data.ativo });
+}
 
 export async function POST(req, { params }) {
   let user;

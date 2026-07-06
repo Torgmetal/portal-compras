@@ -77,7 +77,7 @@ export async function GET(req) {
         foto: true,
         setor: { select: { id: true, nome: true, sigla: true } },
         cargo: { select: { id: true, nome: true, nivel: true } },
-        usuario: { select: { id: true } }, // acesso de autoatendimento habilitado?
+        usuario: { select: { id: true, ativo: true } }, // acesso de autoatendimento (habilitado? bloqueado?)
       },
       orderBy: { nome: "asc" },
       take: 500,
