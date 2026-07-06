@@ -18,6 +18,7 @@ const schema = z.object({
   competencia: z.string().regex(/^\d{4}-\d{2}$/),
   soParaMim: z.boolean().default(false),
   somentePendentes: z.boolean().default(true),
+  anexarPdf: z.boolean().default(true), // anexa o PDF do holerite no e-mail
 });
 
 function competenciaExtenso(c) {
@@ -26,18 +27,24 @@ function competenciaExtenso(c) {
   return `${nomes[Number(mes)] || mes}/${ano}`;
 }
 
-function montarEmail({ nome, competencia, link }) {
+function montarEmail({ nome, competencia, link, comAnexo }) {
   const ref = competenciaExtenso(competencia);
   const subject = `Seu holerite de ${ref} está disponível`;
+  const linhaAnexo = comAnexo
+    ? `<p>Seu holerite segue <strong>em anexo (PDF)</strong> e também está disponível no portal.</p>`
+    : `<p>Seu holerite referente a <strong>${escapeHtml(ref)}</strong> já está disponível no portal.</p>`;
   const html = `
     <div style="font-family:Arial,sans-serif;color:#002945">
       <p>Olá, ${escapeHtml(nome)}.</p>
-      <p>Seu holerite referente a <strong>${escapeHtml(ref)}</strong> já está disponível no portal.</p>
+      ${linhaAnexo}
       <p><a href="${link}" style="display:inline-block;background:#006EAB;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Acessar meu holerite</a></p>
       <p style="color:#576D7E;font-size:13px">Entre com seu <strong>CPF</strong> e senha. Após visualizar, confirme o recebimento na própria página.</p>
       <p style="color:#576D7E;font-size:12px">Workspace Torg — uso interno / confidencial.</p>
     </div>`;
-  return { subject, html, text: `Seu holerite de ${ref} está disponível. Entre com seu CPF e senha: ${link}` };
+  const text = comAnexo
+    ? `Seu holerite de ${ref} segue em anexo (PDF) e está no portal. Entre com seu CPF e senha: ${link}`
+    : `Seu holerite de ${ref} está disponível. Entre com seu CPF e senha: ${link}`;
+  return { subject, html, text };
 }
 
 export async function POST(req) {
@@ -52,7 +59,7 @@ export async function POST(req) {
   try { body = await req.json(); } catch { return NextResponse.json({ success: false, error: "Body inválido" }, { status: 400 }); }
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
-  const { competencia, soParaMim, somentePendentes } = parsed.data;
+  const { competencia, soParaMim, somentePendentes, anexarPdf } = parsed.data;
 
   const origin = process.env.NEXTAUTH_URL || new URL(req.url).origin;
   const link = `${origin}/meu-rh`;
@@ -68,15 +75,28 @@ export async function POST(req) {
 
   const holerites = await prisma.holerite.findMany({
     where: { competencia, ...(somentePendentes ? { status: "PENDENTE" } : {}) },
-    select: { id: true, funcionario: { select: { nome: true, email: true } } },
+    select: { id: true, arquivoUrl: true, arquivoNome: true, funcionario: { select: { nome: true, email: true } } },
   });
 
   let enviados = 0; const semEmail = []; const falhas = [];
   for (const h of holerites) {
     const email = h.funcionario?.email;
     if (!email) { semEmail.push(h.funcionario?.nome || h.id); continue; }
-    const msg = montarEmail({ nome: h.funcionario.nome, competencia, link });
-    const res = await sendEmail({ to: email, ...msg });
+
+    // Anexa o PDF do holerite (best-effort — se o download falhar, envia só o aviso).
+    let attachments;
+    if (anexarPdf && h.arquivoUrl) {
+      try {
+        const pdf = await fetch(h.arquivoUrl);
+        if (pdf.ok) {
+          const buf = Buffer.from(await pdf.arrayBuffer());
+          attachments = [{ filename: (h.arquivoNome || `holerite-${competencia}.pdf`).replace(/["\r\n]/g, ""), content: buf.toString("base64") }];
+        }
+      } catch { /* segue sem anexo */ }
+    }
+
+    const msg = montarEmail({ nome: h.funcionario.nome, competencia, link, comAnexo: !!attachments });
+    const res = await sendEmail({ to: email, ...msg, ...(attachments ? { attachments } : {}) });
     if (res.ok) {
       await prisma.holerite.update({ where: { id: h.id }, data: { status: "ENVIADO", enviadoEm: new Date() } });
       enviados++;

@@ -40,9 +40,11 @@ export async function GET(req, { params }) {
   }
 
   const nome = (h.arquivoNome || "holerite.pdf").replace(/["\r\n]/g, "");
+  // ?download=1 → força o download (anexo); senão abre inline no navegador.
+  const baixar = new URL(req.url).searchParams.get("download") === "1";
   const headers = new Headers();
   headers.set("Content-Type", "application/pdf");
-  headers.set("Content-Disposition", `inline; filename="${nome}"`);
+  headers.set("Content-Disposition", `${baixar ? "attachment" : "inline"}; filename="${nome}"`);
   headers.set("Cache-Control", "private, no-store");
   return new Response(res.body, { status: 200, headers });
 }

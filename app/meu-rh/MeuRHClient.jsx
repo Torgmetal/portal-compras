@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import {
   Receipt, Loader2, AlertCircle, RefreshCw, Inbox, LogOut, FileText, CheckCircle2,
-  CalendarDays, Palmtree, KeyRound,
+  CalendarDays, Palmtree, KeyRound, Download,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -197,6 +197,10 @@ export default function MeuRHClient({ nome }) {
                       className="px-3 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2">
                       <FileText size={15} /> Ver holerite
                     </button>
+                    <a href={`/api/meu-rh/holerite/${h.id}/arquivo?download=1`}
+                      className="px-3 py-2 bg-white border border-gray-200 text-torg-gray text-sm rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2" title="Baixar PDF">
+                      <Download size={15} /> Baixar
+                    </a>
                     {confirmado ? (
                       <span className="px-3 py-2 text-sm text-green-700 bg-green-50 rounded-lg font-medium flex items-center gap-2"><CheckCircle2 size={15} /> Recebido</span>
                     ) : (

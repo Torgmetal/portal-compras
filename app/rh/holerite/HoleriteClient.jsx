@@ -64,6 +64,7 @@ export default function HoleriteClient() {
   const [salvando, setSalvando] = useState(false);
   const [disparando, setDisparando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+  const [anexarPdf, setAnexarPdf] = useState(true);
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro("");
@@ -154,7 +155,7 @@ export default function HoleriteClient() {
     try {
       const r = await fetch("/api/rh/holerite/disparar", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ competencia, soParaMim }),
+        body: JSON.stringify({ competencia, soParaMim, anexarPdf }),
       });
       const d = await lerResposta(r);
       if (!r.ok) throw new Error(d.error || "Falha no disparo");
@@ -319,6 +320,10 @@ export default function HoleriteClient() {
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <h3 className="text-lg font-semibold text-torg-dark">Acompanhamento — {competenciaExtenso(competencia)}</h3>
           <div className="flex items-center gap-2">
+            <label className="text-xs text-torg-gray inline-flex items-center gap-1.5 mr-1 select-none cursor-pointer" title="Anexa o PDF do holerite no e-mail">
+              <input type="checkbox" checked={anexarPdf} onChange={(e) => setAnexarPdf(e.target.checked)} className="accent-torg-blue" />
+              Anexar PDF
+            </label>
             <button onClick={() => disparar(true)} disabled={disparando}
               className="px-3 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2 disabled:opacity-50">
               <Send size={15} /> Disparar só pra mim
