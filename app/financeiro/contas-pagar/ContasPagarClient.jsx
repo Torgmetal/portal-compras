@@ -115,10 +115,15 @@ export default function ContasPagarClient() {
 
   const resumoPor = (campo) => {
     const map = new Map();
+    const add = (k, valor) => { const cur = map.get(k) || { valor: 0, qtd: 0 }; cur.valor += valor || 0; cur.qtd++; map.set(k, cur); };
     for (const c of filtradas.filter((x) => x.aberta)) {
-      const k = c[campo] || "(sem)";
-      const cur = map.get(k) || { valor: 0, qtd: 0 };
-      cur.valor += c.valor || 0; cur.qtd++; map.set(k, cur);
+      // Título rateado: distribui o valor entre TODAS as categorias do rateio
+      // (cada uma recebe a sua fatia), em vez de jogar tudo em uma só.
+      if (campo === "categoria" && Array.isArray(c.rateio) && c.rateio.length > 1) {
+        for (const r of c.rateio) add(r.nome || r.codigo || "(sem)", r.valor || 0);
+      } else {
+        add(c[campo] || "(sem)", c.valor || 0);
+      }
     }
     return [...map.entries()].map(([k, v]) => ({ k, ...v })).sort((a, b) => b.valor - a.valor).slice(0, 12);
   };
@@ -324,7 +329,9 @@ export default function ContasPagarClient() {
                       </td>
                       <td className="px-3 py-2 text-gray-700 max-w-[200px] truncate" title={c.fornecedor}>{c.fornecedor}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-torg-dark whitespace-nowrap">{fmtMoeda(c.valor)}</td>
-                      <td className="px-3 py-2 text-gray-600 max-w-[160px] truncate" title={c.categoria}>{c.categoria || "—"}</td>
+                      <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate" title={Array.isArray(c.rateio) ? c.rateio.map((r) => `${r.nome || r.codigo}: ${(r.valor || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`).join("  ·  ") : (c.categoria || "")}>
+                        {Array.isArray(c.rateio) ? c.rateio.map((r) => r.nome || r.codigo).join(" / ") : (c.categoria || "—")}
+                      </td>
                       <td className="px-3 py-2 whitespace-nowrap"><OmieCell valor={c.nf} copiar={c.chaveNfe || c.nf} rotulo="NF" /></td>
                       <td className="px-3 py-2 whitespace-nowrap"><OmieCell valor={c.pedidoCompra} copiar={c.pedidoCompra} rotulo="Pedido" /></td>
                       <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{c.parcela || "—"}</td>

@@ -59,6 +59,7 @@ export async function GET(req) {
       parcela: c.numeroParcela,
       pedidoCompra: c.numeroPedidoCompra,
       categoria: c.categoriaNome,
+      rateio: Array.isArray(c.categoriasRateio) ? c.categoriasRateio : null,
       tipoDocumento: c.tipoDocumento,
       observacao: c.observacao,
       situacao, diasAtraso, aberta,

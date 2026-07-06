@@ -2657,6 +2657,7 @@ model ContaPagar {
   numeroPedidoCompra String?
   categoriaCodigo    String?
   categoriaNome      String?
+  categoriasRateio   Json? // rateio por categoria [{codigo,nome,valor}] quando o título é distribuído
   projetoCodigo      String?
   tipoDocumento      String? // BOL, etc.
   status             String? // ABERTO/PAGO/ATRASADO/VENCIDO/CANCELADO
