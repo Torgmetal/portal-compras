@@ -205,13 +205,18 @@ export default function ControleFinanceiroOP({ opId }) {
                     <td className="px-4 py-2 text-right tabular-nums font-medium text-torg-dark">{fmtMoeda(p.total)}</td>
                     <td className="px-4 py-2 text-xs text-torg-gray whitespace-nowrap">{p.nfNumero || "—"}</td>
                     <td className="px-4 py-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${
-                        p.statusEntrega === "RECEBIDO"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}>
-                        {p.statusEntrega === "RECEBIDO" ? "Recebido" : "Aguardando"}
-                      </span>
+                      {(() => {
+                        // O sync grava statusEntrega "ENTREGUE"/"ATRASADO" (nunca "RECEBIDO").
+                        // Checar só "RECEBIDO" deixava tudo como "Aguardando".
+                        const rec = ["ENTREGUE", "ATRASADO", "RECEBIDO"].includes(p.statusEntrega);
+                        const parc = p.statusEntrega === "PARCIAL";
+                        const cls = rec ? "bg-emerald-100 text-emerald-700" : parc ? "bg-torg-blue-50 text-torg-blue" : "bg-amber-50 text-amber-700";
+                        return (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${cls}`}>
+                            {rec ? "Recebido" : parc ? "Parcial" : "Aguardando"}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-2 text-torg-gray text-xs whitespace-nowrap">{fmtData(p.createdAt)}</td>
                   </tr>
