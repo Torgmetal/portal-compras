@@ -64,6 +64,7 @@ const schema = z.object({
   diasGozo: z.number().int().min(1).max(30).default(30),
   diasVendidos: z.number().int().min(0).max(10).default(0),
   descontos: z.number().min(0).default(0),
+  salarioBase: z.number().min(0).optional().nullable(), // override manual do salário-base do cálculo
   status: z.enum(["PROGRAMADA", "GOZADA"]).default("PROGRAMADA"),
   observacao: z.string().max(500).optional().nullable(),
 });
@@ -80,7 +81,7 @@ export async function POST(req) {
   try { body = await req.json(); } catch { return NextResponse.json({ success: false, error: "Body inválido" }, { status: 400 }); }
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
-  const { funcionarioId, dataInicio, diasGozo, diasVendidos, descontos, status, observacao } = parsed.data;
+  const { funcionarioId, dataInicio, diasGozo, diasVendidos, descontos, salarioBase, status, observacao } = parsed.data;
   if (diasGozo + diasVendidos > 30) return NextResponse.json({ success: false, error: "Gozo + vendidos não pode passar de 30 dias" }, { status: 400 });
 
   const func = await prisma.funcionario.findUnique({
@@ -89,10 +90,13 @@ export async function POST(req) {
   });
   if (!func) return NextResponse.json({ success: false, error: "Funcionário não encontrado" }, { status: 404 });
 
+  // Base do cálculo = override manual do RH (se informado) ou o salário do cadastro.
+  const base = salarioBase != null ? salarioBase : func.salario;
+
   // Período aquisitivo = admissão + (nº de férias já usadas, exceto canceladas).
   const usadas = await prisma.ferias.count({ where: { funcionarioId, status: { not: "CANCELADA" } } });
   const periodo = periodoAtual(func.dataAdmissao, usadas);
-  const valor = valorFerias(func.salario, diasGozo, diasVendidos, descontos).total;
+  const valor = valorFerias(base, diasGozo, diasVendidos, descontos).total;
 
   const ferias = await prisma.ferias.create({
     data: {
@@ -107,7 +111,7 @@ export async function POST(req) {
   });
 
   await prisma.auditLog.create({
-    data: { userId: user.id, action: "PROGRAMAR_FERIAS", entity: "Ferias", entityId: ferias.id, diff: { funcionarioId, dataInicio, diasGozo, diasVendidos, descontos, status, valor } },
+    data: { userId: user.id, action: "PROGRAMAR_FERIAS", entity: "Ferias", entityId: ferias.id, diff: { funcionarioId, dataInicio, diasGozo, diasVendidos, descontos, salarioBase: base, status, valor } },
   }).catch(() => {});
 
   return NextResponse.json({ success: true, ferias });

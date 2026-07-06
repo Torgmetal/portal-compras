@@ -26,7 +26,7 @@ export default function FeriasClient() {
   const [filtro, setFiltro] = useState("");
   const [expandido, setExpandido] = useState(null);
   const [modal, setModal] = useState(null); // { funcionario }
-  const [form, setForm] = useState({ dataInicio: "", diasGozo: 30, diasVendidos: 0, descontos: 0, status: "PROGRAMADA", observacao: "" });
+  const [form, setForm] = useState({ dataInicio: "", diasGozo: 30, diasVendidos: 0, descontos: 0, salarioBase: "", status: "PROGRAMADA", observacao: "" });
   const [salvando, setSalvando] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -46,7 +46,7 @@ export default function FeriasClient() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  const abrir = (func) => { setForm({ dataInicio: "", diasGozo: 30, diasVendidos: 0, descontos: 0, status: "PROGRAMADA", observacao: "" }); setModal({ funcionario: func }); };
+  const abrir = (func) => { setForm({ dataInicio: "", diasGozo: 30, diasVendidos: 0, descontos: 0, salarioBase: func.salario != null ? String(func.salario) : "", status: "PROGRAMADA", observacao: "" }); setModal({ funcionario: func }); };
 
   const salvar = async () => {
     if (!form.dataInicio) { showToast("Informe a data de início", "error"); return; }
@@ -54,7 +54,7 @@ export default function FeriasClient() {
     try {
       const r = await fetch("/api/rh/ferias", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ funcionarioId: modal.funcionario.id, dataInicio: form.dataInicio, diasGozo: Number(form.diasGozo), diasVendidos: Number(form.diasVendidos), descontos: Number(form.descontos) || 0, status: form.status, observacao: form.observacao || null }),
+        body: JSON.stringify({ funcionarioId: modal.funcionario.id, dataInicio: form.dataInicio, diasGozo: Number(form.diasGozo), diasVendidos: Number(form.diasVendidos), descontos: Number(form.descontos) || 0, salarioBase: form.salarioBase !== "" ? Number(form.salarioBase) : null, status: form.status, observacao: form.observacao || null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao programar");
@@ -88,7 +88,8 @@ export default function FeriasClient() {
     </button>
   );
 
-  const val = modal ? valorFerias(modal.funcionario.salario, Number(form.diasGozo) || 0, Number(form.diasVendidos) || 0, Number(form.descontos) || 0) : null;
+  const baseCalc = form.salarioBase !== "" ? Number(form.salarioBase) : modal?.funcionario?.salario;
+  const val = modal ? valorFerias(baseCalc, Number(form.diasGozo) || 0, Number(form.diasVendidos) || 0, Number(form.descontos) || 0) : null;
 
   return (
     <div className="space-y-6 max-w-[1500px]">
@@ -221,6 +222,12 @@ export default function FeriasClient() {
                   <label className="block text-xs font-medium text-torg-gray mb-1">Dias vendidos (abono)</label>
                   <input type="number" min="0" max="10" value={form.diasVendidos} onChange={(e) => setForm({ ...form, diasVendidos: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-torg-gray mb-1">Salário base p/ cálculo (R$)</label>
+                  <input type="number" min="0" step="0.01" value={form.salarioBase} onChange={(e) => setForm({ ...form, salarioBase: e.target.value })}
+                    placeholder="0,00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
+                  <p className="text-[10px] text-torg-gray mt-1">Vem do cadastro; ajuste se precisar (recalcula os valores).</p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Descontos (empréstimos etc.)</label>
