@@ -14,6 +14,24 @@ const TIPOS = [
   { v: "RESCISAO", label: "Rescisão" },
 ];
 
+// Ordem p/ diferenciar tipos quando o MESMO funcionário tem 2+ holerites na
+// competência (ex.: mensal + férias). O par (funcionário, competência, tipo) é
+// único no banco — dois holerites do mesmo funcionário PRECISAM de tipos
+// distintos para coexistirem, senão um sobrescreve o outro.
+const ORDEM_TIPOS = ["MENSAL", "FERIAS", "DECIMO_TERCEIRO", "RESCISAO"];
+function distinguirTipos(itens) {
+  const usados = new Map(); // funcionarioId -> Set(tipos já atribuídos)
+  return itens.map((it) => {
+    if (!it.funcionarioId) return it;
+    const set = usados.get(it.funcionarioId) || new Set();
+    let tipo = it.tipo || "MENSAL";
+    if (set.has(tipo)) tipo = ORDEM_TIPOS.find((t) => !set.has(t)) || tipo;
+    set.add(tipo);
+    usados.set(it.funcionarioId, set);
+    return { ...it, tipo };
+  });
+}
+
 const STATUS_BADGE = {
   PENDENTE: "bg-gray-100 text-gray-600",
   ENVIADO: "bg-amber-100 text-amber-700",
@@ -101,12 +119,19 @@ export default function HoleriteClient() {
       const d = await lerResposta(r);
       if (!r.ok) throw new Error(d.error || "Falha ao preparar o lote");
       const empresa = d.itens.find((i) => i.parse?.empresa)?.parse.empresa || null;
+      const itens = distinguirTipos(d.itens.map((i) => ({ ...i, tipo: "MENSAL" })));
+      const cont = {};
+      itens.forEach((i) => { if (i.funcionarioId) cont[i.funcionarioId] = (cont[i.funcionarioId] || 0) + 1; });
+      const nDup = Object.values(cont).filter((n) => n > 1).length;
       setRevisao({
-        itens: d.itens.map((i) => ({ ...i, tipo: "MENSAL" })),
+        itens,
         funcionarios: d.funcionarios || [],
         arquivoOriginalUrl: blob.url, arquivoOriginalNome: file.name, empresa,
       });
-      showToast(`${d.totalPaginas} páginas lidas — revise os vínculos`, "success");
+      showToast(
+        `${d.totalPaginas} páginas lidas${nDup ? ` · ${nDup} funcionário(s) com 2+ holerites (tipos ajustados)` : ""} — revise os vínculos`,
+        "success"
+      );
     } catch (e) {
       showToast(e.message || "Erro ao importar", "error");
     } finally {
@@ -213,6 +238,19 @@ export default function HoleriteClient() {
     return `https://wa.me/${full}?text=${txt}`;
   };
 
+  // Colisão remanescente: mesmo funcionário + mesmo tipo em 2+ páginas (não
+  // coexistem no banco). Trava o Confirmar até o RH dar tipos diferentes.
+  const chaveCont = {};
+  if (revisao) for (const it of revisao.itens) {
+    if (it.funcionarioId) { const k = `${it.funcionarioId}|${it.tipo}`; chaveCont[k] = (chaveCont[k] || 0) + 1; }
+  }
+  const colisoes = revisao
+    ? [...new Set(revisao.itens
+        .filter((it) => it.funcionarioId && chaveCont[`${it.funcionarioId}|${it.tipo}`] > 1)
+        .map((it) => revisao.funcionarios.find((f) => f.id === it.funcionarioId)?.nome || it.parse?.nome || "funcionário"))]
+    : [];
+  const temColisao = colisoes.length > 0;
+
   return (
     <div className="space-y-6 max-w-[1400px]">
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -287,7 +325,7 @@ export default function HoleriteClient() {
                       </td>
                       <td className="px-2 py-1.5">
                         <select value={it.tipo} onChange={(e) => editarItem(i, "tipo", e.target.value)}
-                          className="border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue bg-white">
+                          className={`rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue bg-white border ${it.funcionarioId && chaveCont[`${it.funcionarioId}|${it.tipo}`] > 1 ? "border-amber-400 ring-1 ring-amber-300" : "border-gray-200"}`}>
                           {TIPOS.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
                         </select>
                       </td>
@@ -304,9 +342,14 @@ export default function HoleriteClient() {
                 </tbody>
               </table>
             </div>
+            {temColisao && (
+              <div className="mt-3 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+                <strong>{colisoes.join(", ")}</strong> {colisoes.length > 1 ? "aparecem" : "aparece"} em 2+ páginas com o <strong>mesmo tipo</strong>. Dois holerites do mesmo funcionário precisam de <strong>tipos diferentes</strong> (ex.: um Mensal e um Férias) — ajuste na coluna <strong>Tipo</strong> para liberar a importação.
+              </div>
+            )}
             <div className="flex items-center justify-end gap-2 mt-3">
               <button onClick={() => setRevisao(null)} className="px-4 py-2 text-sm text-torg-gray hover:text-torg-dark">Cancelar</button>
-              <button onClick={confirmarImportacao} disabled={salvando}
+              <button onClick={confirmarImportacao} disabled={salvando || temColisao}
                 className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange/90 font-medium flex items-center gap-2 disabled:opacity-50">
                 {salvando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Confirmar importação
               </button>
