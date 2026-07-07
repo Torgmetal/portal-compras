@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Workspace Torg — Meu RH",
-  description: "Portal do funcionário: holerites e recebimentos.",
+  title: "Portal do Colaborador — Torg",
+  description: "Portal do colaborador: mural, holerites, férias e ponto.",
 };
 
 export default function MeuRHLayout({ children }) {

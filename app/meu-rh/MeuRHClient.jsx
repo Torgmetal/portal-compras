@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import {
   Receipt, Loader2, AlertCircle, RefreshCw, Inbox, LogOut, FileText, CheckCircle2,
-  CalendarDays, Palmtree, KeyRound, Download, Megaphone, MessageSquarePlus, Pin, Send, X, Clock,
+  CalendarDays, Palmtree, KeyRound, Download, Megaphone, MessageSquarePlus, Pin, Send, X, Clock, UserRound,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -227,25 +227,32 @@ export default function MeuRHClient({ nome }) {
   const proxima = ferias.find((f) => diaUTC(f.dataFim) >= hoje) || ferias[ferias.length - 1] || null;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <header className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-torg-blue flex items-center justify-center text-white"><Receipt size={20} /></div>
-          <div>
-            <h1 className="text-xl font-extrabold text-torg-dark leading-tight">Meu RH</h1>
-            <p className="text-sm text-torg-gray">Olá, {nome}</p>
+    <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+      <header className="mb-6">
+        {/* Linha principal: marca + Sair (Sair vira ícone no celular) */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-torg-blue flex items-center justify-center text-white shrink-0"><UserRound size={20} /></div>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-extrabold text-torg-dark leading-tight truncate">Portal do Colaborador</h1>
+              <p className="text-xs sm:text-sm text-torg-gray truncate">Olá, {nome}</p>
+            </div>
           </div>
+          <button onClick={() => signOut({ callbackUrl: "/entrar" })}
+            className="shrink-0 text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50">
+            <LogOut size={16} /> <span className="hidden sm:inline">Sair</span>
+          </button>
         </div>
-        <div className="flex items-center gap-4">
+        {/* Ações secundárias: linha própria, quebram no celular */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
           <button onClick={() => setFbAberto(true)} className="text-sm text-torg-blue hover:text-torg-blue-700 inline-flex items-center gap-1.5 font-medium"><MessageSquarePlus size={16} /> Enviar sugestão</button>
           <Link href="/meu-rh/trocar-senha" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5"><KeyRound size={16} /> Trocar senha</Link>
-          <button onClick={() => signOut({ callbackUrl: "/entrar" })}
-            className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5"><LogOut size={16} /> Sair</button>
         </div>
       </header>
 
-      {/* Abas */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+      {/* Abas — rolam na horizontal no celular */}
+      <div className="-mx-4 px-4 mb-6 overflow-x-auto">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-max">
         <button onClick={() => setAba("mural")}
           className={`px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2 transition-colors ${aba === "mural" ? "bg-white text-torg-dark shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>
           <Megaphone size={15} /> Mural
@@ -262,6 +269,7 @@ export default function MeuRHClient({ nome }) {
           className={`px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2 transition-colors ${aba === "ponto" ? "bg-white text-torg-dark shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>
           <Clock size={15} /> Ponto
         </button>
+      </div>
       </div>
 
       {aba === "mural" && (
