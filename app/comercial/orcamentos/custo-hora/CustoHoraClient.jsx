@@ -19,7 +19,7 @@ export default function CustoHoraClient() {
   const [impostosVenda, setImpostosVenda] = useState(15);
   const [horasDia, setHorasDia] = useState(8.75);
   const [diasUteis, setDiasUteis] = useState(22);
-  const [ocupacao, setOcupacao] = useState(80);
+  const [ocupacao, setOcupacao] = useState(8);
   const [setores, setSetores] = useState([]);
   const [dirty, setDirty] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -38,7 +38,7 @@ export default function CustoHoraClient() {
       setCriterio(c.criterioRateio || "MOD");
       setMargem(c.margemPct ?? 30);
       setImpostosVenda(c.impostosVendaPct ?? 15);
-      setHorasDia(c.horasDia ?? 8.75); setDiasUteis(c.diasUteis ?? 22); setOcupacao(c.ocupacaoPct ?? 85);
+      setHorasDia(c.horasDia ?? 8.75); setDiasUteis(c.diasUteis ?? 22); setOcupacao(c.ocupacaoPct ?? 8);
       setSetores((Array.isArray(c.setores) ? c.setores : []).map((s) => ({ id: s.id || uid(), nome: s.nome || "", salarios: s.salarios ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: s.cifDireto ?? 0 })));
       setDirty(false);
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
@@ -61,7 +61,7 @@ export default function CustoHoraClient() {
         horasDia: num(horasDia) || 8.75,
         diasUteis: num(diasUteis) || 22,
         ocupacaoPct: num(ocupacao) || 80,
-        setores: setores.map((s) => ({ id: s.id, nome: s.nome, salarios: num(s.salarios), headcount: num(s.headcount), horasMes: Math.round(num(s.headcount) * (num(horasDia) * num(diasUteis) * (num(ocupacao) / 100))), cifDireto: num(s.cifDireto) })),
+        setores: setores.map((s) => ({ id: s.id, nome: s.nome, salarios: num(s.salarios), headcount: num(s.headcount), horasMes: Math.round(num(s.headcount) * (num(horasDia) * num(diasUteis) * (1 - num(ocupacao) / 100))), cifDireto: num(s.cifDireto) })),
       };
       const r = await fetch("/api/comercial/custo-hora", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const d = await r.json();
@@ -72,7 +72,7 @@ export default function CustoHoraClient() {
 
   // ─── Cálculo ao vivo ───
   const f = num(fator);
-  const horasPorPessoa = num(horasDia) * num(diasUteis) * (num(ocupacao) / 100);
+  const horasPorPessoa = num(horasDia) * num(diasUteis) * (1 - num(ocupacao) / 100);
   const horasMes = (s) => num(s.headcount) * horasPorPessoa;
   const mod = (s) => num(s.salarios) * f;
   const modTotal = setores.reduce((a, s) => a + mod(s), 0);
@@ -159,12 +159,12 @@ export default function CustoHoraClient() {
             <input type="number" step="1" value={diasUteis} onChange={(e) => { setDiasUteis(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
           </div>
           <div>
-            <label className="text-xs text-torg-gray">Aproveitamento (%)</label>
-            <input type="number" step="1" value={ocupacao} onChange={(e) => { setOcupacao(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
-            <p className="text-[10px] text-torg-gray mt-1">presença (absenteísmo) + paradas</p>
+            <label className="text-xs text-torg-gray">Absenteísmo (%)</label>
+            <input type="number" step="0.5" value={ocupacao} onChange={(e) => { setOcupacao(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+            <p className="text-[10px] text-torg-gray mt-1">faltas médias</p>
           </div>
         </div>
-        <p className="text-[11px] text-torg-gray mt-1">Horas/mês por pessoa = horas/dia × dias úteis × ocupação = <strong>{Math.round(horasPorPessoa)} h</strong>. As horas/mês de cada setor saem de <strong>pessoas × esse valor</strong>.</p>
+        <p className="text-[11px] text-torg-gray mt-1">Horas/mês por pessoa = horas/dia × dias úteis × (1 − absenteísmo) = <strong>{Math.round(horasPorPessoa)} h</strong>. As horas/mês de cada setor saem de <strong>pessoas × esse valor</strong>.</p>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-100 text-sm">
           <div><div className="text-[11px] text-torg-gray uppercase">MOD (c/ encargos)</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(modTotal)}</div></div>
@@ -227,7 +227,7 @@ export default function CustoHoraClient() {
       <div className="text-xs text-torg-gray space-y-1">
         <p><strong>Como calcula:</strong> MOD = salários × fator de encargos. Overhead/ADM = custo total − custos diretos (resíduo), rateado pelo critério escolhido.</p>
         <p>Custo-hora = (MOD + CIF + overhead) ÷ horas do setor — já inclui tudo do custo total mensal (salários, encargos, ADM). <strong>Preço-hora = custo-hora × (1 + margem de lucro) ÷ (1 − impostos de venda)</strong>: a margem é lucro puro e os impostos (ISS/PIS/COFINS) saem por cima da venda.</p>
-        <p>Horas/mês do setor = <strong>pessoas × (horas/dia × dias úteis × ocupação)</strong> — automático. Ajuste a jornada nos campos acima; ocupação 60–85% (nunca 100%).</p>
+        <p>Horas/mês do setor = <strong>pessoas × horas/dia × dias úteis × (1 − absenteísmo)</strong> — automático. Ajuste a jornada e o absenteísmo (faltas médias) nos campos acima.</p>
         <p><strong>CIF (R$/mês)</strong> é o custo indireto do setor por mês (energia/consumíveis/depreciação da máquina) — valor em reais, não %. Opcional: se deixar 0, entra no overhead rateado.</p>
       </div>
     </div>

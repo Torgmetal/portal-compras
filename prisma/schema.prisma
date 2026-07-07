@@ -1412,7 +1412,7 @@ model ConfigCustoHora {
   impostosVendaPct  Float    @default(15) // ISS + PIS/COFINS sobre a venda (Lucro Real)
   horasDia          Float    @default(8.75) // jornada: horas/dia × dias × aproveitamento = horas/pessoa
   diasUteis         Float    @default(22)
-  ocupacaoPct       Float    @default(85) // aproveitamento: presença (absenteísmo) + paradas
+  ocupacaoPct       Float    @default(8) // absenteísmo % (faltas) — horas = pessoas × hd × dias × (1 − ocupacaoPct/100)
   setores           Json     @default("[]")
   atualizadoPorNome String?
   updatedAt         DateTime @updatedAt @default(now())

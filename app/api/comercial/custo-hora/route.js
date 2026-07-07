@@ -45,7 +45,7 @@ const schema = z.object({
   impostosVendaPct: z.number().min(0).max(90).default(15),
   horasDia: z.number().min(1).max(24).default(8),
   diasUteis: z.number().min(1).max(31).default(22),
-  ocupacaoPct: z.number().min(1).max(100).default(80),
+  ocupacaoPct: z.number().min(0).max(100).default(8),
   setores: z.array(setorSchema).max(50),
 });
 
