@@ -19,6 +19,9 @@
     },
     "app/api/rh/holerite/preparar/route.js": {
       "memory": 3009
+    },
+    "app/api/relatorios/[id]/pdf/route.js": {
+      "memory": 3009
     }
   },
   "crons": [

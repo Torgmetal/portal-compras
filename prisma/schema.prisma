@@ -1341,6 +1341,27 @@ model FeedbackRH {
   @@index([status, createdAt])
 }
 
+// Painel de Relatórios — v1: relatório de status com fotos p/ o cliente, no
+// layout padrão Torg (linha do Data Book). blocos = JSON [{ id, titulo,
+// descricao, fotos: [{ url, legenda }] }]. Sem relações — vínculo à OP é só snapshot.
+model RelatorioStatus {
+  id            String   @id @default(cuid())
+  opId          String?
+  opNumero      String? // OP.numero é texto ("067", "T60B") — snapshot
+  cliente       String?
+  obra          String?
+  titulo        String
+  resumo        String?
+  blocos        Json     @default("[]")
+  status        String   @default("RASCUNHO") // RASCUNHO | EMITIDO
+  criadoPorId   String?
+  criadoPorNome String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
 // Portal da Qualidade — Módulo 1 (Controle de Documentos). Espelha o padrão dos
 // documentos de RH (arquivo no Blob privado + backup ISO no SharePoint + proxy
 // de download), com camada de VALIDAÇÃO da informação e amarração a norma +
