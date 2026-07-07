@@ -16,6 +16,12 @@ const updateSchema = z.object({
   valor: z.number().nonnegative().nullable().optional(),
   observacoes: z.string().max(4000).nullable().optional(),
   composicao: z.record(z.any()).optional(),
+  arquivos: z.array(z.object({
+    url: z.string().url(),
+    nome: z.string().max(300).optional().default(""),
+    tamanho: z.number().nonnegative().optional(),
+    tipo: z.string().max(120).optional().default(""),
+  })).max(60).optional(),
 });
 
 export async function GET(_req, { params }) {
@@ -42,7 +48,7 @@ export async function PATCH(req, { params }) {
 
   const d = parsed.data;
   const data = {};
-  for (const k of ["cliente", "obra", "contato", "servicos", "status", "valor", "observacoes", "composicao"]) {
+  for (const k of ["cliente", "obra", "contato", "servicos", "status", "valor", "observacoes", "composicao", "arquivos"]) {
     if (k in d) data[k] = d[k];
   }
   const os = await prisma.orcamentoServico.update({ where: { id: params.id }, data });

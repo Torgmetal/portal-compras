@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
 
@@ -12,6 +12,7 @@ const num = (v) => Number(v) || 0;
 const fmtKg = (v) => num(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " kg";
 const fmtH = (min) => { const m = Math.round(num(min)); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 const fmtBRL = (v) => num(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtTam = (b) => { const n = num(b); if (n < 1024) return `${n} B`; if (n < 1048576) return `${Math.round(n / 1024)} KB`; return `${(n / 1048576).toFixed(1)} MB`; };
 const pesoLinha = (l) => num(l.pesoKgM) * num(l.comprimento) * num(l.qtdBarras);
 const tempoLinha = (l) => num(l.tempoMinBarra) * num(l.qtdBarras);
 
@@ -31,6 +32,9 @@ export default function ServicoDetalheClient({ id }) {
   const [aba, setAba] = useState("dados");
   const [dirty, setDirty] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [arquivos, setArquivos] = useState([]);
+  const [subindoArq, setSubindoArq] = useState(0);
+  const arqRef = useRef(null);
 
   const marcar = () => setDirty(true);
 
@@ -47,6 +51,7 @@ export default function ServicoDetalheClient({ id }) {
       setNumero(o.numero || null); setCliente(o.cliente || ""); setObra(o.obra || ""); setContato(o.contato || "");
       setServSel(Array.isArray(o.servicos) ? o.servicos : []); setStatus(o.status || "RASCUNHO"); setObs(o.observacoes || "");
       setComposicao(o.composicao && typeof o.composicao === "object" ? o.composicao : {});
+      setArquivos(Array.isArray(o.arquivos) ? o.arquivos : []);
       const d2 = await r2.json().catch(() => ({}));
       if (r2.ok) setPerfis(d2.perfis || []);
       setDirty(false);
@@ -54,9 +59,27 @@ export default function ServicoDetalheClient({ id }) {
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
 
-  useEffect(() => { if (aba !== "dados" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
+  useEffect(() => { if (aba !== "dados" && aba !== "arquivos" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
 
   const toggleServ = (k) => { setServSel((p) => (p.includes(k) ? p.filter((x) => x !== k) : [...p, k])); marcar(); };
+
+  const addArquivos = async (files) => {
+    const lista = Array.from(files || []);
+    if (!lista.length) return;
+    setSubindoArq((n) => n + lista.length);
+    for (const file of lista) {
+      try {
+        const fd = new FormData(); fd.append("file", file);
+        const r = await fetch("/api/upload-blob", { method: "POST", body: fd });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Falha no upload");
+        setArquivos((p) => [...p, { url: d.url, nome: d.nomeArquivo || file.name, tamanho: d.tamanho || file.size, tipo: d.tipo || file.type }]);
+        marcar();
+      } catch (e) { showToast(e.message || "Falha ao subir arquivo", "error"); }
+      finally { setSubindoArq((n) => n - 1); }
+    }
+  };
+  const rmArquivo = (i) => { setArquivos((p) => p.filter((_, idx) => idx !== i)); marcar(); };
 
   const salvar = async () => {
     if (cliente.trim().length < 2) { showToast("Informe o cliente", "error"); return; }
@@ -65,7 +88,7 @@ export default function ServicoDetalheClient({ id }) {
     try {
       const r = await fetch(`/api/comercial/orcamento-servico/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, servicos: servSel, status, observacoes: obs || null, composicao, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
+        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, servicos: servSel, status, observacoes: obs || null, composicao, arquivos, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao salvar");
@@ -102,7 +125,7 @@ export default function ServicoDetalheClient({ id }) {
     </div>
   );
 
-  const tabs = [{ key: "dados", label: "Dados" }, ...servSel.map((s) => ({ key: s, label: SERVICO_LABEL[s] || s }))];
+  const tabs = [{ key: "dados", label: "Dados" }, { key: "arquivos", label: "Arquivos do cliente" }, ...servSel.map((s) => ({ key: s, label: SERVICO_LABEL[s] || s }))];
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -116,7 +139,7 @@ export default function ServicoDetalheClient({ id }) {
           <select value={status} onChange={(e) => { setStatus(e.target.value); marcar(); }} className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-torg-blue">
             {Object.entries(STATUS_SERVICO).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
-          <button onClick={salvar} disabled={salvando} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange/90 font-medium inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={salvar} disabled={salvando || subindoArq > 0} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange/90 font-medium inline-flex items-center gap-2 disabled:opacity-50">
             {salvando ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar
           </button>
         </div>
@@ -161,6 +184,33 @@ export default function ServicoDetalheClient({ id }) {
             <label className="text-xs text-torg-gray">Observações</label>
             <textarea value={obs} onChange={(e) => { setObs(e.target.value); marcar(); }} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue resize-y" />
           </div>
+        </div>
+      )}
+
+      {aba === "arquivos" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><FolderUp size={18} className="text-torg-blue" /> Arquivos do cliente</h3>
+          <p className="text-sm text-torg-gray mb-3">Desenhos, listas, especificações e o que o cliente enviar (PDF, DWG, DXF, XLSX, imagens…).</p>
+          {arquivos.length > 0 && (
+            <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg mb-3">
+              {arquivos.map((a, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <a href={a.url} target="_blank" rel="noreferrer" className="text-sm text-torg-blue hover:underline inline-flex items-center gap-2 min-w-0"><FileText size={15} className="shrink-0" /> <span className="truncate">{a.nome}</span></a>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-[11px] text-torg-gray">{fmtTam(a.tamanho)}</span>
+                    <button onClick={() => rmArquivo(i)} className="text-red-400 hover:text-red-600" title="Remover"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <button onClick={() => arqRef.current?.click()} disabled={subindoArq > 0}
+            className="w-full py-6 border-2 border-dashed border-gray-200 rounded-xl text-torg-gray hover:border-torg-blue hover:text-torg-blue font-medium flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-50">
+            {subindoArq > 0 ? <Loader2 size={22} className="animate-spin" /> : <FolderUp size={22} />}
+            <span>{subindoArq > 0 ? `Enviando ${subindoArq}…` : "Adicionar arquivos"}</span>
+          </button>
+          <input ref={arqRef} type="file" multiple className="hidden" onChange={(e) => { addArquivos(e.target.files); e.target.value = ""; }} />
+          <p className="text-[11px] text-torg-gray mt-2">Clique em Salvar para guardar a lista de arquivos.</p>
         </div>
       )}
 
