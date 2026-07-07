@@ -46,11 +46,11 @@ export async function POST(req) {
   // Notifica o RH por e-mail (best-effort — o feedback já está salvo de qualquer forma).
   try {
     let rh = await prisma.user.findMany({
-      where: { ativo: true, email: { not: null }, modulos: { some: { modulo: "RH" } } },
+      where: { ativo: true, modulos: { some: { modulo: "RH" } } }, // User.email é obrigatório
       select: { email: true },
     });
     if (!rh.length) {
-      rh = await prisma.user.findMany({ where: { ativo: true, tipo: "ADMIN", email: { not: null } }, select: { email: true } });
+      rh = await prisma.user.findMany({ where: { ativo: true, tipo: "ADMIN" }, select: { email: true } });
     }
     const destinos = [...new Set(rh.map((u) => u.email).filter(Boolean))];
     if (destinos.length) {
