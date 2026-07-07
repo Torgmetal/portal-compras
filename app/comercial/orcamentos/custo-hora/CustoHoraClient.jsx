@@ -1,6 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { Calculator, Loader2, AlertCircle, RefreshCw, Save, Plus, Trash2, Info } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Calculator, Loader2, AlertCircle, RefreshCw, Save, Plus, Trash2, Info, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 const num = (v) => { const n = Number(v); return isFinite(n) ? n : 0; };
@@ -23,6 +23,8 @@ export default function CustoHoraClient() {
   const [setores, setSetores] = useState([]);
   const [dirty, setDirty] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const arqRef = useRef(null);
 
   const marcar = () => setDirty(true);
 
@@ -39,15 +41,30 @@ export default function CustoHoraClient() {
       setMargem(c.margemPct ?? 30);
       setImpostosVenda(c.impostosVendaPct ?? 15);
       setHorasDia(c.horasDia ?? 8.75); setDiasUteis(c.diasUteis ?? 22); setOcupacao(c.ocupacaoPct ?? 8);
-      setSetores((Array.isArray(c.setores) ? c.setores : []).map((s) => ({ id: s.id || uid(), nome: s.nome || "", salarios: s.salarios ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: s.cifDireto ?? 0 })));
+      setSetores((Array.isArray(c.setores) ? c.setores : []).map((s) => ({ id: s.id || uid(), nome: s.nome || "", empresa: s.empresa || "", salarios: s.salarios ?? 0, mod: s.mod ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: s.cifDireto ?? 0 })));
       setDirty(false);
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
   const setSetor = (i, campo, valor) => { setSetores((p) => p.map((s, idx) => (idx === i ? { ...s, [campo]: valor } : s))); marcar(); };
-  const addSetor = () => { setSetores((p) => [...p, { id: uid(), nome: "", salarios: 0, headcount: 0, horasMes: 0, cifDireto: 0 }]); marcar(); };
+  const addSetor = () => { setSetores((p) => [...p, { id: uid(), nome: "", empresa: "", salarios: 0, mod: 0, headcount: 0, horasMes: 0, cifDireto: 0 }]); marcar(); };
   const rmSetor = (i) => { setSetores((p) => p.filter((_, idx) => idx !== i)); marcar(); };
+
+  const importarCet = async (file) => {
+    if (!file) return;
+    setImportando(true);
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const r = await fetch("/api/comercial/custo-hora/importar", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao importar");
+      setSetores((d.setores || []).map((s) => ({ id: uid(), nome: s.nome || "", empresa: s.empresa || "", salarios: s.salarios ?? 0, mod: s.mod ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: 0 })));
+      marcar();
+      showToast(`${(d.setores || []).length} setores importados · CET total ${fmtBRL0(d.cetTotal)}`, "success");
+    } catch (e) { showToast(e.message, "error"); }
+    finally { setImportando(false); }
+  };
 
   const salvar = async () => {
     setSalvando(true);
@@ -61,7 +78,7 @@ export default function CustoHoraClient() {
         horasDia: num(horasDia) || 8.75,
         diasUteis: num(diasUteis) || 22,
         ocupacaoPct: num(ocupacao) || 80,
-        setores: setores.map((s) => ({ id: s.id, nome: s.nome, salarios: num(s.salarios), headcount: num(s.headcount), horasMes: Math.round(num(s.headcount) * (num(horasDia) * num(diasUteis) * (1 - num(ocupacao) / 100))), cifDireto: num(s.cifDireto) })),
+        setores: setores.map((s) => ({ id: s.id, nome: s.nome, empresa: s.empresa || "", salarios: num(s.salarios), mod: num(s.mod), headcount: num(s.headcount), horasMes: Math.round(horasMes(s)), cifDireto: num(s.cifDireto) })),
       };
       const r = await fetch("/api/comercial/custo-hora", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const d = await r.json();
@@ -73,8 +90,8 @@ export default function CustoHoraClient() {
   // ─── Cálculo ao vivo ───
   const f = num(fator);
   const horasPorPessoa = num(horasDia) * num(diasUteis) * (1 - num(ocupacao) / 100);
-  const horasMes = (s) => num(s.headcount) * horasPorPessoa;
-  const mod = (s) => num(s.salarios) * f;
+  const horasMes = (s) => (num(s.horasMes) > 0 ? num(s.horasMes) : num(s.headcount) * horasPorPessoa);
+  const mod = (s) => (num(s.mod) > 0 ? num(s.mod) : num(s.salarios) * f); // CET real (importado) ou salários × fator
   const modTotal = setores.reduce((a, s) => a + mod(s), 0);
   const cifTotal = setores.reduce((a, s) => a + num(s.cifDireto), 0);
   const diretoTotal = modTotal + cifTotal;
@@ -111,6 +128,10 @@ export default function CustoHoraClient() {
         </div>
         <div className="flex items-center gap-2">
           {dirty && <span className="text-xs text-amber-600">não salvo</span>}
+          <button onClick={() => arqRef.current?.click()} disabled={importando} className="px-3 py-2 border border-torg-blue/30 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-2 disabled:opacity-50" title="Importar a planilha de auditoria (CET) — traz salário, CET real, horas e pessoas por setor">
+            {importando ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Importar auditoria
+          </button>
+          <input ref={arqRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(e) => { importarCet(e.target.files?.[0]); e.target.value = ""; }} />
           <button onClick={salvar} disabled={salvando} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange/90 font-medium inline-flex items-center gap-2 disabled:opacity-50">
             {salvando ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar
           </button>
@@ -186,11 +207,12 @@ export default function CustoHoraClient() {
             <thead className="bg-gray-50/60">
               <tr className="text-left text-xs font-medium text-gray-500 uppercase">
                 <th className="px-3 py-2">Setor</th>
+                <th className="px-3 py-2">Empresa</th>
                 <th className="px-3 py-2 text-right">Salários (R$/mês)</th>
                 <th className="px-3 py-2 text-right">Pessoas</th>
                 <th className="px-3 py-2 text-right">Horas/mês</th>
                 <th className="px-3 py-2 text-right">CIF (R$/mês)</th>
-                <th className="px-3 py-2 text-right">MOD</th>
+                <th className="px-3 py-2 text-right">MOD (CET)</th>
                 <th className="px-3 py-2 text-right">Overhead</th>
                 <th className="px-3 py-2 text-right">Custo/mês</th>
                 <th className="px-3 py-2 text-right bg-torg-blue-50/50">Custo-hora</th>
@@ -200,10 +222,11 @@ export default function CustoHoraClient() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {setores.length === 0 ? (
-                <tr><td colSpan={11} className="px-3 py-6 text-center text-torg-gray text-sm">Nenhum setor. Adicione abaixo.</td></tr>
+                <tr><td colSpan={12} className="px-3 py-6 text-center text-torg-gray text-sm">Nenhum setor. Importe a auditoria (CET) ou adicione abaixo.</td></tr>
               ) : setores.map((s, i) => (
                 <tr key={s.id}>
-                  <td className="px-3 py-1.5"><input value={s.nome} onChange={(e) => setSetor(i, "nome", e.target.value)} placeholder="Setor" className="w-32 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue" /></td>
+                  <td className="px-3 py-1.5"><input value={s.nome} onChange={(e) => setSetor(i, "nome", e.target.value)} placeholder="Setor" className="w-36 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue" /></td>
+                  <td className="px-3 py-1.5 text-xs text-torg-gray">{s.empresa || "—"}</td>
                   <td className="px-3 py-1.5 text-right"><input type="number" step="100" value={s.salarios} onChange={(e) => setSetor(i, "salarios", e.target.value)} className="w-28 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                   <td className="px-3 py-1.5 text-right"><input type="number" step="1" value={s.headcount} onChange={(e) => setSetor(i, "headcount", e.target.value)} className="w-16 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                   <td className="px-3 py-1.5 text-right tabular-nums text-torg-gray">{Math.round(horasMes(s)).toLocaleString("pt-BR")}</td>
@@ -225,9 +248,10 @@ export default function CustoHoraClient() {
       </button>
 
       <div className="text-xs text-torg-gray space-y-1">
-        <p><strong>Como calcula:</strong> MOD = salários × fator de encargos. Overhead/ADM = custo total − custos diretos (resíduo), rateado pelo critério escolhido.</p>
+        <p><strong>Como calcula:</strong> MOD = <strong>CET real</strong> (quando importado da auditoria) ou salários × fator de encargos. Overhead/ADM = custo total − custos diretos (resíduo), rateado pelo critério escolhido.</p>
+        <p><strong>Importar auditoria:</strong> lê a aba "Custo Efetivo" e traz cada setor (dos 2 CNPJs) com CET real, horas efetivas (Previstas − Ausência) e nº de pessoas. Depois é só revisar e <strong>Salvar</strong>.</p>
         <p>Custo-hora = (MOD + CIF + overhead) ÷ horas do setor — já inclui tudo do custo total mensal (salários, encargos, ADM). <strong>Preço-hora = custo-hora × (1 + margem de lucro) ÷ (1 − impostos de venda)</strong>: a margem é lucro puro e os impostos (ISS/PIS/COFINS) saem por cima da venda.</p>
-        <p>Horas/mês do setor = <strong>pessoas × horas/dia × dias úteis × (1 − absenteísmo)</strong> — automático. Ajuste a jornada e o absenteísmo (faltas médias) nos campos acima.</p>
+        <p>Horas/mês do setor = <strong>horas efetivas da auditoria</strong> (Previstas − Ausência) quando importado; senão <strong>pessoas × horas/dia × dias úteis × (1 − absenteísmo)</strong>. Ajuste a jornada e o absenteísmo nos campos acima.</p>
         <p><strong>CIF (R$/mês)</strong> é o custo indireto do setor por mês (energia/consumíveis/depreciação da máquina) — valor em reais, não %. Opcional: se deixar 0, entra no overhead rateado.</p>
       </div>
     </div>
