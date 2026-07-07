@@ -16,7 +16,8 @@ export default function CustoHoraClient() {
   const [custoTotal, setCustoTotal] = useState("");
   const [criterio, setCriterio] = useState("MOD");
   const [margem, setMargem] = useState(30);
-  const [horasDia, setHorasDia] = useState(8);
+  const [impostosVenda, setImpostosVenda] = useState(15);
+  const [horasDia, setHorasDia] = useState(8.75);
   const [diasUteis, setDiasUteis] = useState(22);
   const [ocupacao, setOcupacao] = useState(80);
   const [setores, setSetores] = useState([]);
@@ -36,7 +37,8 @@ export default function CustoHoraClient() {
       setCustoTotal(c.custoTotalMensal ?? "");
       setCriterio(c.criterioRateio || "MOD");
       setMargem(c.margemPct ?? 30);
-      setHorasDia(c.horasDia ?? 8); setDiasUteis(c.diasUteis ?? 22); setOcupacao(c.ocupacaoPct ?? 80);
+      setImpostosVenda(c.impostosVendaPct ?? 15);
+      setHorasDia(c.horasDia ?? 8.75); setDiasUteis(c.diasUteis ?? 22); setOcupacao(c.ocupacaoPct ?? 85);
       setSetores((Array.isArray(c.setores) ? c.setores : []).map((s) => ({ id: s.id || uid(), nome: s.nome || "", salarios: s.salarios ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: s.cifDireto ?? 0 })));
       setDirty(false);
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
@@ -55,7 +57,8 @@ export default function CustoHoraClient() {
         custoTotalMensal: custoTotal === "" || custoTotal === null ? null : num(custoTotal),
         criterioRateio: criterio,
         margemPct: num(margem),
-        horasDia: num(horasDia) || 8,
+        impostosVendaPct: num(impostosVenda),
+        horasDia: num(horasDia) || 8.75,
         diasUteis: num(diasUteis) || 22,
         ocupacaoPct: num(ocupacao) || 80,
         setores: setores.map((s) => ({ id: s.id, nome: s.nome, salarios: num(s.salarios), headcount: num(s.headcount), horasMes: Math.round(num(s.headcount) * (num(horasDia) * num(diasUteis) * (num(ocupacao) / 100))), cifDireto: num(s.cifDireto) })),
@@ -86,7 +89,8 @@ export default function CustoHoraClient() {
   const overheadAloc = (s) => overheadTotal * peso(s);
   const custoMes = (s) => mod(s) + num(s.cifDireto) + overheadAloc(s);
   const custoHora = (s) => (horasMes(s) > 0 ? custoMes(s) / horasMes(s) : 0);
-  const precoHora = (s) => custoHora(s) * (1 + num(margem) / 100);
+  const imp = Math.min(89, num(impostosVenda)) / 100;
+  const precoHora = (s) => (custoHora(s) * (1 + num(margem) / 100)) / (1 - imp);
   const custoAlocadoTotal = setores.reduce((a, s) => a + custoMes(s), 0);
   const faltaAlocar = num(custoTotal) - custoAlocadoTotal;
 
@@ -115,7 +119,7 @@ export default function CustoHoraClient() {
 
       {/* Parâmetros */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <div>
             <label className="text-xs text-torg-gray">Fator de encargos</label>
             <input type="number" step="0.01" value={fator} onChange={(e) => { setFator(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
@@ -135,8 +139,13 @@ export default function CustoHoraClient() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-torg-gray">Margem p/ preço (%)</label>
+            <label className="text-xs text-torg-gray">Margem de lucro (%)</label>
             <input type="number" step="1" value={margem} onChange={(e) => { setMargem(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+          </div>
+          <div>
+            <label className="text-xs text-torg-gray">Impostos venda (%)</label>
+            <input type="number" step="0.1" value={impostosVenda} onChange={(e) => { setImpostosVenda(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+            <p className="text-[10px] text-torg-gray mt-1">ISS + PIS/COFINS</p>
           </div>
         </div>
 
@@ -150,8 +159,9 @@ export default function CustoHoraClient() {
             <input type="number" step="1" value={diasUteis} onChange={(e) => { setDiasUteis(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
           </div>
           <div>
-            <label className="text-xs text-torg-gray">Ocupação (%)</label>
+            <label className="text-xs text-torg-gray">Aproveitamento (%)</label>
             <input type="number" step="1" value={ocupacao} onChange={(e) => { setOcupacao(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+            <p className="text-[10px] text-torg-gray mt-1">presença (absenteísmo) + paradas</p>
           </div>
         </div>
         <p className="text-[11px] text-torg-gray mt-1">Horas/mês por pessoa = horas/dia × dias úteis × ocupação = <strong>{Math.round(horasPorPessoa)} h</strong>. As horas/mês de cada setor saem de <strong>pessoas × esse valor</strong>.</p>
@@ -216,7 +226,7 @@ export default function CustoHoraClient() {
 
       <div className="text-xs text-torg-gray space-y-1">
         <p><strong>Como calcula:</strong> MOD = salários × fator de encargos. Overhead/ADM = custo total − custos diretos (resíduo), rateado pelo critério escolhido.</p>
-        <p>Custo-hora = (MOD + CIF + overhead alocado) ÷ horas produtivas do setor. Preço-hora = custo-hora × (1 + margem).</p>
+        <p>Custo-hora = (MOD + CIF + overhead) ÷ horas do setor — já inclui tudo do custo total mensal (salários, encargos, ADM). <strong>Preço-hora = custo-hora × (1 + margem de lucro) ÷ (1 − impostos de venda)</strong>: a margem é lucro puro e os impostos (ISS/PIS/COFINS) saem por cima da venda.</p>
         <p>Horas/mês do setor = <strong>pessoas × (horas/dia × dias úteis × ocupação)</strong> — automático. Ajuste a jornada nos campos acima; ocupação 60–85% (nunca 100%).</p>
         <p><strong>CIF (R$/mês)</strong> é o custo indireto do setor por mês (energia/consumíveis/depreciação da máquina) — valor em reais, não %. Opcional: se deixar 0, entra no overhead rateado.</p>
       </div>

@@ -42,6 +42,7 @@ const schema = z.object({
   custoTotalMensal: z.number().nonnegative().nullable().optional(),
   criterioRateio: z.enum(["MOD", "HEADCOUNT", "HORAS"]),
   margemPct: z.number().min(0).max(500),
+  impostosVendaPct: z.number().min(0).max(90).default(15),
   horasDia: z.number().min(1).max(24).default(8),
   diasUteis: z.number().min(1).max(31).default(22),
   ocupacaoPct: z.number().min(1).max(100).default(80),
@@ -58,7 +59,7 @@ export async function PUT(req) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
   const d = parsed.data;
-  const dados = { fatorEncargos: d.fatorEncargos, custoTotalMensal: d.custoTotalMensal ?? null, criterioRateio: d.criterioRateio, margemPct: d.margemPct, horasDia: d.horasDia, diasUteis: d.diasUteis, ocupacaoPct: d.ocupacaoPct, setores: d.setores, atualizadoPorNome: user.name || null };
+  const dados = { fatorEncargos: d.fatorEncargos, custoTotalMensal: d.custoTotalMensal ?? null, criterioRateio: d.criterioRateio, margemPct: d.margemPct, impostosVendaPct: d.impostosVendaPct, horasDia: d.horasDia, diasUteis: d.diasUteis, ocupacaoPct: d.ocupacaoPct, setores: d.setores, atualizadoPorNome: user.name || null };
 
   const cfg = await prisma.configCustoHora.upsert({ where: { id: ID }, update: dados, create: { id: ID, ...dados } });
   await prisma.auditLog.create({
