@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
+import { precoHoraDoServico } from "@/lib/custo-hora-calc";
 
 const os = (n) => (n ? `OS-${String(n).padStart(3, "0")}` : "—");
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
@@ -37,6 +38,8 @@ export default function ServicoDetalheClient({ id }) {
   const [salvando, setSalvando] = useState(false);
   const [arquivos, setArquivos] = useState([]);
   const [subindoArq, setSubindoArq] = useState(0);
+  const [configCH, setConfigCH] = useState(null);
+  const autoValorRef = useRef(false);
   const arqRef = useRef(null);
 
   const marcar = () => setDirty(true);
@@ -44,9 +47,10 @@ export default function ServicoDetalheClient({ id }) {
   const carregar = useCallback(async () => {
     setCarregando(true); setErro("");
     try {
-      const [r1, r2] = await Promise.all([
+      const [r1, r2, r3] = await Promise.all([
         fetch(`/api/comercial/orcamento-servico/${id}`),
         fetch(`/api/comercial/orcamento-servico/perfis`),
+        fetch(`/api/comercial/custo-hora`),
       ]);
       const d = await r1.json();
       if (!r1.ok) throw new Error(d.error || "Falha ao carregar");
@@ -58,6 +62,8 @@ export default function ServicoDetalheClient({ id }) {
       setArquivos(Array.isArray(o.arquivos) ? o.arquivos : []);
       const d2 = await r2.json().catch(() => ({}));
       if (r2.ok) setPerfis(d2.perfis || []);
+      const d3 = await r3.json().catch(() => ({}));
+      if (r3.ok) setConfigCH(d3.config || null);
       setDirty(false);
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [id]);
@@ -120,6 +126,17 @@ export default function ServicoDetalheClient({ id }) {
   const setCfValorHora = (v) => { setComposicao((p) => ({ ...p, CORTE_FURACAO: { ...(p.CORTE_FURACAO || {}), valorHora: v } })); marcar(); };
   const custoCf = (cfTempoTotal / 60) * cfValorHora; // tempo total (h) × R$/hora
   const custoTotal = custoCf; // soma dos serviços (por ora só corte/furação)
+
+  // Puxa a preço-hora do custo-hora (setor de preparação/corte) pro valor/hora.
+  const cfSetorPreco = precoHoraDoServico(configCH, "CORTE_FURACAO"); // { nome, precoHora } | null
+  const cfPrecoSugerido = cfSetorPreco ? Math.round(cfSetorPreco.precoHora * 100) / 100 : 0;
+  useEffect(() => {
+    if (autoValorRef.current || carregando) return;
+    if (cfPrecoSugerido > 0 && !num(composicao?.CORTE_FURACAO?.valorHora)) {
+      setCfValorHora(cfPrecoSugerido);
+      autoValorRef.current = true;
+    }
+  }, [cfPrecoSugerido, carregando, composicao]);
 
   if (carregando) return <div className="py-20 text-center text-torg-gray"><Loader2 size={30} className="mx-auto animate-spin mb-2" /> Carregando...</div>;
   if (erro) return (
@@ -288,6 +305,11 @@ export default function ServicoDetalheClient({ id }) {
                 <label className="text-xs text-torg-gray">Valor por hora (R$/h)</label>
                 <input type="number" step="0.01" value={cfValorHora || ""} onChange={(e) => setCfValorHora(e.target.value === "" ? 0 : Number(e.target.value))} placeholder="0,00"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+                {cfPrecoSugerido > 0 ? (
+                  <p className="text-[11px] text-torg-gray mt-1">Custo-hora ({cfSetorPreco.nome}): <strong className="text-torg-dark tabular-nums">{fmtBRL(cfPrecoSugerido)}/h</strong>{num(cfValorHora) !== cfPrecoSugerido && (<button type="button" onClick={() => setCfValorHora(cfPrecoSugerido)} className="ml-1.5 text-torg-blue hover:underline font-medium">usar</button>)}</p>
+                ) : (
+                  <p className="text-[11px] text-amber-600 mt-1"><Link href="/comercial/orcamentos/custo-hora" className="hover:underline">Defina o custo-hora</Link> pra puxar automático.</p>
+                )}
               </div>
               <div>
                 <label className="text-xs text-torg-gray">Tempo total</label>
