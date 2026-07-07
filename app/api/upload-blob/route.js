@@ -16,46 +16,14 @@ export const maxDuration = 30;
 // DWG/DXF de projetos estruturais podem passar de 20MB.
 const MAX_SIZE = 50 * 1024 * 1024;
 
-// Extensoes permitidas por categoria
-const EXTENSOES_PERMITIDAS = [
-  // Documentos
-  "pdf", "xlsx", "xls", "csv", "doc", "docx", "txt",
-  // Imagens (sem SVG — pode conter <script> e o blob é servido publicamente)
-  "png", "jpg", "jpeg", "gif", "webp",
-  // CAD
-  "dwg", "dxf", "step", "stp", "iges", "igs",
-  // Compactados
-  "zip", "rar", "7z",
-];
-
-// MIME types permitidos (CAD frequentemente vem como octet-stream, tratado a parte)
-const MIME_TYPES_PERMITIDOS = new Set([
-  // Documentos
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-excel",
-  "text/csv",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "text/plain",
-  // Imagens
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  // CAD (quando o browser identifica corretamente)
-  "application/acad",
-  "application/x-acad",
-  "application/x-autocad",
-  "image/vnd.dxf",
-  "model/step",
-  "model/iges",
-  // Compactados
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/vnd.rar",
-  "application/x-rar-compressed",
-  "application/x-7z-compressed",
+// NÃO fazemos allowlist de tipo: o cliente manda CAD dos mais variados
+// (IGS/IGES, STEP, SAT, Parasolid, nativos de CAD, etc.) e o portal só precisa
+// LISTAR os arquivos anexados. A única checagem é um bloqueio mínimo de
+// extensões que executam script no navegador — o blob é servido num URL
+// PÚBLICO, então HTML/SVG/scripts abririam brecha de XSS.
+const EXTENSOES_BLOQUEADAS = new Set([
+  "html", "htm", "xhtml", "shtml", "svg", "svgz", "xml", "xsl", "xslt",
+  "js", "mjs", "jse", "vbs", "wsf", "hta", "phtml", "php", "php3", "php4", "php5",
 ]);
 
 export async function POST(req) {
@@ -94,29 +62,13 @@ export async function POST(req) {
     );
   }
 
-  // Validacao de tipo de arquivo
+  // Sem checagem de tipo — só listamos os arquivos do cliente. Bloqueio mínimo
+  // apenas de extensões que executam script no navegador (o blob é público).
   const nomeOriginal = String(file.name || "");
   const extensao = nomeOriginal.split(".").pop()?.toLowerCase() || "";
-  const mimeType = (file.type || "application/octet-stream").toLowerCase();
-
-  const extensaoPermitida = EXTENSOES_PERMITIDAS.includes(extensao);
-  const mimePermitido = MIME_TYPES_PERMITIDOS.has(mimeType);
-  // CAD files frequentemente chegam como octet-stream — aceitar se a extensao bater
-  const fallbackOctetStream =
-    mimeType === "application/octet-stream" && extensaoPermitida;
-  // CAD e compactados: o browser inventa o MIME (model/iges, application/iges,
-  // application/step, application/x-step, etc.). Pra essas extensoes a EXTENSAO
-  // manda — nenhuma delas é executável/servível como script, então é seguro.
-  const EXTENSOES_POR_EXTENSAO = ["dwg", "dxf", "step", "stp", "iges", "igs", "zip", "rar", "7z"];
-  const fallbackPorExtensao = extensaoPermitida && EXTENSOES_POR_EXTENSAO.includes(extensao);
-
-  if (!extensaoPermitida || (!mimePermitido && !fallbackOctetStream && !fallbackPorExtensao)) {
+  if (EXTENSOES_BLOQUEADAS.has(extensao)) {
     return NextResponse.json(
-      {
-        error:
-          `Tipo de arquivo nao permitido (.${extensao}, ${mimeType}). ` +
-          `Extensoes aceitas: ${EXTENSOES_PERMITIDAS.join(", ")}.`,
-      },
+      { error: `Por segurança, arquivos .${extensao} não podem ser anexados (executam script no navegador). Se precisar enviar, compacte num .zip e suba o zip.` },
       { status: 400 }
     );
   }
