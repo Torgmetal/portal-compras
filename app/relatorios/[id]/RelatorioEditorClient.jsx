@@ -56,6 +56,7 @@ export default function RelatorioEditorClient({ id }) {
   const [enviando, setEnviando] = useState(false);
   const [aceite, setAceite] = useState(null);
   const [enviosHist, setEnviosHist] = useState([]);
+  const [numero, setNumero] = useState(null);
 
   const marcar = () => setDirty(true);
 
@@ -72,6 +73,7 @@ export default function RelatorioEditorClient({ id }) {
       setClienteEmailOp(d.clienteEmailOp || "");
       setAceite(rel.aceitoEm ? { em: rel.aceitoEm, nome: rel.aceitoNome } : null);
       setEnviosHist(Array.isArray(rel.envios) ? rel.envios : []);
+      setNumero(rel.numero || null);
       setDirty(false);
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [id]);
@@ -170,7 +172,10 @@ export default function RelatorioEditorClient({ id }) {
     <div className="space-y-5 max-w-[900px]">
       {/* Barra superior */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <Link href="/relatorios" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5"><ArrowLeft size={16} /> Relatórios</Link>
+        <div className="flex items-center gap-3">
+          <Link href="/relatorios" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5"><ArrowLeft size={16} /> Relatórios</Link>
+          {numero && <span className="text-xs font-mono font-semibold text-torg-blue bg-torg-blue-50 rounded-full px-2 py-0.5">REL-{String(numero).padStart(3, "0")}</span>}
+        </div>
         <div className="flex items-center gap-2">
           {dirty && <span className="text-xs text-amber-600">alterações não salvas</span>}
           <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${status === "EMITIDO" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{status}</span>

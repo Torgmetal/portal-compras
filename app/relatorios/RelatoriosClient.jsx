@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  FileBarChart2, Plus, Loader2, AlertCircle, RefreshCw, Inbox, FileDown, Trash2, X, Camera,
+  FileBarChart2, Plus, Loader2, AlertCircle, RefreshCw, Inbox, FileDown, Trash2, X, Camera, CheckCircle2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -17,6 +17,7 @@ export default function RelatoriosClient() {
   const [relatorios, setRelatorios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
+  const [filtroOp, setFiltroOp] = useState("todas");
 
   const [novo, setNovo] = useState(false);
   const [ops, setOps] = useState([]);
@@ -72,6 +73,17 @@ export default function RelatoriosClient() {
     return [o.numero, o.cliente, o.obra].filter(Boolean).some((s) => s.toLowerCase().includes(q));
   }).slice(0, 100);
 
+  // OPs distintas presentes nos relatórios (p/ o filtro) + lista filtrada.
+  const opsFiltro = [];
+  const vistosOp = new Set();
+  for (const r of relatorios) {
+    const key = r.opNumero || "__sem__";
+    if (vistosOp.has(key)) continue;
+    vistosOp.add(key);
+    opsFiltro.push({ key, label: r.opNumero ? `${fmtOP(r.opNumero)}${r.cliente ? " · " + r.cliente : ""}` : "Sem OP" });
+  }
+  const relatoriosFiltrados = filtroOp === "todas" ? relatorios : relatorios.filter((r) => (r.opNumero || "__sem__") === filtroOp);
+
   return (
     <div className="space-y-6 max-w-[1100px]">
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -101,29 +113,66 @@ export default function RelatoriosClient() {
           <p className="text-sm text-torg-gray mt-1">Clique em “Novo relatório de status” para começar.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {relatorios.map((r) => (
-            <div key={r.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col">
-              <div className="flex items-start justify-between gap-2">
-                <Link href={`/relatorios/${r.id}`} className="font-semibold text-torg-dark hover:text-torg-blue leading-tight">{r.titulo}</Link>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${ST[r.status] || "bg-gray-100 text-gray-600"}`}>{r.status}</span>
-              </div>
-              <div className="text-xs text-torg-gray mt-1">
-                {[r.cliente, r.obra, fmtOP(r.opNumero)].filter(Boolean).join(" · ") || "—"}
-              </div>
-              <div className="text-[11px] text-torg-gray mt-2 flex items-center gap-3">
-                <span className="inline-flex items-center gap-1"><Camera size={12} /> {r.nFotos} foto{r.nFotos === 1 ? "" : "s"}</span>
-                <span>{r.nBlocos} bloco{r.nBlocos === 1 ? "" : "s"}</span>
-                <span>· {fmt(r.createdAt)}{r.criadoPorNome ? ` · ${r.criadoPorNome}` : ""}</span>
-              </div>
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-50">
-                <Link href={`/relatorios/${r.id}`} className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 font-medium">Abrir</Link>
-                <a href={`/api/relatorios/${r.id}/pdf`} target="_blank" rel="noreferrer" className="text-xs text-torg-dark border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 inline-flex items-center gap-1.5"><FileDown size={13} /> PDF</a>
-                <button onClick={() => excluir(r.id)} className="text-xs text-red-500 hover:text-red-700 ml-auto inline-flex items-center gap-1"><Trash2 size={13} /></button>
-              </div>
+        <>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-sm text-torg-gray">Filtrar por OP:</label>
+            <select value={filtroOp} onChange={(e) => setFiltroOp(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-torg-blue">
+              <option value="todas">Todas as OPs</option>
+              {opsFiltro.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+            </select>
+            <span className="text-xs text-torg-gray">{relatoriosFiltrados.length} de {relatorios.length}</span>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50/60">
+                  <tr className="text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3">Nº</th>
+                    <th className="px-4 py-3">Relatório</th>
+                    <th className="px-4 py-3">OP / Cliente</th>
+                    <th className="px-4 py-3 text-center">Fotos</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3">Aceite</th>
+                    <th className="px-4 py-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {relatoriosFiltrados.length === 0 ? (
+                    <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-torg-gray">Nenhum relatório para esta OP.</td></tr>
+                  ) : relatoriosFiltrados.map((r) => (
+                    <tr key={r.id} className="hover:bg-gray-50/50">
+                      <td className="px-4 py-3 font-mono text-torg-blue font-semibold whitespace-nowrap">{r.numero ? `REL-${String(r.numero).padStart(3, "0")}` : "—"}</td>
+                      <td className="px-4 py-3">
+                        <Link href={`/relatorios/${r.id}`} className="font-medium text-torg-dark hover:text-torg-blue">{r.titulo}</Link>
+                        <div className="text-[11px] text-torg-gray">{r.nBlocos} bloco{r.nBlocos === 1 ? "" : "s"} · {fmt(r.createdAt)}{r.criadoPorNome ? ` · ${r.criadoPorNome}` : ""}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-torg-dark">{r.cliente || "—"}</div>
+                        <div className="text-[11px] text-torg-gray">{[fmtOP(r.opNumero), r.obra].filter(Boolean).join(" · ") || "—"}</div>
+                      </td>
+                      <td className="px-4 py-3 text-center text-torg-gray whitespace-nowrap"><span className="inline-flex items-center gap-1"><Camera size={12} /> {r.nFotos}</span></td>
+                      <td className="px-4 py-3 text-center"><span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${ST[r.status] || "bg-gray-100 text-gray-600"}`}>{r.status}</span></td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {r.aceitoEm ? <span className="inline-flex items-center gap-1 text-xs text-green-700 font-medium"><CheckCircle2 size={13} /> Aceito</span>
+                          : r.nEnvios > 0 ? <span className="text-xs text-amber-600">Aguardando</span>
+                          : <span className="text-xs text-gray-400">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-3">
+                          <Link href={`/relatorios/${r.id}`} className="text-xs text-torg-blue hover:underline">Abrir</Link>
+                          <a href={`/api/relatorios/${r.id}/pdf`} target="_blank" rel="noreferrer" className="text-xs text-torg-dark hover:underline inline-flex items-center gap-1"><FileDown size={12} /> PDF</a>
+                          <button onClick={() => excluir(r.id)} className="text-red-400 hover:text-red-600" title="Excluir"><Trash2 size={13} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-        </div>
+          </div>
+        </>
       )}
 
       {novo && (

@@ -27,7 +27,7 @@ export async function GET(req) {
     where: opId ? { opId } : undefined,
     orderBy: { createdAt: "desc" },
     take: 300,
-    select: { id: true, titulo: true, cliente: true, obra: true, opNumero: true, status: true, criadoPorNome: true, createdAt: true, updatedAt: true, blocos: true, aceitoEm: true, aceitoNome: true, token: true, envios: true },
+    select: { id: true, numero: true, titulo: true, cliente: true, obra: true, opNumero: true, status: true, criadoPorNome: true, createdAt: true, updatedAt: true, blocos: true, aceitoEm: true, aceitoNome: true, token: true, envios: true },
   });
   const relatorios = rows.map((r) => {
     const blocos = Array.isArray(r.blocos) ? r.blocos : [];
@@ -50,9 +50,12 @@ export async function POST(req) {
   if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
   const d = parsed.data;
 
+  // Número sequencial global (REL-001, REL-002, …).
+  const ultimo = await prisma.relatorioStatus.findFirst({ orderBy: { numero: "desc" }, select: { numero: true } });
+  const numero = (ultimo?.numero || 0) + 1;
   const rel = await prisma.relatorioStatus.create({
     data: {
-      titulo: d.titulo, opId: d.opId || null, opNumero: d.opNumero || null,
+      numero, titulo: d.titulo, opId: d.opId || null, opNumero: d.opNumero || null,
       cliente: d.cliente || null, obra: d.obra || null, blocos: [],
       criadoPorId: user.id, criadoPorNome: user.name || null,
     },

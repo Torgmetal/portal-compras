@@ -1346,6 +1346,7 @@ model FeedbackRH {
 // descricao, fotos: [{ url, legenda }] }]. Sem relações — vínculo à OP é só snapshot.
 model RelatorioStatus {
   id            String   @id @default(cuid())
+  numero        Int? // sequencial global (REL-001) — atribuído na criação
   opId          String?
   opNumero      String? // OP.numero é texto ("067", "T60B") — snapshot
   cliente       String?
