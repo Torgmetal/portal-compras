@@ -69,7 +69,7 @@ export default function ServicoDetalheClient({ id }) {
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
 
-  useEffect(() => { if (aba !== "dados" && aba !== "arquivos" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
+  useEffect(() => { if (aba !== "dados" && aba !== "arquivos" && aba !== "resumo" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
 
   const toggleServ = (k) => { setServSel((p) => (p.includes(k) ? p.filter((x) => x !== k) : [...p, k])); marcar(); };
 
@@ -147,6 +147,19 @@ export default function ServicoDetalheClient({ id }) {
     }
   }, [cfPrecoSugerido, carregando, composicao]);
 
+  // ─── Resumo da proposta (prévia do custo) ───
+  const chMargem = num(configCH?.margemPct);
+  const chImpostos = num(configCH?.impostosVendaPct);
+  const resumoServicos = servSel.map((s) => {
+    if (s === "CORTE_FURACAO") return { key: s, label: "Corte a laser", unid: cfMetodo === "KG" ? "kg" : "h", qtd: cfMetodo === "KG" ? cfPesoTotal : cfTempoTotal / 60, valorUnit: cfMetodo === "KG" ? cfPrecoKg : cfValorHora, valorTotal: custoCf };
+    return { key: s, label: SERVICO_LABEL[s] || s, unid: "", qtd: 0, valorUnit: 0, valorTotal: 0, pendente: true };
+  });
+  const valorProposta = resumoServicos.reduce((a, s) => a + num(s.valorTotal), 0);
+  const impostosRs = (valorProposta * chImpostos) / 100;
+  const baseComMargem = valorProposta - impostosRs;
+  const custoBaseResumo = chMargem > 0 ? baseComMargem / (1 + chMargem / 100) : baseComMargem;
+  const margemRs = baseComMargem - custoBaseResumo;
+
   if (carregando) return <div className="py-20 text-center text-torg-gray"><Loader2 size={30} className="mx-auto animate-spin mb-2" /> Carregando...</div>;
   if (erro) return (
     <div className="py-20 text-center">
@@ -155,7 +168,7 @@ export default function ServicoDetalheClient({ id }) {
     </div>
   );
 
-  const tabs = [{ key: "dados", label: "Dados" }, { key: "arquivos", label: "Arquivos do cliente" }, ...servSel.map((s) => ({ key: s, label: SERVICO_LABEL[s] || s }))];
+  const tabs = [{ key: "dados", label: "Dados" }, { key: "arquivos", label: "Arquivos do cliente" }, ...servSel.map((s) => ({ key: s, label: SERVICO_LABEL[s] || s })), { key: "resumo", label: "Resumo / Proposta" }];
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -363,6 +376,50 @@ export default function ServicoDetalheClient({ id }) {
           <Layers size={26} className="mx-auto text-gray-300 mb-2" />
           <p className="text-torg-dark font-medium">{SERVICO_LABEL[aba]} — composição em breve</p>
           <p className="text-sm text-torg-gray mt-1">Vamos montar aqui os itens e o cálculo deste serviço.</p>
+        </div>
+      )}
+
+      {aba === "resumo" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100"><h3 className="font-semibold text-torg-dark flex items-center gap-2"><DollarSign size={17} className="text-torg-blue" /> Resumo da proposta</h3></div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50/60"><tr className="text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-2">Item</th><th className="px-4 py-2">Serviço</th><th className="px-4 py-2 text-center">Unid.</th><th className="px-4 py-2 text-right">Qtd.</th><th className="px-4 py-2 text-right">Valor unit.</th><th className="px-4 py-2 text-right">Valor total</th>
+                </tr></thead>
+                <tbody className="divide-y divide-gray-50">
+                  {resumoServicos.map((s, i) => (
+                    <tr key={s.key} className={s.pendente ? "text-torg-gray" : ""}>
+                      <td className="px-4 py-2 tabular-nums">{String(i + 1).padStart(2, "0")}</td>
+                      <td className="px-4 py-2">{s.label}</td>
+                      <td className="px-4 py-2 text-center">{s.unid || "—"}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{s.qtd ? s.qtd.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{s.valorUnit ? fmtBRL(s.valorUnit) : "—"}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-medium text-torg-dark">{s.valorTotal ? fmtBRL(s.valorTotal) : (s.pendente ? "a definir" : "—")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr className="border-t-2 border-gray-100 bg-gray-50/40"><td colSpan={5} className="px-4 py-2.5 text-right font-semibold text-torg-dark uppercase text-xs">Valor total</td><td className="px-4 py-2.5 text-right font-extrabold text-torg-blue tabular-nums">{fmtBRL(valorProposta)}</td></tr></tfoot>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h4 className="text-sm font-semibold text-torg-dark mb-3">Composição do preço <span className="text-xs font-normal text-torg-gray">(embutida — vem do custo-hora)</span></h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <div><div className="text-[11px] text-torg-gray uppercase">Custo</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL(custoBaseResumo)}</div></div>
+              <div><div className="text-[11px] text-torg-gray uppercase">Margem ({chMargem}%)</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL(margemRs)}</div></div>
+              <div><div className="text-[11px] text-torg-gray uppercase">Impostos ({chImpostos}%)</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL(impostosRs)}</div></div>
+              <div><div className="text-[11px] text-torg-gray uppercase">Preço de venda</div><div className="font-extrabold text-torg-blue tabular-nums">{fmtBRL(valorProposta)}</div></div>
+            </div>
+            <p className="text-[11px] text-torg-gray mt-3">Margem e impostos já vêm embutidos no valor/hora (ou R$/kg) do custo-hora — todos os impostos inclusos (lucro real). Esta é a prévia que vai pra proposta.</p>
+          </div>
+
+          <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="text-sm text-torg-dark">Gerar a <strong>proposta em Word</strong> no padrão Torg (PTC), com destinatário, descrição e a tabela de preços já preenchidos.</div>
+            <button type="button" disabled title="Em construção" className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 opacity-50 cursor-not-allowed"><FileText size={15} /> Gerar proposta (.docx) — em breve</button>
+          </div>
         </div>
       )}
     </div>
