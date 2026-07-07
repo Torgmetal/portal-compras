@@ -1354,12 +1354,18 @@ model RelatorioStatus {
   resumo        String?
   blocos        Json     @default("[]")
   status        String   @default("RASCUNHO") // RASCUNHO | EMITIDO
+  token         String?  @unique // link público de aceite do cliente
+  aceitoEm      DateTime?
+  aceitoNome    String?
+  aceitoIp      String?
+  envios        Json     @default("[]") // histórico: [{ para, cc, porNome, em }]
   criadoPorId   String?
   criadoPorNome String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([createdAt])
+  @@index([opId])
 }
 
 // Portal da Qualidade — Módulo 1 (Controle de Documentos). Espelha o padrão dos
