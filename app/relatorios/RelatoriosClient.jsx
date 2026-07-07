@@ -20,6 +20,7 @@ export default function RelatoriosClient() {
 
   const [novo, setNovo] = useState(false);
   const [ops, setOps] = useState([]);
+  const [carregandoOps, setCarregandoOps] = useState(false);
   const [buscaOp, setBuscaOp] = useState("");
   const [titulo, setTitulo] = useState("");
   const [opSel, setOpSel] = useState(null);
@@ -37,10 +38,9 @@ export default function RelatoriosClient() {
   useEffect(() => { carregar(); }, [carregar]);
 
   const abrirNovo = async () => {
-    setNovo(true); setTitulo(""); setOpSel(null); setBuscaOp("");
-    if (!ops.length) {
-      try { const r = await fetch("/api/relatorios/ops"); const d = await r.json(); if (r.ok) setOps(d.ops || []); } catch {}
-    }
+    setNovo(true); setTitulo(""); setOpSel(null); setBuscaOp(""); setCarregandoOps(true);
+    try { const r = await fetch("/api/relatorios/ops"); const d = await r.json(); if (r.ok) setOps(d.ops || []); } catch {}
+    finally { setCarregandoOps(false); }
   };
 
   const criar = async () => {
@@ -70,7 +70,7 @@ export default function RelatoriosClient() {
     const q = buscaOp.trim().toLowerCase();
     if (!q) return true;
     return [o.numero, o.cliente, o.obra].filter(Boolean).some((s) => s.toLowerCase().includes(q));
-  }).slice(0, 40);
+  }).slice(0, 100);
 
   return (
     <div className="space-y-6 max-w-[1100px]">
@@ -136,7 +136,7 @@ export default function RelatoriosClient() {
             <label className="text-xs text-torg-gray">Título</label>
             <input value={titulo} onChange={(e) => setTitulo(e.target.value)} autoFocus placeholder="Ex.: Status de fabricação — Julho/2026"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 mt-1 focus:ring-2 focus:ring-torg-blue" />
-            <label className="text-xs text-torg-gray">Vincular a uma OP <span className="text-gray-400">(opcional — preenche cliente/obra)</span></label>
+            <label className="text-xs text-torg-gray">Selecionar a OP <span className="text-gray-400">(ativas — preenche cliente/obra)</span></label>
             {opSel ? (
               <div className="flex items-center justify-between border border-torg-blue-200 bg-torg-blue-50/40 rounded-lg px-3 py-2 mt-1 text-sm">
                 <span className="text-torg-dark">{fmtOP(opSel.numero)} · {opSel.cliente}{opSel.obra ? " · " + opSel.obra : ""}</span>
@@ -144,19 +144,23 @@ export default function RelatoriosClient() {
               </div>
             ) : (
               <>
-                <input value={buscaOp} onChange={(e) => setBuscaOp(e.target.value)} placeholder="Buscar OP por número, cliente ou obra…"
+                <input value={buscaOp} onChange={(e) => setBuscaOp(e.target.value)} placeholder="Buscar OP ativa por número, cliente ou obra…"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" />
-                {buscaOp.trim() && (
-                  <div className="border border-gray-100 rounded-lg mt-1 max-h-48 overflow-y-auto divide-y divide-gray-50">
-                    {opsFiltradas.length === 0 ? <div className="px-3 py-2 text-xs text-torg-gray">Nenhuma OP encontrada</div> :
-                      opsFiltradas.map((o) => (
-                        <button key={o.id} onClick={() => { setOpSel(o); if (!titulo.trim()) setTitulo(`Status — ${o.obra || o.cliente}`); }}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50">
-                          <span className="font-medium text-torg-dark">{fmtOP(o.numero)}</span> · {o.cliente}{o.obra ? " · " + o.obra : ""}
-                        </button>
-                      ))}
-                  </div>
-                )}
+                <div className="border border-gray-100 rounded-lg mt-1 max-h-56 overflow-y-auto divide-y divide-gray-50">
+                  {carregandoOps ? (
+                    <div className="px-3 py-3 text-xs text-torg-gray inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> Carregando OPs ativas…</div>
+                  ) : opsFiltradas.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-torg-gray">{ops.length === 0 ? "Nenhuma OP ativa encontrada" : "Nenhuma OP bate com a busca"}</div>
+                  ) : (
+                    opsFiltradas.map((o) => (
+                      <button key={o.id} onClick={() => { setOpSel(o); if (!titulo.trim()) setTitulo(`Status — ${o.obra || o.cliente}`); }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50">
+                        <span className="font-medium text-torg-dark">{fmtOP(o.numero)}</span> · {o.cliente}{o.obra ? " · " + o.obra : ""}
+                      </button>
+                    ))
+                  )}
+                </div>
+                {!carregandoOps && ops.length > 0 && <p className="text-[11px] text-torg-gray mt-1">{ops.length} OP{ops.length === 1 ? "" : "s"} ativa{ops.length === 1 ? "" : "s"}.</p>}
               </>
             )}
             <div className="flex items-center justify-end gap-2 mt-5">

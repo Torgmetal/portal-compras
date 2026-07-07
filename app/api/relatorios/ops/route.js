@@ -10,10 +10,12 @@ export async function GET() {
   try { await requireRole(MODS_RELATORIOS); }
   catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
+  // Só OPs ativas (exclui encerradas/canceladas) — são as que ainda rendem relatório de status.
   const ops = await prisma.oP.findMany({
+    where: { status: { notIn: ["ENCERRADA", "CANCELADA"] } },
     orderBy: { createdAt: "desc" },
     take: 800,
-    select: { id: true, numero: true, cliente: true, obra: true },
+    select: { id: true, numero: true, cliente: true, obra: true, status: true },
   });
   return NextResponse.json({ success: true, ops });
 }
