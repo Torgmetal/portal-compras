@@ -151,10 +151,10 @@ export default function CustoHoraClient() {
             <thead className="bg-gray-50/60">
               <tr className="text-left text-xs font-medium text-gray-500 uppercase">
                 <th className="px-3 py-2">Setor</th>
-                <th className="px-3 py-2 text-right">Salários/mês</th>
+                <th className="px-3 py-2 text-right">Salários (R$/mês)</th>
                 <th className="px-3 py-2 text-right">Pessoas</th>
                 <th className="px-3 py-2 text-right">Horas/mês</th>
-                <th className="px-3 py-2 text-right">CIF direto</th>
+                <th className="px-3 py-2 text-right">CIF (R$/mês)</th>
                 <th className="px-3 py-2 text-right">MOD</th>
                 <th className="px-3 py-2 text-right">Overhead</th>
                 <th className="px-3 py-2 text-right">Custo/mês</th>
@@ -193,6 +193,7 @@ export default function CustoHoraClient() {
         <p><strong>Como calcula:</strong> MOD = salários × fator de encargos. Overhead/ADM = custo total − custos diretos (resíduo), rateado pelo critério escolhido.</p>
         <p>Custo-hora = (MOD + CIF + overhead alocado) ÷ horas produtivas do setor. Preço-hora = custo-hora × (1 + margem).</p>
         <p>Horas produtivas ≈ postos × horas/dia × dias úteis × ocupação (60–85%, nunca 100%).</p>
+        <p><strong>CIF (R$/mês)</strong> é o custo indireto do setor por mês (energia/consumíveis/depreciação da máquina) — valor em reais, não %. Opcional: se deixar 0, entra no overhead rateado.</p>
       </div>
     </div>
   );
