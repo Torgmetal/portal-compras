@@ -1395,6 +1395,10 @@ model OrcamentoServico {
   valor         Float?
   observacoes   String?
   diasPagamento Int? // dias p/ pagamento na proposta (default 15 se vazio)
+  revisao       Int      @default(0) // revisão atual (R00, R01…)
+  revisoes      Json     @default("[]") // histórico: [{ num, data, motivo }]
+  enviadoEm     DateTime? // 1º envio ao cliente
+  envios        Json     @default("[]") // log de envios: [{ data, para, cc, revisao, porNome }]
   opId          String?
   criadoPorId   String?
   criadoPorNome String?

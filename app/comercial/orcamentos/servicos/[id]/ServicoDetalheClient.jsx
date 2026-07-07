@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
 import { precoHoraDoServico } from "@/lib/custo-hora-calc";
@@ -9,6 +9,8 @@ import { precoHoraDoServico } from "@/lib/custo-hora-calc";
 const os = (n) => (n ? `OS-${String(n).padStart(3, "0")}` : "—");
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 const CAT_LABEL = { VIGAS_W: "Vigas W", PERFIS_HP: "Perfis HP" };
+const MSG_PADRAO = "Agradecemos a oportunidade de apresentar nossa proposta. A Torg Metal une precisão, prazo e qualidade certificada para entregar o melhor resultado ao seu projeto — e teremos muita satisfação em avançar com você. Ficamos à disposição para alinhar os detalhes e seguir juntos.";
+const rNum = (n) => "R" + String(n || 0).padStart(2, "0");
 const num = (v) => Number(v) || 0;
 const fmtKg = (v) => num(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " kg";
 const fmtH = (min) => { const m = Math.round(num(min)); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
@@ -29,6 +31,18 @@ export default function ServicoDetalheClient({ id }) {
   const [telefone, setTelefone] = useState("");
   const [endereco, setEndereco] = useState("");
   const [diasPagamento, setDiasPagamento] = useState("");
+  const [revisao, setRevisao] = useState(0);
+  const [revisoes, setRevisoes] = useState([]);
+  const [enviadoEm, setEnviadoEm] = useState(null);
+  const [emailsTorg, setEmailsTorg] = useState([]);
+  const [modalEnvio, setModalEnvio] = useState(false);
+  const [envDest, setEnvDest] = useState("");
+  const [envCc, setEnvCc] = useState([]);
+  const [envMsg, setEnvMsg] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [modalRev, setModalRev] = useState(false);
+  const [motivoRev, setMotivoRev] = useState("");
+  const [criandoRev, setCriandoRev] = useState(false);
   const [servSel, setServSel] = useState([]);
   const [status, setStatus] = useState("RASCUNHO");
   const [obs, setObs] = useState("");
@@ -59,6 +73,7 @@ export default function ServicoDetalheClient({ id }) {
       setNumero(o.numero || null); setCliente(o.cliente || ""); setObra(o.obra || ""); setContato(o.contato || "");
       setEmail(o.email || ""); setTelefone(o.telefone || ""); setEndereco(o.endereco || "");
       setDiasPagamento(o.diasPagamento ?? "");
+      setRevisao(o.revisao || 0); setRevisoes(Array.isArray(o.revisoes) ? o.revisoes : []); setEnviadoEm(o.enviadoEm || null);
       setServSel(Array.isArray(o.servicos) ? o.servicos : []); setStatus(o.status || "RASCUNHO"); setObs(o.observacoes || "");
       setComposicao(o.composicao && typeof o.composicao === "object" ? o.composicao : {});
       setArquivos(Array.isArray(o.arquivos) ? o.arquivos : []);
@@ -70,6 +85,7 @@ export default function ServicoDetalheClient({ id }) {
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => { fetch("/api/relatorios/emails").then((r) => r.json()).then((d) => { if (d?.success) setEmailsTorg(d.emails || []); }).catch(() => {}); }, []);
 
   useEffect(() => { if (aba !== "dados" && aba !== "arquivos" && aba !== "resumo" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
 
@@ -165,9 +181,41 @@ export default function ServicoDetalheClient({ id }) {
   const custoBaseResumo = chMargem > 0 ? baseComMargem / (1 + chMargem / 100) : baseComMargem;
   const margemRs = baseComMargem - custoBaseResumo;
 
+  const numeroPtcLocal = `PTC-${String(numero || 0).padStart(3, "0")}-26-${rNum(revisao)}`;
+
   const baixarProposta = (formato) => {
     if (dirty) { showToast("Salve o orçamento antes de gerar a proposta", "error"); return; }
     window.location.href = `/api/comercial/orcamento-servico/${id}/proposta?formato=${formato}`;
+  };
+
+  const abrirEnvio = () => {
+    if (dirty) { showToast("Salve o orçamento antes de enviar", "error"); return; }
+    if (!servSel.length) { showToast("Selecione ao menos um serviço", "error"); return; }
+    setEnvDest(email || ""); setEnvMsg(MSG_PADRAO); setEnvCc([]); setModalEnvio(true);
+  };
+  const toggleCc = (em) => setEnvCc((p) => (p.includes(em) ? p.filter((x) => x !== em) : [...p, em]));
+  const enviarProposta = async () => {
+    if (!envDest.trim()) { showToast("Informe o e-mail do cliente", "error"); return; }
+    setEnviando(true);
+    try {
+      const r = await fetch(`/api/comercial/orcamento-servico/${id}/enviar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ para: envDest.trim(), cc: envCc, mensagem: envMsg }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao enviar");
+      setStatus("ENVIADO"); setEnviadoEm(d.orcamento?.enviadoEm || new Date().toISOString());
+      if (d.orcamento?.revisoes) setRevisoes(d.orcamento.revisoes);
+      setModalEnvio(false); showToast("Proposta enviada ao cliente", "success");
+    } catch (e) { showToast(e.message, "error"); } finally { setEnviando(false); }
+  };
+  const criarRevisao = async () => {
+    if (motivoRev.trim().length < 3) { showToast("Descreva o que foi revisado", "error"); return; }
+    setCriandoRev(true);
+    try {
+      const r = await fetch(`/api/comercial/orcamento-servico/${id}/revisao`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ motivo: motivoRev.trim() }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao registrar a revisão");
+      setRevisao(d.revisao); if (d.orcamento?.revisoes) setRevisoes(d.orcamento.revisoes);
+      setMotivoRev(""); setModalRev(false); showToast(`Revisão ${rNum(d.revisao)} registrada`, "success");
+    } catch (e) { showToast(e.message, "error"); } finally { setCriandoRev(false); }
   };
 
   if (carregando) return <div className="py-20 text-center text-torg-gray"><Loader2 size={30} className="mx-auto animate-spin mb-2" /> Carregando...</div>;
@@ -446,11 +494,77 @@ export default function ServicoDetalheClient({ id }) {
             </div>
           </div>
 
-          <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
-            <div className="text-sm text-torg-dark">Gere a <strong>prévia da proposta</strong> (padrão PTC) pra conferir antes de enviar ao cliente.</div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button type="button" onClick={() => baixarProposta("docx")} className="px-4 py-2 border border-torg-blue/30 text-torg-blue text-sm rounded-lg font-medium inline-flex items-center gap-2 hover:bg-torg-blue-50"><FileText size={15} /> Word</button>
-              <button type="button" onClick={() => baixarProposta("pdf")} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 hover:bg-torg-blue/90"><FileText size={15} /> Baixar PDF (prévia)</button>
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
+            <div className="flex items-start justify-between flex-wrap gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-torg-dark">Proposta {numeroPtcLocal}</h4>
+                <p className="text-xs text-torg-gray mt-0.5">{enviadoEm ? `Enviada ao cliente em ${new Date(enviadoEm).toLocaleDateString("pt-BR")} · revisão atual ${rNum(revisao)}` : "Ainda não enviada — gere a prévia e confira antes."}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button type="button" onClick={() => baixarProposta("docx")} className="px-3 py-2 border border-gray-200 text-torg-gray text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:border-torg-blue hover:text-torg-blue"><FileText size={15} /> Word</button>
+                <button type="button" onClick={() => baixarProposta("pdf")} className="px-3 py-2 border border-torg-blue/30 text-torg-blue text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-blue-50"><FileText size={15} /> PDF (prévia)</button>
+                {enviadoEm && <button type="button" onClick={() => setModalRev(true)} className="px-3 py-2 border border-amber-300 text-amber-700 text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-amber-50"><RefreshCw size={15} /> Criar revisão</button>}
+                <button type="button" onClick={abrirEnvio} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-orange/90"><Send size={15} /> {enviadoEm ? "Reenviar ao cliente" : "Enviar ao cliente"}</button>
+              </div>
+            </div>
+            {revisoes.length > 1 && (
+              <div className="border-t border-gray-100 pt-3">
+                <div className="text-[11px] text-torg-gray uppercase mb-1">Histórico de revisões</div>
+                <div className="space-y-1">
+                  {revisoes.map((r, i) => (
+                    <div key={i} className="text-xs text-torg-dark flex gap-2"><span className="font-semibold tabular-nums w-8 shrink-0">{rNum(r.num)}</span><span className="text-torg-gray w-20 shrink-0">{r.data ? new Date(r.data).toLocaleDateString("pt-BR") : ""}</span><span>{r.motivo}</span></div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {modalEnvio && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !enviando && setModalEnvio(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-torg-dark mb-3 flex items-center gap-2"><Send size={18} className="text-torg-orange" /> Enviar proposta ao cliente</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-torg-gray">E-mail do cliente</label>
+                <input value={envDest} onChange={(e) => setEnvDest(e.target.value)} placeholder="cliente@empresa.com" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" />
+              </div>
+              <div>
+                <label className="text-xs text-torg-gray">Cópia (comercial Torg)</label>
+                <div className="mt-1 border border-gray-200 rounded-lg max-h-32 overflow-y-auto divide-y divide-gray-50">
+                  {emailsTorg.length === 0 ? <div className="px-3 py-2 text-xs text-torg-gray">Nenhum e-mail carregado.</div> : emailsTorg.map((u) => (
+                    <label key={u.email} className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50">
+                      <input type="checkbox" checked={envCc.includes(u.email)} onChange={() => toggleCc(u.email)} className="accent-torg-blue" />
+                      <span className="text-torg-dark">{u.nome}</span><span className="text-torg-gray truncate">{u.email}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-torg-gray">Mensagem ao cliente</label>
+                <textarea value={envMsg} onChange={(e) => setEnvMsg(e.target.value)} rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue resize-y" />
+              </div>
+              <p className="text-[11px] text-torg-gray">Anexo <strong>{numeroPtcLocal}.pdf</strong>, enviado por "Torg Metal - Comercial". Assunto com o nº e a revisão.</p>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setModalEnvio(false)} disabled={enviando} className="px-4 py-2 text-sm text-torg-gray rounded-lg hover:bg-gray-100">Cancelar</button>
+              <button onClick={enviarProposta} disabled={enviando} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 disabled:opacity-50">{enviando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalRev && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !criandoRev && setModalRev(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-torg-dark mb-1 flex items-center gap-2"><RefreshCw size={18} className="text-amber-600" /> Criar revisão {rNum(revisao + 1)}</h3>
+            <p className="text-xs text-torg-gray mb-3">Registre o que mudou (fica no histórico e na tabela de revisões da proposta). Correção pequena antes de reenviar não precisa de revisão — é só reenviar.</p>
+            <label className="text-xs text-torg-gray">O que foi revisado? *</label>
+            <textarea value={motivoRev} onChange={(e) => setMotivoRev(e.target.value)} rows={3} placeholder="ex.: Ajuste do preço do corte conforme negociação" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue resize-y" />
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setModalRev(false)} disabled={criandoRev} className="px-4 py-2 text-sm text-torg-gray rounded-lg hover:bg-gray-100">Cancelar</button>
+              <button onClick={criarRevisao} disabled={criandoRev} className="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 disabled:opacity-50">{criandoRev ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} Registrar revisão</button>
             </div>
           </div>
         </div>
