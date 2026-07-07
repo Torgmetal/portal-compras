@@ -54,6 +54,8 @@ export default function RelatorioEditorClient({ id }) {
   const [mensagem, setMensagem] = useState("");
   const [torgEmails, setTorgEmails] = useState([]);
   const [enviando, setEnviando] = useState(false);
+  const [aceite, setAceite] = useState(null);
+  const [enviosHist, setEnviosHist] = useState([]);
 
   const marcar = () => setDirty(true);
 
@@ -68,6 +70,8 @@ export default function RelatorioEditorClient({ id }) {
       setOpNumero(rel.opNumero || ""); setResumo(rel.resumo || ""); setStatus(rel.status || "RASCUNHO");
       setBlocos((Array.isArray(rel.blocos) ? rel.blocos : []).map((b) => ({ id: b.id || uid(), titulo: b.titulo || "", descricao: b.descricao || "", fotos: Array.isArray(b.fotos) ? b.fotos : [] })));
       setClienteEmailOp(d.clienteEmailOp || "");
+      setAceite(rel.aceitoEm ? { em: rel.aceitoEm, nome: rel.aceitoNome } : null);
+      setEnviosHist(Array.isArray(rel.envios) ? rel.envios : []);
       setDirty(false);
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [id]);
@@ -188,6 +192,17 @@ export default function RelatorioEditorClient({ id }) {
           </button>
         </div>
       </div>
+
+      {(enviosHist.length > 0 || aceite) && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-2.5 text-xs text-torg-gray flex items-center gap-x-4 gap-y-1 flex-wrap">
+          {enviosHist.length > 0 && <span>📤 Enviado ao cliente {enviosHist.length}× · último {new Date(enviosHist[enviosHist.length - 1].em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>}
+          {aceite ? (
+            <span className="inline-flex items-center gap-1 text-green-700 font-medium"><CheckCircle2 size={13} /> Aceito por {aceite.nome} em {new Date(aceite.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+          ) : enviosHist.length > 0 ? (
+            <span className="text-amber-600 font-medium">aguardando aceite do cliente</span>
+          ) : null}
+        </div>
+      )}
 
       {/* Identificação */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">

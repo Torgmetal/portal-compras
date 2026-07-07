@@ -9,6 +9,7 @@ import {
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 import MateriaisOPSection from "@/components/MateriaisOPSection";
+import RelatoriosOPSection from "@/components/RelatoriosOPSection";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import { fmtOP } from "@/lib/utils";
@@ -702,6 +703,9 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           ))}
         </div>
       )}
+
+      {/* Relatórios de Status enviados ao cliente (rastreio) */}
+      <RelatoriosOPSection opId={op.id} />
 
       {/* Histórico */}
       {(op.revisoes.length > 0 || op.ajustesPrazo.length > 0) && (

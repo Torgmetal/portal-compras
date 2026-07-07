@@ -18,20 +18,23 @@ const createSchema = z.object({
   obra: z.string().optional().nullable(),
 });
 
-export async function GET() {
+export async function GET(req) {
   try { await requireRole(MODS_RELATORIOS); }
   catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
+  const opId = new URL(req.url).searchParams.get("opId"); // filtra por OP (painel do Comercial)
   const rows = await prisma.relatorioStatus.findMany({
+    where: opId ? { opId } : undefined,
     orderBy: { createdAt: "desc" },
     take: 300,
-    select: { id: true, titulo: true, cliente: true, obra: true, opNumero: true, status: true, criadoPorNome: true, createdAt: true, updatedAt: true, blocos: true },
+    select: { id: true, titulo: true, cliente: true, obra: true, opNumero: true, status: true, criadoPorNome: true, createdAt: true, updatedAt: true, blocos: true, aceitoEm: true, aceitoNome: true, token: true, envios: true },
   });
   const relatorios = rows.map((r) => {
     const blocos = Array.isArray(r.blocos) ? r.blocos : [];
     const nFotos = blocos.reduce((a, b) => a + (Array.isArray(b?.fotos) ? b.fotos.length : 0), 0);
-    const { blocos: _omit, ...rest } = r;
-    return { ...rest, nBlocos: blocos.length, nFotos };
+    const envios = Array.isArray(r.envios) ? r.envios : [];
+    const { blocos: _b, envios: _e, ...rest } = r;
+    return { ...rest, nBlocos: blocos.length, nFotos, envios, nEnvios: envios.length, ultimoEnvio: envios.length ? envios[envios.length - 1].em : null };
   });
   return NextResponse.json({ success: true, relatorios });
 }
