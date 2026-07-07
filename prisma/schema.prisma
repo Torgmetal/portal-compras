@@ -1376,6 +1376,28 @@ model RelatorioStatus {
   @@index([opId])
 }
 
+// Orçamento de Serviço (Comercial → Central de Orçamentos) — separado do
+// Orcamento de estrutura. servicos = JSON de chaves (CORTE_FURACAO, JATEAMENTO,
+// PINTURA, SOLDA). Criado por SQL; abas da proposta virão depois.
+model OrcamentoServico {
+  id            String   @id @default(cuid())
+  numero        Int? // sequencial (OS-001)
+  cliente       String
+  obra          String?
+  contato       String?
+  servicos      Json     @default("[]")
+  status        String   @default("RASCUNHO")
+  valor         Float?
+  observacoes   String?
+  opId          String?
+  criadoPorId   String?
+  criadoPorNome String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
 // Portal da Qualidade — Módulo 1 (Controle de Documentos). Espelha o padrão dos
 // documentos de RH (arquivo no Blob privado + backup ISO no SharePoint + proxy
 // de download), com camada de VALIDAÇÃO da informação e amarração a norma +
