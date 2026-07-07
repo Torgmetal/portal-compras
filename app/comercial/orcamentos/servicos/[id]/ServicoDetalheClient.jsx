@@ -165,6 +165,11 @@ export default function ServicoDetalheClient({ id }) {
   const custoBaseResumo = chMargem > 0 ? baseComMargem / (1 + chMargem / 100) : baseComMargem;
   const margemRs = baseComMargem - custoBaseResumo;
 
+  const baixarProposta = (formato) => {
+    if (dirty) { showToast("Salve o orçamento antes de gerar a proposta", "error"); return; }
+    window.location.href = `/api/comercial/orcamento-servico/${id}/proposta?formato=${formato}`;
+  };
+
   if (carregando) return <div className="py-20 text-center text-torg-gray"><Loader2 size={30} className="mx-auto animate-spin mb-2" /> Carregando...</div>;
   if (erro) return (
     <div className="py-20 text-center">
@@ -442,8 +447,11 @@ export default function ServicoDetalheClient({ id }) {
           </div>
 
           <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
-            <div className="text-sm text-torg-dark">Gerar a <strong>proposta em Word</strong> no padrão Torg (PTC), com destinatário, descrição e a tabela de preços já preenchidos.</div>
-            <button type="button" onClick={() => { if (dirty) { showToast("Salve o orçamento antes de gerar a proposta", "error"); return; } window.location.href = `/api/comercial/orcamento-servico/${id}/proposta`; }} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 hover:bg-torg-blue/90 shrink-0"><FileText size={15} /> Gerar proposta (.docx)</button>
+            <div className="text-sm text-torg-dark">Gere a <strong>prévia da proposta</strong> (padrão PTC) pra conferir antes de enviar ao cliente.</div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button type="button" onClick={() => baixarProposta("docx")} className="px-4 py-2 border border-torg-blue/30 text-torg-blue text-sm rounded-lg font-medium inline-flex items-center gap-2 hover:bg-torg-blue-50"><FileText size={15} /> Word</button>
+              <button type="button" onClick={() => baixarProposta("pdf")} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 hover:bg-torg-blue/90"><FileText size={15} /> Baixar PDF (prévia)</button>
+            </div>
           </div>
         </div>
       )}
