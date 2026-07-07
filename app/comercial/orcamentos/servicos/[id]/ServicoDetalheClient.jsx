@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
 
@@ -11,6 +11,7 @@ const CAT_LABEL = { VIGAS_W: "Vigas W", PERFIS_HP: "Perfis HP" };
 const num = (v) => Number(v) || 0;
 const fmtKg = (v) => num(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " kg";
 const fmtH = (min) => { const m = Math.round(num(min)); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
+const fmtBRL = (v) => num(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pesoLinha = (l) => num(l.pesoKgM) * num(l.comprimento) * num(l.qtdBarras);
 const tempoLinha = (l) => num(l.tempoMinBarra) * num(l.qtdBarras);
 
@@ -64,7 +65,7 @@ export default function ServicoDetalheClient({ id }) {
     try {
       const r = await fetch(`/api/comercial/orcamento-servico/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, servicos: servSel, status, observacoes: obs || null, composicao }),
+        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, servicos: servSel, status, observacoes: obs || null, composicao, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao salvar");
@@ -88,6 +89,10 @@ export default function ServicoDetalheClient({ id }) {
   const perfisPorCat = perfis.reduce((acc, p) => { (acc[p.categoria] = acc[p.categoria] || []).push(p); return acc; }, {});
   const cfPesoTotal = cfLinhas.reduce((a, l) => a + pesoLinha(l), 0);
   const cfTempoTotal = cfLinhas.reduce((a, l) => a + tempoLinha(l), 0);
+  const cfValorHora = num(composicao?.CORTE_FURACAO?.valorHora);
+  const setCfValorHora = (v) => { setComposicao((p) => ({ ...p, CORTE_FURACAO: { ...(p.CORTE_FURACAO || {}), valorHora: v } })); marcar(); };
+  const custoCf = (cfTempoTotal / 60) * cfValorHora; // tempo total (h) × R$/hora
+  const custoTotal = custoCf; // soma dos serviços (por ora só corte/furação)
 
   if (carregando) return <div className="py-20 text-center text-torg-gray"><Loader2 size={30} className="mx-auto animate-spin mb-2" /> Carregando...</div>;
   if (erro) return (
@@ -217,6 +222,27 @@ export default function ServicoDetalheClient({ id }) {
             <Plus size={16} /> Adicionar perfil
           </button>
           <p className="text-xs text-torg-gray">Peso = kg/m do perfil × comprimento × qtd de barras. O <strong>tempo médio (min/barra)</strong> você informa a partir da programação da máquina.</p>
+
+          {/* Custos — valor por hora sobre o tempo total */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mt-2">
+            <h4 className="text-sm font-semibold text-torg-dark mb-3 flex items-center gap-2"><DollarSign size={16} className="text-torg-blue" /> Custo do corte / furação</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+              <div>
+                <label className="text-xs text-torg-gray">Valor por hora (R$/h)</label>
+                <input type="number" step="0.01" value={cfValorHora || ""} onChange={(e) => setCfValorHora(e.target.value === "" ? 0 : Number(e.target.value))} placeholder="0,00"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+              </div>
+              <div>
+                <label className="text-xs text-torg-gray">Tempo total</label>
+                <div className="text-lg font-semibold text-torg-dark mt-1 tabular-nums">{fmtH(cfTempoTotal)} <span className="text-xs text-torg-gray font-normal">({(cfTempoTotal / 60).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} h)</span></div>
+              </div>
+              <div className="sm:text-right">
+                <label className="text-xs text-torg-gray">Custo</label>
+                <div className="text-2xl font-extrabold text-torg-blue mt-0.5 tabular-nums">{fmtBRL(custoCf)}</div>
+              </div>
+            </div>
+            <p className="text-xs text-torg-gray mt-3">Custo = tempo total (h) × valor por hora. Peso total do lote: <strong>{fmtKg(cfPesoTotal)}</strong>.</p>
+          </div>
         </div>
       )}
 
