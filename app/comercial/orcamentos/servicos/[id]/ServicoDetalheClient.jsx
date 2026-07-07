@@ -197,7 +197,7 @@ export default function ServicoDetalheClient({ id }) {
       {aba === "arquivos" && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><FolderUp size={18} className="text-torg-blue" /> Arquivos do cliente</h3>
-          <p className="text-sm text-torg-gray mb-3">Desenhos, listas, especificações e o que o cliente enviar (PDF, DWG, DXF, XLSX, imagens…).</p>
+          <p className="text-sm text-torg-gray mb-3">Desenhos, listas, modelos e o que o cliente enviar — PDF, DWG, DXF, <strong>IGS/IGES</strong>, STEP, XLSX, imagens, ZIP. Até 50 MB por arquivo; pode selecionar vários de uma vez.</p>
           {arquivos.length > 0 && (
             <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg mb-3">
               {arquivos.map((a, i) => (

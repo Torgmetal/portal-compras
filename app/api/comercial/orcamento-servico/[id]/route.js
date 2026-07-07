@@ -24,7 +24,7 @@ const updateSchema = z.object({
     nome: z.string().max(300).optional().default(""),
     tamanho: z.number().nonnegative().optional(),
     tipo: z.string().max(120).optional().default(""),
-  })).max(60).optional(),
+  })).max(400).optional(),
 });
 
 export async function GET(_req, { params }) {

@@ -104,8 +104,13 @@ export async function POST(req) {
   // CAD files frequentemente chegam como octet-stream — aceitar se a extensao bater
   const fallbackOctetStream =
     mimeType === "application/octet-stream" && extensaoPermitida;
+  // CAD e compactados: o browser inventa o MIME (model/iges, application/iges,
+  // application/step, application/x-step, etc.). Pra essas extensoes a EXTENSAO
+  // manda — nenhuma delas é executável/servível como script, então é seguro.
+  const EXTENSOES_POR_EXTENSAO = ["dwg", "dxf", "step", "stp", "iges", "igs", "zip", "rar", "7z"];
+  const fallbackPorExtensao = extensaoPermitida && EXTENSOES_POR_EXTENSAO.includes(extensao);
 
-  if (!extensaoPermitida || (!mimePermitido && !fallbackOctetStream)) {
+  if (!extensaoPermitida || (!mimePermitido && !fallbackOctetStream && !fallbackPorExtensao)) {
     return NextResponse.json(
       {
         error:
