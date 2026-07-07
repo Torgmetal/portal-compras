@@ -128,6 +128,9 @@ export default function ServicoDetalheClient({ id }) {
   const setCfMetodo = (m) => { setComposicao((p) => ({ ...p, CORTE_FURACAO: { ...(p.CORTE_FURACAO || {}), metodoPreco: m } })); marcar(); };
   const cfPrecoKg = num(composicao?.CORTE_FURACAO?.precoKg);
   const setCfPrecoKg = (v) => { setComposicao((p) => ({ ...p, CORTE_FURACAO: { ...(p.CORTE_FURACAO || {}), precoKg: v } })); marcar(); };
+  const setCfCampo = (campo, valor) => { setComposicao((p) => ({ ...p, CORTE_FURACAO: { ...(p.CORTE_FURACAO || {}), [campo]: valor } })); marcar(); };
+  const cfMaterial = composicao?.CORTE_FURACAO?.material || "";
+  const cfEspessura = composicao?.CORTE_FURACAO?.espessura || "";
   const custoPorHora = (cfTempoTotal / 60) * cfValorHora; // tempo (h) × R$/h
   const custoPorKg = cfPesoTotal * cfPrecoKg;             // peso (kg) × R$/kg
   const custoCf = cfMetodo === "KG" ? custoPorKg : custoPorHora;
@@ -319,6 +322,15 @@ export default function ServicoDetalheClient({ id }) {
           </button>
           <p className="text-xs text-torg-gray">Peso = kg/m do perfil × comprimento × qtd de barras. O <strong>tempo médio (min/barra)</strong> você informa a partir da programação da máquina.</p>
 
+          {/* Descrição técnica — vai pra proposta */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mt-2">
+            <h4 className="text-sm font-semibold text-torg-dark mb-3 flex items-center gap-2"><FileText size={16} className="text-torg-blue" /> Descrição técnica <span className="text-xs font-normal text-torg-gray">(vai pra proposta)</span></h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div><label className="text-xs text-torg-gray">Material</label><input value={cfMaterial} onChange={(e) => setCfCampo("material", e.target.value)} placeholder="ex.: Aço ASTM A36" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" /></div>
+              <div><label className="text-xs text-torg-gray">Espessura</label><input value={cfEspessura} onChange={(e) => setCfCampo("espessura", e.target.value)} placeholder='ex.: 9,5 mm ou 3/8"' className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" /></div>
+            </div>
+          </div>
+
           {/* Custos — por hora ou por kg */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mt-2">
             <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
@@ -418,7 +430,7 @@ export default function ServicoDetalheClient({ id }) {
 
           <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
             <div className="text-sm text-torg-dark">Gerar a <strong>proposta em Word</strong> no padrão Torg (PTC), com destinatário, descrição e a tabela de preços já preenchidos.</div>
-            <button type="button" disabled title="Em construção" className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 opacity-50 cursor-not-allowed"><FileText size={15} /> Gerar proposta (.docx) — em breve</button>
+            <button type="button" onClick={() => { if (dirty) { showToast("Salve o orçamento antes de gerar a proposta", "error"); return; } window.location.href = `/api/comercial/orcamento-servico/${id}/proposta`; }} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 hover:bg-torg-blue/90 shrink-0"><FileText size={15} /> Gerar proposta (.docx)</button>
           </div>
         </div>
       )}
