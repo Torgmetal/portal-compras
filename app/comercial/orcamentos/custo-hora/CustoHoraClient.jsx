@@ -41,14 +41,14 @@ export default function CustoHoraClient() {
       setMargem(c.margemPct ?? 30);
       setImpostosVenda(c.impostosVendaPct ?? 15);
       setHorasDia(c.horasDia ?? 8.75); setDiasUteis(c.diasUteis ?? 22); setOcupacao(c.ocupacaoPct ?? 8);
-      setSetores((Array.isArray(c.setores) ? c.setores : []).map((s) => ({ id: s.id || uid(), nome: s.nome || "", empresa: s.empresa || "", salarios: s.salarios ?? 0, mod: s.mod ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: s.cifDireto ?? 0 })));
+      setSetores((Array.isArray(c.setores) ? c.setores : []).map((s) => ({ id: s.id || uid(), nome: s.nome || "", empresa: s.empresa || "", faturaHora: s.faturaHora !== false, salarios: s.salarios ?? 0, mod: s.mod ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: s.cifDireto ?? 0 })));
       setDirty(false);
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
   const setSetor = (i, campo, valor) => { setSetores((p) => p.map((s, idx) => (idx === i ? { ...s, [campo]: valor } : s))); marcar(); };
-  const addSetor = () => { setSetores((p) => [...p, { id: uid(), nome: "", empresa: "", salarios: 0, mod: 0, headcount: 0, horasMes: 0, cifDireto: 0 }]); marcar(); };
+  const addSetor = () => { setSetores((p) => [...p, { id: uid(), nome: "", empresa: "", faturaHora: true, salarios: 0, mod: 0, headcount: 0, horasMes: 0, cifDireto: 0 }]); marcar(); };
   const rmSetor = (i) => { setSetores((p) => p.filter((_, idx) => idx !== i)); marcar(); };
 
   const importarCet = async (file) => {
@@ -59,7 +59,7 @@ export default function CustoHoraClient() {
       const r = await fetch("/api/comercial/custo-hora/importar", { method: "POST", body: fd });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao importar");
-      setSetores((d.setores || []).map((s) => ({ id: uid(), nome: s.nome || "", empresa: s.empresa || "", salarios: s.salarios ?? 0, mod: s.mod ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: 0 })));
+      setSetores((d.setores || []).map((s) => ({ id: uid(), nome: s.nome || "", empresa: s.empresa || "", faturaHora: s.faturaHora !== false, salarios: s.salarios ?? 0, mod: s.mod ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: 0 })));
       marcar();
       showToast(`${(d.setores || []).length} setores importados · CET total ${fmtBRL0(d.cetTotal)}`, "success");
     } catch (e) { showToast(e.message, "error"); }
@@ -78,7 +78,7 @@ export default function CustoHoraClient() {
         horasDia: num(horasDia) || 8.75,
         diasUteis: num(diasUteis) || 22,
         ocupacaoPct: num(ocupacao) || 80,
-        setores: setores.map((s) => ({ id: s.id, nome: s.nome, empresa: s.empresa || "", salarios: num(s.salarios), mod: num(s.mod), headcount: num(s.headcount), horasMes: num(s.horasMes), cifDireto: num(s.cifDireto) })),
+        setores: setores.map((s) => ({ id: s.id, nome: s.nome, empresa: s.empresa || "", faturaHora: s.faturaHora !== false, salarios: num(s.salarios), mod: num(s.mod), headcount: num(s.headcount), horasMes: num(s.horasMes), cifDireto: num(s.cifDireto) })),
       };
       const r = await fetch("/api/comercial/custo-hora", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const d = await r.json();
@@ -90,26 +90,32 @@ export default function CustoHoraClient() {
   // ─── Cálculo ao vivo ───
   const f = num(fator);
   const horasPorPessoa = num(horasDia) * num(diasUteis) * (1 - num(ocupacao) / 100);
+  const fatura = (s) => s.faturaHora !== false; // fábrica/externa faturam hora; ADM/apoio = overhead (rateado)
   const horasMes = (s) => (num(s.horasMes) > 0 ? num(s.horasMes) : num(s.headcount) * horasPorPessoa);
   const mod = (s) => (num(s.mod) > 0 ? num(s.mod) : num(s.salarios) * f); // CET real (importado) ou salários × fator
   const modTotal = setores.reduce((a, s) => a + mod(s), 0);
   const cifTotal = setores.reduce((a, s) => a + num(s.cifDireto), 0);
-  const diretoTotal = modTotal + cifTotal;
-  const overheadTotal = Math.max(0, num(custoTotal) - diretoTotal);
-  const hcTotal = setores.reduce((a, s) => a + num(s.headcount), 0);
-  const horasTotal = setores.reduce((a, s) => a + horasMes(s), 0);
+  // Overhead a ratear = custo total − diretos DOS SETORES QUE FATURAM. Assim o
+  // custo do apoio (ADM) e toda a estrutura entram no rateio dos que vendem hora.
+  const billableDireto = setores.reduce((a, s) => a + (fatura(s) ? mod(s) + num(s.cifDireto) : 0), 0);
+  const overheadTotal = Math.max(0, num(custoTotal) - billableDireto);
+  // Pesos do rateio: só entre os setores que faturam.
+  const modBill = setores.reduce((a, s) => a + (fatura(s) ? mod(s) : 0), 0);
+  const hcBill = setores.reduce((a, s) => a + (fatura(s) ? num(s.headcount) : 0), 0);
+  const horasBill = setores.reduce((a, s) => a + (fatura(s) ? horasMes(s) : 0), 0);
   const peso = (s) => {
-    if (criterio === "HEADCOUNT") return hcTotal ? num(s.headcount) / hcTotal : 0;
-    if (criterio === "HORAS") return horasTotal ? horasMes(s) / horasTotal : 0;
-    return modTotal ? mod(s) / modTotal : 0;
+    if (!fatura(s)) return 0;
+    if (criterio === "HEADCOUNT") return hcBill ? num(s.headcount) / hcBill : 0;
+    if (criterio === "HORAS") return horasBill ? horasMes(s) / horasBill : 0;
+    return modBill ? mod(s) / modBill : 0;
   };
-  const overheadAloc = (s) => overheadTotal * peso(s);
+  const overheadAloc = (s) => (fatura(s) ? overheadTotal * peso(s) : 0);
   const custoMes = (s) => mod(s) + num(s.cifDireto) + overheadAloc(s);
-  const custoHora = (s) => (horasMes(s) > 0 ? custoMes(s) / horasMes(s) : 0);
+  const custoHora = (s) => (fatura(s) && horasMes(s) > 0 ? custoMes(s) / horasMes(s) : 0);
   const imp = Math.min(89, num(impostosVenda)) / 100;
-  const precoHora = (s) => (custoHora(s) * (1 + num(margem) / 100)) / (1 - imp);
-  const custoAlocadoTotal = setores.reduce((a, s) => a + custoMes(s), 0);
-  const faltaAlocar = num(custoTotal) - custoAlocadoTotal;
+  const precoHora = (s) => (fatura(s) ? (custoHora(s) * (1 + num(margem) / 100)) / (1 - imp) : 0);
+  const custoAlocadoTotal = setores.reduce((a, s) => a + (fatura(s) ? custoMes(s) : 0), 0);
+  const overheadSetoresTotal = setores.reduce((a, s) => a + (fatura(s) ? 0 : mod(s) + num(s.cifDireto)), 0);
 
   if (carregando) return <div className="py-20 text-center text-torg-gray"><Loader2 size={30} className="mx-auto animate-spin mb-2" /> Carregando...</div>;
   if (erro) return (
@@ -190,12 +196,12 @@ export default function CustoHoraClient() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-100 text-sm">
           <div><div className="text-[11px] text-torg-gray uppercase">MOD (c/ encargos)</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(modTotal)}</div></div>
           <div><div className="text-[11px] text-torg-gray uppercase">CIF direto</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(cifTotal)}</div></div>
-          <div><div className="text-[11px] text-torg-gray uppercase">Overhead / ADM a ratear</div><div className="font-semibold text-torg-blue tabular-nums">{fmtBRL0(overheadTotal)}</div><div className="text-[10px] text-torg-gray">resíduo (total − diretos)</div></div>
-          <div><div className="text-[11px] text-torg-gray uppercase">Alocado</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(custoAlocadoTotal)}</div></div>
+          <div><div className="text-[11px] text-torg-gray uppercase">Overhead a ratear</div><div className="font-semibold text-torg-blue tabular-nums">{fmtBRL0(overheadTotal)}</div><div className="text-[10px] text-torg-gray">ADM ({fmtBRL0(overheadSetoresTotal)}) + estrutura</div></div>
+          <div><div className="text-[11px] text-torg-gray uppercase">Alocado nos que faturam</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(custoAlocadoTotal)}</div></div>
         </div>
-        {num(custoTotal) > 0 && diretoTotal > num(custoTotal) && (
+        {num(custoTotal) > 0 && billableDireto > num(custoTotal) && (
           <div className="mt-3 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 flex items-start gap-2">
-            <Info size={14} className="mt-0.5 shrink-0" /> Os custos diretos ({fmtBRL0(diretoTotal)}) já passam do total mensal ({fmtBRL0(num(custoTotal))}). Reveja os salários/encargos ou o custo total — o overhead ficou zero.
+            <Info size={14} className="mt-0.5 shrink-0" /> Os diretos dos setores que faturam ({fmtBRL0(billableDireto)}) já passam do total mensal ({fmtBRL0(num(custoTotal))}). Reveja o custo total ou os setores marcados como "fatura" — o overhead ficou zero.
           </div>
         )}
       </div>
@@ -208,6 +214,7 @@ export default function CustoHoraClient() {
               <tr className="text-left text-xs font-medium text-gray-500 uppercase">
                 <th className="px-3 py-2">Setor</th>
                 <th className="px-3 py-2">Tipo</th>
+                <th className="px-3 py-2 text-center">Fatura?</th>
                 <th className="px-3 py-2 text-right">Salários (R$/mês)</th>
                 <th className="px-3 py-2 text-right">Pessoas</th>
                 <th className="px-3 py-2 text-right">Horas/mês</th>
@@ -222,20 +229,21 @@ export default function CustoHoraClient() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {setores.length === 0 ? (
-                <tr><td colSpan={12} className="px-3 py-6 text-center text-torg-gray text-sm">Nenhum setor. Importe a auditoria (CET) ou adicione abaixo.</td></tr>
+                <tr><td colSpan={13} className="px-3 py-6 text-center text-torg-gray text-sm">Nenhum setor. Importe a auditoria (CET) ou adicione abaixo.</td></tr>
               ) : setores.map((s, i) => (
-                <tr key={s.id}>
+                <tr key={s.id} className={fatura(s) ? "" : "bg-gray-50/50 text-torg-gray"}>
                   <td className="px-3 py-1.5"><input value={s.nome} onChange={(e) => setSetor(i, "nome", e.target.value)} placeholder="Setor" className="w-36 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue" /></td>
                   <td className="px-3 py-1.5 text-xs text-torg-gray">{s.empresa || "—"}</td>
+                  <td className="px-3 py-1.5 text-center"><input type="checkbox" checked={fatura(s)} onChange={(e) => setSetor(i, "faturaHora", e.target.checked)} title="Marcado = setor que fatura hora (fábrica/externa). Desmarque para tratar como overhead (ADM/apoio), rateado nos que faturam." className="accent-torg-blue w-4 h-4 cursor-pointer" /></td>
                   <td className="px-3 py-1.5 text-right"><input type="number" step="100" value={s.salarios} onChange={(e) => setSetor(i, "salarios", e.target.value)} className="w-28 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                   <td className="px-3 py-1.5 text-right"><input type="number" step="1" value={s.headcount} onChange={(e) => setSetor(i, "headcount", e.target.value)} className="w-16 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                   <td className="px-3 py-1.5 text-right"><input type="number" step="10" value={s.horasMes || ""} onChange={(e) => setSetor(i, "horasMes", e.target.value)} placeholder={String(Math.round(num(s.headcount) * horasPorPessoa))} title="Horas/mês lançadas manualmente. Vazio = estimativa por pessoas × jornada." className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue placeholder:text-gray-300" /></td>
                   <td className="px-3 py-1.5 text-right"><input type="number" step="100" value={s.cifDireto} onChange={(e) => setSetor(i, "cifDireto", e.target.value)} className="w-24 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                   <td className="px-3 py-1.5 text-right tabular-nums text-torg-gray">{fmtBRL0(mod(s))}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums text-torg-gray">{fmtBRL0(overheadAloc(s))}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums text-torg-dark font-medium">{fmtBRL0(custoMes(s))}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-torg-dark bg-torg-blue-50/40">{fmtBRL(custoHora(s))}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums font-extrabold text-torg-blue bg-torg-blue-50/40">{fmtBRL(precoHora(s))}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-torg-gray">{fatura(s) ? fmtBRL0(overheadAloc(s)) : "—"}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-torg-dark font-medium">{fatura(s) ? fmtBRL0(custoMes(s)) : "—"}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums font-semibold text-torg-dark bg-torg-blue-50/40">{fatura(s) ? fmtBRL(custoHora(s)) : "—"}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums font-extrabold text-torg-blue bg-torg-blue-50/40">{fatura(s) ? fmtBRL(precoHora(s)) : "—"}</td>
                   <td className="px-3 py-1.5 text-center"><button onClick={() => rmSetor(i)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button></td>
                 </tr>
               ))}
@@ -248,7 +256,7 @@ export default function CustoHoraClient() {
       </button>
 
       <div className="text-xs text-torg-gray space-y-1">
-        <p><strong>Como calcula:</strong> MOD = <strong>CET real</strong> (quando importado da auditoria) ou salários × fator de encargos. Overhead/ADM = custo total − custos diretos (resíduo), rateado pelo critério escolhido.</p>
+        <p><strong>Como calcula:</strong> MOD = <strong>CET real</strong> (importado) ou salários × fator. Só os setores marcados em <strong>"Fatura?"</strong> ganham custo/preço-hora; o custo dos <strong>não marcados (ADM/apoio)</strong> + a estrutura vira <strong>overhead</strong>, rateado nos que faturam pelo critério escolhido. Assim a hora vendida carrega a empresa inteira.</p>
         <p><strong>Importar auditoria:</strong> lê a aba "Custo Efetivo" e agrupa (Torg + VMI = uma empresa): setores de fábrica separados, <strong>Montagem externa</strong> à parte (não é fábrica) e todo o apoio em <strong>ADM</strong>. Traz CET real e nº de pessoas; as <strong>horas você lança na mão</strong>. Depois revise e <strong>Salve</strong>.</p>
         <p>Custo-hora = (MOD + CIF + overhead) ÷ horas do setor — já inclui tudo do custo total mensal (salários, encargos, ADM). <strong>Preço-hora = custo-hora × (1 + margem de lucro) ÷ (1 − impostos de venda)</strong>: a margem é lucro puro e os impostos (ISS/PIS/COFINS) saem por cima da venda.</p>
         <p>Horas/mês do setor são <strong>manuais</strong> — digite na coluna Horas/mês. Se deixar vazio, entra a estimativa <strong>pessoas × horas/dia × dias úteis × (1 − absenteísmo)</strong> (ajuste a jornada e o absenteísmo acima).</p>

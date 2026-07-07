@@ -33,6 +33,7 @@ const setorSchema = z.object({
   id: z.string(),
   nome: z.string().max(120),
   empresa: z.string().max(80).optional().default(""),
+  faturaHora: z.boolean().optional().default(true), // false = overhead (ADM/apoio), rateado nos que faturam
   salarios: z.number().nonnegative().default(0),
   mod: z.number().nonnegative().optional().default(0), // CET real (importado); se >0, é usado no lugar de salários×fator
   headcount: z.number().nonnegative().default(0),
