@@ -1394,6 +1394,7 @@ model OrcamentoServico {
   status        String   @default("RASCUNHO")
   valor         Float?
   observacoes   String?
+  diasPagamento Int? // dias p/ pagamento na proposta (default 15 se vazio)
   opId          String?
   criadoPorId   String?
   criadoPorNome String?

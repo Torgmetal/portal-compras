@@ -28,6 +28,7 @@ export default function ServicoDetalheClient({ id }) {
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [endereco, setEndereco] = useState("");
+  const [diasPagamento, setDiasPagamento] = useState("");
   const [servSel, setServSel] = useState([]);
   const [status, setStatus] = useState("RASCUNHO");
   const [obs, setObs] = useState("");
@@ -57,6 +58,7 @@ export default function ServicoDetalheClient({ id }) {
       const o = d.orcamento;
       setNumero(o.numero || null); setCliente(o.cliente || ""); setObra(o.obra || ""); setContato(o.contato || "");
       setEmail(o.email || ""); setTelefone(o.telefone || ""); setEndereco(o.endereco || "");
+      setDiasPagamento(o.diasPagamento ?? "");
       setServSel(Array.isArray(o.servicos) ? o.servicos : []); setStatus(o.status || "RASCUNHO"); setObs(o.observacoes || "");
       setComposicao(o.composicao && typeof o.composicao === "object" ? o.composicao : {});
       setArquivos(Array.isArray(o.arquivos) ? o.arquivos : []);
@@ -98,7 +100,7 @@ export default function ServicoDetalheClient({ id }) {
     try {
       const r = await fetch(`/api/comercial/orcamento-servico/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, email: email || null, telefone: telefone || null, endereco: endereco || null, servicos: servSel, status, observacoes: obs || null, composicao, arquivos, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
+        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, email: email || null, telefone: telefone || null, endereco: endereco || null, diasPagamento: diasPagamento === "" ? null : Number(diasPagamento), servicos: servSel, status, observacoes: obs || null, composicao, arquivos, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao salvar");
@@ -426,6 +428,17 @@ export default function ServicoDetalheClient({ id }) {
               <div><div className="text-[11px] text-torg-gray uppercase">Preço de venda</div><div className="font-extrabold text-torg-blue tabular-nums">{fmtBRL(valorProposta)}</div></div>
             </div>
             <p className="text-[11px] text-torg-gray mt-3">Margem e impostos já vêm embutidos no valor/hora (ou R$/kg) do custo-hora — todos os impostos inclusos (lucro real). Esta é a prévia que vai pra proposta.</p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h4 className="text-sm font-semibold text-torg-dark mb-3">Condições da proposta</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="text-xs text-torg-gray">Dias para pagamento</label>
+                <input type="number" step="1" value={diasPagamento} onChange={(e) => { setDiasPagamento(e.target.value); marcar(); }} placeholder="15" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+                <p className="text-[10px] text-torg-gray mt-1">vai pra proposta (padrão 15)</p>
+              </div>
+            </div>
           </div>
 
           <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
