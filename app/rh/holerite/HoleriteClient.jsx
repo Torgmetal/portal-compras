@@ -83,6 +83,7 @@ export default function HoleriteClient() {
   const [disparando, setDisparando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
   const [anexarPdf, setAnexarPdf] = useState(true);
+  const [filaWa, setFilaWa] = useState(null); // { itens:[{id,nome,telefone}], idx, semTel:[nomes], enviados:Set }
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro("");
@@ -238,6 +239,28 @@ export default function HoleriteClient() {
     return `https://wa.me/${full}?text=${txt}`;
   };
 
+  // Fila de avisos por WhatsApp: holerites ainda não confirmados, separando quem
+  // tem telefone (entra na fila) de quem não tem. O RH abre um a um, do próprio nº.
+  const abrirFilaWa = () => {
+    const naoConfirmados = holerites.filter((h) => h.status !== "CONFIRMADO");
+    const itens = naoConfirmados
+      .filter((h) => (h.funcionario?.telefone || "").replace(/\D/g, ""))
+      .map((h) => ({ id: h.id, nome: h.funcionario.nome, telefone: h.funcionario.telefone }));
+    const semTel = naoConfirmados
+      .filter((h) => !(h.funcionario?.telefone || "").replace(/\D/g, ""))
+      .map((h) => h.funcionario?.nome || "—");
+    if (itens.length === 0) { showToast("Nenhum funcionário pendente com telefone cadastrado", "error"); return; }
+    setFilaWa({ itens, idx: 0, semTel, enviados: new Set() });
+  };
+  const enviarAtualWa = () => {
+    if (!filaWa) return;
+    const atual = filaWa.itens[filaWa.idx];
+    const link = waLink(atual.telefone, atual.nome);
+    if (link) window.open(link, "_blank", "noopener");
+    setFilaWa((f) => ({ ...f, enviados: new Set(f.enviados).add(atual.id), idx: f.idx + 1 }));
+  };
+  const pularWa = () => setFilaWa((f) => (f ? { ...f, idx: f.idx + 1 } : f));
+
   // Colisão remanescente: mesmo funcionário + mesmo tipo em 2+ páginas (não
   // coexistem no banco). Trava o Confirmar até o RH dar tipos diferentes.
   const chaveCont = {};
@@ -375,6 +398,11 @@ export default function HoleriteClient() {
               className="px-3 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50">
               {disparando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Disparar pendentes
             </button>
+            <button onClick={abrirFilaWa} disabled={holerites.length === 0}
+              className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 disabled:opacity-50"
+              title="Avisar os funcionários por WhatsApp, um a um, do seu próprio número">
+              <MessageCircle size={15} /> WhatsApp em massa
+            </button>
             {holerites.length > 0 && (
               <button onClick={cancelarImportacao} disabled={cancelando}
                 className="px-3 py-2 bg-white border border-red-200 text-red-600 text-sm rounded-lg hover:bg-red-50 font-medium flex items-center gap-2 disabled:opacity-50"
@@ -439,6 +467,71 @@ export default function HoleriteClient() {
           </div>
         )}
       </div>
+
+      {/* Fila "WhatsApp em massa" — abre um a um, do próprio número do RH */}
+      {filaWa && (() => {
+        const total = filaWa.itens.length;
+        const fim = filaWa.idx >= total;
+        const atual = fim ? null : filaWa.itens[filaWa.idx];
+        const enviados = filaWa.enviados.size;
+        return (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-torg-dark flex items-center gap-2"><MessageCircle size={18} className="text-green-600" /> WhatsApp em massa</h3>
+                <button onClick={() => setFilaWa(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+              </div>
+
+              <div className="p-5">
+                {fim ? (
+                  <div className="text-center py-2">
+                    <CheckCircle2 size={40} className="mx-auto text-green-500 mb-2" />
+                    <p className="text-torg-dark font-semibold">Fila concluída</p>
+                    <p className="text-sm text-torg-gray mt-1">{enviados} de {total} avisados por WhatsApp.</p>
+                    {filaWa.semTel.length > 0 && (
+                      <p className="text-xs text-torg-gray mt-2">{filaWa.semTel.length} sem telefone cadastrado (não entraram na fila).</p>
+                    )}
+                    <button onClick={() => setFilaWa(null)} className="mt-4 px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium">Concluir</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between text-xs text-torg-gray mb-1">
+                      <span>{filaWa.idx + 1} de {total}</span>
+                      <span>{enviados} enviado(s)</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-4">
+                      <div className="h-full bg-green-500 transition-all" style={{ width: `${(filaWa.idx / total) * 100}%` }} />
+                    </div>
+
+                    <div className="bg-gray-50 rounded-xl p-4 text-center">
+                      <p className="text-lg font-bold text-torg-dark">{atual.nome}</p>
+                      <p className="text-sm text-torg-gray tabular-nums">{atual.telefone}</p>
+                    </div>
+
+                    <p className="text-xs text-torg-gray mt-3 text-center">
+                      Abre o <span className="font-medium">seu</span> WhatsApp com a mensagem pronta. É só clicar em enviar lá e voltar aqui.
+                    </p>
+
+                    <div className="flex items-center gap-2 mt-4">
+                      <button onClick={pularWa}
+                        className="px-4 py-2.5 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50 font-medium">
+                        Pular
+                      </button>
+                      <button onClick={enviarAtualWa}
+                        className="flex-1 px-4 py-2.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-semibold inline-flex items-center justify-center gap-2">
+                        <MessageCircle size={16} /> Abrir WhatsApp e avançar
+                      </button>
+                    </div>
+                    {filaWa.semTel.length > 0 && (
+                      <p className="text-[11px] text-torg-gray mt-3 text-center">{filaWa.semTel.length} funcionário(s) sem telefone serão pulados.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
