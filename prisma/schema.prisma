@@ -1385,6 +1385,9 @@ model OrcamentoServico {
   cliente       String
   obra          String?
   contato       String?
+  email         String?
+  telefone      String?
+  endereco      String?
   servicos      Json     @default("[]")
   composicao    Json     @default("{}") // por serviço: { CORTE_FURACAO: { linhas: [...] }, ... }
   arquivos      Json     @default("[]") // arquivos do cliente: [{ url, nome, tamanho, tipo }]

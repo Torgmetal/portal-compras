@@ -11,6 +11,9 @@ const updateSchema = z.object({
   cliente: z.string().trim().min(2).max(200).optional(),
   obra: z.string().max(200).nullable().optional(),
   contato: z.string().max(200).nullable().optional(),
+  email: z.string().max(200).nullable().optional(),
+  telefone: z.string().max(80).nullable().optional(),
+  endereco: z.string().max(400).nullable().optional(),
   servicos: z.array(z.string()).min(1).refine((a) => a.every((s) => SERVICO_KEYS.includes(s)), "Serviço inválido").optional(),
   status: z.enum(["RASCUNHO", "ENVIADO", "FECHADO", "PERDIDO"]).optional(),
   valor: z.number().nonnegative().nullable().optional(),
@@ -48,7 +51,7 @@ export async function PATCH(req, { params }) {
 
   const d = parsed.data;
   const data = {};
-  for (const k of ["cliente", "obra", "contato", "servicos", "status", "valor", "observacoes", "composicao", "arquivos"]) {
+  for (const k of ["cliente", "obra", "contato", "email", "telefone", "endereco", "servicos", "status", "valor", "observacoes", "composicao", "arquivos"]) {
     if (k in d) data[k] = d[k];
   }
   const os = await prisma.orcamentoServico.update({ where: { id: params.id }, data });

@@ -24,6 +24,9 @@ export default function ServicoDetalheClient({ id }) {
   const [cliente, setCliente] = useState("");
   const [obra, setObra] = useState("");
   const [contato, setContato] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [endereco, setEndereco] = useState("");
   const [servSel, setServSel] = useState([]);
   const [status, setStatus] = useState("RASCUNHO");
   const [obs, setObs] = useState("");
@@ -49,6 +52,7 @@ export default function ServicoDetalheClient({ id }) {
       if (!r1.ok) throw new Error(d.error || "Falha ao carregar");
       const o = d.orcamento;
       setNumero(o.numero || null); setCliente(o.cliente || ""); setObra(o.obra || ""); setContato(o.contato || "");
+      setEmail(o.email || ""); setTelefone(o.telefone || ""); setEndereco(o.endereco || "");
       setServSel(Array.isArray(o.servicos) ? o.servicos : []); setStatus(o.status || "RASCUNHO"); setObs(o.observacoes || "");
       setComposicao(o.composicao && typeof o.composicao === "object" ? o.composicao : {});
       setArquivos(Array.isArray(o.arquivos) ? o.arquivos : []);
@@ -88,7 +92,7 @@ export default function ServicoDetalheClient({ id }) {
     try {
       const r = await fetch(`/api/comercial/orcamento-servico/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, servicos: servSel, status, observacoes: obs || null, composicao, arquivos, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
+        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, email: email || null, telefone: telefone || null, endereco: endereco || null, servicos: servSel, status, observacoes: obs || null, composicao, arquivos, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao salvar");
@@ -166,6 +170,9 @@ export default function ServicoDetalheClient({ id }) {
             <div><label className="text-xs text-torg-gray">Cliente</label><input value={cliente} onChange={(e) => { setCliente(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" /></div>
             <div><label className="text-xs text-torg-gray">Obra</label><input value={obra} onChange={(e) => { setObra(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" /></div>
             <div><label className="text-xs text-torg-gray">Contato</label><input value={contato} onChange={(e) => { setContato(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" /></div>
+            <div><label className="text-xs text-torg-gray">E-mail</label><input type="email" value={email} onChange={(e) => { setEmail(e.target.value); marcar(); }} placeholder="cliente@empresa.com" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" /></div>
+            <div><label className="text-xs text-torg-gray">Telefone</label><input value={telefone} onChange={(e) => { setTelefone(e.target.value); marcar(); }} placeholder="(19) 99999-9999" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" /></div>
+            <div className="sm:col-span-3"><label className="text-xs text-torg-gray">Endereço</label><input value={endereco} onChange={(e) => { setEndereco(e.target.value); marcar(); }} placeholder="Rua, nº, bairro, cidade/UF" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" /></div>
           </div>
           <div>
             <label className="text-xs text-torg-gray">Serviços</label>

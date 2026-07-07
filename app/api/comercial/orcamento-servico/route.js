@@ -13,6 +13,9 @@ const createSchema = z.object({
   cliente: z.string().trim().min(2, "Informe o cliente").max(200),
   obra: z.string().max(200).nullable().optional(),
   contato: z.string().max(200).nullable().optional(),
+  email: z.string().max(200).nullable().optional(),
+  telefone: z.string().max(80).nullable().optional(),
+  endereco: z.string().max(400).nullable().optional(),
   servicos: z.array(z.string()).min(1, "Selecione ao menos um serviço").refine((a) => a.every((s) => SERVICO_KEYS.includes(s)), "Serviço inválido"),
   observacoes: z.string().max(4000).nullable().optional(),
 });
@@ -41,6 +44,7 @@ export async function POST(req) {
   const os = await prisma.orcamentoServico.create({
     data: {
       numero, cliente: d.cliente, obra: d.obra || null, contato: d.contato || null,
+      email: d.email || null, telefone: d.telefone || null, endereco: d.endereco || null,
       servicos: d.servicos, observacoes: d.observacoes || null,
       criadoPorId: user.id, criadoPorNome: user.name || null,
     },
