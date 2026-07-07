@@ -1409,6 +1409,9 @@ model ConfigCustoHora {
   custoTotalMensal  Float?
   criterioRateio    String   @default("MOD") // MOD | HEADCOUNT | HORAS
   margemPct         Float    @default(30)
+  horasDia          Float    @default(8) // jornada: horas/dia × dias × ocupação = horas produtivas/pessoa
+  diasUteis         Float    @default(22)
+  ocupacaoPct       Float    @default(80)
   setores           Json     @default("[]")
   atualizadoPorNome String?
   updatedAt         DateTime @updatedAt @default(now())
