@@ -1405,8 +1405,9 @@ model OrcamentoServico {
 
 // Configuração de custo-hora por setor (Comercial) — base do "valor por hora"
 // das propostas de serviço. Singleton (id="default"). setores = JSON
-// [{ id, nome, salarios, headcount, horasMes, cifDireto }]. O overhead/ADM é
-// derivado pelo resíduo: custoTotalMensal − MOD − CIF.
+// [{ id, nome, empresa, faturaHora, salarios, mod, headcount, horasMes, cifDireto }].
+// Overhead a ratear = folha dos setores que NÃO faturam (ADM) + outrosCustos
+// (custos operacionais não-folha da DRE: material auxiliar, energia, gás, etc.).
 model ConfigCustoHora {
   id                String   @id
   fatorEncargos     Float    @default(1.8)
@@ -1418,6 +1419,7 @@ model ConfigCustoHora {
   diasUteis         Float    @default(22)
   ocupacaoPct       Float    @default(8) // absenteísmo % (faltas) — horas = pessoas × hd × dias × (1 − ocupacaoPct/100)
   setores           Json     @default("[]")
+  outrosCustos      Json     @default("[]") // overhead não-folha: [{ id, nome, valor }] (R$/mês)
   atualizadoPorNome String?
   updatedAt         DateTime @updatedAt @default(now())
 }

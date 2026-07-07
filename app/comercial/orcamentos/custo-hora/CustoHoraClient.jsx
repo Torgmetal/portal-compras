@@ -8,6 +8,27 @@ const fmtBRL = (v) => num(v).toLocaleString("pt-BR", { style: "currency", curren
 const fmtBRL0 = (v) => num(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 
+// Sugestão de custos operacionais NÃO-folha, tirada da DRE Alvo 2026 (sem folha,
+// sem matéria-prima, sem hospedagem, sem capex/financeiro). Valores R$/mês.
+const SEED_OUTROS_DRE = [
+  { nome: "Material auxiliar", valor: 30000 },
+  { nome: "Gás (equipamento)", valor: 25000 },
+  { nome: "Energia elétrica — fábrica", valor: 35000 },
+  { nome: "Ferramentas", valor: 5000 },
+  { nome: "Aluguel equipamento produção + empilhadeira", valor: 14000 },
+  { nome: "Aluguéis (imóvel, veículos, equip. montagem/TI)", valor: 44800 },
+  { nome: "Manutenções (equip., software, imóvel, rede, veículos)", valor: 55740 },
+  { nome: "Prestadores (consultoria, advogado, contabilidade, seg. trabalho)", valor: 43000 },
+  { nome: "Utilidades (energia escritório, água, telefone, combustível)", valor: 15200 },
+  { nome: "Materiais (escritório, limpeza, EPI)", valor: 12500 },
+  { nome: "Seguros (incêndio, predial, engenharia)", valor: 4800 },
+  { nome: "Marketing", valor: 2250 },
+  { nome: "Impostos/taxas (IPVA, IPTU, contribuição, despachante)", valor: 3500 },
+  { nome: "Bancárias + pedágio", valor: 1700 },
+  { nome: "Refeições (ADM)", valor: 4000 },
+  { nome: "Outros — acertos de funcionários", valor: 10000 },
+];
+
 export default function CustoHoraClient() {
   const { showToast } = useStore();
   const [carregando, setCarregando] = useState(true);
@@ -21,6 +42,7 @@ export default function CustoHoraClient() {
   const [diasUteis, setDiasUteis] = useState(22);
   const [ocupacao, setOcupacao] = useState(8);
   const [setores, setSetores] = useState([]);
+  const [outrosCustos, setOutrosCustos] = useState([]);
   const [dirty, setDirty] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [importando, setImportando] = useState(false);
@@ -42,6 +64,7 @@ export default function CustoHoraClient() {
       setImpostosVenda(c.impostosVendaPct ?? 15);
       setHorasDia(c.horasDia ?? 8.75); setDiasUteis(c.diasUteis ?? 22); setOcupacao(c.ocupacaoPct ?? 8);
       setSetores((Array.isArray(c.setores) ? c.setores : []).map((s) => ({ id: s.id || uid(), nome: s.nome || "", empresa: s.empresa || "", faturaHora: s.faturaHora !== false, salarios: s.salarios ?? 0, mod: s.mod ?? 0, headcount: s.headcount ?? 0, horasMes: s.horasMes ?? 0, cifDireto: s.cifDireto ?? 0 })));
+      setOutrosCustos((Array.isArray(c.outrosCustos) ? c.outrosCustos : []).map((x) => ({ id: x.id || uid(), nome: x.nome || "", valor: x.valor ?? 0 })));
       setDirty(false);
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, []);
@@ -66,12 +89,17 @@ export default function CustoHoraClient() {
     finally { setImportando(false); }
   };
 
+  const addOutro = () => { setOutrosCustos((p) => [...p, { id: uid(), nome: "", valor: 0 }]); marcar(); };
+  const setOutro = (i, campo, valor) => { setOutrosCustos((p) => p.map((c, idx) => (idx === i ? { ...c, [campo]: valor } : c))); marcar(); };
+  const rmOutro = (i) => { setOutrosCustos((p) => p.filter((_, idx) => idx !== i)); marcar(); };
+  const sugerirOutros = () => { setOutrosCustos(SEED_OUTROS_DRE.map((c) => ({ id: uid(), nome: c.nome, valor: c.valor }))); marcar(); showToast("Custos da DRE preenchidos — revise e Salve", "success"); };
+
   const salvar = async () => {
     setSalvando(true);
     try {
       const payload = {
         fatorEncargos: num(fator) || 1,
-        custoTotalMensal: custoTotal === "" || custoTotal === null ? null : num(custoTotal),
+        custoTotalMensal: Math.round(custoTotalCalc),
         criterioRateio: criterio,
         margemPct: num(margem),
         impostosVendaPct: num(impostosVenda),
@@ -79,6 +107,7 @@ export default function CustoHoraClient() {
         diasUteis: num(diasUteis) || 22,
         ocupacaoPct: num(ocupacao) || 80,
         setores: setores.map((s) => ({ id: s.id, nome: s.nome, empresa: s.empresa || "", faturaHora: s.faturaHora !== false, salarios: num(s.salarios), mod: num(s.mod), headcount: num(s.headcount), horasMes: num(s.horasMes), cifDireto: num(s.cifDireto) })),
+        outrosCustos: outrosCustos.map((c) => ({ id: c.id, nome: c.nome, valor: num(c.valor) })),
       };
       const r = await fetch("/api/comercial/custo-hora", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const d = await r.json();
@@ -95,10 +124,12 @@ export default function CustoHoraClient() {
   const mod = (s) => (num(s.mod) > 0 ? num(s.mod) : num(s.salarios) * f); // CET real (importado) ou salários × fator
   const modTotal = setores.reduce((a, s) => a + mod(s), 0);
   const cifTotal = setores.reduce((a, s) => a + num(s.cifDireto), 0);
-  // Overhead a ratear = custo total − diretos DOS SETORES QUE FATURAM. Assim o
-  // custo do apoio (ADM) e toda a estrutura entram no rateio dos que vendem hora.
-  const billableDireto = setores.reduce((a, s) => a + (fatura(s) ? mod(s) + num(s.cifDireto) : 0), 0);
-  const overheadTotal = Math.max(0, num(custoTotal) - billableDireto);
+  // Overhead a ratear = folha dos setores que NÃO faturam (ADM) + custos
+  // operacionais não-folha (outrosCustos, da DRE). Tudo isso é diluído nos
+  // setores que vendem hora.
+  const overheadFolha = setores.reduce((a, s) => a + (fatura(s) ? 0 : mod(s) + num(s.cifDireto)), 0);
+  const outrosTotal = outrosCustos.reduce((a, c) => a + num(c.valor), 0);
+  const overheadTotal = overheadFolha + outrosTotal;
   // Pesos do rateio: só entre os setores que faturam.
   const modBill = setores.reduce((a, s) => a + (fatura(s) ? mod(s) : 0), 0);
   const hcBill = setores.reduce((a, s) => a + (fatura(s) ? num(s.headcount) : 0), 0);
@@ -115,7 +146,7 @@ export default function CustoHoraClient() {
   const imp = Math.min(89, num(impostosVenda)) / 100;
   const precoHora = (s) => (fatura(s) ? (custoHora(s) * (1 + num(margem) / 100)) / (1 - imp) : 0);
   const custoAlocadoTotal = setores.reduce((a, s) => a + (fatura(s) ? custoMes(s) : 0), 0);
-  const overheadSetoresTotal = setores.reduce((a, s) => a + (fatura(s) ? 0 : mod(s) + num(s.cifDireto)), 0);
+  const custoTotalCalc = modTotal + cifTotal + outrosTotal; // custo mensal total a recuperar nas horas faturáveis
 
   if (carregando) return <div className="py-20 text-center text-torg-gray"><Loader2 size={30} className="mx-auto animate-spin mb-2" /> Carregando...</div>;
   if (erro) return (
@@ -146,16 +177,11 @@ export default function CustoHoraClient() {
 
       {/* Parâmetros */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <label className="text-xs text-torg-gray">Fator de encargos</label>
             <input type="number" step="0.01" value={fator} onChange={(e) => { setFator(e.target.value); marcar(); }} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
             <p className="text-[10px] text-torg-gray mt-1">Lucro Real ≈ 1,7–1,8</p>
-          </div>
-          <div>
-            <label className="text-xs text-torg-gray">Custo total mensal (R$)</label>
-            <input type="number" step="1000" value={custoTotal} onChange={(e) => { setCustoTotal(e.target.value); marcar(); }} placeholder="1500000" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
-            <p className="text-[10px] text-torg-gray mt-1">Toda a estrutura</p>
           </div>
           <div>
             <label className="text-xs text-torg-gray">Ratear ADM/overhead por</label>
@@ -193,17 +219,13 @@ export default function CustoHoraClient() {
         </div>
         <p className="text-[11px] text-torg-gray mt-1">Horas/mês são <strong>lançadas manualmente</strong> por setor. Vazio usa a estimativa de <strong>{Math.round(horasPorPessoa)} h/pessoa</strong> (horas/dia × dias úteis × (1 − absenteísmo)) como sugestão.</p>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-100 text-sm">
-          <div><div className="text-[11px] text-torg-gray uppercase">MOD (c/ encargos)</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(modTotal)}</div></div>
-          <div><div className="text-[11px] text-torg-gray uppercase">CIF direto</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(cifTotal)}</div></div>
-          <div><div className="text-[11px] text-torg-gray uppercase">Overhead a ratear</div><div className="font-semibold text-torg-blue tabular-nums">{fmtBRL0(overheadTotal)}</div><div className="text-[10px] text-torg-gray">ADM ({fmtBRL0(overheadSetoresTotal)}) + estrutura</div></div>
-          <div><div className="text-[11px] text-torg-gray uppercase">Alocado nos que faturam</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(custoAlocadoTotal)}</div></div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-4 border-t border-gray-100 text-sm">
+          <div><div className="text-[11px] text-torg-gray uppercase">MOD (folha, c/ enc.)</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(modTotal)}</div></div>
+          <div><div className="text-[11px] text-torg-gray uppercase">Outros custos (DRE)</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(outrosTotal)}</div></div>
+          <div><div className="text-[11px] text-torg-gray uppercase">Overhead a ratear</div><div className="font-semibold text-torg-blue tabular-nums">{fmtBRL0(overheadTotal)}</div><div className="text-[10px] text-torg-gray">ADM folha ({fmtBRL0(overheadFolha)}) + outros</div></div>
+          <div><div className="text-[11px] text-torg-gray uppercase">Custo total/mês</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(custoTotalCalc)}</div></div>
+          <div><div className="text-[11px] text-torg-gray uppercase">Alocado</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(custoAlocadoTotal)}</div></div>
         </div>
-        {num(custoTotal) > 0 && billableDireto > num(custoTotal) && (
-          <div className="mt-3 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 flex items-start gap-2">
-            <Info size={14} className="mt-0.5 shrink-0" /> Os diretos dos setores que faturam ({fmtBRL0(billableDireto)}) já passam do total mensal ({fmtBRL0(num(custoTotal))}). Reveja o custo total ou os setores marcados como "fatura" — o overhead ficou zero.
-          </div>
-        )}
       </div>
 
       {/* Setores */}
@@ -255,10 +277,37 @@ export default function CustoHoraClient() {
         <Plus size={16} /> Adicionar setor
       </button>
 
+      {/* Outros custos operacionais (overhead não-folha) */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+          <h3 className="text-base font-semibold text-torg-dark flex items-center gap-2"><Info size={16} className="text-torg-blue" /> Outros custos operacionais (overhead)</h3>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-torg-gray">Total: <strong className="text-torg-dark tabular-nums">{fmtBRL0(outrosTotal)}/mês</strong></span>
+            <button onClick={sugerirOutros} className="text-xs text-torg-blue border border-torg-blue/30 rounded-lg px-2.5 py-1.5 hover:bg-torg-blue-50 font-medium">Sugerir da DRE</button>
+          </div>
+        </div>
+        <p className="text-xs text-torg-gray mb-3">Custos <strong>não-folha</strong> da estrutura (material auxiliar, energia, gás, aluguéis, manutenção…). Entram no overhead rateado nos setores que faturam. <strong>Sem folha, sem matéria-prima, sem capex</strong> (já tratados à parte).</p>
+        {outrosCustos.length > 0 && (
+          <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg mb-3">
+            {outrosCustos.map((c, i) => (
+              <div key={c.id} className="flex items-center gap-2 px-3 py-1.5">
+                <input value={c.nome} onChange={(e) => setOutro(i, "nome", e.target.value)} placeholder="Descrição do custo" className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue" />
+                <input type="number" step="100" value={c.valor} onChange={(e) => setOutro(i, "valor", e.target.value)} className="w-32 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" />
+                <span className="text-[11px] text-torg-gray w-8">/mês</span>
+                <button onClick={() => rmOutro(i)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={addOutro} className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-torg-gray hover:border-torg-blue hover:text-torg-blue text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors">
+          <Plus size={15} /> Adicionar custo
+        </button>
+      </div>
+
       <div className="text-xs text-torg-gray space-y-1">
-        <p><strong>Como calcula:</strong> MOD = <strong>CET real</strong> (importado) ou salários × fator. Só os setores marcados em <strong>"Fatura?"</strong> ganham custo/preço-hora; o custo dos <strong>não marcados (ADM/apoio)</strong> + a estrutura vira <strong>overhead</strong>, rateado nos que faturam pelo critério escolhido. Assim a hora vendida carrega a empresa inteira.</p>
+        <p><strong>Como calcula:</strong> MOD = <strong>CET real</strong> (importado) ou salários × fator. Só os setores marcados em <strong>"Fatura?"</strong> ganham custo/preço-hora. O <strong>overhead a ratear</strong> = folha dos setores que não faturam (ADM) + os <strong>outros custos operacionais</strong> acima — rateado nos que faturam pelo critério escolhido. Assim a hora vendida carrega a empresa inteira.</p>
         <p><strong>Importar auditoria:</strong> lê a aba "Custo Efetivo" e agrupa (Torg + VMI = uma empresa): setores de fábrica separados, <strong>Montagem externa</strong> à parte (não é fábrica) e todo o apoio em <strong>ADM</strong>. Traz CET real e nº de pessoas; as <strong>horas você lança na mão</strong>. Depois revise e <strong>Salve</strong>.</p>
-        <p>Custo-hora = (MOD + CIF + overhead) ÷ horas do setor — já inclui tudo do custo total mensal (salários, encargos, ADM). <strong>Preço-hora = custo-hora × (1 + margem de lucro) ÷ (1 − impostos de venda)</strong>: a margem é lucro puro e os impostos (ISS/PIS/COFINS) saem por cima da venda.</p>
+        <p>Custo-hora = (MOD + CIF + overhead) ÷ horas do setor — já inclui folha, ADM e os outros custos operacionais. <strong>Preço-hora = custo-hora × (1 + margem de lucro) ÷ (1 − impostos de venda)</strong>: a margem é lucro puro e os impostos (ISS/PIS/COFINS) saem por cima da venda.</p>
         <p>Horas/mês do setor são <strong>manuais</strong> — digite na coluna Horas/mês. Se deixar vazio, entra a estimativa <strong>pessoas × horas/dia × dias úteis × (1 − absenteísmo)</strong> (ajuste a jornada e o absenteísmo acima).</p>
         <p><strong>CIF (R$/mês)</strong> é o custo indireto do setor por mês (energia/consumíveis/depreciação da máquina) — valor em reais, não %. Opcional: se deixar 0, entra no overhead rateado.</p>
       </div>

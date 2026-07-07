@@ -50,6 +50,12 @@ const schema = z.object({
   diasUteis: z.number().min(1).max(31).default(22),
   ocupacaoPct: z.number().min(0).max(100).default(8),
   setores: z.array(setorSchema).max(50),
+  // Overhead não-folha (custos operacionais da DRE): material auxiliar, energia, gás, aluguéis, etc.
+  outrosCustos: z.array(z.object({
+    id: z.string(),
+    nome: z.string().max(120),
+    valor: z.number().nonnegative().default(0),
+  })).max(80).optional().default([]),
 });
 
 export async function PUT(req) {
@@ -62,7 +68,7 @@ export async function PUT(req) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
   const d = parsed.data;
-  const dados = { fatorEncargos: d.fatorEncargos, custoTotalMensal: d.custoTotalMensal ?? null, criterioRateio: d.criterioRateio, margemPct: d.margemPct, impostosVendaPct: d.impostosVendaPct, horasDia: d.horasDia, diasUteis: d.diasUteis, ocupacaoPct: d.ocupacaoPct, setores: d.setores, atualizadoPorNome: user.name || null };
+  const dados = { fatorEncargos: d.fatorEncargos, custoTotalMensal: d.custoTotalMensal ?? null, criterioRateio: d.criterioRateio, margemPct: d.margemPct, impostosVendaPct: d.impostosVendaPct, horasDia: d.horasDia, diasUteis: d.diasUteis, ocupacaoPct: d.ocupacaoPct, setores: d.setores, outrosCustos: d.outrosCustos ?? [], atualizadoPorNome: user.name || null };
 
   const cfg = await prisma.configCustoHora.upsert({ where: { id: ID }, update: dados, create: { id: ID, ...dados } });
   await prisma.auditLog.create({
