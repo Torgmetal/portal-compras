@@ -20,6 +20,7 @@ import {
   Cog,
   ShieldCheck,
   Lock,
+  FileBarChart2,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -89,6 +90,14 @@ const MODULOS = [
     icon: ShieldCheck,
     cor: "bg-torg-blue-100 text-torg-blue",
     modulos: ["QUALIDADE"],
+  },
+  {
+    href: "/relatorios",
+    label: "Relatórios",
+    desc: "Relatórios de status com fotos (padrão Torg)",
+    icon: FileBarChart2,
+    cor: "bg-teal-100 text-teal-700",
+    modulos: ["COMERCIAL", "PRODUCAO", "ENGENHARIA", "PCP", "QUALIDADE"],
   },
   {
     href: "/indicadores",

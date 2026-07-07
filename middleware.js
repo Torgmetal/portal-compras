@@ -116,6 +116,7 @@ export default withAuth(
         if (path.startsWith("/planejamento") && !temModulo("PLANEJAMENTO", "PRODUCAO")) return false;
         if (path.startsWith("/pcp")        && !temModulo("PCP", "PLANEJAMENTO", "PRODUCAO")) return false;
         if (path.startsWith("/qualidade")  && !temModulo("QUALIDADE"))   return false;
+        if (path.startsWith("/relatorios") && !temModulo("COMERCIAL", "PRODUCAO", "ENGENHARIA", "PCP", "QUALIDADE")) return false;
         if (path.startsWith("/admin")      && !isAdmin)                  return false;
 
         return true;
