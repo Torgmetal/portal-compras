@@ -1286,12 +1286,19 @@ model PontoItem {
   id               String           @id @default(cuid())
   pontoId          String
   funcionarioId    String?
-  pisArquivo       String // PIS como veio no ACJEF (12 chars)
+  pisArquivo       String // chave do arquivo: PIS (ACJEF) ou CPF-dígitos (PDF Secullum)
+  cpfArquivo       String? // CPF como veio no PDF Secullum (dígitos) — casa com o cadastro
   empresa          String? // empresa do arquivo (TORG/VMI) — multi-empresa por competência
   nome             String? // preenchido quando casa/mapeia o funcionário
-  marcacoes        Json? // [{ data, marcacoes[], raw }] — referência
+  marcacoes        Json? // [{ data, marcacoes[], raw }] — referência (ACJEF)
+  diario           Json? // espelho diário do PDF Secullum: { totais{min}, dias[{data,batidas,faixas}] }
+  origem           String          @default("MANUAL") // MANUAL | ACJEF | SECULLUM_PDF
+  horasNormais     Float            @default(0)
   horasExtras50    Float            @default(0)
+  horasExtras60    Float            @default(0)
+  horasExtras80    Float            @default(0)
   horasExtras100   Float            @default(0)
+  horasExtras150   Float            @default(0)
   faltas           Float            @default(0)
   atrasos          Float            @default(0)
   adicionalNoturno Float            @default(0)

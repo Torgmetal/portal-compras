@@ -75,6 +75,24 @@ export default function PontoClient() {
     }
   };
 
+  const importarPdf = async (file) => {
+    if (!file) return;
+    setImportando(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/rh/ponto/importar-pdf", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao importar");
+      showToast(`Ponto de ${d.competencia} importado do PDF — ${d.casados} casados, ${d.naoCasados} a vincular`, "success");
+      setCompetencia(d.competencia);
+    } catch (e) {
+      showToast(e.message, "error");
+    } finally {
+      setImportando(false);
+    }
+  };
+
   const editar = (id, campo, valor) => {
     setItens((prev) => prev.map((it) => (it.id === id ? { ...it, [campo]: valor === "" ? 0 : Number(valor) } : it)));
     setDirty((prev) => new Set(prev).add(id));
@@ -167,8 +185,15 @@ export default function PontoClient() {
       {/* Import */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-torg-gray">Arquivo <strong>ACJEF (.txt)</strong> gerado no sistema de ponto (Controle de Jornadas — Portaria 1510).</p>
-        <label className={`px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-2 cursor-pointer ${importando ? "opacity-50 pointer-events-none" : ""}`}>
-          {importando ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} {importando ? "Importando…" : "Importar ACJEF"}
+        <label className={`px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-2 cursor-pointer ${importando ? "opacity-50 pointer-events-none" : ""}`}
+          title="Cartão de ponto Secullum em PDF — traz totais, faixas e batidas automaticamente">
+          {importando ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} {importando ? "Importando…" : "Importar PDF (Secullum)"}
+          <input type="file" accept="application/pdf,.pdf" className="hidden"
+            onChange={(e) => { importarPdf(e.target.files[0]); e.target.value = ""; }} />
+        </label>
+        <label className={`px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-2 cursor-pointer ${importando ? "opacity-50 pointer-events-none" : ""}`}
+          title="Arquivo ACJEF do sistema (só marcações, sem totais por faixa)">
+          <Upload size={16} /> Importar ACJEF
           <input type="file" accept=".txt,text/plain" className="hidden"
             onChange={(e) => { importar(e.target.files[0]); e.target.value = ""; }} />
         </label>

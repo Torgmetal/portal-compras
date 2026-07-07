@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import {
   Receipt, Loader2, AlertCircle, RefreshCw, Inbox, LogOut, FileText, CheckCircle2,
-  CalendarDays, Palmtree, KeyRound, Download, Megaphone, MessageSquarePlus, Pin, Send, X,
+  CalendarDays, Palmtree, KeyRound, Download, Megaphone, MessageSquarePlus, Pin, Send, X, Clock,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -18,6 +18,15 @@ const STATUS_F = {
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtMoeda = (v) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+// minutos → "HH:MM" (igual o cartão de ponto). 0/vazio → "—"
+const minHM = (m) => { const v = Math.round(Number(m) || 0); return v ? `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}` : "—"; };
+// data ISO "2026-05-26" → "26/05" + dia da semana curto
+const diaLabel = (iso) => { const d = new Date(iso + "T12:00:00"); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`; };
+const FAIXAS_PONTO = [
+  { k: "normais", label: "Normais" }, { k: "ex50", label: "HE 50%" }, { k: "ex60", label: "HE 60%" },
+  { k: "ex80", label: "HE 80%" }, { k: "ex100", label: "HE 100%" }, { k: "ex150", label: "HE 150%" },
+  { k: "noturno", label: "Ad. noturno" }, { k: "faltas", label: "Faltas" }, { k: "dsr", label: "DSR" },
+];
 
 function competenciaExtenso(c) {
   if (!c) return "";
@@ -95,6 +104,12 @@ export default function MeuRHClient({ nome }) {
   const [carregandoFerias, setCarregandoFerias] = useState(true);
   const [erroFerias, setErroFerias] = useState("");
 
+  // Ponto
+  const [pontoComps, setPontoComps] = useState([]);
+  const [pontoSel, setPontoSel] = useState(0); // índice da competência selecionada
+  const [carregandoPonto, setCarregandoPonto] = useState(true);
+  const [erroPonto, setErroPonto] = useState("");
+
   const carregar = useCallback(async () => {
     setCarregando(true); setErro("");
     try {
@@ -134,7 +149,17 @@ export default function MeuRHClient({ nome }) {
     } catch (e) { setErroMural(e.message); } finally { setCarregandoMural(false); }
   }, []);
 
-  useEffect(() => { carregarMural(); carregar(); carregarFerias(); }, [carregarMural, carregar, carregarFerias]);
+  const carregarPonto = useCallback(async () => {
+    setCarregandoPonto(true); setErroPonto("");
+    try {
+      const r = await fetch("/api/meu-rh/ponto");
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao carregar");
+      setPontoComps(d.competencias || []);
+    } catch (e) { setErroPonto(e.message); } finally { setCarregandoPonto(false); }
+  }, []);
+
+  useEffect(() => { carregarMural(); carregar(); carregarFerias(); carregarPonto(); }, [carregarMural, carregar, carregarFerias, carregarPonto]);
 
   const enviarFeedback = async () => {
     if (fbMensagem.trim().length < 3) return;
@@ -232,6 +257,10 @@ export default function MeuRHClient({ nome }) {
         <button onClick={() => setAba("ferias")}
           className={`px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2 transition-colors ${aba === "ferias" ? "bg-white text-torg-dark shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>
           <Palmtree size={15} /> Férias
+        </button>
+        <button onClick={() => setAba("ponto")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-2 transition-colors ${aba === "ponto" ? "bg-white text-torg-dark shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>
+          <Clock size={15} /> Ponto
         </button>
       </div>
 
@@ -401,6 +430,97 @@ export default function MeuRHClient({ nome }) {
             )}
           </div>
         )
+      )}
+
+      {aba === "ponto" && (
+        carregandoPonto ? (
+          <div className="py-16 text-center text-torg-gray"><Loader2 size={28} className="mx-auto animate-spin mb-2" /> Carregando...</div>
+        ) : erroPonto ? (
+          <div className="py-16 text-center">
+            <AlertCircle size={28} className="mx-auto text-red-400 mb-2" />
+            <p className="text-sm text-red-600 mb-3">{erroPonto}</p>
+            <button onClick={carregarPonto} className="px-3 py-1.5 text-sm bg-torg-blue text-white rounded-lg inline-flex items-center gap-2"><RefreshCw size={14} /> Tentar novamente</button>
+          </div>
+        ) : pontoComps.length === 0 ? (
+          <div className="py-16 text-center">
+            <Clock size={40} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-torg-gray">Seu cartão de ponto ainda não foi disponibilizado.</p>
+            <p className="text-sm text-torg-gray mt-1">Quando o RH importar, o espelho do mês aparece aqui.</p>
+          </div>
+        ) : (() => {
+          const comp = pontoComps[Math.min(pontoSel, pontoComps.length - 1)];
+          const tot = comp.totais || {};
+          return (
+            <div className="space-y-5">
+              {/* Seletor de competência */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {pontoComps.map((c, i) => (
+                  <button key={c.id} onClick={() => setPontoSel(i)}
+                    className={`px-3 py-1.5 text-sm rounded-lg font-medium ${i === Math.min(pontoSel, pontoComps.length - 1) ? "bg-torg-blue text-white" : "bg-white border border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
+                    {competenciaExtenso(c.competencia)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Cabeçalho do período */}
+              <div className="text-xs text-torg-gray">
+                Período: <span className="font-medium text-torg-dark">{comp.periodoInicio} a {comp.periodoFim}</span>
+                {comp.empresa ? ` · ${comp.empresa}` : ""}
+              </div>
+
+              {/* Totais por faixa */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                {FAIXAS_PONTO.map((f) => (
+                  <div key={f.k} className="bg-white rounded-xl border border-gray-100 shadow-sm px-3 py-2 text-center">
+                    <p className="text-[10px] uppercase tracking-wide text-torg-gray">{f.label}</p>
+                    <p className={`text-lg font-extrabold tabular-nums ${f.k === "faltas" && tot[f.k] ? "text-red-600" : "text-torg-dark"}`}>{minHM(tot[f.k])}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Espelho diário */}
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50/60">
+                    <tr className="text-torg-gray">
+                      <th className="px-2 py-2 text-left font-medium">Dia</th>
+                      <th className="px-2 py-2 text-center font-medium" colSpan={6}>Batidas</th>
+                      <th className="px-2 py-2 text-right font-medium">Normais</th>
+                      <th className="px-2 py-2 text-right font-medium">50%</th>
+                      <th className="px-2 py-2 text-right font-medium">60%</th>
+                      <th className="px-2 py-2 text-right font-medium">80%</th>
+                      <th className="px-2 py-2 text-right font-medium">100%</th>
+                      <th className="px-2 py-2 text-right font-medium">150%</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {(comp.dias || []).map((d) => {
+                      const batidas = [d.ent1, d.sai1, d.ent2, d.sai2, d.ent3, d.sai3];
+                      const folga = batidas.every((b) => !b || /folga/i.test(b));
+                      return (
+                        <tr key={d.data} className="hover:bg-gray-50">
+                          <td className="px-2 py-1.5 whitespace-nowrap text-torg-dark font-medium">{diaLabel(d.data)} <span className="text-torg-gray font-normal">{d.diaSemana}</span></td>
+                          {folga ? (
+                            <td colSpan={6} className="px-2 py-1.5 text-center text-torg-gray italic">Folga</td>
+                          ) : batidas.map((b, i) => (
+                            <td key={i} className="px-2 py-1.5 text-center tabular-nums text-torg-dark">{b || "—"}</td>
+                          ))}
+                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.normais)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex50)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex60)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex80)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex100)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex150)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-torg-gray">Espelho do cartão de ponto (Secullum). Em caso de divergência, procure o RH.</p>
+            </div>
+          );
+        })()
       )}
 
       {fbAberto && (
