@@ -124,12 +124,21 @@ export default function ServicoDetalheClient({ id }) {
   const cfTempoTotal = cfLinhas.reduce((a, l) => a + tempoLinha(l), 0);
   const cfValorHora = num(composicao?.CORTE_FURACAO?.valorHora);
   const setCfValorHora = (v) => { setComposicao((p) => ({ ...p, CORTE_FURACAO: { ...(p.CORTE_FURACAO || {}), valorHora: v } })); marcar(); };
-  const custoCf = (cfTempoTotal / 60) * cfValorHora; // tempo total (h) × R$/hora
+  const cfMetodo = composicao?.CORTE_FURACAO?.metodoPreco === "KG" ? "KG" : "HORA"; // precificar por hora ou por kg
+  const setCfMetodo = (m) => { setComposicao((p) => ({ ...p, CORTE_FURACAO: { ...(p.CORTE_FURACAO || {}), metodoPreco: m } })); marcar(); };
+  const cfPrecoKg = num(composicao?.CORTE_FURACAO?.precoKg);
+  const setCfPrecoKg = (v) => { setComposicao((p) => ({ ...p, CORTE_FURACAO: { ...(p.CORTE_FURACAO || {}), precoKg: v } })); marcar(); };
+  const custoPorHora = (cfTempoTotal / 60) * cfValorHora; // tempo (h) × R$/h
+  const custoPorKg = cfPesoTotal * cfPrecoKg;             // peso (kg) × R$/kg
+  const custoCf = cfMetodo === "KG" ? custoPorKg : custoPorHora;
+  const cfRkgEq = cfPesoTotal > 0 ? custoCf / cfPesoTotal : 0;         // R$/kg equivalente
+  const cfRhEq = cfTempoTotal > 0 ? custoCf / (cfTempoTotal / 60) : 0; // R$/h equivalente
   const custoTotal = custoCf; // soma dos serviços (por ora só corte/furação)
 
   // Puxa a preço-hora do custo-hora (setor de preparação/corte) pro valor/hora.
   const cfSetorPreco = precoHoraDoServico(configCH, "CORTE_FURACAO"); // { nome, precoHora } | null
   const cfPrecoSugerido = cfSetorPreco ? Math.round(cfSetorPreco.precoHora * 100) / 100 : 0;
+  const cfPrecoKgSugerido = cfPesoTotal > 0 && cfPrecoSugerido > 0 ? Math.round(((cfPrecoSugerido * (cfTempoTotal / 60)) / cfPesoTotal) * 100) / 100 : 0; // R$/kg equivalente ao custo-hora
   useEffect(() => {
     if (autoValorRef.current || carregando) return;
     if (cfPrecoSugerido > 0 && !num(composicao?.CORTE_FURACAO?.valorHora)) {
@@ -297,30 +306,54 @@ export default function ServicoDetalheClient({ id }) {
           </button>
           <p className="text-xs text-torg-gray">Peso = kg/m do perfil × comprimento × qtd de barras. O <strong>tempo médio (min/barra)</strong> você informa a partir da programação da máquina.</p>
 
-          {/* Custos — valor por hora sobre o tempo total */}
+          {/* Custos — por hora ou por kg */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mt-2">
-            <h4 className="text-sm font-semibold text-torg-dark mb-3 flex items-center gap-2"><DollarSign size={16} className="text-torg-blue" /> Custo do corte / furação</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-              <div>
-                <label className="text-xs text-torg-gray">Valor por hora (R$/h)</label>
-                <input type="number" step="0.01" value={cfValorHora || ""} onChange={(e) => setCfValorHora(e.target.value === "" ? 0 : Number(e.target.value))} placeholder="0,00"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
-                {cfPrecoSugerido > 0 ? (
-                  <p className="text-[11px] text-torg-gray mt-1">Custo-hora ({cfSetorPreco.nome}): <strong className="text-torg-dark tabular-nums">{fmtBRL(cfPrecoSugerido)}/h</strong>{num(cfValorHora) !== cfPrecoSugerido && (<button type="button" onClick={() => setCfValorHora(cfPrecoSugerido)} className="ml-1.5 text-torg-blue hover:underline font-medium">usar</button>)}</p>
-                ) : (
-                  <p className="text-[11px] text-amber-600 mt-1"><Link href="/comercial/orcamentos/custo-hora" className="hover:underline">Defina o custo-hora</Link> pra puxar automático.</p>
-                )}
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><DollarSign size={16} className="text-torg-blue" /> Custo do corte / furação</h4>
+              <div className="inline-flex rounded-lg border border-gray-200 p-0.5 text-xs">
+                <button type="button" onClick={() => setCfMetodo("HORA")} className={`px-3 py-1 rounded-md font-medium ${cfMetodo === "HORA" ? "bg-torg-blue text-white" : "text-torg-gray hover:text-torg-dark"}`}>Por hora</button>
+                <button type="button" onClick={() => setCfMetodo("KG")} className={`px-3 py-1 rounded-md font-medium ${cfMetodo === "KG" ? "bg-torg-blue text-white" : "text-torg-gray hover:text-torg-dark"}`}>Por kg</button>
               </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+              {cfMetodo === "HORA" ? (
+                <div>
+                  <label className="text-xs text-torg-gray">Valor por hora (R$/h)</label>
+                  <input type="number" step="0.01" value={cfValorHora || ""} onChange={(e) => setCfValorHora(e.target.value === "" ? 0 : Number(e.target.value))} placeholder="0,00"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+                  {cfPrecoSugerido > 0 ? (
+                    <p className="text-[11px] text-torg-gray mt-1">Custo-hora ({cfSetorPreco.nome}): <strong className="text-torg-dark tabular-nums">{fmtBRL(cfPrecoSugerido)}/h</strong>{num(cfValorHora) !== cfPrecoSugerido && (<button type="button" onClick={() => setCfValorHora(cfPrecoSugerido)} className="ml-1.5 text-torg-blue hover:underline font-medium">usar</button>)}</p>
+                  ) : (
+                    <p className="text-[11px] text-amber-600 mt-1"><Link href="/comercial/orcamentos/custo-hora" className="hover:underline">Defina o custo-hora</Link> pra puxar automático.</p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs text-torg-gray">Preço por kg (R$/kg)</label>
+                  <input type="number" step="0.01" value={cfPrecoKg || ""} onChange={(e) => setCfPrecoKg(e.target.value === "" ? 0 : Number(e.target.value))} placeholder="0,00"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
+                  {cfPrecoKgSugerido > 0 && (
+                    <p className="text-[11px] text-torg-gray mt-1">Pelo custo-hora daria <strong className="text-torg-dark tabular-nums">{fmtBRL(cfPrecoKgSugerido)}/kg</strong>{num(cfPrecoKg) !== cfPrecoKgSugerido && (<button type="button" onClick={() => setCfPrecoKg(cfPrecoKgSugerido)} className="ml-1.5 text-torg-blue hover:underline font-medium">usar</button>)}</p>
+                  )}
+                </div>
+              )}
               <div>
-                <label className="text-xs text-torg-gray">Tempo total</label>
-                <div className="text-lg font-semibold text-torg-dark mt-1 tabular-nums">{fmtH(cfTempoTotal)} <span className="text-xs text-torg-gray font-normal">({(cfTempoTotal / 60).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} h)</span></div>
+                <label className="text-xs text-torg-gray">{cfMetodo === "KG" ? "Peso total" : "Tempo total"}</label>
+                <div className="text-lg font-semibold text-torg-dark mt-1 tabular-nums">
+                  {cfMetodo === "KG" ? fmtKg(cfPesoTotal) : <>{fmtH(cfTempoTotal)} <span className="text-xs text-torg-gray font-normal">({(cfTempoTotal / 60).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} h)</span></>}
+                </div>
               </div>
               <div className="sm:text-right">
                 <label className="text-xs text-torg-gray">Custo</label>
                 <div className="text-2xl font-extrabold text-torg-blue mt-0.5 tabular-nums">{fmtBRL(custoCf)}</div>
+                {custoCf > 0 && <div className="text-[11px] text-torg-gray mt-0.5 tabular-nums">≈ {fmtBRL(cfMetodo === "KG" ? cfRhEq : cfRkgEq)}/{cfMetodo === "KG" ? "h" : "kg"}</div>}
               </div>
             </div>
-            <p className="text-xs text-torg-gray mt-3">Custo = tempo total (h) × valor por hora. Peso total do lote: <strong>{fmtKg(cfPesoTotal)}</strong>.</p>
+            <p className="text-xs text-torg-gray mt-3">
+              {cfMetodo === "KG"
+                ? <>Custo = peso total (kg) × preço por kg. Tempo total: <strong>{fmtH(cfTempoTotal)}</strong>.</>
+                : <>Custo = tempo total (h) × valor por hora. Peso total do lote: <strong>{fmtKg(cfPesoTotal)}</strong>.</>}
+            </p>
           </div>
         </div>
       )}
