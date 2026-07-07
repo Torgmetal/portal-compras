@@ -78,7 +78,7 @@ export default function CustoHoraClient() {
         horasDia: num(horasDia) || 8.75,
         diasUteis: num(diasUteis) || 22,
         ocupacaoPct: num(ocupacao) || 80,
-        setores: setores.map((s) => ({ id: s.id, nome: s.nome, empresa: s.empresa || "", salarios: num(s.salarios), mod: num(s.mod), headcount: num(s.headcount), horasMes: Math.round(horasMes(s)), cifDireto: num(s.cifDireto) })),
+        setores: setores.map((s) => ({ id: s.id, nome: s.nome, empresa: s.empresa || "", salarios: num(s.salarios), mod: num(s.mod), headcount: num(s.headcount), horasMes: num(s.horasMes), cifDireto: num(s.cifDireto) })),
       };
       const r = await fetch("/api/comercial/custo-hora", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const d = await r.json();
@@ -185,7 +185,7 @@ export default function CustoHoraClient() {
             <p className="text-[10px] text-torg-gray mt-1">faltas médias</p>
           </div>
         </div>
-        <p className="text-[11px] text-torg-gray mt-1">Horas/mês por pessoa = horas/dia × dias úteis × (1 − absenteísmo) = <strong>{Math.round(horasPorPessoa)} h</strong>. As horas/mês de cada setor saem de <strong>pessoas × esse valor</strong>.</p>
+        <p className="text-[11px] text-torg-gray mt-1">Horas/mês são <strong>lançadas manualmente</strong> por setor. Vazio usa a estimativa de <strong>{Math.round(horasPorPessoa)} h/pessoa</strong> (horas/dia × dias úteis × (1 − absenteísmo)) como sugestão.</p>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-100 text-sm">
           <div><div className="text-[11px] text-torg-gray uppercase">MOD (c/ encargos)</div><div className="font-semibold text-torg-dark tabular-nums">{fmtBRL0(modTotal)}</div></div>
@@ -207,7 +207,7 @@ export default function CustoHoraClient() {
             <thead className="bg-gray-50/60">
               <tr className="text-left text-xs font-medium text-gray-500 uppercase">
                 <th className="px-3 py-2">Setor</th>
-                <th className="px-3 py-2">Empresa</th>
+                <th className="px-3 py-2">Tipo</th>
                 <th className="px-3 py-2 text-right">Salários (R$/mês)</th>
                 <th className="px-3 py-2 text-right">Pessoas</th>
                 <th className="px-3 py-2 text-right">Horas/mês</th>
@@ -229,7 +229,7 @@ export default function CustoHoraClient() {
                   <td className="px-3 py-1.5 text-xs text-torg-gray">{s.empresa || "—"}</td>
                   <td className="px-3 py-1.5 text-right"><input type="number" step="100" value={s.salarios} onChange={(e) => setSetor(i, "salarios", e.target.value)} className="w-28 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                   <td className="px-3 py-1.5 text-right"><input type="number" step="1" value={s.headcount} onChange={(e) => setSetor(i, "headcount", e.target.value)} className="w-16 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
-                  <td className="px-3 py-1.5 text-right tabular-nums text-torg-gray">{Math.round(horasMes(s)).toLocaleString("pt-BR")}</td>
+                  <td className="px-3 py-1.5 text-right"><input type="number" step="10" value={s.horasMes || ""} onChange={(e) => setSetor(i, "horasMes", e.target.value)} placeholder={String(Math.round(num(s.headcount) * horasPorPessoa))} title="Horas/mês lançadas manualmente. Vazio = estimativa por pessoas × jornada." className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue placeholder:text-gray-300" /></td>
                   <td className="px-3 py-1.5 text-right"><input type="number" step="100" value={s.cifDireto} onChange={(e) => setSetor(i, "cifDireto", e.target.value)} className="w-24 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                   <td className="px-3 py-1.5 text-right tabular-nums text-torg-gray">{fmtBRL0(mod(s))}</td>
                   <td className="px-3 py-1.5 text-right tabular-nums text-torg-gray">{fmtBRL0(overheadAloc(s))}</td>
@@ -249,9 +249,9 @@ export default function CustoHoraClient() {
 
       <div className="text-xs text-torg-gray space-y-1">
         <p><strong>Como calcula:</strong> MOD = <strong>CET real</strong> (quando importado da auditoria) ou salários × fator de encargos. Overhead/ADM = custo total − custos diretos (resíduo), rateado pelo critério escolhido.</p>
-        <p><strong>Importar auditoria:</strong> lê a aba "Custo Efetivo" e traz cada setor (dos 2 CNPJs) com CET real, horas efetivas (Previstas − Ausência) e nº de pessoas. Depois é só revisar e <strong>Salvar</strong>.</p>
+        <p><strong>Importar auditoria:</strong> lê a aba "Custo Efetivo" e agrupa (Torg + VMI = uma empresa): setores de fábrica separados, <strong>Montagem externa</strong> à parte (não é fábrica) e todo o apoio em <strong>ADM</strong>. Traz CET real e nº de pessoas; as <strong>horas você lança na mão</strong>. Depois revise e <strong>Salve</strong>.</p>
         <p>Custo-hora = (MOD + CIF + overhead) ÷ horas do setor — já inclui tudo do custo total mensal (salários, encargos, ADM). <strong>Preço-hora = custo-hora × (1 + margem de lucro) ÷ (1 − impostos de venda)</strong>: a margem é lucro puro e os impostos (ISS/PIS/COFINS) saem por cima da venda.</p>
-        <p>Horas/mês do setor = <strong>horas efetivas da auditoria</strong> (Previstas − Ausência) quando importado; senão <strong>pessoas × horas/dia × dias úteis × (1 − absenteísmo)</strong>. Ajuste a jornada e o absenteísmo nos campos acima.</p>
+        <p>Horas/mês do setor são <strong>manuais</strong> — digite na coluna Horas/mês. Se deixar vazio, entra a estimativa <strong>pessoas × horas/dia × dias úteis × (1 − absenteísmo)</strong> (ajuste a jornada e o absenteísmo acima).</p>
         <p><strong>CIF (R$/mês)</strong> é o custo indireto do setor por mês (energia/consumíveis/depreciação da máquina) — valor em reais, não %. Opcional: se deixar 0, entra no overhead rateado.</p>
       </div>
     </div>
