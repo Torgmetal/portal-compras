@@ -38,7 +38,13 @@ export async function GET(_req, { params }) {
 
   const rel = await prisma.relatorioStatus.findUnique({ where: { id: params.id } });
   if (!rel) return NextResponse.json({ success: false, error: "Relatório não encontrado" }, { status: 404 });
-  return NextResponse.json({ success: true, relatorio: rel });
+  // Contato do cliente (para pré-preencher o "Para" no envio) — vem da OP vinculada.
+  let clienteEmailOp = null;
+  if (rel.opId) {
+    const op = await prisma.oP.findUnique({ where: { id: rel.opId }, select: { clienteEmail: true } }).catch(() => null);
+    clienteEmailOp = op?.clienteEmail || null;
+  }
+  return NextResponse.json({ success: true, relatorio: rel, clienteEmailOp });
 }
 
 export async function PATCH(req, { params }) {
