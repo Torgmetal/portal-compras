@@ -52,8 +52,9 @@ export async function POST(req) {
       update: { empresa: dados.empresa || undefined },
       create: { competencia, empresa: dados.empresa || null, criadoPorId: user.id },
     });
-    // Reimport: substitui os itens desta origem nesta competência.
-    await tx.pontoItem.deleteMany({ where: { pontoId: pc.id, origem: "SECULLUM_PDF" } });
+    // Reimport: substitui só os itens desta MESMA empresa (TORG e VMI convivem
+    // na mesma competência — não pode apagar a outra empresa ao reimportar uma).
+    await tx.pontoItem.deleteMany({ where: { pontoId: pc.id, origem: "SECULLUM_PDF", empresa: dados.empresa || null } });
     await tx.pontoItem.createMany({
       data: dados.funcionarios.map((f) => {
         const match = porCpf.get(f.cpfDigitos);

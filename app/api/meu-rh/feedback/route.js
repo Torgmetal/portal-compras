@@ -43,16 +43,10 @@ export async function POST(req) {
     },
   });
 
-  // Notifica o RH por e-mail (best-effort — o feedback já está salvo de qualquer forma).
+  // Notifica por e-mail (best-effort — o feedback já está salvo de qualquer forma).
+  // Destinatário fixo: só a conta administrativa recebe as mensagens.
   try {
-    let rh = await prisma.user.findMany({
-      where: { ativo: true, modulos: { some: { modulo: "RH" } } }, // User.email é obrigatório
-      select: { email: true },
-    });
-    if (!rh.length) {
-      rh = await prisma.user.findMany({ where: { ativo: true, tipo: "ADMIN" }, select: { email: true } });
-    }
-    const destinos = [...new Set(rh.map((u) => u.email).filter(Boolean))];
+    const destinos = ["adm@torg.com.br"];
     if (destinos.length) {
       const autor = anonimo ? "Funcionário (anônimo)" : `${func?.nome || user.name}${func?.setor?.nome ? " · " + func.setor.nome : ""}`;
       const origin = process.env.NEXTAUTH_URL || new URL(req.url).origin;

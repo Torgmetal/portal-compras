@@ -12,7 +12,8 @@ export const maxDuration = 60;
 const num = z.number().finite().nonnegative().optional();
 const itemSchema = z.object({
   id: z.string().min(1),
-  horasExtras50: num, horasExtras100: num, faltas: num, atrasos: num,
+  horasNormais: num, horasExtras50: num, horasExtras60: num, horasExtras80: num,
+  horasExtras100: num, horasExtras150: num, faltas: num, atrasos: num,
   adicionalNoturno: num, dsr: num, ajudaCusto: num,
   observacao: z.string().max(500).optional().nullable(),
 }).strict();

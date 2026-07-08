@@ -15,12 +15,16 @@ const extenso = (c) => {
 };
 
 const EDIT = [
+  { k: "horasNormais", label: "Normais" },
   { k: "horasExtras50", label: "HE 50%" },
+  { k: "horasExtras60", label: "HE 60%" },
+  { k: "horasExtras80", label: "HE 80%" },
   { k: "horasExtras100", label: "HE 100%" },
+  { k: "horasExtras150", label: "HE 150%" },
   { k: "faltas", label: "Faltas" },
-  { k: "atrasos", label: "Atrasos" },
   { k: "adicionalNoturno", label: "Ad. Not." },
   { k: "dsr", label: "DSR" },
+  { k: "atrasos", label: "Atrasos" },
   { k: "ajudaCusto", label: "Ajuda Custo" },
 ];
 
@@ -107,8 +111,9 @@ export default function PontoClient() {
     setSalvando(true);
     try {
       const payload = itens.filter((it) => dirty.has(it.id)).map((it) => ({
-        id: it.id, horasExtras50: it.horasExtras50, horasExtras100: it.horasExtras100, faltas: it.faltas,
-        atrasos: it.atrasos, adicionalNoturno: it.adicionalNoturno, dsr: it.dsr, ajudaCusto: it.ajudaCusto,
+        id: it.id, horasNormais: it.horasNormais, horasExtras50: it.horasExtras50, horasExtras60: it.horasExtras60,
+        horasExtras80: it.horasExtras80, horasExtras100: it.horasExtras100, horasExtras150: it.horasExtras150,
+        faltas: it.faltas, atrasos: it.atrasos, adicionalNoturno: it.adicionalNoturno, dsr: it.dsr, ajudaCusto: it.ajudaCusto,
         observacao: it.observacao || null,
       }));
       const r = await fetch(`/api/rh/ponto/${ponto.id}/itens`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: payload }) });
@@ -261,7 +266,10 @@ export default function PontoClient() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {itens.map((it) => {
-                    const dias = Array.isArray(it.marcacoes) ? it.marcacoes : [];
+                    // ACJEF grava em `marcacoes`; PDF Secullum em `diario.dias` (com batidas).
+                    const dias = (Array.isArray(it.marcacoes) && it.marcacoes.length)
+                      ? it.marcacoes
+                      : (Array.isArray(it.diario?.dias) ? it.diario.dias : []);
                     return (
                       <Fragment key={it.id}>
                         <tr className="hover:bg-gray-50/50">
@@ -299,11 +307,16 @@ export default function PontoClient() {
                           <tr className="bg-gray-50/60">
                             <td colSpan={EDIT.length + 3} className="px-4 py-2">
                               <div className="flex flex-wrap gap-2">
-                                {dias.length === 0 ? <span className="text-[11px] text-torg-gray">sem marcações</span> : dias.map((d, i) => (
-                                  <span key={i} className="text-[10px] bg-white border border-gray-100 rounded px-1.5 py-0.5 text-torg-gray">
-                                    {d.data?.slice(8)}/{d.data?.slice(5, 7)}: {(d.marcacoes || []).join(" ") || "—"}
-                                  </span>
-                                ))}
+                                {dias.length === 0 ? <span className="text-[11px] text-torg-gray">sem marcações</span> : dias.map((d, i) => {
+                                  const batidas = Array.isArray(d.marcacoes)
+                                    ? d.marcacoes.join(" ")
+                                    : [d.ent1, d.sai1, d.ent2, d.sai2, d.ent3, d.sai3].filter(Boolean).join(" ");
+                                  return (
+                                    <span key={i} className="text-[10px] bg-white border border-gray-100 rounded px-1.5 py-0.5 text-torg-gray">
+                                      {d.data?.slice(8)}/{d.data?.slice(5, 7)}: {batidas || "—"}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             </td>
                           </tr>
