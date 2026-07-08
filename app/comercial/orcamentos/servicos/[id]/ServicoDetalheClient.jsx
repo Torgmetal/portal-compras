@@ -39,6 +39,7 @@ export default function ServicoDetalheClient({ id }) {
   const [envDest, setEnvDest] = useState("");
   const [envCc, setEnvCc] = useState([]);
   const [envMsg, setEnvMsg] = useState("");
+  const [novoEmail, setNovoEmail] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [modalRev, setModalRev] = useState(false);
   const [motivoRev, setMotivoRev] = useState("");
@@ -194,6 +195,13 @@ export default function ServicoDetalheClient({ id }) {
     setEnvDest(email || ""); setEnvMsg(MSG_PADRAO); setEnvCc([]); setModalEnvio(true);
   };
   const toggleCc = (em) => setEnvCc((p) => (p.includes(em) ? p.filter((x) => x !== em) : [...p, em]));
+  const addEmail = () => {
+    const e = novoEmail.trim().toLowerCase();
+    if (!e) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { showToast("E-mail inválido", "error"); return; }
+    if (!envCc.includes(e)) setEnvCc((p) => [...p, e]);
+    setNovoEmail("");
+  };
   const enviarProposta = async () => {
     if (!envDest.trim()) { showToast("Informe o e-mail do cliente", "error"); return; }
     setEnviando(true);
@@ -531,14 +539,25 @@ export default function ServicoDetalheClient({ id }) {
                 <input value={envDest} onChange={(e) => setEnvDest(e.target.value)} placeholder="cliente@empresa.com" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" />
               </div>
               <div>
-                <label className="text-xs text-torg-gray">Cópia (comercial Torg)</label>
+                <label className="text-xs text-torg-gray">Enviar também para (cópia) — selecione e/ou adicione</label>
                 <div className="mt-1 border border-gray-200 rounded-lg max-h-32 overflow-y-auto divide-y divide-gray-50">
-                  {emailsTorg.length === 0 ? <div className="px-3 py-2 text-xs text-torg-gray">Nenhum e-mail carregado.</div> : emailsTorg.map((u) => (
+                  {emailsTorg.map((u) => (
                     <label key={u.email} className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50">
                       <input type="checkbox" checked={envCc.includes(u.email)} onChange={() => toggleCc(u.email)} className="accent-torg-blue" />
                       <span className="text-torg-dark">{u.nome}</span><span className="text-torg-gray truncate">{u.email}</span>
                     </label>
                   ))}
+                  {envCc.filter((e) => !emailsTorg.some((u) => u.email === e)).map((e) => (
+                    <div key={e} className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs bg-torg-blue-50/40">
+                      <span className="flex items-center gap-2 min-w-0"><input type="checkbox" checked readOnly className="accent-torg-blue" /><span className="text-torg-dark truncate">{e}</span></span>
+                      <button type="button" onClick={() => toggleCc(e)} className="text-red-400 hover:text-red-600 shrink-0"><Trash2 size={13} /></button>
+                    </div>
+                  ))}
+                  {emailsTorg.length === 0 && envCc.length === 0 && <div className="px-3 py-2 text-xs text-torg-gray">Adicione e-mails abaixo.</div>}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <input value={novoEmail} onChange={(e) => setNovoEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addEmail(); } }} type="email" placeholder="adicionar outro e-mail…" className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-torg-blue" />
+                  <button type="button" onClick={addEmail} className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg font-medium hover:bg-torg-blue/90 shrink-0">Adicionar</button>
                 </div>
               </div>
               <div>
