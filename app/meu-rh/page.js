@@ -9,7 +9,7 @@ export default async function MeuRHPage() {
   // Área exclusiva do funcionário (autoatendimento). O middleware já barra os
   // demais, mas reforçamos aqui (defesa em profundidade).
   if (!session?.user || session.user.tipo !== "FUNCIONARIO" || !session.user.funcionarioId) {
-    redirect("/entrar");
+    redirect("/colaborador");
   }
   // Troca de senha obrigatória (1º acesso com senha provisória / expiração 90d).
   if (session.user.deveTrocarSenha) {

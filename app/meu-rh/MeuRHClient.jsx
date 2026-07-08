@@ -238,7 +238,7 @@ export default function MeuRHClient({ nome }) {
               <p className="text-xs sm:text-sm text-torg-gray truncate">Olá, {nome}</p>
             </div>
           </div>
-          <button onClick={() => signOut({ callbackUrl: "/entrar" })}
+          <button onClick={() => signOut({ callbackUrl: "/colaborador" })}
             className="shrink-0 text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50">
             <LogOut size={16} /> <span className="hidden sm:inline">Sair</span>
           </button>

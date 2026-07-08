@@ -111,7 +111,7 @@ function LoginForm() {
         <form onSubmit={submit} className="w-full max-w-md bg-white rounded-2xl border border-torg-blue-100 shadow-sm p-7 space-y-5">
           <div>
             <h2 className="text-2xl font-extrabold text-torg-dark tracking-tight">Entrar</h2>
-            <p className="text-sm text-torg-gray mt-1">Interno: e-mail e senha. Funcionário: CPF e senha.</p>
+            <p className="text-sm text-torg-gray mt-1">Acesso interno — use seu e-mail e senha.</p>
           </div>
 
           {erro && (
@@ -122,15 +122,15 @@ function LoginForm() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">E-mail ou CPF</label>
+            <label className="block text-sm font-medium text-torg-dark mb-1">E-mail</label>
             <input
-              type="text"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
-              autoComplete="username"
-              placeholder="seu@email.com ou CPF (só funcionários)"
+              autoComplete="email"
+              placeholder="seu@email.com"
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
             />
           </div>
@@ -162,6 +162,12 @@ function LoginForm() {
               className="block text-sm text-torg-blue hover:text-torg-blue-700 font-medium"
             >
               Esqueci minha senha
+            </Link>
+            <Link
+              href="/colaborador"
+              className="block text-sm text-torg-gray hover:text-torg-dark"
+            >
+              É funcionário? Acesse o <span className="font-medium">Portal do Colaborador</span>
             </Link>
             <p className="text-xs text-torg-gray">
               Não tem acesso? Fale com o administrador do portal.

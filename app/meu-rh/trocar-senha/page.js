@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function TrocarSenhaFuncionarioPage() {
   const session = await getSession();
   if (!session?.user || session.user.tipo !== "FUNCIONARIO" || !session.user.funcionarioId) {
-    redirect("/entrar");
+    redirect("/colaborador");
   }
   return (
     <TrocarSenhaFuncionarioClient

@@ -13,6 +13,20 @@ import { NextResponse } from "next/server";
 // Redirect de domínios .vercel.app → workspace.torg.com.br via vercel.json (edge, mais rápido)
 export default withAuth(
   function middleware(req) {
+    const token = req.nextauth?.token;
+    const path = req.nextUrl.pathname;
+
+    // Área do colaborador (/meu-rh): login próprio em /colaborador (não /entrar).
+    if (path.startsWith("/meu-rh") || path.startsWith("/api/meu-rh")) {
+      if (!token) {
+        if (path.startsWith("/api/")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        return NextResponse.redirect(new URL("/colaborador", req.url));
+      }
+      if (token.tipo !== "FUNCIONARIO") {
+        // Usuário interno não usa o portal do colaborador.
+        return NextResponse.redirect(new URL("/", req.url));
+      }
+    }
     // Retorno explícito necessário para que o Vercel sirva corretamente
     // tanto páginas dinâmicas (ƒ) quanto estáticas (○) após autorização.
     return NextResponse.next();
@@ -28,6 +42,7 @@ export default withAuth(
           path.startsWith("/api/auth") ||
           path.startsWith("/_next") ||
           path === "/entrar" ||
+          path === "/colaborador" ||
           path === "/trocar-senha" ||
           path === "/api/trocar-senha" ||
           path === "/esqueci-senha" ||
@@ -76,18 +91,15 @@ export default withAuth(
         ) {
           return true;
         }
+        // /meu-rh (+ API) é tratado na função do middleware acima (login próprio
+        // em /colaborador; isolamento por tipo). Deixa passar aqui.
+        if (path.startsWith("/meu-rh") || path.startsWith("/api/meu-rh")) return true;
+
         // Demais rotas: precisa estar logado
         if (!token) return false;
 
-        // Funcionário (autoatendimento): só enxerga /meu-rh (+ sua API). Bloqueado
-        // em todo o resto do portal interno. Usuários internos não usam /meu-rh.
-        const isFuncionario = token.tipo === "FUNCIONARIO";
-        if (isFuncionario) {
-          return path.startsWith("/meu-rh") || path.startsWith("/api/meu-rh");
-        }
-        if (path.startsWith("/meu-rh") || path.startsWith("/api/meu-rh")) {
-          return false; // área exclusiva do funcionário
-        }
+        // Funcionário (autoatendimento) não acessa o portal interno.
+        if (token.tipo === "FUNCIONARIO") return false;
 
         // Gates por tipo/módulo
         const isAdmin = token.tipo === "ADMIN";

@@ -33,7 +33,7 @@ export default function TrocarSenhaFuncionarioClient({ nome, obrigatoria }) {
       if (!res.ok) throw new Error(data.error || "Erro ao trocar a senha");
       setSucesso(true);
       // Sai e volta pro login — o token de sessão recarrega sem a exigência de troca.
-      setTimeout(() => signOut({ callbackUrl: "/entrar" }), 1500);
+      setTimeout(() => signOut({ callbackUrl: "/colaborador" }), 1500);
     } catch (e) {
       setErro(e.message);
       setSalvando(false);
