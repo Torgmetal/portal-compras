@@ -61,24 +61,6 @@ export default function PontoClient() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  const importar = async (file) => {
-    if (!file) return;
-    setImportando(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await fetch("/api/rh/ponto/importar", { method: "POST", body: fd });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Falha ao importar");
-      showToast(`Ponto de ${d.competencia} importado — ${d.casados} casados, ${d.naoCasados} a vincular`, "success");
-      setCompetencia(d.competencia);
-    } catch (e) {
-      showToast(e.message, "error");
-    } finally {
-      setImportando(false);
-    }
-  };
-
   const importarPdf = async (file) => {
     if (!file) return;
     setImportando(true);
@@ -178,7 +160,7 @@ export default function PontoClient() {
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
             <Clock className="text-torg-blue" /> Controle de Ponto
           </h2>
-          <p className="text-sm text-torg-gray mt-1">Importe o arquivo ACJEF, vincule os PIS e preencha os totais por funcionário para a contabilidade.</p>
+          <p className="text-sm text-torg-gray mt-1">Importe o cartão de ponto (PDF Secullum) — totais por faixa e batidas vêm automaticamente, casando por CPF.</p>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-torg-gray">Competência</label>
@@ -189,18 +171,12 @@ export default function PontoClient() {
 
       {/* Import */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center justify-between flex-wrap gap-3">
-        <p className="text-sm text-torg-gray">Arquivo <strong>ACJEF (.txt)</strong> gerado no sistema de ponto (Controle de Jornadas — Portaria 1510).</p>
+        <p className="text-sm text-torg-gray">Cartão de ponto em <strong>PDF (Secullum)</strong> — o mesmo relatório da TORG e da VMI. Casa por CPF; reimportar substitui só a empresa do arquivo.</p>
         <label className={`px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-2 cursor-pointer ${importando ? "opacity-50 pointer-events-none" : ""}`}
           title="Cartão de ponto Secullum em PDF — traz totais, faixas e batidas automaticamente">
           {importando ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} {importando ? "Importando…" : "Importar PDF (Secullum)"}
           <input type="file" accept="application/pdf,.pdf" className="hidden"
             onChange={(e) => { importarPdf(e.target.files[0]); e.target.value = ""; }} />
-        </label>
-        <label className={`px-4 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-2 cursor-pointer ${importando ? "opacity-50 pointer-events-none" : ""}`}
-          title="Arquivo ACJEF do sistema (só marcações, sem totais por faixa)">
-          <Upload size={16} /> Importar ACJEF
-          <input type="file" accept=".txt,text/plain" className="hidden"
-            onChange={(e) => { importar(e.target.files[0]); e.target.value = ""; }} />
         </label>
       </div>
 
@@ -216,7 +192,7 @@ export default function PontoClient() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
           <Inbox size={40} className="mx-auto text-gray-300 mb-3" />
           <p className="text-torg-gray mb-1">Nenhum ponto importado para <strong>{extenso(competencia)}</strong>.</p>
-          <p className="text-xs text-torg-gray">Importe o arquivo ACJEF acima para começar.</p>
+          <p className="text-xs text-torg-gray">Importe o cartão de ponto (PDF Secullum) acima para começar.</p>
           {competencias.length > 0 && (
             <div className="mt-5 text-xs text-torg-gray">Histórico: {competencias.map((c) => (
               <button key={c.competencia} onClick={() => setCompetencia(c.competencia)} className="underline hover:text-torg-blue mx-1">{c.competencia}</button>
