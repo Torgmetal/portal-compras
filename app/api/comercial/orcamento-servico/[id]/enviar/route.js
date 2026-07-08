@@ -5,8 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { gerarPropostaDocx } from "@/lib/proposta-servico-docx";
-import { converterDocxParaPdf } from "@/lib/cloudconvert";
+import { gerarPropostaPDF } from "@/lib/proposta-servico-pdf";
 import { sendEmail } from "@/lib/email";
 import { z } from "zod";
 
@@ -38,14 +37,14 @@ export async function POST(req, { params }) {
   const para = (d.para || o.email || "").trim();
   if (!para) return NextResponse.json({ success: false, error: "Informe o e-mail do cliente." }, { status: 400 });
 
-  // gera docx → pdf
+  // gera o PDF direto (pdf-lib, sem serviço externo)
   let pdf, numeroPtc;
   try {
-    const r = gerarPropostaDocx(o);
+    const r = await gerarPropostaPDF(o);
     numeroPtc = r.numeroPtc;
-    pdf = await converterDocxParaPdf(r.buffer, `${numeroPtc}.docx`);
+    pdf = Buffer.from(r.bytes);
   } catch (e) {
-    return NextResponse.json({ success: false, error: e?.message || "Falha ao gerar o PDF" }, { status: 502 });
+    return NextResponse.json({ success: false, error: "Falha ao gerar o PDF: " + (e?.message || "erro") }, { status: 500 });
   }
 
   const rev = String(o.revisao || 0).padStart(2, "0");
