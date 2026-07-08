@@ -1,14 +1,15 @@
 // GET /api/comercial/orcamento-servico/[id]/proposta?formato=docx|pdf
-// Baixa a proposta PTC preenchida. docx = template Word; pdf = gerado direto
-// (pdf-lib), sem serviço externo. Só ADMIN/COMERCIAL.
+// docx = template Word. pdf = converte o Word (CloudConvert, IDÊNTICO ao modelo)
+// quando CLOUDCONVERT_API_KEY existe; senão gera em pdf-lib (recriado). ADMIN/COMERCIAL.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarPropostaDocx } from "@/lib/proposta-servico-docx";
 import { gerarPropostaPDF } from "@/lib/proposta-servico-pdf";
+import { converterDocxParaPdf, cloudConvertConfigurado } from "@/lib/cloudconvert";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function GET(req, { params }) {
   let user;
@@ -23,11 +24,21 @@ export async function GET(req, { params }) {
   let buffer, filename, contentType;
   try {
     if (pdf) {
-      const { bytes, numeroPtc } = await gerarPropostaPDF(o);
-      buffer = Buffer.from(bytes); filename = `${numeroPtc}.pdf`; contentType = "application/pdf";
+      contentType = "application/pdf";
+      if (cloudConvertConfigurado()) {
+        // converte o SEU Word → PDF (idêntico ao modelo)
+        const { buffer: docxBuf, numeroPtc } = gerarPropostaDocx(o);
+        buffer = await converterDocxParaPdf(docxBuf, `${numeroPtc}.docx`);
+        filename = `${numeroPtc}.pdf`;
+      } else {
+        // fallback sem serviço externo (layout recriado)
+        const { bytes, numeroPtc } = await gerarPropostaPDF(o);
+        buffer = Buffer.from(bytes); filename = `${numeroPtc}.pdf`;
+      }
     } else {
       const { buffer: b, numeroPtc } = gerarPropostaDocx(o);
-      buffer = b; filename = `${numeroPtc}.docx`; contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      buffer = b; filename = `${numeroPtc}.docx`;
+      contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     }
   } catch (e) {
     return NextResponse.json({ success: false, error: "Falha ao gerar a proposta: " + (e?.message || "erro") }, { status: 500 });

@@ -86,7 +86,7 @@ export default function ServicoDetalheClient({ id }) {
     } catch (e) { setErro(e.message); } finally { setCarregando(false); }
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
-  useEffect(() => { fetch("/api/relatorios/emails").then((r) => r.json()).then((d) => { if (d?.success) setEmailsTorg(d.emails || []); }).catch(() => {}); }, []);
+  useEffect(() => { fetch("/api/comercial/emails").then((r) => r.json()).then((d) => { if (d?.success) setEmailsTorg(d.emails || []); }).catch(() => {}); }, []);
 
   useEffect(() => { if (aba !== "dados" && aba !== "arquivos" && aba !== "resumo" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
 

@@ -5,7 +5,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { gerarPropostaDocx } from "@/lib/proposta-servico-docx";
 import { gerarPropostaPDF } from "@/lib/proposta-servico-pdf";
+import { converterDocxParaPdf, cloudConvertConfigurado } from "@/lib/cloudconvert";
 import { sendEmail } from "@/lib/email";
 import { z } from "zod";
 
@@ -37,12 +39,18 @@ export async function POST(req, { params }) {
   const para = (d.para || o.email || "").trim();
   if (!para) return NextResponse.json({ success: false, error: "Informe o e-mail do cliente." }, { status: 400 });
 
-  // gera o PDF direto (pdf-lib, sem serviço externo)
+  // gera o PDF: CloudConvert (idêntico ao Word) se houver key; senão pdf-lib.
   let pdf, numeroPtc;
   try {
-    const r = await gerarPropostaPDF(o);
-    numeroPtc = r.numeroPtc;
-    pdf = Buffer.from(r.bytes);
+    if (cloudConvertConfigurado()) {
+      const r = gerarPropostaDocx(o);
+      numeroPtc = r.numeroPtc;
+      pdf = await converterDocxParaPdf(r.buffer, `${numeroPtc}.docx`);
+    } else {
+      const r = await gerarPropostaPDF(o);
+      numeroPtc = r.numeroPtc;
+      pdf = Buffer.from(r.bytes);
+    }
   } catch (e) {
     return NextResponse.json({ success: false, error: "Falha ao gerar o PDF: " + (e?.message || "erro") }, { status: 500 });
   }
