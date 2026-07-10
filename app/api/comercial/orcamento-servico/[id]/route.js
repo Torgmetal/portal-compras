@@ -22,6 +22,13 @@ const updateSchema = z.object({
   pagamentoPrazo: z.string().max(200).nullable().optional(),
   inclusos: z.array(z.string().max(500)).max(40).nullable().optional(),
   exclusos: z.array(z.string().max(500)).max(40).nullable().optional(),
+  lotes: z.array(z.object({
+    id: z.string(),
+    nome: z.string().max(120).optional().default(""),
+    local: z.string().max(600).optional().default(""),
+    data: z.string().max(40).optional().default(""),
+    itens: z.array(z.object({ descricao: z.string().max(300).optional().default(""), qtd: z.string().max(40).optional().default(""), unidade: z.string().max(40).optional().default("") })).max(200).optional().default([]),
+  })).max(60).nullable().optional(),
   composicao: z.record(z.any()).optional(),
   arquivos: z.array(z.object({
     url: z.string().url(),
@@ -55,7 +62,7 @@ export async function PATCH(req, { params }) {
 
   const d = parsed.data;
   const data = {};
-  for (const k of ["cliente", "obra", "contato", "email", "telefone", "endereco", "servicos", "status", "valor", "observacoes", "diasPagamento", "pagamentoPrazo", "inclusos", "exclusos", "composicao", "arquivos"]) {
+  for (const k of ["cliente", "obra", "contato", "email", "telefone", "endereco", "servicos", "status", "valor", "observacoes", "diasPagamento", "pagamentoPrazo", "inclusos", "exclusos", "lotes", "composicao", "arquivos"]) {
     if (k in d) data[k] = d[k];
   }
   const os = await prisma.orcamentoServico.update({ where: { id: params.id }, data });

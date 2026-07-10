@@ -35,6 +35,7 @@ export default function ServicoDetalheClient({ id }) {
   const [pagamentoPrazo, setPagamentoPrazo] = useState("");
   const [incl, setIncl] = useState([]);
   const [excl, setExcl] = useState([]);
+  const [lotes, setLotes] = useState([]);
   const [revisao, setRevisao] = useState(0);
   const [revisoes, setRevisoes] = useState([]);
   const [enviadoEm, setEnviadoEm] = useState(null);
@@ -83,6 +84,7 @@ export default function ServicoDetalheClient({ id }) {
       setPagamentoPrazo(o.pagamentoPrazo ?? (o.diasPagamento ? String(o.diasPagamento) : ""));
       setIncl(Array.isArray(o.inclusos) && o.inclusos.length ? o.inclusos : DEFAULT_INCLUSOS);
       setExcl(Array.isArray(o.exclusos) && o.exclusos.length ? o.exclusos : DEFAULT_EXCLUSOS);
+      setLotes(Array.isArray(o.lotes) ? o.lotes : []);
       setRevisao(o.revisao || 0); setRevisoes(Array.isArray(o.revisoes) ? o.revisoes : []); setEnviadoEm(o.enviadoEm || null);
       setConsolidadaEm(o.consolidadaEm || null);
       setServSel(Array.isArray(o.servicos) ? o.servicos : []); setStatus(o.status || "RASCUNHO"); setObs(o.observacoes || "");
@@ -98,7 +100,7 @@ export default function ServicoDetalheClient({ id }) {
   useEffect(() => { carregar(); }, [carregar]);
   useEffect(() => { fetch("/api/comercial/emails").then((r) => r.json()).then((d) => { if (d?.success) setEmailsTorg(d.emails || []); }).catch(() => {}); }, []);
 
-  useEffect(() => { if (aba !== "dados" && aba !== "arquivos" && aba !== "resumo" && aba !== "inclusos" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
+  useEffect(() => { if (aba !== "dados" && aba !== "arquivos" && aba !== "resumo" && aba !== "inclusos" && aba !== "lotes" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
 
   const toggleServ = (k) => { setServSel((p) => (p.includes(k) ? p.filter((x) => x !== k) : [...p, k])); marcar(); };
 
@@ -127,7 +129,7 @@ export default function ServicoDetalheClient({ id }) {
     try {
       const r = await fetch(`/api/comercial/orcamento-servico/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, email: email || null, telefone: telefone || null, endereco: endereco || null, pagamentoPrazo: pagamentoPrazo.trim() || null, inclusos: incl.map((s) => s.trim()).filter(Boolean), exclusos: excl.map((s) => s.trim()).filter(Boolean), servicos: servSel, status, observacoes: obs || null, composicao, arquivos, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
+        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, email: email || null, telefone: telefone || null, endereco: endereco || null, pagamentoPrazo: pagamentoPrazo.trim() || null, inclusos: incl.map((s) => s.trim()).filter(Boolean), exclusos: excl.map((s) => s.trim()).filter(Boolean), lotes, servicos: servSel, status, observacoes: obs || null, composicao, arquivos, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao salvar");
@@ -210,6 +212,18 @@ export default function ServicoDetalheClient({ id }) {
     } catch (e) { showToast(e.message, "error"); } finally { setConsolidando(false); }
   };
 
+  const addLote = () => { setLotes((p) => [...p, { id: uid(), nome: `Lote ${p.length + 1}`, local: "", data: "", itens: [] }]); marcar(); };
+  const setLoteCampo = (i, campo, valor) => { setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, [campo]: valor } : l))); marcar(); };
+  const rmLote = (i) => { setLotes((p) => p.filter((_, idx) => idx !== i)); marcar(); };
+  const addItemLote = (i) => { setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, itens: [...(l.itens || []), { descricao: "", qtd: "", unidade: "" }] } : l))); marcar(); };
+  const setItemLote = (i, j, campo, valor) => { setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, itens: (l.itens || []).map((it, jdx) => (jdx === j ? { ...it, [campo]: valor } : it)) } : l))); marcar(); };
+  const rmItemLote = (i, j) => { setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, itens: (l.itens || []).filter((_, jdx) => jdx !== j) } : l))); marcar(); };
+  const puxarPerfisLote = (i) => {
+    const perfis = cfLinhas.filter((l) => l.perfil).map((l) => ({ descricao: l.perfil, qtd: String(num(l.qtdBarras) || ""), unidade: "barras" }));
+    if (!perfis.length) { showToast("Sem perfis no corte pra puxar", "error"); return; }
+    setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, itens: [...(l.itens || []), ...perfis] } : l))); marcar();
+  };
+
   const abrirEnvio = () => {
     if (dirty) { showToast("Salve o orçamento antes de enviar", "error"); return; }
     if (!servSel.length) { showToast("Selecione ao menos um serviço", "error"); return; }
@@ -274,7 +288,7 @@ export default function ServicoDetalheClient({ id }) {
     </div>
   );
 
-  const tabs = [{ key: "dados", label: "Dados" }, { key: "arquivos", label: "Arquivos do cliente" }, ...servSel.map((s) => ({ key: s, label: SERVICO_LABEL[s] || s })), { key: "inclusos", label: "Inclusos / Exclusos" }, { key: "resumo", label: "Resumo / Proposta" }];
+  const tabs = [{ key: "dados", label: "Dados" }, { key: "arquivos", label: "Arquivos do cliente" }, ...servSel.map((s) => ({ key: s, label: SERVICO_LABEL[s] || s })), { key: "inclusos", label: "Inclusos / Exclusos" }, { key: "lotes", label: "Lotes / Entregas" }, { key: "resumo", label: "Resumo / Proposta" }];
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -501,6 +515,44 @@ export default function ServicoDetalheClient({ id }) {
             {renderLista("Inclusos", incl, setIncl, DEFAULT_INCLUSOS)}
             {renderLista("Exclusos", excl, setExcl, DEFAULT_EXCLUSOS)}
           </div>
+        </div>
+      )}
+
+      {aba === "lotes" && (
+        <div className="space-y-3">
+          <div className="flex items-start justify-between flex-wrap gap-2">
+            <p className="text-sm text-torg-gray max-w-xl">Monte os <strong>lotes de entrega</strong> — cada lote com seu <strong>local de entrega</strong> e os itens que vão nele. Gere o <strong>Plano de Entregas</strong> pra combinar com o cliente e o transporte.</p>
+            <button type="button" onClick={() => { if (dirty) { showToast("Salve o orçamento antes de gerar", "error"); return; } window.location.href = `/api/comercial/orcamento-servico/${id}/lotes-pdf`; }} className="px-3 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-blue/90 shrink-0"><FileText size={15} /> Plano de Entregas (PDF)</button>
+          </div>
+          {lotes.map((lote, i) => (
+            <div key={lote.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <input value={lote.nome} onChange={(e) => setLoteCampo(i, "nome", e.target.value)} placeholder={`Lote ${i + 1}`} className="font-semibold text-torg-dark border border-gray-200 rounded px-2 py-1 text-sm w-40 focus:ring-1 focus:ring-torg-blue" />
+                <input value={lote.data} onChange={(e) => setLoteCampo(i, "data", e.target.value)} placeholder="Data prevista" className="w-32 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue" />
+                <button type="button" onClick={() => rmLote(i)} className="ml-auto text-red-400 hover:text-red-600" title="Remover lote"><Trash2 size={15} /></button>
+              </div>
+              <label className="text-xs text-torg-gray">Local de entrega</label>
+              <textarea value={lote.local} onChange={(e) => setLoteCampo(i, "local", e.target.value)} rows={2} placeholder="Endereço / obra / responsável pelo recebimento" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 mb-3 focus:ring-2 focus:ring-torg-blue resize-y" />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-torg-gray">Itens deste lote</label>
+                <button type="button" onClick={() => puxarPerfisLote(i)} className="text-xs text-torg-blue hover:underline">+ puxar perfis do corte</button>
+              </div>
+              <div className="space-y-1.5">
+                {(lote.itens || []).map((it, j) => (
+                  <div key={j} className="flex items-center gap-2">
+                    <input value={it.descricao} onChange={(e) => setItemLote(i, j, "descricao", e.target.value)} placeholder="Descrição do item" className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue" />
+                    <input value={it.qtd} onChange={(e) => setItemLote(i, j, "qtd", e.target.value)} placeholder="Qtd" className="w-16 border border-gray-200 rounded px-2 py-1 text-xs text-right focus:ring-1 focus:ring-torg-blue" />
+                    <input value={it.unidade} onChange={(e) => setItemLote(i, j, "unidade", e.target.value)} placeholder="un" className="w-20 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue" />
+                    <button type="button" onClick={() => rmItemLote(i, j)} className="text-red-400 hover:text-red-600 shrink-0"><Trash2 size={13} /></button>
+                  </div>
+                ))}
+                {!(lote.itens || []).length && <p className="text-xs text-torg-gray">Nenhum item. Adicione ou puxe os perfis do corte.</p>}
+              </div>
+              <button type="button" onClick={() => addItemLote(i)} className="w-full mt-2 py-1.5 border-2 border-dashed border-gray-200 rounded-lg text-torg-gray hover:border-torg-blue hover:text-torg-blue text-xs font-medium inline-flex items-center justify-center gap-1"><Plus size={13} /> Adicionar item</button>
+            </div>
+          ))}
+          {lotes.length === 0 && <p className="text-sm text-torg-gray">Nenhum lote ainda. Clique em "Adicionar lote".</p>}
+          <button type="button" onClick={addLote} className="w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-torg-gray hover:border-torg-blue hover:text-torg-blue font-medium inline-flex items-center justify-center gap-2 transition-colors"><Plus size={16} /> Adicionar lote</button>
         </div>
       )}
 

@@ -1398,6 +1398,7 @@ model OrcamentoServico {
   pagamentoPrazo String? // prazo de pagamento livre: "15", "28/42", "30/60"…
   inclusos      Json? // lista custom de inclusos (null = padrão)
   exclusos      Json? // lista custom de exclusos (null = padrão)
+  lotes         Json? // lotes de entrega: [{ id, nome, local, data, itens:[{descricao,qtd,unidade}] }]
   revisao       Int      @default(0) // revisão atual (R00, R01…)
   revisoes      Json     @default("[]") // histórico: [{ num, data, motivo }]
   enviadoEm     DateTime? // 1º envio ao cliente
