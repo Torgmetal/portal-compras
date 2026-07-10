@@ -61,10 +61,11 @@ export default async function OPDetailPage({ params }) {
 
   // Pendência: proposta de serviço que gerou esta OP e ainda não foi assinada
   // pelo cliente (derivado — some sozinho quando o cliente aprova).
-  const propostaPend = await prisma.orcamentoServico.findFirst({
-    where: { opCriadaId: op.id, aceitoEm: null },
-    select: { id: true, numero: true, aceiteEnviadoEm: true },
+  const propostaVinc = await prisma.orcamentoServico.findFirst({
+    where: { opCriadaId: op.id },
+    select: { id: true, numero: true, aceitoEm: true, aceiteEnviadoEm: true, lotes: true },
   });
+  const propostaPend = propostaVinc && !propostaVinc.aceitoEm ? propostaVinc : null;
 
   // Cobertura por categoria: pra cada categoria da OP, lista RMs (apenas ENGENHARIA) que cobrem
   const categoriasNoEscopo = new Set();
@@ -346,7 +347,7 @@ export default async function OPDetailPage({ params }) {
         </div>
       )}
 
-      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} />
+      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} proposta={propostaVinc} />
 
       <PedidosOmieSection pedidos={pedidos} />
     </div>

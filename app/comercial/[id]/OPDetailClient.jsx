@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket,
+  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
@@ -34,13 +34,22 @@ function calcStatus(op) {
   return "ABERTA";
 }
 
-export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false }) {
+const VISTAS = [
+  { key: "resumo", label: "Resumo", icon: FileText },
+  { key: "engenharia", label: "Engenharia", icon: Ruler },
+  { key: "producao", label: "Produção", icon: Factory },
+  { key: "expedicao", label: "Expedição", icon: Truck },
+  { key: "financeiro", label: "Financeiro", icon: DollarSign },
+];
+
+export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, proposta = null }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
   // Permissao pra aplicar alteracao de verba direto, sem virar solicitacao
   // pendente. Inclui ADMIN e COMERCIAL com a flag podeAlterarVerba.
   const podeAlterarVerbaDireto = isMaster || podeAlterarVerba;
 
+  const [vista, setVista] = useState("resumo");
   const [modalAditivo, setModalAditivo] = useState(false);
   const [modalRevisao, setModalRevisao] = useState(false);
   const [modalPrazo, setModalPrazo] = useState(false);
@@ -137,6 +146,15 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
   return (
     <>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1.5 flex gap-1 overflow-x-auto">
+        {VISTAS.map((v) => { const Icon = v.icon; return (
+          <button key={v.key} onClick={() => setVista(v.key)} className={`px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${vista === v.key ? "bg-torg-blue text-white" : "text-torg-gray hover:bg-gray-50"}`}>
+            <Icon size={15} /> {v.label}
+          </button>
+        ); })}
+      </div>
+
+      {vista === "resumo" && (<>
       {/* Cabeçalho */}
       <div className="space-y-4">
         {/* Identidade da OP */}
@@ -736,6 +754,79 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      </>)}
+
+      {vista === "expedicao" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><Truck size={18} className="text-torg-blue" /> Programação de entrega por lote</h3>
+            {proposta?.id && Array.isArray(proposta.lotes) && proposta.lotes.length > 0 && (
+              <a href={`/api/comercial/orcamento-servico/${proposta.id}/lotes-pdf`} className="px-3 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-blue-700"><FileText size={15} /> Plano de Entregas (PDF)</a>
+            )}
+          </div>
+          {!proposta ? (
+            <p className="text-sm text-torg-gray">Esta OP não está vinculada a uma proposta de serviço com lotes de entrega.</p>
+          ) : !Array.isArray(proposta.lotes) || proposta.lotes.length === 0 ? (
+            <p className="text-sm text-torg-gray">A proposta {proposta.numero ? `OS-${String(proposta.numero).padStart(3, "0")}` : "de serviço"} ainda não tem lotes de entrega. <Link href={`/comercial/orcamentos/servicos/${proposta.id}`} className="text-torg-blue hover:underline">Abrir proposta</Link> para montar os lotes.</p>
+          ) : (
+            <div className="space-y-3">
+              {proposta.lotes.map((lote, i) => (
+                <div key={lote.id || i} className="border border-gray-100 rounded-lg overflow-hidden">
+                  <div className="bg-torg-dark text-white px-4 py-2 flex items-center justify-between gap-2">
+                    <span className="font-semibold text-sm">{lote.nome || `Lote ${i + 1}`}</span>
+                    <span className="text-xs text-white/80">{[lote.data && `Entrega: ${lote.data}`, `${(lote.itens || []).length} item(ns)`].filter(Boolean).join(" · ")}</span>
+                  </div>
+                  {lote.local && <p className="px-4 pt-2 text-xs text-torg-gray"><span className="font-semibold">Local:</span> {lote.local}</p>}
+                  <table className="w-full text-sm">
+                    <thead><tr className="text-xs text-torg-gray"><th className="text-left px-4 py-1.5 font-medium">Descrição</th><th className="text-right px-4 py-1.5 font-medium w-20">Qtd</th><th className="text-left px-4 py-1.5 font-medium w-24">Unid.</th></tr></thead>
+                    <tbody>
+                      {(lote.itens || []).map((it, j) => (
+                        <tr key={j} className="border-t border-gray-50"><td className="px-4 py-1.5 text-torg-dark">{it.descricao || "—"}{it.url && <a href={it.url} target="_blank" rel="noreferrer" className="text-torg-blue ml-1.5 text-xs underline">arquivo</a>}</td><td className="px-4 py-1.5 text-right text-torg-gray">{it.qtd || ""}</td><td className="px-4 py-1.5 text-torg-gray">{it.unidade || ""}</td></tr>
+                      ))}
+                      {(lote.itens || []).length === 0 && <tr><td colSpan={3} className="px-4 py-1.5 text-xs text-torg-gray">Sem itens.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+              <p className="text-xs text-torg-gray">A baixa por romaneio (marcar cada lote como entregue conforme os romaneios) entra na próxima etapa.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {vista === "engenharia" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><Ruler size={18} className="text-torg-blue" /> Engenharia</h3>
+          <p className="text-sm text-torg-gray mb-4">Projetos, RMs de compra e listas da OP. Projetos e listas entram na próxima etapa.</p>
+          <h4 className="text-sm font-semibold text-torg-dark mb-2">RMs de compra ({(op.rms || []).length})</h4>
+          {(op.rms || []).length === 0 ? <p className="text-sm text-torg-gray">Nenhuma RM vinculada a esta OP.</p> : (
+            <div className="space-y-1.5">
+              {op.rms.map((rm) => (
+                <div key={rm.id} className="flex items-center justify-between gap-2 border border-gray-100 rounded-lg px-3 py-2 text-sm">
+                  <span className="font-mono font-semibold text-torg-dark">{rm.numero || rm.id.slice(0, 8)}</span>
+                  <span className="text-xs text-torg-gray flex-1 truncate">{rm.tipoRM || ""}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray whitespace-nowrap">{rm.status || ""}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {vista === "producao" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-2"><Factory size={18} className="text-torg-blue" /> Produção</h3>
+          <p className="text-sm text-torg-gray">Status geral da produção — a lista de peças/etapas que dá baixa conforme os apontamentos do Syneco. Em construção (próxima etapa).</p>
+        </div>
+      )}
+
+      {vista === "financeiro" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-2"><DollarSign size={18} className="text-torg-blue" /> Demonstrativo financeiro</h3>
+          <p className="text-sm text-torg-gray">Receitas, medições, despesas e aditivos. Por enquanto o demonstrativo completo está na aba <button onClick={() => setVista("resumo")} className="text-torg-blue underline font-medium">Resumo</button>; será organizado aqui na próxima etapa.</p>
         </div>
       )}
 
