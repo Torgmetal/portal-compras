@@ -799,28 +799,34 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
       )}
 
       {vista === "engenharia" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><Ruler size={18} className="text-torg-blue" /> Engenharia</h3>
-          <p className="text-sm text-torg-gray">Projetos e listas de material da OP. Em construção (próxima etapa). As RMs de compra estão na aba <button onClick={() => setVista("compras")} className="text-torg-blue underline font-medium">Compras</button>.</p>
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><Ruler size={18} className="text-torg-blue" /> Engenharia</h3>
+            <p className="text-sm text-torg-gray mb-4">RMs emitidas e listas de material da OP.</p>
+            <h4 className="text-sm font-semibold text-torg-dark mb-2">RMs emitidas ({(op.rms || []).length})</h4>
+            {(op.rms || []).length === 0 ? <p className="text-sm text-torg-gray">Nenhuma RM emitida para esta OP.</p> : (
+              <div className="space-y-1.5">
+                {op.rms.map((rm) => (
+                  <div key={rm.id} className="flex items-center justify-between gap-2 border border-gray-100 rounded-lg px-3 py-2 text-sm">
+                    <span className="font-mono font-semibold text-torg-dark">{rm.numero || rm.id.slice(0, 8)}</span>
+                    <span className="text-xs text-torg-gray flex-1 truncate">{rm.tipoRM || ""}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray whitespace-nowrap">{rm.status || ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h4 className="text-sm font-semibold text-torg-dark mb-1">Listas</h4>
+            <p className="text-sm text-torg-gray">Lista de expedíveis, LPC e demais listas de material da engenharia. Em construção (próxima etapa).</p>
+          </div>
         </div>
       )}
 
       {vista === "compras" && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><ShoppingCart size={18} className="text-torg-blue" /> Compras</h3>
-          <p className="text-sm text-torg-gray mb-4">RMs de compra e pedidos da OP. O acompanhamento dos pedidos/recebimentos entra na próxima etapa.</p>
-          <h4 className="text-sm font-semibold text-torg-dark mb-2">RMs de compra ({(op.rms || []).length})</h4>
-          {(op.rms || []).length === 0 ? <p className="text-sm text-torg-gray">Nenhuma RM vinculada a esta OP.</p> : (
-            <div className="space-y-1.5">
-              {op.rms.map((rm) => (
-                <div key={rm.id} className="flex items-center justify-between gap-2 border border-gray-100 rounded-lg px-3 py-2 text-sm">
-                  <span className="font-mono font-semibold text-torg-dark">{rm.numero || rm.id.slice(0, 8)}</span>
-                  <span className="text-xs text-torg-gray flex-1 truncate">{rm.tipoRM || ""}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray whitespace-nowrap">{rm.status || ""}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-2"><ShoppingCart size={18} className="text-torg-blue" /> Compras</h3>
+          <p className="text-sm text-torg-gray">Pedidos de compra, cotações e recebimentos da OP. Em construção (próxima etapa). As <button onClick={() => setVista("engenharia")} className="text-torg-blue underline font-medium">RMs emitidas</button> ficam na Engenharia.</p>
         </div>
       )}
 
