@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send, CheckCircle2, ClipboardList } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
 import { precoHoraDoServico } from "@/lib/custo-hora-calc";
@@ -40,6 +40,10 @@ export default function ServicoDetalheClient({ id }) {
   const [revisoes, setRevisoes] = useState([]);
   const [enviadoEm, setEnviadoEm] = useState(null);
   const [consolidadaEm, setConsolidadaEm] = useState(null);
+  const [opCriadaId, setOpCriadaId] = useState(null);
+  const [gerarOpOpen, setGerarOpOpen] = useState(false);
+  const [opNumero, setOpNumero] = useState("");
+  const [gerandoOp, setGerandoOp] = useState(false);
   const [consolidando, setConsolidando] = useState(false);
   const [emailsTorg, setEmailsTorg] = useState([]);
   const [modalEnvio, setModalEnvio] = useState(false);
@@ -87,6 +91,7 @@ export default function ServicoDetalheClient({ id }) {
       setLotes(Array.isArray(o.lotes) ? o.lotes : []);
       setRevisao(o.revisao || 0); setRevisoes(Array.isArray(o.revisoes) ? o.revisoes : []); setEnviadoEm(o.enviadoEm || null);
       setConsolidadaEm(o.consolidadaEm || null);
+      setOpCriadaId(o.opCriadaId || null);
       setServSel(Array.isArray(o.servicos) ? o.servicos : []); setStatus(o.status || "RASCUNHO"); setObs(o.observacoes || "");
       setComposicao(o.composicao && typeof o.composicao === "object" ? o.composicao : {});
       setArquivos(Array.isArray(o.arquivos) ? o.arquivos : []);
@@ -210,6 +215,18 @@ export default function ServicoDetalheClient({ id }) {
       setConsolidadaEm(d.orcamento?.consolidadaEm || null);
       showToast(valor ? "Proposta consolidada" : "Consolidação desfeita", "success");
     } catch (e) { showToast(e.message, "error"); } finally { setConsolidando(false); }
+  };
+
+  const gerarOp = async () => {
+    if (!opNumero.trim()) { showToast("Informe o número da OP", "error"); return; }
+    setGerandoOp(true);
+    try {
+      const r = await fetch(`/api/comercial/orcamento-servico/${id}/gerar-op`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ numero: opNumero }) });
+      const dt = await r.json();
+      if (!r.ok) throw new Error(dt.error || "Falha ao gerar OP");
+      setOpCriadaId(dt.id); setGerarOpOpen(false);
+      showToast(`OP ${dt.numero} criada`, "success");
+    } catch (e) { showToast(e.message, "error"); } finally { setGerandoOp(false); }
   };
 
   const addLote = () => { setLotes((p) => [...p, { id: uid(), nome: `Lote ${p.length + 1}`, local: "", data: "", itens: [] }]); marcar(); };
@@ -622,6 +639,17 @@ export default function ServicoDetalheClient({ id }) {
                 <button type="button" onClick={abrirEnvio} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-orange/90"><Send size={15} /> {enviadoEm ? "Reenviar ao cliente" : "Enviar ao cliente"}</button>
               </div>
             </div>
+            <div className="border-t border-gray-100 pt-3 flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <p className="text-sm font-semibold text-torg-dark flex items-center gap-1.5"><ClipboardList size={15} className="text-torg-orange" /> Ordem de Produção</p>
+                <p className="text-xs text-torg-gray mt-0.5">{opCriadaId ? "OP já gerada a partir desta proposta." : consolidadaEm ? "Proposta consolidada — pode gerar a OP com os dados da proposta." : "Consolide a proposta para liberar a geração da OP."}</p>
+              </div>
+              {opCriadaId ? (
+                <a href={`/comercial/${opCriadaId}`} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-green-700"><CheckCircle2 size={15} /> Ver OP criada</a>
+              ) : (
+                <button type="button" onClick={() => { setOpNumero(""); setGerarOpOpen(true); }} disabled={!consolidadaEm} title={consolidadaEm ? "" : "Consolide a proposta primeiro"} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-orange/90 disabled:opacity-40 disabled:cursor-not-allowed"><ClipboardList size={15} /> Gerar OP</button>
+              )}
+            </div>
             {revisoes.length > 1 && (
               <div className="border-t border-gray-100 pt-3">
                 <div className="text-[11px] text-torg-gray uppercase mb-1">Histórico de revisões</div>
@@ -691,6 +719,27 @@ export default function ServicoDetalheClient({ id }) {
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setModalRev(false)} disabled={criandoRev} className="px-4 py-2 text-sm text-torg-gray rounded-lg hover:bg-gray-100">Cancelar</button>
               <button onClick={criarRevisao} disabled={criandoRev} className="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 disabled:opacity-50">{criandoRev ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} Registrar revisão</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {gerarOpOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !gerandoOp && setGerarOpOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-torg-dark mb-1 flex items-center gap-2"><ClipboardList size={18} className="text-torg-orange" /> Gerar Ordem de Produção</h3>
+            <p className="text-xs text-torg-gray mb-3">Cria a OP já com o cliente, a obra e um item por serviço (com o valor da proposta). Depois é só ajustar os detalhes no painel da OP.</p>
+            <div className="bg-gray-50 rounded-lg p-3 text-xs text-torg-dark space-y-0.5 mb-3">
+              <div><span className="text-torg-gray">Cliente:</span> <strong>{cliente || "—"}</strong></div>
+              {obra && <div><span className="text-torg-gray">Obra:</span> {obra}</div>}
+              <div><span className="text-torg-gray">Serviços:</span> {servSel.map((s) => SERVICO_LABEL[s] || s).join(", ") || "—"}</div>
+              <div><span className="text-torg-gray">Valor:</span> {custoTotal ? custoTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}</div>
+            </div>
+            <label className="text-xs text-torg-gray">Número da OP *</label>
+            <input value={opNumero} onChange={(e) => setOpNumero(e.target.value)} placeholder="ex.: 124 ou T124" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" autoFocus />
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setGerarOpOpen(false)} disabled={gerandoOp} className="px-4 py-2 text-sm text-torg-gray rounded-lg hover:bg-gray-100">Cancelar</button>
+              <button onClick={gerarOp} disabled={gerandoOp} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 disabled:opacity-50">{gerandoOp ? <Loader2 size={15} className="animate-spin" /> : <ClipboardList size={15} />} Gerar OP</button>
             </div>
           </div>
         </div>
