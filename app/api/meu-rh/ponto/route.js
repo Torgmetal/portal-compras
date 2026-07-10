@@ -1,5 +1,5 @@
-// GET /api/meu-rh/ponto — espelho de ponto do funcionário logado (totais por
-// faixa + dia a dia, igual o cartão). Traz as competências já importadas.
+// GET /api/meu-rh/ponto — cartões de ponto (PDF) do funcionário logado, por
+// competência. O funcionário só vê e baixa o PDF (a página dele), igual holerite.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireFuncionario } from "@/lib/session";
@@ -15,17 +15,16 @@ export async function GET() {
   }
 
   const itens = await prisma.pontoItem.findMany({
-    where: { funcionarioId: user.funcionarioId, diario: { not: null } },
-    select: { id: true, empresa: true, diario: true, ponto: { select: { competencia: true } } },
+    where: { funcionarioId: user.funcionarioId, pdfUrl: { not: null } },
+    select: { id: true, empresa: true, ponto: { select: { competencia: true } } },
     orderBy: { ponto: { competencia: "desc" } },
   });
 
-  const competencias = itens.map((i) => ({
+  const cartoes = itens.map((i) => ({
     id: i.id,
     competencia: i.ponto?.competencia || null,
     empresa: i.empresa,
-    ...i.diario, // { totais, dias, periodoInicio, periodoFim, folha }
   }));
 
-  return NextResponse.json({ competencias });
+  return NextResponse.json({ cartoes });
 }

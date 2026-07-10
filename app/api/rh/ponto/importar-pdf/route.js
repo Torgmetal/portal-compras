@@ -3,6 +3,7 @@
 // PontoCompetencia + itens com os totais por faixa + espelho diário (JSON).
 // Reimportar substitui os itens desta origem na mesma competência. Só ADMIN/RH.
 import { NextResponse } from "next/server";
+import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { parsePontoSecullum } from "@/lib/ponto-secullum-pdf";
@@ -30,15 +31,28 @@ export async function POST(req) {
   const file = form.get("file");
   if (!file || typeof file.arrayBuffer !== "function") return NextResponse.json({ success: false, error: "Nenhum arquivo enviado" }, { status: 400 });
 
+  const buf = Buffer.from(await file.arrayBuffer());
   let dados;
   try {
-    dados = await parsePontoSecullum(Buffer.from(await file.arrayBuffer()));
+    dados = await parsePontoSecullum(buf);
   } catch (e) {
     return NextResponse.json({ success: false, error: "PDF ilegível: " + (e?.message || "erro") }, { status: 422 });
   }
   const competencia = competenciaDoPeriodo(dados.periodoFim);
   if (!competencia) return NextResponse.json({ success: false, error: "Não identifiquei o período/competência no PDF" }, { status: 422 });
   if (!dados.funcionarios.length) return NextResponse.json({ success: false, error: "Nenhum funcionário encontrado no PDF" }, { status: 422 });
+
+  // Guarda o PDF COMPLETO no Blob (uma vez). A página de cada funcionário é
+  // extraída sob demanda no /meu-rh — assim o funcionário vê/baixa o próprio
+  // cartão, igual holerite, sem estourar o tempo do import (nada de 54 uploads).
+  let pdfUrl = null;
+  try {
+    const slug = (dados.empresa || "empresa").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 20);
+    const blob = await put(`ponto-secullum/${competencia}-${slug}-${Date.now()}.pdf`, buf, { access: "public", contentType: "application/pdf" });
+    pdfUrl = blob.url;
+  } catch (e) {
+    return NextResponse.json({ success: false, error: "Falha ao guardar o PDF: " + (e?.message || "erro") }, { status: 502 });
+  }
 
   // Match por CPF (dígitos). Cadastro pode ter CPF com ou sem máscara.
   const funcs = await prisma.funcionario.findMany({ where: { cpf: { not: null } }, select: { id: true, nome: true, cpf: true } });
@@ -64,6 +78,7 @@ export async function POST(req) {
           pisArquivo: f.cpfDigitos, cpfArquivo: f.cpfDigitos,
           empresa: dados.empresa || null,
           funcionarioId: match?.id || null, nome: match?.nome || null,
+          pdfUrl, pagina: f.pagina,
           diario: { totais: t, dias: f.dias, periodoInicio: dados.periodoInicio, periodoFim: dados.periodoFim, folha: f.folha },
           horasNormais: min2h(t.normais), horasExtras50: min2h(t.ex50), horasExtras60: min2h(t.ex60),
           horasExtras80: min2h(t.ex80), horasExtras100: min2h(t.ex100), horasExtras150: min2h(t.ex150),

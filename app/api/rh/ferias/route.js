@@ -84,35 +84,42 @@ export async function POST(req) {
   const { funcionarioId, dataInicio, diasGozo, diasVendidos, descontos, salarioBase, status, observacao } = parsed.data;
   if (diasGozo + diasVendidos > 30) return NextResponse.json({ success: false, error: "Gozo + vendidos não pode passar de 30 dias" }, { status: 400 });
 
-  const func = await prisma.funcionario.findUnique({
-    where: { id: funcionarioId },
-    select: { id: true, salario: true, dataAdmissao: true },
-  });
-  if (!func) return NextResponse.json({ success: false, error: "Funcionário não encontrado" }, { status: 404 });
+  try {
+    const func = await prisma.funcionario.findUnique({
+      where: { id: funcionarioId },
+      select: { id: true, salario: true, dataAdmissao: true },
+    });
+    if (!func) return NextResponse.json({ success: false, error: "Funcionário não encontrado" }, { status: 404 });
+    if (!func.dataAdmissao) return NextResponse.json({ success: false, error: "Funcionário sem data de admissão — preencha o cadastro antes de lançar férias." }, { status: 400 });
 
-  // Base do cálculo = override manual do RH (se informado) ou o salário do cadastro.
-  const base = salarioBase != null ? salarioBase : func.salario;
+    // Base do cálculo = override manual do RH (se informado) ou o salário do cadastro.
+    const base = salarioBase != null ? salarioBase : func.salario;
 
-  // Período aquisitivo = admissão + (nº de férias já usadas, exceto canceladas).
-  const usadas = await prisma.ferias.count({ where: { funcionarioId, status: { not: "CANCELADA" } } });
-  const periodo = periodoAtual(func.dataAdmissao, usadas);
-  const valor = valorFerias(base, diasGozo, diasVendidos, descontos).total;
+    // Período aquisitivo = admissão + (nº de férias já usadas, exceto canceladas).
+    const usadas = await prisma.ferias.count({ where: { funcionarioId, status: { not: "CANCELADA" } } });
+    const periodo = periodoAtual(func.dataAdmissao, usadas);
+    const fim = fimGozo(dataInicio, diasGozo);
+    const valor = valorFerias(base, diasGozo, diasVendidos, descontos).total;
 
-  const ferias = await prisma.ferias.create({
-    data: {
-      funcionarioId,
-      periodoAquisInicio: new Date(periodo.aquisInicio),
-      periodoAquisFim: new Date(periodo.aquisFim),
-      dataInicio: new Date(dataInicio),
-      dataFim: new Date(fimGozo(dataInicio, diasGozo)),
-      diasGozo, diasVendidos, descontos, valorEstimado: valor,
-      status, observacao: observacao || null,
-    },
-  });
+    const ferias = await prisma.ferias.create({
+      data: {
+        funcionarioId,
+        periodoAquisInicio: new Date(periodo.aquisInicio),
+        periodoAquisFim: new Date(periodo.aquisFim),
+        dataInicio: new Date(dataInicio),
+        dataFim: fim ? new Date(fim) : new Date(dataInicio),
+        diasGozo, diasVendidos, descontos, valorEstimado: Number.isFinite(valor) ? valor : 0,
+        status, observacao: observacao || null,
+      },
+    });
 
-  await prisma.auditLog.create({
-    data: { userId: user.id, action: "PROGRAMAR_FERIAS", entity: "Ferias", entityId: ferias.id, diff: { funcionarioId, dataInicio, diasGozo, diasVendidos, descontos, salarioBase: base, status, valor } },
-  }).catch(() => {});
+    await prisma.auditLog.create({
+      data: { userId: user.id, action: "PROGRAMAR_FERIAS", entity: "Ferias", entityId: ferias.id, diff: { funcionarioId, dataInicio, diasGozo, diasVendidos, descontos, salarioBase: base, status, valor } },
+    }).catch(() => {});
 
-  return NextResponse.json({ success: true, ferias });
+    return NextResponse.json({ success: true, ferias });
+  } catch (e) {
+    // Surfacia a causa real em vez de um 500 opaco (que aparecia como "INVALID").
+    return NextResponse.json({ success: false, error: `Não foi possível salvar as férias: ${e?.message || "erro desconhecido"}` }, { status: 500 });
+  }
 }

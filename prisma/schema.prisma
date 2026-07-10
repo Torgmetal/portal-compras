@@ -1292,6 +1292,8 @@ model PontoItem {
   nome             String? // preenchido quando casa/mapeia o funcionário
   marcacoes        Json? // [{ data, marcacoes[], raw }] — referência (ACJEF)
   diario           Json? // espelho diário do PDF Secullum: { totais{min}, dias[{data,batidas,faixas}] }
+  pdfUrl           String? // Blob do PDF Secullum COMPLETO (a página do funcionário é extraída sob demanda)
+  pagina           Int? // nº da página deste funcionário dentro do PDF completo (1-based)
   origem           String          @default("MANUAL") // MANUAL | ACJEF | SECULLUM_PDF
   horasNormais     Float            @default(0)
   horasExtras50    Float            @default(0)

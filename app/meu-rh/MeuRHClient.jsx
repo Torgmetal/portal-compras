@@ -18,15 +18,6 @@ const STATUS_F = {
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtMoeda = (v) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-// minutos → "HH:MM" (igual o cartão de ponto). 0/vazio → "—"
-const minHM = (m) => { const v = Math.round(Number(m) || 0); return v ? `${String(Math.floor(v / 60)).padStart(2, "0")}:${String(v % 60).padStart(2, "0")}` : "—"; };
-// data ISO "2026-05-26" → "26/05" + dia da semana curto
-const diaLabel = (iso) => { const d = new Date(iso + "T12:00:00"); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`; };
-const FAIXAS_PONTO = [
-  { k: "normais", label: "Normais" }, { k: "ex50", label: "HE 50%" }, { k: "ex60", label: "HE 60%" },
-  { k: "ex80", label: "HE 80%" }, { k: "ex100", label: "HE 100%" }, { k: "ex150", label: "HE 150%" },
-  { k: "noturno", label: "Ad. noturno" }, { k: "faltas", label: "Faltas" }, { k: "dsr", label: "DSR" },
-];
 
 function competenciaExtenso(c) {
   if (!c) return "";
@@ -106,7 +97,6 @@ export default function MeuRHClient({ nome }) {
 
   // Ponto
   const [pontoComps, setPontoComps] = useState([]);
-  const [pontoSel, setPontoSel] = useState(0); // índice da competência selecionada
   const [carregandoPonto, setCarregandoPonto] = useState(true);
   const [erroPonto, setErroPonto] = useState("");
 
@@ -155,7 +145,7 @@ export default function MeuRHClient({ nome }) {
       const r = await fetch("/api/meu-rh/ponto");
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao carregar");
-      setPontoComps(d.competencias || []);
+      setPontoComps(d.cartoes || []);
     } catch (e) { setErroPonto(e.message); } finally { setCarregandoPonto(false); }
   }, []);
 
@@ -455,80 +445,29 @@ export default function MeuRHClient({ nome }) {
             <p className="text-torg-gray">Seu cartão de ponto ainda não foi disponibilizado.</p>
             <p className="text-sm text-torg-gray mt-1">Quando o RH importar, o espelho do mês aparece aqui.</p>
           </div>
-        ) : (() => {
-          const comp = pontoComps[Math.min(pontoSel, pontoComps.length - 1)];
-          const tot = comp.totais || {};
-          return (
-            <div className="space-y-5">
-              {/* Seletor de competência */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {pontoComps.map((c, i) => (
-                  <button key={c.id} onClick={() => setPontoSel(i)}
-                    className={`px-3 py-1.5 text-sm rounded-lg font-medium ${i === Math.min(pontoSel, pontoComps.length - 1) ? "bg-torg-blue text-white" : "bg-white border border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
-                    {competenciaExtenso(c.competencia)}
-                  </button>
-                ))}
+        ) : (
+          <div className="space-y-3">
+            {pontoComps.map((c) => (
+              <div key={c.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <div className="font-semibold text-torg-dark">Cartão de ponto — {competenciaExtenso(c.competencia)}</div>
+                  {c.empresa && <div className="text-xs text-torg-gray mt-0.5">{c.empresa}</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <a href={`/api/meu-rh/ponto/${c.id}/arquivo`} target="_blank" rel="noopener"
+                    className="px-3 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2">
+                    <FileText size={15} /> Ver cartão
+                  </a>
+                  <a href={`/api/meu-rh/ponto/${c.id}/arquivo?download=1`}
+                    className="px-3 py-2 bg-white border border-gray-200 text-torg-gray text-sm rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2" title="Baixar PDF">
+                    <Download size={15} /> Baixar
+                  </a>
+                </div>
               </div>
-
-              {/* Cabeçalho do período */}
-              <div className="text-xs text-torg-gray">
-                Período: <span className="font-medium text-torg-dark">{comp.periodoInicio} a {comp.periodoFim}</span>
-                {comp.empresa ? ` · ${comp.empresa}` : ""}
-              </div>
-
-              {/* Totais por faixa */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                {FAIXAS_PONTO.map((f) => (
-                  <div key={f.k} className="bg-white rounded-xl border border-gray-100 shadow-sm px-3 py-2 text-center">
-                    <p className="text-[10px] uppercase tracking-wide text-torg-gray">{f.label}</p>
-                    <p className={`text-lg font-extrabold tabular-nums ${f.k === "faltas" && tot[f.k] ? "text-red-600" : "text-torg-dark"}`}>{minHM(tot[f.k])}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Espelho diário */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50/60">
-                    <tr className="text-torg-gray">
-                      <th className="px-2 py-2 text-left font-medium">Dia</th>
-                      <th className="px-2 py-2 text-center font-medium" colSpan={6}>Batidas</th>
-                      <th className="px-2 py-2 text-right font-medium">Normais</th>
-                      <th className="px-2 py-2 text-right font-medium">50%</th>
-                      <th className="px-2 py-2 text-right font-medium">60%</th>
-                      <th className="px-2 py-2 text-right font-medium">80%</th>
-                      <th className="px-2 py-2 text-right font-medium">100%</th>
-                      <th className="px-2 py-2 text-right font-medium">150%</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {(comp.dias || []).map((d) => {
-                      const batidas = [d.ent1, d.sai1, d.ent2, d.sai2, d.ent3, d.sai3];
-                      const folga = batidas.every((b) => !b || /folga/i.test(b));
-                      return (
-                        <tr key={d.data} className="hover:bg-gray-50">
-                          <td className="px-2 py-1.5 whitespace-nowrap text-torg-dark font-medium">{diaLabel(d.data)} <span className="text-torg-gray font-normal">{d.diaSemana}</span></td>
-                          {folga ? (
-                            <td colSpan={6} className="px-2 py-1.5 text-center text-torg-gray italic">Folga</td>
-                          ) : batidas.map((b, i) => (
-                            <td key={i} className="px-2 py-1.5 text-center tabular-nums text-torg-dark">{b || "—"}</td>
-                          ))}
-                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.normais)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex50)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex60)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex80)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex100)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">{minHM(d.ex150)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-[11px] text-torg-gray">Espelho do cartão de ponto (Secullum). Em caso de divergência, procure o RH.</p>
-            </div>
-          );
-        })()
+            ))}
+            <p className="text-[11px] text-torg-gray">Cartão de ponto do mês. Em caso de divergência, procure o RH.</p>
+          </div>
+        )
       )}
 
       {fbAberto && (

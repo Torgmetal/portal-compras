@@ -44,20 +44,25 @@ export async function PATCH(req, { params }) {
   if (diasGozo + diasVendidos > 30) return NextResponse.json({ success: false, error: "Gozo + vendidos não pode passar de 30 dias" }, { status: 400 });
   const dataInicioStr = d.dataInicio ?? (atual.dataInicio ? new Date(atual.dataInicio).toISOString().slice(0, 10) : null);
 
+  const valorEd = valorFerias(atual.funcionario?.salario, diasGozo, diasVendidos, descontos).total;
+  const fimEd = dataInicioStr ? fimGozo(dataInicioStr, diasGozo) : null;
   const data = {
     ...(d.status ? { status: d.status } : {}),
     ...(d.observacao !== undefined ? { observacao: d.observacao || null } : {}),
     diasGozo, diasVendidos, descontos,
-    valorEstimado: valorFerias(atual.funcionario?.salario, diasGozo, diasVendidos, descontos).total,
-    ...(dataInicioStr ? { dataInicio: new Date(dataInicioStr), dataFim: new Date(fimGozo(dataInicioStr, diasGozo)) } : {}),
+    valorEstimado: Number.isFinite(valorEd) ? valorEd : 0,
+    ...(dataInicioStr ? { dataInicio: new Date(dataInicioStr), dataFim: fimEd ? new Date(fimEd) : new Date(dataInicioStr) } : {}),
   };
 
-  const ferias = await prisma.ferias.update({ where: { id: params.id }, data });
-  await prisma.auditLog.create({
-    data: { userId: user.id, action: "EDITAR_FERIAS", entity: "Ferias", entityId: params.id, diff: d },
-  }).catch(() => {});
-
-  return NextResponse.json({ success: true, ferias });
+  try {
+    const ferias = await prisma.ferias.update({ where: { id: params.id }, data });
+    await prisma.auditLog.create({
+      data: { userId: user.id, action: "EDITAR_FERIAS", entity: "Ferias", entityId: params.id, diff: d },
+    }).catch(() => {});
+    return NextResponse.json({ success: true, ferias });
+  } catch (e) {
+    return NextResponse.json({ success: false, error: `Não foi possível salvar: ${e?.message || "erro desconhecido"}` }, { status: 500 });
+  }
 }
 
 export async function DELETE(_req, { params }) {
