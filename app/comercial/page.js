@@ -91,10 +91,12 @@ export default async function ComercialHome({ searchParams }) {
       );
       return { ...op, verbaTotal: verbaBase + verbaAditivos, statusCalc: calcStatus(op) };
     })
-    // Nº da OP decrescente (mais recente primeiro)
-    .sort((a, b) =>
-      (b.numero || "").localeCompare(a.numero || "", undefined, { numeric: true, sensitivity: "base" })
-    );
+    // Nº da OP decrescente — ordena pelo número embutido (robusto a formatos com
+    // prefixo/espaços, ex.: "OP - 096"); desempate por localeCompare numérico.
+    .sort((a, b) => {
+      const n = (s) => { const m = String(s || "").match(/\d+/); return m ? parseInt(m[0], 10) : -1; };
+      return n(b.numero) - n(a.numero) || String(b.numero || "").localeCompare(String(a.numero || ""), undefined, { numeric: true, sensitivity: "base" });
+    });
 
   return (
     <div className="space-y-6 max-w-7xl">
