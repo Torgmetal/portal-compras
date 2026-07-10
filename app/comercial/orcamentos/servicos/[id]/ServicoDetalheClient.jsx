@@ -240,6 +240,15 @@ export default function ServicoDetalheClient({ id }) {
     if (!perfis.length) { showToast("Sem perfis no corte pra puxar", "error"); return; }
     setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, itens: [...(l.itens || []), ...perfis] } : l))); marcar();
   };
+  // Anexar arquivos ao lote — usa só a NOMENCLATURA (nome do arquivo, sem a
+  // extensão) como item; aceita qualquer extensão (IGS, STEP, PDF…), não sobe
+  // o arquivo (é só pra montar a lista de entrega). Igual à ideia dos arquivos
+  // do orçamento, mas aqui só o nome interessa.
+  const anexarArquivosLote = (i, files) => {
+    const novos = Array.from(files || []).map((f) => ({ descricao: f.name.replace(/\.[^./\\]+$/, ""), qtd: "", unidade: "" }));
+    if (!novos.length) return;
+    setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, itens: [...(l.itens || []), ...novos] } : l))); marcar();
+  };
 
   const abrirEnvio = () => {
     if (dirty) { showToast("Salve o orçamento antes de enviar", "error"); return; }
@@ -538,7 +547,7 @@ export default function ServicoDetalheClient({ id }) {
       {aba === "lotes" && (
         <div className="space-y-3">
           <div className="flex items-start justify-between flex-wrap gap-2">
-            <p className="text-sm text-torg-gray max-w-xl">Monte os <strong>lotes de entrega</strong> — cada lote com seu <strong>local de entrega</strong> e os itens que vão nele. Gere o <strong>Plano de Entregas</strong> pra combinar com o cliente e o transporte.</p>
+            <p className="text-sm text-torg-gray max-w-xl">Monte os <strong>lotes de entrega</strong> — cada lote com seu <strong>local de entrega</strong> e os itens que vão nele. Digite os itens, <strong>puxe os perfis do corte</strong> ou <strong>anexe arquivos</strong> (qualquer extensão — os nomes viram os itens). Gere o <strong>Plano de Entregas</strong> pra combinar com o cliente e o transporte.</p>
             <button type="button" onClick={() => { if (dirty) { showToast("Salve o orçamento antes de gerar", "error"); return; } window.location.href = `/api/comercial/orcamento-servico/${id}/lotes-pdf`; }} className="px-3 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-blue/90 shrink-0"><FileText size={15} /> Plano de Entregas (PDF)</button>
           </div>
           {lotes.map((lote, i) => (
@@ -550,9 +559,12 @@ export default function ServicoDetalheClient({ id }) {
               </div>
               <label className="text-xs text-torg-gray">Local de entrega</label>
               <textarea value={lote.local} onChange={(e) => setLoteCampo(i, "local", e.target.value)} rows={2} placeholder="Endereço / obra / responsável pelo recebimento" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 mb-3 focus:ring-2 focus:ring-torg-blue resize-y" />
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
                 <label className="text-xs text-torg-gray">Itens deste lote</label>
-                <button type="button" onClick={() => puxarPerfisLote(i)} className="text-xs text-torg-blue hover:underline">+ puxar perfis do corte</button>
+                <div className="flex items-center gap-3">
+                  <label className="text-xs text-torg-blue hover:underline cursor-pointer">+ anexar arquivos<input type="file" multiple className="hidden" onChange={(e) => { anexarArquivosLote(i, e.target.files); e.target.value = ""; }} /></label>
+                  <button type="button" onClick={() => puxarPerfisLote(i)} className="text-xs text-torg-blue hover:underline">+ puxar perfis do corte</button>
+                </div>
               </div>
               <div className="space-y-1.5">
                 {(lote.itens || []).map((it, j) => (
