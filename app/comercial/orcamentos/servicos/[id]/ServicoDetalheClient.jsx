@@ -49,6 +49,8 @@ export default function ServicoDetalheClient({ id }) {
   const [aceitePara, setAceitePara] = useState("");
   const [aceiteMsg, setAceiteMsg] = useState("");
   const [enviandoAceite, setEnviandoAceite] = useState(false);
+  const [aceiteCc, setAceiteCc] = useState([]);
+  const [aceiteNovoEmail, setAceiteNovoEmail] = useState("");
   const [gerarOpOpen, setGerarOpOpen] = useState(false);
   const [opNumero, setOpNumero] = useState("");
   const [gerandoOp, setGerandoOp] = useState(false);
@@ -230,12 +232,20 @@ export default function ServicoDetalheClient({ id }) {
     } catch (e) { showToast(e.message, "error"); } finally { setConsolidando(false); }
   };
 
-  const abrirAceite = () => { if (dirty) { showToast("Salve o orçamento antes de enviar", "error"); return; } setAceitePara(email || ""); setAceiteMsg(""); setAceiteOpen(true); };
+  const abrirAceite = () => { if (dirty) { showToast("Salve o orçamento antes de enviar", "error"); return; } setAceitePara(email || ""); setAceiteMsg(""); setAceiteCc(emailsTorg.map((u) => u.email)); setAceiteNovoEmail(""); setAceiteOpen(true); };
+  const toggleAceiteCc = (em) => setAceiteCc((p) => (p.includes(em) ? p.filter((x) => x !== em) : [...p, em]));
+  const addAceiteEmail = () => {
+    const e = aceiteNovoEmail.trim().toLowerCase();
+    if (!e) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { showToast("E-mail inválido", "error"); return; }
+    if (!aceiteCc.includes(e)) setAceiteCc((p) => [...p, e]);
+    setAceiteNovoEmail("");
+  };
   const enviarAceite = async () => {
     if (!aceitePara.trim()) { showToast("Informe o e-mail do cliente", "error"); return; }
     setEnviandoAceite(true);
     try {
-      const r = await fetch(`/api/comercial/orcamento-servico/${id}/enviar-aceite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ para: aceitePara || undefined, mensagem: aceiteMsg || undefined }) });
+      const r = await fetch(`/api/comercial/orcamento-servico/${id}/enviar-aceite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ para: aceitePara || undefined, cc: aceiteCc, mensagem: aceiteMsg || undefined }) });
       const dt = await r.json();
       if (!r.ok) throw new Error(dt.error || "Falha ao enviar");
       setAceiteToken(dt.orcamento?.aceiteToken || aceiteToken);
@@ -798,6 +808,26 @@ export default function ServicoDetalheClient({ id }) {
             <p className="text-xs text-torg-gray mb-3">O cliente recebe um e-mail com o PDF e um botão para <strong>aprovar a proposta online</strong> (registra nome, documento, data, hora e IP).</p>
             <label className="text-xs text-torg-gray">E-mail do cliente *</label>
             <input value={aceitePara} onChange={(e) => setAceitePara(e.target.value)} placeholder="cliente@empresa.com.br" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 mb-3 focus:ring-2 focus:ring-torg-blue" autoFocus />
+            <label className="text-xs text-torg-gray">Comercial em cópia — o time recebe a mesma proposta enviada ao cliente</label>
+            <div className="mt-1 border border-gray-200 rounded-lg max-h-32 overflow-y-auto divide-y divide-gray-50">
+              {emailsTorg.map((u) => (
+                <label key={u.email} className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50">
+                  <input type="checkbox" checked={aceiteCc.includes(u.email)} onChange={() => toggleAceiteCc(u.email)} className="accent-torg-blue" />
+                  <span className="text-torg-dark">{u.nome}</span><span className="text-torg-gray truncate">{u.email}</span>
+                </label>
+              ))}
+              {aceiteCc.filter((e) => !emailsTorg.some((u) => u.email === e)).map((e) => (
+                <div key={e} className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs bg-torg-blue-50/40">
+                  <span className="flex items-center gap-2 min-w-0"><input type="checkbox" checked readOnly className="accent-torg-blue" /><span className="text-torg-dark truncate">{e}</span></span>
+                  <button type="button" onClick={() => toggleAceiteCc(e)} className="text-red-400 hover:text-red-600 shrink-0"><Trash2 size={13} /></button>
+                </div>
+              ))}
+              {emailsTorg.length === 0 && aceiteCc.length === 0 && <div className="px-3 py-2 text-xs text-torg-gray">Adicione e-mails abaixo.</div>}
+            </div>
+            <div className="flex gap-2 mt-2 mb-3">
+              <input value={aceiteNovoEmail} onChange={(e) => setAceiteNovoEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAceiteEmail(); } }} type="email" placeholder="adicionar outro e-mail…" className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-torg-blue" />
+              <button type="button" onClick={addAceiteEmail} className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg font-medium hover:bg-torg-blue/90 shrink-0">Adicionar</button>
+            </div>
             <label className="text-xs text-torg-gray">Mensagem (opcional)</label>
             <textarea value={aceiteMsg} onChange={(e) => setAceiteMsg(e.target.value)} rows={3} placeholder="Mensagem que vai no corpo do e-mail…" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue resize-y" />
             <div className="flex justify-end gap-2 mt-4">
