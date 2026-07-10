@@ -792,7 +792,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                   </table>
                 </div>
               ))}
-              <p className="text-xs text-torg-gray">A baixa por romaneio (marcar cada lote como entregue conforme os romaneios) entra na próxima etapa.</p>
+              <p className="text-xs text-torg-gray">Próxima etapa: espelhar aqui a <strong>lista de expedíveis</strong> da Engenharia e os <strong>romaneios emitidos para transporte</strong>, dando baixa em cada lote conforme os romaneios saem.</p>
             </div>
           )}
         </div>
@@ -833,16 +833,70 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
       {vista === "producao" && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-2"><Factory size={18} className="text-torg-blue" /> Produção</h3>
-          <p className="text-sm text-torg-gray">Status geral da produção — a lista de peças/etapas que dá baixa conforme os apontamentos do Syneco. Em construção (próxima etapa).</p>
+          <p className="text-sm text-torg-gray">Status de cada peça da obra que está em produção — a lista dá baixa conforme os apontamentos do Syneco. Em construção (próxima etapa).</p>
         </div>
       )}
 
-      {vista === "financeiro" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-2"><DollarSign size={18} className="text-torg-blue" /> Demonstrativo financeiro</h3>
-          <p className="text-sm text-torg-gray">Receitas, medições, despesas e aditivos. Por enquanto o demonstrativo completo está na aba <button onClick={() => setVista("resumo")} className="text-torg-blue underline font-medium">Resumo</button>; será organizado aqui na próxima etapa.</p>
-        </div>
-      )}
+      {vista === "financeiro" && (() => {
+        const DIA = 86400000;
+        const verbaItens = (op.itens || []).reduce((s, i) => s + (Number(i.valorVerba) || 0), 0);
+        const verbaAdit = (op.aditivos || []).reduce((s, a) => s + (a.itens || []).reduce((ss, i) => ss + (Number(i.valorVerba) || 0), 0), 0);
+        const verbaTotal = verbaItens + verbaAdit;
+        const diasPlan = op.dataInicio && op.dataFimPrevista ? Math.max(0, Math.round((new Date(op.dataFimPrevista) - new Date(op.dataInicio)) / DIA)) : null;
+        const medicoes = op.medicoes || [];
+        return (
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><DollarSign size={18} className="text-torg-blue" /> Verbas estimadas (comercial)</h3>
+                <span className="text-sm font-bold text-torg-dark tabular-nums">{fmtMoeda(verbaTotal)}</span>
+              </div>
+              {(op.itens || []).length === 0 ? <p className="text-sm text-torg-gray">Sem itens.</p> : (
+                <div className="space-y-1.5">
+                  {op.itens.map((it) => (
+                    <div key={it.id} className="flex items-center justify-between gap-3 text-sm border-b border-gray-50 pb-1.5">
+                      <span className="text-torg-dark truncate">{it.categoria}{it.descricao ? ` — ${it.descricao}` : ""}</span>
+                      <span className="text-torg-gray tabular-nums whitespace-nowrap">{fmtMoeda(it.valorVerba)}</span>
+                    </div>
+                  ))}
+                  {verbaAdit > 0 && <div className="flex items-center justify-between gap-3 text-sm pt-1"><span className="text-torg-gray">+ Aditivos</span><span className="text-torg-gray tabular-nums">{fmtMoeda(verbaAdit)}</span></div>}
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Tempo planejado</p>
+                <p className="text-xl font-bold text-torg-dark">{diasPlan != null ? `${diasPlan} dias` : "—"}</p>
+                <p className="text-xs text-torg-gray mt-1">{fmtData(op.dataInicio)} → {fmtData(op.dataFimPrevista)}</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Pedidos emitidos (Torg)</p>
+                <p className="text-xl font-bold text-torg-dark tabular-nums">{fmtMoeda(op.kpisFinanceiros?.pedidosTorg || 0)}</p>
+                <p className="text-xs text-torg-gray mt-1">detalhe na aba Compras</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Notas Torg emitidas</p>
+                <p className="text-xl font-bold text-torg-dark tabular-nums">{fmtMoeda(op.resumoMedicoes?.totalMedido || 0)}</p>
+                <p className="text-xs text-torg-gray mt-1">{medicoes.length} nota(s)</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h4 className="text-sm font-semibold text-torg-dark mb-2">Notas / medições emitidas (Torg)</h4>
+              {medicoes.length === 0 ? <p className="text-sm text-torg-gray">Nenhuma nota emitida ainda.</p> : (
+                <div className="space-y-1.5">
+                  {medicoes.map((m) => (
+                    <div key={m.id} className="flex items-center justify-between gap-3 text-sm border border-gray-100 rounded-lg px-3 py-2">
+                      <span className="font-mono text-torg-dark">{m.numeroPedidoOmie ? `Pedido ${m.numeroPedidoOmie}` : (m.etapa || "Medição")}</span>
+                      <span className="text-torg-gray tabular-nums whitespace-nowrap">{fmtMoeda(m.valorBruto)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-torg-gray">O <strong>custo por hora real</strong> (conforme o tempo que está levando na obra) entra na próxima etapa — depende das horas apontadas no Syneco. O demonstrativo detalhado (receita/despesa/aditivos) segue na aba <button onClick={() => setVista("resumo")} className="text-torg-blue underline font-medium">Resumo</button> por enquanto.</p>
+          </div>
+        );
+      })()}
 
       {/* Modais */}
       {modalAditivo && (
