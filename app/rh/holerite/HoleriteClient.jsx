@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { upload } from "@vercel/blob/client";
 import {
   Receipt, Upload, Loader2, CheckCircle2, AlertCircle, Send, KeyRound,
-  MessageCircle, RefreshCw, Inbox, X, Trash2,
+  MessageCircle, RefreshCw, Inbox, X, Trash2, FileDown,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -406,6 +406,11 @@ export default function HoleriteClient() {
               className="px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 disabled:opacity-50"
               title="Avisar os funcionários por WhatsApp, um a um, do seu próprio número">
               <MessageCircle size={15} /> WhatsApp em massa
+            </button>
+            <button onClick={() => { window.location.href = `/api/rh/holerite/comprovante?competencia=${competencia}`; }} disabled={holerites.length === 0}
+              className="px-3 py-2 bg-white border border-gray-200 text-torg-gray text-sm rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 disabled:opacity-50"
+              title="Baixar comprovante de recebimento (ciência): quem visualizou/confirmou, com data, hora e IP">
+              <FileDown size={15} /> Comprovante
             </button>
             {holerites.length > 0 && (
               <button onClick={cancelarImportacao} disabled={cancelando}
