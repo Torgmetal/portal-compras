@@ -58,13 +58,17 @@ export async function GET(req) {
   return NextResponse.json({ success: true, linhas, resumo });
 }
 
+// Campos numéricos robustos: número vazio/NaN/fora de faixa vira default seguro
+// (evita "Invalid input: expected number, received NaN" ao lançar, sobretudo
+// férias retroativas em que o RH mexe nos campos).
+const fin = (v, def) => { const n = Number(v); return Number.isFinite(n) ? n : def; };
 const schema = z.object({
   funcionarioId: z.string().min(1),
   dataInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de início inválida"),
-  diasGozo: z.number().int().min(1).max(30).default(30),
-  diasVendidos: z.number().int().min(0).max(10).default(0),
-  descontos: z.number().min(0).default(0),
-  salarioBase: z.number().min(0).optional().nullable(), // override manual do salário-base do cálculo
+  diasGozo: z.preprocess((v) => { const n = Math.trunc(fin(v, 30)); return n >= 1 && n <= 30 ? n : 30; }, z.number().int().min(1).max(30)).default(30),
+  diasVendidos: z.preprocess((v) => { const n = Math.trunc(fin(v, 0)); return n >= 0 && n <= 10 ? n : 0; }, z.number().int().min(0).max(10)).default(0),
+  descontos: z.preprocess((v) => Math.max(0, fin(v, 0)), z.number().min(0)).default(0),
+  salarioBase: z.preprocess((v) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v)), z.number().min(0).nullable()).default(null), // override manual; inválido → usa o do cadastro
   status: z.enum(["PROGRAMADA", "GOZADA"]).default("PROGRAMADA"),
   observacao: z.string().max(500).optional().nullable(),
 });
