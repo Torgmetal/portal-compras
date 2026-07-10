@@ -21,7 +21,7 @@ const itemSchema = z.object({
   arquivoTamanho: z.number().int().optional().nullable(),
   tipo: z.enum(["MENSAL", "DECIMO_TERCEIRO", "FERIAS", "RESCISAO"]).default("MENSAL"),
   empresa: z.string().optional().nullable(),
-  valorLiquido: z.number().optional().nullable(),
+  valorLiquido: z.preprocess((v) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v)), z.number().nullable()).default(null), // parse best-effort pode vir NaN (layout VMI) → null
 });
 
 const schema = z.object({
