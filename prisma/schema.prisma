@@ -1195,9 +1195,10 @@ model Holerite {
   empresa        String?
   tipo           String        @default("MENSAL") // MENSAL | DECIMO_TERCEIRO | FERIAS | RESCISAO
   valorLiquido   Float? // parse best-effort do PDF
-  arquivoUrl     String? // Blob privado da página individual
+  arquivoUrl     String? // Blob do PDF (página individual OU o PDF completo do lote)
   arquivoNome    String?
   arquivoTamanho Int?
+  pagina         Int? // quando arquivoUrl é o PDF completo, a página deste holerite (1-based)
   status         String        @default("PENDENTE") // PENDENTE | ENVIADO | VISUALIZADO | CONFIRMADO
   enviadoEm      DateTime?
   visualizadoEm  DateTime?

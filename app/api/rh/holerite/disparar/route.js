@@ -75,7 +75,7 @@ export async function POST(req) {
 
   const holerites = await prisma.holerite.findMany({
     where: { competencia, ...(somentePendentes ? { status: "PENDENTE" } : {}) },
-    select: { id: true, arquivoUrl: true, arquivoNome: true, funcionario: { select: { nome: true, email: true } } },
+    select: { id: true, arquivoUrl: true, arquivoNome: true, pagina: true, funcionario: { select: { nome: true, email: true } } },
   });
 
   let enviados = 0; const semEmail = []; const falhas = [];
@@ -84,12 +84,22 @@ export async function POST(req) {
     if (!email) { semEmail.push(h.funcionario?.nome || h.id); continue; }
 
     // Anexa o PDF do holerite (best-effort — se o download falhar, envia só o aviso).
+    // Se `pagina` está setada, arquivoUrl é o PDF COMPLETO → extrai só a página.
     let attachments;
     if (anexarPdf && h.arquivoUrl) {
       try {
         const pdf = await fetch(h.arquivoUrl);
         if (pdf.ok) {
-          const buf = Buffer.from(await pdf.arrayBuffer());
+          let buf = Buffer.from(await pdf.arrayBuffer());
+          if (h.pagina) {
+            const { PDFDocument } = await import("pdf-lib");
+            const src = await PDFDocument.load(buf);
+            const out = await PDFDocument.create();
+            const idx = Math.min(Math.max(h.pagina - 1, 0), src.getPageCount() - 1);
+            const [pg] = await out.copyPages(src, [idx]);
+            out.addPage(pg);
+            buf = Buffer.from(await out.save());
+          }
           attachments = [{ filename: (h.arquivoNome || `holerite-${competencia}.pdf`).replace(/["\r\n]/g, ""), content: buf.toString("base64") }];
         }
       } catch { /* segue sem anexo */ }

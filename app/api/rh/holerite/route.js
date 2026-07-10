@@ -15,7 +15,8 @@ export const maxDuration = 300;
 
 const itemSchema = z.object({
   funcionarioId: z.string().min(1),
-  arquivoUrl: z.string().url(),
+  arquivoUrl: z.string().url(), // agora = PDF completo do lote (mesma URL p/ todos)
+  pagina: z.number().int().optional().nullable(), // página deste holerite dentro do PDF completo
   arquivoNome: z.string().optional().nullable(),
   arquivoTamanho: z.number().int().optional().nullable(),
   tipo: z.enum(["MENSAL", "DECIMO_TERCEIRO", "FERIAS", "RESCISAO"]).default("MENSAL"),
@@ -97,12 +98,12 @@ export async function POST(req) {
         where: { funcionarioId_competencia_tipo: { funcionarioId: it.funcionarioId, competencia, tipo: it.tipo } },
         update: {
           loteId: novoLote.id, empresa: it.empresa || empresa || null, valorLiquido: it.valorLiquido ?? null,
-          arquivoUrl: it.arquivoUrl, arquivoNome: it.arquivoNome || null, arquivoTamanho: it.arquivoTamanho ?? null,
+          arquivoUrl: it.arquivoUrl, arquivoNome: it.arquivoNome || null, arquivoTamanho: it.arquivoTamanho ?? null, pagina: it.pagina ?? null,
         },
         create: {
           funcionarioId: it.funcionarioId, loteId: novoLote.id, competencia, tipo: it.tipo,
           empresa: it.empresa || empresa || null, valorLiquido: it.valorLiquido ?? null,
-          arquivoUrl: it.arquivoUrl, arquivoNome: it.arquivoNome || null, arquivoTamanho: it.arquivoTamanho ?? null,
+          arquivoUrl: it.arquivoUrl, arquivoNome: it.arquivoNome || null, arquivoTamanho: it.arquivoTamanho ?? null, pagina: it.pagina ?? null,
           status: "PENDENTE",
         },
       });

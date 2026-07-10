@@ -157,8 +157,12 @@ export default function HoleriteClient() {
           competencia, empresa: revisao.empresa,
           arquivoOriginalUrl: revisao.arquivoOriginalUrl, arquivoOriginalNome: revisao.arquivoOriginalNome,
           itens: validos.map((i) => ({
-            funcionarioId: i.funcionarioId, arquivoUrl: i.arquivoUrl, arquivoNome: i.arquivoNome,
-            arquivoTamanho: i.arquivoTamanho, tipo: i.tipo, empresa: i.parse?.empresa || revisao.empresa,
+            funcionarioId: i.funcionarioId,
+            // arquivoUrl = PDF completo (mesmo p/ todos); `pagina` diz qual página é.
+            arquivoUrl: revisao.arquivoOriginalUrl,
+            pagina: i.pagina,
+            arquivoNome: `holerite-${competencia}-p${String(i.pagina).padStart(2, "0")}.pdf`,
+            tipo: i.tipo, empresa: i.parse?.empresa || revisao.empresa,
             valorLiquido: i.parse?.valorLiquido ?? null,
           })),
         }),

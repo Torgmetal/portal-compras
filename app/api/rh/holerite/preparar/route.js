@@ -4,15 +4,14 @@
 // NÃO grava nada no banco — devolve a proposta pra tela de revisão do RH commitar.
 // Só ADMIN/RH.
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
-import { splitPaginas, extrairTextos, parseHolerite, matchFuncionario } from "@/lib/holerite-pdf";
+import { extrairTextos, parseHolerite, matchFuncionario } from "@/lib/holerite-pdf";
 import { z } from "zod";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // PDFs grandes (até 50MB / dezenas de páginas): split + extração + upload por página
+export const maxDuration = 300;
 
 const schema = z.object({
   blobUrl: z.string().url(),
@@ -46,50 +45,35 @@ export async function POST(req) {
     orderBy: { nome: "asc" },
   });
 
-  let paginas, textos;
+  // Só EXTRAI o texto de cada página (rápido) para sugerir o funcionário. NÃO
+  // dividimos nem subimos página por página — o PDF completo já está no Blob
+  // (blobUrl) e a página de cada holerite é extraída sob demanda quando o
+  // funcionário abre no /meu-rh. Isso elimina os dezenas de uploads que
+  // estouravam o tempo em PDFs grandes (ex.: VMI).
+  let textos;
   try {
-    [paginas, textos] = await Promise.all([splitPaginas(buffer), extrairTextos(buffer)]);
+    textos = await extrairTextos(buffer);
   } catch (e) {
     return NextResponse.json({ success: false, error: "PDF ilegível: " + (e?.message || "erro") }, { status: 422 });
   }
 
-  // Sobe cada página individual no Blob (privada, sufixo aleatório) e monta a
-  // proposta. EM PARALELO (lotes) — um holerite mensal tem 1 página por
-  // funcionário (dezenas), e uploads sequenciais estouravam o limite de tempo.
-  const itens = new Array(paginas.length);
-  const CONCORRENCIA = 20; // uploads são I/O-bound — mais paralelismo derruba o tempo total
-  try {
-    for (let inicio = 0; inicio < paginas.length; inicio += CONCORRENCIA) {
-      const lote = paginas.slice(inicio, inicio + CONCORRENCIA);
-      await Promise.all(lote.map(async (p) => {
-        const info = parseHolerite(textos[p.index] || "");
-        const sugestao = matchFuncionario(info, funcionarios);
-        const nomeArq = `holerite-${parsed.data.competencia}-p${String(p.index + 1).padStart(2, "0")}.pdf`;
-        const blob = await put(`holerites/${parsed.data.competencia}/${nomeArq}`, Buffer.from(p.bytes), {
-          access: "public", // URL com sufixo aleatório; servida só via proxy autenticado
-          addRandomSuffix: true,
-          contentType: "application/pdf",
-        });
-        itens[p.index] = {
-          pagina: p.index + 1,
-          arquivoUrl: blob.url,
-          arquivoNome: nomeArq,
-          arquivoTamanho: p.bytes.length,
-          parse: info,
-          funcionarioId: sugestao.confianca >= 0.5 ? sugestao.funcionarioId : null,
-          confianca: Number(sugestao.confianca.toFixed(2)),
-          motivo: sugestao.motivo,
-        };
-      }));
-    }
-  } catch (e) {
-    return NextResponse.json({ success: false, error: "Falha ao subir as páginas: " + (e?.message || "erro") }, { status: 502 });
-  }
+  const itens = textos.map((texto, i) => {
+    const info = parseHolerite(texto || "");
+    const sugestao = matchFuncionario(info, funcionarios);
+    return {
+      pagina: i + 1,
+      parse: info,
+      funcionarioId: sugestao.confianca >= 0.5 ? sugestao.funcionarioId : null,
+      confianca: Number(sugestao.confianca.toFixed(2)),
+      motivo: sugestao.motivo,
+    };
+  });
 
   return NextResponse.json({
     success: true,
     competencia: parsed.data.competencia,
-    totalPaginas: paginas.length,
+    totalPaginas: textos.length,
+    pdfUrl: parsed.data.blobUrl, // PDF completo — as páginas são extraídas depois
     itens,
     funcionarios, // p/ o dropdown de correção manual
   });
