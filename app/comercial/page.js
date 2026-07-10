@@ -65,6 +65,14 @@ export default async function ComercialHome({ searchParams }) {
     }),
   ]);
 
+  // Pendências de assinatura: OPs geradas de propostas de serviço ainda não
+  // assinadas pelo cliente (chip na lista; some quando o cliente aprova).
+  const propostasPend = await prisma.orcamentoServico.findMany({
+    where: { opCriadaId: { not: null }, aceitoEm: null },
+    select: { opCriadaId: true },
+  });
+  const opsAguardandoAssinatura = new Set(propostasPend.map((p) => p.opCriadaId));
+
   // Status calculado sobre todas as OPs (query leve) — alimenta as contagens das abas
   const opsKpiComStatus = opsKpiRaw.map((op) => ({ ...op, statusCalc: calcStatus(op) }));
 
@@ -172,7 +180,10 @@ export default async function ComercialHome({ searchParams }) {
                           {fmtOP(op.numero)}
                         </Link>
                       </td>
-                      <td className="px-6 py-3 text-torg-dark max-w-[200px] truncate" title={op.cliente}>{op.cliente}</td>
+                      <td className="px-6 py-3 text-torg-dark max-w-[220px]">
+                        <div className="truncate" title={op.cliente}>{op.cliente}</div>
+                        {opsAguardandoAssinatura.has(op.id) && <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full whitespace-nowrap">⏳ aguardando assinatura</span>}
+                      </td>
                       <td className="px-6 py-3 text-torg-gray max-w-[180px] truncate" title={op.obra || ""}>{op.obra || "—"}</td>
                       <td className="px-6 py-3 text-torg-gray whitespace-nowrap">{fmtData(op.dataInicio)}</td>
                       <td className="px-6 py-3 text-torg-gray whitespace-nowrap">{fmtData(op.dataFimPrevista)}</td>

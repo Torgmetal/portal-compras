@@ -819,6 +819,7 @@ export default function ServicoDetalheClient({ id }) {
               <div><span className="text-torg-gray">Serviços:</span> {servSel.map((s) => SERVICO_LABEL[s] || s).join(", ") || "—"}</div>
               <div><span className="text-torg-gray">Valor:</span> {custoTotal ? custoTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}</div>
             </div>
+            {!aceitoEm && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">⏳ A proposta ainda não foi assinada pelo cliente. A OP será criada normalmente e ficará com a pendência <strong>"aguardando assinatura"</strong> até a aprovação.</p>}
             <label className="text-xs text-torg-gray">Número da OP *</label>
             <input value={opNumero} onChange={(e) => setOpNumero(e.target.value)} placeholder="ex.: 124 ou T124" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" autoFocus />
             <div className="flex justify-end gap-2 mt-4">

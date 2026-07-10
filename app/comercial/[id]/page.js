@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Clock } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
 
@@ -58,6 +58,13 @@ export default async function OPDetailPage({ params }) {
   });
 
   if (!op) notFound();
+
+  // Pendência: proposta de serviço que gerou esta OP e ainda não foi assinada
+  // pelo cliente (derivado — some sozinho quando o cliente aprova).
+  const propostaPend = await prisma.orcamentoServico.findFirst({
+    where: { opCriadaId: op.id, aceitoEm: null },
+    select: { id: true, numero: true, aceiteEnviadoEm: true },
+  });
 
   // Cobertura por categoria: pra cada categoria da OP, lista RMs (apenas ENGENHARIA) que cobrem
   const categoriasNoEscopo = new Set();
@@ -327,6 +334,17 @@ export default async function OPDetailPage({ params }) {
       <Link href="/comercial" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
         <ArrowLeft size={14} /> Voltar pra lista de OPs
       </Link>
+
+      {propostaPend && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+          <Clock size={18} className="text-amber-600 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">Aguardando assinatura do cliente</p>
+            <p className="text-xs text-amber-700 mt-0.5">Esta OP foi gerada a partir da proposta {propostaPend.numero ? `OS-${String(propostaPend.numero).padStart(3, "0")}` : "de serviço"}, que ainda não foi aprovada pelo cliente{propostaPend.aceiteEnviadoEm ? " (link de aprovação já enviado)" : ""}. A pendência fica em aberto até a assinatura.</p>
+          </div>
+          <Link href={`/comercial/orcamentos/servicos/${propostaPend.id}`} className="text-xs font-semibold text-amber-800 underline whitespace-nowrap shrink-0">Abrir proposta</Link>
+        </div>
+      )}
 
       <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} />
 
