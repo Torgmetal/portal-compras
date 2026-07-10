@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send, CheckCircle2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
 import { precoHoraDoServico } from "@/lib/custo-hora-calc";
+import { DEFAULT_INCLUSOS, DEFAULT_EXCLUSOS } from "@/lib/proposta-textos";
 
 const os = (n) => (n ? `OS-${String(n).padStart(3, "0")}` : "—");
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
@@ -31,9 +32,14 @@ export default function ServicoDetalheClient({ id }) {
   const [telefone, setTelefone] = useState("");
   const [endereco, setEndereco] = useState("");
   const [diasPagamento, setDiasPagamento] = useState("");
+  const [pagamentoPrazo, setPagamentoPrazo] = useState("");
+  const [incl, setIncl] = useState([]);
+  const [excl, setExcl] = useState([]);
   const [revisao, setRevisao] = useState(0);
   const [revisoes, setRevisoes] = useState([]);
   const [enviadoEm, setEnviadoEm] = useState(null);
+  const [consolidadaEm, setConsolidadaEm] = useState(null);
+  const [consolidando, setConsolidando] = useState(false);
   const [emailsTorg, setEmailsTorg] = useState([]);
   const [modalEnvio, setModalEnvio] = useState(false);
   const [envDest, setEnvDest] = useState("");
@@ -74,7 +80,11 @@ export default function ServicoDetalheClient({ id }) {
       setNumero(o.numero || null); setCliente(o.cliente || ""); setObra(o.obra || ""); setContato(o.contato || "");
       setEmail(o.email || ""); setTelefone(o.telefone || ""); setEndereco(o.endereco || "");
       setDiasPagamento(o.diasPagamento ?? "");
+      setPagamentoPrazo(o.pagamentoPrazo ?? (o.diasPagamento ? String(o.diasPagamento) : ""));
+      setIncl(Array.isArray(o.inclusos) && o.inclusos.length ? o.inclusos : DEFAULT_INCLUSOS);
+      setExcl(Array.isArray(o.exclusos) && o.exclusos.length ? o.exclusos : DEFAULT_EXCLUSOS);
       setRevisao(o.revisao || 0); setRevisoes(Array.isArray(o.revisoes) ? o.revisoes : []); setEnviadoEm(o.enviadoEm || null);
+      setConsolidadaEm(o.consolidadaEm || null);
       setServSel(Array.isArray(o.servicos) ? o.servicos : []); setStatus(o.status || "RASCUNHO"); setObs(o.observacoes || "");
       setComposicao(o.composicao && typeof o.composicao === "object" ? o.composicao : {});
       setArquivos(Array.isArray(o.arquivos) ? o.arquivos : []);
@@ -88,7 +98,7 @@ export default function ServicoDetalheClient({ id }) {
   useEffect(() => { carregar(); }, [carregar]);
   useEffect(() => { fetch("/api/comercial/emails").then((r) => r.json()).then((d) => { if (d?.success) setEmailsTorg(d.emails || []); }).catch(() => {}); }, []);
 
-  useEffect(() => { if (aba !== "dados" && aba !== "arquivos" && aba !== "resumo" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
+  useEffect(() => { if (aba !== "dados" && aba !== "arquivos" && aba !== "resumo" && aba !== "inclusos" && !servSel.includes(aba)) setAba("dados"); }, [servSel, aba]);
 
   const toggleServ = (k) => { setServSel((p) => (p.includes(k) ? p.filter((x) => x !== k) : [...p, k])); marcar(); };
 
@@ -117,7 +127,7 @@ export default function ServicoDetalheClient({ id }) {
     try {
       const r = await fetch(`/api/comercial/orcamento-servico/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, email: email || null, telefone: telefone || null, endereco: endereco || null, diasPagamento: diasPagamento === "" ? null : Number(diasPagamento), servicos: servSel, status, observacoes: obs || null, composicao, arquivos, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
+        body: JSON.stringify({ cliente, obra: obra || null, contato: contato || null, email: email || null, telefone: telefone || null, endereco: endereco || null, pagamentoPrazo: pagamentoPrazo.trim() || null, inclusos: incl.map((s) => s.trim()).filter(Boolean), exclusos: excl.map((s) => s.trim()).filter(Boolean), servicos: servSel, status, observacoes: obs || null, composicao, arquivos, valor: custoTotal ? Math.round(custoTotal * 100) / 100 : null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao salvar");
@@ -188,6 +198,17 @@ export default function ServicoDetalheClient({ id }) {
     if (dirty) { showToast("Salve o orçamento antes de gerar a proposta", "error"); return; }
     window.location.href = `/api/comercial/orcamento-servico/${id}/proposta?formato=${formato}`;
   };
+  const consolidar = async (valor) => {
+    if (valor && dirty) { showToast("Salve o orçamento antes de consolidar", "error"); return; }
+    setConsolidando(true);
+    try {
+      const r = await fetch(`/api/comercial/orcamento-servico/${id}/consolidar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ consolidar: valor }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha");
+      setConsolidadaEm(d.orcamento?.consolidadaEm || null);
+      showToast(valor ? "Proposta consolidada" : "Consolidação desfeita", "success");
+    } catch (e) { showToast(e.message, "error"); } finally { setConsolidando(false); }
+  };
 
   const abrirEnvio = () => {
     if (dirty) { showToast("Salve o orçamento antes de enviar", "error"); return; }
@@ -226,6 +247,25 @@ export default function ServicoDetalheClient({ id }) {
     } catch (e) { showToast(e.message, "error"); } finally { setCriandoRev(false); }
   };
 
+  const renderLista = (titulo, itens, setItens, padrao) => (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold text-torg-dark">{titulo}</h4>
+        <button type="button" onClick={() => { setItens([...padrao]); marcar(); }} className="text-xs text-torg-blue hover:underline">Restaurar padrão</button>
+      </div>
+      <div className="space-y-2">
+        {itens.map((it, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input value={it} onChange={(e) => { setItens(itens.map((x, idx) => (idx === i ? e.target.value : x))); marcar(); }} className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-torg-blue" />
+            <button type="button" onClick={() => { setItens(itens.filter((_, idx) => idx !== i)); marcar(); }} className="text-red-400 hover:text-red-600 shrink-0"><Trash2 size={14} /></button>
+          </div>
+        ))}
+        {itens.length === 0 && <p className="text-xs text-torg-gray">Nenhum item.</p>}
+      </div>
+      <button type="button" onClick={() => { setItens([...itens, ""]); marcar(); }} className="w-full mt-2 py-1.5 border-2 border-dashed border-gray-200 rounded-lg text-torg-gray hover:border-torg-blue hover:text-torg-blue text-xs font-medium inline-flex items-center justify-center gap-1"><Plus size={13} /> Adicionar item</button>
+    </div>
+  );
+
   if (carregando) return <div className="py-20 text-center text-torg-gray"><Loader2 size={30} className="mx-auto animate-spin mb-2" /> Carregando...</div>;
   if (erro) return (
     <div className="py-20 text-center">
@@ -234,7 +274,7 @@ export default function ServicoDetalheClient({ id }) {
     </div>
   );
 
-  const tabs = [{ key: "dados", label: "Dados" }, { key: "arquivos", label: "Arquivos do cliente" }, ...servSel.map((s) => ({ key: s, label: SERVICO_LABEL[s] || s })), { key: "resumo", label: "Resumo / Proposta" }];
+  const tabs = [{ key: "dados", label: "Dados" }, { key: "arquivos", label: "Arquivos do cliente" }, ...servSel.map((s) => ({ key: s, label: SERVICO_LABEL[s] || s })), { key: "inclusos", label: "Inclusos / Exclusos" }, { key: "resumo", label: "Resumo / Proposta" }];
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -454,6 +494,16 @@ export default function ServicoDetalheClient({ id }) {
         </div>
       )}
 
+      {aba === "inclusos" && (
+        <div className="space-y-3">
+          <p className="text-sm text-torg-gray">Edite o que está <strong>incluso</strong> e <strong>excluso</strong> nesta proposta. Ex.: se a obra não precisa de data book, remova essa linha dos inclusos.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {renderLista("Inclusos", incl, setIncl, DEFAULT_INCLUSOS)}
+            {renderLista("Exclusos", excl, setExcl, DEFAULT_EXCLUSOS)}
+          </div>
+        </div>
+      )}
+
       {aba === "resumo" && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -495,9 +545,9 @@ export default function ServicoDetalheClient({ id }) {
             <h4 className="text-sm font-semibold text-torg-dark mb-3">Condições da proposta</h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
-                <label className="text-xs text-torg-gray">Dias para pagamento</label>
-                <input type="number" step="1" value={diasPagamento} onChange={(e) => { setDiasPagamento(e.target.value); marcar(); }} placeholder="15" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
-                <p className="text-[10px] text-torg-gray mt-1">vai pra proposta (padrão 15)</p>
+                <label className="text-xs text-torg-gray">Prazo de pagamento</label>
+                <input value={pagamentoPrazo} onChange={(e) => { setPagamentoPrazo(e.target.value); marcar(); }} placeholder="ex.: 15, 30, 28/42…" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue" />
+                <p className="text-[10px] text-torg-gray mt-1">livre — vira "&lt;prazo&gt; dias" na proposta (padrão 15)</p>
               </div>
             </div>
           </div>
@@ -505,13 +555,18 @@ export default function ServicoDetalheClient({ id }) {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div className="flex items-start justify-between flex-wrap gap-3">
               <div>
-                <h4 className="text-sm font-semibold text-torg-dark">Proposta {numeroPtcLocal}</h4>
+                <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 flex-wrap">Proposta {numeroPtcLocal}{consolidadaEm && <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">CONSOLIDADA</span>}</h4>
                 <p className="text-xs text-torg-gray mt-0.5">{enviadoEm ? `Enviada ao cliente em ${new Date(enviadoEm).toLocaleDateString("pt-BR")} · revisão atual ${rNum(revisao)}` : "Ainda não enviada — gere a prévia e confira antes."}</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <button type="button" onClick={() => baixarProposta("docx")} className="px-3 py-2 border border-gray-200 text-torg-gray text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:border-torg-blue hover:text-torg-blue"><FileText size={15} /> Word</button>
                 <button type="button" onClick={() => baixarProposta("pdf")} className="px-3 py-2 border border-torg-blue/30 text-torg-blue text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-blue-50"><FileText size={15} /> PDF (prévia)</button>
                 {enviadoEm && <button type="button" onClick={() => setModalRev(true)} className="px-3 py-2 border border-amber-300 text-amber-700 text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-amber-50"><RefreshCw size={15} /> Criar revisão</button>}
+                {!consolidadaEm ? (
+                  <button type="button" onClick={() => consolidar(true)} disabled={consolidando} className="px-3 py-2 border border-green-300 text-green-700 text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-green-50 disabled:opacity-50">{consolidando ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Consolidar</button>
+                ) : (
+                  <button type="button" onClick={() => consolidar(false)} disabled={consolidando} title="Desfazer consolidação" className="px-3 py-2 border border-gray-200 text-torg-gray text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:border-amber-300 hover:text-amber-700 disabled:opacity-50">Desfazer</button>
+                )}
                 <button type="button" onClick={abrirEnvio} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-orange/90"><Send size={15} /> {enviadoEm ? "Reenviar ao cliente" : "Enviar ao cliente"}</button>
               </div>
             </div>

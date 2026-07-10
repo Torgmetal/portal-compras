@@ -1394,11 +1394,22 @@ model OrcamentoServico {
   status        String   @default("RASCUNHO")
   valor         Float?
   observacoes   String?
-  diasPagamento Int? // dias p/ pagamento na proposta (default 15 se vazio)
+  diasPagamento Int? // legado — usar pagamentoPrazo (texto livre)
+  pagamentoPrazo String? // prazo de pagamento livre: "15", "28/42", "30/60"…
+  inclusos      Json? // lista custom de inclusos (null = padrão)
+  exclusos      Json? // lista custom de exclusos (null = padrão)
   revisao       Int      @default(0) // revisão atual (R00, R01…)
   revisoes      Json     @default("[]") // histórico: [{ num, data, motivo }]
   enviadoEm     DateTime? // 1º envio ao cliente
   envios        Json     @default("[]") // log de envios: [{ data, para, cc, revisao, porNome }]
+  consolidadaEm DateTime? // proposta consolidada (trava edição; ganha tarja)
+  aceiteToken   String?   @unique // token do link público de aceite do cliente
+  aceiteEnviadoEm DateTime? // quando o link de aceite foi enviado
+  aceitoEm      DateTime? // cliente aceitou/assinou
+  aceitoNome    String? // nome de quem aceitou
+  aceitoDoc     String? // RG/CPF de quem aceitou
+  aceitoIp      String? // IP do aceite
+  opCriadaId    String? // OP gerada a partir desta proposta aceita
   opId          String?
   criadoPorId   String?
   criadoPorNome String?
