@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send, CheckCircle2, ClipboardList, Paperclip } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send, CheckCircle2, ClipboardList, Paperclip, ShieldCheck, Copy } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
 import { precoHoraDoServico } from "@/lib/custo-hora-calc";
@@ -41,6 +41,14 @@ export default function ServicoDetalheClient({ id }) {
   const [enviadoEm, setEnviadoEm] = useState(null);
   const [consolidadaEm, setConsolidadaEm] = useState(null);
   const [opCriadaId, setOpCriadaId] = useState(null);
+  const [aceitoEm, setAceitoEm] = useState(null);
+  const [aceitoNome, setAceitoNome] = useState(null);
+  const [aceiteEnviadoEm, setAceiteEnviadoEm] = useState(null);
+  const [aceiteToken, setAceiteToken] = useState(null);
+  const [aceiteOpen, setAceiteOpen] = useState(false);
+  const [aceitePara, setAceitePara] = useState("");
+  const [aceiteMsg, setAceiteMsg] = useState("");
+  const [enviandoAceite, setEnviandoAceite] = useState(false);
   const [gerarOpOpen, setGerarOpOpen] = useState(false);
   const [opNumero, setOpNumero] = useState("");
   const [gerandoOp, setGerandoOp] = useState(false);
@@ -93,6 +101,10 @@ export default function ServicoDetalheClient({ id }) {
       setRevisao(o.revisao || 0); setRevisoes(Array.isArray(o.revisoes) ? o.revisoes : []); setEnviadoEm(o.enviadoEm || null);
       setConsolidadaEm(o.consolidadaEm || null);
       setOpCriadaId(o.opCriadaId || null);
+      setAceitoEm(o.aceitoEm || null);
+      setAceitoNome(o.aceitoNome || null);
+      setAceiteEnviadoEm(o.aceiteEnviadoEm || null);
+      setAceiteToken(o.aceiteToken || null);
       setServSel(Array.isArray(o.servicos) ? o.servicos : []); setStatus(o.status || "RASCUNHO"); setObs(o.observacoes || "");
       setComposicao(o.composicao && typeof o.composicao === "object" ? o.composicao : {});
       setArquivos(Array.isArray(o.arquivos) ? o.arquivos : []);
@@ -217,6 +229,22 @@ export default function ServicoDetalheClient({ id }) {
       showToast(valor ? "Proposta consolidada" : "Consolidação desfeita", "success");
     } catch (e) { showToast(e.message, "error"); } finally { setConsolidando(false); }
   };
+
+  const abrirAceite = () => { if (dirty) { showToast("Salve o orçamento antes de enviar", "error"); return; } setAceitePara(email || ""); setAceiteMsg(""); setAceiteOpen(true); };
+  const enviarAceite = async () => {
+    if (!aceitePara.trim()) { showToast("Informe o e-mail do cliente", "error"); return; }
+    setEnviandoAceite(true);
+    try {
+      const r = await fetch(`/api/comercial/orcamento-servico/${id}/enviar-aceite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ para: aceitePara || undefined, mensagem: aceiteMsg || undefined }) });
+      const dt = await r.json();
+      if (!r.ok) throw new Error(dt.error || "Falha ao enviar");
+      setAceiteToken(dt.orcamento?.aceiteToken || aceiteToken);
+      setAceiteEnviadoEm(dt.orcamento?.aceiteEnviadoEm || new Date().toISOString());
+      setAceiteOpen(false);
+      showToast("Link de aprovação enviado ao cliente", "success");
+    } catch (e) { showToast(e.message, "error"); } finally { setEnviandoAceite(false); }
+  };
+  const copiarLinkAceite = () => { if (!aceiteToken) return; const url = `${window.location.origin}/proposta/aceite/${aceiteToken}`; if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => showToast("Link copiado", "success")).catch(() => showToast(url, "success")); else showToast(url, "success"); };
 
   const gerarOp = async () => {
     if (!opNumero.trim()) { showToast("Informe o número da OP", "error"); return; }
@@ -666,6 +694,18 @@ export default function ServicoDetalheClient({ id }) {
                 <button type="button" onClick={abrirEnvio} className="px-4 py-2 bg-torg-orange text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-orange/90"><Send size={15} /> {enviadoEm ? "Reenviar ao cliente" : "Enviar ao cliente"}</button>
               </div>
             </div>
+            <div className="border-t border-gray-100 pt-3 flex items-start justify-between flex-wrap gap-2">
+              <div>
+                <p className="text-sm font-semibold text-torg-dark flex items-center gap-1.5"><ShieldCheck size={15} className="text-torg-blue" /> Aceite do cliente</p>
+                <p className="text-xs text-torg-gray mt-0.5">{aceitoEm ? `Aprovada por ${aceitoNome || "cliente"} em ${new Date(aceitoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}.` : aceiteEnviadoEm ? `Link enviado em ${new Date(aceiteEnviadoEm).toLocaleDateString("pt-BR")} — aguardando aprovação do cliente.` : consolidadaEm ? "Consolidada — envie ao cliente para aprovar online." : "Consolide a proposta para liberar o envio de aceite."}</p>
+                {aceiteToken && !aceitoEm && <button type="button" onClick={copiarLinkAceite} className="text-xs text-torg-blue hover:underline inline-flex items-center gap-1 mt-1"><Copy size={12} /> copiar link de aprovação</button>}
+              </div>
+              {aceitoEm ? (
+                <span className="px-4 py-2 bg-green-100 text-green-800 text-sm rounded-lg font-medium inline-flex items-center gap-1.5"><CheckCircle2 size={15} /> Aprovada</span>
+              ) : (
+                <button type="button" onClick={abrirAceite} disabled={!consolidadaEm} title={consolidadaEm ? "" : "Consolide a proposta primeiro"} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"><Send size={15} /> {aceiteEnviadoEm ? "Reenviar aceite" : "Enviar para aceite"}</button>
+              )}
+            </div>
             <div className="border-t border-gray-100 pt-3 flex items-center justify-between flex-wrap gap-2">
               <div>
                 <p className="text-sm font-semibold text-torg-dark flex items-center gap-1.5"><ClipboardList size={15} className="text-torg-orange" /> Ordem de Produção</p>
@@ -746,6 +786,23 @@ export default function ServicoDetalheClient({ id }) {
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setModalRev(false)} disabled={criandoRev} className="px-4 py-2 text-sm text-torg-gray rounded-lg hover:bg-gray-100">Cancelar</button>
               <button onClick={criarRevisao} disabled={criandoRev} className="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 disabled:opacity-50">{criandoRev ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} Registrar revisão</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {aceiteOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !enviandoAceite && setAceiteOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-torg-dark mb-1 flex items-center gap-2"><ShieldCheck size={18} className="text-torg-blue" /> Enviar para aceite do cliente</h3>
+            <p className="text-xs text-torg-gray mb-3">O cliente recebe um e-mail com o PDF e um botão para <strong>aprovar a proposta online</strong> (registra nome, documento, data, hora e IP).</p>
+            <label className="text-xs text-torg-gray">E-mail do cliente *</label>
+            <input value={aceitePara} onChange={(e) => setAceitePara(e.target.value)} placeholder="cliente@empresa.com.br" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 mb-3 focus:ring-2 focus:ring-torg-blue" autoFocus />
+            <label className="text-xs text-torg-gray">Mensagem (opcional)</label>
+            <textarea value={aceiteMsg} onChange={(e) => setAceiteMsg(e.target.value)} rows={3} placeholder="Mensagem que vai no corpo do e-mail…" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue resize-y" />
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setAceiteOpen(false)} disabled={enviandoAceite} className="px-4 py-2 text-sm text-torg-gray rounded-lg hover:bg-gray-100">Cancelar</button>
+              <button onClick={enviarAceite} disabled={enviandoAceite || !aceitePara.trim()} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-2 disabled:opacity-50">{enviandoAceite ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar</button>
             </div>
           </div>
         </div>

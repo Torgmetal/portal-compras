@@ -87,7 +87,10 @@ export default withAuth(
           path.startsWith("/api/apresentacao/") ||
           // Aceite do Relatorio de Status pelo cliente — publico via token unico
           path.startsWith("/relatorio/aceite/") ||
-          path.startsWith("/api/relatorio/aceite/")
+          path.startsWith("/api/relatorio/aceite/") ||
+          // Aceite da Proposta de Servico pelo cliente — publico via token unico
+          path.startsWith("/proposta/aceite/") ||
+          path.startsWith("/api/proposta/aceite/")
         ) {
           return true;
         }
