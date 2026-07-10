@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory,
+  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
@@ -37,6 +37,7 @@ function calcStatus(op) {
 const VISTAS = [
   { key: "resumo", label: "Resumo", icon: FileText },
   { key: "engenharia", label: "Engenharia", icon: Ruler },
+  { key: "compras", label: "Compras", icon: ShoppingCart },
   { key: "producao", label: "Produção", icon: Factory },
   { key: "expedicao", label: "Expedição", icon: Truck },
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
@@ -800,7 +801,14 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
       {vista === "engenharia" && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><Ruler size={18} className="text-torg-blue" /> Engenharia</h3>
-          <p className="text-sm text-torg-gray mb-4">Projetos, RMs de compra e listas da OP. Projetos e listas entram na próxima etapa.</p>
+          <p className="text-sm text-torg-gray">Projetos e listas de material da OP. Em construção (próxima etapa). As RMs de compra estão na aba <button onClick={() => setVista("compras")} className="text-torg-blue underline font-medium">Compras</button>.</p>
+        </div>
+      )}
+
+      {vista === "compras" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><ShoppingCart size={18} className="text-torg-blue" /> Compras</h3>
+          <p className="text-sm text-torg-gray mb-4">RMs de compra e pedidos da OP. O acompanhamento dos pedidos/recebimentos entra na próxima etapa.</p>
           <h4 className="text-sm font-semibold text-torg-dark mb-2">RMs de compra ({(op.rms || []).length})</h4>
           {(op.rms || []).length === 0 ? <p className="text-sm text-torg-gray">Nenhuma RM vinculada a esta OP.</p> : (
             <div className="space-y-1.5">
