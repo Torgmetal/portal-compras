@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send, CheckCircle2, ClipboardList } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, RefreshCw, Save, Wrench, Plus, Trash2, Layers, DollarSign, FolderUp, FileText, Send, CheckCircle2, ClipboardList, Paperclip } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
 import { precoHoraDoServico } from "@/lib/custo-hora-calc";
@@ -65,6 +65,7 @@ export default function ServicoDetalheClient({ id }) {
   const [salvando, setSalvando] = useState(false);
   const [arquivos, setArquivos] = useState([]);
   const [subindoArq, setSubindoArq] = useState(0);
+  const [subindoLoteArq, setSubindoLoteArq] = useState(0);
   const [configCH, setConfigCH] = useState(null);
   const autoValorRef = useRef(false);
   const arqRef = useRef(null);
@@ -240,14 +241,27 @@ export default function ServicoDetalheClient({ id }) {
     if (!perfis.length) { showToast("Sem perfis no corte pra puxar", "error"); return; }
     setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, itens: [...(l.itens || []), ...perfis] } : l))); marcar();
   };
-  // Anexar arquivos ao lote — usa só a NOMENCLATURA (nome do arquivo, sem a
-  // extensão) como item; aceita qualquer extensão (IGS, STEP, PDF…), não sobe
-  // o arquivo (é só pra montar a lista de entrega). Igual à ideia dos arquivos
-  // do orçamento, mas aqui só o nome interessa.
-  const anexarArquivosLote = (i, files) => {
-    const novos = Array.from(files || []).map((f) => ({ descricao: f.name.replace(/\.[^./\\]+$/, ""), qtd: "", unidade: "" }));
-    if (!novos.length) return;
-    setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, itens: [...(l.itens || []), ...novos] } : l))); marcar();
+  // Anexar arquivos ao lote — SOBE cada arquivo (mesmo /api/upload-blob do
+  // orçamento, qualquer extensão IGS/STEP/PDF…) e cria um item com o nome (sem
+  // extensão) na descrição + link pro arquivo. Ter o desenho anexado a cada
+  // peça facilita a separação por lote.
+  const anexarArquivosLote = async (i, files) => {
+    const lista = Array.from(files || []);
+    if (!lista.length) return;
+    setSubindoLoteArq((n) => n + lista.length);
+    for (const file of lista) {
+      try {
+        const fd = new FormData(); fd.append("file", file);
+        const r = await fetch("/api/upload-blob", { method: "POST", body: fd });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Falha no upload");
+        const nome = d.nomeArquivo || file.name;
+        const item = { descricao: nome.replace(/\.[^./\\]+$/, ""), qtd: "", unidade: "", url: d.url, nomeArquivo: nome, tipo: d.tipo || file.type || null, tamanho: d.tamanho || file.size || null };
+        setLotes((p) => p.map((l, idx) => (idx === i ? { ...l, itens: [...(l.itens || []), item] } : l)));
+        marcar();
+      } catch (e) { showToast(e.message || "Falha ao subir arquivo", "error"); }
+      finally { setSubindoLoteArq((n) => n - 1); }
+    }
   };
 
   const abrirEnvio = () => {
@@ -547,7 +561,7 @@ export default function ServicoDetalheClient({ id }) {
       {aba === "lotes" && (
         <div className="space-y-3">
           <div className="flex items-start justify-between flex-wrap gap-2">
-            <p className="text-sm text-torg-gray max-w-xl">Monte os <strong>lotes de entrega</strong> — cada lote com seu <strong>local de entrega</strong> e os itens que vão nele. Digite os itens, <strong>puxe os perfis do corte</strong> ou <strong>anexe arquivos</strong> (qualquer extensão — os nomes viram os itens). Gere o <strong>Plano de Entregas</strong> pra combinar com o cliente e o transporte.</p>
+            <p className="text-sm text-torg-gray max-w-xl">Monte os <strong>lotes de entrega</strong> — cada lote com seu <strong>local de entrega</strong> e os itens que vão nele. Digite os itens, <strong>puxe os perfis do corte</strong> ou <strong>anexe arquivos</strong> (qualquer extensão — sobe o arquivo e o nome vira o item, com link pra abrir na separação). Gere o <strong>Plano de Entregas</strong> pra combinar com o cliente e o transporte.</p>
             <button type="button" onClick={() => { if (dirty) { showToast("Salve o orçamento antes de gerar", "error"); return; } window.location.href = `/api/comercial/orcamento-servico/${id}/lotes-pdf`; }} className="px-3 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-blue/90 shrink-0"><FileText size={15} /> Plano de Entregas (PDF)</button>
           </div>
           {lotes.map((lote, i) => (
@@ -562,7 +576,7 @@ export default function ServicoDetalheClient({ id }) {
               <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
                 <label className="text-xs text-torg-gray">Itens deste lote</label>
                 <div className="flex items-center gap-3">
-                  <label className="text-xs text-torg-blue hover:underline cursor-pointer">+ anexar arquivos<input type="file" multiple className="hidden" onChange={(e) => { anexarArquivosLote(i, e.target.files); e.target.value = ""; }} /></label>
+                  <label className={`text-xs cursor-pointer inline-flex items-center gap-1 ${subindoLoteArq > 0 ? "text-torg-gray cursor-wait" : "text-torg-blue hover:underline"}`}>{subindoLoteArq > 0 ? <><Loader2 size={11} className="animate-spin" /> enviando…</> : "+ anexar arquivos"}<input type="file" multiple disabled={subindoLoteArq > 0} className="hidden" onChange={(e) => { anexarArquivosLote(i, e.target.files); e.target.value = ""; }} /></label>
                   <button type="button" onClick={() => puxarPerfisLote(i)} className="text-xs text-torg-blue hover:underline">+ puxar perfis do corte</button>
                 </div>
               </div>
@@ -572,6 +586,7 @@ export default function ServicoDetalheClient({ id }) {
                     <input value={it.descricao} onChange={(e) => setItemLote(i, j, "descricao", e.target.value)} placeholder="Descrição do item" className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue" />
                     <input value={it.qtd} onChange={(e) => setItemLote(i, j, "qtd", e.target.value)} placeholder="Qtd" className="w-16 border border-gray-200 rounded px-2 py-1 text-xs text-right focus:ring-1 focus:ring-torg-blue" />
                     <input value={it.unidade} onChange={(e) => setItemLote(i, j, "unidade", e.target.value)} placeholder="un" className="w-20 border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue" />
+                    {it.url ? <a href={it.url} target="_blank" rel="noopener noreferrer" title={it.nomeArquivo || "Abrir arquivo"} className="text-torg-blue hover:text-torg-blue/60 shrink-0"><Paperclip size={13} /></a> : <span className="w-[13px] shrink-0" />}
                     <button type="button" onClick={() => rmItemLote(i, j)} className="text-red-400 hover:text-red-600 shrink-0"><Trash2 size={13} /></button>
                   </div>
                 ))}

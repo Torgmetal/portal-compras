@@ -27,7 +27,7 @@ const updateSchema = z.object({
     nome: z.string().max(120).optional().default(""),
     local: z.string().max(600).optional().default(""),
     data: z.string().max(40).optional().default(""),
-    itens: z.array(z.object({ descricao: z.string().max(300).optional().default(""), qtd: z.string().max(40).optional().default(""), unidade: z.string().max(40).optional().default("") })).max(200).optional().default([]),
+    itens: z.array(z.object({ descricao: z.string().max(300).optional().default(""), qtd: z.string().max(40).optional().default(""), unidade: z.string().max(40).optional().default(""), url: z.string().max(2000).optional().nullable(), nomeArquivo: z.string().max(400).optional().nullable(), tipo: z.string().max(200).optional().nullable(), tamanho: z.number().optional().nullable() })).max(200).optional().default([]),
   })).max(60).nullable().optional(),
   composicao: z.record(z.any()).optional(),
   arquivos: z.array(z.object({
