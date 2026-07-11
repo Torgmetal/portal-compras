@@ -129,13 +129,13 @@ export default function PedidosOmieSection({ pedidos }) {
                 <td className="px-4 py-2.5 text-right text-torg-dark font-medium tabular-nums">
                   {fmtMoeda(p.total)}
                 </td>
-                <td className="px-4 py-2.5 text-xs">
+                <td className="px-4 py-2.5 text-xs whitespace-nowrap">
                   {p.faturamentoDireto ? (
-                    <span className="px-2 py-0.5 bg-torg-orange-50 text-torg-orange-700 rounded-full font-medium">
-                      FD
+                    <span className="px-2 py-0.5 bg-torg-orange-50 text-torg-orange-700 rounded-full font-medium whitespace-nowrap" title="Faturamento direto — o fornecedor fatura direto no cliente">
+                      Faturado Cliente
                     </span>
                   ) : (
-                    <span className="text-torg-gray">Normal</span>
+                    <span className="text-torg-gray">Faturado Torg</span>
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-torg-gray text-xs whitespace-nowrap">{fmtData(p.createdAt)}</td>
