@@ -1063,15 +1063,15 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, 
           <table className="w-full text-sm min-w-[900px]">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Pedido</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Itens</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" title={`Percentual da medição em relação ao ${baseLabel.toLowerCase()} (${fmtMoeda(baseContrato)})`}>% Contrato</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Soma acumulada das medições ao longo do tempo">% Acumulado</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Pedido</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descrição</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Data</th>
+                <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Itens</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Valor</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap" title={`Percentual da medição em relação ao ${baseLabel.toLowerCase()} (${fmtMoeda(baseContrato)})`}>% Contrato</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap" title="Soma acumulada das medições ao longo do tempo">% Acumulado</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Status</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -1083,9 +1083,9 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, 
                   ? "text-amber-700 bg-amber-50"
                   : "text-torg-dark bg-torg-blue-50";
                 return (
-                <tr key={m.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                <tr key={m.id} className="hover:bg-gray-50 align-middle">
+                  <td className="px-4 py-2 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
                       <a
                         href={`/api/omie/pedido-compra-pdf/${m.codigoPedidoOmie || m.numeroPedidoOmie}`}
                         target="_blank"
@@ -1130,9 +1130,9 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, 
                       </span>
                     ) : "—"}
                   </td>
-                  <td className="px-4 py-2 text-xs">
+                  <td className="px-4 py-2 text-xs whitespace-nowrap">
                     {m.status ? (
-                      <span className={`px-2 py-0.5 rounded-full font-medium ${statusMedicaoClasses(m.etapa)}`}>
+                      <span className={`inline-block px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${statusMedicaoClasses(m.etapa)}`}>
                         {m.status}
                       </span>
                     ) : (
