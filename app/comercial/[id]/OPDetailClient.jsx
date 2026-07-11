@@ -814,34 +814,46 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         const verbaTotal = verbaItens + verbaAdit;
         const diasPlan = op.dataInicio && op.dataFimPrevista ? Math.max(0, Math.round((new Date(op.dataFimPrevista) - new Date(op.dataInicio)) / DIA)) : null;
         return (
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-                <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><DollarSign size={18} className="text-torg-blue" /> Verbas estimadas (comercial)</h3>
-                <span className="text-sm font-bold text-torg-dark tabular-nums">{fmtMoeda(verbaTotal)}</span>
-              </div>
-              {(op.itens || []).length === 0 ? <p className="text-sm text-torg-gray">Sem itens.</p> : (
-                <div className="space-y-1.5">
-                  {op.itens.map((it) => (
-                    <div key={it.id} className="flex items-center justify-between gap-3 text-sm border-b border-gray-50 pb-1.5">
-                      <span className="text-torg-dark truncate">{it.categoria}{it.descricao ? ` — ${it.descricao}` : ""}</span>
-                      <span className="text-torg-gray tabular-nums whitespace-nowrap">{fmtMoeda(it.valorVerba)}</span>
-                    </div>
-                  ))}
-                  {verbaAdit > 0 && <div className="flex items-center justify-between gap-3 text-sm pt-1"><span className="text-torg-gray">+ Aditivos</span><span className="text-torg-gray tabular-nums">{fmtMoeda(verbaAdit)}</span></div>}
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100 border-b border-gray-100">
+                <div className="p-4">
+                  <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Verba estimada</p>
+                  <p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtMoeda(verbaTotal)}</p>
+                  <p className="text-[10px] text-torg-gray mt-1">{(op.itens || []).length} item(ns){verbaAdit > 0 ? " + aditivos" : ""}</p>
                 </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Tempo planejado</p>
-                <p className="text-xl font-bold text-torg-dark">{diasPlan != null ? `${diasPlan} dias` : "—"}</p>
-                <p className="text-xs text-torg-gray mt-1">{fmtData(op.dataInicio)} → {fmtData(op.dataFimPrevista)}</p>
+                <div className="p-4">
+                  <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Tempo planejado</p>
+                  <p className="text-lg font-extrabold text-torg-dark tabular-nums">{diasPlan != null ? `${diasPlan} dias` : "—"}</p>
+                  <p className="text-[10px] text-torg-gray mt-1 tabular-nums">{fmtData(op.dataInicio)} → {fmtData(op.dataFimPrevista)}</p>
+                </div>
+                <div className="p-4">
+                  <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Pedidos emitidos</p>
+                  <p className="text-lg font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(op.kpisFinanceiros?.pedidosTorg || 0)}</p>
+                  <p className="text-[10px] text-torg-gray mt-1">detalhe em Compras</p>
+                </div>
+                <div className="p-4">
+                  <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Notas Torg</p>
+                  <p className="text-lg font-extrabold text-torg-blue tabular-nums">{fmtMoeda(op.resumoMedicoes?.totalMedido || 0)}</p>
+                  <p className="text-[10px] text-torg-gray mt-1">{(op.medicoes || []).length} nota(s)</p>
+                </div>
               </div>
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Pedidos emitidos (Torg)</p>
-                <p className="text-xl font-bold text-torg-dark tabular-nums">{fmtMoeda(op.kpisFinanceiros?.pedidosTorg || 0)}</p>
-                <p className="text-xs text-torg-gray mt-1">detalhe na aba Compras</p>
+              <div className="p-6">
+                <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-3"><DollarSign size={16} className="text-torg-blue" /> Verbas estimadas pelo comercial</h3>
+                {(op.itens || []).length === 0 ? <p className="text-sm text-torg-gray">Sem itens.</p> : (
+                  <div className="divide-y divide-gray-50">
+                    {op.itens.map((it) => (
+                      <div key={it.id} className="flex items-center justify-between gap-4 py-2">
+                        <span className="text-sm text-torg-dark min-w-0"><span className="font-medium">{labelCategoria(it.categoria)}</span>{it.descricao ? <span className="text-torg-gray"> — {it.descricao}</span> : ""}</span>
+                        <span className="text-sm text-torg-dark tabular-nums whitespace-nowrap">{fmtMoeda(it.valorVerba)}</span>
+                      </div>
+                    ))}
+                    {verbaAdit > 0 && (
+                      <div className="flex items-center justify-between gap-4 py-2"><span className="text-sm text-torg-gray">+ Aditivos</span><span className="text-sm text-torg-gray tabular-nums">{fmtMoeda(verbaAdit)}</span></div>
+                    )}
+                    <div className="flex items-center justify-between gap-4 pt-2.5"><span className="text-sm font-bold text-torg-dark">Total</span><span className="text-sm font-bold text-torg-dark tabular-nums">{fmtMoeda(verbaTotal)}</span></div>
+                  </div>
+                )}
               </div>
             </div>
             <MedicoesCard
