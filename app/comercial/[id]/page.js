@@ -347,9 +347,7 @@ export default async function OPDetailPage({ params }) {
         </div>
       )}
 
-      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} proposta={propostaVinc} />
-
-      <PedidosOmieSection pedidos={pedidos} />
+      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} proposta={propostaVinc} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
     </div>
   );
 }

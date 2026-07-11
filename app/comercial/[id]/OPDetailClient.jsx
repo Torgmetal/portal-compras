@@ -43,7 +43,7 @@ const VISTAS = [
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
 
-export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, proposta = null }) {
+export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, proposta = null, comprasSlot = null }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
   // Permissao pra aplicar alteracao de verba direto, sem virar solicitacao
@@ -824,9 +824,12 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
       )}
 
       {vista === "compras" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-2"><ShoppingCart size={18} className="text-torg-blue" /> Compras</h3>
-          <p className="text-sm text-torg-gray">Pedidos de compra, cotações e recebimentos da OP. Em construção (próxima etapa). As <button onClick={() => setVista("engenharia")} className="text-torg-blue underline font-medium">RMs emitidas</button> ficam na Engenharia.</p>
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><ShoppingCart size={18} className="text-torg-blue" /> Compras</h3>
+            <p className="text-sm text-torg-gray">Pedidos de compra emitidos para a OP e as NFs de compra (entrada) recebidas — vinculados e registrados. As <button onClick={() => setVista("engenharia")} className="text-torg-blue underline font-medium">RMs emitidas</button> ficam na Engenharia; as notas de venda (Torg) no <button onClick={() => setVista("financeiro")} className="text-torg-blue underline font-medium">Financeiro</button>.</p>
+          </div>
+          {comprasSlot}
         </div>
       )}
 
