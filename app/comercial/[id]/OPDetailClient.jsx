@@ -17,6 +17,7 @@ import { fmtOP } from "@/lib/utils";
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+const plural = (n, s, p) => `${n} ${Number(n) === 1 ? s : p}`;
 
 const STATUS_LABELS = {
   ABERTA: { label: "Aberta", className: "bg-torg-blue-50 text-torg-blue" },
@@ -398,7 +399,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                   <span className="text-base font-bold text-torg-blue tabular-nums">{fmtMoeda(op.kpisFinanceiros.receitaLiquida)}</span>
                 </div>
               </div>
-              <p className="text-[10px] text-torg-gray mt-2">{(op.receitas || []).length} receita(s) cadastrada(s)</p>
+              <p className="text-[10px] text-torg-gray mt-2">{plural((op.receitas || []).length, "receita cadastrada", "receitas cadastradas")}</p>
 
               {/* Impostos detalhados */}
               {op.kpisFinanceiros.impostosDetalhados && op.kpisFinanceiros.totalImpostos > 0 && (
@@ -745,7 +746,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                 <div key={lote.id || i} className="border border-gray-100 rounded-lg overflow-hidden">
                   <div className="bg-torg-dark text-white px-4 py-2 flex items-center justify-between gap-2">
                     <span className="font-semibold text-sm">{lote.nome || `Lote ${i + 1}`}</span>
-                    <span className="text-xs text-white/80">{[lote.data && `Entrega: ${lote.data}`, `${(lote.itens || []).length} item(ns)`].filter(Boolean).join(" · ")}</span>
+                    <span className="text-xs text-white/80">{[lote.data && `Entrega: ${lote.data}`, plural((lote.itens || []).length, "item", "itens")].filter(Boolean).join(" · ")}</span>
                   </div>
                   {lote.local && <p className="px-4 pt-2 text-xs text-torg-gray"><span className="font-semibold">Local:</span> {lote.local}</p>}
                   <table className="w-full text-sm">
@@ -783,9 +784,11 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               </div>
             )}
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h4 className="text-sm font-semibold text-torg-dark mb-1">Listas</h4>
-            <p className="text-sm text-torg-gray">Lista de expedíveis, LPC e demais listas de material da engenharia. Em construção (próxima etapa).</p>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <FileText size={26} className="mx-auto text-gray-300 mb-2" />
+            <p className="text-sm font-semibold text-torg-dark">Listas de material</p>
+            <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">A lista de expedíveis, a LPC e as demais listas da engenharia aparecerão aqui.</p>
+            <span className="inline-block mt-3 text-[10px] font-semibold uppercase tracking-wider text-torg-blue bg-torg-blue-50 px-2 py-1 rounded-full">Em breve</span>
           </div>
         </div>
       )}
@@ -801,9 +804,11 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
       )}
 
       {vista === "producao" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-2"><Factory size={18} className="text-torg-blue" /> Produção</h3>
-          <p className="text-sm text-torg-gray">Status de cada peça da obra que está em produção — a lista dá baixa conforme os apontamentos do Syneco. Em construção (próxima etapa).</p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+          <Factory size={28} className="mx-auto text-gray-300 mb-2" />
+          <p className="text-sm font-semibold text-torg-dark">Produção</p>
+          <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">O status de cada peça da obra em produção, dando baixa conforme os apontamentos do Syneco.</p>
+          <span className="inline-block mt-3 text-[10px] font-semibold uppercase tracking-wider text-torg-blue bg-torg-blue-50 px-2 py-1 rounded-full">Em breve</span>
         </div>
       )}
 
@@ -816,26 +821,26 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         return (
           <div className="space-y-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-gray-100 border-b border-gray-100">
-                <div className="p-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 border-b border-gray-100">
+                <div className="bg-white p-4">
                   <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Verba estimada</p>
                   <p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtMoeda(verbaTotal)}</p>
-                  <p className="text-[10px] text-torg-gray mt-1">{(op.itens || []).length} item(ns){verbaAdit > 0 ? " + aditivos" : ""}</p>
+                  <p className="text-[10px] text-torg-gray mt-1">{plural((op.itens || []).length, "item", "itens")}{verbaAdit > 0 ? " + aditivos" : ""}</p>
                 </div>
-                <div className="p-4">
+                <div className="bg-white p-4">
                   <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Tempo planejado</p>
                   <p className="text-lg font-extrabold text-torg-dark tabular-nums">{diasPlan != null ? `${diasPlan} dias` : "—"}</p>
                   <p className="text-[10px] text-torg-gray mt-1 tabular-nums">{fmtData(op.dataInicio)} → {fmtData(op.dataFimPrevista)}</p>
                 </div>
-                <div className="p-4">
+                <div className="bg-white p-4">
                   <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Pedidos emitidos</p>
                   <p className="text-lg font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(op.kpisFinanceiros?.pedidosTorg || 0)}</p>
                   <p className="text-[10px] text-torg-gray mt-1">detalhe em Compras</p>
                 </div>
-                <div className="p-4">
+                <div className="bg-white p-4">
                   <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Notas Torg</p>
                   <p className="text-lg font-extrabold text-torg-blue tabular-nums">{fmtMoeda(op.resumoMedicoes?.totalMedido || 0)}</p>
-                  <p className="text-[10px] text-torg-gray mt-1">{(op.medicoes || []).length} nota(s)</p>
+                  <p className="text-[10px] text-torg-gray mt-1">{plural((op.medicoes || []).length, "nota", "notas")}</p>
                 </div>
               </div>
               <div className="p-6">
