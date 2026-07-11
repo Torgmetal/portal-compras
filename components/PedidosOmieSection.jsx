@@ -70,7 +70,7 @@ export default function PedidosOmieSection({ pedidos }) {
           </span>
           {qtdFD > 0 && (
             <span className="text-xs bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full font-medium border border-amber-200">
-              {qtdFD} FD pendente{qtdFD !== 1 ? "s" : ""}
+              {qtdFD} Faturado Cliente pendente{qtdFD !== 1 ? "s" : ""}
             </span>
           )}
           {qtdErros > 0 && (

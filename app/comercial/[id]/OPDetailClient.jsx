@@ -363,7 +363,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
             {/* Verba FD */}
             {temFD ? (
               <div className="p-4">
-                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Verba FD</p>
+                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Verba Fat. Cliente</p>
                 <p className="text-lg font-extrabold text-torg-orange-700 tabular-nums">{fmtMoeda(op.kpisFinanceiros.verbaFD)}</p>
                 {(op.kpisFinanceiros?.excedenteFD || 0) > 0 && (
                   <p className="text-[10px] text-red-600 font-medium mt-1">Excedente: {fmtMoeda(op.kpisFinanceiros.excedenteFD)}</p>
@@ -371,9 +371,9 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               </div>
             ) : (
               <div className="p-4">
-                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Verba FD</p>
+                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Verba Fat. Cliente</p>
                 <p className="text-lg font-extrabold text-gray-300">—</p>
-                <p className="text-[10px] text-torg-gray mt-1">Sem itens FD</p>
+                <p className="text-[10px] text-torg-gray mt-1">Sem itens Faturado Cliente</p>
               </div>
             )}
           </div>
@@ -2464,9 +2464,9 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                             ? "bg-torg-orange/10 text-torg-orange border-torg-orange/30 hover:bg-torg-orange/20"
                             : "bg-torg-blue/10 text-torg-blue border-torg-blue/20 hover:bg-torg-blue/20"
                         }`}
-                        title={it.faturamentoDireto ? "Clique para mudar para Torg" : "Clique para mudar para Faturamento Direto"}
+                        title={it.faturamentoDireto ? "Clique para mudar para Faturado Torg" : "Clique para mudar para Faturado Cliente (faturamento direto)"}
                       >
-                        {it.faturamentoDireto ? "Direto" : "Torg"}
+                        {it.faturamentoDireto ? "Faturado Cliente" : "Faturado Torg"}
                       </button>
                     ) : (
                       <span className={`text-xs font-medium px-2.5 py-0.5 rounded-lg border ${
@@ -2474,7 +2474,7 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                           ? "bg-torg-orange/10 text-torg-orange border-torg-orange/30"
                           : "bg-torg-blue/10 text-torg-blue border-torg-blue/20"
                       }`}>
-                        {it.faturamentoDireto ? "Direto" : "Torg"}
+                        {it.faturamentoDireto ? "Faturado Cliente" : "Faturado Torg"}
                       </span>
                     )}
                   </td>
