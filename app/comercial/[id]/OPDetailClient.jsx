@@ -501,40 +501,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         onEditar={() => setModalCliente(true)}
       />
 
-      {/* Medições (Pedidos de Venda do Omie) */}
-      <MedicoesCard
-        medicoes={op.medicoes || []}
-        resumo={op.resumoMedicoes}
-        receitaBruta={op.kpisFinanceiros?.receitaBruta || 0}
-        valorTotalContrato={op.kpisFinanceiros?.valorTotalContrato || 0}
-        contratoExplicito={op.kpisFinanceiros?.contratoExplicito || false}
-        encerrada={encerradaOuCancelada}
-        syncId={syncMedicaoId}
-        onAdicionar={() => setModalMedicao(true)}
-        onSync={async (id) => {
-          setSyncMedicaoId(id);
-          try {
-            const res = await fetch(`/api/comercial/medicao/${id}`, { method: "POST" });
-            const d = await res.json().catch(() => ({}));
-            if (!res.ok) {
-              const detalhe = d?.error || `HTTP ${res.status}`;
-              alert(`Falha ao sincronizar medição:\n\n${detalhe}\n\nO erro foi salvo no registro — passe o mouse no aviso "⚠ erro no sync" pra ver detalhes.`);
-            }
-            router.refresh();
-          } catch (e) {
-            alert(`Erro de rede ao sincronizar: ${e.message}`);
-          } finally {
-            setSyncMedicaoId(null);
-          }
-        }}
-        onRemover={async (id, numero) => {
-          if (!window.confirm(`Desvincular medição ${numero}?\n\nIsso só remove o vínculo no portal — o pedido continua intacto no Omie.`)) return;
-          const res = await fetch(`/api/comercial/medicao/${id}`, { method: "DELETE" });
-          const d = await res.json();
-          if (!res.ok) return alert(d.error || "Erro");
-          router.refresh();
-        }}
-      />
+      {/* Medições (Pedidos de Venda do Omie) — movidas para a aba Financeiro */}
 
       {/* Cobertura por categoria (gaps de RM da Engenharia) */}
       {op.cobertura && Object.keys(op.cobertura).length > 0 && (
@@ -846,7 +813,6 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         const verbaAdit = (op.aditivos || []).reduce((s, a) => s + (a.itens || []).reduce((ss, i) => ss + (Number(i.valorVerba) || 0), 0), 0);
         const verbaTotal = verbaItens + verbaAdit;
         const diasPlan = op.dataInicio && op.dataFimPrevista ? Math.max(0, Math.round((new Date(op.dataFimPrevista) - new Date(op.dataInicio)) / DIA)) : null;
-        const medicoes = op.medicoes || [];
         return (
           <div className="space-y-4">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -866,7 +832,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                 <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Tempo planejado</p>
                 <p className="text-xl font-bold text-torg-dark">{diasPlan != null ? `${diasPlan} dias` : "—"}</p>
@@ -877,25 +843,33 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                 <p className="text-xl font-bold text-torg-dark tabular-nums">{fmtMoeda(op.kpisFinanceiros?.pedidosTorg || 0)}</p>
                 <p className="text-xs text-torg-gray mt-1">detalhe na aba Compras</p>
               </div>
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Notas Torg emitidas</p>
-                <p className="text-xl font-bold text-torg-dark tabular-nums">{fmtMoeda(op.resumoMedicoes?.totalMedido || 0)}</p>
-                <p className="text-xs text-torg-gray mt-1">{medicoes.length} nota(s)</p>
-              </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h4 className="text-sm font-semibold text-torg-dark mb-2">Notas / medições emitidas (Torg)</h4>
-              {medicoes.length === 0 ? <p className="text-sm text-torg-gray">Nenhuma nota emitida ainda.</p> : (
-                <div className="space-y-1.5">
-                  {medicoes.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between gap-3 text-sm border border-gray-100 rounded-lg px-3 py-2">
-                      <span className="font-mono text-torg-dark">{m.numeroPedidoOmie ? `Pedido ${m.numeroPedidoOmie}` : (m.etapa || "Medição")}</span>
-                      <span className="text-torg-gray tabular-nums whitespace-nowrap">{fmtMoeda(m.valorBruto)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <MedicoesCard
+              medicoes={op.medicoes || []}
+              resumo={op.resumoMedicoes}
+              receitaBruta={op.kpisFinanceiros?.receitaBruta || 0}
+              valorTotalContrato={op.kpisFinanceiros?.valorTotalContrato || 0}
+              contratoExplicito={op.kpisFinanceiros?.contratoExplicito || false}
+              encerrada={encerradaOuCancelada}
+              syncId={syncMedicaoId}
+              onAdicionar={() => setModalMedicao(true)}
+              onSync={async (id) => {
+                setSyncMedicaoId(id);
+                try {
+                  const res = await fetch(`/api/comercial/medicao/${id}`, { method: "POST" });
+                  const d = await res.json().catch(() => ({}));
+                  if (!res.ok) { const detalhe = d?.error || `HTTP ${res.status}`; alert(`Falha ao sincronizar medição:\n\n${detalhe}\n\nO erro foi salvo no registro — passe o mouse no aviso "⚠ erro no sync" pra ver detalhes.`); }
+                  router.refresh();
+                } catch (e) { alert(`Erro de rede ao sincronizar: ${e.message}`); } finally { setSyncMedicaoId(null); }
+              }}
+              onRemover={async (id, numero) => {
+                if (!window.confirm(`Desvincular medição ${numero}?\n\nIsso só remove o vínculo no portal — o pedido continua intacto no Omie.`)) return;
+                const res = await fetch(`/api/comercial/medicao/${id}`, { method: "DELETE" });
+                const d = await res.json();
+                if (!res.ok) return alert(d.error || "Erro");
+                router.refresh();
+              }}
+            />
             <p className="text-xs text-torg-gray">O <strong>custo por hora real</strong> (conforme o tempo que está levando na obra) entra na próxima etapa — depende das horas apontadas no Syneco. O demonstrativo detalhado (receita/despesa/aditivos) segue na aba <button onClick={() => setVista("resumo")} className="text-torg-blue underline font-medium">Resumo</button> por enquanto.</p>
           </div>
         );
