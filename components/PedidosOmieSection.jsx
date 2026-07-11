@@ -109,7 +109,8 @@ export default function PedidosOmieSection({ pedidos }) {
               <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
               <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
               <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Data</th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">NF entrada</th>
               <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
             </tr>
           </thead>
@@ -137,7 +138,16 @@ export default function PedidosOmieSection({ pedidos }) {
                     <span className="text-torg-gray">Normal</span>
                   )}
                 </td>
-                <td className="px-4 py-2.5 text-torg-gray text-xs">{fmtData(p.createdAt)}</td>
+                <td className="px-4 py-2.5 text-torg-gray text-xs whitespace-nowrap">{fmtData(p.createdAt)}</td>
+                <td className="px-4 py-2.5 text-xs whitespace-nowrap">
+                  {p.nfLista && p.nfLista.length > 0 ? (
+                    <span className="font-mono text-torg-dark" title={p.nfLista.map((nf) => `NF ${nf.numero}${nf.serie ? `/${nf.serie}` : ""}${nf.chave ? ` · chave ${nf.chave}` : ""}`).join("\n")}>
+                      {p.nfLista.map((nf) => nf.numero).join(", ")}
+                    </span>
+                  ) : (
+                    <span className="text-torg-gray" title="Sem NF de entrada registrada ainda">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-2.5">
                   {p.status === "CRIADO" ? (
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-torg-blue text-white">

@@ -107,6 +107,12 @@ export default async function OPDetailPage({ params }) {
       anexoUrl: true,
       anexoNome: true,
       categoriaItem: true,
+      nfNumero: true,
+      nfChave: true,
+      nfSerie: true,
+      statusEntrega: true,
+      recebidoEm: true,
+      recebimentos: { select: { nfNumero: true, nfSerie: true, nfChave: true } },
       cotacao: { select: { rm: { select: { numero: true } } } },
     },
   });
@@ -127,6 +133,14 @@ export default async function OPDetailPage({ params }) {
     anexoUrl: p.anexoUrl,
     anexoNome: p.anexoNome,
     categoriaItem: p.categoriaItem,
+    statusEntrega: p.statusEntrega || null,
+    // NFs de entrada do pedido (dedup: campo do pedido + recebimentos)
+    nfLista: (() => {
+      const m = new Map();
+      if (p.nfNumero) m.set(p.nfNumero, { numero: p.nfNumero, serie: p.nfSerie || null, chave: p.nfChave || null });
+      for (const r of p.recebimentos || []) if (r.nfNumero) m.set(r.nfNumero, { numero: r.nfNumero, serie: r.nfSerie || null, chave: r.nfChave || null });
+      return [...m.values()];
+    })(),
   }));
   // Separa entre normais (via cotacao) e FD avulsos (manuais)
   const pedidosFdAvulsos = pedidos.filter((p) => p.criadoManualmente);
