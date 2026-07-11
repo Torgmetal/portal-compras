@@ -67,6 +67,14 @@ export default async function OPDetailPage({ params }) {
   });
   const propostaPend = propostaVinc && !propostaVinc.aceitoEm ? propostaVinc : null;
 
+  // Peças da OP (LPC/Tekla já importadas no módulo Engenharia) — lista da aba Engenharia.
+  const pecas = await prisma.pecaConjunto.findMany({
+    where: { opId: op.id },
+    orderBy: [{ marca: "asc" }],
+    select: { id: true, marca: true, tipoPeca: true, pesoTotalKg: true, status: true, statusPrep: true, statusEstoque: true },
+    take: 3000,
+  });
+
   // Cobertura por categoria: pra cada categoria da OP, lista RMs (apenas ENGENHARIA) que cobrem
   const categoriasNoEscopo = new Set();
   for (const it of op.itens) categoriasNoEscopo.add(it.categoria);
@@ -361,7 +369,7 @@ export default async function OPDetailPage({ params }) {
         </div>
       )}
 
-      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} proposta={propostaVinc} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
+      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
     </div>
   );
 }

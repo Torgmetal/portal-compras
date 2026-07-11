@@ -18,6 +18,14 @@ const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const plural = (n, s, p) => `${n} ${Number(n) === 1 ? s : p}`;
+const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
+const TIPO_PECA = { CONJUNTO: "Conjunto", CROQUI: "Croqui" };
+const ESTOQUE_PECA = {
+  DISPONIVEL: { l: "Disponível", c: "bg-emerald-50 text-emerald-700" },
+  PARCIAL: { l: "Parcial", c: "bg-amber-50 text-amber-700" },
+  INDISPONIVEL: { l: "Indisponível", c: "bg-red-50 text-red-700" },
+};
+const capStatus = (s) => (s ? s.toLowerCase().replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "—");
 
 const STATUS_LABELS = {
   ABERTA: { label: "Aberta", className: "bg-torg-blue-50 text-torg-blue" },
@@ -44,7 +52,7 @@ const VISTAS = [
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
 
-export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, proposta = null, comprasSlot = null }) {
+export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, proposta = null, comprasSlot = null, pecas = [] }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
   // Permissao pra aplicar alteracao de verba direto, sem virar solicitacao
@@ -784,11 +792,58 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               </div>
             )}
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-            <FileText size={26} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-sm font-semibold text-torg-dark">Listas de material</p>
-            <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">A lista de expedíveis, a LPC e as demais listas da engenharia aparecerão aqui.</p>
-            <span className="inline-block mt-3 text-[10px] font-semibold uppercase tracking-wider text-torg-blue bg-torg-blue-50 px-2 py-1 rounded-full">Em breve</span>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="flex items-center justify-between flex-wrap gap-2 px-6 pt-5 pb-3">
+              <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><FileText size={16} className="text-torg-blue" /> Lista de peças (LPC)</h4>
+              {op.numero && <a href={`/engenharia/op/${encodeURIComponent(op.numero)}`} className="text-xs text-torg-blue hover:underline whitespace-nowrap">abrir em Engenharia</a>}
+            </div>
+            {pecas.length === 0 ? (
+              <div className="px-6 pb-8 pt-2 text-center">
+                <FileText size={26} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-sm font-semibold text-torg-dark">LPC ainda não importado</p>
+                <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">Importe o Tekla/LPC no módulo <strong>Engenharia</strong> — a lista de peças aparece aqui automaticamente, sem precisar subir arquivo.</p>
+              </div>
+            ) : (() => {
+              const pesoTotal = pecas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+              const conjuntos = pecas.filter((p) => p.tipoPeca === "CONJUNTO").length;
+              const croquis = pecas.filter((p) => p.tipoPeca === "CROQUI").length;
+              const comEstoque = pecas.filter((p) => p.statusEstoque === "DISPONIVEL").length;
+              return (
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 border-y border-gray-100">
+                    <div className="bg-white p-4"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Peças</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{pecas.length}</p></div>
+                    <div className="bg-white p-4"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Peso total</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtKg(pesoTotal)}</p></div>
+                    <div className="bg-white p-4"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Conjuntos / Croquis</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{conjuntos} / {croquis}</p></div>
+                    <div className="bg-white p-4"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-1">Com estoque</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{comEstoque}</p></div>
+                  </div>
+                  <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
+                    <table className="w-full text-sm min-w-[560px]">
+                      <thead className="bg-gray-50 sticky top-0"><tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Marca</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Tipo</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Peso (kg)</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Estoque</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Status</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {pecas.map((p) => {
+                          const est = ESTOQUE_PECA[p.statusEstoque];
+                          return (
+                            <tr key={p.id} className="align-middle hover:bg-gray-50">
+                              <td className="px-4 py-2 font-mono text-torg-dark whitespace-nowrap">{p.marca}</td>
+                              <td className="px-4 py-2 text-torg-gray text-xs whitespace-nowrap">{TIPO_PECA[p.tipoPeca] || "—"}</td>
+                              <td className="px-4 py-2 text-right text-torg-dark tabular-nums whitespace-nowrap">{Number(p.pesoTotalKg || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</td>
+                              <td className="px-4 py-2 whitespace-nowrap">{est ? <span className={`inline-block text-[10px] font-medium px-2 py-0.5 rounded-full ${est.c}`}>{est.l}</span> : <span className="text-torg-gray text-xs">—</span>}</td>
+                              <td className="px-4 py-2 text-xs text-torg-gray whitespace-nowrap">{p.statusPrep === "PREPARADO" ? "Preparado" : capStatus(p.status)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
