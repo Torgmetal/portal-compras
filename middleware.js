@@ -42,7 +42,7 @@ export default withAuth(
           path.startsWith("/api/auth") ||
           path.startsWith("/_next") ||
           path === "/entrar" ||
-          path === "/colaborador" ||
+          path.startsWith("/colaborador") ||
           path === "/trocar-senha" ||
           path === "/api/trocar-senha" ||
           path === "/esqueci-senha" ||

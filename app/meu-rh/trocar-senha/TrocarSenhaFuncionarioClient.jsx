@@ -147,7 +147,7 @@ export default function TrocarSenhaFuncionarioClient({ nome, obrigatoria }) {
 
         {!obrigatoria && (
           <Link
-            href="/meu-rh"
+            href="/colaborador"
             className="text-center text-sm text-torg-gray hover:text-torg-dark pt-2 border-t border-gray-100 inline-flex items-center gap-1 justify-center w-full"
           >
             <ArrowLeft size={14} /> Voltar

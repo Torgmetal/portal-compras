@@ -167,8 +167,8 @@ export default function TorguinhoChat() {
     user?.tipo === "ADMIN" ||
     (user?.modulos ?? []).some(m => config.modulosHabilitados.includes(m));
 
-  // Portal do funcionário (/meu-rh) não exibe o Torguinho — é ferramenta interna do time.
-  if (pathname?.startsWith("/meu-rh")) return null;
+  // Portal do funcionário (/colaborador, /meu-rh) não exibe o Torguinho — é ferramenta interna do time.
+  if (pathname?.startsWith("/colaborador") || pathname?.startsWith("/meu-rh")) return null;
   if (status !== "authenticated" || !config || !config.ativo || !temAcesso) return null;
 
   const nome = user?.name?.split(" ")[0] || "colega";

@@ -61,7 +61,7 @@ function LoginForm() {
       let destino = callbackUrl;
       try {
         const s = await fetch("/api/auth/session").then((r) => r.json());
-        if (s?.user?.tipo === "FUNCIONARIO") destino = "/meu-rh";
+        if (s?.user?.tipo === "FUNCIONARIO") destino = "/colaborador";
         else if (!destino) destino = homePorRole(s?.user?.role);
       } catch {
         if (!destino) destino = "/";

@@ -235,7 +235,7 @@ export default function HoleriteClient() {
     if (!num) return null;
     const full = num.length <= 11 ? `55${num}` : num;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const link = `${origin}/meu-rh`;
+    const link = `${origin}/colaborador`;
     const txt = encodeURIComponent(
       `Olá, ${nome}! Seu holerite de ${competenciaExtenso(competencia)} já está disponível no portal da Torg.\n\n` +
       `Acesse com seu CPF e senha para visualizar e confirmar o recebimento:\n${link}`

@@ -62,7 +62,7 @@ export async function POST(req) {
   const { competencia, soParaMim, somentePendentes, anexarPdf } = parsed.data;
 
   const origin = process.env.NEXTAUTH_URL || new URL(req.url).origin;
-  const link = `${origin}/meu-rh`;
+  const link = `${origin}/colaborador`;
 
   // Modo seguro: e-mail de amostra só pro RH logado, sem tocar no banco.
   if (soParaMim) {

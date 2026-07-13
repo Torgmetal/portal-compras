@@ -236,7 +236,7 @@ export default function MeuRHClient({ nome }) {
         {/* Ações secundárias: linha própria, quebram no celular */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
           <button onClick={() => setFbAberto(true)} className="text-sm text-torg-blue hover:text-torg-blue-700 inline-flex items-center gap-1.5 font-medium"><MessageSquarePlus size={16} /> Enviar sugestão</button>
-          <Link href="/meu-rh/trocar-senha" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5"><KeyRound size={16} /> Trocar senha</Link>
+          <Link href="/colaborador/trocar-senha" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5"><KeyRound size={16} /> Trocar senha</Link>
         </div>
       </header>
 
