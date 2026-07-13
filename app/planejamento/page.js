@@ -1,9 +1,7 @@
-import PlanejamentoClient from "./PlanejamentoClient";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Planejamento — Torg Metal",
-};
-
+// O "Painel Geral" foi removido — a entrada do módulo Planejamento cai direto
+// na primeira aba (Cronogramas).
 export default function PlanejamentoPage() {
-  return <PlanejamentoClient />;
+  redirect("/planejamento/cronogramas");
 }
