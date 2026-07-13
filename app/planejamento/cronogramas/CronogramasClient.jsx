@@ -1207,6 +1207,14 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
               {recalculando ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
               Recalcular Datas
             </button>
+            {/* Exportar MS Project (.xml) — o cliente abre no Project dele pra validar */}
+            <button
+              onClick={() => { window.location.href = `/api/planejamento/cronogramas/${cronogramaId}/msproject`; }}
+              className="px-3 py-1.5 text-[10px] font-medium text-torg-dark bg-white border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center gap-1.5"
+              title="Exporta este cronograma em XML do MS Project (.xml). O cliente abre no Project dele (Arquivo → Abrir → Importar) para validar/comparar."
+            >
+              <FileDown size={11} /> MS Project
+            </button>
             {/* Toggle lista / gantt */}
             <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden">
               <button
