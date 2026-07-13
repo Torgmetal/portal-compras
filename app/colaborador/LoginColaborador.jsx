@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import Link from "next/link";
 import { Loader2, AlertCircle, UserRound, KeyRound } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -100,12 +99,6 @@ export default function LoginColaborador() {
             Não tem senha? Fale com o RH.
           </p>
         </form>
-
-        <div className="text-center mt-4">
-          <Link href="/entrar" className="text-sm text-torg-gray hover:text-torg-dark">
-            É de um setor da Torg? <span className="font-medium">Acesso interno</span>
-          </Link>
-        </div>
       </div>
     </div>
   );
