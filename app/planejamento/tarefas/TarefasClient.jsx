@@ -158,7 +158,10 @@ export default function TarefasClient() {
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">Tarefas</h2>
           <p className="text-xs text-torg-gray mt-0.5">
-            {aba === "semanais" ? (filtroOp.trim() ? `Tarefas da OP-${filtroOp.trim().padStart(3, "0")} — todas as semanas` : todasSemanas ? "Acompanhamento por setor — todas as semanas" : `Acompanhamento por setor — Semana ${semana}/${ano}`) : "Atividades dos cronogramas ativos"}
+            {aba === "semanais"
+              ? (filtroOp.trim() ? `Tarefas da OP-${filtroOp.trim().padStart(3, "0")} — todas as semanas` : todasSemanas ? "Acompanhamento por setor — todas as semanas" : `Acompanhamento por setor — Semana ${semana}/${ano}`)
+              : aba === "cronograma" ? "Atividades dos cronogramas ativos"
+              : "Compras atrasadas e itens para cobrança dos setores"}
           </p>
         </div>
         {aba === "semanais" && (
@@ -189,10 +192,22 @@ export default function TarefasClient() {
         >
           <GanttChart size={13} /> Cronograma
         </button>
+        <button
+          onClick={() => setAba("cobranca")}
+          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+            aba === "cobranca" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
+          }`}
+        >
+          <AlertTriangle size={13} /> Cobrança
+        </button>
       </div>
 
       {aba === "cronograma" && (
         <AtividadesCronograma showToast={showToast} />
+      )}
+
+      {aba === "cobranca" && (
+        <AbaCobranca showToast={showToast} />
       )}
 
       {aba === "semanais" && (
@@ -753,6 +768,86 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Aba Cobrança — compras atrasadas (abrir RM) ──────────────────────
+function AbaCobranca() {
+  const [compras, setCompras] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [semAcesso, setSemAcesso] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/compras/cronograma")
+      .then((r) => {
+        if (r.status === 401 || r.status === 403) { setSemAcesso(true); return null; }
+        return r.ok ? r.json() : null;
+      })
+      .then((j) => {
+        if (!j?.success) return;
+        const atrasadas = (j.data || [])
+          .filter((i) => i.statusEntrega === "ATRASADO")
+          .sort((a, b) => new Date(a.prazoEntrega) - new Date(b.prazoEntrega));
+        setCompras(atrasadas);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const diasAtraso = (prazo) => Math.max(0, Math.floor((Date.now() - new Date(prazo)) / 86400000));
+  const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
+
+  return (
+    <div className="space-y-4">
+      <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+          <AlertTriangle size={15} className="text-red-500" />
+          <h3 className="text-sm font-semibold text-torg-dark">Compras atrasadas</h3>
+          {!loading && !semAcesso && <span className="text-[11px] text-torg-gray">({compras.length})</span>}
+          <span className="text-[11px] text-torg-gray ml-auto">material comprado com entrega vencida — cobre o Compras / abra a RM</span>
+        </div>
+        {loading ? (
+          <div className="p-6 text-center text-torg-gray text-sm flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> carregando…</div>
+        ) : semAcesso ? (
+          <div className="p-6 text-center text-torg-gray text-[12px]">Disponível para ADM e Compras.</div>
+        ) : compras.length === 0 ? (
+          <div className="p-6 text-center text-torg-gray text-[12px] flex items-center justify-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> Nenhuma compra atrasada.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead className="bg-gray-50/60 text-torg-gray">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium whitespace-nowrap">OP</th>
+                  <th className="text-left px-3 py-2 font-medium">Material</th>
+                  <th className="text-left px-3 py-2 font-medium">Fornecedor</th>
+                  <th className="text-left px-3 py-2 font-medium whitespace-nowrap">RM</th>
+                  <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Prazo</th>
+                  <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Atraso</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {compras.map((c) => (
+                  <tr key={c.id} className="hover:bg-red-50/30 align-middle">
+                    <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{fmtOP(c.opNumero)}</td>
+                    <td className="px-3 py-2 text-torg-dark max-w-[240px] truncate" title={c.descricao || ""}>{c.descricao || "—"}</td>
+                    <td className="px-3 py-2 text-torg-gray max-w-[160px] truncate" title={c.fornecedor || ""}>{c.fornecedor || "—"}</td>
+                    <td className="px-3 py-2 font-mono text-torg-gray whitespace-nowrap">{c.rmNumero}</td>
+                    <td className="px-3 py-2 text-right text-torg-gray whitespace-nowrap">{fmtData(c.prazoEntrega)}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold text-[10px]">{diasAtraso(c.prazoEntrega)}d</span>
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <a href={`/compras/rm/${c.rmId}`} className="text-torg-blue hover:text-torg-dark font-medium">Abrir RM →</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
