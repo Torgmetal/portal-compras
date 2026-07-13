@@ -1,7 +1,6 @@
-import StatusObraClient from "./StatusObraClient";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Status da obra — Planejamento Torg" };
-
+// Aba "Status da obra" saiu do ar (pouco usada). Redireciona pra Cronogramas.
 export default function StatusObraPage() {
-  return <StatusObraClient />;
+  redirect("/planejamento/cronogramas");
 }

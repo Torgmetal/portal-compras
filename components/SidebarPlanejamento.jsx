@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ListTodo, GanttChart, Truck, ClipboardCheck, Sparkles, Mail, PackageCheck } from "lucide-react";
+import { ListTodo, GanttChart, Truck, ClipboardCheck, Sparkles, Mail } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -10,7 +10,6 @@ const menu = [
   { href: "/planejamento/distribuir-tarefas", label: "Distribuir tarefas (IA)", icon: Sparkles },
   { href: "/planejamento/comunicacao", label: "Matriz de comunicação", icon: Mail },
   { href: "/planejamento/expedicao-semanal", label: "Expedição Semanal", icon: Truck },
-  { href: "/planejamento/status-obra", label: "Status da obra", icon: PackageCheck },
   { href: "/planejamento/tarefas", label: "Tarefas", icon: ListTodo },
   { href: "/planejamento/compromissos", label: "Meus Compromissos", icon: ClipboardCheck },
 ];
