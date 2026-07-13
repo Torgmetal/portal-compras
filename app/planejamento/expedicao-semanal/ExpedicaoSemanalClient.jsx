@@ -419,12 +419,12 @@ function ObraCard({ obra }) {
             </div>
           </div>
 
-          {/* Itens a expedir (conjuntos) */}
-          {itens.length > 0 && (
+          {/* Itens a expedir — só peças já apontadas como pintadas no Syneco */}
+          {itens.length > 0 ? (
             <div>
               <div className="flex items-start justify-between gap-2 mb-1.5">
                 <p className="text-[10px] font-semibold text-torg-dark">
-                  Itens a expedir <span className="text-torg-gray font-normal">({itens.length} conjuntos · nº = ordem de envio · entregas = quantidade por local)</span>
+                  Itens a expedir <span className="text-torg-gray font-normal">({itens.length} {itens.length === 1 ? "peça pintada" : "peças pintadas"} · nº = ordem de envio · entregas = quantidade por local)</span>
                 </p>
                 <div className="flex items-center gap-2 shrink-0">
                   {pedido && (
@@ -535,6 +535,11 @@ function ObraCard({ obra }) {
                   </tbody>
                 </table>
               </div>
+            </div>
+          ) : (
+            <div className="text-[11px] text-torg-gray bg-gray-50 rounded-lg px-3 py-2.5 flex items-center gap-2">
+              <Package size={13} className="text-gray-400 shrink-0" />
+              Nenhuma peça apontada como pintada no Syneco ainda — assim que a Pintura for apontada, os conjuntos aparecem aqui prontos para expedir.
             </div>
           )}
         </div>

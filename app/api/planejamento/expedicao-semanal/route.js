@@ -70,6 +70,38 @@ export async function GET(req) {
     orderBy: { dataFimPrevista: "asc" },
   });
 
+  // "Apontada como pintada no Syneco": o setor REAL da peça vem do MesOrdem ao
+  // vivo (setor mais avançado com produção > 0), NÃO do status armazenado — que
+  // só é auto-avançado até CORTE (pós-corte é lançado manual e costuma ficar
+  // atrasado). Mesma regra da tela Status da Obra. EXPEDIDO é fato do portal.
+  const SYN_SETOR = { Corte: "CORTE", Montagem: "MONTAGEM", Solda: "SOLDA", Acabamento: "ACABAMENTO", Jato: "JATO", Pintura: "PINTURA" };
+  const ORDEM_SYN = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
+  const normMarca = (m) => String(m || "").trim().toUpperCase();
+  const synRows = opsAtivas.length
+    ? await prisma.mesOrdem.groupBy({
+        by: ["opId", "item", "setor"],
+        where: { opId: { in: opsAtivas.map((o) => o.id) }, produzidoUn: { gt: 0 }, setor: { in: Object.keys(SYN_SETOR) } },
+        _sum: { produzidoUn: true },
+      })
+    : [];
+  const synByOp = new Map(); // opId -> Map(marca normalizada -> setor mais avançado do Syneco)
+  for (const s of synRows) {
+    const st = SYN_SETOR[s.setor];
+    if (!st || !s.opId) continue;
+    let mm = synByOp.get(s.opId);
+    if (!mm) synByOp.set(s.opId, (mm = new Map()));
+    const k = normMarca(s.item);
+    const cur = mm.get(k);
+    if (cur === undefined || ORDEM_SYN.indexOf(st) > ORDEM_SYN.indexOf(cur)) mm.set(k, st);
+  }
+  // Setor real de uma peça: Syneco ao vivo; status armazenado só como fallback.
+  const localSetor = (opId, p) => {
+    if (p.status === "EXPEDIDO") return "EXPEDIDO";
+    const mm = synByOp.get(opId);
+    if (mm) { const st = mm.get(normMarca(p.marca)); if (st) return st; }
+    return p.status || "PENDENTE";
+  };
+
   // Romaneios no range (peso real expedido)
   const romaneios = await prisma.romaneio.findMany({
     where: {
@@ -122,12 +154,14 @@ export async function GET(req) {
     const pesoExpedido = op.pecasConjunto.filter((p) => p.status === "EXPEDIDO").reduce((s, p) => s + p.pesoTotalKg, 0);
     const pesoPendente = pesoTotal - pesoExpedido;
 
-    // Pecas prontas para expedir (PINTURA concluida, ainda nao EXPEDIDO)
+    // Distribuição por etapa pelo setor REAL do Syneco (não pelo status armazenado):
+    // "Pronto p/ expedir" = peças apontadas como pintadas (setor real PINTURA).
     const statusProducao = {};
     for (const p of op.pecasConjunto) {
-      if (!statusProducao[p.status]) statusProducao[p.status] = { peso: 0, qte: 0 };
-      statusProducao[p.status].peso += p.pesoTotalKg;
-      statusProducao[p.status].qte += p.qte;
+      const st = localSetor(op.id, p);
+      if (!statusProducao[st]) statusProducao[st] = { peso: 0, qte: 0 };
+      statusProducao[st].peso += p.pesoTotalKg;
+      statusProducao[st].qte += p.qte;
     }
 
     // Grid semanal
@@ -161,14 +195,19 @@ export async function GET(req) {
     });
 
     // Itens a expedir = conjuntos/avulsas (croqui é sub-peça do corte, não expede)
+    // Traz SÓ as peças já apontadas como PINTADAS no Syneco (setor real = PINTURA)
+    // ou já expedidas. Fabricação (Corte→Jato) e estoque ficam de fora. A coluna
+    // "Situação" usa o setor real do Syneco (não o status armazenado).
     const ORD = { PENDENTE: 0, CORTE: 1, MONTAGEM: 2, SOLDA: 3, ACABAMENTO: 4, JATO: 5, PINTURA: 6, EXPEDIDO: 7 };
+    const PRONTAS = new Set(["PINTURA", "EXPEDIDO"]);
     const itens = op.pecasConjunto
       .filter((p) => p.tipoPeca === "CONJUNTO" || p.tipoPeca == null)
       .map((p) => ({
-        id: p.id, marca: p.marca, descricao: p.descricao, qte: p.qte, peso: p.pesoTotalKg, status: p.status,
+        id: p.id, marca: p.marca, descricao: p.descricao, qte: p.qte, peso: p.pesoTotalKg, status: localSetor(op.id, p),
         ordemCampo: p.ordemCampo ?? null,
         entregas: p.entregas.map((e) => ({ id: e.id, destino: e.destino, quantidade: e.quantidade })),
       }))
+      .filter((it) => PRONTAS.has(it.status))
       // ordem de campo (1,2,3…), depois fluxo e marca
       .sort((a, b) =>
         ((a.ordemCampo ?? Infinity) - (b.ordemCampo ?? Infinity)) ||
