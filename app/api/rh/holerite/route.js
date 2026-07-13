@@ -6,7 +6,7 @@
 //         → cria o LoteHolerite e os Holerite (1 por funcionário), status PENDENTE.
 // Só ADMIN/RH.
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaDirect } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 
@@ -63,6 +63,72 @@ export async function GET(req) {
   return NextResponse.json({ success: true, competencias, holerites });
 }
 
+// ─── Escrita em massa dos holerites (padrão CLAUDE.md p/ bulk write) ──────────
+// Um único INSERT ... ON CONFLICT via UNNEST, na conexão DIRETA (sem pooler).
+// Antes eram N upserts sequenciais numa transação interativa sobre o pooler —
+// p/ lotes grandes (VMI ~52) isso estourava (MessageContext/Neon OOM) e a rota,
+// sem try/catch, devolvia 500 de corpo vazio ("servidor demorou demais").
+const SQL_UPSERT_HOLERITE = `
+  INSERT INTO "Holerite" (
+    "id","funcionarioId","loteId","competencia","tipo","empresa","valorLiquido",
+    "arquivoUrl","arquivoNome","arquivoTamanho","pagina","status","createdAt","updatedAt"
+  )
+  SELECT gen_random_uuid()::text, t.*, 'PENDENTE', NOW(), NOW()
+  FROM UNNEST(
+    $1::text[],$2::text[],$3::text[],$4::text[],$5::text[],$6::float8[],
+    $7::text[],$8::text[],$9::int[],$10::int[]
+  ) AS t("funcionarioId","loteId","competencia","tipo","empresa","valorLiquido","arquivoUrl","arquivoNome","arquivoTamanho","pagina")
+  ON CONFLICT ("funcionarioId","competencia","tipo") DO UPDATE SET
+    "loteId"         = EXCLUDED."loteId",
+    "empresa"        = EXCLUDED."empresa",
+    "valorLiquido"   = EXCLUDED."valorLiquido",
+    "arquivoUrl"     = EXCLUDED."arquivoUrl",
+    "arquivoNome"    = EXCLUDED."arquivoNome",
+    "arquivoTamanho" = EXCLUDED."arquivoTamanho",
+    "pagina"         = EXCLUDED."pagina",
+    "updatedAt"      = NOW()
+`;
+
+// Cada parâmetro é um LITERAL de array Postgres em TEXTO ('{"a","b",NULL}') com
+// cast ::tipo[] no SQL — evita o erro "improper binary format" do Prisma.
+const litElH = (e) => e == null ? "NULL" : `"${String(e).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+const pgArrH = (arr) => `{${arr.map(litElH).join(",")}}`;
+const intOuNull = (v) => (v == null || !Number.isFinite(Number(v))) ? null : Math.trunc(Number(v));
+const floatOuNull = (v) => (v == null || !Number.isFinite(Number(v))) ? null : Number(v);
+
+function paramsHolerite(linhas) {
+  return [
+    pgArrH(linhas.map((l) => l.funcionarioId)),
+    pgArrH(linhas.map((l) => l.loteId)),
+    pgArrH(linhas.map((l) => l.competencia)),
+    pgArrH(linhas.map((l) => l.tipo)),
+    pgArrH(linhas.map((l) => l.empresa)),
+    pgArrH(linhas.map((l) => floatOuNull(l.valorLiquido))),
+    pgArrH(linhas.map((l) => l.arquivoUrl)),
+    pgArrH(linhas.map((l) => l.arquivoNome)),
+    pgArrH(linhas.map((l) => intOuNull(l.arquivoTamanho))),
+    pgArrH(linhas.map((l) => intOuNull(l.pagina))),
+  ];
+}
+
+const ehOOM = (e) => /53200|out of memory/i.test(e?.message || "");
+
+// Escrita resiliente: se o Neon estourar memória, divide o lote e tenta de novo.
+async function upsertHoleritesEmMassa(linhas) {
+  if (linhas.length === 0) return;
+  try {
+    await prismaDirect.$executeRawUnsafe(SQL_UPSERT_HOLERITE, ...paramsHolerite(linhas));
+  } catch (e) {
+    if (ehOOM(e) && linhas.length > 1) {
+      const meio = Math.ceil(linhas.length / 2);
+      await upsertHoleritesEmMassa(linhas.slice(0, meio));
+      await upsertHoleritesEmMassa(linhas.slice(meio));
+      return;
+    }
+    throw e;
+  }
+}
+
 export async function POST(req) {
   let user;
   try {
@@ -83,33 +149,35 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: "Há funcionários repetidos (mesmo tipo) no lote" }, { status: 400 });
   }
 
-  const lote = await prisma.$transaction(async (tx) => {
-    const novoLote = await tx.loteHolerite.create({
+  // Cria o lote (1 linha) e grava todos os holerites num único statement em massa
+  // (reimportar a mesma competência/tipo substitui o arquivo via ON CONFLICT,
+  // preservando status/ciência já existentes). Com try/catch para não devolver
+  // 500 opaco (que aparecia como "servidor demorou demais").
+  let lote;
+  try {
+    lote = await prismaDirect.loteHolerite.create({
       data: {
         competencia, empresa: empresa || null, cnpj: cnpj || null,
         arquivoOriginalUrl: arquivoOriginalUrl || null, arquivoOriginalNome: arquivoOriginalNome || null,
         totalPaginas: itens.length, criadoPorId: user.id,
       },
     });
-    for (const it of itens) {
-      // upsert: reimportar a mesma competência/tipo substitui o arquivo, mantendo
-      // o histórico de status só se ainda PENDENTE (re-disparo será manual).
-      await tx.holerite.upsert({
-        where: { funcionarioId_competencia_tipo: { funcionarioId: it.funcionarioId, competencia, tipo: it.tipo } },
-        update: {
-          loteId: novoLote.id, empresa: it.empresa || empresa || null, valorLiquido: it.valorLiquido ?? null,
-          arquivoUrl: it.arquivoUrl, arquivoNome: it.arquivoNome || null, arquivoTamanho: it.arquivoTamanho ?? null, pagina: it.pagina ?? null,
-        },
-        create: {
-          funcionarioId: it.funcionarioId, loteId: novoLote.id, competencia, tipo: it.tipo,
-          empresa: it.empresa || empresa || null, valorLiquido: it.valorLiquido ?? null,
-          arquivoUrl: it.arquivoUrl, arquivoNome: it.arquivoNome || null, arquivoTamanho: it.arquivoTamanho ?? null, pagina: it.pagina ?? null,
-          status: "PENDENTE",
-        },
-      });
-    }
-    return novoLote;
-  });
+    const linhas = itens.map((it) => ({
+      funcionarioId: it.funcionarioId,
+      loteId: lote.id,
+      competencia,
+      tipo: it.tipo,
+      empresa: it.empresa || empresa || null,
+      valorLiquido: it.valorLiquido ?? null,
+      arquivoUrl: it.arquivoUrl,
+      arquivoNome: it.arquivoNome || null,
+      arquivoTamanho: it.arquivoTamanho ?? null,
+      pagina: it.pagina ?? null,
+    }));
+    await upsertHoleritesEmMassa(linhas);
+  } catch (e) {
+    return NextResponse.json({ success: false, error: `Não foi possível salvar os holerites: ${e?.message || "erro desconhecido"}` }, { status: 500 });
+  }
 
   await prisma.auditLog.create({
     data: { userId: user.id, action: "IMPORTAR_HOLERITE_LOTE", entity: "LoteHolerite", entityId: lote.id, diff: { competencia, total: itens.length } },
