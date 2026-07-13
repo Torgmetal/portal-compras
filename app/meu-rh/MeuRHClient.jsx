@@ -6,6 +6,7 @@ import {
   CalendarDays, Palmtree, KeyRound, Download, Megaphone, MessageSquarePlus, Pin, Send, X, Clock, UserRound,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const TIPO_LABEL = { MENSAL: "Mensal", DECIMO_TERCEIRO: "13º salário", FERIAS: "Férias", RESCISAO: "Rescisão" };
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -218,25 +219,48 @@ export default function MeuRHClient({ nome }) {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
-      <header className="mb-6">
-        {/* Linha principal: marca + Sair (Sair vira ícone no celular) */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-torg-blue flex items-center justify-center text-white shrink-0"><UserRound size={20} /></div>
+      {/* Hero: foto industrial da TORG + overlay. Edge-to-edge no celular,
+          card arredondado no desktop. */}
+      <header className="relative -mx-4 -mt-6 sm:-mt-8 mb-6 sm:mx-0 sm:mt-0 overflow-hidden sm:rounded-2xl shadow-sm">
+        {/* Fundo */}
+        <div className="absolute inset-0">
+          <Image src="/obras/planta-industrial.jpg" alt="" fill priority sizes="(max-width: 768px) 100vw, 768px" className="object-cover object-center" />
+          <div className="absolute inset-0 bg-gradient-to-br from-torg-dark/95 via-torg-dark/80 to-torg-blue/70" />
+        </div>
+
+        {/* Conteúdo */}
+        <div className="relative px-5 pt-6 pb-5 sm:px-7 sm:pt-7 sm:pb-6">
+          {/* Topo: logo + Sair */}
+          <div className="flex items-center justify-between gap-3">
+            <Image src="/torg-logo-white.png" alt="Torg Metal" width={120} height={34} priority className="h-7 sm:h-8 w-auto" />
+            <button onClick={() => signOut({ callbackUrl: "/colaborador" })}
+              className="shrink-0 text-sm text-white/90 hover:text-white inline-flex items-center gap-1.5 border border-white/25 rounded-lg px-2.5 py-1.5 hover:bg-white/10 transition-colors">
+              <LogOut size={16} /> <span className="hidden sm:inline">Sair</span>
+            </button>
+          </div>
+
+          {/* Saudação */}
+          <div className="mt-6 flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-full bg-white/15 ring-1 ring-white/30 flex items-center justify-center text-white shrink-0 backdrop-blur-sm">
+              <UserRound size={22} />
+            </div>
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-xl font-extrabold text-torg-dark leading-tight truncate">Portal do Colaborador</h1>
-              <p className="text-xs sm:text-sm text-torg-gray truncate">Olá, {nome}</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-torg-orange font-semibold">Portal do Colaborador</p>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-white leading-tight truncate">Olá, {nome}</h1>
             </div>
           </div>
-          <button onClick={() => signOut({ callbackUrl: "/colaborador" })}
-            className="shrink-0 text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50">
-            <LogOut size={16} /> <span className="hidden sm:inline">Sair</span>
-          </button>
-        </div>
-        {/* Ações secundárias: linha própria, quebram no celular */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
-          <button onClick={() => setFbAberto(true)} className="text-sm text-torg-blue hover:text-torg-blue-700 inline-flex items-center gap-1.5 font-medium"><MessageSquarePlus size={16} /> Enviar sugestão</button>
-          <Link href="/colaborador/trocar-senha" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5"><KeyRound size={16} /> Trocar senha</Link>
+
+          {/* Ações secundárias — pílulas translúcidas, quebram no celular */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <button onClick={() => setFbAberto(true)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-white/15 hover:bg-white/25 border border-white/15 rounded-lg px-3 py-1.5 backdrop-blur-sm transition-colors">
+              <MessageSquarePlus size={16} /> Enviar sugestão
+            </button>
+            <Link href="/colaborador/trocar-senha"
+              className="inline-flex items-center gap-1.5 text-sm text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border border-white/15 rounded-lg px-3 py-1.5 backdrop-blur-sm transition-colors">
+              <KeyRound size={16} /> Trocar senha
+            </Link>
+          </div>
         </div>
       </header>
 
