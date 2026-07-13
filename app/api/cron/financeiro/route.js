@@ -3,6 +3,7 @@
 // garantir que o a receber rode junto com o a pagar e reduzir contenção no Omie
 // (o a receber vinha ficando dias atrasado). Auth via vercel-cron ou CRON_SECRET.
 import { NextResponse } from "next/server";
+import { temCronSecret } from "@/lib/cron-auth";
 import { sincronizarContasPagar } from "@/lib/omie-contas-pagar";
 import { sincronizarContasReceber } from "@/lib/omie-contas-receber";
 import { registrarExecucao } from "@/lib/cron-monitor";
@@ -11,9 +12,8 @@ export const runtime = "nodejs";
 export const maxDuration = 120; // pagar+receber juntos chegam a ~60s; folga p/ não cortar
 
 function autorizado(req) {
-  const auth = req.headers.get("authorization") || "";
-  const ua = req.headers.get("user-agent") || "";
-  return ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
+  // Só Bearer CRON_SECRET (User-Agent é spoofável — SEC-01).
+  return temCronSecret(req);
 }
 
 export async function GET(req) {

@@ -1,6 +1,7 @@
 // Cron Vercel — sincroniza produtos do Omie das categorias configuradas.
 // Roda 1x/hora (config em vercel.json). Autenticacao via header Vercel-Cron.
 import { NextResponse } from "next/server";
+import { temCronSecret } from "@/lib/cron-auth";
 import { sincronizarProdutos } from "@/lib/omie-estoque";
 import { registrarExecucao } from "@/lib/cron-monitor";
 
@@ -8,12 +9,9 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(req) {
-  // Vercel envia header "user-agent: vercel-cron/1.0" e tambem "x-vercel-signature"
-  // Pra simplicidade aceitamos requisicao se vier do user-agent vercel-cron OU
-  // se Authorization Bearer == CRON_SECRET
-  const auth = req.headers.get("authorization") || "";
-  const ua = req.headers.get("user-agent") || "";
-  const isCron = ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
+  // Só autoriza com Bearer CRON_SECRET (a Vercel injeta nas invocações de cron).
+  // NÃO confia no User-Agent — é spoofável (SEC-01).
+  const isCron = temCronSecret(req);
   if (!isCron && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

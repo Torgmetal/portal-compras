@@ -32,21 +32,22 @@ export async function POST(req) {
   const secret = process.env.CRON_SECRET;
   const origin = process.env.NEXTAUTH_URL || new URL(req.url).origin;
 
+  // Os crons agora exigem o Bearer CRON_SECRET (o User-Agent deixou de valer —
+  // SEC-01). Sem o segredo configurado, o disparo forçado não autentica.
+  if (!secret) {
+    return NextResponse.json({ success: false, error: "CRON_SECRET não configurado no ambiente — configure na Vercel para forçar sincronizações." }, { status: 503 });
+  }
+
   await prisma.auditLog.create({
     data: { userId: user.id, action: "FORCAR_SYNC", entity: "CronHeartbeat", entityId: cron.job, diff: { job: cron.job } },
   }).catch(() => {});
 
-  // Re-invoca o cron (nova função serverless). Os crons aceitam o disparo pelo
-  // user-agent "vercel-cron" OU pelo Bearer CRON_SECRET — usamos o UA (funciona
-  // sem depender da env) e adicionamos o Bearer quando o segredo existe. O
+  // Re-invoca o cron (nova função serverless) com o Bearer CRON_SECRET. O
   // endpoint em si já é restrito a ADMIN. Aguardamos até o fim pra o heartbeat
   // atualizar; o client não bloqueia a tela.
   try {
     const r = await fetch(`${origin}${cron.path}`, {
-      headers: {
-        "user-agent": "vercel-cron/1.0 (forcado-admin)",
-        ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
-      },
+      headers: { Authorization: `Bearer ${secret}` },
       cache: "no-store",
     });
     const texto = await r.text().catch(() => "");

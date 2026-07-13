@@ -1,6 +1,7 @@
 // Cron Vercel — sincroniza movimentacoes do Omie (entradas + saidas)
 // dos ultimos 2 dias. Roda 1x/hora.
 import { NextResponse } from "next/server";
+import { temCronSecret } from "@/lib/cron-auth";
 import { sincronizarMovimentacoes } from "@/lib/omie-estoque";
 import { registrarExecucao } from "@/lib/cron-monitor";
 
@@ -8,9 +9,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(req) {
-  const auth = req.headers.get("authorization") || "";
-  const ua = req.headers.get("user-agent") || "";
-  const isCron = ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
+  // Só Bearer CRON_SECRET (User-Agent é spoofável — SEC-01).
+  const isCron = temCronSecret(req);
   if (!isCron && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

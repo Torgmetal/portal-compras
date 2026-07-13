@@ -3,6 +3,7 @@
 // (env QUALIDADE_ALERTA_EMAILS, separado por vírgula). Não envia se não houver nada.
 // Autenticação igual aos outros crons (user-agent vercel-cron OU Bearer CRON_SECRET).
 import { NextResponse } from "next/server";
+import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { calcStatusValidade, diasAlertaCategoria } from "@/lib/qualidade-status";
@@ -27,9 +28,8 @@ async function destinatarios() {
 }
 
 export async function GET(req) {
-  const auth = req.headers.get("authorization") || "";
-  const ua = req.headers.get("user-agent") || "";
-  const isCron = ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
+  // Só Bearer CRON_SECRET (User-Agent é spoofável — SEC-01).
+  const isCron = temCronSecret(req);
 
   // Disparo manual: ADMIN logado → envia uma PRÉVIA só pro próprio e-mail (teste,
   // sem spammar os destinatários). Senão, só o cron interno do Vercel roda.

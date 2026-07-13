@@ -3,6 +3,7 @@
 // ficarem em dia sem ninguém rodar o "Importar Syneco" à mão. Carimbo no AuditLog
 // (action RECONCILIAR_SYNECO_AUTO) — lido pelo painel do PCP ("última baixa").
 import { NextResponse } from "next/server";
+import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { reconciliarSynecoCorte } from "@/lib/reconciliar-syneco-corte";
 import { registrarExecucao } from "@/lib/cron-monitor";
@@ -11,9 +12,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET(req) {
-  const auth = req.headers.get("authorization") || "";
-  const ua = req.headers.get("user-agent") || "";
-  const isCron = ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
+  // Só Bearer CRON_SECRET (User-Agent é spoofável — SEC-01).
+  const isCron = temCronSecret(req);
   if (!isCron && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -147,10 +147,8 @@ export async function POST(req) {
 
 // GET: sync via Vercel Cron
 export async function GET(req) {
-  // Auth: user-agent vercel-cron OU Bearer CRON_SECRET (padrão dos crons).
-  const auth = req.headers.get("authorization") || "";
-  const ua = req.headers.get("user-agent") || "";
-  const isCron = ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
+  // Auth: só Bearer CRON_SECRET (User-Agent é spoofável — SEC-01).
+  const isCron = temCronSecret(req);
   if (!isCron && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }

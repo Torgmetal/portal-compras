@@ -2,6 +2,7 @@
 // há tempo demais ou falhou, manda 1 e-mail de alerta pros ADMINs. Roda 1x/dia
 // (vercel.json). É o guarda-corpo contra cron morrer em silêncio.
 import { NextResponse } from "next/server";
+import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { checarSaudeCrons, registrarExecucao } from "@/lib/cron-monitor";
@@ -12,9 +13,8 @@ export const maxDuration = 60;
 const fmt = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }) : "nunca");
 
 export async function GET(req) {
-  const auth = req.headers.get("authorization") || "";
-  const ua = req.headers.get("user-agent") || "";
-  const isCron = ua.includes("vercel-cron") || auth === `Bearer ${process.env.CRON_SECRET}`;
+  // Só Bearer CRON_SECRET (User-Agent é spoofável — SEC-01).
+  const isCron = temCronSecret(req);
   if (!isCron && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
