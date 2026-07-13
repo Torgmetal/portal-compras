@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
@@ -37,17 +38,10 @@ export async function POST(req) {
 
   const { opNumero, titulo, dataInicio, dataFim, usarTemplate } = parsed.data;
 
-  // Verifica se já existe cronograma para essa OP (criado manualmente)
-  const manualPath = `manual://${opNumero}`;
-  const existente = await prisma.cronograma.findFirst({
-    where: { opNumero, ativo: true },
-  });
-  if (existente) {
-    return NextResponse.json(
-      { success: false, error: `Já existe um cronograma para a OP ${opNumero}` },
-      { status: 409 }
-    );
-  }
+  // Permite MÚLTIPLOS cronogramas por OP (prédios/frentes/solicitações novas) —
+  // como o sharepointPath é único, cada cronograma manual ganha um sufixo
+  // aleatório em vez de bloquear quando a OP já tem um.
+  const manualPath = `manual://${opNumero}/${randomUUID()}`;
 
   // Busca OP para vincular
   const opNum = opNumero.replace(/^T0*/i, "").padStart(3, "0");
@@ -118,24 +112,25 @@ export async function GET() {
     return NextResponse.json({ success: false, error: e.message }, { status });
   }
 
-  // OPs ativas que ainda não têm cronograma
-  const opsComCronograma = await prisma.cronograma.findMany({
+  // Agora é permitido ter mais de um cronograma por OP (prédios/frentes/novas
+  // solicitações). Não excluímos mais as OPs que já têm — só informamos quantos
+  // já existem, pra UI mostrar um aviso.
+  const cronogramas = await prisma.cronograma.findMany({
     where: { ativo: true },
     select: { opNumero: true },
   });
-  const opsComCronogramaSet = new Set(opsComCronograma.map((c) => c.opNumero));
+  const countPorOp = {};
+  for (const c of cronogramas) {
+    const num = c.opNumero.replace(/^T0*/i, "").padStart(3, "0");
+    countPorOp[num] = (countPorOp[num] || 0) + 1;
+  }
 
   const ops = await prisma.oP.findMany({
     where: { status: "ABERTA" },
     select: { id: true, numero: true, cliente: true, obra: true },
     orderBy: { numero: "desc" },
   });
-
-  // Filtra OPs que já têm cronograma (considerando formato T001 vs 001)
-  const disponiveis = ops.filter((op) => {
-    const tNum = `T${op.numero}`;
-    return !opsComCronogramaSet.has(op.numero) && !opsComCronogramaSet.has(tNum);
-  });
+  const disponiveis = ops.map((op) => ({ ...op, cronogramasExistentes: countPorOp[op.numero] || 0 }));
 
   return NextResponse.json({ ops: disponiveis, template: TEMPLATE_DEPARTAMENTOS });
 }

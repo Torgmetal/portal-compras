@@ -499,6 +499,7 @@ function NovoCronogramaModal({ onClose, onCreated }) {
                   {ops.map((op) => (
                     <option key={op.id} value={op.numero}>
                       {op.numero} — {op.cliente} {op.obra ? `(${op.obra})` : ""}
+                      {op.cronogramasExistentes > 0 ? ` · já tem ${op.cronogramasExistentes} cronograma${op.cronogramasExistentes > 1 ? "s" : ""}` : ""}
                     </option>
                   ))}
                 </select>
@@ -521,6 +522,16 @@ function NovoCronogramaModal({ onClose, onCreated }) {
               />
             )}
           </div>
+
+          {(() => {
+            const sel = ops.find((o) => o.numero === opSelecionada);
+            return sel && sel.cronogramasExistentes > 0 ? (
+              <p className="text-[10px] text-amber-600 -mt-2 flex items-start gap-1">
+                <AlertTriangle size={11} className="shrink-0 mt-0.5" />
+                Esta OP já tem {sel.cronogramasExistentes} cronograma{sel.cronogramasExistentes > 1 ? "s" : ""}. Você vai criar outro — use um título que diferencie (ex.: prédio, frente ou nova solicitação).
+              </p>
+            ) : null;
+          })()}
 
           {/* Título */}
           <div>
@@ -2052,6 +2063,13 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
   const [sendingReg, setSendingReg] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Peso → % automático: ao preencher/alterar o peso planejado ou realizado, a
+  // % concluída é recalculada (realizado ÷ planejado). Sem peso planejado a %
+  // continua manual. O `pct` recalculado é o que vai no salvar.
+  const recalcPctPeso = (plan, real) => {
+    if (plan > 0) setPct(Math.min(100, Math.max(0, Math.round((real / plan) * 100))));
+  };
+
   // Detecta se datas previstas foram alteradas em relação ao original
   const inicioOriginal = tarefa.dataInicioPrevista ? new Date(tarefa.dataInicioPrevista).toISOString().split("T")[0] : "";
   const fimOriginal = tarefa.dataFimPrevista ? new Date(tarefa.dataFimPrevista).toISOString().split("T")[0] : "";
@@ -2482,7 +2500,7 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
                 min={0}
                 step={100}
                 value={pesoPlan || ""}
-                onChange={(e) => setPesoPlan(parseFloat(e.target.value) || 0)}
+                onChange={(e) => { const v = parseFloat(e.target.value) || 0; setPesoPlan(v); recalcPctPeso(v, pesoReal); }}
                 className="w-20 text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white text-right"
                 placeholder="0"
               />
@@ -2495,12 +2513,17 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
                 min={0}
                 step={100}
                 value={pesoReal || ""}
-                onChange={(e) => setPesoReal(parseFloat(e.target.value) || 0)}
+                onChange={(e) => { const v = parseFloat(e.target.value) || 0; setPesoReal(v); recalcPctPeso(pesoPlan, v); }}
                 className="w-20 text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white text-right"
                 placeholder="0"
               />
               <span className="text-[9px] text-torg-gray">kg</span>
             </div>
+            {pesoPlan > 0 && (
+              <span className="text-[9px] text-torg-blue whitespace-nowrap" title="% concluída calculada pelo peso realizado ÷ planejado">
+                = {Math.min(100, Math.max(0, Math.round((pesoReal / pesoPlan) * 100)))}% concluída
+              </span>
+            )}
           </div>
           {/* Antecessoras */}
           <AntecessorasPicker
