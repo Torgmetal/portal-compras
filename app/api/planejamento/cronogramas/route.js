@@ -30,6 +30,31 @@ function limparTituloCronograma(titulo) {
   return t || titulo; // fallback pro original se ficou vazio
 }
 
+/**
+ * Segunda passada do import: liga as predecessoras. As tarefas são criadas em
+ * bloco (nested create, sem id ainda), então aqui mapeamos UID (MS Project) → id
+ * da CronogramaTarefa e gravamos antecessoraIds (que guardam ids). Sem isso o
+ * vínculo do .mpp se perde e o Gantt reexportado sai sem as linhas de ligação.
+ */
+async function vincularAntecessoras(cronogramaId, parsedTarefas) {
+  if (!parsedTarefas.some((t) => (t.predecessorUids || []).length)) return 0;
+  const tarefas = await prisma.cronogramaTarefa.findMany({
+    where: { cronogramaId },
+    select: { id: true, uidMpp: true },
+  });
+  const uidToId = new Map(tarefas.map((t) => [t.uidMpp, t.id]));
+  const updates = [];
+  for (const t of parsedTarefas) {
+    const id = uidToId.get(t.uidMpp);
+    const preds = (t.predecessorUids || []).map((u) => uidToId.get(u)).filter((pid) => pid && pid !== id);
+    if (id && preds.length) {
+      updates.push(prisma.cronogramaTarefa.update({ where: { id }, data: { antecessoraIds: preds } }));
+    }
+  }
+  if (updates.length) await prisma.$transaction(updates);
+  return updates.length;
+}
+
 export async function GET(req) {
   try {
     await requireRole(["ADMIN", "PRODUCAO", "PLANEJAMENTO", "COMERCIAL", "ENGENHARIA", "COMPRAS", "EXPEDICAO"]);
@@ -188,9 +213,10 @@ export async function POST(req) {
             },
           },
         });
-        results.push({ arquivo: file.name, status: "atualizado", op: opNumFormatted, tarefas: parsed.tarefas.length });
+        const nAnt = await vincularAntecessoras(existing.id, parsed.tarefas);
+        results.push({ arquivo: file.name, status: "atualizado", op: opNumFormatted, tarefas: parsed.tarefas.length, antecessoras: nAnt });
       } else {
-        await prisma.cronograma.create({
+        const novo = await prisma.cronograma.create({
           data: {
             opNumero: opNumFormatted,
             opId: op?.id || null,
@@ -216,7 +242,8 @@ export async function POST(req) {
             },
           },
         });
-        results.push({ arquivo: file.name, status: "criado", op: opNumFormatted, tarefas: parsed.tarefas.length });
+        const nAnt = await vincularAntecessoras(novo.id, parsed.tarefas);
+        results.push({ arquivo: file.name, status: "criado", op: opNumFormatted, tarefas: parsed.tarefas.length, antecessoras: nAnt });
       }
     } catch (e) {
       results.push({ arquivo: file.name, status: "erro", motivo: e.message?.slice(0, 200) });
