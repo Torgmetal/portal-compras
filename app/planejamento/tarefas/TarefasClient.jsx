@@ -87,6 +87,7 @@ export default function TarefasClient() {
   const [erro, setErro] = useState("");
   const [semana, setSemana] = useState(semanaInit);
   const [ano, setAno] = useState(anoInit);
+  const [todasSemanas, setTodasSemanas] = useState(true); // default: mostra TODAS as tarefas (não precisa lembrar a semana)
   const [filtroSetor, setFiltroSetor] = useState("");
   const [filtroOp, setFiltroOp] = useState("");
   const [modalNova, setModalNova] = useState(false);
@@ -107,7 +108,7 @@ export default function TarefasClient() {
     try {
       const params = new URLSearchParams();
       if (filtroOp.trim()) params.set("op", filtroOp.trim());
-      else { params.set("semana", semana); params.set("ano", ano); }
+      else if (!todasSemanas) { params.set("semana", semana); params.set("ano", ano); }
       if (filtroSetor) params.set("setor", filtroSetor);
       const res = await fetch(`/api/planejamento/tarefas?${params}`);
       if (!res.ok) throw new Error("Erro ao carregar");
@@ -118,7 +119,7 @@ export default function TarefasClient() {
     } finally {
       setLoading(false);
     }
-  }, [semana, ano, filtroSetor, filtroOp]);
+  }, [semana, ano, filtroSetor, filtroOp, todasSemanas]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -157,7 +158,7 @@ export default function TarefasClient() {
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight">Tarefas</h2>
           <p className="text-xs text-torg-gray mt-0.5">
-            {aba === "semanais" ? (filtroOp.trim() ? `Tarefas da OP-${filtroOp.trim().padStart(3, "0")} — todas as semanas` : `Acompanhamento por setor — Semana ${semana}/${ano}`) : "Atividades dos cronogramas ativos"}
+            {aba === "semanais" ? (filtroOp.trim() ? `Tarefas da OP-${filtroOp.trim().padStart(3, "0")} — todas as semanas` : todasSemanas ? "Acompanhamento por setor — todas as semanas" : `Acompanhamento por setor — Semana ${semana}/${ano}`) : "Atividades dos cronogramas ativos"}
           </p>
         </div>
         {aba === "semanais" && (
@@ -199,12 +200,16 @@ export default function TarefasClient() {
       {/* Filtros */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2 flex-wrap">
         <Filter size={14} className="text-torg-gray" />
-        <div className={`flex items-center gap-1 ${filtroOp.trim() ? "opacity-40" : ""}`} title={filtroOp.trim() ? "Filtrando por OP — semana ignorada" : ""}>
+        <label className="text-[10px] text-torg-gray inline-flex items-center gap-1 cursor-pointer select-none" title="Mostra todas as tarefas, sem filtrar por semana">
+          <input type="checkbox" checked={todasSemanas} onChange={(e) => setTodasSemanas(e.target.checked)} disabled={!!filtroOp.trim()} className="accent-torg-blue" />
+          Todas as semanas
+        </label>
+        <div className={`flex items-center gap-1 ${(filtroOp.trim() || todasSemanas) ? "opacity-40" : ""}`} title={filtroOp.trim() ? "Filtrando por OP — semana ignorada" : todasSemanas ? "Desmarque \"Todas as semanas\" para filtrar" : ""}>
           <label className="text-[10px] text-torg-gray">Semana:</label>
-          <input type="number" value={semana} onChange={(e) => setSemana(+e.target.value)} min={1} max={53} disabled={!!filtroOp.trim()}
+          <input type="number" value={semana} onChange={(e) => setSemana(+e.target.value)} min={1} max={53} disabled={!!filtroOp.trim() || todasSemanas}
             className="w-14 px-2 py-1 border border-gray-300 rounded text-xs text-center disabled:bg-gray-50" />
           <span className="text-torg-gray">/</span>
-          <input type="number" value={ano} onChange={(e) => setAno(+e.target.value)} min={2024} disabled={!!filtroOp.trim()}
+          <input type="number" value={ano} onChange={(e) => setAno(+e.target.value)} min={2024} disabled={!!filtroOp.trim() || todasSemanas}
             className="w-16 px-2 py-1 border border-gray-300 rounded text-xs text-center disabled:bg-gray-50" />
         </div>
         <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value)}
