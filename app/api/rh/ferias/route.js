@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { periodoAtual, valorFerias, fimGozo } from "@/lib/ferias-calc";
+import { periodoAtual, valorFerias, fimGozo, periodoIndiceDe, periodosUsados } from "@/lib/ferias-calc";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -33,9 +33,10 @@ export async function GET(req) {
   });
 
   let linhas = funcs.map((f) => {
-    // Cada férias registrada (gozada ou programada, exceto cancelada) avança o
-    // período aquisitivo — assim registrar as férias já tiradas tira da "vencida".
-    const usadas = f.ferias.filter((x) => x.status !== "CANCELADA").length;
+    // Período atual = admissão + nº de períodos aquisitivos já consumidos. Uma
+    // férias retroativa (início antigo) avança direto pro período dela — tudo
+    // antes dela conta como gozado. Ver periodosUsados/periodoIndiceDe.
+    const usadas = periodosUsados(f.ferias);
     const periodo = periodoAtual(f.dataAdmissao, usadas);
     return {
       id: f.id, nome: f.nome, matricula: f.matricula, empresa: f.empresa,
@@ -99,9 +100,11 @@ export async function POST(req) {
     // Base do cálculo = override manual do RH (se informado) ou o salário do cadastro.
     const base = salarioBase != null ? salarioBase : func.salario;
 
-    // Período aquisitivo = admissão + (nº de férias já usadas, exceto canceladas).
-    const usadas = await prisma.ferias.count({ where: { funcionarioId, status: { not: "CANCELADA" } } });
-    const periodo = periodoAtual(func.dataAdmissao, usadas);
+    // Período aquisitivo DESTA férias = aquele em que o início do gozo cai (não o
+    // "atual"). Assim uma férias retroativa fica rotulada com o período certo e,
+    // no painel, as anteriores a ela passam a contar como já gozadas.
+    const idx = periodoIndiceDe(func.dataAdmissao, dataInicio);
+    const periodo = periodoAtual(func.dataAdmissao, idx);
     const fim = fimGozo(dataInicio, diasGozo);
     const valor = valorFerias(base, diasGozo, diasVendidos, descontos).total;
 
@@ -113,12 +116,13 @@ export async function POST(req) {
         dataInicio: new Date(dataInicio),
         dataFim: fim ? new Date(fim) : new Date(dataInicio),
         diasGozo, diasVendidos, descontos, valorEstimado: Number.isFinite(valor) ? valor : 0,
+        periodoIndice: idx,
         status, observacao: observacao || null,
       },
     });
 
     await prisma.auditLog.create({
-      data: { userId: user.id, action: "PROGRAMAR_FERIAS", entity: "Ferias", entityId: ferias.id, diff: { funcionarioId, dataInicio, diasGozo, diasVendidos, descontos, salarioBase: base, status, valor } },
+      data: { userId: user.id, action: "PROGRAMAR_FERIAS", entity: "Ferias", entityId: ferias.id, diff: { funcionarioId, dataInicio, diasGozo, diasVendidos, descontos, salarioBase: base, status, valor, periodoIndice: idx } },
     }).catch(() => {});
 
     return NextResponse.json({ success: true, ferias });

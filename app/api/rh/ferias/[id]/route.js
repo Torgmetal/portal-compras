@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { valorFerias, fimGozo } from "@/lib/ferias-calc";
+import { valorFerias, fimGozo, periodoAtual, periodoIndiceDe } from "@/lib/ferias-calc";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -33,7 +33,7 @@ export async function PATCH(req, { params }) {
 
   const atual = await prisma.ferias.findUnique({
     where: { id: params.id },
-    select: { id: true, diasGozo: true, diasVendidos: true, descontos: true, dataInicio: true, funcionario: { select: { salario: true } } },
+    select: { id: true, diasGozo: true, diasVendidos: true, descontos: true, dataInicio: true, funcionario: { select: { salario: true, dataAdmissao: true } } },
   });
   if (!atual) return NextResponse.json({ success: false, error: "Programação não encontrada" }, { status: 404 });
 
@@ -46,12 +46,18 @@ export async function PATCH(req, { params }) {
 
   const valorEd = valorFerias(atual.funcionario?.salario, diasGozo, diasVendidos, descontos).total;
   const fimEd = dataInicioStr ? fimGozo(dataInicioStr, diasGozo) : null;
+  // Se a data de início mudou, o período aquisitivo desta férias muda junto
+  // (mantém a inferência de férias retroativa consistente).
+  const recalcPeriodo = d.dataInicio && atual.funcionario?.dataAdmissao;
+  const idxEd = recalcPeriodo ? periodoIndiceDe(atual.funcionario.dataAdmissao, dataInicioStr) : null;
+  const pEd = recalcPeriodo ? periodoAtual(atual.funcionario.dataAdmissao, idxEd) : null;
   const data = {
     ...(d.status ? { status: d.status } : {}),
     ...(d.observacao !== undefined ? { observacao: d.observacao || null } : {}),
     diasGozo, diasVendidos, descontos,
     valorEstimado: Number.isFinite(valorEd) ? valorEd : 0,
     ...(dataInicioStr ? { dataInicio: new Date(dataInicioStr), dataFim: fimEd ? new Date(fimEd) : new Date(dataInicioStr) } : {}),
+    ...(recalcPeriodo ? { periodoIndice: idxEd, periodoAquisInicio: new Date(pEd.aquisInicio), periodoAquisFim: new Date(pEd.aquisFim) } : {}),
   };
 
   try {

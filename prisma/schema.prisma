@@ -1066,6 +1066,7 @@ model Ferias {
   diasVendidos       Int         @default(0)
   valorEstimado      Float? // valor líquido estimado (bruto − descontos) — snapshot
   descontos          Float       @default(0) // descontos manuais (empréstimos etc.)
+  periodoIndice      Int? // nº do período aquisitivo (0 = 1º ano) inferido da dataInicio vs. admissão. Lançar uma férias retroativa avança o período: as anteriores contam como gozadas.
   status             String      @default("PENDENTE")
   observacao         String?
   createdAt          DateTime    @default(now())

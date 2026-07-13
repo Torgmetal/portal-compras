@@ -12,7 +12,7 @@ import { escapeHtml } from "@/lib/html";
 import { z } from "zod";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const schema = z.object({
   competencia: z.string().regex(/^\d{4}-\d{2}$/),
@@ -78,27 +78,48 @@ export async function POST(req) {
     select: { id: true, arquivoUrl: true, arquivoNome: true, pagina: true, funcionario: { select: { nome: true, email: true } } },
   });
 
+  // Cache do PDF completo do lote: com a extração preguiçosa, TODOS os holerites
+  // da competência apontam pra MESMA arquivoUrl (o PDF inteiro) e diferem só pela
+  // `pagina`. Baixar + carregar no pdf-lib UMA vez por URL (e não por funcionário)
+  // evita dezenas de downloads do mesmo PDF grande (VMI) que estouravam os 60s.
+  const { PDFDocument } = await import("pdf-lib");
+  const fontes = new Map(); // arquivoUrl -> { doc, total } | null (falhou)
+  async function fonteDoc(url) {
+    if (fontes.has(url)) return fontes.get(url);
+    let entrada = null;
+    try {
+      const pdf = await fetch(url);
+      if (pdf.ok) {
+        const doc = await PDFDocument.load(Buffer.from(await pdf.arrayBuffer()));
+        entrada = { doc, total: doc.getPageCount() };
+      }
+    } catch { /* fica null → segue sem anexo */ }
+    fontes.set(url, entrada);
+    return entrada;
+  }
+
   let enviados = 0; const semEmail = []; const falhas = [];
   for (const h of holerites) {
     const email = h.funcionario?.email;
     if (!email) { semEmail.push(h.funcionario?.nome || h.id); continue; }
 
     // Anexa o PDF do holerite (best-effort — se o download falhar, envia só o aviso).
-    // Se `pagina` está setada, arquivoUrl é o PDF COMPLETO → extrai só a página.
+    // Se `pagina` está setada, arquivoUrl é o PDF COMPLETO → extrai só a página do
+    // documento já carregado no cache; senão anexa o arquivo inteiro (legado).
     let attachments;
     if (anexarPdf && h.arquivoUrl) {
       try {
-        const pdf = await fetch(h.arquivoUrl);
-        if (pdf.ok) {
-          let buf = Buffer.from(await pdf.arrayBuffer());
+        const fonte = await fonteDoc(h.arquivoUrl);
+        if (fonte) {
+          let buf;
           if (h.pagina) {
-            const { PDFDocument } = await import("pdf-lib");
-            const src = await PDFDocument.load(buf);
             const out = await PDFDocument.create();
-            const idx = Math.min(Math.max(h.pagina - 1, 0), src.getPageCount() - 1);
-            const [pg] = await out.copyPages(src, [idx]);
+            const idx = Math.min(Math.max(h.pagina - 1, 0), fonte.total - 1);
+            const [pg] = await out.copyPages(fonte.doc, [idx]);
             out.addPage(pg);
             buf = Buffer.from(await out.save());
+          } else {
+            buf = Buffer.from(await fonte.doc.save());
           }
           attachments = [{ filename: (h.arquivoNome || `holerite-${competencia}.pdf`).replace(/["\r\n]/g, ""), content: buf.toString("base64") }];
         }

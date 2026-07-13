@@ -5,7 +5,7 @@ import {
   ChevronRight, Clock,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { valorFerias, fimGozo } from "@/lib/ferias-calc";
+import { valorFerias, fimGozo, periodoIndiceDe, periodoAtual } from "@/lib/ferias-calc";
 
 const fmt = (v) => (Number(v) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -90,6 +90,12 @@ export default function FeriasClient() {
 
   const baseCalc = form.salarioBase !== "" ? Number(form.salarioBase) : modal?.funcionario?.salario;
   const val = modal ? valorFerias(baseCalc, Number(form.diasGozo) || 0, Number(form.diasVendidos) || 0, Number(form.descontos) || 0) : null;
+  // Período aquisitivo em que a data de início cai + se é retroativa (avança o
+  // período: as anteriores contam como já gozadas).
+  const idxLanc = modal && form.dataInicio && modal.funcionario?.dataAdmissao
+    ? periodoIndiceDe(modal.funcionario.dataAdmissao, form.dataInicio) : null;
+  const periodoLanc = idxLanc != null ? periodoAtual(modal.funcionario.dataAdmissao, idxLanc) : null;
+  const retroativa = !!(periodoLanc && new Date(form.dataInicio) < new Date(modal.funcionario?.periodo?.aquisInicio || 0));
 
   return (
     <div className="space-y-6 max-w-[1500px]">
@@ -248,6 +254,15 @@ export default function FeriasClient() {
                 <input type="text" value={form.observacao} onChange={(e) => setForm({ ...form, observacao: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
               </div>
+              {/* Período aquisitivo em que esta férias cai + aviso de retroativa */}
+              {periodoLanc && (
+                <div className={`rounded-lg px-3 py-2 text-xs border ${retroativa ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-gray-50 border-gray-200 text-torg-gray"}`}>
+                  <div>Período aquisitivo desta férias: <strong>{fmtData(periodoLanc.aquisInicio)} → {fmtData(periodoLanc.aquisFim)}</strong></div>
+                  {retroativa && (
+                    <div className="mt-1">Férias <strong>retroativa</strong>: ao salvar, os períodos anteriores a este passam a contar como <strong>já gozados</strong> — o painel vai contar os próximos a partir daqui.</div>
+                  )}
+                </div>
+              )}
               {/* Valor estimado ao vivo */}
               <div className="bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-3 text-sm">
                 <div className="flex justify-between text-torg-gray"><span>Férias ({form.diasGozo}d)</span><span className="tabular-nums">R$ {fmt(val?.ferias)}</span></div>
