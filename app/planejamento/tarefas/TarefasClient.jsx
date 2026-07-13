@@ -772,44 +772,63 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
   );
 }
 
-// ─── Aba Cobrança — compras atrasadas (abrir RM) ──────────────────────
-function AbaCobranca() {
+// ─── Aba Cobrança — compras atrasadas + marcos de produção + entregas ────
+const SIT_BADGE = {
+  ATRASADO: "bg-red-100 text-red-700",
+  PROXIMO: "bg-amber-100 text-amber-700",
+};
+function AbaCobranca({ showToast }) {
   const [compras, setCompras] = useState([]);
+  const [semAcessoCompras, setSemAcessoCompras] = useState(false);
+  const [marcos, setMarcos] = useState([]);
+  const [entregas, setEntregas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [semAcesso, setSemAcesso] = useState(false);
+  const [cobrando, setCobrando] = useState("");
 
   useEffect(() => {
-    fetch("/api/compras/cronograma")
-      .then((r) => {
-        if (r.status === 401 || r.status === 403) { setSemAcesso(true); return null; }
-        return r.ok ? r.json() : null;
-      })
-      .then((j) => {
-        if (!j?.success) return;
-        const atrasadas = (j.data || [])
-          .filter((i) => i.statusEntrega === "ATRASADO")
-          .sort((a, b) => new Date(a.prazoEntrega) - new Date(b.prazoEntrega));
-        setCompras(atrasadas);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch("/api/compras/cronograma").then((r) => (r.status === 401 || r.status === 403 ? { _sem: true } : r.ok ? r.json() : null)).catch(() => null),
+      fetch("/api/planejamento/cobranca").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([c, cob]) => {
+      if (c?._sem) setSemAcessoCompras(true);
+      else if (c?.success) setCompras((c.data || []).filter((i) => i.statusEntrega === "ATRASADO").sort((a, b) => new Date(a.prazoEntrega) - new Date(b.prazoEntrega)));
+      if (cob) { setMarcos(cob.marcos || []); setEntregas(cob.entregas || []); }
+    }).finally(() => setLoading(false));
   }, []);
 
   const diasAtraso = (prazo) => Math.max(0, Math.floor((Date.now() - new Date(prazo)) / 86400000));
   const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
+  async function cobrarSetor(dept) {
+    const label = DEPT_LABEL[dept] || dept;
+    if (!confirm(`Enviar cobrança dos marcos de ${label} por e-mail ao setor?`)) return;
+    setCobrando(dept);
+    try {
+      const r = await fetch("/api/planejamento/cobranca", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ departamento: dept }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao cobrar");
+      showToast?.(`Cobrança de ${label} enviada — ${j.marcos} marco(s) para ${j.enviados} pessoa(s)`, "sucesso");
+    } catch (e) { showToast?.(e.message, "erro"); } finally { setCobrando(""); }
+  }
+
+  // Marcos agrupados por setor
+  const marcosPorDept = {};
+  for (const m of marcos) { const d = m.departamento || "SEM_SETOR"; (marcosPorDept[d] ||= []).push(m); }
+  const depts = Object.keys(marcosPorDept).sort();
+
+  if (loading) return <div className="p-8 text-center text-torg-gray text-sm flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> carregando cobrança…</div>;
+
   return (
     <div className="space-y-4">
+      {/* Compras atrasadas */}
       <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap">
           <AlertTriangle size={15} className="text-red-500" />
           <h3 className="text-sm font-semibold text-torg-dark">Compras atrasadas</h3>
-          {!loading && !semAcesso && <span className="text-[11px] text-torg-gray">({compras.length})</span>}
+          {!semAcessoCompras && <span className="text-[11px] text-torg-gray">({compras.length})</span>}
           <span className="text-[11px] text-torg-gray ml-auto">material comprado com entrega vencida — cobre o Compras / abra a RM</span>
         </div>
-        {loading ? (
-          <div className="p-6 text-center text-torg-gray text-sm flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> carregando…</div>
-        ) : semAcesso ? (
+        {semAcessoCompras ? (
           <div className="p-6 text-center text-torg-gray text-[12px]">Disponível para ADM e Compras.</div>
         ) : compras.length === 0 ? (
           <div className="p-6 text-center text-torg-gray text-[12px] flex items-center justify-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> Nenhuma compra atrasada.</div>
@@ -835,12 +854,84 @@ function AbaCobranca() {
                     <td className="px-3 py-2 text-torg-gray max-w-[160px] truncate" title={c.fornecedor || ""}>{c.fornecedor || "—"}</td>
                     <td className="px-3 py-2 font-mono text-torg-gray whitespace-nowrap">{c.rmNumero}</td>
                     <td className="px-3 py-2 text-right text-torg-gray whitespace-nowrap">{fmtData(c.prazoEntrega)}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold text-[10px]">{diasAtraso(c.prazoEntrega)}d</span>
-                    </td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <a href={`/compras/rm/${c.rmId}`} className="text-torg-blue hover:text-torg-dark font-medium">Abrir RM →</a>
-                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap"><span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold text-[10px]">{diasAtraso(c.prazoEntrega)}d</span></td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap"><a href={`/compras/rm/${c.rmId}`} className="text-torg-blue hover:text-torg-dark font-medium">Abrir RM →</a></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Marcos de produção — cobrança por setor */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+          <CalendarClock size={15} className="text-torg-blue" />
+          <h3 className="text-sm font-semibold text-torg-dark">Marcos de produção</h3>
+          <span className="text-[11px] text-torg-gray">({marcos.length})</span>
+          <span className="text-[11px] text-torg-gray ml-auto">datas-chave do cronograma atrasadas ou próximas — cobre o setor responsável</span>
+        </div>
+        {marcos.length === 0 ? (
+          <div className="p-6 text-center text-torg-gray text-[12px] flex items-center justify-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> Nenhum marco atrasado ou próximo.</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {depts.map((dept) => (
+              <div key={dept} className="px-4 py-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[12px] font-semibold text-torg-dark">{DEPT_LABEL[dept] || "Sem setor"} <span className="text-torg-gray font-normal">({marcosPorDept[dept].length})</span></span>
+                  {dept !== "SEM_SETOR" && (
+                    <button onClick={() => cobrarSetor(dept)} disabled={cobrando === dept} className="text-[11px] font-medium text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2.5 py-1 inline-flex items-center gap-1 disabled:opacity-50">
+                      {cobrando === dept ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />} Cobrar {DEPT_LABEL[dept]}
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {marcosPorDept[dept].map((m) => (
+                    <div key={m.id} className="flex items-center gap-2 text-[12px]">
+                      <span className={`px-1.5 py-0.5 rounded-full font-semibold text-[10px] whitespace-nowrap ${SIT_BADGE[m.situacao] || "bg-gray-100 text-torg-gray"}`}>{m.situacao === "ATRASADO" ? `${diasAtraso(m.data)}d` : "próximo"}</span>
+                      {m.opNumero && <span className="font-mono font-semibold text-torg-blue whitespace-nowrap">{fmtOP(m.opNumero)}</span>}
+                      <span className="text-torg-dark truncate" title={m.nome}>{m.nome}</span>
+                      <span className="text-torg-gray whitespace-nowrap ml-auto">{fmtData(m.data)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Entregas programadas */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+          <CalendarClock size={15} className="text-torg-orange" />
+          <h3 className="text-sm font-semibold text-torg-dark">Entregas programadas</h3>
+          <span className="text-[11px] text-torg-gray">({entregas.length})</span>
+          <span className="text-[11px] text-torg-gray ml-auto">cargas planejadas ainda não expedidas — atrasadas ou próximas</span>
+        </div>
+        {entregas.length === 0 ? (
+          <div className="p-6 text-center text-torg-gray text-[12px] flex items-center justify-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> Nenhuma entrega atrasada ou próxima.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead className="bg-gray-50/60 text-torg-gray">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Situação</th>
+                  <th className="text-left px-3 py-2 font-medium whitespace-nowrap">OP</th>
+                  <th className="text-left px-3 py-2 font-medium">Cliente</th>
+                  <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Itens</th>
+                  <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Data prevista</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {entregas.map((e) => (
+                  <tr key={e.id} className="hover:bg-gray-50/50 align-middle">
+                    <td className="px-3 py-2 whitespace-nowrap"><span className={`px-1.5 py-0.5 rounded-full font-semibold text-[10px] ${SIT_BADGE[e.situacao] || "bg-gray-100 text-torg-gray"}`}>{e.situacao === "ATRASADO" ? `${diasAtraso(e.data)}d atrás` : "próxima"}</span></td>
+                    <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{e.opNumero ? fmtOP(e.opNumero) : "—"}</td>
+                    <td className="px-3 py-2 text-torg-dark max-w-[220px] truncate" title={e.cliente || ""}>{e.cliente || "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-torg-gray">{e.itens}</td>
+                    <td className="px-3 py-2 text-right text-torg-gray whitespace-nowrap">{fmtData(e.data)}</td>
                   </tr>
                 ))}
               </tbody>
