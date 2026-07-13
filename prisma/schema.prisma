@@ -66,6 +66,7 @@ model PasswordResetToken {
   userId    String
   expiresAt DateTime
   used      Boolean  @default(false)
+  tentativas Int     @default(0) // nº de códigos errados tentados — trava anti-brute-force
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
 

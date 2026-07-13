@@ -7,11 +7,49 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 // Gera código numérico de 6 dígitos (não começa com 0)
 function gerarCodigo() {
   const n = crypto.randomInt(100000, 999999);
   return String(n);
+}
+
+// Máximo de códigos errados por token antes de invalidá-lo — trava o brute-force
+// do código de 6 dígitos (900k combinações). Com 5 tentativas por token e
+// expiração de 15 min, a chance de adivinhar é desprezível.
+const MAX_TENTATIVAS = 5;
+
+// Rate-limit por IP em CADA etapa (defesa em profundidade; o cap por token é o
+// controle robusto por sobreviver a cold starts / múltiplas instâncias).
+const limEnviar = createRateLimiter({ name: "esqueci-enviar", maxRequests: 5, windowMs: 15 * 60_000 });
+const limTentar = createRateLimiter({ name: "esqueci-tentar", maxRequests: 12, windowMs: 15 * 60_000 });
+
+// Comparação timing-safe de códigos de mesmo tamanho.
+function codigoConfere(a, b) {
+  const ba = Buffer.from(String(a || ""), "utf8");
+  const bb = Buffer.from(String(b || ""), "utf8");
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
+// Busca o token ATIVO do usuário (não usado, não expirado). Só existe um por vez
+// (enviarCodigo invalida os anteriores).
+function tokenAtivoDoUsuario(userId) {
+  return prisma.passwordResetToken.findFirst({
+    where: { userId, used: false, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+// Registra uma tentativa errada e invalida o token ao atingir o limite.
+async function registrarTentativaErrada(token) {
+  const tentativas = (token.tentativas || 0) + 1;
+  await prisma.passwordResetToken.update({
+    where: { id: token.id },
+    data: { tentativas, ...(tentativas >= MAX_TENTATIVAS ? { used: true } : {}) },
+  }).catch(() => {});
+  return tentativas >= MAX_TENTATIVAS;
 }
 
 // ─── Schemas Zod ───────────────────────────────────────────────
@@ -49,6 +87,14 @@ export async function POST(req) {
 // ─── Etapa 1: Enviar código por email ─────────────────────────
 
 async function enviarCodigo(req) {
+  const rl = limEnviar(req);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Muitas solicitações. Tente novamente mais tarde." },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   let body;
   try {
     body = schemaEnviar.parse(await req.json());
@@ -138,6 +184,14 @@ async function enviarCodigo(req) {
 // ─── Etapa 2: Verificar código ─────────────────────────────────
 
 async function verificarCodigo(req) {
+  const rl = limTentar(req);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Muitas tentativas. Tente novamente mais tarde." },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   let body;
   try {
     body = schemaVerificar.parse(await req.json());
@@ -159,18 +213,20 @@ async function verificarCodigo(req) {
     );
   }
 
-  const token = await prisma.passwordResetToken.findFirst({
-    where: {
-      userId: user.id,
-      token: body.codigo,
-      used: false,
-      expiresAt: { gt: new Date() },
-    },
-  });
-
+  const token = await tokenAtivoDoUsuario(user.id);
   if (!token) {
     return NextResponse.json(
       { success: false, error: "Código inválido ou expirado." },
+      { status: 400 }
+    );
+  }
+
+  // Confere o código com trava de tentativas: erra → incrementa; ao atingir o
+  // limite, invalida o token (força pedir um novo).
+  if (!codigoConfere(token.token, body.codigo)) {
+    const bloqueou = await registrarTentativaErrada(token);
+    return NextResponse.json(
+      { success: false, error: bloqueou ? "Muitas tentativas erradas. Solicite um novo código." : "Código inválido ou expirado." },
       { status: 400 }
     );
   }
@@ -181,6 +237,14 @@ async function verificarCodigo(req) {
 // ─── Etapa 3: Resetar senha ───────────────────────────────────
 
 async function resetarSenha(req) {
+  const rl = limTentar(req);
+  if (!rl.success) {
+    return NextResponse.json(
+      { success: false, error: "Muitas tentativas. Tente novamente mais tarde." },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   let body;
   try {
     body = schemaResetar.parse(await req.json());
@@ -202,19 +266,18 @@ async function resetarSenha(req) {
     );
   }
 
-  // Busca e valida o token
-  const token = await prisma.passwordResetToken.findFirst({
-    where: {
-      userId: user.id,
-      token: body.codigo,
-      used: false,
-      expiresAt: { gt: new Date() },
-    },
-  });
-
+  // Busca o token ATIVO do usuário e confere o código com trava de tentativas.
+  const token = await tokenAtivoDoUsuario(user.id);
   if (!token) {
     return NextResponse.json(
       { success: false, error: "Código inválido ou expirado. Solicite um novo." },
+      { status: 400 }
+    );
+  }
+  if (!codigoConfere(token.token, body.codigo)) {
+    const bloqueou = await registrarTentativaErrada(token);
+    return NextResponse.json(
+      { success: false, error: bloqueou ? "Muitas tentativas erradas. Solicite um novo código." : "Código inválido ou expirado. Solicite um novo." },
       { status: 400 }
     );
   }
