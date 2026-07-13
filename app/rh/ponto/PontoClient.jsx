@@ -1,8 +1,8 @@
 "use client";
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
-  Clock, Loader2, AlertCircle, RefreshCw, Inbox, Upload, Save, Download,
-  Lock, LockOpen, ChevronRight, Trash2,
+  Clock, Loader2, AlertCircle, RefreshCw, Inbox, Upload, Download,
+  Lock, LockOpen, Trash2, FileText,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -14,19 +14,6 @@ const extenso = (c) => {
   return `${N[Number(m)] || m}/${a}`;
 };
 
-const EDIT = [
-  { k: "horasNormais", label: "Normais" },
-  { k: "horasExtras50", label: "HE 50%" },
-  { k: "horasExtras60", label: "HE 60%" },
-  { k: "horasExtras80", label: "HE 80%" },
-  { k: "horasExtras100", label: "HE 100%" },
-  { k: "horasExtras150", label: "HE 150%" },
-  { k: "faltas", label: "Faltas" },
-  { k: "adicionalNoturno", label: "Ad. Not." },
-  { k: "dsr", label: "DSR" },
-  { k: "atrasos", label: "Atrasos" },
-  { k: "ajudaCusto", label: "Ajuda Custo" },
-];
 
 export default function PontoClient() {
   const { showToast } = useStore();
@@ -35,12 +22,10 @@ export default function PontoClient() {
   const [funcionarios, setFuncionarios] = useState([]);
   const [ponto, setPonto] = useState(null);
   const [itens, setItens] = useState([]);
-  const [dirty, setDirty] = useState(new Set());
-  const [expandido, setExpandido] = useState(null);
+  const [dirty, setDirty] = useState(new Set()); // mantido só p/ o guard de fechar competência
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [importando, setImportando] = useState(false);
-  const [salvando, setSalvando] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(""); setDirty(new Set());
@@ -79,36 +64,6 @@ export default function PontoClient() {
     }
   };
 
-  const editar = (id, campo, valor) => {
-    setItens((prev) => prev.map((it) => (it.id === id ? { ...it, [campo]: valor === "" ? 0 : Number(valor) } : it)));
-    setDirty((prev) => new Set(prev).add(id));
-  };
-  const editarObs = (id, valor) => {
-    setItens((prev) => prev.map((it) => (it.id === id ? { ...it, observacao: valor } : it)));
-    setDirty((prev) => new Set(prev).add(id));
-  };
-
-  const salvar = async () => {
-    if (dirty.size === 0) return;
-    setSalvando(true);
-    try {
-      const payload = itens.filter((it) => dirty.has(it.id)).map((it) => ({
-        id: it.id, horasNormais: it.horasNormais, horasExtras50: it.horasExtras50, horasExtras60: it.horasExtras60,
-        horasExtras80: it.horasExtras80, horasExtras100: it.horasExtras100, horasExtras150: it.horasExtras150,
-        faltas: it.faltas, atrasos: it.atrasos, adicionalNoturno: it.adicionalNoturno, dsr: it.dsr, ajudaCusto: it.ajudaCusto,
-        observacao: it.observacao || null,
-      }));
-      const r = await fetch(`/api/rh/ponto/${ponto.id}/itens`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: payload }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Falha ao salvar");
-      setDirty(new Set());
-      showToast(`${payload.length} linhas salvas`, "success");
-    } catch (e) {
-      showToast(e.message, "error");
-    } finally {
-      setSalvando(false);
-    }
-  };
 
   const mapear = async (itemId, funcionarioId) => {
     if (!funcionarioId) return;
@@ -222,87 +177,42 @@ export default function PontoClient() {
               ) : (
                 <button onClick={() => mudarStatus("FECHADA")} className="px-3 py-2 text-xs text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-1.5"><Lock size={14} /> Fechar</button>
               )}
-              <button onClick={salvar} disabled={salvando || dirty.size === 0 || fechada}
-                className="px-4 py-2 bg-torg-orange text-white text-xs rounded-lg hover:bg-torg-orange/90 font-medium inline-flex items-center gap-1.5 disabled:opacity-50">
-                {salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Salvar
-              </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
-              <table className="text-xs whitespace-nowrap w-full">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Funcionário / PIS</th>
-                    <th className="px-2 py-2 text-center font-medium text-gray-500 uppercase">Dias</th>
-                    {EDIT.map((c) => <th key={c.k} className="px-2 py-2 text-right font-medium text-gray-500 uppercase">{c.label}</th>)}
-                    <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase">Obs.</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {itens.map((it) => {
-                    // ACJEF grava em `marcacoes`; PDF Secullum em `diario.dias` (com batidas).
-                    const dias = (Array.isArray(it.marcacoes) && it.marcacoes.length)
-                      ? it.marcacoes
-                      : (Array.isArray(it.diario?.dias) ? it.diario.dias : []);
-                    return (
-                      <Fragment key={it.id}>
-                        <tr className="hover:bg-gray-50/50">
-                          <td className="px-2 py-1">
-                            {it.funcionarioId ? (
-                              <div className="font-medium text-torg-dark">{it.nome}</div>
-                            ) : (
-                              <select defaultValue="" onChange={(e) => mapear(it.id, e.target.value)}
-                                className="border border-amber-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue max-w-[220px]">
-                                <option value="">— vincular funcionário —</option>
-                                {funcionarios.map((f) => <option key={f.id} value={f.id}>{f.nome}{f.matricula ? ` (${f.matricula})` : ""}</option>)}
-                              </select>
-                            )}
-                            <div className="text-[10px] text-torg-gray font-mono">{it.pisArquivo}{it.empresa ? ` · ${it.empresa}` : ""}</div>
-                          </td>
-                          <td className="px-2 py-1 text-center">
-                            <button onClick={() => setExpandido(expandido === it.id ? null : it.id)} className="inline-flex items-center gap-0.5 text-torg-blue hover:underline">
-                              <ChevronRight size={12} className={expandido === it.id ? "rotate-90 transition-transform" : "transition-transform"} /> {dias.length}
-                            </button>
-                          </td>
-                          {EDIT.map((c) => (
-                            <td key={c.k} className="px-1 py-1 text-right">
-                              <input type="number" step="0.01" value={it[c.k] ?? 0} disabled={fechada}
-                                onChange={(e) => editar(it.id, c.k, e.target.value)}
-                                className="w-16 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue disabled:bg-gray-50" />
-                            </td>
-                          ))}
-                          <td className="px-1 py-1">
-                            <input type="text" value={it.observacao || ""} disabled={fechada}
-                              onChange={(e) => editarObs(it.id, e.target.value)} placeholder="—"
-                              className="w-40 border border-gray-200 rounded px-1.5 py-1 text-xs focus:ring-1 focus:ring-torg-blue disabled:bg-gray-50" />
-                          </td>
-                        </tr>
-                        {expandido === it.id && (
-                          <tr className="bg-gray-50/60">
-                            <td colSpan={EDIT.length + 3} className="px-4 py-2">
-                              <div className="flex flex-wrap gap-2">
-                                {dias.length === 0 ? <span className="text-[11px] text-torg-gray">sem marcações</span> : dias.map((d, i) => {
-                                  const batidas = Array.isArray(d.marcacoes)
-                                    ? d.marcacoes.join(" ")
-                                    : [d.ent1, d.sai1, d.ent2, d.sai2, d.ent3, d.sai3].filter(Boolean).join(" ");
-                                  return (
-                                    <span key={i} className="text-[10px] bg-white border border-gray-100 rounded px-1.5 py-0.5 text-torg-gray">
-                                      {d.data?.slice(8)}/{d.data?.slice(5, 7)}: {batidas || "—"}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+            {itens.map((it) => (
+              <div key={it.id} className="p-3 flex items-center justify-between flex-wrap gap-2 hover:bg-gray-50/50">
+                <div className="min-w-0">
+                  {it.funcionarioId ? (
+                    <div className="font-medium text-torg-dark">{it.nome}</div>
+                  ) : (
+                    <select defaultValue="" onChange={(e) => mapear(it.id, e.target.value)}
+                      className="border border-amber-300 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue max-w-[240px]">
+                      <option value="">— vincular funcionário —</option>
+                      {funcionarios.map((f) => <option key={f.id} value={f.id}>{f.nome}{f.matricula ? ` (${f.matricula})` : ""}</option>)}
+                    </select>
+                  )}
+                  {it.empresa && <div className="text-[11px] text-torg-gray">{it.empresa}</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  {it.pdfUrl ? (
+                    <>
+                      <a href={`/api/rh/ponto/${it.id}/arquivo`} target="_blank" rel="noopener"
+                        className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-1.5">
+                        <FileText size={14} /> Ver PDF
+                      </a>
+                      <a href={`/api/rh/ponto/${it.id}/arquivo?download=1`}
+                        className="px-3 py-1.5 bg-white border border-gray-200 text-torg-gray text-xs rounded-lg hover:bg-gray-50 font-medium inline-flex items-center gap-1.5" title="Baixar">
+                        <Download size={14} /> Baixar
+                      </a>
+                    </>
+                  ) : (
+                    <span className="text-[11px] text-torg-gray italic">sem PDF — reimporte o cartão</span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}
