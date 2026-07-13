@@ -592,10 +592,15 @@ function ModalAvisarCliente({ tarefa, onClose, onEnviado, onErro }) {
 
 // ─── Modal: enviar lembrete escolhendo destinatários (setor + cliente) ─────────
 function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
-  const [contatos, setContatos] = useState([]);
+  const [sugeridos, setSugeridos] = useState([]);
+  const [todos, setTodos] = useState([]);       // diretório completo da Torg
+  const [avulsos, setAvulsos] = useState([]);    // e-mails digitados à mão
+  const [cliente, setCliente] = useState(null);  // contato do cliente já cadastrado
   const [loading, setLoading] = useState(true);
   const [sel, setSel] = useState([]);
   const [avulso, setAvulso] = useState("");
+  const [busca, setBusca] = useState("");
+  const [verTodos, setVerTodos] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [incluirCliente, setIncluirCliente] = useState(false);
   const [clienteEmail, setClienteEmail] = useState(tarefa.clienteEmail || "");
@@ -604,7 +609,14 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
   useEffect(() => {
     fetch(`/api/planejamento/tarefas/${tarefa.id}/lembrete`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { const cs = j?.sugeridos || []; setContatos(cs); setSel(cs.map((c) => c.email)); })
+      .then((j) => {
+        const sug = j?.sugeridos || [];
+        setSugeridos(sug);
+        setTodos(j?.todos || []);
+        setCliente(j?.cliente || null);
+        setSel(sug.map((c) => c.email)); // sugeridos já marcados
+        setClienteEmail((prev) => prev || j?.cliente?.email || "");
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [tarefa.id]);
@@ -614,9 +626,16 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
     const e = avulso.trim().toLowerCase();
     if (!emailValido(e)) return;
     if (!sel.includes(e)) setSel((s) => [...s, e]);
-    if (!contatos.some((c) => c.email === e)) setContatos((cs) => [...cs, { nome: "", email: e }]);
+    if (!avulsos.some((a) => a.email === e) && !sugeridos.some((c) => c.email === e) && !todos.some((c) => c.email === e)) {
+      setAvulsos((a) => [...a, { nome: "", email: e }]);
+    }
     setAvulso("");
   };
+  const b = busca.trim().toLowerCase();
+  const todosFiltrados = b
+    ? todos.filter((c) => c.nome.toLowerCase().includes(b) || c.email.toLowerCase().includes(b) || (c.setor || "").toLowerCase().includes(b))
+    : todos;
+  const nSelTodos = todos.filter((c) => sel.includes(c.email)).length;
 
   async function enviar() {
     const emails = [...new Set(sel)];
@@ -660,14 +679,20 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
               <p className="text-[12px] text-torg-gray flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> carregando contatos…</p>
             ) : (
               <div className="space-y-1">
-                {contatos.map((c) => (
+                {sugeridos.map((c) => (
                   <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
                     <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
                     {c.nome ? `${c.nome} ` : ""}<span className="text-torg-gray">{c.email}</span>
                     {c.origem === "matriz" && <span className="text-[9px] text-torg-gray/70">· matriz</span>}
                   </label>
                 ))}
-                {contatos.length === 0 && <p className="text-[11px] text-amber-600">Nenhuma pessoa no setor nem na matriz — adicione um e-mail abaixo ou configure a <a href="/planejamento/comunicacao" className="underline">Matriz de comunicação</a>.</p>}
+                {avulsos.map((c) => (
+                  <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
+                    <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
+                    <span className="text-torg-gray">{c.email}</span><span className="text-[9px] text-torg-gray/70">· avulso</span>
+                  </label>
+                ))}
+                {sugeridos.length === 0 && avulsos.length === 0 && <p className="text-[11px] text-amber-600">Ninguém sugerido para este setor — use a lista de toda a Torg abaixo ou adicione um e-mail.</p>}
               </div>
             )}
             <div className="flex items-center gap-2 mt-2">
@@ -676,16 +701,44 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
             </div>
           </div>
 
-          {tarefa.doCliente && (
+          {/* Diretório completo da Torg — escolher qualquer pessoa sem digitar */}
+          {todos.length > 0 && (
+            <div className="border border-gray-200 rounded-lg">
+              <button type="button" onClick={() => setVerTodos((v) => !v)} className="w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-torg-dark hover:bg-gray-50 rounded-lg">
+                <span className="flex items-center gap-1.5"><User size={13} className="text-torg-blue" /> Todos da Torg <span className="text-torg-gray font-normal">({todos.length})</span></span>
+                <span className="flex items-center gap-2">
+                  {nSelTodos > 0 && <span className="text-[10px] text-torg-blue font-medium">{nSelTodos} selecionado{nSelTodos > 1 ? "s" : ""}</span>}
+                  <span className="text-torg-gray">{verTodos ? "▾" : "▸"}</span>
+                </span>
+              </button>
+              {verTodos && (
+                <div className="px-3 pb-2 border-t border-gray-100 pt-2">
+                  <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="buscar por nome, e-mail ou setor…" className="w-full text-[12px] border border-gray-300 rounded-lg px-2 py-1.5 mb-2" />
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {todosFiltrados.map((c) => (
+                      <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
+                        <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
+                        {c.nome ? `${c.nome} ` : ""}<span className="text-torg-gray">{c.email}</span>
+                        {c.setor && <span className="text-[9px] text-torg-gray/70">· {SETOR_LABEL[c.setor] || c.setor}</span>}
+                      </label>
+                    ))}
+                    {todosFiltrados.length === 0 && <p className="text-[11px] text-torg-gray">Ninguém encontrado para “{busca}”.</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(tarefa.doCliente || cliente) && (
             <div className="border border-orange-200 bg-orange-50/50 rounded-lg p-3">
               <label className="flex items-center gap-2 text-[12px] font-semibold text-torg-orange cursor-pointer">
                 <input type="checkbox" checked={incluirCliente} onChange={(e) => setIncluirCliente(e.target.checked)} className="accent-torg-orange" />
-                <Building2 size={13} /> Também avisar o cliente
+                <Building2 size={13} /> Também avisar o cliente{cliente?.nome ? ` — ${cliente.nome}` : ""}
               </label>
               {incluirCliente && (
                 <>
                   <input value={clienteEmail} onChange={(e) => setClienteEmail(e.target.value)} placeholder="e-mail do cliente" className="w-full mt-2 text-[12px] border border-gray-300 rounded-lg px-2 py-1.5" />
-                  <p className="text-[10px] text-torg-gray mt-1">O cliente recebe um e-mail com botões de 1 clique (Já concluí / Informar nova data).</p>
+                  <p className="text-[10px] text-torg-gray mt-1">{cliente?.email ? "E-mail já cadastrado na OP — dá pra editar." : "O cliente recebe um e-mail com botões de 1 clique (Já concluí / Informar nova data)."}</p>
                 </>
               )}
             </div>
