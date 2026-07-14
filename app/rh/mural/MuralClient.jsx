@@ -2,8 +2,9 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Megaphone, Loader2, AlertCircle, RefreshCw, Inbox, Send, Trash2, Pin,
-  Mail, MessageSquare, CheckCircle2,
+  Mail, MessageSquare, CheckCircle2, ImagePlus, X,
 } from "lucide-react";
+import { upload } from "@vercel/blob/client";
 import { useStore } from "@/lib/store";
 
 const CAT_LABEL = { SUGESTAO: "Sugestão", RECLAMACAO: "Reclamação", ELOGIO: "Elogio", DUVIDA: "Dúvida", OUTRO: "Outro" };
@@ -26,6 +27,8 @@ export default function MuralClient() {
   const [erroA, setErroA] = useState("");
   const [titulo, setTitulo] = useState("");
   const [corpo, setCorpo] = useState("");
+  const [imagemUrl, setImagemUrl] = useState(null);
+  const [subindoImg, setSubindoImg] = useState(false);
   const [fixado, setFixado] = useState(false);
   const [enviarEmail, setEnviarEmail] = useState(false);
   const [publicando, setPublicando] = useState(false);
@@ -59,6 +62,26 @@ export default function MuralClient() {
 
   useEffect(() => { carregarAvisos(); carregarFeedbacks(); }, [carregarAvisos, carregarFeedbacks]);
 
+  const escolherImagem = async (file) => {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) { showToast("Envie uma imagem JPG, PNG, WEBP ou GIF", "error"); return; }
+    if (file.size > 8 * 1024 * 1024) { showToast("Imagem muito grande (máx. 8 MB)", "error"); return; }
+    setSubindoImg(true);
+    try {
+      const safe = String(file.name || "imagem").replace(/[^\w.\- ]/g, "_").slice(0, 80);
+      const blob = await upload(`mural/${Date.now()}-${safe}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/rh/mural/upload-token",
+      });
+      setImagemUrl(blob.url);
+      showToast("Imagem anexada", "success");
+    } catch (e) {
+      showToast(e.message || "Falha ao enviar imagem", "error");
+    } finally {
+      setSubindoImg(false);
+    }
+  };
+
   const publicar = async () => {
     if (titulo.trim().length < 3 || corpo.trim().length < 3) { showToast("Preencha título e comunicado", "error"); return; }
     if (enviarEmail && !confirm("Enviar este comunicado por e-mail para TODOS os funcionários ativos?")) return;
@@ -66,12 +89,12 @@ export default function MuralClient() {
     try {
       const r = await fetch("/api/rh/mural", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ titulo, corpo, fixado, enviarEmail }),
+        body: JSON.stringify({ titulo, corpo, imagemUrl, fixado, enviarEmail }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao publicar");
       showToast(`Comunicado publicado${d.emailEnviados ? ` · ${d.emailEnviados} e-mails` : ""}${d.emailFalhas ? ` · ${d.emailFalhas} falhas` : ""}`, "success");
-      setTitulo(""); setCorpo(""); setFixado(false); setEnviarEmail(false);
+      setTitulo(""); setCorpo(""); setImagemUrl(null); setFixado(false); setEnviarEmail(false);
       await carregarAvisos();
     } catch (e) { showToast(e.message, "error"); } finally { setPublicando(false); }
   };
@@ -134,6 +157,26 @@ export default function MuralClient() {
             <textarea value={corpo} onChange={(e) => setCorpo(e.target.value)} maxLength={5000} rows={5}
               placeholder="Escreva o comunicado para os funcionários…"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue resize-y" />
+
+            {/* Imagem opcional */}
+            {imagemUrl ? (
+              <div className="relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imagemUrl} alt="Prévia" className="max-h-56 rounded-lg border border-gray-200" />
+                <button onClick={() => setImagemUrl(null)} title="Remover imagem"
+                  className="absolute -top-2 -right-2 bg-white border border-gray-200 rounded-full p-1 shadow-sm text-gray-500 hover:text-red-500">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <label className={`inline-flex items-center gap-2 text-sm text-torg-blue border border-dashed border-torg-blue-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-torg-blue-50 w-fit ${subindoImg ? "opacity-50 pointer-events-none" : ""}`}>
+                {subindoImg ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
+                {subindoImg ? "Enviando imagem…" : "Adicionar imagem (opcional)"}
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
+                  onChange={(e) => { escolherImagem(e.target.files[0]); e.target.value = ""; }} />
+              </label>
+            )}
+
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-4">
                 <label className="text-sm text-torg-gray inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -177,6 +220,10 @@ export default function MuralClient() {
                         <span className="font-semibold text-torg-dark">{a.titulo}</span>
                         {a.emailEnviadoEm && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium inline-flex items-center gap-1"><Mail size={11} /> {a.emailDestinatarios || 0} e-mails</span>}
                       </div>
+                      {a.imagemUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={a.imagemUrl} alt="" className="mt-2 max-h-72 rounded-lg border border-gray-100" />
+                      )}
                       <p className="text-sm text-torg-dark/80 mt-1.5 whitespace-pre-wrap">{a.corpo}</p>
                       <p className="text-[11px] text-torg-gray mt-2">{a.criadoPorNome ? `${a.criadoPorNome} · ` : ""}{fmt(a.createdAt)}</p>
                     </div>

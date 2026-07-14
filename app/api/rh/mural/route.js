@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
+import { isBlobUrlSegura } from "@/lib/blob-url";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -15,17 +16,22 @@ export const maxDuration = 60;
 const schema = z.object({
   titulo: z.string().trim().min(3, "Título muito curto").max(160),
   corpo: z.string().trim().min(3, "Escreva o comunicado").max(5000),
+  imagemUrl: z.string().url().optional().nullable(),
   fixado: z.boolean().optional().default(false),
   enviarEmail: z.boolean().optional().default(false),
 });
 
-function montarHtml({ titulo, corpo, autor }) {
+function montarHtml({ titulo, corpo, autor, imagemUrl }) {
+  const imgHtml = imagemUrl
+    ? `<img src="${imagemUrl}" alt="" style="max-width:100%;height:auto;border-radius:8px;margin:0 0 14px;display:block" />`
+    : "";
   return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
     <div style="background:#006EAB;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
       <strong style="font-size:16px">📢 Comunicado do RH — Torg Metal</strong>
     </div>
     <div style="border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px;padding:20px">
       <h2 style="color:#002945;margin:0 0 10px">${escapeHtml(titulo)}</h2>
+      ${imgHtml}
       <div style="color:#333;font-size:14px;line-height:1.6;white-space:pre-wrap">${escapeHtml(corpo)}</div>
       <p style="margin-top:22px;font-size:12px;color:#888">${autor ? escapeHtml(autor) + " · " : ""}Você recebeu este comunicado por fazer parte da equipe Torg. Veja todos os avisos no portal do funcionário.</p>
     </div>
@@ -54,8 +60,11 @@ export async function POST(req) {
   if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
   const { titulo, corpo, fixado, enviarEmail } = parsed.data;
 
+  // Só aceita imagem do nosso Blob (evita guardar URL externa arbitrária).
+  const imagemUrl = parsed.data.imagemUrl && isBlobUrlSegura(parsed.data.imagemUrl) ? parsed.data.imagemUrl : null;
+
   const aviso = await prisma.muralAviso.create({
-    data: { titulo, corpo, fixado, criadoPorId: user.id, criadoPorNome: user.name || null },
+    data: { titulo, corpo, imagemUrl, fixado, criadoPorId: user.id, criadoPorNome: user.name || null },
   });
 
   // Broadcast por e-mail (best-effort: uma falha de envio não desfaz o aviso).
@@ -66,7 +75,7 @@ export async function POST(req) {
       select: { email: true },
     });
     const destinos = [...new Set(funcs.map((f) => (f.email || "").trim()).filter(Boolean))];
-    const html = montarHtml({ titulo, corpo, autor: user.name });
+    const html = montarHtml({ titulo, corpo, autor: user.name, imagemUrl });
     const text = `Comunicado do RH — Torg Metal\n\n${titulo}\n\n${corpo}`;
     const subject = `📢 ${titulo}`;
     // Envio individual (preserva privacidade) em lotes p/ não estourar o tempo.

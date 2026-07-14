@@ -309,6 +309,10 @@ export default function MeuRHClient({ nome }) {
                   {a.fixado && <Pin size={14} className="text-torg-blue shrink-0" />}
                   <span className="font-semibold text-torg-dark">{a.titulo}</span>
                 </div>
+                {a.imagemUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.imagemUrl} alt="" className="mt-2 w-full rounded-lg border border-gray-100" />
+                )}
                 <p className="text-sm text-torg-dark/80 mt-1.5 whitespace-pre-wrap">{a.corpo}</p>
                 <p className="text-[11px] text-torg-gray mt-2">{a.criadoPorNome ? `${a.criadoPorNome} · ` : "RH · "}{new Date(a.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
               </div>

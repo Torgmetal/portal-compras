@@ -13,7 +13,7 @@ export async function GET() {
     where: { ativo: true },
     orderBy: [{ fixado: "desc" }, { createdAt: "desc" }],
     take: 100,
-    select: { id: true, titulo: true, corpo: true, fixado: true, criadoPorNome: true, createdAt: true },
+    select: { id: true, titulo: true, corpo: true, imagemUrl: true, fixado: true, criadoPorNome: true, createdAt: true },
   });
   return NextResponse.json({ success: true, avisos });
 }

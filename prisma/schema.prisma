@@ -1326,6 +1326,7 @@ model MuralAviso {
   id                 String    @id @default(cuid())
   titulo             String
   corpo              String
+  imagemUrl          String? // imagem opcional do comunicado (Vercel Blob público)
   fixado             Boolean   @default(false)
   emailEnviadoEm     DateTime?
   emailDestinatarios Int?
