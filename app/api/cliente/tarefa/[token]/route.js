@@ -77,6 +77,17 @@ export async function POST(req, { params }) {
 
   await prisma.tarefaPlanejamento.update({ where: { id: tarefa.id }, data });
 
+  // Registra no Painel de Respostas (junto com as respostas do setor)
+  await prisma.tarefaResposta.create({
+    data: {
+      tarefaId: tarefa.id, origem: "CLIENTE",
+      autorNome: tarefa.clienteNome || null, autorEmail: tarefa.clienteEmail || null,
+      tipo: body.acao === "concluido" ? "CONCLUIDO" : "NOVA_DATA",
+      novaData: body.acao === "nova_data" ? data.dataPrevista : null,
+      texto: data.clienteResposta,
+    },
+  }).catch(() => {});
+
   await prisma.auditLog.create({
     data: { userId: tarefa.createdById || null, action: "RESPOSTA_CLIENTE_TAREFA", entity: "TarefaPlanejamento", entityId: tarefa.id, diff: { acao: body.acao, novaData: body.novaData || null, comentario: comentario || null } },
   }).catch(() => {});

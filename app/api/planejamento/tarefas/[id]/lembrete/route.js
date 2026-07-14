@@ -5,6 +5,7 @@ import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { criarCompromissosDaTarefa } from "@/lib/compromissos";
 import { CONTATOS_TAREFAS, SETOR_AREA_TAREFA } from "@/lib/contatos-tarefas";
+import { gerarTokenForte } from "@/lib/token";
 
 // Mapeamento setor da tarefa → modulo do sistema (para buscar usuarios)
 const SETOR_MODULO = {
@@ -117,6 +118,16 @@ export async function POST(req, { params }) {
     );
   }
 
+  // Token público pro SETOR responder (1 clique, sem login) — gera na 1ª vez
+  let respostaToken = tarefa.respostaToken;
+  if (!respostaToken) {
+    respostaToken = gerarTokenForte();
+    try { await prisma.tarefaPlanejamento.update({ where: { id: tarefa.id }, data: { respostaToken } }); }
+    catch { respostaToken = tarefa.respostaToken; }
+  }
+  const base = (() => { try { return new URL(req.url).origin; } catch { return ""; } })();
+  const linkResposta = respostaToken ? `${base}/tarefa/resposta/${respostaToken}` : null;
+
   const setorNome = SETOR_LABEL[tarefa.setor] || tarefa.setor;
   const prioridadeNome = PRIORIDADE_LABEL[tarefa.prioridade] || tarefa.prioridade;
   const opInfo = tarefa.opNumero ? `OP-${tarefa.opNumero.padStart(3, "0")}` : null;
@@ -161,6 +172,10 @@ export async function POST(req, { params }) {
           </tr>
         </table>
         ${mensagemExtra ? `<p style="font-size:13px;color:#002945;background:#eef6fb;border-radius:8px;padding:10px 14px;margin:16px 0 0;">${escapeHtml(mensagemExtra)}</p>` : ""}
+        ${linkResposta ? `<div style="margin-top:20px;text-align:center;">
+          <a href="${linkResposta}" style="background:#006EAB;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 24px;border-radius:8px;display:inline-block;">Responder em 1 clique</a>
+          <p style="font-size:11px;color:#9aa5b1;margin:8px 0 0;">Confirmar conclusão · informar nova data · comentar — sem login. Fica registrado no painel do Planejamento.</p>
+        </div>` : ""}
         <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
           <p style="font-size: 12px; color: #576D7E; margin: 0;">
             Lembrete enviado por <strong>${escapeHtml(user.name || "Planejamento")}</strong> via Workspace Torg.

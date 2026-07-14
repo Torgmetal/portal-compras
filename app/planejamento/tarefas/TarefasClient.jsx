@@ -5,6 +5,7 @@ import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
   CheckCircle2, Clock, Circle, ListTodo, Bell, Send,
   GanttChart, AlertTriangle, Mail, User, Building2, CalendarClock, LayoutGrid, List,
+  MessageSquarePlus,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
@@ -161,7 +162,8 @@ export default function TarefasClient() {
             {aba === "semanais"
               ? (filtroOp.trim() ? `Tarefas da OP-${filtroOp.trim().padStart(3, "0")} — todas as semanas` : todasSemanas ? "Acompanhamento por setor — todas as semanas" : `Acompanhamento por setor — Semana ${semana}/${ano}`)
               : aba === "cronograma" ? "Atividades dos cronogramas ativos"
-              : "Compras atrasadas e itens para cobrança dos setores"}
+              : aba === "cobranca" ? "Compras atrasadas e itens para cobrança dos setores"
+              : "Respostas do cliente e dos setores às tarefas"}
           </p>
         </div>
         {aba === "semanais" && (
@@ -200,6 +202,14 @@ export default function TarefasClient() {
         >
           <AlertTriangle size={13} /> Cobrança
         </button>
+        <button
+          onClick={() => setAba("respostas")}
+          className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+            aba === "respostas" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"
+          }`}
+        >
+          <MessageSquarePlus size={13} /> Respostas
+        </button>
       </div>
 
       {aba === "cronograma" && (
@@ -208,6 +218,10 @@ export default function TarefasClient() {
 
       {aba === "cobranca" && (
         <AbaCobranca showToast={showToast} />
+      )}
+
+      {aba === "respostas" && (
+        <AbaRespostas />
       )}
 
       {aba === "semanais" && (
@@ -744,6 +758,76 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Aba Respostas — registros de respostas (cliente + setor) às tarefas ──
+const ORIGEM_BADGE = { CLIENTE: "bg-orange-100 text-orange-700", SETOR: "bg-torg-blue-50 text-torg-blue" };
+const TIPO_LABEL = { CONCLUIDO: "Concluído", NOVA_DATA: "Nova data", COMENTARIO: "Comentário" };
+const TIPO_BADGE = { CONCLUIDO: "bg-emerald-50 text-emerald-700", NOVA_DATA: "bg-amber-50 text-amber-700", COMENTARIO: "bg-gray-100 text-torg-gray" };
+function AbaRespostas() {
+  const [respostas, setRespostas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filtro, setFiltro] = useState(""); // "" | CLIENTE | SETOR
+
+  const carregar = useCallback(() => {
+    setLoading(true);
+    fetch(`/api/planejamento/tarefas/respostas${filtro ? `?origem=${filtro}` : ""}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setRespostas(j?.respostas || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [filtro]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const fmtDT = (d) => new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        {[["", "Todas"], ["SETOR", "Do setor"], ["CLIENTE", "Do cliente"]].map(([k, l]) => (
+          <button key={k} onClick={() => setFiltro(k)} className={`text-[11px] px-2.5 py-1 rounded-lg font-medium ${filtro === k ? "bg-torg-blue text-white" : "bg-white border border-gray-200 text-torg-gray hover:text-torg-dark"}`}>{l}</button>
+        ))}
+        <button onClick={carregar} className="ml-auto p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100" title="Atualizar"><RefreshCw size={14} /></button>
+      </div>
+      <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-torg-gray text-sm flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" /> carregando respostas…</div>
+        ) : respostas.length === 0 ? (
+          <div className="p-10 text-center text-torg-gray text-[12px]"><MessageSquarePlus size={28} className="mx-auto text-gray-300 mb-2" /> Nenhuma resposta ainda. Quando o cliente ou o setor responder um lembrete, o registro aparece aqui.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead className="bg-gray-50/60 text-torg-gray">
+                <tr>
+                  <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Quando</th>
+                  <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Origem</th>
+                  <th className="text-left px-3 py-2 font-medium">Quem</th>
+                  <th className="text-left px-3 py-2 font-medium whitespace-nowrap">OP</th>
+                  <th className="text-left px-3 py-2 font-medium">Tarefa</th>
+                  <th className="text-left px-3 py-2 font-medium">Resposta</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {respostas.map((r) => (
+                  <tr key={r.id} className="hover:bg-gray-50/50 align-top">
+                    <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{fmtDT(r.createdAt)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap"><span className={`px-1.5 py-0.5 rounded-full font-semibold text-[10px] ${ORIGEM_BADGE[r.origem] || "bg-gray-100 text-torg-gray"}`}>{r.origem === "CLIENTE" ? "Cliente" : "Setor"}</span></td>
+                    <td className="px-3 py-2 text-torg-dark whitespace-nowrap">{r.autorNome || "—"}</td>
+                    <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{r.tarefa?.opNumero ? fmtOP(r.tarefa.opNumero) : "—"}</td>
+                    <td className="px-3 py-2 text-torg-dark max-w-[220px] truncate" title={r.tarefa?.titulo || ""}>{r.tarefa?.titulo || "—"}</td>
+                    <td className="px-3 py-2 text-torg-dark max-w-[300px]">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mr-1 ${TIPO_BADGE[r.tipo] || "bg-gray-100 text-torg-gray"}`}>{TIPO_LABEL[r.tipo] || r.tipo}</span>
+                      <span className="text-torg-gray">{r.texto || ""}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

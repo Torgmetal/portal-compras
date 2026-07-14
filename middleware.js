@@ -82,6 +82,9 @@ export default withAuth(
           // Resposta do cliente a tarefas do Planejamento — publico via token unico
           path.startsWith("/cliente/tarefa/") ||
           path.startsWith("/api/cliente/tarefa/") ||
+          // Resposta do SETOR a tarefas do Planejamento — publico via token unico
+          path.startsWith("/tarefa/resposta/") ||
+          path.startsWith("/api/tarefa/resposta/") ||
           // Apresentacao ao cliente (Compras) — pagina publica via token unico
           path.startsWith("/apresentacao/") ||
           path.startsWith("/api/apresentacao/") ||

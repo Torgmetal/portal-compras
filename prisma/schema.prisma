@@ -3013,17 +3013,39 @@ model TarefaPlanejamento {
   clienteAvisadoEm  DateTime?
   clienteRespostaEm DateTime?
   clienteResposta   String?
+  // Token público (sem login) para o SETOR responder o lembrete de 1 clique
+  respostaToken     String?          @unique
   createdById       String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   createdBy         User?         @relation("TarefaPlanejamentoCreatedBy", fields: [createdById], references: [id])
   op                OP?           @relation(fields: [opId], references: [id])
   compromissos      Compromisso[]
+  respostas         TarefaResposta[]
 
   @@index([semanaIso, ano])
   @@index([setor])
   @@index([opId])
   @@index([status])
+}
+
+// Registro de cada resposta a uma tarefa do Planejamento (cliente ou setor) —
+// alimenta o Painel de Respostas. Cliente responde via clienteToken; setor via
+// respostaToken (ambos links públicos de 1 clique no e-mail).
+model TarefaResposta {
+  id         String             @id @default(cuid())
+  tarefaId   String
+  origem     String // CLIENTE | SETOR
+  autorNome  String?
+  autorEmail String?
+  tipo       String // CONCLUIDO | NOVA_DATA | COMENTARIO
+  novaData   DateTime?
+  texto      String?
+  createdAt  DateTime           @default(now())
+  tarefa     TarefaPlanejamento @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+
+  @@index([tarefaId])
+  @@index([createdAt])
 }
 
 // Matriz de comunicação por setor: contatos (nome+e-mail) que recebem as
