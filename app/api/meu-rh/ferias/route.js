@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireFuncionario } from "@/lib/session";
-import { periodoAtual } from "@/lib/ferias-calc";
+import { periodoAtual, periodosUsados } from "@/lib/ferias-calc";
 
 export const runtime = "nodejs";
 
@@ -33,8 +33,9 @@ export async function GET() {
   });
   if (!func) return NextResponse.json({ error: "Funcionário não encontrado" }, { status: 404 });
 
-  // Período aquisitivo atual (admissão + nº de férias já usadas).
-  const periodo = periodoAtual(func.dataAdmissao, func.ferias.length);
+  // Período aquisitivo atual (admissão + períodos já consumidos, recomputados
+  // pela data de início de cada férias — mesma regra do painel do RH).
+  const periodo = periodoAtual(func.dataAdmissao, periodosUsados(func.dataAdmissao, func.ferias));
 
   return NextResponse.json({ ferias: func.ferias, periodo });
 }

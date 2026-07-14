@@ -23,7 +23,13 @@ export async function GET(req) {
   const filtroSit = new URL(req.url).searchParams.get("situacao");
 
   const funcs = await prisma.funcionario.findMany({
-    where: { ativo: true },
+    // Só CLT e sem cargos de diretoria — férias (CLT) não se aplica a PJ nem a
+    // diretores/sócios.
+    where: {
+      ativo: true,
+      tipoContrato: "CLT",
+      NOT: { cargo: { nome: { contains: "diretor", mode: "insensitive" } } },
+    },
     select: {
       id: true, nome: true, matricula: true, empresa: true, salario: true, dataAdmissao: true,
       setor: { select: { nome: true, sigla: true } },
@@ -36,7 +42,7 @@ export async function GET(req) {
     // Período atual = admissão + nº de períodos aquisitivos já consumidos. Uma
     // férias retroativa (início antigo) avança direto pro período dela — tudo
     // antes dela conta como gozado. Ver periodosUsados/periodoIndiceDe.
-    const usadas = periodosUsados(f.ferias);
+    const usadas = periodosUsados(f.dataAdmissao, f.ferias);
     const periodo = periodoAtual(f.dataAdmissao, usadas);
     return {
       id: f.id, nome: f.nome, matricula: f.matricula, empresa: f.empresa,
