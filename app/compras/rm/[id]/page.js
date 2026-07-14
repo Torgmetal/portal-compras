@@ -47,7 +47,7 @@ export default async function RMComprasDetail({ params }) {
   const cotacoesRelacionadas = await prisma.cotacao.findMany({
     where: { id: { in: cotIdsDestaRM } },
     select: {
-      id: true, rmId: true, fornecedorNome: true, fornecedorEmail: true, token: true,
+      id: true, rmId: true, fornecedorNome: true, fornecedorEmail: true, fornecedorId: true, token: true,
       status: true, total: true, totalProposta: true, numeroRevisao: true,
       createdAt: true, prazoResposta: true, recebidaEm: true,
       cnpj: true, nCodOmie: true,

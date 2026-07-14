@@ -305,6 +305,15 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
             <Mail size={15} /> Enviar Cotação
           </button>
           )}
+          {!ehServicoDireto && (rm.status === "EM_COTACAO" || rm.status === "COTADA") && (
+            <button
+              onClick={() => { setPreSelecionarMode("re-enviar"); setModalEnviarCot(true); }}
+              className="h-9 px-3.5 bg-white border border-torg-blue text-torg-blue text-sm font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1.5"
+              title="Reenvia a cotação numa nova rodada — pra corrigir um erro ou pedir desconto. Os fornecedores da última cotação já vêm marcados."
+            >
+              <RotateCcw size={15} /> Reenviar cotação
+            </button>
+          )}
           {!ehServicoDireto && qtdSemPropostaRm > 0 && rm.status !== "PEDIDO_GERADO" && rm.status !== "CANCELADA" && (
             <button
               onClick={() => { setPreSelecionarMode("sem-proposta"); setModalEnviarCot(true); }}
@@ -2539,6 +2548,34 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
   const removerFornecedor = (idx) =>
     setFornecedoresLinhas((p) => (p.length === 1 ? [{ nome: "", email: "" }] : p.filter((_, i) => i !== idx)));
 
+  // Fornecedores da última cotação (pra pré-marcar no modo "re-enviar").
+  const fornecedoresAnteriores = useMemo(() => {
+    const seen = new Set(), out = [];
+    for (const c of (rm.cotacoes || [])) {
+      if (["CANCELADA", "DECLINADA"].includes(c.status)) continue;
+      const email = String(c.fornecedorEmail || "").trim().toLowerCase();
+      if (!email || seen.has(email)) continue;
+      seen.add(email);
+      out.push({ fornecedorId: c.fornecedorId || null, nome: c.fornecedorNome || "", email });
+    }
+    return out;
+  }, [rm.cotacoes]);
+  // Modo re-enviar: quando os fornecedores cadastrados terminam de carregar,
+  // pré-marca os da última cotação — registrados via vendor list (mantém nCodOmie),
+  // avulsos por e-mail. Roda uma vez (quando carregandoForn vira false).
+  useEffect(() => {
+    if (preSelecionarMode !== "re-enviar" || carregandoForn) return;
+    const regIds = new Set(fornecedoresCadastrados.map((f) => f.id));
+    const sel = new Set(), linhas = [];
+    for (const f of fornecedoresAnteriores) {
+      if (f.fornecedorId && regIds.has(f.fornecedorId)) sel.add(f.fornecedorId);
+      else if (f.email) linhas.push({ nome: f.nome, email: f.email });
+    }
+    setFornSelecionadosIds(sel);
+    setFornecedoresLinhas(linhas.length ? linhas : [{ nome: "", email: "" }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregandoForn]);
+
   // Lista filtrada de fornecedores cadastrados pra exibir
   const fornFiltrados = useMemo(() => {
     return fornecedoresCadastrados.filter((f) => {
@@ -2674,6 +2711,18 @@ function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSelecionar
               <p className="font-medium">Modo: Re-cotar itens sem proposta</p>
               <p className="text-xs mt-0.5">
                 Já marcamos só os itens que o fornecedor anterior não precificou. Adicione um novo fornecedor abaixo pra enviar.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {preSelecionarMode === "re-enviar" && (
+          <div className="bg-torg-blue-50 border border-torg-blue-100 text-torg-dark text-sm rounded px-3 py-2 flex items-start gap-2">
+            <RotateCcw size={14} className="mt-0.5 flex-shrink-0 text-torg-blue" />
+            <div>
+              <p className="font-medium">Reenvio da cotação — nova rodada</p>
+              <p className="text-xs mt-0.5 text-torg-gray">
+                Pra corrigir um erro ou pedir desconto. Já marcamos os itens e os fornecedores da última cotação — confira, ajuste se precisar e envie. Cada envio gera uma nova cotação (a anterior fica no histórico).
               </p>
             </div>
           </div>
