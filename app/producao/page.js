@@ -36,9 +36,12 @@ export default async function PainelProducao() {
     // Pipeline das peças (conjuntos + avulsas; croqui só conta no corte)
     prisma.pecaConjunto.groupBy({ by: ["status", "tipoPeca"], _count: true, _sum: { pesoTotalKg: true } }),
 
-    // Meta mensal por setor (modelo Meta — mesmas usadas no Mapa)
+    // Meta mensal por setor (modelo Meta — mesmas usadas no Mapa). Sem filtrar
+    // por setor no SQL: o setor é gravado com casing inconsistente ("CORTE" vs
+    // "Corte") e o IN do Postgres é case-sensitive — o casamento é feito no JS,
+    // case-insensitive (senão a meta some e o painel mostra "—").
     prisma.meta.findMany({
-      where: { modulo: "PRODUCAO", tipo: "PESO_KG", ano, mes, setor: { in: SETORES_SYNECO } },
+      where: { modulo: "PRODUCAO", tipo: "PESO_KG", ano, mes },
       select: { setor: true, valorMensal: true },
     }),
 
@@ -110,7 +113,7 @@ export default async function PainelProducao() {
   const setores = SETORES_SYNECO.map((s) => {
     const k = s.toUpperCase();
     const h = hojeMap[k] || { kg: 0, un: 0 };
-    const meta = metas.find((m) => m.setor === s);
+    const meta = metas.find((m) => (m.setor || "").toUpperCase() === k);
     return {
       setor: s,
       hojeKg: h.kg,

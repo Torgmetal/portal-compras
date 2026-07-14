@@ -253,14 +253,19 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
       {semanas.length > 0 && (
         <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <h3 className="text-sm font-bold text-torg-dark mb-3">Produção apontada por semana (todos os setores)</h3>
-          <div className="flex items-end gap-1.5 h-40">
-            {semanas.map((s) => (
-              <div key={s.semana} className="flex-1 flex flex-col items-center justify-end gap-1 group">
-                <span className="text-[9px] tabular-nums text-torg-gray opacity-0 group-hover:opacity-100 transition-opacity">{fmtKg(s.kg)}</span>
-                <div className="w-full bg-torg-blue/80 rounded-t hover:bg-torg-blue transition-colors" style={{ height: `${pct(s.kg, maxSem)}%` }} />
-                <span className="text-[9px] text-torg-gray">{s.semana.slice(-3)}</span>
-              </div>
-            ))}
+          {/* Altura da barra em PIXEL (a maior semana = 140px). Usar % aqui não
+              funciona: a coluna não tem altura definida e o % colapsa. */}
+          <div className="flex items-end gap-1.5 h-44">
+            {semanas.map((s) => {
+              const h = Math.max(3, Math.round((s.kg / maxSem) * 140));
+              return (
+                <div key={s.semana} className="flex-1 min-w-0 flex flex-col items-center justify-end gap-1 group">
+                  <span className="text-[9px] tabular-nums text-torg-gray opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">{fmtKg(s.kg)}</span>
+                  <div className="w-full bg-torg-blue/80 rounded-t hover:bg-torg-blue transition-colors" style={{ height: `${h}px` }} title={fmtKg(s.kg)} />
+                  <span className="text-[9px] text-torg-gray">{s.semana.slice(-3)}</span>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
