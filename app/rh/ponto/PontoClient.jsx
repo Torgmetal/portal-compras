@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Clock, Loader2, AlertCircle, RefreshCw, Inbox, Upload, Download,
-  Lock, LockOpen, Trash2, FileText,
+  Lock, LockOpen, Trash2, FileText, FileDown,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
@@ -172,6 +172,11 @@ export default function PontoClient() {
                 <Trash2 size={14} /> Excluir importação
               </button>
               <a href={`/api/rh/ponto/${ponto.id}/export`} className="px-3 py-2 text-xs text-torg-dark border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-1.5"><Download size={14} /> Exportar</a>
+              <a href={`/api/rh/ponto/comprovante?competencia=${ponto.competencia}`}
+                className="px-3 py-2 text-xs text-torg-dark border border-gray-200 rounded-lg hover:bg-gray-50 inline-flex items-center gap-1.5"
+                title="Baixar comprovante de conferência (ciência): quem visualizou/confirmou, com data, hora e IP">
+                <FileDown size={14} /> Comprovante
+              </a>
               {fechada ? (
                 <button onClick={() => mudarStatus("ABERTA")} className="px-3 py-2 text-xs text-torg-blue border border-torg-blue-200 rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1.5"><LockOpen size={14} /> Reabrir</button>
               ) : (
