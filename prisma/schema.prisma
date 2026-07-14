@@ -3016,6 +3016,10 @@ model TarefaPlanejamento {
   clienteResposta   String?
   // Token público (sem login) para o SETOR responder o lembrete de 1 clique
   respostaToken     String?          @unique
+  // "Aguardando resposta": setado quando o lembrete (pedindo resposta) é enviado;
+  // limpo/comparado quando o setor responde — pra saber o que ainda falta cobrar.
+  respostaSolicitadaEm DateTime?
+  respostaRecebidaEm   DateTime?
   // Checklist de sub-tarefas: [{ id, titulo, feita }]
   subtarefas        Json             @default("[]")
   createdById       String?

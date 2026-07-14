@@ -62,7 +62,7 @@ export async function POST(req, { params }) {
   const comentario = (body.comentario || "").trim().slice(0, 500);
 
   let tipo, texto, novaData = null, resumo;
-  const tarefaUpdate = {};
+  const tarefaUpdate = { respostaRecebidaEm: new Date() };
   if (body.acao === "concluido") {
     tipo = "CONCLUIDO";
     texto = `Concluído${comentario ? `: ${comentario}` : ""}`;

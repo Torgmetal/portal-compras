@@ -321,6 +321,11 @@ export default function TarefasClient() {
                           : t.clienteAvisadoEm
                             ? <p className="text-[10px] text-torg-orange mt-1.5">⏳ aguardando resposta do cliente…</p>
                             : null)}
+                        {t.respostaSolicitadaEm && (
+                          (t.respostaRecebidaEm && new Date(t.respostaRecebidaEm) >= new Date(t.respostaSolicitadaEm))
+                            ? <p className="text-[10px] text-emerald-600 mt-1.5">✅ respondido {new Date(t.respostaRecebidaEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</p>
+                            : <p className="text-[10px] text-amber-600 mt-1.5 font-medium">⏳ aguardando resposta desde {new Date(t.respostaSolicitadaEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</p>
+                        )}
                         <Subtarefas tarefa={t} onChanged={carregar} />
                         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-50">
                           <select value={t.status} onChange={(e) => atualizarStatus(t.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 bg-white flex-1">

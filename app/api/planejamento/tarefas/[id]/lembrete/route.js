@@ -118,13 +118,13 @@ export async function POST(req, { params }) {
     );
   }
 
-  // Token público pro SETOR responder (1 clique, sem login) — gera na 1ª vez
+  // Token público pro SETOR responder (1 clique, sem login) + marca "aguardando
+  // resposta" a cada envio (fica registrado pra saber o que ainda falta cobrar).
   let respostaToken = tarefa.respostaToken;
-  if (!respostaToken) {
-    respostaToken = gerarTokenForte();
-    try { await prisma.tarefaPlanejamento.update({ where: { id: tarefa.id }, data: { respostaToken } }); }
-    catch { respostaToken = tarefa.respostaToken; }
-  }
+  const updEnvio = { respostaSolicitadaEm: new Date() };
+  if (!respostaToken) { respostaToken = gerarTokenForte(); updEnvio.respostaToken = respostaToken; }
+  try { await prisma.tarefaPlanejamento.update({ where: { id: tarefa.id }, data: updEnvio }); }
+  catch { if (updEnvio.respostaToken) respostaToken = tarefa.respostaToken; }
   const base = (() => { try { return new URL(req.url).origin; } catch { return ""; } })();
   const linkResposta = respostaToken ? `${base}/tarefa/resposta/${respostaToken}` : null;
 
