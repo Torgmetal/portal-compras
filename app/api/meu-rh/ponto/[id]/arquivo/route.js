@@ -19,11 +19,19 @@ export async function GET(req, { params }) {
 
   const item = await prisma.pontoItem.findUnique({
     where: { id: params.id },
-    select: { funcionarioId: true, pdfUrl: true, pagina: true, ponto: { select: { competencia: true } } },
+    select: { funcionarioId: true, pdfUrl: true, pagina: true, status: true, visualizadoEm: true, ponto: { select: { competencia: true } } },
   });
   // 404 genérico mesmo quando existe mas é de outro — não vaza existência.
   if (!item || item.funcionarioId !== user.funcionarioId || !item.pdfUrl) {
     return NextResponse.json({ error: "Cartão não encontrado" }, { status: 404 });
+  }
+
+  // Marca como visualizado na 1ª abertura (sem regredir se já confirmado).
+  if (!item.visualizadoEm) {
+    await prisma.pontoItem.update({
+      where: { id: params.id },
+      data: { visualizadoEm: new Date(), ...(item.status === "PENDENTE" ? { status: "VISUALIZADO" } : {}) },
+    }).catch(() => {});
   }
 
   try { assertBlobUrlSegura(item.pdfUrl); }

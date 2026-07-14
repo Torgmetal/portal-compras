@@ -1310,6 +1310,10 @@ model PontoItem {
   dsr              Float            @default(0)
   ajudaCusto       Float            @default(0)
   observacao       String?
+  status           String           @default("PENDENTE") // PENDENTE | VISUALIZADO | CONFIRMADO (ciência do colaborador)
+  visualizadoEm    DateTime?
+  confirmadoEm     DateTime?
+  confirmadoIp     String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   ponto            PontoCompetencia @relation(fields: [pontoId], references: [id], onDelete: Cascade)

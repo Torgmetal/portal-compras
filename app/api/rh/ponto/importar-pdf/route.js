@@ -54,9 +54,23 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: "Falha ao guardar o PDF: " + (e?.message || "erro") }, { status: 502 });
   }
 
-  // Match por CPF (dígitos). Cadastro pode ter CPF com ou sem máscara.
-  const funcs = await prisma.funcionario.findMany({ where: { cpf: { not: null } }, select: { id: true, nome: true, cpf: true } });
-  const porCpf = new Map(funcs.map((f) => [soDigitos(f.cpf), f]));
+  // Match por CPF → matrícula (Nº FOLHA) → PIS → nome. O modelo "Montagem
+  // Externa" (Ponto Web) não traz CPF, então casamos pelos outros identificadores.
+  const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim();
+  const funcs = await prisma.funcionario.findMany({ select: { id: true, nome: true, cpf: true, pis: true, matricula: true } });
+  const porCpf = new Map(), porMat = new Map(), porPis = new Map(), porNome = new Map();
+  for (const f of funcs) {
+    if (f.cpf) porCpf.set(soDigitos(f.cpf), f);
+    if (f.matricula) porMat.set(soDigitos(f.matricula), f);
+    if (f.pis) porPis.set(soDigitos(f.pis), f);
+    if (f.nome) porNome.set(norm(f.nome), f);
+  }
+  const acharMatch = (f) =>
+    (f.cpfDigitos && porCpf.get(f.cpfDigitos)) ||
+    (f.folha && porMat.get(soDigitos(f.folha))) ||
+    (f.pis && porPis.get(soDigitos(f.pis))) ||
+    (f.nome && porNome.get(norm(f.nome))) ||
+    null;
 
   const min2h = (m) => Math.round(((Number(m) || 0) / 60) * 100) / 100; // minutos → horas (2 casas)
 
@@ -71,11 +85,11 @@ export async function POST(req) {
     await tx.pontoItem.deleteMany({ where: { pontoId: pc.id, origem: "SECULLUM_PDF", empresa: dados.empresa || null } });
     await tx.pontoItem.createMany({
       data: dados.funcionarios.map((f) => {
-        const match = porCpf.get(f.cpfDigitos);
+        const match = acharMatch(f);
         const t = f.totais;
         return {
           pontoId: pc.id, origem: "SECULLUM_PDF",
-          pisArquivo: f.cpfDigitos, cpfArquivo: f.cpfDigitos,
+          pisArquivo: f.pis || f.cpfDigitos || f.folha || null, cpfArquivo: f.cpfDigitos || null,
           empresa: dados.empresa || null,
           funcionarioId: match?.id || null, nome: match?.nome || null,
           pdfUrl, pagina: f.pagina,
@@ -90,7 +104,7 @@ export async function POST(req) {
     return pc;
   });
 
-  const casados = dados.funcionarios.filter((f) => porCpf.has(f.cpfDigitos)).length;
+  const casados = dados.funcionarios.filter((f) => acharMatch(f)).length;
   await prisma.auditLog.create({
     data: { userId: user.id, action: "IMPORTAR_PONTO_PDF", entity: "PontoCompetencia", entityId: ponto.id, diff: { competencia, total: dados.funcionarios.length, casados } },
   }).catch(() => {});

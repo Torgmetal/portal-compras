@@ -194,6 +194,13 @@ export default function PontoClient() {
                     </select>
                   )}
                   {it.empresa && <div className="text-[11px] text-torg-gray">{it.empresa}</div>}
+                  {it.funcionarioId && (
+                    <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${it.status === "CONFIRMADO" ? "bg-green-100 text-green-700" : it.status === "VISUALIZADO" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                      {it.status === "CONFIRMADO"
+                        ? `Confirmado${it.confirmadoEm ? " · " + new Date(it.confirmadoEm).toLocaleDateString("pt-BR") : ""}`
+                        : it.status === "VISUALIZADO" ? "Visualizado" : "Aguardando confirmação"}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {it.pdfUrl ? (

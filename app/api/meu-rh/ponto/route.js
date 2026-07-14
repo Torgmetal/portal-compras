@@ -16,7 +16,7 @@ export async function GET() {
 
   const itens = await prisma.pontoItem.findMany({
     where: { funcionarioId: user.funcionarioId, pdfUrl: { not: null } },
-    select: { id: true, empresa: true, ponto: { select: { competencia: true } } },
+    select: { id: true, empresa: true, status: true, confirmadoEm: true, ponto: { select: { competencia: true } } },
     orderBy: { ponto: { competencia: "desc" } },
   });
 
@@ -24,6 +24,8 @@ export async function GET() {
     id: i.id,
     competencia: i.ponto?.competencia || null,
     empresa: i.empresa,
+    status: i.status,
+    confirmadoEm: i.confirmadoEm,
   }));
 
   return NextResponse.json({ cartoes });

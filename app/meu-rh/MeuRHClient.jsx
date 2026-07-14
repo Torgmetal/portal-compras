@@ -88,6 +88,7 @@ export default function MeuRHClient({ nome }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [confirmando, setConfirmando] = useState(null);
+  const [confirmandoPonto, setConfirmandoPonto] = useState(null);
   const [baixando, setBaixando] = useState(null);
 
   // Férias
@@ -210,6 +211,20 @@ export default function MeuRHClient({ nome }) {
       setErro(e.message);
     } finally {
       setConfirmando(null);
+    }
+  };
+
+  const confirmarPonto = async (id) => {
+    setConfirmandoPonto(id);
+    try {
+      const r = await fetch(`/api/meu-rh/ponto/${id}/confirmar`, { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Falha ao confirmar");
+      setPontoComps((prev) => prev.map((c) => (c.id === id ? { ...c, status: "CONFIRMADO", confirmadoEm: d.confirmadoEm || new Date().toISOString() } : c)));
+    } catch (e) {
+      setErroPonto(e.message);
+    } finally {
+      setConfirmandoPonto(null);
     }
   };
 
@@ -475,25 +490,39 @@ export default function MeuRHClient({ nome }) {
           </div>
         ) : (
           <div className="space-y-3">
-            {pontoComps.map((c) => (
-              <div key={c.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <div className="font-semibold text-torg-dark">Cartão de ponto — {competenciaExtenso(c.competencia)}</div>
-                  {c.empresa && <div className="text-xs text-torg-gray mt-0.5">{c.empresa}</div>}
+            {pontoComps.map((c) => {
+              const confirmado = c.status === "CONFIRMADO";
+              return (
+                <div key={c.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <div className="font-semibold text-torg-dark">Cartão de ponto — {competenciaExtenso(c.competencia)}</div>
+                    <div className="text-xs text-torg-gray mt-0.5">
+                      {c.empresa || "—"}
+                      {confirmado && c.confirmadoEm ? ` · confirmado em ${new Date(c.confirmadoEm).toLocaleDateString("pt-BR")}` : ""}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a href={`/api/meu-rh/ponto/${c.id}/arquivo`} target="_blank" rel="noopener"
+                      className="px-3 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2">
+                      <FileText size={15} /> Ver cartão
+                    </a>
+                    <a href={`/api/meu-rh/ponto/${c.id}/arquivo?download=1`}
+                      className="px-3 py-2 bg-white border border-gray-200 text-torg-gray text-sm rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2" title="Baixar PDF">
+                      <Download size={15} /> Baixar
+                    </a>
+                    {confirmado ? (
+                      <span className="px-3 py-2 text-sm text-green-700 bg-green-50 rounded-lg font-medium flex items-center gap-2"><CheckCircle2 size={15} /> Confirmado</span>
+                    ) : (
+                      <button onClick={() => confirmarPonto(c.id)} disabled={confirmandoPonto === c.id}
+                        className="px-3 py-2 bg-torg-orange text-white text-sm rounded-lg hover:bg-torg-orange/90 font-medium flex items-center gap-2 disabled:opacity-50">
+                        {confirmandoPonto === c.id ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Conferi e confirmo
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <a href={`/api/meu-rh/ponto/${c.id}/arquivo`} target="_blank" rel="noopener"
-                    className="px-3 py-2 bg-white border border-torg-blue-200 text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-2">
-                    <FileText size={15} /> Ver cartão
-                  </a>
-                  <a href={`/api/meu-rh/ponto/${c.id}/arquivo?download=1`}
-                    className="px-3 py-2 bg-white border border-gray-200 text-torg-gray text-sm rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2" title="Baixar PDF">
-                    <Download size={15} /> Baixar
-                  </a>
-                </div>
-              </div>
-            ))}
-            <p className="text-[11px] text-torg-gray">Cartão de ponto do mês. Em caso de divergência, procure o RH.</p>
+              );
+            })}
+            <p className="text-[11px] text-torg-gray">Cartão de ponto do mês. Confira e confirme; em caso de divergência, procure o RH antes de confirmar.</p>
           </div>
         )
       )}
