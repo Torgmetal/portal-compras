@@ -42,7 +42,7 @@ export async function GET(req) {
   const tarefas = await prisma.tarefaPlanejamento.findMany({
     where,
     include: {
-      op: { select: { numero: true, cliente: true } },
+      op: { select: { numero: true, cliente: true, obra: true } },
       createdBy: { select: { name: true } },
     },
     orderBy: [{ prioridade: "asc" }, { createdAt: "desc" }],

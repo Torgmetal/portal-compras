@@ -3016,6 +3016,8 @@ model TarefaPlanejamento {
   clienteResposta   String?
   // Token público (sem login) para o SETOR responder o lembrete de 1 clique
   respostaToken     String?          @unique
+  // Checklist de sub-tarefas: [{ id, titulo, feita }]
+  subtarefas        Json             @default("[]")
   createdById       String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt

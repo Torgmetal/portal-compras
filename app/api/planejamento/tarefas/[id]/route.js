@@ -10,6 +10,11 @@ const schemaUpdate = z.object({
   prioridade: z.enum(["ALTA", "MEDIA", "BAIXA"]).optional(),
   responsavel: z.string().nullable().optional(),
   observacao: z.string().nullable().optional(),
+  subtarefas: z.array(z.object({
+    id: z.string(),
+    titulo: z.string().min(1).max(200),
+    feita: z.boolean(),
+  })).max(50).optional(),
 });
 
 export async function PATCH(req, { params }) {

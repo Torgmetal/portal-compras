@@ -306,6 +306,7 @@ export default function TarefasClient() {
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <span className="text-[9px] font-semibold text-torg-gray uppercase tracking-wide">{SETOR_LABEL[t.setor] || t.setor}</span>
                           {t.opNumero && <span className="text-[10px] text-torg-blue font-mono">{fmtOP(t.opNumero)}</span>}
+                          {(t.op?.cliente || t.op?.obra) && <span className="text-[10px] text-torg-gray truncate max-w-[130px]" title={[t.op?.cliente, t.op?.obra].filter(Boolean).join(" — ")}>{t.op?.cliente || t.op?.obra}</span>}
                           <span className={`px-1.5 py-0 text-[9px] font-semibold rounded border ${PRIORIDADE_COR[t.prioridade]}`}>{t.prioridade}</span>
                           {t.doCliente && <span className="px-1.5 py-0 text-[9px] font-semibold rounded border bg-orange-50 text-torg-orange border-orange-200 inline-flex items-center gap-0.5"><Building2 size={9} /> CLIENTE</span>}
                         </div>
@@ -320,6 +321,7 @@ export default function TarefasClient() {
                           : t.clienteAvisadoEm
                             ? <p className="text-[10px] text-torg-orange mt-1.5">⏳ aguardando resposta do cliente…</p>
                             : null)}
+                        <Subtarefas tarefa={t} onChanged={carregar} />
                         <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-50">
                           <select value={t.status} onChange={(e) => atualizarStatus(t.id, e.target.value)} className="text-[10px] border border-gray-200 rounded px-1 py-0.5 bg-white flex-1">
                             {Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -758,6 +760,62 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Checklist de sub-tarefas de uma tarefa (card do kanban). Salva o array
+// inteiro via PATCH; atualização otimista com rollback em erro.
+const novoSubId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+function Subtarefas({ tarefa, onChanged }) {
+  const [itens, setItens] = useState(Array.isArray(tarefa.subtarefas) ? tarefa.subtarefas : []);
+  const [aberto, setAberto] = useState(false);
+  const [novo, setNovo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => { setItens(Array.isArray(tarefa.subtarefas) ? tarefa.subtarefas : []); }, [tarefa.subtarefas]);
+
+  const feitas = itens.filter((s) => s.feita).length;
+
+  async function salvar(novos) {
+    const anterior = itens;
+    setItens(novos);
+    setSalvando(true);
+    try {
+      const r = await fetch(`/api/planejamento/tarefas/${tarefa.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subtarefas: novos }) });
+      if (!r.ok) throw new Error();
+      onChanged?.();
+    } catch { setItens(anterior); } finally { setSalvando(false); }
+  }
+  const toggle = (id) => salvar(itens.map((s) => (s.id === id ? { ...s, feita: !s.feita } : s)));
+  const remover = (id) => salvar(itens.filter((s) => s.id !== id));
+  const adicionar = () => { const t = novo.trim(); if (!t) return; salvar([...itens, { id: novoSubId(), titulo: t.slice(0, 200), feita: false }]); setNovo(""); };
+
+  return (
+    <div className="mt-1.5">
+      <button type="button" onClick={() => setAberto((v) => !v)} className="text-[10px] text-torg-gray hover:text-torg-blue inline-flex items-center gap-1">
+        <ListTodo size={11} /> {itens.length > 0 ? `Sub-tarefas ${feitas}/${itens.length}` : "Sub-tarefas"} <span>{aberto ? "▾" : "▸"}</span>
+      </button>
+      {itens.length > 0 && (
+        <div className="h-1 bg-gray-100 rounded-full overflow-hidden mt-1">
+          <div className="h-full bg-emerald-400 transition-all" style={{ width: `${(feitas / itens.length) * 100}%` }} />
+        </div>
+      )}
+      {aberto && (
+        <div className="mt-1.5 space-y-1">
+          {itens.map((s) => (
+            <div key={s.id} className="flex items-center gap-1.5 group">
+              <input type="checkbox" checked={s.feita} onChange={() => toggle(s.id)} disabled={salvando} className="accent-emerald-500 shrink-0" />
+              <span className={`text-[11px] flex-1 ${s.feita ? "line-through text-torg-gray" : "text-torg-dark"}`}>{s.titulo}</span>
+              <button onClick={() => remover(s.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 shrink-0" title="Remover"><X size={11} /></button>
+            </div>
+          ))}
+          <div className="flex items-center gap-1">
+            <input value={novo} onChange={(e) => setNovo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); adicionar(); } }} placeholder="+ sub-tarefa" className="flex-1 text-[11px] border border-gray-200 rounded px-1.5 py-0.5" />
+            <button onClick={adicionar} disabled={!novo.trim() || salvando} className="text-[10px] font-medium text-torg-blue hover:text-torg-dark disabled:opacity-40">add</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
