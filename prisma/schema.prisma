@@ -2990,6 +2990,26 @@ model CronogramaCobranca {
   @@index([token])
 }
 
+// Cobrança dos MARCOS de produção (aba Cobrança das Tarefas). Pode abranger
+// marcos de vários cronogramas de um mesmo setor. O setor responde por link
+// público: por marco, informa se FINALIZOU (data de conclusão + evidência) ou,
+// se não, a NOVA data prevista. É obrigatório responder cada marco.
+model CobrancaMarco {
+  id             String    @id @default(cuid())
+  token          String    @unique @default(cuid())
+  departamento   String
+  tarefaIds      String[] // CronogramaTarefa (marcos) cobrados
+  emailsEnviados String[]
+  respondido     Boolean   @default(false)
+  respostas      Json? // [{ tarefaId, status, novaData, dataConclusao, evidencia }]
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  respondidoEm   DateTime?
+  respondidoPor  String?
+
+  @@index([token])
+}
+
 model TarefaPlanejamento {
   id                String        @id @default(cuid())
   titulo            String

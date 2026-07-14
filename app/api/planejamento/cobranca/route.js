@@ -96,7 +96,7 @@ export async function POST(req) {
       cronograma: { ativo: true }, departamento, isSummary: false,
       dataInicioPrevista: { not: null }, dataFimPrevista: { not: null }, percentualRealizado: { lt: 100 },
     },
-    select: { nome: true, dataInicioPrevista: true, dataFimPrevista: true, cronograma: { select: { opNumero: true } } },
+    select: { id: true, nome: true, dataInicioPrevista: true, dataFimPrevista: true, cronograma: { select: { opNumero: true } } },
     orderBy: { dataFimPrevista: "asc" }, take: 500,
   });
   const marcos = marcosRaw.filter(ehMarco).filter((m) => classifica(m.dataFimPrevista, now) !== "FUTURO");
@@ -109,6 +109,13 @@ export async function POST(req) {
   });
   const emails = [...new Set(usuarios.map((u) => u.email).filter(Boolean))];
   if (!emails.length) return NextResponse.json({ error: "Ninguém cadastrado para receber neste setor." }, { status: 400 });
+
+  // Registro da cobrança (com token) pro setor responder por link público.
+  const cobranca = await prisma.cobrancaMarco.create({
+    data: { departamento, tarefaIds: marcos.map((m) => m.id), emailsEnviados: emails, createdById: user.id },
+  });
+  const base = (() => { try { return new URL(req.url).origin; } catch { return ""; } })();
+  const linkResposta = `${base}/cobranca-marcos/${cobranca.token}`;
 
   const linhas = marcos.map((m) => {
     const atras = classifica(m.dataFimPrevista, now) === "ATRASADO";
@@ -135,6 +142,10 @@ export async function POST(req) {
           </tr></thead>
           <tbody>${linhas}</tbody>
         </table>
+        <div style="margin-top:20px;text-align:center;">
+          <a href="${linkResposta}" style="background:#006EAB;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 26px;border-radius:8px;display:inline-block;">Responder a cobrança</a>
+          <p style="font-size:11px;color:#9aa5b1;margin:8px 0 0;">Para cada marco: se <b>finalizou</b>, informe a data e a evidência (o que aconteceu); se <b>não</b>, a nova data prevista. Sem login.</p>
+        </div>
         <p style="font-size:11px;color:#9aa5b1;margin:16px 0 0;">Enviado por ${escapeHtml(user.name || "Planejamento Torg")} pelo Portal Torg.</p>
       </div>
     </div>`;
