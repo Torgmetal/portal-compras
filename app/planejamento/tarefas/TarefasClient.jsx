@@ -607,15 +607,12 @@ function ModalAvisarCliente({ tarefa, onClose, onEnviado, onErro }) {
 
 // ─── Modal: enviar lembrete escolhendo destinatários (setor + cliente) ─────────
 function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
-  const [sugeridos, setSugeridos] = useState([]);
-  const [todos, setTodos] = useState([]);       // diretório completo da Torg
+  const [areas, setAreas] = useState([]);        // contatos fixos agrupados por área
   const [avulsos, setAvulsos] = useState([]);    // e-mails digitados à mão
   const [cliente, setCliente] = useState(null);  // contato do cliente já cadastrado
   const [loading, setLoading] = useState(true);
   const [sel, setSel] = useState([]);
   const [avulso, setAvulso] = useState("");
-  const [busca, setBusca] = useState("");
-  const [verTodos, setVerTodos] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [incluirCliente, setIncluirCliente] = useState(false);
   const [clienteEmail, setClienteEmail] = useState(tarefa.clienteEmail || "");
@@ -625,11 +622,12 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
     fetch(`/api/planejamento/tarefas/${tarefa.id}/lembrete`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        const sug = j?.sugeridos || [];
-        setSugeridos(sug);
-        setTodos(j?.todos || []);
+        const as = j?.areas || [];
+        setAreas(as);
         setCliente(j?.cliente || null);
-        setSel(sug.map((c) => c.email)); // sugeridos já marcados
+        // pré-marca os contatos da área do setor da tarefa
+        const pre = as.find((a) => a.area === j?.areaPreMarcada);
+        setSel(pre ? pre.contatos.map((c) => c.email) : []);
         setClienteEmail((prev) => prev || j?.cliente?.email || "");
       })
       .catch(() => {})
@@ -637,20 +635,14 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
   }, [tarefa.id]);
 
   const toggle = (email) => setSel((s) => (s.includes(email) ? s.filter((e) => e !== email) : [...s, email]));
+  const conhecido = (email) => areas.some((a) => a.contatos.some((c) => c.email === email)) || avulsos.some((a) => a.email === email);
   const addAvulso = () => {
     const e = avulso.trim().toLowerCase();
     if (!emailValido(e)) return;
     if (!sel.includes(e)) setSel((s) => [...s, e]);
-    if (!avulsos.some((a) => a.email === e) && !sugeridos.some((c) => c.email === e) && !todos.some((c) => c.email === e)) {
-      setAvulsos((a) => [...a, { nome: "", email: e }]);
-    }
+    if (!conhecido(e)) setAvulsos((a) => [...a, { nome: "", email: e }]);
     setAvulso("");
   };
-  const b = busca.trim().toLowerCase();
-  const todosFiltrados = b
-    ? todos.filter((c) => c.nome.toLowerCase().includes(b) || c.email.toLowerCase().includes(b) || (c.setor || "").toLowerCase().includes(b))
-    : todos;
-  const nSelTodos = todos.filter((c) => sel.includes(c.email)).length;
 
   async function enviar() {
     const emails = [...new Set(sel)];
@@ -689,25 +681,37 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-torg-dark mb-1.5">Quem recebe — {SETOR_LABEL[tarefa.setor] || tarefa.setor}</label>
+            <label className="block text-xs font-semibold text-torg-dark mb-1.5">Quem recebe <span className="text-torg-gray font-normal">— o setor da tarefa já vem marcado</span></label>
             {loading ? (
               <p className="text-[12px] text-torg-gray flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> carregando contatos…</p>
             ) : (
-              <div className="space-y-1">
-                {sugeridos.map((c) => (
-                  <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
-                    <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
-                    {c.nome ? `${c.nome} ` : ""}<span className="text-torg-gray">{c.email}</span>
-                    {c.origem === "matriz" && <span className="text-[9px] text-torg-gray/70">· matriz</span>}
-                  </label>
+              <div className="space-y-2.5">
+                {areas.map((a) => (
+                  <div key={a.area}>
+                    <p className="text-[10px] font-semibold text-torg-gray uppercase tracking-wide mb-1">{a.area}</p>
+                    <div className="space-y-1">
+                      {a.contatos.map((c) => (
+                        <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
+                          <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
+                          {c.nome} <span className="text-torg-gray">{c.email}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 ))}
-                {avulsos.map((c) => (
-                  <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
-                    <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
-                    <span className="text-torg-gray">{c.email}</span><span className="text-[9px] text-torg-gray/70">· avulso</span>
-                  </label>
-                ))}
-                {sugeridos.length === 0 && avulsos.length === 0 && <p className="text-[11px] text-amber-600">Ninguém sugerido para este setor — use a lista de toda a Torg abaixo ou adicione um e-mail.</p>}
+                {avulsos.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Avulsos</p>
+                    <div className="space-y-1">
+                      {avulsos.map((c) => (
+                        <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
+                          <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
+                          <span className="text-torg-gray">{c.email}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             <div className="flex items-center gap-2 mt-2">
@@ -715,34 +719,6 @@ function ModalLembrete({ tarefa, onClose, onEnviado, onErro }) {
               <button type="button" onClick={addAvulso} disabled={!avulso.includes("@")} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark disabled:opacity-40">adicionar</button>
             </div>
           </div>
-
-          {/* Diretório completo da Torg — escolher qualquer pessoa sem digitar */}
-          {todos.length > 0 && (
-            <div className="border border-gray-200 rounded-lg">
-              <button type="button" onClick={() => setVerTodos((v) => !v)} className="w-full flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-torg-dark hover:bg-gray-50 rounded-lg">
-                <span className="flex items-center gap-1.5"><User size={13} className="text-torg-blue" /> Todos da Torg <span className="text-torg-gray font-normal">({todos.length})</span></span>
-                <span className="flex items-center gap-2">
-                  {nSelTodos > 0 && <span className="text-[10px] text-torg-blue font-medium">{nSelTodos} selecionado{nSelTodos > 1 ? "s" : ""}</span>}
-                  <span className="text-torg-gray">{verTodos ? "▾" : "▸"}</span>
-                </span>
-              </button>
-              {verTodos && (
-                <div className="px-3 pb-2 border-t border-gray-100 pt-2">
-                  <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="buscar por nome, e-mail ou setor…" className="w-full text-[12px] border border-gray-300 rounded-lg px-2 py-1.5 mb-2" />
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {todosFiltrados.map((c) => (
-                      <label key={c.email} className="flex items-center gap-1.5 text-[12px] text-torg-dark cursor-pointer">
-                        <input type="checkbox" checked={sel.includes(c.email)} onChange={() => toggle(c.email)} className="accent-torg-blue" />
-                        {c.nome ? `${c.nome} ` : ""}<span className="text-torg-gray">{c.email}</span>
-                        {c.setor && <span className="text-[9px] text-torg-gray/70">· {SETOR_LABEL[c.setor] || c.setor}</span>}
-                      </label>
-                    ))}
-                    {todosFiltrados.length === 0 && <p className="text-[11px] text-torg-gray">Ninguém encontrado para “{busca}”.</p>}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           {(tarefa.doCliente || cliente) && (
             <div className="border border-orange-200 bg-orange-50/50 rounded-lg p-3">

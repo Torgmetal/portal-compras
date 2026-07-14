@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { criarCompromissosDaTarefa } from "@/lib/compromissos";
-import { getContatosSetor } from "@/lib/comunicacao-setor";
+import { CONTATOS_TAREFAS, SETOR_AREA_TAREFA } from "@/lib/contatos-tarefas";
 
 // Mapeamento setor da tarefa → modulo do sistema (para buscar usuarios)
 const SETOR_MODULO = {
@@ -37,8 +37,8 @@ const SETOR_LABEL = {
 
 const PRIORIDADE_LABEL = { ALTA: "🔴 Alta", MEDIA: "🟡 Média", BAIXA: "🟢 Baixa" };
 
-// GET — destinatários sugeridos p/ o modal: pessoas do setor (usuários com o
-// módulo) + contatos da matriz, deduplicados. Assim dá pra escolher os internos.
+// GET — destinatários do modal: lista fixa de contatos (definida pelo Vitor),
+// agrupada por área, + o contato do cliente já cadastrado. Só essas pessoas.
 export async function GET(req, { params }) {
   try {
     await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO"]);
@@ -56,37 +56,18 @@ export async function GET(req, { params }) {
   });
   if (!tarefa) return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 });
 
-  const modulo = SETOR_MODULO[tarefa.setor] || tarefa.setor;
-  const usuarios = await prisma.user.findMany({
-    where: { ativo: true, modulos: { some: { modulo } } },
-    select: { name: true, email: true },
-  });
-  const matriz = await getContatosSetor(tarefa.setor).catch(() => []);
-
-  // Sugeridos = pessoas do setor da tarefa + contatos da matriz (pré-marcados no modal)
-  const map = new Map();
-  for (const u of usuarios) if (u.email) map.set(u.email.toLowerCase(), { nome: u.name || "", email: u.email, origem: "setor" });
-  for (const c of matriz) if (c.email && !map.has(c.email.toLowerCase())) map.set(c.email.toLowerCase(), { nome: c.nome || "", email: c.email, origem: "matriz" });
-  const sugeridos = [...map.values()];
-  const sugeridosSet = new Set(sugeridos.map((s) => s.email.toLowerCase()));
-
-  // Diretório completo da Torg (todos os usuários ativos) — pra escolher qualquer
-  // pessoa sem precisar digitar. Exclui quem já está nos sugeridos.
-  const todosUsuarios = await prisma.user.findMany({
-    where: { ativo: true },
-    select: { name: true, email: true, setor: true },
-    orderBy: { name: "asc" },
-  });
-  const todos = todosUsuarios
-    .filter((u) => u.email && !sugeridosSet.has(u.email.toLowerCase()))
-    .map((u) => ({ nome: u.name || "", email: u.email, setor: u.setor || "" }));
-
   // Contato do cliente já cadastrado (na tarefa ou na OP) — pra incluir sem digitar.
   const clienteEmail = tarefa.clienteEmail || tarefa.op?.clienteEmail || "";
   const clienteNome = tarefa.clienteNome || tarefa.op?.clienteContato || tarefa.op?.cliente || "";
   const cliente = clienteEmail ? { nome: clienteNome, email: clienteEmail } : null;
 
-  return NextResponse.json({ setor: tarefa.setor, doCliente: tarefa.doCliente, sugeridos, todos, cliente });
+  return NextResponse.json({
+    setor: tarefa.setor,
+    doCliente: tarefa.doCliente,
+    areas: CONTATOS_TAREFAS,
+    areaPreMarcada: SETOR_AREA_TAREFA[tarefa.setor] || null,
+    cliente,
+  });
 }
 
 export async function POST(req, { params }) {
