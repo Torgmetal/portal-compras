@@ -124,7 +124,9 @@ export async function POST(req, { params }) {
       return {
         codigo: l.codigoOmieItem || null,
         descricao: l.rmItem.descricao,
-        unidade: l.rmItem.unidade || "KG",
+        // qtd vai em KG quando é cotado por peso (aço) → unidade TEM que ser KG,
+        // não a original da RM (barra/pç), senão o Omie fica com kg rotulado errado.
+        unidade: (Number(l.rmItem.peso) || 0) > 0 ? "KG" : (l.rmItem.unidade || "KG"),
         qtd: qtdKg,
         precoUnit: precoComIPI,
       };
