@@ -2,19 +2,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { getISOWeek } from "@/lib/semana-iso";
 import { z } from "zod";
 
 export const runtime = "nodejs";
-
-function getISOWeek(d) {
-  const date = new Date(d.getTime());
-  date.setHours(0, 0, 0, 0);
-  date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7));
-  const week1 = new Date(date.getFullYear(), 0, 4);
-  const semana = 1 + Math.round(((date - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
-  const ano = date.getFullYear();
-  return { semana, ano };
-}
 
 export async function GET() {
   try { await requireRole(["ADMIN", "PLANEJAMENTO"]); }
@@ -64,9 +55,8 @@ export async function POST(req) {
   const dataReuniao = body.dataReuniao ? new Date(body.dataReuniao + "T12:00:00Z") : new Date();
   const { semana, ano } = getISOWeek(dataReuniao);
 
-  // numero sequencial global
-  const ultima = await prisma.ataReuniao.findFirst({ orderBy: { numero: "desc" }, select: { numero: true } });
-  const numero = (ultima?.numero || 0) + 1;
+  // número da ata = número da semana ISO da reunião (ata semanal → ATA-029 = semana 29)
+  const numero = semana;
 
   const ata = await prisma.ataReuniao.create({
     data: {

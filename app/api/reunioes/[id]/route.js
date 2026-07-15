@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { getISOWeek } from "@/lib/semana-iso";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -48,6 +49,13 @@ export async function PATCH(req, { params }) {
   if (body.pauta !== undefined) data.pauta = body.pauta?.trim() || null;
   if (body.dataReuniao !== undefined) data.dataReuniao = body.dataReuniao ? new Date(body.dataReuniao + "T12:00:00Z") : null;
   if (body.envolvidos !== undefined) data.envolvidos = body.envolvidos;
+
+  // Enquanto RASCUNHO, o número/semana acompanham a data da reunião (ATA = semana ISO).
+  // Depois de enviada, a identidade fica travada (não renumera).
+  if (ata.status === "RASCUNHO" && body.dataReuniao) {
+    const { semana, ano } = getISOWeek(new Date(body.dataReuniao + "T12:00:00Z"));
+    data.semanaIso = semana; data.ano = ano; data.numero = semana;
+  }
 
   // Depois de enviada, alteração sobe a revisão (ISO) — exige motivo.
   if (ata.status !== "RASCUNHO" && Object.keys(data).length > 0) {
