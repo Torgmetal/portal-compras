@@ -9,6 +9,8 @@ const STATUS = { RASCUNHO: { l: "Rascunho", c: "bg-gray-100 text-gray-700" }, EN
 const numAta = (n) => `ATA-${String(n).padStart(3, "0")}`;
 const rev = (n) => `R${String(n).padStart(2, "0")}`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
+const opNum = (a) => { const n = parseInt(String(a?.op || "").replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : Infinity; };
+const ordenarPorOp = (list) => (list || []).slice().sort((a, b) => opNum(a) - opNum(b)); // ordem numérica de OP; sem OP por último
 
 export default function ReunioesClient() {
   const router = useRouter();
@@ -102,7 +104,7 @@ function ModalNovaAta({ onClose, onCriada }) {
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao organizar");
       const novas = (j.atividades || []).map((a) => ({ op: a.op || "", descricao: a.descricao || "", setor: a.setor || "", responsavel: a.responsavel || "", prazo: a.prazo || "" }));
       if (!novas.length) { setErroIA("A IA não encontrou atividades no rascunho."); return; }
-      setAtividades((prev) => [...prev.filter((a) => a.descricao.trim()), ...novas]);
+      setAtividades((prev) => ordenarPorOp([...prev.filter((a) => a.descricao.trim()), ...novas]));
       setRascunho("");
     } catch (e) { setErroIA(e.message); } finally { setOrganizando(false); }
   }
@@ -111,7 +113,8 @@ function ModalNovaAta({ onClose, onCriada }) {
     setErro("");
     if (!titulo.trim()) return setErro("Informe o título da ata.");
     const envs = envolvidos.filter((e) => e.nome.trim() && e.email.trim());
-    const atvs = atividades.filter((a) => a.descricao.trim());
+    const atvs = ordenarPorOp(atividades.filter((a) => a.descricao.trim()));
+    if (atvs.length) setAtividades(atvs);
     if (!envs.length) return setErro("Adicione ao menos um envolvido (nome + e-mail).");
     setSalvando(true);
     try {

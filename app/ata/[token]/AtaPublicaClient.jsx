@@ -5,6 +5,8 @@ const SETOR_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS:
 const sl = (s) => SETOR_LABEL[s] || s || "—";
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+const opNum = (a) => { const n = parseInt(String(a?.op || "").replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : Infinity; };
+const ordenarPorOp = (list) => (list || []).slice().sort((a, b) => opNum(a) - opNum(b));
 
 const C = { blue: "#006EAB", dark: "#002945", gray: "#576D7E", bg: "#f1f5f9", line: "#e5e7eb", green: "#059669", amber: "#d97706" };
 
@@ -95,7 +97,7 @@ export default function AtaPublicaClient({ token }) {
 
   // Confirmado: ata completa
   const envolvidos = Array.isArray(ata.envolvidos) ? ata.envolvidos : [];
-  const atividades = Array.isArray(ata.atividades) ? ata.atividades : [];
+  const atividades = ordenarPorOp(Array.isArray(ata.atividades) ? ata.atividades : []);
   const minhas = atividades.filter((a) => a.podeResponder);
 
   return (

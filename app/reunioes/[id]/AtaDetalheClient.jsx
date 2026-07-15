@@ -13,10 +13,12 @@ const rev = (n) => `R${String(n).padStart(2, "0")}`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+const opNum = (a) => { const n = parseInt(String(a?.op || "").replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : Infinity; };
+const ordenarPorOp = (list) => (list || []).slice().sort((a, b) => opNum(a) - opNum(b)); // ordem numérica de OP; sem OP por último (estável dentro da mesma OP)
 function agrupaPorOp(atvs) {
   const map = new Map();
-  for (const a of atvs || []) { const k = a.op || ""; if (!map.has(k)) map.set(k, []); map.get(k).push(a); }
-  return [...map.entries()].sort((x, y) => (x[0] || "~").localeCompare(y[0] || "~", "pt", { numeric: true }));
+  for (const a of ordenarPorOp(atvs)) { const k = a.op || ""; if (!map.has(k)) map.set(k, []); map.get(k).push(a); }
+  return [...map.entries()]; // já em ordem numérica de OP
 }
 
 export default function AtaDetalheClient({ id }) {
@@ -222,7 +224,7 @@ function RascunhoEditor({ ata, onSaved }) {
   const [dataReuniao, setDataReuniao] = useState(dISO(ata.dataReuniao));
   const [pauta, setPauta] = useState(ata.pauta || "");
   const [envolvidos, setEnvolvidos] = useState(Array.isArray(ata.envolvidos) && ata.envolvidos.length ? ata.envolvidos : [{ nome: "", email: "", setor: "" }]);
-  const [atividades, setAtividades] = useState((ata.atividades || []).length ? ata.atividades.map((a) => ({ op: a.op || "", descricao: a.descricao, setor: a.setor || "", responsavel: a.responsavel || "", prazo: dISO(a.prazo) })) : [{ op: "", descricao: "", setor: "", responsavel: "", prazo: "" }]);
+  const [atividades, setAtividades] = useState((ata.atividades || []).length ? ordenarPorOp(ata.atividades.map((a) => ({ op: a.op || "", descricao: a.descricao, setor: a.setor || "", responsavel: a.responsavel || "", prazo: dISO(a.prazo) }))) : [{ op: "", descricao: "", setor: "", responsavel: "", prazo: "" }]);
   const [rascunho, setRascunho] = useState("");
   const [organizando, setOrganizando] = useState(false);
   const [erroIA, setErroIA] = useState("");
@@ -242,7 +244,7 @@ function RascunhoEditor({ ata, onSaved }) {
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao organizar");
       const novas = (j.atividades || []).map((a) => ({ op: a.op || "", descricao: a.descricao || "", setor: a.setor || "", responsavel: a.responsavel || "", prazo: a.prazo || "" }));
       if (!novas.length) { setErroIA("A IA não encontrou atividades no rascunho."); return; }
-      setAtividades((prev) => [...prev.filter((a) => a.descricao.trim()), ...novas]);
+      setAtividades((prev) => ordenarPorOp([...prev.filter((a) => a.descricao.trim()), ...novas]));
       setRascunho("");
     } catch (e) { setErroIA(e.message); } finally { setOrganizando(false); }
   }
@@ -251,7 +253,8 @@ function RascunhoEditor({ ata, onSaved }) {
     setErro(""); setOk(false);
     if (!titulo.trim()) return setErro("Informe o título.");
     const envs = envolvidos.filter((e) => e.nome.trim() && e.email.trim());
-    const atvs = atividades.filter((a) => a.descricao.trim());
+    const atvs = ordenarPorOp(atividades.filter((a) => a.descricao.trim()));
+    if (atvs.length) setAtividades(atvs);
     if (!envs.length) return setErro("Adicione ao menos um envolvido.");
     setSalvando(true);
     try {
