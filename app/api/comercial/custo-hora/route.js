@@ -3,11 +3,25 @@
 //   PUT → salva. Só ADMIN/COMERCIAL.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, requireUser } from "@/lib/session";
+import { temAcessoDiretoria } from "@/lib/diretoria";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 const ID = "default";
+
+// Custo-hora "mora" na Diretoria, mas o Comercial (detalhe do serviço) ainda LÊ
+// os valores pra montar a proposta. Libera ADMIN/COMERCIAL OU quem tem acesso à
+// Diretoria (allowlist própria).
+async function gateCustoHora() {
+  try { return await requireRole(["ADMIN", "COMERCIAL"]); }
+  catch (e) {
+    if (e.message === "Unauthorized") throw e;
+    const user = await requireUser();
+    if (await temAcessoDiretoria(user.email)) return user;
+    throw e;
+  }
+}
 
 const DEFAULT_SETORES = [
   { id: "corte", nome: "Corte e furação", salarios: 0, headcount: 0, horasMes: 0, cifDireto: 0 },
@@ -17,7 +31,7 @@ const DEFAULT_SETORES = [
 ];
 
 export async function GET() {
-  try { await requireRole(["ADMIN", "COMERCIAL"]); }
+  try { await gateCustoHora(); }
   catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   let cfg = await prisma.configCustoHora.findUnique({ where: { id: ID } });
@@ -60,7 +74,7 @@ const schema = z.object({
 
 export async function PUT(req) {
   let user;
-  try { user = await requireRole(["ADMIN", "COMERCIAL"]); }
+  try { user = await gateCustoHora(); }
   catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   let body;

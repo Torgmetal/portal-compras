@@ -1,9 +1,6 @@
-import { requireRole } from "@/lib/session";
-import CustoHoraClient from "./CustoHoraClient";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function CustoHoraPage() {
-  await requireRole(["ADMIN", "COMERCIAL"]);
-  return <CustoHoraClient />;
+// Custo-hora foi movido para o Portal da Diretoria (faz mais sentido lá).
+export default function CustoHoraPage() {
+  redirect("/diretoria");
 }

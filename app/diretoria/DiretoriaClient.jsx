@@ -7,6 +7,7 @@ import {
   AlertTriangle, Flame, Search, ArrowDownRight, ArrowUpRight,
   CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download, Target,
 } from "lucide-react";
+import CustoHoraClient from "@/components/CustoHoraClient";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
 const fmtDataHora = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
@@ -22,6 +23,7 @@ const ABAS_BASE = [
   { id: "conferencia", label: "Conferência" },
   { id: "cortar", label: "Onde cortar" },
   { id: "previsao", label: "Previsão de faturamento" },
+  { id: "custo-hora", label: "Custo-hora" },
 ];
 const ABAS_FIN = ["resumo", "cortar"]; // dependem do fetch /financeiro
 
@@ -195,6 +197,8 @@ export default function DiretoriaClient({ isDono, userNome }) {
 
         {/* ════════ PREVISÃO DE FATURAMENTO ════════ */}
         {aba === "previsao" && <PrevisaoFaturamento />}
+
+        {aba === "custo-hora" && <CustoHoraClient />}
 
         {/* ════════ ACESSO ════════ */}
         {aba === "acesso" && isDono && (

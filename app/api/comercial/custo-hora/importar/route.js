@@ -2,14 +2,26 @@
 // Agrega a aba "Custo Efetivo" por setor e devolve os setores (CET real + horas
 // efetivas + headcount) p/ a tela do custo-hora. Não salva — o RH revisa antes.
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/session";
+import { requireRole, requireUser } from "@/lib/session";
+import { temAcessoDiretoria } from "@/lib/diretoria";
 import { parseCetAuditoria } from "@/lib/cet-auditoria";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
+// Libera ADMIN/COMERCIAL ou quem tem acesso à Diretoria (custo-hora mora lá).
+async function gateCustoHora() {
+  try { return await requireRole(["ADMIN", "COMERCIAL"]); }
+  catch (e) {
+    if (e.message === "Unauthorized") throw e;
+    const user = await requireUser();
+    if (await temAcessoDiretoria(user.email)) return user;
+    throw e;
+  }
+}
+
 export async function POST(req) {
-  try { await requireRole(["ADMIN", "COMERCIAL"]); }
+  try { await gateCustoHora(); }
   catch (e) { return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   let form;
