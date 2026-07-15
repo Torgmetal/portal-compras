@@ -3014,6 +3014,67 @@ model CobrancaMarco {
   @@index([token])
 }
 
+// Ata de reunião semanal (módulo Reuniões). Sequencial + revisão ISO. As
+// atividades são atribuídas a setores, que confirmam recebimento por link e
+// preenchem informação + evidência.
+model AtaReuniao {
+  id          String            @id @default(cuid())
+  numero      Int // sequencial (ATA-001)
+  semanaIso   Int
+  ano         Int
+  titulo      String
+  dataReuniao DateTime?
+  status      String            @default("RASCUNHO") // RASCUNHO | ENVIADA | CONCLUIDA
+  revisao     Int               @default(0) // R00, R01…
+  pauta       String?
+  envolvidos  Json              @default("[]") // [{ nome, email, setor }]
+  revisoes    Json              @default("[]") // [{ n, motivo, em, por }]
+  createdById String?
+  enviadaEm   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  atividades  AtaAtividade[]
+  confirmacoes AtaConfirmacao[]
+
+  @@index([ano, semanaIso])
+  @@index([status])
+}
+
+model AtaAtividade {
+  id            String     @id @default(cuid())
+  ataId         String
+  descricao     String
+  setor         String // setor responsável
+  responsavel   String?
+  prazo         DateTime?
+  status        String     @default("PENDENTE") // PENDENTE | RESPONDIDO
+  resposta      String? // informação preenchida pelo setor
+  evidencia     String? // evidência (texto)
+  respondidoPor String?
+  respondidoEm  DateTime?
+  ordem         Int        @default(0)
+  createdAt     DateTime   @default(now())
+  ata           AtaReuniao @relation(fields: [ataId], references: [id], onDelete: Cascade)
+
+  @@index([ataId])
+}
+
+// Um por envolvido — link público (token) pra confirmar recebimento e ver/preencher a ata.
+model AtaConfirmacao {
+  id           String     @id @default(cuid())
+  ataId        String
+  nome         String
+  email        String
+  setor        String?
+  token        String     @unique
+  confirmadoEm DateTime?
+  createdAt    DateTime   @default(now())
+  ata          AtaReuniao @relation(fields: [ataId], references: [id], onDelete: Cascade)
+
+  @@index([ataId])
+  @@index([token])
+}
+
 model TarefaPlanejamento {
   id                String        @id @default(cuid())
   titulo            String

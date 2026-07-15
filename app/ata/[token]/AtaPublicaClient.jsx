@@ -1,0 +1,187 @@
+"use client";
+import { useState, useEffect, useCallback } from "react";
+
+const SETOR_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS: "Compras", PRODUCAO: "Produção", PCP: "PCP", PLANEJAMENTO: "Planejamento", EXPEDICAO: "Expedição", QUALIDADE: "Qualidade", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro", RH: "RH", DIRETORIA: "Diretoria" };
+const sl = (s) => SETOR_LABEL[s] || s || "—";
+const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
+const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+
+const C = { blue: "#006EAB", dark: "#002945", gray: "#576D7E", bg: "#f1f5f9", line: "#e5e7eb", green: "#059669", amber: "#d97706" };
+
+export default function AtaPublicaClient({ token }) {
+  const [dados, setDados] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [confirmando, setConfirmando] = useState(false);
+  const [nome, setNome] = useState("");
+  const [resp, setResp] = useState({}); // { [atvId]: { resposta, evidencia } }
+  const [enviandoId, setEnviandoId] = useState("");
+  const [msgId, setMsgId] = useState("");
+
+  const carregar = useCallback(() => {
+    fetch(`/api/ata/${token}`).then((r) => r.json()).then((j) => {
+      if (j.success) setDados(j); else setErro(j.error || "Link inválido.");
+    }).catch(() => setErro("Não foi possível carregar.")).finally(() => setLoading(false));
+  }, [token]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const setR = (id, patch) => setResp((r) => ({ ...r, [id]: { ...(r[id] || {}), ...patch } }));
+
+  async function confirmar() {
+    setConfirmando(true); setErro("");
+    try {
+      const r = await fetch(`/api/ata/${token}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "confirmar" }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao confirmar.");
+      setLoading(true); carregar();
+    } catch (e) { setErro(e.message); } finally { setConfirmando(false); }
+  }
+
+  async function responder(atv) {
+    const a = resp[atv.id] || {};
+    if (!(a.resposta || "").trim() && !(a.evidencia || "").trim()) { setMsgId(atv.id + ":erro"); return; }
+    setEnviandoId(atv.id);
+    try {
+      const r = await fetch(`/api/ata/${token}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "responder", atividadeId: atv.id, resposta: a.resposta || "", evidencia: a.evidencia || "", respondidoPor: nome || "" }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao enviar.");
+      carregar();
+    } catch (e) { alert(e.message); } finally { setEnviandoId(""); }
+  }
+
+  const Wrap = ({ children }) => (
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", justifyContent: "center", padding: "24px 12px", fontFamily: "Arial, sans-serif" }}>
+      <div style={{ width: "100%", maxWidth: 640 }}>{children}</div>
+    </div>
+  );
+  const card = { background: "#fff", borderRadius: 12, padding: 24, marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,.06)" };
+  const inp = { width: "100%", boxSizing: "border-box", padding: "8px 10px", fontSize: 14, border: "1px solid #cbd5e1", borderRadius: 8 };
+
+  if (loading) return <Wrap><p style={{ textAlign: "center", color: C.gray, marginTop: 60 }}>carregando…</p></Wrap>;
+  if (erro && !dados) return <Wrap><div style={{ ...card, textAlign: "center", color: "#b91c1c", marginTop: 40 }}>{erro}</div></Wrap>;
+
+  const { ata, confirmacao } = dados;
+  const confirmado = !!confirmacao.confirmadoEm;
+
+  const Header = (
+    <div style={{ background: C.blue, color: "#fff", borderRadius: 12, padding: "20px 24px", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+        <span style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 16, letterSpacing: .5 }}>{ata.codigo}</span>
+        <span style={{ fontSize: 12, opacity: .9 }}>Semana ISO {ata.semanaIso}/{ata.ano}</span>
+      </div>
+      <h1 style={{ margin: "8px 0 4px", fontSize: 20 }}>{ata.titulo}</h1>
+      <p style={{ margin: 0, fontSize: 13, opacity: .9 }}>Torg Metal · Reunião em {fmt(ata.dataReuniao)}</p>
+    </div>
+  );
+
+  // Gate: ainda não confirmou o recebimento
+  if (!confirmado) return (
+    <Wrap>
+      {Header}
+      <div style={{ ...card, textAlign: "center" }}>
+        <p style={{ fontSize: 40, margin: "4px 0 8px" }}>📋</p>
+        <h2 style={{ margin: "0 0 8px", fontSize: 18, color: C.dark }}>Confirme o recebimento</h2>
+        <p style={{ fontSize: 14, color: C.gray, lineHeight: 1.5, margin: "0 auto 20px", maxWidth: 440 }}>
+          {confirmacao.nome ? <>Olá, <b>{confirmacao.nome}</b>. </> : null}
+          Você está entre os envolvidos nesta ata de reunião{confirmacao.setor ? <> pelo setor <b>{sl(confirmacao.setor)}</b></> : null}. Ao confirmar, você terá acesso ao conteúdo completo e poderá preencher as atividades do seu setor com as informações e evidências.
+        </p>
+        {erro && <p style={{ color: "#b91c1c", fontSize: 13 }}>{erro}</p>}
+        <button onClick={confirmar} disabled={confirmando} style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, padding: "12px 28px", cursor: "pointer", opacity: confirmando ? .6 : 1 }}>
+          {confirmando ? "confirmando…" : "Confirmar recebimento e abrir a ata"}
+        </button>
+      </div>
+    </Wrap>
+  );
+
+  // Confirmado: ata completa
+  const envolvidos = Array.isArray(ata.envolvidos) ? ata.envolvidos : [];
+  const atividades = Array.isArray(ata.atividades) ? ata.atividades : [];
+  const minhas = atividades.filter((a) => a.podeResponder);
+
+  return (
+    <Wrap>
+      {Header}
+      <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#065f46", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>
+        ✅ Recebimento confirmado em {fmtDT(confirmacao.confirmadoEm)}.
+      </div>
+
+      {ata.pauta && (
+        <div style={card}>
+          <h3 style={{ margin: "0 0 8px", fontSize: 14, color: C.dark }}>Pauta</h3>
+          <p style={{ margin: 0, fontSize: 14, color: C.dark, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{ata.pauta}</p>
+        </div>
+      )}
+
+      <div style={card}>
+        <h3 style={{ margin: "0 0 10px", fontSize: 14, color: C.dark }}>Envolvidos ({envolvidos.length})</h3>
+        {envolvidos.map((e, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, padding: "6px 0", borderBottom: i < envolvidos.length - 1 ? `1px solid ${C.line}` : "none" }}>
+            <span style={{ fontWeight: 600, color: C.dark, minWidth: 150 }}>{e.nome || "—"}</span>
+            <span style={{ color: C.gray, flex: 1 }}>{e.email}</span>
+            <span style={{ fontSize: 11, background: "#f1f5f9", color: C.gray, padding: "2px 8px", borderRadius: 6 }}>{sl(e.setor)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Minhas atividades (preencher) */}
+      {minhas.length > 0 && (
+        <div style={card}>
+          <h3 style={{ margin: "0 0 4px", fontSize: 14, color: C.dark }}>Atividades do seu setor ({sl(confirmacao.setor)})</h3>
+          <p style={{ margin: "0 0 12px", fontSize: 12, color: C.gray }}>Preencha a informação e a evidência de cada atividade atribuída ao seu setor.</p>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, color: C.dark, fontWeight: 600, display: "block", marginBottom: 4 }}>Seu nome</label>
+            <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Quem está respondendo" style={{ ...inp, maxWidth: 280 }} />
+          </div>
+          {minhas.map((a) => {
+            const done = a.status === "RESPONDIDO";
+            const cur = resp[a.id] || {};
+            return (
+              <div key={a.id} style={{ border: `1px solid ${done ? "#a7f3d0" : C.line}`, background: done ? "#f0fdf4" : "#fafafa", borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                  <p style={{ margin: 0, fontSize: 14, color: C.dark, fontWeight: 600 }}>{a.descricao}</p>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: done ? "#d1fae5" : "#fef3c7", color: done ? "#065f46" : "#92400e" }}>{done ? "Respondido" : "Pendente"}</span>
+                </div>
+                {a.prazo && <p style={{ margin: "4px 0 0", fontSize: 11, color: C.gray }}>Prazo: {fmt(a.prazo)}</p>}
+                {done ? (
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #d1fae5", fontSize: 13 }}>
+                    {a.resposta && <p style={{ margin: "0 0 4px", color: C.dark, whiteSpace: "pre-wrap" }}>{a.resposta}</p>}
+                    {a.evidencia && <p style={{ margin: 0, color: C.gray, wordBreak: "break-all" }}>📎 {a.evidencia}</p>}
+                    <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9ca3af" }}>{a.respondidoPor || "—"} · {fmtDT(a.respondidoEm)}</p>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 10 }}>
+                    <textarea value={cur.resposta || ""} onChange={(e) => setR(a.id, { resposta: e.target.value })} rows={2} placeholder="Informação / status da atividade" style={{ ...inp, marginBottom: 8, resize: "vertical" }} />
+                    <input value={cur.evidencia || ""} onChange={(e) => setR(a.id, { evidencia: e.target.value })} placeholder="Evidência (link do arquivo, nº do documento, observação…)" style={{ ...inp, marginBottom: 8 }} />
+                    {msgId === a.id + ":erro" && <p style={{ color: "#b91c1c", fontSize: 12, margin: "0 0 6px" }}>Preencha a informação e/ou a evidência.</p>}
+                    <button onClick={() => responder(a)} disabled={enviandoId === a.id} style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, padding: "8px 18px", cursor: "pointer", opacity: enviandoId === a.id ? .6 : 1 }}>{enviandoId === a.id ? "enviando…" : "Enviar resposta"}</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Todas as atividades (visão geral) */}
+      <div style={card}>
+        <h3 style={{ margin: "0 0 10px", fontSize: 14, color: C.dark }}>Todas as atividades ({atividades.length})</h3>
+        {atividades.map((a) => {
+          const done = a.status === "RESPONDIDO";
+          return (
+            <div key={a.id} style={{ padding: "8px 0", borderBottom: `1px solid ${C.line}`, fontSize: 13 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                <span style={{ color: C.dark }}>{a.descricao}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: done ? "#d1fae5" : "#fef3c7", color: done ? "#065f46" : "#92400e" }}>{done ? "OK" : "Pendente"}</span>
+              </div>
+              <p style={{ margin: "3px 0 0", fontSize: 11, color: C.gray }}>{sl(a.setor)}{a.responsavel ? ` · ${a.responsavel}` : ""}{a.prazo ? ` · prazo ${fmt(a.prazo)}` : ""}</p>
+              {done && a.resposta && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.dark, whiteSpace: "pre-wrap" }}>{a.resposta}</p>}
+              {done && a.evidencia && <p style={{ margin: "2px 0 0", fontSize: 12, color: C.gray, wordBreak: "break-all" }}>📎 {a.evidencia}</p>}
+            </div>
+          );
+        })}
+      </div>
+
+      <p style={{ textAlign: "center", fontSize: 11, color: "#9ca3af", margin: "6px 0 24px" }}>Ata {ata.codigo} · Torg Metal · documento controlado (ISO)</p>
+    </Wrap>
+  );
+}

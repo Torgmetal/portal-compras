@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Lock,
   FileBarChart2,
+  NotebookPen,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -130,6 +131,14 @@ const MODULOS = [
     icon: Cog,
     cor: "bg-emerald-100 text-emerald-700",
     modulos: ["PCP", "PLANEJAMENTO", "PRODUCAO"],
+  },
+  {
+    href: "/reunioes",
+    label: "Reuniões",
+    desc: "Atas de reunião semanal (ISO)",
+    icon: NotebookPen,
+    cor: "bg-torg-blue-50 text-torg-blue",
+    modulos: ["PLANEJAMENTO"],
   },
   {
     href: "/diretoria",
