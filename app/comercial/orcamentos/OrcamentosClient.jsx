@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
+import OrcamentosTabs from "@/components/OrcamentosTabs";
 
 // ─── CONSTANTES ─────────────────────────────────────────────────
 
@@ -278,14 +279,15 @@ export default function OrcamentosClient() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <OrcamentosTabs />
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">
-            Central de Orçamentos
+            Propostas
           </h2>
           <p className="text-sm text-torg-gray mt-1">
-            Propostas comerciais — do orçamento ao fechamento.
+            Todas as propostas comerciais — do orçamento ao fechamento.
           </p>
         </div>
         <button

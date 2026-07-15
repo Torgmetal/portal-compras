@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { FolderKanban, Inbox, FileSpreadsheet, GitBranchPlus, ChevronDown, BarChart3, FilePlus2, CalendarClock, Presentation, Wrench, Calculator } from "lucide-react";
+import { FolderKanban, Inbox, FileSpreadsheet, GitBranchPlus, ChevronDown, BarChart3, FilePlus2, CalendarClock, Presentation, Wrench, Calculator, Building2 } from "lucide-react";
 import { useState } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -14,10 +14,11 @@ const menu = [
     label: "Central de Orçamentos",
     icon: FileSpreadsheet,
     sub: [
-      { href: "/comercial/orcamentos/servicos", label: "Orçamento de Serviço", icon: Wrench },
+      { href: "/comercial/orcamentos", label: "Propostas", icon: FileSpreadsheet },
+      { href: "/comercial/orcamentos/propostas", label: "Propostas Estruturas", icon: Building2 },
+      { href: "/comercial/orcamentos/servicos", label: "Propostas Serviço", icon: Wrench },
       { href: "/comercial/orcamentos/custo-hora", label: "Custo-hora (setores)", icon: Calculator },
       { href: "/comercial/orcamentos/acompanhamento", label: "Acompanhamento", icon: CalendarClock },
-      { href: "/comercial/orcamentos/propostas", label: "Propostas", icon: FilePlus2 },
       { href: "/comercial/orcamentos/pipeline", label: "Pipeline", icon: GitBranchPlus },
       { href: "/comercial/orcamentos/kpis", label: "Indicadores", icon: BarChart3 },
     ],

@@ -5,6 +5,7 @@ import {
   FilePlus2, Search, AlertCircle, Loader2, ChevronRight, Plus,
   FolderOpen, X, Link2,
 } from "lucide-react";
+import OrcamentosTabs from "@/components/OrcamentosTabs";
 
 const STATUS_LABELS = {
   RASCUNHO: { label: "Rascunho", cor: "bg-gray-100 text-gray-700" },
@@ -211,11 +212,12 @@ export default function PropostasClient() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <OrcamentosTabs />
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Propostas (EPC)</h2>
-          <p className="text-sm text-torg-gray mt-1">Estudos de precificação comercial</p>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Propostas Estruturas</h2>
+          <p className="text-sm text-torg-gray mt-1">Propostas com escopo de estrutura metálica (EPC) — numeração automática</p>
         </div>
         <button
           onClick={() => setShowModal(true)}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Wrench, Plus, Loader2, AlertCircle, RefreshCw, X, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
+import OrcamentosTabs from "@/components/OrcamentosTabs";
 
 const fmt = (d) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const ST = { RASCUNHO: "bg-amber-100 text-amber-700", ENVIADO: "bg-blue-100 text-blue-700", FECHADO: "bg-green-100 text-green-700", PERDIDO: "bg-red-100 text-red-700" };
@@ -67,15 +68,16 @@ export default function ServicosClient() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      <OrcamentosTabs />
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2">
-            <Wrench className="text-torg-blue" /> Orçamento de Serviço
+            <Wrench className="text-torg-blue" /> Propostas Serviço
           </h2>
-          <p className="text-sm text-torg-gray mt-1">Corte e furação de vigas, jateamento, pintura e solda.</p>
+          <p className="text-sm text-torg-gray mt-1">Corte e furação de vigas, jateamento, pintura e solda — numeração automática.</p>
         </div>
         <button onClick={abrirNovo} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2">
-          <Plus size={18} /> Novo orçamento de serviço
+          <Plus size={18} /> Nova proposta de serviço
         </button>
       </div>
 
