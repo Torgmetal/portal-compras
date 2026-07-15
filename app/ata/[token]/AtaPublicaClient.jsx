@@ -7,6 +7,11 @@ const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 const opNum = (a) => { const n = parseInt(String(a?.op || "").replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : Infinity; };
 const ordenarPorOp = (list) => (list || []).slice().sort((a, b) => opNum(a) - opNum(b));
+function agrupaPorOp(atvs) {
+  const map = new Map();
+  for (const a of ordenarPorOp(atvs)) { const k = a.op || ""; if (!map.has(k)) map.set(k, []); map.get(k).push(a); }
+  return [...map.entries()];
+}
 
 const C = { blue: "#006EAB", dark: "#002945", gray: "#576D7E", bg: "#f1f5f9", line: "#e5e7eb", green: "#059669", amber: "#d97706" };
 
@@ -164,20 +169,33 @@ export default function AtaPublicaClient({ token }) {
         </div>
       )}
 
-      {/* Todas as atividades (visão geral) */}
+      {/* Todas as atividades — por OP */}
       <div style={card}>
-        <h3 style={{ margin: "0 0 10px", fontSize: 14, color: C.dark }}>Todas as atividades ({atividades.length})</h3>
-        {atividades.map((a) => {
-          const done = a.status === "RESPONDIDO";
+        <h3 style={{ margin: "0 0 14px", fontSize: 15, color: C.dark }}>Atividades por OP</h3>
+        {agrupaPorOp(atividades).map(([op, itens]) => {
+          const nOk = itens.filter((x) => x.status === "RESPONDIDO").length;
           return (
-            <div key={a.id} style={{ padding: "8px 0", borderBottom: `1px solid ${C.line}`, fontSize: 13 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
-                <span style={{ color: C.dark }}>{a.descricao}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: done ? "#d1fae5" : "#fef3c7", color: done ? "#065f46" : "#92400e" }}>{done ? "OK" : "Pendente"}</span>
+            <div key={op || "_"} style={{ border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#eff6ff", borderBottom: "1px solid #dbeafe" }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.dark }}>{op ? `OP ${op}` : "Sem OP"}</span>
+                <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, background: nOk === itens.length ? "#d1fae5" : "#fef3c7", color: nOk === itens.length ? "#065f46" : "#92400e" }}>{nOk}/{itens.length} ok</span>
               </div>
-              <p style={{ margin: "3px 0 0", fontSize: 11, color: C.gray }}>{[a.op ? `OP ${a.op}` : null, a.setor ? sl(a.setor) : "sem setor", a.responsavel || null, a.prazo ? `prazo ${fmt(a.prazo)}` : null].filter(Boolean).join(" · ")}</p>
-              {done && a.resposta && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.dark, whiteSpace: "pre-wrap" }}>{a.resposta}</p>}
-              {done && a.evidencia && <p style={{ margin: "2px 0 0", fontSize: 12, color: C.gray, wordBreak: "break-all" }}>📎 {a.evidencia}</p>}
+              <div style={{ padding: "4px 14px" }}>
+                {itens.map((a, idx) => {
+                  const done = a.status === "RESPONDIDO";
+                  return (
+                    <div key={a.id} style={{ padding: "11px 0", borderBottom: idx < itens.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                        <span style={{ fontSize: 14, color: C.dark, fontWeight: 500, lineHeight: 1.4 }}>{a.descricao}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: done ? "#d1fae5" : "#fef3c7", color: done ? "#065f46" : "#92400e" }}>{done ? "OK" : "Pendente"}</span>
+                      </div>
+                      <p style={{ margin: "5px 0 0", fontSize: 11, color: C.gray }}>{[a.setor ? sl(a.setor) : "sem setor", a.responsavel || null, a.prazo ? `prazo ${fmt(a.prazo)}` : null].filter(Boolean).join(" · ")}</p>
+                      {done && a.resposta && <p style={{ margin: "6px 0 0", fontSize: 13, color: C.dark, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{a.resposta}</p>}
+                      {done && a.evidencia && <p style={{ margin: "3px 0 0", fontSize: 12, color: C.gray, wordBreak: "break-all" }}>📎 {a.evidencia}</p>}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
