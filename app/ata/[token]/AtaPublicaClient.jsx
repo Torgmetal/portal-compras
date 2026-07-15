@@ -141,7 +141,7 @@ export default function AtaPublicaClient({ token }) {
                   <p style={{ margin: 0, fontSize: 14, color: C.dark, fontWeight: 600 }}>{a.descricao}</p>
                   <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: done ? "#d1fae5" : "#fef3c7", color: done ? "#065f46" : "#92400e" }}>{done ? "Respondido" : "Pendente"}</span>
                 </div>
-                {a.prazo && <p style={{ margin: "4px 0 0", fontSize: 11, color: C.gray }}>Prazo: {fmt(a.prazo)}</p>}
+                {(a.op || a.prazo) && <p style={{ margin: "4px 0 0", fontSize: 11, color: C.gray }}>{[a.op ? `OP ${a.op}` : null, a.prazo ? `Prazo: ${fmt(a.prazo)}` : null].filter(Boolean).join(" · ")}</p>}
                 {done ? (
                   <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #d1fae5", fontSize: 13 }}>
                     {a.resposta && <p style={{ margin: "0 0 4px", color: C.dark, whiteSpace: "pre-wrap" }}>{a.resposta}</p>}
@@ -173,7 +173,7 @@ export default function AtaPublicaClient({ token }) {
                 <span style={{ color: C.dark }}>{a.descricao}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: done ? "#d1fae5" : "#fef3c7", color: done ? "#065f46" : "#92400e" }}>{done ? "OK" : "Pendente"}</span>
               </div>
-              <p style={{ margin: "3px 0 0", fontSize: 11, color: C.gray }}>{sl(a.setor)}{a.responsavel ? ` · ${a.responsavel}` : ""}{a.prazo ? ` · prazo ${fmt(a.prazo)}` : ""}</p>
+              <p style={{ margin: "3px 0 0", fontSize: 11, color: C.gray }}>{[a.op ? `OP ${a.op}` : null, a.setor ? sl(a.setor) : "sem setor", a.responsavel || null, a.prazo ? `prazo ${fmt(a.prazo)}` : null].filter(Boolean).join(" · ")}</p>
               {done && a.resposta && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.dark, whiteSpace: "pre-wrap" }}>{a.resposta}</p>}
               {done && a.evidencia && <p style={{ margin: "2px 0 0", fontSize: 12, color: C.gray, wordBreak: "break-all" }}>📎 {a.evidencia}</p>}
             </div>

@@ -27,7 +27,7 @@ const schema = z.object({
   dataReuniao: z.string().optional().nullable(),
   pauta: z.string().max(4000).optional().nullable(),
   envolvidos: z.array(z.object({ nome: z.string().min(1), email: z.string().email(), setor: z.string().optional().nullable() })).optional(),
-  atividades: z.array(z.object({ descricao: z.string().min(1), setor: z.string().min(1), responsavel: z.string().optional().nullable(), prazo: z.string().optional().nullable() })).optional(),
+  atividades: z.array(z.object({ op: z.string().optional().nullable(), descricao: z.string().min(1), setor: z.string().optional().nullable(), responsavel: z.string().optional().nullable(), prazo: z.string().optional().nullable() })).optional(),
   motivoRevisao: z.string().max(300).optional().nullable(),
 });
 
@@ -64,7 +64,7 @@ export async function PATCH(req, { params }) {
   if (body.atividades !== undefined) {
     if (ata.status !== "RASCUNHO") return NextResponse.json({ error: "Ata já enviada — não dá pra trocar as atividades (só subir revisão nos dados)." }, { status: 400 });
     ops.push(prisma.ataAtividade.deleteMany({ where: { ataId: ata.id } }));
-    ops.push(prisma.ataAtividade.createMany({ data: body.atividades.map((a, i) => ({ ataId: ata.id, descricao: a.descricao.trim(), setor: a.setor, responsavel: a.responsavel?.trim() || null, prazo: a.prazo ? new Date(a.prazo + "T12:00:00Z") : null, ordem: i })) }));
+    ops.push(prisma.ataAtividade.createMany({ data: body.atividades.map((a, i) => ({ ataId: ata.id, descricao: a.descricao.trim(), op: a.op?.trim() || null, setor: a.setor?.trim() || null, responsavel: a.responsavel?.trim() || null, prazo: a.prazo ? new Date(a.prazo + "T12:00:00Z") : null, ordem: i })) }));
   }
 
   if (ops.length) await prisma.$transaction(ops);

@@ -34,7 +34,7 @@ export async function GET(_req, { params }) {
       pauta: confirmado ? ata.pauta : null,
       envolvidos: confirmado ? ata.envolvidos : null,
       atividades: confirmado ? ata.atividades.map((a) => ({
-        id: a.id, descricao: a.descricao, setor: a.setor, responsavel: a.responsavel, prazo: a.prazo,
+        id: a.id, descricao: a.descricao, op: a.op, setor: a.setor, responsavel: a.responsavel, prazo: a.prazo,
         status: a.status, resposta: a.resposta, evidencia: a.evidencia, respondidoPor: a.respondidoPor, respondidoEm: a.respondidoEm,
         // marca as atividades que ESTE envolvido pode preencher (mesmo setor)
         podeResponder: !!conf.setor && String(a.setor).toUpperCase() === String(conf.setor).toUpperCase(),

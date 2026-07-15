@@ -3044,7 +3044,8 @@ model AtaAtividade {
   id            String     @id @default(cuid())
   ataId         String
   descricao     String
-  setor         String // setor responsável
+  op            String? // OP relacionada (organização por OP no rascunho da IA)
+  setor         String? // setor responsável (pode ficar em branco p/ preencher depois)
   responsavel   String?
   prazo         DateTime?
   status        String     @default("PENDENTE") // PENDENTE | RESPONDIDO

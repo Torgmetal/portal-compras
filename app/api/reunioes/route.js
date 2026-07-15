@@ -49,7 +49,7 @@ const schema = z.object({
   dataReuniao: z.string().optional().nullable(),
   pauta: z.string().max(4000).optional().nullable(),
   envolvidos: z.array(z.object({ nome: z.string().min(1), email: z.string().email(), setor: z.string().optional().nullable() })).default([]),
-  atividades: z.array(z.object({ descricao: z.string().min(1), setor: z.string().min(1), responsavel: z.string().optional().nullable(), prazo: z.string().optional().nullable() })).default([]),
+  atividades: z.array(z.object({ op: z.string().optional().nullable(), descricao: z.string().min(1), setor: z.string().optional().nullable(), responsavel: z.string().optional().nullable(), prazo: z.string().optional().nullable() })).default([]),
 });
 
 export async function POST(req) {
@@ -74,7 +74,8 @@ export async function POST(req) {
       pauta: body.pauta?.trim() || null, envolvidos: body.envolvidos, createdById: user.id,
       atividades: {
         create: body.atividades.map((a, i) => ({
-          descricao: a.descricao.trim(), setor: a.setor, responsavel: a.responsavel?.trim() || null,
+          descricao: a.descricao.trim(), op: a.op?.trim() || null, setor: a.setor?.trim() || null,
+          responsavel: a.responsavel?.trim() || null,
           prazo: a.prazo ? new Date(a.prazo + "T12:00:00Z") : null, ordem: i,
         })),
       },

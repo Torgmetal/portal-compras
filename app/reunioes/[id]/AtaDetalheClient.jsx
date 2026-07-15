@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, NotebookPen, Loader2, Send, Trash2, Plus, X, CheckCircle2, Clock, AlertCircle, Users, Link2, Copy, Check, History, Pencil, Paperclip } from "lucide-react";
+import { ArrowLeft, NotebookPen, Loader2, Send, Trash2, Plus, X, CheckCircle2, Clock, AlertCircle, Users, Link2, Copy, Check, History, Pencil, Paperclip, Sparkles } from "lucide-react";
 
 const SETORES = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "QUALIDADE", "ALMOXARIFADO", "FINANCEIRO", "RH", "DIRETORIA"];
 const SETOR_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS: "Compras", PRODUCAO: "Produção", PCP: "PCP", PLANEJAMENTO: "Planejamento", EXPEDICAO: "Expedição", QUALIDADE: "Qualidade", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro", RH: "RH", DIRETORIA: "Diretoria" };
@@ -13,6 +13,11 @@ const rev = (n) => `R${String(n).padStart(2, "0")}`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+function agrupaPorOp(atvs) {
+  const map = new Map();
+  for (const a of atvs || []) { const k = a.op || ""; if (!map.has(k)) map.set(k, []); map.get(k).push(a); }
+  return [...map.entries()].sort((x, y) => (x[0] || "~").localeCompare(y[0] || "~", "pt", { numeric: true }));
+}
 
 export default function AtaDetalheClient({ id }) {
   const router = useRouter();
@@ -165,35 +170,46 @@ function EnvolvidosView({ ata, confMap, onFlash }) {
 /* ── Atividades (enviada): read-only + respostas ──────────────── */
 function AtividadesView({ ata }) {
   const atvs = ata.atividades || [];
+  const grupos = agrupaPorOp(atvs);
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
       <h3 className="text-sm font-semibold text-torg-dark mb-3">Atividades e respostas dos setores</h3>
       {atvs.length === 0 ? <p className="text-sm text-torg-gray">Nenhuma atividade cadastrada.</p> : (
-        <div className="space-y-2.5">
-          {atvs.map((a) => {
-            const ok = a.status === "RESPONDIDO";
-            return (
-              <div key={a.id} className={`rounded-lg border p-3 ${ok ? "border-emerald-100 bg-emerald-50/40" : "border-gray-100 bg-gray-50/40"}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <p className="text-sm text-torg-dark font-medium">{a.descricao}</p>
-                    <p className="text-[11px] text-torg-gray mt-0.5">
-                      <span className="px-1.5 py-0.5 rounded bg-white border border-gray-200">{sl(a.setor)}</span>
-                      {a.responsavel ? ` · ${a.responsavel}` : ""}{a.prazo ? ` · prazo ${fmtD(a.prazo)}` : ""}
-                    </p>
-                  </div>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${ok ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{ok ? "Respondido" : "Pendente"}</span>
-                </div>
-                {ok && (
-                  <div className="mt-2 pt-2 border-t border-emerald-100/70 text-[13px] space-y-1">
-                    {a.resposta && <p className="text-torg-dark whitespace-pre-wrap">{a.resposta}</p>}
-                    {a.evidencia && <p className="text-torg-gray flex items-start gap-1"><Paperclip size={12} className="mt-0.5 flex-shrink-0" /> <span className="break-all">{a.evidencia}</span></p>}
-                    <p className="text-[11px] text-gray-400">{a.respondidoPor || "—"} · {fmtDT(a.respondidoEm)}</p>
-                  </div>
-                )}
+        <div className="space-y-4">
+          {grupos.map(([op, itens]) => (
+            <div key={op || "_"}>
+              <div className="text-[11px] font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded bg-torg-blue-50 border border-torg-blue-100 text-torg-blue">{op ? `OP ${op}` : "Sem OP"}</span>
+                <span className="text-torg-gray font-normal normal-case">{itens.filter((x) => x.status === "RESPONDIDO").length}/{itens.length} respondidas</span>
               </div>
-            );
-          })}
+              <div className="space-y-2.5">
+                {itens.map((a) => {
+                  const ok = a.status === "RESPONDIDO";
+                  return (
+                    <div key={a.id} className={`rounded-lg border p-3 ${ok ? "border-emerald-100 bg-emerald-50/40" : "border-gray-100 bg-gray-50/40"}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <p className="text-sm text-torg-dark font-medium">{a.descricao}</p>
+                          <p className="text-[11px] text-torg-gray mt-0.5">
+                            {a.setor ? <span className="px-1.5 py-0.5 rounded bg-white border border-gray-200">{sl(a.setor)}</span> : <span className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700">sem setor</span>}
+                            {a.responsavel ? ` · ${a.responsavel}` : ""}{a.prazo ? ` · prazo ${fmtD(a.prazo)}` : ""}
+                          </p>
+                        </div>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${ok ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{ok ? "Respondido" : "Pendente"}</span>
+                      </div>
+                      {ok && (
+                        <div className="mt-2 pt-2 border-t border-emerald-100/70 text-[13px] space-y-1">
+                          {a.resposta && <p className="text-torg-dark whitespace-pre-wrap">{a.resposta}</p>}
+                          {a.evidencia && <p className="text-torg-gray flex items-start gap-1"><Paperclip size={12} className="mt-0.5 flex-shrink-0" /> <span className="break-all">{a.evidencia}</span></p>}
+                          <p className="text-[11px] text-gray-400">{a.respondidoPor || "—"} · {fmtDT(a.respondidoEm)}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -206,7 +222,10 @@ function RascunhoEditor({ ata, onSaved }) {
   const [dataReuniao, setDataReuniao] = useState(dISO(ata.dataReuniao));
   const [pauta, setPauta] = useState(ata.pauta || "");
   const [envolvidos, setEnvolvidos] = useState(Array.isArray(ata.envolvidos) && ata.envolvidos.length ? ata.envolvidos : [{ nome: "", email: "", setor: "" }]);
-  const [atividades, setAtividades] = useState((ata.atividades || []).length ? ata.atividades.map((a) => ({ descricao: a.descricao, setor: a.setor, responsavel: a.responsavel || "", prazo: dISO(a.prazo) })) : [{ descricao: "", setor: "", responsavel: "", prazo: "" }]);
+  const [atividades, setAtividades] = useState((ata.atividades || []).length ? ata.atividades.map((a) => ({ op: a.op || "", descricao: a.descricao, setor: a.setor || "", responsavel: a.responsavel || "", prazo: dISO(a.prazo) })) : [{ op: "", descricao: "", setor: "", responsavel: "", prazo: "" }]);
+  const [rascunho, setRascunho] = useState("");
+  const [organizando, setOrganizando] = useState(false);
+  const [erroIA, setErroIA] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const [ok, setOk] = useState(false);
@@ -214,11 +233,25 @@ function RascunhoEditor({ ata, onSaved }) {
   const setEnv = (i, k, v) => setEnvolvidos((p) => p.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
   const setAtv = (i, k, v) => setAtividades((p) => p.map((a, j) => (j === i ? { ...a, [k]: v } : a)));
 
+  async function organizar() {
+    if (!rascunho.trim()) return;
+    setOrganizando(true); setErroIA("");
+    try {
+      const r = await fetch("/api/reunioes/parse-rascunho", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rascunho, envolvidos: envolvidos.filter((e) => e.nome.trim() || e.email.trim()) }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao organizar");
+      const novas = (j.atividades || []).map((a) => ({ op: a.op || "", descricao: a.descricao || "", setor: a.setor || "", responsavel: a.responsavel || "", prazo: a.prazo || "" }));
+      if (!novas.length) { setErroIA("A IA não encontrou atividades no rascunho."); return; }
+      setAtividades((prev) => [...prev.filter((a) => a.descricao.trim()), ...novas]);
+      setRascunho("");
+    } catch (e) { setErroIA(e.message); } finally { setOrganizando(false); }
+  }
+
   async function salvar() {
     setErro(""); setOk(false);
     if (!titulo.trim()) return setErro("Informe o título.");
     const envs = envolvidos.filter((e) => e.nome.trim() && e.email.trim());
-    const atvs = atividades.filter((a) => a.descricao.trim() && a.setor);
+    const atvs = atividades.filter((a) => a.descricao.trim());
     if (!envs.length) return setErro("Adicione ao menos um envolvido.");
     setSalvando(true);
     try {
@@ -275,20 +308,37 @@ function RascunhoEditor({ ata, onSaved }) {
 
       <div>
         <label className="block text-xs font-semibold text-torg-dark mb-1.5">Atividades</label>
+
+        {/* Rascunho → IA */}
+        <div className="bg-torg-blue-50/50 border border-torg-blue-100 rounded-lg p-3 mb-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Sparkles size={14} className="text-torg-blue" />
+            <span className="text-[12px] font-semibold text-torg-dark">Organizar rascunho com IA</span>
+          </div>
+          <p className="text-[11px] text-torg-gray mb-2">Cole o rascunho (texto livre). A IA separa as atividades, agrupa por OP e traz o setor/responsável quando dá pra deduzir dos envolvidos — o resto fica em branco. As atividades geradas entram na lista abaixo pra você revisar.</p>
+          <textarea value={rascunho} onChange={(e) => setRascunho(e.target.value)} rows={4} placeholder={"Ex.:\nOP 085 — engenharia termina o detalhamento das marcas até sexta\nComprar chapa A572 pra obra 112 (Matheus)"} className="w-full text-[12px] border border-gray-200 rounded px-2 py-1.5 mb-2" />
+          <div className="flex items-center gap-2">
+            <button onClick={organizar} disabled={organizando || !rascunho.trim()} className="px-3 py-1.5 bg-torg-blue text-white text-[12px] rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{organizando ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Organizar com IA</button>
+            {erroIA && <span className="text-[11px] text-red-600 flex items-center gap-1"><AlertCircle size={12} /> {erroIA}</span>}
+          </div>
+        </div>
+
         <div className="space-y-2">
           {atividades.map((a, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <input value={a.descricao} onChange={(ev) => setAtv(i, "descricao", ev.target.value)} placeholder="Descrição da atividade" className="flex-1 text-[12px] border border-gray-200 rounded px-2 py-1.5" />
-              <select value={a.setor || ""} onChange={(ev) => setAtv(i, "setor", ev.target.value)} className="text-[12px] border border-gray-200 rounded px-2 py-1.5 bg-white">
-                <option value="">Setor</option>
+            <div key={i} className="flex items-start gap-1.5">
+              <input value={a.op || ""} onChange={(ev) => setAtv(i, "op", ev.target.value)} placeholder="OP" className="w-14 text-[12px] border border-gray-200 rounded px-2 py-1.5" title="OP" />
+              <input value={a.descricao} onChange={(ev) => setAtv(i, "descricao", ev.target.value)} placeholder="Descrição da atividade" className="flex-1 min-w-0 text-[12px] border border-gray-200 rounded px-2 py-1.5" />
+              <select value={a.setor || ""} onChange={(ev) => setAtv(i, "setor", ev.target.value)} className="w-28 text-[12px] border border-gray-200 rounded px-1.5 py-1.5 bg-white">
+                <option value="">Setor…</option>
                 {SETORES.map((s) => <option key={s} value={s}>{SETOR_LABEL[s]}</option>)}
               </select>
-              <input type="date" value={a.prazo || ""} onChange={(ev) => setAtv(i, "prazo", ev.target.value)} className="text-[12px] border border-gray-200 rounded px-2 py-1.5" title="Prazo" />
+              <input value={a.responsavel || ""} onChange={(ev) => setAtv(i, "responsavel", ev.target.value)} placeholder="Resp." className="w-24 text-[12px] border border-gray-200 rounded px-2 py-1.5" title="Responsável" />
+              <input type="date" value={a.prazo || ""} onChange={(ev) => setAtv(i, "prazo", ev.target.value)} className="w-32 text-[12px] border border-gray-200 rounded px-1.5 py-1.5" title="Prazo" />
               <button onClick={() => setAtividades((p) => (p.length === 1 ? p : p.filter((_, j) => j !== i)))} className="text-gray-300 hover:text-red-500 p-1 mt-1"><Trash2 size={13} /></button>
             </div>
           ))}
         </div>
-        <button onClick={() => setAtividades((p) => [...p, { descricao: "", setor: "", responsavel: "", prazo: "" }])} className="mt-1.5 text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={13} /> Adicionar atividade</button>
+        <button onClick={() => setAtividades((p) => [...p, { op: "", descricao: "", setor: "", responsavel: "", prazo: "" }])} className="mt-1.5 text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={13} /> Adicionar atividade</button>
       </div>
 
       {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
