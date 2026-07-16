@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
-import { recalcularCronograma, rollupPercentualDepartamentos } from "@/lib/cronograma-recalcular";
+import { recalcularCronograma, rollupPercentualDepartamentos, calcularDefasagem } from "@/lib/cronograma-recalcular";
 
 const patchSchema = z.object({
   nome: z.string().min(1).max(200).optional(),
@@ -141,6 +141,13 @@ export async function PATCH(req, { params }) {
       diffAntes.dataInicioPrevista = tarefa.dataInicioPrevista?.toISOString() || null;
       diffDepois.dataInicioPrevista = novo?.toISOString() || null;
       data.dataInicioPrevista = novo;
+      // Data digitada à mão numa tarefa com antecessora: guarda a defasagem
+      // (lead/lag) que ela representa. Negativa = antecipação (começou antes da
+      // anterior terminar). Sem isso o recálculo logo em seguida jogaria a data
+      // de volta pro dia seguinte ao fim da antecessora.
+      if (novo && tarefa.antecessoraIds?.length) {
+        data.defasagemDias = await calcularDefasagem(tarefa.cronogramaId, id, novo);
+      }
     }
   }
   if (parsed.data.dataFimPrevista !== undefined) {

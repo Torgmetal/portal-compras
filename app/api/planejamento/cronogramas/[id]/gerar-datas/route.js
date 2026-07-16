@@ -38,7 +38,7 @@ export async function POST(req, { params }) {
       id: true, dataInicio: true, tipoDias: true,
       tarefas: {
         orderBy: { uidMpp: "asc" },
-        select: { id: true, nome: true, uidMpp: true, departamento: true, isSummary: true, antecessoraIds: true, duracaoDias: true },
+        select: { id: true, nome: true, uidMpp: true, departamento: true, isSummary: true, antecessoraIds: true, duracaoDias: true, defasagemDias: true },
       },
     },
   });

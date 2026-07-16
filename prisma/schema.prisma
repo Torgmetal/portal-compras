@@ -2928,6 +2928,7 @@ model CronogramaTarefa {
   outlineLevel        Int                     @default(0)
   parentUid           Int?
   antecessoraIds      String[]                @default([]) // IDs de tarefas predecessoras (finish-to-start)
+  defasagemDias       Int                     @default(0) // Lead/lag vs o fim das antecessoras (DU ou DC). NEGATIVO = antecipação: começa antes da anterior terminar (na prática a gente adianta atividade). Preservado nos recálculos.
   duracaoDias         Int                     @default(0) // Duracao em dias (DU ou DC conforme cronograma)
   dataLiberacao       DateTime? // Data em que a tarefa foi liberada (desbloqueio externo)
   motivoBloqueio      String? // Ex: "Aguardando assinatura do aditivo"
