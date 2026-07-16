@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Loader2, FileText, Download, Image as ImageIcon, Briefcase, FileCheck2 } from "lucide-react";
+import TorgLogo from "@/components/TorgLogo";
 
 const GRUPOS = [
   { tipo: "CADASTRAL", label: "Documentos cadastrais", icon: FileCheck2 },
@@ -50,9 +51,8 @@ export default function ApresentacaoClient({ token }) {
           : { background: "linear-gradient(135deg,#006EAB,#00263F)" }} />
         <div className="absolute inset-0" style={{ background: "linear-gradient(120deg,rgba(0,38,63,.92),rgba(0,38,63,.55))" }} />
         <div className="relative max-w-3xl mx-auto px-6 py-16 sm:py-20 text-white">
-          <div className="inline-flex items-center gap-2 bg-white/95 rounded-lg px-3 py-1.5 mb-6">
-            <span className="w-6 h-6 rounded bg-gradient-to-br from-[#006EAB] to-[#00263F] grid place-items-center text-white font-extrabold text-xs">T</span>
-            <span className="font-extrabold text-[#00263F] text-sm tracking-tight">Torg Metal</span>
+          <div className="inline-flex bg-white/95 rounded-lg px-4 py-2 mb-6 shadow-sm">
+            <TorgLogo size="sm" />
           </div>
           <p className="text-[#F4801F] font-semibold uppercase tracking-widest text-xs mb-2">Apresentação</p>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight text-balance">
