@@ -38,6 +38,7 @@ model User {
   cronogramaRegistros      CronogramaRegistro[]  @relation("CronogramaRegistroCreatedBy")
   cronogramaRevisoes       CronogramaRevisao[]   @relation("CronogramaRevisaoCreatedBy")
   cronogramaCobrancas      CronogramaCobranca[]  @relation("CobrancaCreatedBy")
+  cronogramaEnvios         CronogramaEnvio[]     @relation("CronogramaEnvioCreatedBy")
   necessidadesSemanais     NecessidadeSemanal[]  @relation("NecessidadeSemanalCreatedBy")
   notificacoes             Notificacao[]
   opsCriadas               OP[]                  @relation("OPCreatedBy")
@@ -124,6 +125,7 @@ model OP {
   clienteCnpj          String?
   clienteContato       String?
   clienteEmail         String?
+  clienteContatos      Json                 @default("[]") // [{nome,email}] — contatos do cliente registrados nesta OP (ficam salvos ao enviar o cronograma; reaproveitados nos envios seguintes)
   clienteEndereco      String?
   clienteIE            String?
   clienteRazaoSocial   String?
@@ -2905,6 +2907,7 @@ model Cronograma {
   tarefas        CronogramaTarefa[]
   revisoes       CronogramaRevisao[]
   cobrancas      CronogramaCobranca[]
+  envios         CronogramaEnvio[]
 
   @@index([opNumero])
   @@index([ativo])
@@ -2975,6 +2978,24 @@ model CronogramaRevisao {
 }
 
 // Cobranca por email — cada envio gera um token publico para o setor responder com novas datas
+// Envio do cronograma (PDF) pelo portal — pros setores da Torg e/ou pro cliente.
+// Espelha a estrutura da CronogramaCobranca. Guarda pra quem foi e quando, pra
+// dar rastro de "o cliente já recebeu esta versão?".
+model CronogramaEnvio {
+  id            String     @id @default(cuid())
+  cronogramaId  String
+  destinatarios Json       @default("[]") // [{ nome, email, tipo: "SETOR" | "CLIENTE" }]
+  mensagem      String?
+  assunto       String?
+  enviados      Int        @default(0) // quantos e-mails saíram de fato
+  createdById   String
+  createdAt     DateTime   @default(now())
+  cronograma    Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+  createdBy     User       @relation("CronogramaEnvioCreatedBy", fields: [createdById], references: [id])
+
+  @@index([cronogramaId])
+}
+
 model CronogramaCobranca {
   id             String     @id @default(cuid())
   token          String     @unique @default(cuid())

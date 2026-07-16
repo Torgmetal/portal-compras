@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { fmtOP } from "@/lib/utils";
+import ModalEnviarCronograma from "@/components/planejamento/ModalEnviarCronograma";
 import {
   Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronRight,
   Clock, CheckCircle2, AlertTriangle, Download, MessageSquarePlus,
@@ -816,6 +817,7 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
   const [deleting, setDeleting] = useState(false);
   const [savingTipoDias, setSavingTipoDias] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
+  const [modalEnviar, setModalEnviar] = useState(false);
 
   const definirDataBase = async () => {
     const hoje = new Date().toISOString().split("T")[0];
@@ -987,6 +989,13 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
                 <FileDown size={12} /> Exportar Gantt (PDF)
               </button>
               <button
+                onClick={() => setModalEnviar(true)}
+                className="px-3 py-1 text-[10px] font-medium text-torg-blue bg-white border border-torg-blue rounded-lg hover:bg-torg-blue-50 flex items-center gap-1.5"
+                title="Envia o cronograma em PDF por e-mail para o cliente e/ou para a equipe."
+              >
+                <Send size={12} /> Enviar ao cliente
+              </button>
+              <button
                 onClick={encerrarCronograma}
                 disabled={encerrando}
                 className="px-3 py-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 flex items-center gap-1.5 disabled:opacity-50"
@@ -1006,6 +1015,10 @@ function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cronogram
             </div>
           )}
         </div>
+      )}
+
+      {modalEnviar && (
+        <ModalEnviarCronograma cronogramaId={cronogramaId} onClose={() => setModalEnviar(false)} />
       )}
 
       <div className="flex items-center justify-between border-b border-gray-100">
