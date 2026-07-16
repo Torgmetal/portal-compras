@@ -35,6 +35,7 @@ export async function GET(_req, { params }) {
       envolvidos: confirmado ? ata.envolvidos : null,
       atividades: confirmado ? ata.atividades.map((a) => ({
         id: a.id, descricao: a.descricao, op: a.op, setor: a.setor, responsavel: a.responsavel, prazo: a.prazo,
+        origemAtaNumero: a.origemAtaNumero,
         status: a.status, resposta: a.resposta, evidencia: a.evidencia, respondidoPor: a.respondidoPor, respondidoEm: a.respondidoEm,
         // destaque das atividades do setor do envolvido — NÃO é trava: qualquer
         // envolvido confirmado pode preencher qualquer atividade (a ata cobre
@@ -51,6 +52,7 @@ const schema = z.object({
   resposta: z.string().max(2000).optional().nullable(),
   evidencia: z.string().max(2000).optional().nullable(),
   respondidoPor: z.string().max(100).optional().nullable(),
+  status: z.enum(["EM_ANDAMENTO", "CONCLUIDA"]).optional(),
 });
 
 export async function POST(req, { params }) {
@@ -86,7 +88,7 @@ export async function POST(req, { params }) {
       evidencia: (body.evidencia || "").trim() || null,
       respondidoPor: (body.respondidoPor || conf.nome || "").trim().slice(0, 100) || null,
       respondidoEm: new Date(),
-      status: "RESPONDIDO",
+      status: body.status || "EM_ANDAMENTO",
     },
   });
   return NextResponse.json({ success: true });

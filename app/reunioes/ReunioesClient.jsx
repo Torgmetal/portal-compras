@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { NotebookPen, Plus, Loader2, AlertCircle, X, Trash2, Users, CheckCircle2, Clock, Sparkles } from "lucide-react";
-import AtaAtividadesEditor, { novaSecaoVazia, achatarSecoes } from "@/components/AtaAtividadesEditor";
+import { NotebookPen, Plus, Loader2, AlertCircle, X, Trash2, Users, CheckCircle2, Clock, Sparkles, RotateCcw } from "lucide-react";
+import AtaAtividadesEditor, { novaSecaoVazia, achatarSecoes, agruparSecoes } from "@/components/AtaAtividadesEditor";
 
 const SETORES = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "QUALIDADE", "ALMOXARIFADO", "FINANCEIRO", "RH", "DIRETORIA"];
 const SETOR_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS: "Compras", PRODUCAO: "Produção", PCP: "PCP", PLANEJAMENTO: "Planejamento", EXPEDICAO: "Expedição", QUALIDADE: "Qualidade", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro", RH: "RH", DIRETORIA: "Diretoria" };
@@ -57,7 +57,8 @@ export default function ReunioesClient() {
                   <th className="text-left px-3 py-2 font-medium">Título</th>
                   <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Status</th>
                   <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Confirmados</th>
-                  <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Atividades</th>
+                  <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Concluídas</th>
+                  <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Atrasadas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -68,7 +69,8 @@ export default function ReunioesClient() {
                     <td className="px-3 py-2 text-torg-dark max-w-[280px] truncate" title={a.titulo}>{a.titulo}</td>
                     <td className="px-3 py-2 text-center whitespace-nowrap"><span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${STATUS[a.status]?.c || "bg-gray-100"}`}>{STATUS[a.status]?.l || a.status}</span></td>
                     <td className="px-3 py-2 text-center text-torg-gray whitespace-nowrap">{a.status === "RASCUNHO" ? "—" : `${a.confirmados}/${a.totalEnvolvidos}`}</td>
-                    <td className="px-3 py-2 text-center text-torg-gray whitespace-nowrap">{a.atividadesRespondidas}/{a.totalAtividades}</td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap"><span className={a.atividadesConcluidas === a.totalAtividades && a.totalAtividades > 0 ? "text-emerald-600 font-semibold" : "text-torg-gray"}>{a.atividadesConcluidas}/{a.totalAtividades}</span></td>
+                    <td className="px-3 py-2 text-center whitespace-nowrap">{a.atividadesAtrasadas > 0 ? <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">{a.atividadesAtrasadas}</span> : <span className="text-torg-gray">—</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -88,10 +90,26 @@ function ModalNovaAta({ onClose, onCriada }) {
   const [pauta, setPauta] = useState("");
   const [envolvidos, setEnvolvidos] = useState([{ nome: "", email: "", setor: "" }]);
   const [secoes, setSecoes] = useState(novaSecaoVazia());
+  const [pend, setPend] = useState(null); // pendências arrastadas da ata anterior
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
   const setEnv = (i, k, v) => setEnvolvidos((p) => p.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
+
+  // O que ficou atrasado ou em andamento na última ata volta pra acompanhamento
+  useEffect(() => {
+    fetch("/api/reunioes/pendencias").then((r) => (r.ok ? r.json() : null)).then((j) => {
+      if (!j?.ata) return;
+      if (j.atividades?.length) {
+        setPend(j);
+        setSecoes((prev) => agruparSecoes([...achatarSecoes(prev), ...j.atividades]));
+      }
+      // mesma reunião semanal: reaproveita os envolvidos se ainda não digitou ninguém
+      if (j.envolvidos?.length) {
+        setEnvolvidos((prev) => (prev.some((e) => e.nome.trim() || e.email.trim()) ? prev : j.envolvidos.map((e) => ({ nome: e.nome || "", email: e.email || "", setor: e.setor || "" }))));
+      }
+    }).catch(() => {});
+  }, []);
 
   async function salvar() {
     setErro("");
@@ -116,6 +134,12 @@ function ModalNovaAta({ onClose, onCriada }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-4">
+          {pend && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg px-3.5 py-2.5 text-[12px] text-purple-800 flex items-start gap-2">
+              <RotateCcw size={14} className="mt-0.5 flex-shrink-0" />
+              <span>Trouxemos <b>{pend.atividades.length}</b> tarefa{pend.atividades.length === 1 ? "" : "s"} em aberto (atrasada{pend.atividades.length === 1 ? "" : "s"} ou em andamento) da <b>ATA-{String(pend.ata.numero).padStart(3, "0")}</b> — semana {pend.ata.semanaIso} — pra continuar o acompanhamento. Revise abaixo e remova o que não faz mais sentido.</span>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-torg-dark mb-1">Título *</label>

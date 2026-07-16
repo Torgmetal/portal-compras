@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Sparkles, Loader2, Plus, Trash2, AlertCircle, FolderKanban } from "lucide-react";
+import { Sparkles, Loader2, Plus, Trash2, AlertCircle, FolderKanban, RotateCcw } from "lucide-react";
 
 const SETORES = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "QUALIDADE", "ALMOXARIFADO", "FINANCEIRO", "RH", "DIRETORIA"];
 const SETOR_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS: "Compras", PRODUCAO: "Produção", PCP: "PCP", PLANEJAMENTO: "Planejamento", EXPEDICAO: "Expedição", QUALIDADE: "Qualidade", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro", RH: "RH", DIRETORIA: "Diretoria" };
@@ -16,7 +16,7 @@ export function agruparSecoes(atvs) {
   for (const a of atvs || []) {
     const k = (a.op || "").toString().trim();
     if (!map.has(k)) map.set(k, []);
-    map.get(k).push({ descricao: a.descricao || "", setor: a.setor || "", responsavel: a.responsavel || "", prazo: toDateInput(a.prazo) });
+    map.get(k).push({ descricao: a.descricao || "", setor: a.setor || "", responsavel: a.responsavel || "", prazo: toDateInput(a.prazo), origemAtaNumero: a.origemAtaNumero ?? null });
   }
   const secoes = [...map.entries()]
     .sort((x, y) => opNum(x[0]) - opNum(y[0]))
@@ -30,7 +30,7 @@ export function achatarSecoes(secoes) {
   for (const s of secoes || []) {
     for (const it of s.itens || []) {
       if (!(it.descricao || "").trim()) continue;
-      out.push({ op: (s.op || "").trim() || null, descricao: it.descricao.trim(), setor: it.setor || null, responsavel: (it.responsavel || "").trim() || null, prazo: it.prazo || null });
+      out.push({ op: (s.op || "").trim() || null, descricao: it.descricao.trim(), setor: it.setor || null, responsavel: (it.responsavel || "").trim() || null, prazo: it.prazo || null, origemAtaNumero: it.origemAtaNumero ?? null });
     }
   }
   return out;
@@ -93,7 +93,13 @@ export default function AtaAtividadesEditor({ secoes, setSecoes, envolvidos }) {
               </div>
               <div className="p-3 space-y-2.5 bg-gray-50/40">
                 {s.itens.map((it, j) => (
-                  <div key={j} className="bg-white border border-gray-200 rounded-lg p-3">
+                  <div key={j} className={`bg-white border rounded-lg p-3 ${it.origemAtaNumero != null ? "border-purple-200" : "border-gray-200"}`}>
+                    {it.origemAtaNumero != null && (
+                      <div className="mb-2 flex items-center gap-1.5">
+                        <RotateCcw size={12} className="text-purple-600" />
+                        <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-full px-2 py-0.5">em aberto desde a ATA-{String(it.origemAtaNumero).padStart(3, "0")}</span>
+                      </div>
+                    )}
                     <input value={it.descricao} onChange={(e) => setItem(i, j, "descricao", e.target.value)} placeholder="Descrição da atividade" className="w-full text-[13px] border border-gray-200 rounded-md px-2.5 py-2 mb-2.5" />
                     <div className="flex items-center gap-2 flex-wrap">
                       <label className="text-[10px] text-torg-gray uppercase tracking-wide">Setor</label>

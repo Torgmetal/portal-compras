@@ -15,6 +15,7 @@ const schema = z.object({
   atividadeId: z.string().optional(),
   resposta: z.string().max(2000).optional().nullable(),
   evidencia: z.string().max(2000).optional().nullable(),
+  status: z.enum(["EM_ANDAMENTO", "CONCLUIDA"]).optional(),
 });
 
 export async function POST(req, { params }) {
@@ -52,7 +53,7 @@ export async function POST(req, { params }) {
       evidencia: (body.evidencia || "").trim() || null,
       respondidoPor: String(user.name || user.email || "").slice(0, 100) || null,
       respondidoEm: new Date(),
-      status: "RESPONDIDO",
+      status: body.status || "EM_ANDAMENTO",
     },
   });
   return NextResponse.json({ success: true });

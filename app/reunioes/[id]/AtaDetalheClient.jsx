@@ -4,6 +4,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, NotebookPen, Loader2, Send, Trash2, Plus, X, CheckCircle2, Clock, AlertCircle, Users, Link2, Copy, Check, History, Pencil, Paperclip, Sparkles, FolderKanban, FileDown } from "lucide-react";
 import AtaAtividadesEditor, { agruparSecoes, achatarSecoes } from "@/components/AtaAtividadesEditor";
+import { statusLabel, ehConcluida } from "@/lib/ata-status";
+
+// cores por status da atividade (PENDENTE = atrasada)
+const ST = {
+  PENDENTE: { chip: "bg-red-100 text-red-700", card: "border-red-100 bg-red-50/40" },
+  EM_ANDAMENTO: { chip: "bg-blue-100 text-blue-700", card: "border-blue-100 bg-blue-50/40" },
+  CONCLUIDA: { chip: "bg-emerald-100 text-emerald-700", card: "border-emerald-100 bg-emerald-50/40" },
+};
+const st = (s) => ST[s] || ST.PENDENTE;
 
 const SETORES = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "QUALIDADE", "ALMOXARIFADO", "FINANCEIRO", "RH", "DIRETORIA"];
 const SETOR_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS: "Compras", PRODUCAO: "Produção", PCP: "PCP", PLANEJAMENTO: "Planejamento", EXPEDICAO: "Expedição", QUALIDADE: "Qualidade", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro", RH: "RH", DIRETORIA: "Diretoria" };
@@ -84,7 +93,7 @@ export default function AtaDetalheClient({ id }) {
 
   const isRascunho = ata.status === "RASCUNHO";
   const confMap = new Map((ata.confirmacoes || []).map((c) => [String(c.email).toLowerCase(), c]));
-  const respondidas = (ata.atividades || []).filter((a) => a.status === "RESPONDIDO").length;
+  const respondidas = (ata.atividades || []).filter((a) => ehConcluida(a.status)).length;
   const confirmados = (ata.confirmacoes || []).filter((c) => c.confirmadoEm).length;
 
   return (
@@ -126,7 +135,7 @@ export default function AtaDetalheClient({ id }) {
           {!isRascunho && (
             <div className="flex gap-4 text-center">
               <div><div className="text-2xl font-bold text-torg-blue">{confirmados}/{(ata.confirmacoes || []).length}</div><div className="text-[10px] text-torg-gray uppercase tracking-wide">Confirmaram</div></div>
-              <div><div className="text-2xl font-bold text-emerald-600">{respondidas}/{(ata.atividades || []).length}</div><div className="text-[10px] text-torg-gray uppercase tracking-wide">Responderam</div></div>
+              <div><div className="text-2xl font-bold text-emerald-600">{respondidas}/{(ata.atividades || []).length}</div><div className="text-[10px] text-torg-gray uppercase tracking-wide">Concluídas</div></div>
             </div>
           )}
         </div>
@@ -197,24 +206,32 @@ function EnvolvidosView({ ata, confMap, onFlash, gerente }) {
 
 /* ── Atividades (enviada): read-only + respostas ──────────────── */
 function AtividadesView({ ata, id, eu, onSaved }) {
-  const atvs = ata.atividades || [];
-  const grupos = agrupaPorOp(atvs);
-  const totalOk = atvs.filter((a) => a.status === "RESPONDIDO").length;
+  const todas = ata.atividades || [];
   const meuSetor = (eu?.setor || "").toUpperCase();
 
+  const [filtro, setFiltro] = useState("TODAS"); // TODAS | PENDENTE | EM_ANDAMENTO | CONCLUIDA | MEU_SETOR
   const [resp, setResp] = useState({});
   const [enviandoId, setEnviandoId] = useState("");
   const [editando, setEditando] = useState({});
   const [erroId, setErroId] = useState("");
   const setR = (aid, patch) => setResp((r) => ({ ...r, [aid]: { ...(r[aid] || {}), ...patch } }));
-  const abrirEdicao = (a) => { setR(a.id, { resposta: a.resposta || "", evidencia: a.evidencia || "" }); setEditando((e) => ({ ...e, [a.id]: true })); };
+  const abrirEdicao = (a) => { setR(a.id, { resposta: a.resposta || "", evidencia: a.evidencia || "", status: a.status === "CONCLUIDA" ? "CONCLUIDA" : "EM_ANDAMENTO" }); setEditando((e) => ({ ...e, [a.id]: true })); };
+
+  const conta = (s) => todas.filter((a) => (a.status || "PENDENTE") === s).length;
+  const nMeuSetor = todas.filter((a) => meuSetor && String(a.setor || "").toUpperCase() === meuSetor).length;
+  const atvs = todas.filter((a) => {
+    if (filtro === "TODAS") return true;
+    if (filtro === "MEU_SETOR") return meuSetor && String(a.setor || "").toUpperCase() === meuSetor;
+    return (a.status || "PENDENTE") === filtro;
+  });
+  const grupos = agrupaPorOp(atvs);
 
   async function responder(a) {
     const cur = resp[a.id] || {};
     if (!(cur.resposta || "").trim() && !(cur.evidencia || "").trim()) { setErroId(a.id); return; }
     setEnviandoId(a.id); setErroId("");
     try {
-      const r = await fetch(`/api/reunioes/${id}/responder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "responder", atividadeId: a.id, resposta: cur.resposta || "", evidencia: cur.evidencia || "" }) });
+      const r = await fetch(`/api/reunioes/${id}/responder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "responder", atividadeId: a.id, resposta: cur.resposta || "", evidencia: cur.evidencia || "", status: cur.status || "EM_ANDAMENTO" }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao enviar");
       setEditando((e) => ({ ...e, [a.id]: false }));
@@ -222,47 +239,69 @@ function AtividadesView({ ata, id, eu, onSaved }) {
     } catch (e) { alert(e.message); } finally { setEnviandoId(""); }
   }
 
+  const FILTROS = [
+    { k: "TODAS", l: "Todas", n: todas.length, c: "bg-torg-dark text-white" },
+    { k: "PENDENTE", l: "Atrasadas", n: conta("PENDENTE"), c: "bg-red-600 text-white" },
+    { k: "EM_ANDAMENTO", l: "Em andamento", n: conta("EM_ANDAMENTO"), c: "bg-blue-600 text-white" },
+    { k: "CONCLUIDA", l: "Concluídas", n: conta("CONCLUIDA"), c: "bg-emerald-600 text-white" },
+    ...(nMeuSetor ? [{ k: "MEU_SETOR", l: `Meu setor (${sl(meuSetor)})`, n: nMeuSetor, c: "bg-torg-blue text-white" }] : []),
+  ];
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 sm:p-6">
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-base font-semibold text-torg-dark">Atividades por OP</h3>
-        {atvs.length > 0 && <span className="text-[12px] text-torg-gray">{totalOk}/{atvs.length} respondidas</span>}
+        {todas.length > 0 && <span className="text-[12px] text-torg-gray">{conta("CONCLUIDA")}/{todas.length} concluídas</span>}
       </div>
-      {atvs.length > 0 && <p className="text-[12px] text-torg-gray mb-4">Preencha a informação e a evidência das atividades. {meuSetor ? <>As do seu setor (<b>{sl(meuSetor)}</b>) estão destacadas, mas você pode responder qualquer uma.</> : "Você pode responder qualquer atividade."} Fica registrado quem respondeu.</p>}
-      {atvs.length === 0 ? <p className="text-sm text-torg-gray">Nenhuma atividade cadastrada.</p> : (
+      {todas.length > 0 && <p className="text-[12px] text-torg-gray mb-3">Preencha a informação, a evidência e diga se a tarefa está <b>em andamento</b> ou <b>concluída</b>. O que ficar sem resposta conta como <b>atrasada</b> e volta na ata da semana seguinte.</p>}
+
+      {todas.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap mb-4">
+          {FILTROS.map((f) => (
+            <button key={f.k} onClick={() => setFiltro(f.k)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${filtro === f.k ? f.c : "bg-gray-100 text-torg-gray hover:bg-gray-200"}`}>
+              {f.l} <span className="opacity-70">{f.n}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {todas.length === 0 ? <p className="text-sm text-torg-gray">Nenhuma atividade cadastrada.</p> : atvs.length === 0 ? <p className="text-sm text-torg-gray py-4 text-center">Nenhuma atividade neste filtro.</p> : (
         <div className="space-y-5">
           {grupos.map(([op, itens]) => {
-            const nOk = itens.filter((x) => x.status === "RESPONDIDO").length;
+            const nOk = itens.filter((x) => ehConcluida(x.status)).length;
             return (
               <div key={op || "_"} className="border border-gray-200 rounded-xl overflow-hidden">
                 <div className="flex items-center gap-2.5 px-4 py-3 bg-torg-blue-50/70 border-b border-torg-blue-100">
                   <FolderKanban size={17} className="text-torg-blue" />
                   <span className="text-[15px] font-bold text-torg-dark">{op ? `OP ${op}` : "Sem OP"}</span>
-                  <span className={`ml-auto text-[11px] font-semibold px-2.5 py-1 rounded-full ${nOk === itens.length ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{nOk}/{itens.length} respondidas</span>
+                  <span className={`ml-auto text-[11px] font-semibold px-2.5 py-1 rounded-full ${nOk === itens.length ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{nOk}/{itens.length} concluídas</span>
                 </div>
                 <div className="p-3.5 sm:p-4 space-y-3">
                   {itens.map((a) => {
-                    const ok = a.status === "RESPONDIDO";
+                    const sKey = a.status || "PENDENTE";
+                    const respondida = sKey !== "PENDENTE";
                     const meu = !!meuSetor && String(a.setor || "").toUpperCase() === meuSetor;
-                    const aberto = !ok || editando[a.id];
+                    const aberto = !respondida || editando[a.id];
                     const cur = resp[a.id] || {};
                     return (
-                      <div key={a.id} className={`rounded-lg border p-4 ${ok ? "border-emerald-100 bg-emerald-50/40" : meu ? "border-torg-blue-100 bg-torg-blue-50/30" : "border-gray-100 bg-gray-50/50"}`}>
+                      <div key={a.id} className={`rounded-lg border p-4 ${respondida ? st(sKey).card : meu ? "border-torg-blue-100 bg-torg-blue-50/30" : st("PENDENTE").card}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
                             <p className="text-[14px] text-torg-dark font-medium leading-snug">{a.descricao}</p>
                             <div className="flex items-center gap-2 flex-wrap mt-2 text-[11px]">
                               {meu && <span className="px-2 py-0.5 rounded-full bg-torg-blue-100 text-torg-blue font-bold">seu setor</span>}
+                              {a.origemAtaNumero != null && <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold" title="Tarefa que veio de uma ata anterior e continua em acompanhamento">arrasta da ATA-{String(a.origemAtaNumero).padStart(3, "0")}</span>}
                               {a.setor ? <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-torg-gray font-medium">{sl(a.setor)}</span> : <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-medium">sem setor</span>}
                               {a.responsavel && <span className="text-torg-gray">Resp.: {a.responsavel}</span>}
                               {a.prazo && <span className="text-torg-gray">prazo {fmtD(a.prazo)}</span>}
                             </div>
                           </div>
-                          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${ok ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{ok ? "Respondido" : "Pendente"}</span>
+                          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${st(sKey).chip}`}>{statusLabel(sKey)}</span>
                         </div>
 
-                        {ok && !aberto && (
-                          <div className="mt-3 pt-3 border-t border-emerald-100/70 text-[13px] space-y-1.5">
+                        {respondida && !aberto && (
+                          <div className="mt-3 pt-3 border-t border-gray-200/60 text-[13px] space-y-1.5">
                             {a.resposta && <p className="text-torg-dark whitespace-pre-wrap leading-relaxed">{a.resposta}</p>}
                             {a.evidencia && <p className="text-torg-gray flex items-start gap-1.5"><Paperclip size={13} className="mt-0.5 flex-shrink-0" /> <span className="break-all">{a.evidencia}</span></p>}
                             <div className="flex items-center gap-3 flex-wrap">
@@ -276,10 +315,22 @@ function AtividadesView({ ata, id, eu, onSaved }) {
                           <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
                             <textarea value={cur.resposta || ""} onChange={(e) => setR(a.id, { resposta: e.target.value })} rows={2} placeholder="Informação / status da atividade" className="w-full text-[13px] border border-gray-200 rounded-md px-2.5 py-2" />
                             <input value={cur.evidencia || ""} onChange={(e) => setR(a.id, { evidencia: e.target.value })} placeholder="Evidência (link do arquivo, nº do documento, observação…)" className="w-full text-[13px] border border-gray-200 rounded-md px-2.5 py-2" />
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] text-torg-gray font-medium">Situação:</span>
+                              {[{ v: "EM_ANDAMENTO", l: "Em andamento", c: "bg-blue-600" }, { v: "CONCLUIDA", l: "Concluída", c: "bg-emerald-600" }].map((o) => {
+                                const sel = (cur.status || "EM_ANDAMENTO") === o.v;
+                                return (
+                                  <button key={o.v} type="button" onClick={() => setR(a.id, { status: o.v })}
+                                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${sel ? `${o.c} text-white border-transparent` : "bg-white text-torg-gray border-gray-300 hover:bg-gray-50"}`}>
+                                    {o.l}
+                                  </button>
+                                );
+                              })}
+                            </div>
                             {erroId === a.id && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> Preencha a informação e/ou a evidência.</p>}
                             <div className="flex items-center gap-2">
-                              <button onClick={() => responder(a)} disabled={enviandoId === a.id} className="px-3.5 py-1.5 bg-torg-blue text-white text-[13px] rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{enviandoId === a.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} {ok ? "Salvar alteração" : "Enviar resposta"}</button>
-                              {ok && <button onClick={() => setEditando((e) => ({ ...e, [a.id]: false }))} className="px-3 py-1.5 border border-gray-300 text-torg-gray text-[13px] rounded-lg hover:bg-gray-50">cancelar</button>}
+                              <button onClick={() => responder(a)} disabled={enviandoId === a.id} className="px-3.5 py-1.5 bg-torg-blue text-white text-[13px] rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{enviandoId === a.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} {respondida ? "Salvar alteração" : "Enviar resposta"}</button>
+                              {respondida && <button onClick={() => setEditando((e) => ({ ...e, [a.id]: false }))} className="px-3 py-1.5 border border-gray-300 text-torg-gray text-[13px] rounded-lg hover:bg-gray-50">cancelar</button>}
                             </div>
                           </div>
                         )}

@@ -32,7 +32,8 @@ export async function GET() {
     return {
       ...rest,
       totalAtividades: _count.atividades,
-      atividadesRespondidas: atividades.filter((x) => x.status === "RESPONDIDO").length,
+      atividadesConcluidas: atividades.filter((x) => x.status === "CONCLUIDA").length,
+      atividadesAtrasadas: atividades.filter((x) => (x.status || "PENDENTE") === "PENDENTE").length,
       totalEnvolvidos: _count.confirmacoes || (Array.isArray(a.envolvidos) ? a.envolvidos.length : 0),
       confirmados: confirmacoes.filter((c) => c.confirmadoEm).length,
     };
@@ -45,7 +46,7 @@ const schema = z.object({
   dataReuniao: z.string().optional().nullable(),
   pauta: z.string().max(4000).optional().nullable(),
   envolvidos: z.array(z.object({ nome: z.string().min(1), email: z.string().email(), setor: z.string().optional().nullable() })).default([]),
-  atividades: z.array(z.object({ op: z.string().optional().nullable(), descricao: z.string().min(1), setor: z.string().optional().nullable(), responsavel: z.string().optional().nullable(), prazo: z.string().optional().nullable() })).default([]),
+  atividades: z.array(z.object({ op: z.string().optional().nullable(), descricao: z.string().min(1), setor: z.string().optional().nullable(), responsavel: z.string().optional().nullable(), prazo: z.string().optional().nullable(), origemAtaNumero: z.number().int().optional().nullable() })).default([]),
 });
 
 export async function POST(req) {
@@ -70,7 +71,7 @@ export async function POST(req) {
       atividades: {
         create: body.atividades.map((a, i) => ({
           descricao: a.descricao.trim(), op: a.op?.trim() || null, setor: a.setor?.trim() || null,
-          responsavel: a.responsavel?.trim() || null,
+          responsavel: a.responsavel?.trim() || null, origemAtaNumero: a.origemAtaNumero ?? null,
           prazo: a.prazo ? new Date(a.prazo + "T12:00:00Z") : null, ordem: i,
         })),
       },
