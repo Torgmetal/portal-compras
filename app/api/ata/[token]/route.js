@@ -36,8 +36,10 @@ export async function GET(_req, { params }) {
       atividades: confirmado ? ata.atividades.map((a) => ({
         id: a.id, descricao: a.descricao, op: a.op, setor: a.setor, responsavel: a.responsavel, prazo: a.prazo,
         status: a.status, resposta: a.resposta, evidencia: a.evidencia, respondidoPor: a.respondidoPor, respondidoEm: a.respondidoEm,
-        // marca as atividades que ESTE envolvido pode preencher (mesmo setor)
-        podeResponder: !!conf.setor && String(a.setor).toUpperCase() === String(conf.setor).toUpperCase(),
+        // destaque das atividades do setor do envolvido — NÃO é trava: qualquer
+        // envolvido confirmado pode preencher qualquer atividade (a ata cobre
+        // setores que nem sempre têm representante na lista de envolvidos).
+        meuSetor: !!conf.setor && !!a.setor && String(a.setor).toUpperCase() === String(conf.setor).toUpperCase(),
       })) : null,
     },
   });
@@ -65,14 +67,14 @@ export async function POST(req, { params }) {
     return NextResponse.json({ success: true });
   }
 
-  // responder: exige recebimento confirmado + atividade do MESMO setor
+  // responder: basta ter confirmado o recebimento. Sem trava por setor — a ata
+  // cobre setores que nem sempre têm um representante entre os envolvidos, e
+  // travar deixava a maioria das atividades sem ninguém que pudesse responder.
+  // Quem respondeu fica registrado em respondidoPor.
   if (!conf.confirmadoEm) return NextResponse.json({ success: false, error: "Confirme o recebimento antes de responder." }, { status: 400 });
   if (!body.atividadeId) return NextResponse.json({ success: false, error: "Atividade não informada." }, { status: 400 });
   const atv = ata.atividades.find((a) => a.id === body.atividadeId);
   if (!atv) return NextResponse.json({ success: false, error: "Atividade não encontrada." }, { status: 404 });
-  if (!conf.setor || String(atv.setor).toUpperCase() !== String(conf.setor).toUpperCase()) {
-    return NextResponse.json({ success: false, error: "Esta atividade é de outro setor." }, { status: 403 });
-  }
   if (!(body.resposta || "").trim() && !(body.evidencia || "").trim()) {
     return NextResponse.json({ success: false, error: "Preencha a informação e/ou a evidência." }, { status: 400 });
   }

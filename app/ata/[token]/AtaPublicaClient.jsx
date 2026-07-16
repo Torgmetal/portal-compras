@@ -24,6 +24,7 @@ export default function AtaPublicaClient({ token }) {
   const [resp, setResp] = useState({}); // { [atvId]: { resposta, evidencia } }
   const [enviandoId, setEnviandoId] = useState("");
   const [msgId, setMsgId] = useState("");
+  const [editando, setEditando] = useState({}); // { [atvId]: true } — reabre o form de uma já respondida
 
   const carregar = useCallback(() => {
     fetch(`/api/ata/${token}`).then((r) => r.json()).then((j) => {
@@ -44,14 +45,20 @@ export default function AtaPublicaClient({ token }) {
     } catch (e) { setErro(e.message); } finally { setConfirmando(false); }
   }
 
+  const abrirEdicao = (atv) => {
+    setR(atv.id, { resposta: atv.resposta || "", evidencia: atv.evidencia || "" });
+    setEditando((e) => ({ ...e, [atv.id]: true }));
+  };
+
   async function responder(atv) {
     const a = resp[atv.id] || {};
     if (!(a.resposta || "").trim() && !(a.evidencia || "").trim()) { setMsgId(atv.id + ":erro"); return; }
-    setEnviandoId(atv.id);
+    setEnviandoId(atv.id); setMsgId("");
     try {
       const r = await fetch(`/api/ata/${token}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "responder", atividadeId: atv.id, resposta: a.resposta || "", evidencia: a.evidencia || "", respondidoPor: nome || "" }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao enviar.");
+      setEditando((e) => ({ ...e, [atv.id]: false }));
       carregar();
     } catch (e) { alert(e.message); } finally { setEnviandoId(""); }
   }
@@ -103,13 +110,15 @@ export default function AtaPublicaClient({ token }) {
   // Confirmado: ata completa
   const envolvidos = Array.isArray(ata.envolvidos) ? ata.envolvidos : [];
   const atividades = ordenarPorOp(Array.isArray(ata.atividades) ? ata.atividades : []);
-  const minhas = atividades.filter((a) => a.podeResponder);
+  const nMeuSetor = atividades.filter((a) => a.meuSetor).length;
+  const nOk = atividades.filter((a) => a.status === "RESPONDIDO").length;
 
   return (
     <Wrap>
       {Header}
-      <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#065f46", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>
-        ✅ Recebimento confirmado em {fmtDT(confirmacao.confirmadoEm)}.
+      <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#065f46", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <span>✅ Recebimento confirmado em {fmtDT(confirmacao.confirmadoEm)}.</span>
+        <a href={`/api/ata/${token}/pdf`} target="_blank" rel="noopener noreferrer" style={{ marginLeft: "auto", background: C.blue, color: "#fff", textDecoration: "none", fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 8, whiteSpace: "nowrap" }}>Baixar ata em PDF</a>
       </div>
 
       {ata.pauta && (
@@ -130,68 +139,69 @@ export default function AtaPublicaClient({ token }) {
         ))}
       </div>
 
-      {/* Minhas atividades (preencher) */}
-      {minhas.length > 0 && (
-        <div style={card}>
-          <h3 style={{ margin: "0 0 4px", fontSize: 14, color: C.dark }}>Atividades do seu setor ({sl(confirmacao.setor)})</h3>
-          <p style={{ margin: "0 0 12px", fontSize: 12, color: C.gray }}>Preencha a informação e a evidência de cada atividade atribuída ao seu setor.</p>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 12, color: C.dark, fontWeight: 600, display: "block", marginBottom: 4 }}>Seu nome</label>
-            <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Quem está respondendo" style={{ ...inp, maxWidth: 280 }} />
-          </div>
-          {minhas.map((a) => {
-            const done = a.status === "RESPONDIDO";
-            const cur = resp[a.id] || {};
-            return (
-              <div key={a.id} style={{ border: `1px solid ${done ? "#a7f3d0" : C.line}`, background: done ? "#f0fdf4" : "#fafafa", borderRadius: 10, padding: 14, marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
-                  <p style={{ margin: 0, fontSize: 14, color: C.dark, fontWeight: 600 }}>{a.descricao}</p>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: done ? "#d1fae5" : "#fef3c7", color: done ? "#065f46" : "#92400e" }}>{done ? "Respondido" : "Pendente"}</span>
-                </div>
-                {(a.op || a.prazo) && <p style={{ margin: "4px 0 0", fontSize: 11, color: C.gray }}>{[a.op ? `OP ${a.op}` : null, a.prazo ? `Prazo: ${fmt(a.prazo)}` : null].filter(Boolean).join(" · ")}</p>}
-                {done ? (
-                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #d1fae5", fontSize: 13 }}>
-                    {a.resposta && <p style={{ margin: "0 0 4px", color: C.dark, whiteSpace: "pre-wrap" }}>{a.resposta}</p>}
-                    {a.evidencia && <p style={{ margin: 0, color: C.gray, wordBreak: "break-all" }}>📎 {a.evidencia}</p>}
-                    <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9ca3af" }}>{a.respondidoPor || "—"} · {fmtDT(a.respondidoEm)}</p>
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 10 }}>
-                    <textarea value={cur.resposta || ""} onChange={(e) => setR(a.id, { resposta: e.target.value })} rows={2} placeholder="Informação / status da atividade" style={{ ...inp, marginBottom: 8, resize: "vertical" }} />
-                    <input value={cur.evidencia || ""} onChange={(e) => setR(a.id, { evidencia: e.target.value })} placeholder="Evidência (link do arquivo, nº do documento, observação…)" style={{ ...inp, marginBottom: 8 }} />
-                    {msgId === a.id + ":erro" && <p style={{ color: "#b91c1c", fontSize: 12, margin: "0 0 6px" }}>Preencha a informação e/ou a evidência.</p>}
-                    <button onClick={() => responder(a)} disabled={enviandoId === a.id} style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, padding: "8px 18px", cursor: "pointer", opacity: enviandoId === a.id ? .6 : 1 }}>{enviandoId === a.id ? "enviando…" : "Enviar resposta"}</button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Todas as atividades — por OP */}
+      {/* Atividades por OP — qualquer envolvido que confirmou pode preencher */}
       <div style={card}>
-        <h3 style={{ margin: "0 0 14px", fontSize: 15, color: C.dark }}>Atividades por OP</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <h3 style={{ margin: 0, fontSize: 15, color: C.dark }}>Atividades por OP</h3>
+          <span style={{ fontSize: 12, color: C.gray }}>{nOk}/{atividades.length} respondidas</span>
+        </div>
+        <p style={{ margin: "6px 0 14px", fontSize: 12, color: C.gray, lineHeight: 1.5 }}>
+          Preencha a informação e a evidência de cada atividade.{" "}
+          {nMeuSetor > 0
+            ? <>As do seu setor (<b>{sl(confirmacao.setor)}</b>) estão destacadas, mas você pode responder qualquer uma.</>
+            : <>Você pode responder qualquer atividade da ata.</>}
+        </p>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 12, color: C.dark, fontWeight: 600, display: "block", marginBottom: 4 }}>Seu nome</label>
+          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Quem está respondendo" style={{ ...inp, maxWidth: 280 }} />
+        </div>
+
         {agrupaPorOp(atividades).map(([op, itens]) => {
-          const nOk = itens.filter((x) => x.status === "RESPONDIDO").length;
+          const gOk = itens.filter((x) => x.status === "RESPONDIDO").length;
           return (
-            <div key={op || "_"} style={{ border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", marginBottom: 14 }}>
+            <div key={op || "_"} style={{ border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#eff6ff", borderBottom: "1px solid #dbeafe" }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: C.dark }}>{op ? `OP ${op}` : "Sem OP"}</span>
-                <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, background: nOk === itens.length ? "#d1fae5" : "#fef3c7", color: nOk === itens.length ? "#065f46" : "#92400e" }}>{nOk}/{itens.length} ok</span>
+                <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, background: gOk === itens.length ? "#d1fae5" : "#fef3c7", color: gOk === itens.length ? "#065f46" : "#92400e" }}>{gOk}/{itens.length} ok</span>
               </div>
-              <div style={{ padding: "4px 14px" }}>
-                {itens.map((a, idx) => {
+              <div style={{ padding: 12 }}>
+                {itens.map((a) => {
                   const done = a.status === "RESPONDIDO";
+                  const aberto = !done || editando[a.id];
+                  const cur = resp[a.id] || {};
                   return (
-                    <div key={a.id} style={{ padding: "11px 0", borderBottom: idx < itens.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                    <div key={a.id} style={{ border: `1px solid ${done ? "#a7f3d0" : a.meuSetor ? "#bfdbfe" : C.line}`, background: done ? "#f0fdf4" : a.meuSetor ? "#f8fbff" : "#fafafa", borderRadius: 10, padding: 13, marginBottom: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
-                        <span style={{ fontSize: 14, color: C.dark, fontWeight: 500, lineHeight: 1.4 }}>{a.descricao}</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: done ? "#d1fae5" : "#fef3c7", color: done ? "#065f46" : "#92400e" }}>{done ? "OK" : "Pendente"}</span>
+                        <p style={{ margin: 0, fontSize: 14, color: C.dark, fontWeight: 600, lineHeight: 1.4 }}>{a.descricao}</p>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: done ? "#d1fae5" : "#fef3c7", color: done ? "#065f46" : "#92400e" }}>{done ? "Respondido" : "Pendente"}</span>
                       </div>
-                      <p style={{ margin: "5px 0 0", fontSize: 11, color: C.gray }}>{[a.setor ? sl(a.setor) : "sem setor", a.responsavel || null, a.prazo ? `prazo ${fmt(a.prazo)}` : null].filter(Boolean).join(" · ")}</p>
-                      {done && a.resposta && <p style={{ margin: "6px 0 0", fontSize: 13, color: C.dark, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{a.resposta}</p>}
-                      {done && a.evidencia && <p style={{ margin: "3px 0 0", fontSize: 12, color: C.gray, wordBreak: "break-all" }}>📎 {a.evidencia}</p>}
+                      <p style={{ margin: "6px 0 0", fontSize: 11, color: C.gray }}>
+                        {a.meuSetor && <span style={{ background: "#dbeafe", color: "#1e40af", fontWeight: 700, padding: "2px 7px", borderRadius: 20, marginRight: 6 }}>seu setor</span>}
+                        {[a.setor ? sl(a.setor) : "sem setor", a.responsavel || null, a.prazo ? `prazo ${fmt(a.prazo)}` : null].filter(Boolean).join(" · ")}
+                      </p>
+
+                      {done && !aberto && (
+                        <div style={{ marginTop: 9, paddingTop: 9, borderTop: "1px solid #d1fae5", fontSize: 13 }}>
+                          {a.resposta && <p style={{ margin: "0 0 4px", color: C.dark, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{a.resposta}</p>}
+                          {a.evidencia && <p style={{ margin: 0, color: C.gray, wordBreak: "break-all" }}>📎 {a.evidencia}</p>}
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 11, color: "#9ca3af" }}>{a.respondidoPor || "—"} · {fmtDT(a.respondidoEm)}</span>
+                            <button onClick={() => abrirEdicao(a)} style={{ background: "none", border: "none", color: C.blue, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0, textDecoration: "underline" }}>editar resposta</button>
+                          </div>
+                        </div>
+                      )}
+
+                      {aberto && (
+                        <div style={{ marginTop: 10 }}>
+                          <textarea value={cur.resposta || ""} onChange={(e) => setR(a.id, { resposta: e.target.value })} rows={2} placeholder="Informação / status da atividade" style={{ ...inp, marginBottom: 8, resize: "vertical" }} />
+                          <input value={cur.evidencia || ""} onChange={(e) => setR(a.id, { evidencia: e.target.value })} placeholder="Evidência (link do arquivo, nº do documento, observação…)" style={{ ...inp, marginBottom: 8 }} />
+                          {msgId === a.id + ":erro" && <p style={{ color: "#b91c1c", fontSize: 12, margin: "0 0 6px" }}>Preencha a informação e/ou a evidência.</p>}
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <button onClick={() => responder(a)} disabled={enviandoId === a.id} style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, padding: "8px 18px", cursor: "pointer", opacity: enviandoId === a.id ? .6 : 1 }}>{enviandoId === a.id ? "enviando…" : done ? "Salvar alteração" : "Enviar resposta"}</button>
+                            {done && <button onClick={() => setEditando((e) => ({ ...e, [a.id]: false }))} style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 8, color: C.gray, fontSize: 13, padding: "8px 14px", cursor: "pointer" }}>cancelar</button>}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

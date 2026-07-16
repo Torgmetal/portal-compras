@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, NotebookPen, Loader2, Send, Trash2, Plus, X, CheckCircle2, Clock, AlertCircle, Users, Link2, Copy, Check, History, Pencil, Paperclip, Sparkles, FolderKanban } from "lucide-react";
+import { ArrowLeft, NotebookPen, Loader2, Send, Trash2, Plus, X, CheckCircle2, Clock, AlertCircle, Users, Link2, Copy, Check, History, Pencil, Paperclip, Sparkles, FolderKanban, FileDown } from "lucide-react";
 import AtaAtividadesEditor, { agruparSecoes, achatarSecoes } from "@/components/AtaAtividadesEditor";
 
 const SETORES = ["COMERCIAL", "ENGENHARIA", "COMPRAS", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "QUALIDADE", "ALMOXARIFADO", "FINANCEIRO", "RH", "DIRETORIA"];
@@ -77,6 +77,7 @@ export default function AtaDetalheClient({ id }) {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Link href="/reunioes" className="text-sm text-torg-gray hover:text-torg-blue inline-flex items-center gap-1"><ArrowLeft size={15} /> Atas de reunião</Link>
         <div className="flex items-center gap-2">
+          <a href={`/api/reunioes/${id}/pdf`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-torg-dark inline-flex items-center gap-1.5" title="Baixar a ata em PDF"><FileDown size={14} /> PDF</a>
           {!isRascunho && <button onClick={() => setModalRev(true)} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-torg-dark inline-flex items-center gap-1.5"><Pencil size={14} /> Revisar</button>}
           {isRascunho && <button onClick={enviar} disabled={salvando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{salvando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Enviar aos envolvidos</button>}
           {!isRascunho && <button onClick={enviar} disabled={salvando} className="px-3 py-1.5 border border-torg-blue text-torg-blue text-sm rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-1.5 disabled:opacity-50"><Send size={14} /> Reenviar</button>}
