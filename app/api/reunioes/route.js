@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireAcesso } from "@/lib/session";
 import { podeGerenciarAtas, TIPOS_REUNIOES } from "@/lib/reunioes-acesso";
+import { situacaoAtividade } from "@/lib/ata-status";
 import { getISOWeek } from "@/lib/semana-iso";
 import { z } from "zod";
 
@@ -24,7 +25,7 @@ export async function GET() {
       status: true, revisao: true, enviadaEm: true, envolvidos: true, createdAt: true,
       _count: { select: { atividades: true, confirmacoes: true } },
       confirmacoes: { select: { confirmadoEm: true } },
-      atividades: { select: { status: true } },
+      atividades: { select: { status: true, prazo: true } },
     },
   });
   const lista = atas.map((a) => {
@@ -33,7 +34,8 @@ export async function GET() {
       ...rest,
       totalAtividades: _count.atividades,
       atividadesConcluidas: atividades.filter((x) => x.status === "CONCLUIDA").length,
-      atividadesAtrasadas: atividades.filter((x) => (x.status || "PENDENTE") === "PENDENTE").length,
+      // atrasada é derivada do prazo — sem resposta e ainda dentro do prazo é só pendente
+      atividadesAtrasadas: atividades.filter((x) => situacaoAtividade(x, a) === "ATRASADA").length,
       totalEnvolvidos: _count.confirmacoes || (Array.isArray(a.envolvidos) ? a.envolvidos.length : 0),
       confirmados: confirmacoes.filter((c) => c.confirmadoEm).length,
     };

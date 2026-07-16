@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { situacaoAtividade, SITUACAO_LABEL, respondida as jaRespondida } from "@/lib/ata-status";
 
 const SETOR_LABEL = { COMERCIAL: "Comercial", ENGENHARIA: "Engenharia", COMPRAS: "Compras", PRODUCAO: "Produção", PCP: "PCP", PLANEJAMENTO: "Planejamento", EXPEDICAO: "Expedição", QUALIDADE: "Qualidade", ALMOXARIFADO: "Almoxarifado", FINANCEIRO: "Financeiro", RH: "RH", DIRETORIA: "Diretoria" };
 const sl = (s) => SETOR_LABEL[s] || s || "—";
@@ -15,15 +16,15 @@ function agrupaPorOp(atvs) {
 
 const C = { blue: "#006EAB", dark: "#002945", gray: "#576D7E", bg: "#f1f5f9", line: "#e5e7eb", green: "#059669", amber: "#d97706" };
 
-// status da atividade: sem resposta = atrasada
-const STATUS_LABEL = { PENDENTE: "Atrasada", EM_ANDAMENTO: "Em andamento", CONCLUIDA: "Concluída" };
+// cores por SITUAÇÃO (atrasada é derivada do prazo — ver lib/ata-status.js)
 const STATUS_COR = {
-  PENDENTE: { bg: "#fee2e2", fg: "#b91c1c", card: "#fef2f2", borda: "#fecaca" },
+  PENDENTE: { bg: "#fef3c7", fg: "#92400e", card: "#fafafa", borda: "#e5e7eb" },
+  ATRASADA: { bg: "#fee2e2", fg: "#b91c1c", card: "#fef2f2", borda: "#fecaca" },
   EM_ANDAMENTO: { bg: "#dbeafe", fg: "#1e40af", card: "#eff6ff", borda: "#bfdbfe" },
   CONCLUIDA: { bg: "#d1fae5", fg: "#065f46", card: "#f0fdf4", borda: "#a7f3d0" },
 };
 const stc = (s) => STATUS_COR[s] || STATUS_COR.PENDENTE;
-const stl = (s) => STATUS_LABEL[s] || STATUS_LABEL.PENDENTE;
+const stl = (s) => SITUACAO_LABEL[s] || SITUACAO_LABEL.PENDENTE;
 
 export default function AtaPublicaClient({ token }) {
   const [dados, setDados] = useState(null);
@@ -176,13 +177,13 @@ export default function AtaPublicaClient({ token }) {
               </div>
               <div style={{ padding: 12 }}>
                 {itens.map((a) => {
-                  const sKey = a.status || "PENDENTE";
-                  const respondida = sKey !== "PENDENTE";
+                  const sKey = situacaoAtividade(a, ata);
+                  const respondida = jaRespondida(a);
                   const aberto = !respondida || editando[a.id];
                   const cur = resp[a.id] || {};
                   const cor = stc(sKey);
                   return (
-                    <div key={a.id} style={{ border: `1px solid ${respondida ? cor.borda : a.meuSetor ? "#bfdbfe" : cor.borda}`, background: respondida ? cor.card : a.meuSetor ? "#f8fbff" : cor.card, borderRadius: 10, padding: 13, marginBottom: 10 }}>
+                    <div key={a.id} style={{ border: `1px solid ${!respondida && sKey === "PENDENTE" && a.meuSetor ? "#bfdbfe" : cor.borda}`, background: !respondida && sKey === "PENDENTE" && a.meuSetor ? "#f8fbff" : cor.card, borderRadius: 10, padding: 13, marginBottom: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
                         <p style={{ margin: 0, fontSize: 14, color: C.dark, fontWeight: 600, lineHeight: 1.4 }}>{a.descricao}</p>
                         <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap", background: cor.bg, color: cor.fg }}>{stl(sKey)}</span>

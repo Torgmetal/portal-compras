@@ -4,11 +4,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, NotebookPen, Loader2, Send, Trash2, Plus, X, CheckCircle2, Clock, AlertCircle, Users, Link2, Copy, Check, History, Pencil, Paperclip, Sparkles, FolderKanban, FileDown } from "lucide-react";
 import AtaAtividadesEditor, { agruparSecoes, achatarSecoes } from "@/components/AtaAtividadesEditor";
-import { statusLabel, ehConcluida } from "@/lib/ata-status";
+import { situacaoAtividade, situacaoLabel, respondida, ehConcluida } from "@/lib/ata-status";
 
-// cores por status da atividade (PENDENTE = atrasada)
+// cores por SITUAÇÃO (atrasada é derivada do prazo, não é status do banco)
 const ST = {
-  PENDENTE: { chip: "bg-red-100 text-red-700", card: "border-red-100 bg-red-50/40" },
+  PENDENTE: { chip: "bg-amber-100 text-amber-700", card: "border-gray-100 bg-gray-50/50" },
+  ATRASADA: { chip: "bg-red-100 text-red-700", card: "border-red-100 bg-red-50/40" },
   EM_ANDAMENTO: { chip: "bg-blue-100 text-blue-700", card: "border-blue-100 bg-blue-50/40" },
   CONCLUIDA: { chip: "bg-emerald-100 text-emerald-700", card: "border-emerald-100 bg-emerald-50/40" },
 };
@@ -209,7 +210,8 @@ function AtividadesView({ ata, id, eu, onSaved }) {
   const todas = ata.atividades || [];
   const meuSetor = (eu?.setor || "").toUpperCase();
 
-  const [filtro, setFiltro] = useState("TODAS"); // TODAS | PENDENTE | EM_ANDAMENTO | CONCLUIDA | MEU_SETOR
+  const [filtro, setFiltro] = useState("TODAS"); // TODAS | PENDENTE | ATRASADA | EM_ANDAMENTO | CONCLUIDA | MEU_SETOR
+  const sit = (a) => situacaoAtividade(a, ata); // atrasada sai do prazo, não do status
   const [resp, setResp] = useState({});
   const [enviandoId, setEnviandoId] = useState("");
   const [editando, setEditando] = useState({});
@@ -217,12 +219,12 @@ function AtividadesView({ ata, id, eu, onSaved }) {
   const setR = (aid, patch) => setResp((r) => ({ ...r, [aid]: { ...(r[aid] || {}), ...patch } }));
   const abrirEdicao = (a) => { setR(a.id, { resposta: a.resposta || "", evidencia: a.evidencia || "", status: a.status === "CONCLUIDA" ? "CONCLUIDA" : "EM_ANDAMENTO" }); setEditando((e) => ({ ...e, [a.id]: true })); };
 
-  const conta = (s) => todas.filter((a) => (a.status || "PENDENTE") === s).length;
+  const conta = (s) => todas.filter((a) => sit(a) === s).length;
   const nMeuSetor = todas.filter((a) => meuSetor && String(a.setor || "").toUpperCase() === meuSetor).length;
   const atvs = todas.filter((a) => {
     if (filtro === "TODAS") return true;
     if (filtro === "MEU_SETOR") return meuSetor && String(a.setor || "").toUpperCase() === meuSetor;
-    return (a.status || "PENDENTE") === filtro;
+    return sit(a) === filtro;
   });
   const grupos = agrupaPorOp(atvs);
 
@@ -241,7 +243,8 @@ function AtividadesView({ ata, id, eu, onSaved }) {
 
   const FILTROS = [
     { k: "TODAS", l: "Todas", n: todas.length, c: "bg-torg-dark text-white" },
-    { k: "PENDENTE", l: "Atrasadas", n: conta("PENDENTE"), c: "bg-red-600 text-white" },
+    { k: "ATRASADA", l: "Atrasadas", n: conta("ATRASADA"), c: "bg-red-600 text-white" },
+    { k: "PENDENTE", l: "Pendentes", n: conta("PENDENTE"), c: "bg-amber-600 text-white" },
     { k: "EM_ANDAMENTO", l: "Em andamento", n: conta("EM_ANDAMENTO"), c: "bg-blue-600 text-white" },
     { k: "CONCLUIDA", l: "Concluídas", n: conta("CONCLUIDA"), c: "bg-emerald-600 text-white" },
     ...(nMeuSetor ? [{ k: "MEU_SETOR", l: `Meu setor (${sl(meuSetor)})`, n: nMeuSetor, c: "bg-torg-blue text-white" }] : []),
@@ -253,7 +256,7 @@ function AtividadesView({ ata, id, eu, onSaved }) {
         <h3 className="text-base font-semibold text-torg-dark">Atividades por OP</h3>
         {todas.length > 0 && <span className="text-[12px] text-torg-gray">{conta("CONCLUIDA")}/{todas.length} concluídas</span>}
       </div>
-      {todas.length > 0 && <p className="text-[12px] text-torg-gray mb-3">Preencha a informação, a evidência e diga se a tarefa está <b>em andamento</b> ou <b>concluída</b>. O que ficar sem resposta conta como <b>atrasada</b> e volta na ata da semana seguinte.</p>}
+      {todas.length > 0 && <p className="text-[12px] text-torg-gray mb-3">Preencha a informação, a evidência e diga se a tarefa está <b>em andamento</b> ou <b>concluída</b>. Sem resposta, ela fica <b>pendente</b> até o prazo e vira <b>atrasada</b> depois dele. Tudo que não for concluído volta na ata da semana seguinte.</p>}
 
       {todas.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap mb-4">
@@ -279,13 +282,13 @@ function AtividadesView({ ata, id, eu, onSaved }) {
                 </div>
                 <div className="p-3.5 sm:p-4 space-y-3">
                   {itens.map((a) => {
-                    const sKey = a.status || "PENDENTE";
-                    const respondida = sKey !== "PENDENTE";
+                    const sKey = sit(a);
+                    const jaResp = respondida(a);
                     const meu = !!meuSetor && String(a.setor || "").toUpperCase() === meuSetor;
-                    const aberto = !respondida || editando[a.id];
+                    const aberto = !jaResp || editando[a.id];
                     const cur = resp[a.id] || {};
                     return (
-                      <div key={a.id} className={`rounded-lg border p-4 ${respondida ? st(sKey).card : meu ? "border-torg-blue-100 bg-torg-blue-50/30" : st("PENDENTE").card}`}>
+                      <div key={a.id} className={`rounded-lg border p-4 ${jaResp || sKey === "ATRASADA" ? st(sKey).card : meu ? "border-torg-blue-100 bg-torg-blue-50/30" : st("PENDENTE").card}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
                             <p className="text-[14px] text-torg-dark font-medium leading-snug">{a.descricao}</p>
@@ -297,10 +300,10 @@ function AtividadesView({ ata, id, eu, onSaved }) {
                               {a.prazo && <span className="text-torg-gray">prazo {fmtD(a.prazo)}</span>}
                             </div>
                           </div>
-                          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${st(sKey).chip}`}>{statusLabel(sKey)}</span>
+                          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${st(sKey).chip}`}>{situacaoLabel(sKey)}</span>
                         </div>
 
-                        {respondida && !aberto && (
+                        {jaResp && !aberto && (
                           <div className="mt-3 pt-3 border-t border-gray-200/60 text-[13px] space-y-1.5">
                             {a.resposta && <p className="text-torg-dark whitespace-pre-wrap leading-relaxed">{a.resposta}</p>}
                             {a.evidencia && <p className="text-torg-gray flex items-start gap-1.5"><Paperclip size={13} className="mt-0.5 flex-shrink-0" /> <span className="break-all">{a.evidencia}</span></p>}
@@ -329,8 +332,8 @@ function AtividadesView({ ata, id, eu, onSaved }) {
                             </div>
                             {erroId === a.id && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> Preencha a informação e/ou a evidência.</p>}
                             <div className="flex items-center gap-2">
-                              <button onClick={() => responder(a)} disabled={enviandoId === a.id} className="px-3.5 py-1.5 bg-torg-blue text-white text-[13px] rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{enviandoId === a.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} {respondida ? "Salvar alteração" : "Enviar resposta"}</button>
-                              {respondida && <button onClick={() => setEditando((e) => ({ ...e, [a.id]: false }))} className="px-3 py-1.5 border border-gray-300 text-torg-gray text-[13px] rounded-lg hover:bg-gray-50">cancelar</button>}
+                              <button onClick={() => responder(a)} disabled={enviandoId === a.id} className="px-3.5 py-1.5 bg-torg-blue text-white text-[13px] rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{enviandoId === a.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} {jaResp ? "Salvar alteração" : "Enviar resposta"}</button>
+                              {jaResp && <button onClick={() => setEditando((e) => ({ ...e, [a.id]: false }))} className="px-3 py-1.5 border border-gray-300 text-torg-gray text-[13px] rounded-lg hover:bg-gray-50">cancelar</button>}
                             </div>
                           </div>
                         )}
