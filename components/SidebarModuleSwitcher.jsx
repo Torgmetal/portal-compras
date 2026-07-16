@@ -138,7 +138,9 @@ const MODULOS = [
     desc: "Atas de reunião semanal (ISO)",
     icon: NotebookPen,
     cor: "bg-torg-blue-50 text-torg-blue",
-    modulos: ["PLANEJAMENTO"],
+    // Liberado pra todos os logados: os envolvidos precisam voltar na ata pra
+    // responder as atividades. Criar/editar/enviar continua só ADMIN/PLANEJAMENTO.
+    modulos: null,
   },
   {
     href: "/diretoria",

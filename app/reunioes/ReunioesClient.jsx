@@ -16,13 +16,14 @@ const ordenarPorOp = (list) => (list || []).slice().sort((a, b) => opNum(a) - op
 export default function ReunioesClient() {
   const router = useRouter();
   const [atas, setAtas] = useState([]);
+  const [gerente, setGerente] = useState(false);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(false);
 
   const carregar = useCallback(() => {
     setLoading(true);
-    fetch("/api/reunioes").then((r) => (r.ok ? r.json() : null)).then((j) => setAtas(j?.atas || [])).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
+    fetch("/api/reunioes").then((r) => (r.ok ? r.json() : null)).then((j) => { setAtas(j?.atas || []); setGerente(!!j?.podeGerenciar); }).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -31,9 +32,9 @@ export default function ReunioesClient() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2"><NotebookPen className="text-torg-blue" /> Atas de Reunião</h2>
-          <p className="text-xs text-torg-gray mt-0.5">Ata semanal sequencial (padrão ISO com revisão) — envie aos envolvidos e acompanhe as respostas por setor.</p>
+          <p className="text-xs text-torg-gray mt-0.5">{gerente ? "Ata semanal numerada pela semana ISO (com revisão) — envie aos envolvidos e acompanhe as respostas por setor." : "Abra a ata da semana para preencher as atividades com a informação e a evidência."}</p>
         </div>
-        <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"><Plus size={18} /> Nova ata</button>
+        {gerente && <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-2"><Plus size={18} /> Nova ata</button>}
       </div>
 
       {loading ? (
@@ -43,7 +44,7 @@ export default function ReunioesClient() {
       ) : atas.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
           <NotebookPen size={38} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-torg-gray">Nenhuma ata ainda. Crie a primeira ata da semana.</p>
+          <p className="text-sm text-torg-gray">{gerente ? "Nenhuma ata ainda. Crie a primeira ata da semana." : "Nenhuma ata enviada ainda."}</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">

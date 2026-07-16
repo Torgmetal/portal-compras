@@ -2,15 +2,18 @@
 // depois de ENVIADA, editar campos da ata sobe a REVISÃO (ISO) com motivo.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, requireAcesso } from "@/lib/session";
+import { podeGerenciarAtas, TIPOS_REUNIOES } from "@/lib/reunioes-acesso";
 import { getISOWeek } from "@/lib/semana-iso";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 
 export async function GET(_req, { params }) {
-  try { await requireRole(["ADMIN", "PLANEJAMENTO"]); }
+  let user;
+  try { user = await requireAcesso({ tipos: TIPOS_REUNIOES }); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  const gerente = podeGerenciarAtas(user);
 
   const ata = await prisma.ataReuniao.findUnique({
     where: { id: params.id },
@@ -20,7 +23,23 @@ export async function GET(_req, { params }) {
     },
   });
   if (!ata) return NextResponse.json({ error: "Ata não encontrada" }, { status: 404 });
-  return NextResponse.json({ ata });
+  if (ata.status === "RASCUNHO" && !gerente) return NextResponse.json({ error: "Ata ainda em rascunho." }, { status: 403 });
+
+  // contexto de quem está vendo: é envolvido? já deu o aceite? qual o setor dele?
+  const email = String(user.email || "").toLowerCase();
+  const minha = ata.confirmacoes.find((c) => String(c.email).toLowerCase() === email) || null;
+  const meuSetor = minha?.setor || user.setor || null;
+
+  return NextResponse.json({
+    ata,
+    podeGerenciar: gerente,
+    eu: {
+      nome: user.name || user.email || "",
+      setor: meuSetor,
+      envolvido: !!minha,
+      confirmadoEm: minha?.confirmadoEm || null,
+    },
+  });
 }
 
 const schema = z.object({

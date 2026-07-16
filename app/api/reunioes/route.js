@@ -1,17 +1,22 @@
 // Atas de reunião semanal (módulo Reuniões). GET lista; POST cria.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, requireAcesso } from "@/lib/session";
+import { podeGerenciarAtas, TIPOS_REUNIOES } from "@/lib/reunioes-acesso";
 import { getISOWeek } from "@/lib/semana-iso";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  try { await requireRole(["ADMIN", "PLANEJAMENTO"]); }
+  let user;
+  try { user = await requireAcesso({ tipos: TIPOS_REUNIOES }); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  const gerente = podeGerenciarAtas(user);
 
   const atas = await prisma.ataReuniao.findMany({
+    // rascunho é da equipe que monta a ata; os demais só veem o que foi enviado
+    where: gerente ? {} : { status: { not: "RASCUNHO" } },
     orderBy: [{ ano: "desc" }, { numero: "desc" }],
     take: 200,
     select: {
@@ -32,7 +37,7 @@ export async function GET() {
       confirmados: confirmacoes.filter((c) => c.confirmadoEm).length,
     };
   });
-  return NextResponse.json({ atas: lista });
+  return NextResponse.json({ atas: lista, podeGerenciar: gerente });
 }
 
 const schema = z.object({
