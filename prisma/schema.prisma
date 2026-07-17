@@ -1615,6 +1615,32 @@ model AuditoriaDoc {
   @@index([auditoriaId])
 }
 
+// Auditoria INTERNA (a Torg auditando seus próprios setores) — cronograma +
+// relatório enxuto divulgado ao setor por e-mail. NÃO confundir com Auditoria
+// (externa: portal de documentos p/ certificadora/cliente). Requisito ISO 9001.
+model AuditoriaInterna {
+  id                        String    @id @default(cuid())
+  numero                    Int // sequencial RAI-001
+  setor                     String // setor/processo auditado
+  dataAuditoria             DateTime
+  responsavelAcompanhamento String // quem acompanha a auditoria pelo setor
+  auditor                   String? // auditor (líder)
+  norma                     String? // referência (ISO 9001, NBR 16775…)
+  escopo                    String? // objetivo/escopo
+  status                    String    @default("AGENDADA") // AGENDADA | REALIZADA | EMITIDO
+  constatacoes              Json      @default("[]") // [{ tipo: CONFORME|NAO_CONFORME|MELHORIA, descricao }]
+  acoes                     Json      @default("[]") // [{ oque, responsavel, prazo }]
+  conclusao                 String?
+  divulgadoEm               DateTime?
+  divulgadoPara             Json      @default("[]") // histórico [{ email, em }]
+  createdById               String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@index([status])
+  @@index([dataAuditoria])
+}
+
 // ── Portal de Apresentação ao Cliente (Compras) ──────────────────
 // Biblioteca fixa de documentos institucionais da Torg (cadastra 1x, reusa em
 // toda apresentação): cadastrais, portfólio, etc.
