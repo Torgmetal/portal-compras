@@ -1642,6 +1642,24 @@ model AuditoriaInterna {
   @@index([dataAuditoria])
 }
 
+// Plano de Ação 5W2H (Qualidade) — ações com O quê/Por quê/Onde/Quem/Quando/
+// Como/Quanto, com acompanhamento e status por ação. Pode nascer de auditoria,
+// não-conformidade, reclamação, reunião etc. (campo origem, texto livre).
+model PlanoAcao {
+  id          String   @id @default(cuid())
+  numero      Int // PA-001
+  titulo      String
+  origem      String? // de onde veio (Auditoria RAI-001, NC, reclamação…)
+  responsavel String? // dono do plano
+  status      String   @default("EM_ANDAMENTO") // EM_ANDAMENTO | CONCLUIDO | CANCELADO
+  itens       Json     @default("[]") // [{ oque, porque, onde, quem, quando, como, quanto, status, acompanhamento, concluidoEm }]
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+}
+
 // ── Portal de Apresentação ao Cliente (Compras) ──────────────────
 // Biblioteca fixa de documentos institucionais da Torg (cadastra 1x, reusa em
 // toda apresentação): cadastrais, portfólio, etc.

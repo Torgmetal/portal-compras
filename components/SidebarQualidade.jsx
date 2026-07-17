@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileCheck2, BookCheck, ScrollText, ClipboardCheck, ClipboardList } from "lucide-react";
+import { FileCheck2, BookCheck, ScrollText, ClipboardCheck, ClipboardList, ListChecks } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -11,6 +11,7 @@ const menu = [
   { href: "/qualidade/data-books", label: "Data Books", icon: BookCheck },
   { href: "/qualidade/auditorias-internas", label: "Auditorias Internas", icon: ClipboardList },
   { href: "/qualidade/auditorias", label: "Auditorias Externas", icon: ClipboardCheck },
+  { href: "/qualidade/planos-acao", label: "Planos de Ação (5W2H)", icon: ListChecks },
 ];
 
 export default function SidebarQualidade() {
