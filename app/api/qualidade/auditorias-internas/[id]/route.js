@@ -32,6 +32,10 @@ const schema = z.object({
     responsavel: z.string().max(120).optional().nullable(),
     prazo: z.string().optional().nullable(),
   })).optional(),
+  fotos: z.array(z.object({
+    url: z.string().url(),
+    legenda: z.string().max(300).optional().nullable(),
+  })).optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -56,9 +60,10 @@ export async function PATCH(req, { params }) {
   if (body.conclusao !== undefined) data.conclusao = body.conclusao?.trim() || null;
   if (body.constatacoes !== undefined) data.constatacoes = body.constatacoes.filter((c) => (c.descricao || "").trim()).map((c) => ({ tipo: c.tipo, descricao: c.descricao.trim() }));
   if (body.acoes !== undefined) data.acoes = body.acoes.filter((a) => (a.oque || "").trim()).map((a) => ({ oque: a.oque.trim(), responsavel: (a.responsavel || "").trim() || null, prazo: a.prazo || null }));
+  if (body.fotos !== undefined) data.fotos = body.fotos.filter((f) => (f.url || "").trim()).map((f) => ({ url: f.url, legenda: (f.legenda || "").trim() || null }));
 
   // Enquanto não emitido, ganhar conteúdo de relatório marca como "em elaboração".
-  const temRelatorio = (data.constatacoes?.length || 0) > 0 || !!data.conclusao || (data.acoes?.length || 0) > 0;
+  const temRelatorio = (data.constatacoes?.length || 0) > 0 || !!data.conclusao || (data.acoes?.length || 0) > 0 || (data.fotos?.length || 0) > 0;
   if (atual.status === "AGENDADA" && temRelatorio) data.status = "REALIZADA";
 
   await prisma.auditoriaInterna.update({ where: { id: atual.id }, data });

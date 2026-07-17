@@ -1630,6 +1630,7 @@ model AuditoriaInterna {
   status                    String    @default("AGENDADA") // AGENDADA | REALIZADA | EMITIDO
   constatacoes              Json      @default("[]") // [{ tipo: CONFORME|NAO_CONFORME|MELHORIA, descricao }]
   acoes                     Json      @default("[]") // [{ oque, responsavel, prazo }]
+  fotos                     Json      @default("[]") // registro fotográfico [{ url, legenda }]
   conclusao                 String?
   divulgadoEm               DateTime?
   divulgadoPara             Json      @default("[]") // histórico [{ email, em }]

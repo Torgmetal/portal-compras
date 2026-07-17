@@ -2,11 +2,30 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ClipboardList, Loader2, FileDown, Send, Trash2, Plus, X, CheckCircle2, AlertCircle, Check } from "lucide-react";
+import { ArrowLeft, ClipboardList, Loader2, FileDown, Send, Trash2, Plus, X, CheckCircle2, AlertCircle, Check, ImagePlus } from "lucide-react";
 import { numRAI, SETORES_AUDITORIA, TIPO_CONSTATACAO, TIPOS, STATUS_AI, statusAiLabel } from "@/lib/auditoria-interna";
 
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+
+// Reduz a imagem no navegador (canvas → JPEG) — mantém Blob e PDF leves e só
+// deixa JPG/PNG entrarem (HEIC/webp não vão pro pdf-lib).
+async function reduzImagem(file, maxDim = 1600, quality = 0.82) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = document.createElement("img");
+    await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error("Formato não suportado — use JPG ou PNG")); img.src = url; });
+    let { width, height } = img;
+    const scale = Math.min(1, maxDim / Math.max(width, height));
+    width = Math.round(width * scale); height = Math.round(height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+    const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", quality));
+    if (!blob) throw new Error("Falha ao processar a imagem");
+    return blob;
+  } finally { URL.revokeObjectURL(url); }
+}
 
 export default function AuditoriaInternaDetalheClient({ id }) {
   const router = useRouter();
@@ -21,6 +40,8 @@ export default function AuditoriaInternaDetalheClient({ id }) {
   const [ident, setIdent] = useState({ setor: "", dataAuditoria: "", responsavelAcompanhamento: "", auditor: "", norma: "", escopo: "" });
   const [constatacoes, setConstatacoes] = useState([]);
   const [acoes, setAcoes] = useState([]);
+  const [fotos, setFotos] = useState([]);
+  const [subindoFoto, setSubindoFoto] = useState(0);
   const [conclusao, setConclusao] = useState("");
 
   const carregar = useCallback(() => {
@@ -32,6 +53,7 @@ export default function AuditoriaInternaDetalheClient({ id }) {
       setIdent({ setor: x.setor || "", dataAuditoria: dISO(x.dataAuditoria), responsavelAcompanhamento: x.responsavelAcompanhamento || "", auditor: x.auditor || "", norma: x.norma || "", escopo: x.escopo || "" });
       setConstatacoes(Array.isArray(x.constatacoes) ? x.constatacoes : []);
       setAcoes(Array.isArray(x.acoes) ? x.acoes : []);
+      setFotos(Array.isArray(x.fotos) ? x.fotos : []);
       setConclusao(x.conclusao || "");
     }).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
   }, [id]);
@@ -41,6 +63,26 @@ export default function AuditoriaInternaDetalheClient({ id }) {
   const setId = (k, v) => setIdent((p) => ({ ...p, [k]: v }));
   const setC = (i, k, v) => setConstatacoes((p) => p.map((c, j) => (j === i ? { ...c, [k]: v } : c)));
   const setAc = (i, k, v) => setAcoes((p) => p.map((c, j) => (j === i ? { ...c, [k]: v } : c)));
+
+  const addFotos = async (files) => {
+    const lista = Array.from(files || []);
+    if (!lista.length) return;
+    setErro(""); setSubindoFoto((n) => n + lista.length);
+    for (const file of lista) {
+      try {
+        const reduzida = await reduzImagem(file);
+        const fd = new FormData();
+        fd.append("file", reduzida, "foto.jpg");
+        const r = await fetch("/api/qualidade/auditorias-internas/foto", { method: "POST", body: fd });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Falha no upload");
+        setFotos((p) => [...p, { url: d.url, legenda: "" }]);
+      } catch (e) { setErro(e.message || "Falha ao subir foto"); }
+      finally { setSubindoFoto((n) => n - 1); }
+    }
+  };
+  const setLegenda = (i, v) => setFotos((p) => p.map((f, j) => (j === i ? { ...f, legenda: v } : f)));
+  const rmFoto = (i) => setFotos((p) => p.filter((_, j) => j !== i));
 
   async function salvar() {
     if (!ident.setor.trim()) return setErro("Informe o setor auditado.");
@@ -52,6 +94,7 @@ export default function AuditoriaInternaDetalheClient({ id }) {
           ...ident,
           constatacoes: constatacoes.filter((c) => (c.descricao || "").trim()),
           acoes: acoes.filter((c) => (c.oque || "").trim()),
+          fotos,
           conclusao,
         }),
       });
@@ -138,6 +181,31 @@ export default function AuditoriaInternaDetalheClient({ id }) {
                 </div>
               );
             })}
+          </div>
+        )}
+      </Secao>
+
+      {/* Registro fotográfico */}
+      <Secao titulo="Registro fotográfico" acao={
+        <label className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium cursor-pointer">
+          <ImagePlus size={13} /> Adicionar fotos
+          <input type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={(e) => { addFotos(e.target.files); e.target.value = ""; }} />
+        </label>
+      }>
+        {subindoFoto > 0 && <p className="text-[12px] text-torg-gray flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> subindo {subindoFoto} foto{subindoFoto > 1 ? "s" : ""}…</p>}
+        {fotos.length === 0 && subindoFoto === 0 ? (
+          <p className="text-sm text-torg-gray">Nenhuma foto. Anexe evidências da auditoria (JPG ou PNG) — elas entram no PDF.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {fotos.map((f, i) => (
+              <div key={i} className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                <div className="relative">
+                  <img src={f.url} alt={`Foto ${i + 1}`} className="w-full h-32 object-cover" />
+                  <button onClick={() => rmFoto(i)} title="Remover" className="absolute top-1 right-1 bg-white/90 rounded-full p-1 text-gray-500 hover:text-red-600 shadow"><X size={13} /></button>
+                </div>
+                <input value={f.legenda || ""} onChange={(e) => setLegenda(i, e.target.value)} placeholder="Legenda…" className="w-full text-[11px] border-0 border-t border-gray-100 px-2 py-1.5 bg-white" />
+              </div>
+            ))}
           </div>
         )}
       </Secao>
