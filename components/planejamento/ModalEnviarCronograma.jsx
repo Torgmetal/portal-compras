@@ -83,7 +83,7 @@ export default function ModalEnviarCronograma({ cronogramaId, onClose, onEnviado
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><Send size={15} className="text-torg-blue" /> Enviar cronograma</h3>
-            {dados?.cronograma && <p className="text-[11px] text-torg-gray mt-0.5">OP {dados.cronograma.opNumero}{dados.cronograma.cliente ? ` · ${dados.cronograma.cliente}` : ""} — vai o PDF do Gantt em anexo</p>}
+            {dados?.cronograma && <p className="text-[11px] text-torg-gray mt-0.5">OP {dados.cronograma.opNumero}{dados.cronograma.cliente ? ` · ${dados.cronograma.cliente}` : ""} — vão 2 anexos: o PDF do Gantt e o .xml do MS Project</p>}
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>

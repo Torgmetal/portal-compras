@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { gerarCronogramaPDF } from "@/lib/cronograma-pdf";
+import { gerarCronogramaMSProjectXML } from "@/lib/cronograma-msproject-xml";
 import { CONTATOS_TAREFAS } from "@/lib/contatos-tarefas";
 import { z } from "zod";
 
@@ -85,9 +86,13 @@ export async function POST(req, { params }) {
   }
   const destinatarios = [...porEmail.values()];
 
-  let pdf;
+  // Vão os DOIS anexos: o PDF (visão de Gantt, pra leitura) e o XML do MS
+  // Project (MSPDI), que o cliente abre no Project dele pra validar/comparar.
+  let pdf, xml;
   try { pdf = await gerarCronogramaPDF(c, c.tarefas); }
   catch (e) { return NextResponse.json({ error: "Falha ao gerar o PDF: " + (e?.message || "erro") }, { status: 500 }); }
+  try { xml = gerarCronogramaMSProjectXML(c, c.tarefas); }
+  catch (e) { return NextResponse.json({ error: "Falha ao gerar o XML do MS Project: " + (e?.message || "erro") }, { status: 500 }); }
 
   const op = c.opNumero || c.op?.numero || "";
   const cliente = c.op?.cliente ? ` · ${c.op.cliente}` : "";
@@ -109,12 +114,18 @@ export async function POST(req, { params }) {
           <tr><td style="padding:6px 0;color:#576D7E;">Período</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(periodo)}</td></tr>
         </table>
         <p style="font-size:12px;color:#576D7E;margin:14px 0 0;border-top:1px solid #e5e7eb;padding-top:12px;">
-          O cronograma vai anexo em PDF (<b>${escapeHtml(pdf.filename)}</b>). Enviado por ${escapeHtml(user.name || "Planejamento Torg")} — pode responder este e-mail em caso de dúvida.
+          Seguem dois anexos:<br>
+          • <b>${escapeHtml(pdf.filename)}</b> — o cronograma em PDF (visão de Gantt).<br>
+          • <b>${escapeHtml(xml.filename)}</b> — o mesmo cronograma em XML do MS Project. Para abrir: <i>Arquivo → Abrir</i> e selecione o .xml.<br>
+          <span style="display:inline-block;margin-top:10px;">Enviado por ${escapeHtml(user.name || "Planejamento Torg")} — pode responder este e-mail em caso de dúvida.</span>
         </p>
       </div>
     </div>`;
 
-  const anexo = [{ filename: pdf.filename, content: Buffer.from(pdf.bytes).toString("base64") }];
+  const anexo = [
+    { filename: pdf.filename, content: Buffer.from(pdf.bytes).toString("base64") },
+    { filename: xml.filename, content: Buffer.from(xml.xml, "utf8").toString("base64") },
+  ];
   let ok = 0;
   for (const d of destinatarios) {
     const r = await sendEmail({
