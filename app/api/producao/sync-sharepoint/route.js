@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { temCronSecret } from "@/lib/cron-auth";
 import { downloadPlanilhaProducao, getMesNomePt } from "@/lib/sharepoint";
 import { parseEapProducao } from "@/lib/parse-pcp-eap";
 import { isoWeekString, semanaInicio, semanaFim, parseSemana } from "@/lib/semana";
@@ -152,7 +153,15 @@ export async function GET(req) {
   if (!isCron && process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const result = await executarSync();
-  await registrarExecucao("sync-sharepoint", { ok: !!result.ok, mensagem: result.ok ? null : result.error });
-  return NextResponse.json(result, { status: result.ok ? 200 : 500 });
+  // try/catch: se executarSync lançar (SharePoint fora do ar/token expirado), grava
+  // heartbeat de falha em vez de sumir (senão o monitor alerta "nunca executou").
+  const t0 = Date.now();
+  try {
+    const result = await executarSync();
+    await registrarExecucao("sync-sharepoint", { ok: !!result.ok, mensagem: result.ok ? null : result.error, duracaoMs: Date.now() - t0 });
+    return NextResponse.json(result, { status: result.ok ? 200 : 500 });
+  } catch (e) {
+    await registrarExecucao("sync-sharepoint", { ok: false, mensagem: e?.message || "erro", duracaoMs: Date.now() - t0 });
+    return NextResponse.json({ ok: false, error: e?.message || "erro" }, { status: 500 });
+  }
 }

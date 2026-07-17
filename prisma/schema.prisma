@@ -649,6 +649,7 @@ model PedidoOmie {
   nfChave              String?
   recebidoPorId        String?
   recebidoEm           DateTime?
+  syncEntregaEm        DateTime? // última verificação de entrega no Omie (rotação do cron sync-entregas)
   recebidoPor          User?            @relation("PedidoRecebidoPor", fields: [recebidoPorId], references: [id])
   cotacao              Cotacao?         @relation(fields: [cotacaoId], references: [id])
   op                   OP?              @relation(fields: [opId], references: [id])
@@ -660,6 +661,7 @@ model PedidoOmie {
   @@index([cotacaoId])
   @@index([opId])
   @@index([status])
+  @@index([dataEntregaReal, syncEntregaEm])
 }
 
 model PrazoHistorico {

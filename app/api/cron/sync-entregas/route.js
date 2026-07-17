@@ -19,7 +19,8 @@ export async function GET(req) {
   const t0 = Date.now();
   try {
     const resultado = await syncEntregas(prisma);
-    await registrarExecucao("sync-entregas", { ok: true, duracaoMs: Date.now() - t0, mensagem: `${resultado.sincronizados}/${resultado.total} sincronizados` });
+    const msg = `${resultado.sincronizados} entregas · ${resultado.processados}/${resultado.total} verificados${resultado.timeboxed ? " (parcial — resto na próxima)" : ""}`;
+    await registrarExecucao("sync-entregas", { ok: true, duracaoMs: Date.now() - t0, mensagem: msg });
 
     // Log de auditoria do cron (sem usuario)
     if (resultado.sincronizados > 0) {
