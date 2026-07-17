@@ -4,9 +4,8 @@ import { useRouter } from "next/navigation";
 import { ListChecks, Plus, Loader2, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { numPA, STATUS_PLANO } from "@/lib/plano-acao";
 
-const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
-
-export default function PlanosAcaoClient() {
+// Lista de planos de ação 5W2H — usada como aba dentro de Auditorias Internas.
+export default function PlanosAcaoLista() {
   const router = useRouter();
   const [planos, setPlanos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,17 +19,14 @@ export default function PlanosAcaoClient() {
   useEffect(() => { carregar(); }, [carregar]);
 
   return (
-    <div className="space-y-5 max-w-6xl">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2"><ListChecks className="text-torg-blue" /> Planos de Ação <span className="text-sm font-normal text-torg-gray">5W2H</span></h1>
-          <p className="text-xs text-torg-gray mt-0.5">Ações no formato 5W2H (o quê, por quê, onde, quem, quando, como, quanto) com acompanhamento e status por ação.</p>
-        </div>
-        <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Novo plano</button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-xs text-torg-gray">Ações no formato 5W2H (o quê, por quê, onde, quem, quando, como, quanto) com acompanhamento e status por ação.</p>
+        <button onClick={() => setModal(true)} className="px-3.5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium flex items-center gap-1.5"><Plus size={16} /> Novo plano</button>
       </div>
 
       {loading ? (
-        <div className="py-16 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin mb-2" /> Carregando…</div>
+        <div className="py-14 text-center text-torg-gray"><Loader2 size={24} className="mx-auto animate-spin mb-2" /> Carregando…</div>
       ) : erro ? (
         <div className="py-10 text-center text-red-600 text-sm">{erro}</div>
       ) : planos.length === 0 ? (
@@ -65,12 +61,12 @@ export default function PlanosAcaoClient() {
         </div>
       )}
 
-      {modal && <ModalNovo onClose={() => setModal(false)} onCriado={(id) => router.push(`/qualidade/planos-acao/${id}`)} />}
+      {modal && <ModalNovoPlano onClose={() => setModal(false)} onCriado={(id) => router.push(`/qualidade/planos-acao/${id}`)} />}
     </div>
   );
 }
 
-function ModalNovo({ onClose, onCriado }) {
+function ModalNovoPlano({ onClose, onCriado }) {
   const [f, setF] = useState({ titulo: "", origem: "", responsavel: "" });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const [salvando, setSalvando] = useState(false);

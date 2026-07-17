@@ -1,14 +1,16 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { ClipboardList, Plus, Loader2, X, AlertCircle, CheckCircle2, CalendarDays, FileText } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ClipboardList, Plus, Loader2, X, AlertCircle, CheckCircle2, CalendarDays, FileText, ListChecks } from "lucide-react";
 import { numRAI, SETORES_AUDITORIA, STATUS_AI, statusAiLabel } from "@/lib/auditoria-interna";
+import PlanosAcaoLista from "./PlanosAcaoLista";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
 export default function AuditoriasInternasClient() {
   const router = useRouter();
-  const [aba, setAba] = useState("cronograma");
+  const searchParams = useSearchParams();
+  const [aba, setAba] = useState(searchParams.get("aba") === "planos" ? "planos" : "cronograma");
   const [itens, setItens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -28,14 +30,14 @@ export default function AuditoriasInternasClient() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2"><ClipboardList className="text-torg-blue" /> Auditorias Internas</h1>
-          <p className="text-xs text-torg-gray mt-0.5">Programe as auditorias dos setores e emita o relatório para divulgar ao setor auditado.</p>
+          <p className="text-xs text-torg-gray mt-0.5">Programe as auditorias dos setores, emita o relatório e acompanhe os planos de ação.</p>
         </div>
-        <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova auditoria</button>
+        {aba !== "planos" && <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova auditoria</button>}
       </div>
 
       {/* Abas */}
       <div className="flex items-center gap-1 border-b border-gray-200">
-        {[{ k: "cronograma", l: "Cronograma", icon: CalendarDays }, { k: "relatorios", l: "Relatórios", icon: FileText }].map((t) => {
+        {[{ k: "cronograma", l: "Cronograma", icon: CalendarDays }, { k: "relatorios", l: "Relatórios", icon: FileText }, { k: "planos", l: "Plano de Ação", icon: ListChecks }].map((t) => {
           const Icon = t.icon;
           return (
             <button key={t.k} onClick={() => setAba(t.k)}
@@ -46,7 +48,9 @@ export default function AuditoriasInternasClient() {
         })}
       </div>
 
-      {loading ? (
+      {aba === "planos" ? (
+        <PlanosAcaoLista />
+      ) : loading ? (
         <div className="py-16 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin mb-2" /> Carregando…</div>
       ) : erro ? (
         <div className="py-10 text-center text-red-600 text-sm">{erro}</div>
