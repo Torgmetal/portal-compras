@@ -124,7 +124,7 @@ export async function GET(req) {
   const vagasPreenchidas = await prisma.vaga.findMany({
     where: {
       status: "PREENCHIDA",
-      dataPreenchimento: { gte: inicioAno, lte: fimAno },
+      dataFechamento: { gte: inicioAno, lte: fimAno },
     },
     include: {
       setor: { select: { nome: true } },
@@ -142,7 +142,7 @@ export async function GET(req) {
     const dias = Math.max(
       0,
       Math.round(
-        (new Date(v.dataPreenchimento) - new Date(dataSolicitacao)) /
+        (new Date(v.dataFechamento) - new Date(dataSolicitacao)) /
           (1000 * 60 * 60 * 24)
       )
     );
@@ -153,8 +153,7 @@ export async function GET(req) {
       dias,
       dataSolicitacao,
       dataAprovacao: v.dataAprovacao || null,
-      dataRecrutamento: v.dataRecrutamento || null,
-      dataPreenchimento: v.dataPreenchimento,
+      dataPreenchimento: v.dataFechamento,
     };
   });
 
