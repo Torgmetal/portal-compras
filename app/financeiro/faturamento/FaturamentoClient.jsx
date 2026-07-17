@@ -517,12 +517,13 @@ function FragmentObra({ obra, aberta, onToggle }) {
               <div className="flex flex-wrap gap-1.5">
                 {ped.parcelas.map((pc) => {
                   const cor = pc.situacao === "Cancelado" ? "bg-gray-100 text-gray-400 line-through border-gray-200"
+                    : pc.situacao === "Encerrado" ? "bg-slate-100 text-slate-500 border-slate-300"
                     : pc.situacao === "Faturado" ? "bg-green-50 text-green-700 border-green-200"
                     : pc.atrasado ? "bg-red-50 text-red-700 border-red-200"
                     : "bg-amber-50 text-amber-700 border-amber-200";
                   return (
                     <span key={pc.codigoPedido} className={`text-[11px] px-2 py-0.5 rounded border ${cor}`}
-                      title={`Seq ${pc.sequencial} — ${pc.situacao}`}>
+                      title={`Seq ${pc.sequencial} — ${pc.situacao}${pc.encMotivo ? " · " + pc.encMotivo : ""}`}>
                       {ped.numero}/{pc.sequencial} · {fmtMoeda(pc.valor)} · {pc.situacao}
                     </span>
                   );
