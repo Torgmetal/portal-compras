@@ -6,7 +6,7 @@ import { fmtOP } from "@/lib/utils";
 import {
   Loader2, AlertCircle, RefreshCw, Trophy, TrendingUp, TrendingDown,
   Package, Truck, Star, ChevronDown, ChevronUp, Info, Target, Clock,
-  AlertTriangle, ShoppingCart, ArrowRight, BarChart3, Users,
+  AlertTriangle, ShoppingCart, ArrowRight, BarChart3, Users, Factory,
 } from "lucide-react";
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -62,7 +62,7 @@ function bgNota(nota) {
 
 // ─── HOOK de dados ───────────────────────────────────────────
 function useIndicadores() {
-  const [periodo, setPeriodo] = useState("tudo");
+  const [periodo, setPeriodo] = useState("mes"); // padrão = mês atual (dado mais recente)
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(null);
@@ -894,12 +894,19 @@ const SETORES = [
     href: "/indicadores/rh",
     apiEndpoint: "/api/rh/indicadores",
   },
-  // Futuros setores:
-  // { id: "producao", label: "Produção", ... },
+  {
+    id: "producao",
+    label: "Produção",
+    desc: "Meta de preparação e produção por setor (Syneco)",
+    icon: Factory,
+    cor: "bg-green-600",
+    href: "/indicadores/producao",
+    apiEndpoint: "/api/producao/indicadores",
+  },
 ];
 
 export function VisaoGeralClient() {
-  const [periodo, setPeriodo] = useState("tudo");
+  const [periodo, setPeriodo] = useState("mes"); // padrão = mês atual (dado mais recente)
   const [dadosSetores, setDadosSetores] = useState({});
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(null);

@@ -103,10 +103,10 @@ const MODULOS = [
   {
     href: "/indicadores",
     label: "Indicadores",
-    desc: "Scorecard, Savings e OTIF",
+    desc: "Scorecard, Savings, OTIF e Produção",
     icon: Activity,
     cor: "bg-indigo-100 text-indigo-700",
-    modulos: ["COMPRAS"],
+    modulos: ["COMPRAS", "COMERCIAL", "RH", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "QUALIDADE"],
   },
   {
     href: "/rh",

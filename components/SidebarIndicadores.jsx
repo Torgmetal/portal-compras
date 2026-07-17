@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   Activity, Trophy, TrendingUp, Package, Clock, ShoppingCart,
   BarChart3, ChevronDown, ChevronRight, Target, DollarSign, Zap, Users, Briefcase,
-  UserMinus, BedDouble, ShieldAlert, GraduationCap, Timer, CalendarRange,
+  UserMinus, BedDouble, ShieldAlert, GraduationCap, Timer, CalendarRange, Factory,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
@@ -53,8 +53,15 @@ const setores = [
       { href: "/indicadores/rh/contratacao", label: "Contratação", icon: Timer },
     ],
   },
-  // Futuros setores:
-  // { id: "producao", label: "Produção", icon: Factory, base: "/indicadores/producao", sub: [...] },
+  {
+    id: "producao",
+    label: "Produção",
+    icon: Factory,
+    base: "/indicadores/producao",
+    sub: [
+      { href: "/indicadores/producao", label: "Dashboard", icon: Activity, exact: true },
+    ],
+  },
 ];
 
 export default function SidebarIndicadores() {
