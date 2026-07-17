@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { upload } from "@vercel/blob/client";
 import {
   Loader2, Plus, Trash2, Upload, Link2, Send, Eye, EyeOff, Image as ImageIcon,
   FileText, Check, ExternalLink, Library, Presentation, X,
@@ -8,13 +9,16 @@ import {
 const TIPOS = [{ v: "CADASTRAL", l: "Cadastral" }, { v: "PORTFOLIO", l: "Portfólio" }, { v: "OUTRO", l: "Outro" }];
 const chipStatus = (s) => s === "PUBLICADO" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-500 border-gray-200";
 
+// Upload DIRETO do navegador pro Vercel Blob (client token). Diferente do POST
+// via /api/upload-blob (que passava pela função serverless e travava em 4,5MB),
+// aqui o arquivo vai direto pro Blob — portfólio/catálogo grandes agora sobem.
 async function uploadArquivo(file) {
-  const fd = new FormData();
-  fd.append("file", file);
-  const r = await fetch("/api/upload-blob", { method: "POST", body: fd });
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error || "Falha no upload");
-  return j; // { url, nomeArquivo, tamanho, tipo }
+  const safe = String(file.name || "arquivo").replace(/[^\w\d.\- ]/g, "_").slice(0, 100);
+  const blob = await upload(`apresentacoes/${Date.now()}-${safe}`, file, {
+    access: "public",
+    handleUploadUrl: "/api/comercial/apresentacoes/upload-token",
+  });
+  return { url: blob.url, nomeArquivo: file.name, tamanho: file.size, tipo: file.type || "application/octet-stream" };
 }
 
 export default function ApresentacoesClient() {
