@@ -94,13 +94,14 @@ export async function POST(req, { params }) {
   // Banner padrão da divulgação (logo Torg + abertura animada) — usado nos
   // DOIS comunicados para manter a identidade da marca.
   const banner = (subtituloTipo) => `
-      <div style="background:#002945;border-radius:12px 12px 0 0;padding:26px 28px 20px 28px;text-align:center;">
+      <div style="background:#0D1F3C;border-radius:12px 12px 0 0;padding:26px 28px 20px 28px;text-align:center;">
         <img src="${baseUrl}/torg-logo-white.png" width="150" alt="Torg Metal" style="display:block;margin:0 auto 10px auto;max-width:150px;height:auto;">
         <p style="margin:0;font-size:30px;line-height:1;">🚀🏗️</p>
         <p style="margin:8px 0 0 0;color:#fff;font-size:24px;font-weight:800;letter-spacing:0.5px;">NOVA OBRA CONFIRMADA!</p>
         <p style="margin:6px 0 0 0;color:#F4801F;font-size:18px;font-weight:700;">OP ${esc(op.numero)} — ${obraLabel}</p>
         <p style="margin:10px 0 0 0;color:#90cdf4;font-size:13px;">${subtituloTipo}</p>
-      </div>`;
+      </div>
+          <div style="height:4px;background:#F4801F;"></div>`;
 
   // Gantt em tabela (compatível com clientes de e-mail): barra por fase e
   // marco ◆ para prioridades, posicionados por largura percentual.

@@ -29,9 +29,10 @@ export async function POST(req, { params }) {
   const link = `${BASE}/apresentacao/${ap.token}`;
   const html = `
   <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#00263F">
-    <div style="background:#006EAB;color:#fff;padding:22px 24px;border-radius:12px 12px 0 0">
+    <div style="background:#0D1F3C;color:#fff;padding:22px 24px;border-radius:12px 12px 0 0">
       <h1 style="margin:0;font-size:20px">Torg Metal — Estruturas Metálicas</h1>
     </div>
+    <div style="height:4px;background:#F4801F;"></div>
     <div style="border:1px solid #E2E9F0;border-top:0;border-radius:0 0 12px 12px;padding:24px">
       <p style="font-size:15px">Olá, <strong>${esc(ap.contato)}</strong>${ap.empresa ? ` (${esc(ap.empresa)})` : ""},</p>
       <p style="font-size:14px;line-height:1.55;color:#123549">${esc(ap.mensagemBoasVindas || "Preparamos uma página com a apresentação da Torg Metal, nossos documentos cadastrais e portfólio. Acesse pelo botão abaixo.")}</p>

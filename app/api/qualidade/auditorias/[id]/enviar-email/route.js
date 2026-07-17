@@ -47,9 +47,10 @@ export async function POST(req, { params }) {
   const logoUrl = `${base}/torg-logo-white.png`;
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#002945">
-      <div style="background:#002945;padding:20px 24px 16px;text-align:center;border-radius:8px 8px 0 0">
+      <div style="background:#0D1F3C;padding:20px 24px 16px;text-align:center;border-radius:8px 8px 0 0">
         <img src="${logoUrl}" alt="TORG METAL" width="158" style="width:158px;max-width:62%;height:auto;display:inline-block;border:0" />
         <div style="color:#9ec0e0;font-size:13px;margin-top:8px;letter-spacing:.4px">Portal do Cliente · Qualidade</div>
+          <div style="height:4px;background:#F4801F;"></div>
       </div>
       <div style="border:1px solid #e3e6ea;border-top:none;border-radius:0 0 8px 8px;padding:26px 24px">
         <p style="font-size:16px;font-weight:bold;margin:0 0 14px">${saud}</p>

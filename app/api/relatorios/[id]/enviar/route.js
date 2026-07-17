@@ -49,7 +49,8 @@ export async function POST(req, { params }) {
     ? `<div style="white-space:pre-wrap">${escapeHtml(mensagem)}</div>`
     : `<p>Segue o relatório de status${rel.obra ? " da obra <strong>" + escapeHtml(rel.obra) + "</strong>" : ""}.</p>`;
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#002945">
-    <div style="background:#0d1f3c;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0"><strong>TORG METAL — Relatório de Status</strong></div>
+    <div style="background:#0D1F3C;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0"><strong>TORG METAL — Relatório de Status</strong></div>
+    <div style="height:4px;background:#F4801F;"></div>
     <div style="border:1px solid #eee;border-top:none;border-radius:0 0 10px 10px;padding:18px;font-size:14px;line-height:1.6">
       ${corpo}
       <p style="margin:20px 0"><a href="${aceiteUrl}" style="display:inline-block;background:#006EAB;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:bold">Ver relatório e confirmar recebimento</a></p>

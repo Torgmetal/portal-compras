@@ -118,9 +118,10 @@ export async function POST(req, { params }) {
       }).join("");
       const html = `
         <div style="font-family:Arial,sans-serif;max-width:660px;margin:0 auto;">
-          <div style="background:#006EAB;color:#fff;padding:16px 22px;border-radius:8px 8px 0 0;">
+          <div style="background:#0D1F3C;color:#fff;padding:16px 22px;border-radius:8px 8px 0 0;">
             <h2 style="margin:0;font-size:17px;">📨 Cobrança respondida — ${escapeHtml(DEPT_LABEL[cob.departamento] || cob.departamento)}</h2>
           </div>
+    <div style="height:4px;background:#F4801F;"></div>
           <div style="background:#f9fafb;padding:20px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
             <p style="font-size:14px;color:#002945;margin:0 0 12px;"><b>${escapeHtml(respondidoPor)}</b> respondeu a cobrança dos marcos:</p>
             <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">

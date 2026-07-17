@@ -108,10 +108,11 @@ export async function POST(req, { params }) {
 
       const html = `
         <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto">
-          <div style="background:#006EAB;padding:20px 24px;border-radius:12px 12px 0 0">
+          <div style="background:#0D1F3C;padding:20px 24px;border-radius:12px 12px 0 0">
             <h1 style="color:#fff;margin:0;font-size:20px">Solicitacao de Cotacao de Frete</h1>
             <p style="color:#b3d9f0;margin:4px 0 0;font-size:13px">Torg Metal Estruturas</p>
           </div>
+          <div style="height:4px;background:#F4801F;"></div>
           <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
             <p style="color:#333;font-size:14px;margin:0 0 16px">
               Prezado(a) <strong>${escapeHtml(forn.nome)}</strong>,

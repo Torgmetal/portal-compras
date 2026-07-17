@@ -128,10 +128,11 @@ export async function POST(req) {
 
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;">
-      <div style="background:#006EAB;color:#fff;padding:16px 22px;border-radius:8px 8px 0 0;">
+      <div style="background:#0D1F3C;color:#fff;padding:16px 22px;border-radius:8px 8px 0 0;">
         <h2 style="margin:0;font-size:17px;">Cobrança — ${escapeHtml(DEPT_LABEL[departamento] || departamento)}</h2>
         <p style="margin:4px 0 0;font-size:13px;opacity:.9;">Marcos de produção atrasados ou próximos do vencimento</p>
       </div>
+    <div style="height:4px;background:#F4801F;"></div>
       <div style="background:#f9fafb;padding:20px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
         ${mensagem ? `<p style="font-size:13px;color:#002945;background:#eef6fb;border-radius:8px;padding:10px 14px;margin:0 0 14px;">${escapeHtml(mensagem)}</p>` : ""}
         <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">

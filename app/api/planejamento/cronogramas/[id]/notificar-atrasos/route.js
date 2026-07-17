@@ -218,9 +218,10 @@ export async function POST(req, { params }) {
 
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;">
-        <div style="background:#002945;padding:16px 24px;border-radius:8px 8px 0 0;">
+        <div style="background:#0D1F3C;padding:16px 24px;border-radius:8px 8px 0 0;">
           <h2 style="color:#fff;margin:0;font-size:16px;">⚠️ Alerta de Atraso — ${DEPT_LABEL[dept] || dept}</h2>
         </div>
+          <div style="height:4px;background:#F4801F;"></div>
         <div style="padding:20px 24px;background:#fff;border:1px solid #e5e7eb;border-top:none;">
           <p style="margin:0 0 12px;color:#374151;font-size:14px;">
             O departamento <strong>${DEPT_LABEL[dept] || dept}</strong> possui

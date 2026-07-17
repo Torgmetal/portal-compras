@@ -26,9 +26,10 @@ function montarHtml({ titulo, corpo, autor, imagemUrl }) {
     ? `<img src="${imagemUrl}" alt="" style="max-width:100%;height:auto;border-radius:8px;margin:0 0 14px;display:block" />`
     : "";
   return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
-    <div style="background:#006EAB;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+    <div style="background:#0D1F3C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
       <strong style="font-size:16px">📢 Comunicado do RH — Torg Metal</strong>
     </div>
+    <div style="height:4px;background:#F4801F;"></div>
     <div style="border:1px solid #eee;border-top:none;border-radius:0 0 12px 12px;padding:20px">
       <h2 style="color:#002945;margin:0 0 10px">${escapeHtml(titulo)}</h2>
       ${imgHtml}
