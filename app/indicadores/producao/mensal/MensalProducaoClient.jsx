@@ -23,6 +23,7 @@ export default function MensalProducaoClient() {
 
   const meses = dados?.meses || [];
   const ac = dados?.acumulado;
+  const metaDia = dados?.metaDiaKg || 6000;
   const temDado = meses.some((m) => m.kg);
 
   return (
@@ -30,7 +31,7 @@ export default function MensalProducaoClient() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2"><CalendarRange className="text-green-600" /> Produção — Evolução Mensal</h1>
-          <p className="text-xs text-torg-gray mt-0.5">Produção (preparação / corte) <b>mês a mês</b> e no <b>acumulado do ano</b>, avaliada contra a meta de {kg(dados?.metaDiaKg || 6000)} kg/dia útil.</p>
+          <p className="text-xs text-torg-gray mt-0.5">Produção (acabamento) <b>mês a mês</b> e no <b>acumulado do ano</b>, avaliada contra a meta de {kg(metaDia)} kg/dia útil.</p>
         </div>
         <div className="flex items-center gap-2">
           <select value={ano} onChange={(e) => setAno(Number(e.target.value))} className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white">
@@ -42,7 +43,7 @@ export default function MensalProducaoClient() {
 
       <div className="flex items-start gap-2 text-[12px] text-torg-gray bg-torg-blue-50/40 border border-torg-blue-100/60 rounded-lg px-3 py-2">
         <Info size={14} className="mt-0.5 flex-shrink-0 text-torg-blue" />
-        <span>O peso é <b>por peça</b>. Como a mesma peça é apontada em Corte, Montagem, Solda, Acabamento, Jato e Pintura, somar os setores contaria o peso várias vezes. A produção física é medida na <b>preparação (corte)</b>, onde cada peça é contada uma única vez — e é a base do ritmo da fábrica.</span>
+        <span>A produção é medida no <b>acabamento</b> — a saída da fábrica, com cada peça contada uma única vez. Não se soma os setores: a mesma peça é apontada em Corte, Montagem, Solda, Acabamento, Jato e Pintura, e somar contaria o peso repetido. O corte mede a <b>entrada</b>; o acabamento, o que foi de fato <b>produzido</b> (a pintura não serve porque nem toda peça é pintada).</span>
       </div>
 
       {loading ? (
@@ -50,7 +51,7 @@ export default function MensalProducaoClient() {
       ) : erro ? (
         <div className="py-16 text-center text-red-600 text-sm">{erro}</div>
       ) : !temDado ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-sm text-torg-gray"><Factory size={34} className="mx-auto text-gray-300 mb-2" /> Sem apontamentos de corte em {ano}.</div>
+        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-sm text-torg-gray"><Factory size={34} className="mx-auto text-gray-300 mb-2" /> Sem apontamentos de acabamento em {ano}.</div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
@@ -58,9 +59,10 @@ export default function MensalProducaoClient() {
               <thead className="bg-gray-50/70 text-torg-gray">
                 <tr>
                   <th className="text-left px-4 py-2.5 font-semibold">Mês</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Preparação (kg)</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Produção (kg)</th>
                   <th className="text-right px-4 py-2.5 font-medium">kg/dia útil</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Meta prep.</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Meta (kg/dia)</th>
+                  <th className="text-right px-4 py-2.5 font-medium">Atingimento</th>
                   <th className="text-center px-4 py-2.5 font-medium">Nota</th>
                 </tr>
               </thead>
@@ -70,6 +72,7 @@ export default function MensalProducaoClient() {
                     <td className="px-4 py-2 font-medium text-torg-dark">{MESES[m.mes - 1]}<span className="text-[10px] text-gray-400 ml-1">{m.diasUteis}du</span></td>
                     <td className="px-4 py-2 text-right text-torg-dark">{kg(m.kg)}</td>
                     <td className="px-4 py-2 text-right text-torg-gray">{kg(m.kgDia)}</td>
+                    <td className="px-4 py-2 text-right text-gray-400">{kg(metaDia)}</td>
                     <td className="px-4 py-2 text-right"><span className={corNota(m.metaPct)}>{m.metaPct != null ? `${Math.round(m.metaPct)}%` : "—"}</span></td>
                     <td className={`px-4 py-2 text-center font-bold ${corNota(m.nota)} ${bgNota(m.nota)}`}>{m.nota ?? "—"}</td>
                   </tr>
@@ -81,6 +84,7 @@ export default function MensalProducaoClient() {
                     <td className="px-4 py-2.5">Acumulado {ano}</td>
                     <td className="px-4 py-2.5 text-right">{kg(ac.kg)}</td>
                     <td className="px-4 py-2.5 text-right">{kg(ac.kgDia)}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-500">{kg(metaDia)}</td>
                     <td className="px-4 py-2.5 text-right"><span className={corNota(ac.metaPct)}>{ac.metaPct != null ? `${Math.round(ac.metaPct)}%` : "—"}</span></td>
                     <td className={`px-4 py-2.5 text-center font-bold ${corNota(ac.nota)}`}>{ac.nota ?? "—"}</td>
                   </tr>
@@ -88,7 +92,7 @@ export default function MensalProducaoClient() {
               )}
             </table>
           </div>
-          <p className="text-[11px] text-torg-gray px-4 py-2.5 border-t border-gray-50">A <b>Preparação</b> é o peso cortado no mês (cada peça uma vez). A <b>Nota</b> é o atingimento da meta ({kg(dados?.metaDiaKg || 6000)} kg/dia útil); no mês corrente, a meta considera só os dias úteis já decorridos.</p>
+          <p className="text-[11px] text-torg-gray px-4 py-2.5 border-t border-gray-50">A <b>Produção</b> é o peso que passou pelo acabamento no mês (cada peça uma vez). O <b>Atingimento</b> compara o kg/dia útil com a meta de {kg(metaDia)} kg/dia; no mês corrente, a meta considera só os dias úteis já decorridos.</p>
         </div>
       )}
     </div>
