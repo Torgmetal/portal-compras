@@ -32,6 +32,7 @@ const setores = [
     base: "/indicadores/comercial",
     sub: [
       { href: "/indicadores/comercial", label: "Dashboard", icon: Activity, exact: true },
+      { href: "/indicadores/comercial/mensal", label: "Evolução Mensal", icon: CalendarRange },
       { href: "/indicadores/comercial/win-rate", label: "Win Rate", icon: Target },
       { href: "/indicadores/comercial/margem", label: "Margem Bruta", icon: DollarSign },
       { href: "/indicadores/comercial/pipeline", label: "Pipeline", icon: TrendingUp },
