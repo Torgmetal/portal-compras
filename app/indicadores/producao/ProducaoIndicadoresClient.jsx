@@ -87,8 +87,8 @@ export default function ProducaoIndicadoresClient() {
           {/* Produção por setor */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2"><Package size={16} className="text-torg-blue" /><span className="text-sm font-semibold text-torg-dark">Produção por setor</span></div>
-              <span className="text-sm text-torg-gray">Total: <b className="text-torg-dark">{kg(dados.totais?.kg)} kg</b> · {kg(dados.totais?.kgDia)} kg/dia</span>
+              <div className="flex items-center gap-2"><Package size={16} className="text-torg-blue" /><span className="text-sm font-semibold text-torg-dark">Processamento por setor</span></div>
+              <span className="text-[11px] text-torg-gray flex items-center gap-1"><Info size={12} /> peso por setor — não somar (a mesma peça passa por vários)</span>
             </div>
             <div className="space-y-3">
               {setores.map((s) => (
