@@ -60,6 +60,7 @@ const setores = [
     base: "/indicadores/producao",
     sub: [
       { href: "/indicadores/producao", label: "Dashboard", icon: Activity, exact: true },
+      { href: "/indicadores/producao/mensal", label: "Evolução Mensal", icon: CalendarRange },
     ],
   },
 ];
