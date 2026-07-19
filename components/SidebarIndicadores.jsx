@@ -46,6 +46,7 @@ const setores = [
     base: "/indicadores/rh",
     sub: [
       { href: "/indicadores/rh", label: "Dashboard", icon: Activity, exact: true },
+      { href: "/indicadores/rh/mensal", label: "Evolução Mensal", icon: CalendarRange },
       { href: "/indicadores/rh/turnover", label: "Turnover", icon: UserMinus },
       { href: "/indicadores/rh/absenteismo", label: "Absenteísmo", icon: BedDouble },
       { href: "/indicadores/rh/acidentes", label: "Acidentes", icon: ShieldAlert },
