@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useRef, useEffect } from "react";
+import { upload as blobUpload } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
@@ -121,16 +122,16 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
       const tempId = Math.random().toString(36).slice(2);
       setAnexosUploading((p) => [...p, tempId]);
       try {
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await fetch("/api/upload-blob", { method: "POST", body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Falha no upload");
+        const safe = String(file.name || "arquivo").replace(/[^\w\d.\- ]/g, "_").slice(0, 100);
+        const blob = await blobUpload(`rm-anexos/${Date.now()}-${safe}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/rm/upload-token",
+        });
         setAnexos((p) => [...p, {
-          url: data.url,
-          nomeArquivo: data.nomeArquivo,
-          tamanho: data.tamanho,
-          tipo: data.tipo,
+          url: blob.url,
+          nomeArquivo: file.name,
+          tamanho: file.size,
+          tipo: file.type || "application/octet-stream",
         }]);
       } catch (e) {
         setErroAnexo(`Falha ao enviar "${file.name}": ${e.message}`);

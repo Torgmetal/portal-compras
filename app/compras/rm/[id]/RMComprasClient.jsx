@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useEffect, useRef } from "react";
+import { upload as blobUpload } from "@vercel/blob/client";
 import { fmtOP } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -3256,11 +3257,12 @@ function AnexosSection({ rmId, anexos: anexosIniciais, editavel }) {
     for (const file of files) {
       setUploading((n) => n + 1);
       try {
-        const fd = new FormData();
-        fd.append("file", file);
-        const upRes = await fetch("/api/upload-blob", { method: "POST", body: fd });
-        const upData = await upRes.json();
-        if (!upRes.ok) throw new Error(upData.error || "Falha no upload");
+        const safe = String(file.name || "arquivo").replace(/[^\w\d.\- ]/g, "_").slice(0, 100);
+        const blob = await blobUpload(`rm-anexos/${Date.now()}-${safe}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/rm/upload-token",
+        });
+        const upData = { url: blob.url, nomeArquivo: file.name, tamanho: file.size, tipo: file.type || "application/octet-stream" };
 
         const linkRes = await fetch(`/api/rm/${rmId}/anexos`, {
           method: "POST",
