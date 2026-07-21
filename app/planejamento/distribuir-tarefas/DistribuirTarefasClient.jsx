@@ -40,6 +40,7 @@ export default function DistribuirTarefasClient() {
   const [distribuindo, setDistribuindo] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [dataProgramada, setDataProgramada] = useState("");
+  const [opLote, setOpLote] = useState("");
   const [matriz, setMatriz] = useState(null);
   const [enviarEmail, setEnviarEmail] = useState(true);
   const [destinatarios, setDestinatarios] = useState({}); // { SETOR: [email] }
@@ -119,6 +120,14 @@ export default function DistribuirTarefasClient() {
     const w = semanaDeData(v);
     if (w) { setSemanaIso(w.semana); setAno(w.ano); }
     if (v) setTarefas((arr) => (arr ? arr.map((t) => (t.dataPrevista ? t : { ...t, dataPrevista: v })) : arr));
+  }
+
+  // OP do lote: preenche a OP das tarefas que ficaram SEM OP (não sobrescreve as
+  // que a IA já detectou nem as editadas à mão) — pra reunião de uma OP só.
+  function aplicarOpLote(v) {
+    const op = String(v).replace(/\D/g, "").slice(0, 4);
+    setOpLote(op);
+    if (op) setTarefas((arr) => (arr ? arr.map((t) => (t.opNumero ? t : { ...t, opNumero: op })) : arr));
   }
 
   async function distribuir() {
@@ -228,13 +237,14 @@ export default function DistribuirTarefasClient() {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-end justify-between gap-3 flex-wrap sticky bottom-3">
             <div className="flex items-end gap-2 flex-wrap">
               <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">Data programada</span><input type="date" value={dataProgramada} onChange={(e) => aplicarDataProgramada(e.target.value)} title="Vira o prazo das tarefas sem data e ajusta a semana ISO" className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
+              <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">OP desta rodada</span><input value={opLote} onChange={(e) => aplicarOpLote(e.target.value)} placeholder="ex: 097" title="Preenche a OP das tarefas que ficaram sem OP (não altera as já preenchidas)" className="w-24 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
               <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">Semana ISO</span><input type="number" min={1} max={53} value={semanaIso} onChange={(e) => setSemanaIso(Number(e.target.value))} className="w-20 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
               <label className="block"><span className="block text-[10px] text-torg-gray mb-0.5">Ano</span><input type="number" value={ano} onChange={(e) => setAno(Number(e.target.value))} className="w-24 text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" /></label>
             </div>
             <button onClick={() => setConfirmando(true)} disabled={incluidasCount === 0} className="text-sm font-semibold text-white bg-torg-blue rounded-lg px-5 py-2.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-2">
               <Send size={16} /> Revisar e distribuir {incluidasCount} tarefa(s)
             </button>
-            <p className="w-full text-[10px] text-torg-gray">A <b>data programada</b> ajusta a semana e vira o prazo das tarefas sem data — você ainda pode editar o prazo de cada tarefa acima.</p>
+            <p className="w-full text-[10px] text-torg-gray">A <b>data programada</b> ajusta a semana e vira o prazo das tarefas sem data. A <b>OP desta rodada</b> preenche a OP das tarefas que ficaram sem — útil quando a reunião é toda de uma OP só. As duas só mexem no que está em branco; dá pra editar cada tarefa acima.</p>
           </div>
 
           {confirmando && (
