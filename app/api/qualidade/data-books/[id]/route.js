@@ -20,6 +20,7 @@ function resolverDoc(d) {
   const st = calcStatusValidade(d.dataValidade, diasAlertaCategoria(d.categoria));
   return {
     id: d.id, nome: d.nome, tipo: d.tipo, norma: d.norma, categoria: d.categoria,
+    importRef: d.importRef, numeroDocumento: d.numeroDocumento,
     numeroCorrida: d.numeroCorrida, dataValidade: d.dataValidade, validado: d.validado,
     temArquivo: !!(d.arquivoUrl || d.sharepointItemId),
     status: st.key, statusLabel: st.label,

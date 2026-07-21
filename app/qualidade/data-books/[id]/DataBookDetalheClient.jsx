@@ -573,6 +573,7 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                 <div key={d.id} className="flex items-center justify-between gap-3 py-1 text-[12px]">
                   <div className="min-w-0 flex items-center gap-2">
                     <FileText size={13} className="text-torg-blue shrink-0" />
+                    {d.importRef && <span className="font-mono text-[11px] font-semibold text-torg-blue shrink-0 whitespace-nowrap" title="Rastreabilidade (Índice R)">R {d.importRef}</span>}
                     <span className="text-torg-dark truncate">{d.nome}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
