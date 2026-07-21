@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
 import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock, Paperclip, X } from "lucide-react";
+import ModalEnviarAta from "@/components/comercial/ModalEnviarAta";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
@@ -67,8 +68,6 @@ function AtaEditor({ opId, ata, onChange, onDelete }) {
   const [salvando, setSalvando] = useState(false);
   const [iaLoad, setIaLoad] = useState(false);
   const [enviarOpen, setEnviarOpen] = useState(false);
-  const [email, setEmail] = useState(ata.clienteEmail || "");
-  const [enviando, setEnviando] = useState(false);
   const [anexos, setAnexos] = useState(Array.isArray(ata.anexos) ? ata.anexos : []);
   const [subindo, setSubindo] = useState(false);
   const fileRef = useRef(null);
@@ -93,15 +92,6 @@ function AtaEditor({ opId, ata, onChange, onDelete }) {
       setF((v) => ({ ...v, titulo: j.ata.titulo || v.titulo, participantes: j.ata.participantes || v.participantes }));
       onChange();
     } catch (e) { alert(e.message); } finally { setIaLoad(false); }
-  }
-  async function enviar() {
-    if (!email.includes("@")) { alert("E-mail inválido."); return; }
-    setEnviando(true);
-    try {
-      const r = await fetch(`/api/comercial/op/${opId}/atas/${ata.id}/enviar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-      const j = await r.json(); if (!j.success) throw new Error(j.error);
-      setEnviarOpen(false); onChange();
-    } catch (e) { alert(e.message); } finally { setEnviando(false); }
   }
   async function excluir() {
     if (!confirm(`Excluir a ATA #${nn(ata.numero)}? Não pode ser desfeito.`)) return;
@@ -192,16 +182,11 @@ function AtaEditor({ opId, ata, onChange, onDelete }) {
       {!trav && (
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={salvar} disabled={salvando} className="text-[13px] bg-torg-blue text-white rounded-lg px-3.5 py-1.5 font-medium hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">{salvando && <Loader2 size={13} className="animate-spin" />} Salvar</button>
-          <button onClick={() => setEnviarOpen((o) => !o)} className="text-[13px] border border-torg-blue text-torg-blue rounded-lg px-3 py-1.5 font-medium hover:bg-torg-blue-50 inline-flex items-center gap-1.5"><Send size={13} /> {ata.status === "ENVIADA" ? "Reenviar ao cliente" : "Enviar ao cliente"}</button>
+          <button onClick={() => setEnviarOpen(true)} className="text-[13px] border border-torg-blue text-torg-blue rounded-lg px-3 py-1.5 font-medium hover:bg-torg-blue-50 inline-flex items-center gap-1.5"><Send size={13} /> {ata.status === "ENVIADA" ? "Reenviar ata" : "Enviar ao cliente / Torg"}</button>
           {ata.status === "ENVIADA" && !ata.aceiteEm && <span className="text-[11px] text-blue-600 inline-flex items-center gap-1"><Clock size={12} /> aguardando aceite</span>}
         </div>
       )}
-      {enviarOpen && !trav && (
-        <div className="flex items-center gap-2 flex-wrap border border-torg-blue-100 rounded-lg p-2 bg-torg-blue-50/30">
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e-mail do cliente" className={`${inp} flex-1 min-w-[180px]`} />
-          <button onClick={enviar} disabled={enviando} className="text-[12px] bg-[#F4801F] text-white rounded-lg px-3 py-1.5 font-medium disabled:opacity-50 inline-flex items-center gap-1">{enviando ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />} Enviar</button>
-        </div>
-      )}
+      {enviarOpen && <ModalEnviarAta opId={opId} ataId={ata.id} onClose={() => setEnviarOpen(false)} onEnviado={() => onChange()} />}
     </div>
   );
 }
