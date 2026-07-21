@@ -70,6 +70,9 @@ export default withAuth(
           // Aceite do Kick Off pelos setores — publico via token unico
           path.startsWith("/kickoff/aceite/") ||
           path.startsWith("/api/kickoff/aceite/") ||
+          // Ata de reunião da OP — cliente vê e aceita, publico via token
+          path.startsWith("/ata-op/") ||
+          path.startsWith("/api/ata-op/") ||
           // Aceite do Data Book pelo cliente — publico via token unico
           path.startsWith("/data-book/aceite/") ||
           path.startsWith("/api/qualidade/data-books/aceite/") ||

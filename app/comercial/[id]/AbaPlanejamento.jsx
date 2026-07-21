@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
-import { GanttChart, Loader2, CheckCircle2, Clock, CalendarRange, FileText } from "lucide-react";
+import { GanttChart, Loader2, CheckCircle2, Clock, CalendarRange } from "lucide-react";
 import GanttInline from "@/components/planejamento/GanttInline";
+import AtasOPSection from "./AtasOPSection";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
@@ -67,12 +68,8 @@ export default function AbaPlanejamento({ opId }) {
         )}
       </div>
 
-      {/* Atas da OP — próxima etapa (modelo novo por OP com numeração, IA e aceite do cliente) */}
-      <div className="bg-white rounded-xl border border-dashed border-torg-blue-200 p-4 text-center">
-        <FileText size={20} className="mx-auto text-torg-blue-300 mb-1.5" />
-        <p className="text-sm font-semibold text-torg-dark">Atas de reunião da OP</p>
-        <p className="text-xs text-torg-gray mt-0.5">Em construção — numeração por OP, preenchimento com IA e envio ao cliente para aceite.</p>
-      </div>
+      {/* Atas de reunião da OP — numeração por OP, preenchimento por IA, envio ao cliente p/ aceite */}
+      <AtasOPSection opId={opId} />
     </div>
   );
 }

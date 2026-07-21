@@ -158,6 +158,7 @@ model OP {
   revisoes             Revisao[]
   romaneios            Romaneio[]
   tarefasPlanejamento  TarefaPlanejamento[]
+  atasOP               AtaOP[]
 
   @@index([numero])
   @@index([status])
@@ -461,6 +462,37 @@ model KickoffAceite {
   kickoff   OPKickOff @relation(fields: [kickoffId], references: [id], onDelete: Cascade)
 
   @@index([kickoffId])
+}
+
+// Ata de reunião POR OP (comercial → aba Planejamento). Distinta das atas SEMANAIS
+// (AtaReuniao). Numeração sequencial por OP; rascunho preenchido por IA; enviada
+// ao cliente por token pra aceite. Criada via SQL no Neon (não db push).
+model AtaOP {
+  id            String    @id @default(cuid())
+  opId          String
+  opNumero      String
+  numero        Int // sequencial por OP (ATA OP-102 #01)
+  titulo        String
+  dataReuniao   DateTime?
+  participantes String?
+  pauta         String? // conteúdo da ata (texto, preenchido/ajustado pela IA)
+  conteudoJson  Json? // estrutura da ata da IA: { resumo, topicos[], acoes[] }
+  anexos        Json      @default("[]") // [{ seq, nome, url, tamanho }]
+  status        String    @default("RASCUNHO") // RASCUNHO | ENVIADA | ACEITA
+  tokenCliente  String?   @unique
+  clienteNome   String?
+  clienteEmail  String?
+  enviadoEm     DateTime?
+  aceiteEm      DateTime?
+  aceiteNome    String?
+  aceiteIp      String?
+  criadoPorId   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  op            OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@unique([opId, numero])
+  @@index([opId])
 }
 
 model OPItem {
