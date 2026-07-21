@@ -110,6 +110,21 @@ export default function DataBookDetalheClient({ id, userId }) {
     }
   }
 
+  async function gerarLpc(secao) {
+    setAcao(secao.id);
+    try {
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/gerar-lpc`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
+      if (json.semLpc) alert("Nenhuma peça da LPC encontrada para esta OP. Importe a LPC (Tekla) desta OP antes de gerar a §02.");
+      await carregar();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setAcao(null);
+    }
+  }
+
   async function popularEmpresa(secao) {
     setAcao(secao.id);
     try {
@@ -335,7 +350,7 @@ export default function DataBookDetalheClient({ id, userId }) {
           <SecaoCard key={s.id} secao={s} candidatos={data.candidatos} acaoLoading={acao === s.id}
             onEstado={(e) => setEstado(s, e)} onVincular={(docId) => vincular(s, docId)} onDesvincular={(docId) => desvincular(s, docId)}
             onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onPopularProcedimentos={() => popularProcedimentos(s)}
-            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onReload={carregar} />
+            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onGerarLpc={() => gerarLpc(s)} onReload={carregar} />
         ))}
       </div>
     </div>
@@ -451,7 +466,7 @@ function Campo({ label, v, onChange, type = "text" }) {
   );
 }
 
-function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onReload }) {
+function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onReload }) {
   const [picker, setPicker] = useState(false);
   const [codBusca, setCodBusca] = useState("");
   const [codResultados, setCodResultados] = useState(null);
@@ -632,6 +647,68 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
 
       {/* §10 PIT — editor de tabela montado no portal */}
       {secao.numero === "10" && <PitEditor secao={secao} acaoLoading={acaoLoading} onSave={onSavePit} />}
+
+      {/* §02 Desenhos as-built — tabela LPC (conjunto → posições) + certificado por material */}
+      {secao.numero === "02" && <LpcSecao secao={secao} acaoLoading={acaoLoading} onGerar={onGerarLpc} />}
+    </div>
+  );
+}
+
+function LpcSecao({ secao, acaoLoading, onGerar }) {
+  const c = secao.conteudoJson?.tipo === "lpc" ? secao.conteudoJson : null;
+  const [aberto, setAberto] = useState(false);
+  const conjuntos = c?.conjuntos || [];
+  const MAX = 20;
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-[11px] text-torg-gray">
+          {c
+            ? <>Tabela gerada da LPC · <b className="text-torg-dark">{conjuntos.length} conjuntos</b> · {c.totalPosicoes} posições{c.semCertificado > 0 ? <> · <span className="text-amber-600 font-medium">{c.semCertificado} sem certificado</span></> : <> · <span className="text-emerald-600 font-medium">todas com certificado</span></>}</>
+            : <>Monte a §02 a partir da LPC: cada conjunto → suas posições, com material, corrida (rastreabilidade) e nº do certificado.</>}
+        </div>
+        <button onClick={onGerar} disabled={acaoLoading}
+          className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+          {acaoLoading ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />} {c ? "Atualizar da LPC" : "Gerar da LPC"}
+        </button>
+      </div>
+      {c && conjuntos.length > 0 && (
+        <div className="mt-2">
+          <button onClick={() => setAberto((v) => !v)} className="text-[11px] text-torg-blue hover:text-torg-dark font-medium">{aberto ? "ocultar prévia" : "ver prévia"}</button>
+          {aberto && (
+            <div className="mt-2 border border-gray-100 rounded-lg divide-y divide-gray-100 max-h-96 overflow-y-auto">
+              {conjuntos.slice(0, MAX).map((cj, i) => (
+                <div key={i} className="px-2.5 py-2">
+                  <p className="text-[11px] font-semibold text-torg-dark">Conjunto {cj.marca}{cj.descricao ? ` — ${cj.descricao}` : ""} <span className="text-torg-gray font-normal">· {cj.qte}x</span></p>
+                  <table className="w-full text-[10px] mt-1">
+                    <thead className="text-torg-gray">
+                      <tr>
+                        <th className="text-left font-medium py-0.5">Posição</th>
+                        <th className="text-left font-medium">Material</th>
+                        <th className="text-right font-medium">Qtd</th>
+                        <th className="text-left font-medium pl-2">Rastreab. (corrida)</th>
+                        <th className="text-left font-medium pl-2">Certificado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cj.posicoes.map((p, j) => (
+                        <tr key={j} className="align-top border-t border-gray-50">
+                          <td className="py-0.5 text-torg-dark font-medium">{p.marca}</td>
+                          <td className="text-torg-dark">{p.material || "—"}</td>
+                          <td className="text-right text-torg-gray">{p.qtd}</td>
+                          <td className="pl-2 text-torg-gray">{p.certificados.length ? p.certificados.map((x) => x.corrida || "—").join(", ") : <span className="text-amber-600">—</span>}</td>
+                          <td className="pl-2 text-torg-gray">{p.certificados.length ? p.certificados.map((x) => x.certificado || "—").join(", ") : <span className="text-amber-600">sem certificado</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+              {conjuntos.length > MAX && <p className="px-2.5 py-2 text-[10px] text-torg-gray">+ {conjuntos.length - MAX} conjuntos (todos entram no PDF).</p>}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
