@@ -125,6 +125,21 @@ export default function DataBookDetalheClient({ id, userId }) {
     }
   }
 
+  async function puxarProjetos(secao) {
+    setAcao(secao.id);
+    try {
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/puxar-projetos`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Erro");
+      if (json.semDesenhos) alert("Nenhum desenho (Montagem/Conjunto) encontrado na pasta da OP no servidor. Confira a estrutura /Ordem de Serviço/01. OP/OP-XXX/2. Engenharia/2.5 Projetos.");
+      await carregar();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setAcao(null);
+    }
+  }
+
   async function popularEmpresa(secao) {
     setAcao(secao.id);
     try {
@@ -350,7 +365,7 @@ export default function DataBookDetalheClient({ id, userId }) {
           <SecaoCard key={s.id} secao={s} candidatos={data.candidatos} acaoLoading={acao === s.id}
             onEstado={(e) => setEstado(s, e)} onVincular={(docId) => vincular(s, docId)} onDesvincular={(docId) => desvincular(s, docId)}
             onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onPopularProcedimentos={() => popularProcedimentos(s)}
-            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onGerarLpc={() => gerarLpc(s)} onReload={carregar} />
+            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onGerarLpc={() => gerarLpc(s)} onPuxarProjetos={() => puxarProjetos(s)} onReload={carregar} />
         ))}
       </div>
     </div>
@@ -466,7 +481,7 @@ function Campo({ label, v, onChange, type = "text" }) {
   );
 }
 
-function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onReload }) {
+function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDesvincular, onPopularMaterial, onPopularEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload }) {
   const [picker, setPicker] = useState(false);
   const [codBusca, setCodBusca] = useState("");
   const [codResultados, setCodResultados] = useState(null);
@@ -649,12 +664,12 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
       {secao.numero === "10" && <PitEditor secao={secao} acaoLoading={acaoLoading} onSave={onSavePit} />}
 
       {/* §02 Desenhos as-built — tabela LPC (conjunto → posições) + certificado por material */}
-      {secao.numero === "02" && <LpcSecao secao={secao} acaoLoading={acaoLoading} onGerar={onGerarLpc} />}
+      {secao.numero === "02" && <LpcSecao secao={secao} acaoLoading={acaoLoading} onGerar={onGerarLpc} onPuxarProjetos={onPuxarProjetos} />}
     </div>
   );
 }
 
-function LpcSecao({ secao, acaoLoading, onGerar }) {
+function LpcSecao({ secao, acaoLoading, onGerar, onPuxarProjetos }) {
   const c = secao.conteudoJson?.tipo === "lpc" ? secao.conteudoJson : null;
   const [aberto, setAberto] = useState(false);
   const conjuntos = c?.conjuntos || [];
@@ -667,10 +682,16 @@ function LpcSecao({ secao, acaoLoading, onGerar }) {
             ? <>Tabela gerada da LPC · <b className="text-torg-dark">{conjuntos.length} conjuntos</b> · {c.totalPosicoes} posições{c.semCertificado > 0 ? <> · <span className="text-amber-600 font-medium">{c.semCertificado} sem certificado</span></> : <> · <span className="text-emerald-600 font-medium">todas com certificado</span></>}</>
             : <>Monte a §02 a partir da LPC: cada conjunto → suas posições, com material, corrida (rastreabilidade) e nº do certificado.</>}
         </div>
-        <button onClick={onGerar} disabled={acaoLoading}
-          className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
-          {acaoLoading ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />} {c ? "Atualizar da LPC" : "Gerar da LPC"}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={onGerar} disabled={acaoLoading}
+            className="text-[11px] text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+            {acaoLoading ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />} {c ? "Atualizar tabela LPC" : "Gerar tabela LPC"}
+          </button>
+          <button onClick={onPuxarProjetos} disabled={acaoLoading}
+            className="text-[11px] text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium disabled:opacity-50">
+            <FileText size={12} /> Trazer desenhos da OP (servidor)
+          </button>
+        </div>
       </div>
       {c && conjuntos.length > 0 && (
         <div className="mt-2">
