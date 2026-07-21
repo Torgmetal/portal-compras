@@ -4,12 +4,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart,
+  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 import MateriaisOPSection from "@/components/MateriaisOPSection";
 import RelatoriosOPSection from "@/components/RelatoriosOPSection";
+import AbaPlanejamento from "./AbaPlanejamento";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import { fmtOP } from "@/lib/utils";
@@ -46,6 +47,7 @@ function calcStatus(op) {
 const VISTAS = [
   { key: "resumo", label: "Resumo", icon: FileText },
   { key: "engenharia", label: "Engenharia", icon: Ruler },
+  { key: "planejamento", label: "Planejamento", icon: GanttChart },
   { key: "compras", label: "Compras", icon: ShoppingCart },
   { key: "producao", label: "Produção", icon: Factory },
   { key: "expedicao", label: "Expedição", icon: Truck },
@@ -773,6 +775,8 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           )}
         </div>
       )}
+
+      {vista === "planejamento" && <AbaPlanejamento opId={op.id} />}
 
       {vista === "engenharia" && (
         <div className="space-y-4">
