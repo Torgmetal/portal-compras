@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { X, Loader2, Send, Plus, Trash2, AlertCircle, CheckCircle2, Building2, Users, Clock } from "lucide-react";
+import { X, Loader2, Send, Plus, Trash2, AlertCircle, CheckCircle2, Building2, Users, Clock, Pencil, Check } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 const norm = (e) => String(e || "").trim().toLowerCase();
@@ -49,6 +49,38 @@ export default function ModalEnviarCronograma({ cronogramaId, onClose, onEnviado
   const addCliente = () => setNovos((n) => [...n, { nome: "", email: "" }]);
   const setNovo = (i, k, v) => setNovos((n) => n.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
   const rmNovo = (i) => setNovos((n) => n.filter((_, j) => j !== i));
+
+  // Editar/remover os contatos do cliente JÁ registrados na OP (ex.: corrigir um
+  // e-mail digitado errado). Grava a lista inteira em OP.clienteContatos.
+  const [editKey, setEditKey] = useState(null); // e-mail (norm) do contato em edição
+  const [editForm, setEditForm] = useState({ nome: "", email: "" });
+  const [salvandoEdit, setSalvandoEdit] = useState(false);
+  const registrados = () => (dados?.clientes || []).filter((c) => !c.doCadastro);
+
+  async function salvarContatos(lista) {
+    const r = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/contatos-cliente`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contatos: lista.map((c) => ({ nome: c.nome || "", email: norm(c.email) })) }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar");
+    carregar();
+  }
+  async function confirmarEdicao(origEmail) {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(editForm.email.trim())) return setErro("E-mail inválido.");
+    setErro(""); setSalvandoEdit(true);
+    try {
+      const lista = registrados().map((c) => (norm(c.email) === norm(origEmail) ? { nome: editForm.nome.trim(), email: norm(editForm.email) } : c));
+      await salvarContatos(lista);
+      setEditKey(null);
+    } catch (e) { setErro(e.message); } finally { setSalvandoEdit(false); }
+  }
+  async function removerContato(c) {
+    if (!confirm(`Remover ${c.nome || c.email} da lista de contatos do cliente?`)) return;
+    setErro("");
+    try { await salvarContatos(registrados().filter((x) => norm(x.email) !== norm(c.email))); }
+    catch (e) { setErro(e.message); }
+  }
 
   async function enviar() {
     setErro("");
@@ -101,12 +133,28 @@ export default function ModalEnviarCronograma({ cronogramaId, onClose, onEnviado
                 {dados.clientes?.length > 0 ? (
                   <div className="space-y-1.5 mb-2">
                     {dados.clientes.map((c, i) => (
-                      <label key={i} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer text-[12px] ${marcado(c.email) ? "border-torg-blue bg-torg-blue-50/50" : "border-gray-200 hover:bg-gray-50"}`}>
-                        <input type="checkbox" checked={marcado(c.email)} onChange={() => alternar(c.nome, c.email, "CLIENTE")} className="accent-torg-blue" />
-                        <span className="font-medium text-torg-dark">{c.nome || "—"}</span>
-                        <span className="text-torg-gray flex-1 truncate">{c.email}</span>
-                        {c.doCadastro && <span className="text-[10px] text-torg-gray bg-gray-100 px-1.5 py-0.5 rounded-full whitespace-nowrap">do cadastro da OP</span>}
-                      </label>
+                      editKey === norm(c.email) ? (
+                        <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-torg-blue bg-torg-blue-50/30">
+                          <input value={editForm.nome} onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Nome do contato" className="flex-1 min-w-0 text-[12px] border border-gray-200 rounded px-2 py-1.5" />
+                          <input value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} placeholder="e-mail do cliente" className="flex-1 min-w-0 text-[12px] border border-gray-200 rounded px-2 py-1.5" />
+                          <button onClick={() => confirmarEdicao(c.email)} disabled={salvandoEdit} title="Salvar" className="text-emerald-600 hover:text-emerald-700 p-1 disabled:opacity-50">{salvandoEdit ? <Loader2 size={14} className="animate-spin" /> : <Check size={15} />}</button>
+                          <button onClick={() => setEditKey(null)} disabled={salvandoEdit} title="Cancelar" className="text-gray-400 hover:text-gray-600 p-1"><X size={14} /></button>
+                        </div>
+                      ) : (
+                        <div key={i} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border text-[12px] ${marcado(c.email) ? "border-torg-blue bg-torg-blue-50/50" : "border-gray-200 hover:bg-gray-50"}`}>
+                          <label className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer">
+                            <input type="checkbox" checked={marcado(c.email)} onChange={() => alternar(c.nome, c.email, "CLIENTE")} className="accent-torg-blue" />
+                            <span className="font-medium text-torg-dark whitespace-nowrap">{c.nome || "—"}</span>
+                            <span className="text-torg-gray flex-1 truncate">{c.email}</span>
+                          </label>
+                          {c.doCadastro ? (
+                            <span className="text-[10px] text-torg-gray bg-gray-100 px-1.5 py-0.5 rounded-full whitespace-nowrap">do cadastro da OP</span>
+                          ) : (<>
+                            <button onClick={() => { setEditKey(norm(c.email)); setEditForm({ nome: c.nome || "", email: c.email || "" }); setErro(""); }} title="Editar e-mail" className="text-gray-400 hover:text-torg-blue p-1"><Pencil size={13} /></button>
+                            <button onClick={() => removerContato(c)} title="Remover contato" className="text-gray-300 hover:text-red-500 p-1"><Trash2 size={13} /></button>
+                          </>)}
+                        </div>
+                      )
                     ))}
                   </div>
                 ) : (
