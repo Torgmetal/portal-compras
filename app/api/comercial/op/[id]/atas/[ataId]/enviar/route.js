@@ -24,7 +24,7 @@ const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UT
 async function carregar(opId, ataId) {
   return prisma.ataOP.findFirst({
     where: { id: ataId, opId },
-    include: { op: { select: { id: true, numero: true, cliente: true, obra: true, clienteContato: true, clienteEmail: true, clienteContatos: true } } },
+    include: { op: { select: { id: true, numero: true, cliente: true, obra: true, refCliente: true, clienteContato: true, clienteEmail: true, clienteContatos: true } } },
   });
 }
 
@@ -42,7 +42,7 @@ export async function GET(_req, { params }) {
 
   return NextResponse.json({
     success: true,
-    ata: { numero: ata.numero, opNumero: ata.opNumero, titulo: ata.titulo, obra: ata.op?.obra || null, cliente: ata.op?.cliente || null, status: ata.status, enviadoEm: ata.enviadoEm, aceiteEm: ata.aceiteEm, aceiteNome: ata.aceiteNome, temConteudo: !!(ata.conteudoJson || ata.pauta), anexos: Array.isArray(ata.anexos) ? ata.anexos.length : 0 },
+    ata: { numero: ata.numero, opNumero: ata.opNumero, titulo: ata.titulo, obra: ata.op?.obra || null, cliente: ata.op?.cliente || null, refCliente: ata.op?.refCliente || null, status: ata.status, enviadoEm: ata.enviadoEm, aceiteEm: ata.aceiteEm, aceiteNome: ata.aceiteNome, temConteudo: !!(ata.conteudoJson || ata.pauta), anexos: Array.isArray(ata.anexos) ? ata.anexos.length : 0 },
     clientes: [...registrados, ...doCadastro],
     setores: CONTATOS_TAREFAS,
   });
@@ -57,7 +57,7 @@ const schema = z.object({
   mensagem: z.string().max(2000).optional().nullable(),
 });
 
-function montarEmail({ ata, obra, codigo, nome, tipo, mensagem, link, cj, anexos }) {
+function montarEmail({ ata, obra, refCliente, codigo, nome, tipo, mensagem, link, cj, anexos }) {
   const isCliente = tipo === "CLIENTE";
   const saud = isCliente ? `Olá, <strong>${escapeHtml(nome || "cliente")}</strong>,` : "Olá, equipe,";
   const intro = isCliente
@@ -68,6 +68,7 @@ function montarEmail({ ata, obra, codigo, nome, tipo, mensagem, link, cj, anexos
   const meta = [
     ata.dataReuniao ? `<tr><td style="padding:4px 0;color:#5C7285;width:120px">Reunião</td><td style="padding:4px 0;font-weight:600">${escapeHtml(fmtD(ata.dataReuniao))}</td></tr>` : "",
     ata.participantes ? `<tr><td style="padding:4px 0;color:#5C7285">Participantes</td><td style="padding:4px 0">${escapeHtml(ata.participantes)}</td></tr>` : "",
+    refCliente ? `<tr><td style="padding:4px 0;color:#5C7285">Ref. do cliente</td><td style="padding:4px 0;font-weight:600">${escapeHtml(refCliente)}</td></tr>` : "",
   ].join("");
 
   const resumo = cj?.resumo ? `<p style="font-size:14px;line-height:1.55;color:#123549;margin:14px 0 0">${escapeHtml(cj.resumo)}</p>` : "";
@@ -130,13 +131,14 @@ export async function POST(req, { params }) {
   const link = `${BASE}/ata-op/${token}`;
   const codigo = `${fmtOP(ata.opNumero)} · ATA #${nn(ata.numero)}`;
   const obra = ata.op?.obra || null;
+  const refCliente = ata.op?.refCliente || null;
   const cj = ata.conteudoJson || null;
   const anexos = Array.isArray(ata.anexos) ? ata.anexos : [];
   const mensagem = body.mensagem?.trim() || null;
 
   let ok = 0;
   for (const d of destinatarios) {
-    const html = montarEmail({ ata, obra, codigo, nome: d.nome, tipo: d.tipo, mensagem, link, cj, anexos });
+    const html = montarEmail({ ata, obra, refCliente, codigo, nome: d.nome, tipo: d.tipo, mensagem, link, cj, anexos });
     const assunto = d.tipo === "CLIENTE"
       ? `${codigo} — Ata de reunião para aceite (Torg Metal)`
       : `${codigo} — Ata de reunião (cópia) — Torg Metal`;

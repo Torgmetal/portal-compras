@@ -23,7 +23,7 @@ async function carregar(id) {
     where: { id },
     include: {
       tarefas: true,
-      op: { select: { id: true, numero: true, cliente: true, clienteContato: true, clienteEmail: true, clienteContatos: true } },
+      op: { select: { id: true, numero: true, cliente: true, refCliente: true, clienteContato: true, clienteEmail: true, clienteContatos: true } },
       envios: { orderBy: { createdAt: "desc" }, take: 5, include: { createdBy: { select: { name: true } } } },
     },
   });
@@ -111,6 +111,7 @@ export async function POST(req, { params }) {
         <table style="width:100%;font-size:13px;border-collapse:collapse;margin:16px 0;">
           <tr><td style="padding:6px 0;color:#576D7E;width:110px;">Obra</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(c.titulo || "—")}</td></tr>
           <tr><td style="padding:6px 0;color:#576D7E;">OP</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(op)}</td></tr>
+          ${c.op?.refCliente ? `<tr><td style="padding:6px 0;color:#576D7E;">Ref. do cliente</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(c.op.refCliente)}</td></tr>` : ""}
           <tr><td style="padding:6px 0;color:#576D7E;">Período</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(periodo)}</td></tr>
         </table>
         <p style="font-size:12px;color:#576D7E;margin:14px 0 0;border-top:1px solid #e5e7eb;padding-top:12px;">

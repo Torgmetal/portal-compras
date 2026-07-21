@@ -80,7 +80,7 @@ export default function ModalEnviarAta({ opId, ataId, onClose, onEnviado }) {
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><FileText size={15} className="text-torg-blue" /> Enviar ata de reunião</h3>
-            {a && <p className="text-[11px] text-torg-gray mt-0.5">OP-{nn(a.opNumero)} · ATA #{nn(a.numero)}{a.obra ? ` · ${a.obra}` : a.cliente ? ` · ${a.cliente}` : ""}{a.titulo ? ` — ${a.titulo}` : ""}{a.anexos ? ` · ${a.anexos} anexo${a.anexos === 1 ? "" : "s"}` : ""}</p>}
+            {a && <p className="text-[11px] text-torg-gray mt-0.5">OP-{nn(a.opNumero)} · ATA #{nn(a.numero)}{a.obra ? ` · ${a.obra}` : a.cliente ? ` · ${a.cliente}` : ""}{a.refCliente ? ` · Ref. ${a.refCliente}` : ""}{a.titulo ? ` — ${a.titulo}` : ""}{a.anexos ? ` · ${a.anexos} anexo${a.anexos === 1 ? "" : "s"}` : ""}</p>}
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>

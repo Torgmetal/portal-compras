@@ -15,6 +15,12 @@ export async function GET(_req, { params }) {
   const rel = await prisma.relatorioStatus.findUnique({ where: { id: params.id } });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado" }, { status: 404 });
 
+  // Referência do cliente vem da OP vinculada (ao vivo, sem duplicar no relatório)
+  if (rel.opId) {
+    const op = await prisma.oP.findUnique({ where: { id: rel.opId }, select: { refCliente: true } });
+    rel.refCliente = op?.refCliente || null;
+  }
+
   let out;
   try { out = await gerarRelatorioStatusPDF(rel); }
   catch (e) { return NextResponse.json({ error: "Falha ao gerar o PDF: " + (e?.message || "erro") }, { status: 500 }); }

@@ -20,6 +20,12 @@ export default function AtaDocumento({ ata, children }) {
   const cj = ata.conteudoJson || {};
   const anexos = Array.isArray(ata.anexos) ? ata.anexos : [];
   const obraLinha = [ata.obra, ata.cliente].filter(Boolean).join(" · ");
+  const metaRows = [
+    { label: "Reunião", value: ata.dataReuniao ? fmtD(ata.dataReuniao) : "—" },
+    { label: "Participantes", value: ata.participantes || "—" },
+  ];
+  if (obraLinha) metaRows.push({ label: "Obra / Cliente", value: obraLinha });
+  if (ata.refCliente) metaRows.push({ label: "Ref. do cliente", value: ata.refCliente });
 
   return (
     <>
@@ -37,9 +43,7 @@ export default function AtaDocumento({ ata, children }) {
 
         {/* Metadados */}
         <div style={{ border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
-          <MetaRow label="Reunião" value={ata.dataReuniao ? fmtD(ata.dataReuniao) : "—"} />
-          <MetaRow label="Participantes" value={ata.participantes || "—"} last={!obraLinha} />
-          {obraLinha && <MetaRow label="Obra / Cliente" value={obraLinha} last />}
+          {metaRows.map((r, i) => <MetaRow key={r.label} label={r.label} value={r.value} last={i === metaRows.length - 1} />)}
         </div>
 
         {/* Resumo ou pauta bruta */}

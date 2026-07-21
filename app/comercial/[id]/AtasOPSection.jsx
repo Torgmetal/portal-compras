@@ -131,7 +131,7 @@ function AtaEditor({ opId, ata, opInfo, onChange, onDelete }) {
   // Prévia = como o cliente verá a ata (reflete as edições atuais, mesmo não salvas)
   const previewAta = {
     opNumero: ata.opNumero, numero: ata.numero, titulo: f.titulo,
-    obra: opInfo?.obra || null, cliente: opInfo?.cliente || null,
+    obra: opInfo?.obra || null, cliente: opInfo?.cliente || null, refCliente: opInfo?.refCliente || null,
     dataReuniao: f.dataReuniao || null, participantes: f.participantes,
     conteudoJson: cj, pauta: f.pauta, anexos,
   };

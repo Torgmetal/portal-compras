@@ -7,13 +7,13 @@ export const runtime = "nodejs";
 export async function GET(_req, { params }) {
   const ata = await prisma.ataOP.findUnique({
     where: { tokenCliente: params.token },
-    include: { op: { select: { numero: true, cliente: true, obra: true } } },
+    include: { op: { select: { numero: true, cliente: true, obra: true, refCliente: true } } },
   });
   if (!ata) return NextResponse.json({ success: false, error: "Link inválido ou expirado." }, { status: 404 });
   return NextResponse.json({
     success: true,
     ata: {
-      numero: ata.numero, opNumero: ata.opNumero, cliente: ata.op?.cliente, obra: ata.op?.obra,
+      numero: ata.numero, opNumero: ata.opNumero, cliente: ata.op?.cliente, obra: ata.op?.obra, refCliente: ata.op?.refCliente,
       titulo: ata.titulo, dataReuniao: ata.dataReuniao, participantes: ata.participantes,
       conteudoJson: ata.conteudoJson, pauta: ata.pauta, anexos: ata.anexos,
       status: ata.status, aceiteEm: ata.aceiteEm, aceiteNome: ata.aceiteNome,
