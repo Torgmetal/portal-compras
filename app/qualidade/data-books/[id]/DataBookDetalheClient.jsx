@@ -577,7 +577,8 @@ function SecaoCard({ secao, candidatos, acaoLoading, onEstado, onVincular, onDes
                     <span className="text-torg-dark truncate">{d.nome}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {d.numeroCorrida && <span className="text-torg-gray font-mono text-[11px] whitespace-nowrap">corrida {d.numeroCorrida}</span>}
+                    {d.numeroDocumento && <span className="text-torg-gray font-mono text-[11px] whitespace-nowrap" title="Nº do certificado">cert {d.numeroDocumento}</span>}
+                    {d.numeroCorrida && <span className="text-torg-gray font-mono text-[11px] whitespace-nowrap" title="Corrida">corrida {d.numeroCorrida}</span>}
                     {d.status !== "SEM_VALIDADE" && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COR[d.status]}`}>{d.statusLabel}</span>}
                     <button onClick={() => onDesvincular(d.id)} disabled={acaoLoading} className="text-torg-gray hover:text-red-600 disabled:opacity-50"><X size={14} /></button>
                   </div>
