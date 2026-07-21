@@ -199,6 +199,9 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                       <span className="text-torg-gray">{op.obra}</span>
                     </>
                   )}
+                  {op.refCliente && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium border border-amber-100 whitespace-nowrap" title="Referência do cliente para esta obra">Ref. cliente: {op.refCliente}</span>
+                  )}
                 </div>
                 {op.descricao && <p className="text-xs text-torg-gray mt-1.5 max-w-xl">{op.descricao}</p>}
                 {(op.estoqueMaterial || op.tipoDataBook) && (
@@ -1568,6 +1571,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
     numero: op.numero || "",
     cliente: op.cliente || "",
     obra: op.obra || "",
+    refCliente: op.refCliente || "",
     descricao: op.descricao || "",
     dataInicio: fmtDateInput(op.dataInicio),
     dataFimPrevista: fmtDateInput(op.dataFimPrevista),
@@ -1604,6 +1608,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
           numero: form.numero.trim().toUpperCase(),
           cliente: form.cliente.trim(),
           obra: form.obra.trim() || null,
+          refCliente: form.refCliente.trim() || null,
           descricao: form.descricao.trim() || null,
           dataInicio: form.dataInicio || null,
           dataFimPrevista: form.dataFimPrevista || null,
@@ -1669,6 +1674,17 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
             placeholder="Ex: Mezanino Industrial"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
           />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Referência do cliente</label>
+          <input
+            type="text" value={form.refCliente}
+            onChange={(e) => set("refCliente", e.target.value)}
+            placeholder="Ex: código/nº da obra no cliente (contrato, WBS, TAG…)"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+          <p className="text-[11px] text-torg-gray mt-1">Código próprio do cliente — aparece nos relatórios e documentos enviados.</p>
         </div>
 
         <div>

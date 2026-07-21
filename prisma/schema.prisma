@@ -112,6 +112,7 @@ model OP {
   numero               String               @unique
   cliente              String
   obra                 String?
+  refCliente           String?              // código/nº de referência da obra no cliente (aparece nos relatórios enviados)
   descricao            String?
   status               OPStatus             @default(ABERTA)
   createdById          String

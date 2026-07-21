@@ -12,7 +12,7 @@ const fmtMoeda = (v) =>
 export default function NovaOP() {
   const router = useRouter();
   const [form, setForm] = useState({
-    numero: "", cliente: "", obra: "", descricao: "",
+    numero: "", cliente: "", obra: "", refCliente: "", descricao: "",
     dataInicio: "", dataFimPrevista: "",
     estoqueMaterial: "", tipoDataBook: "",
   });
@@ -112,6 +112,16 @@ export default function NovaOP() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
             />
           </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-torg-dark mb-1">Referência do cliente</label>
+          <input
+            type="text" value={form.refCliente}
+            onChange={(e) => set("refCliente", e.target.value)}
+            placeholder="Ex: código/nº da obra no cliente (contrato, WBS, TAG…)"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+          <p className="text-[11px] text-torg-gray mt-1">Código próprio do cliente para esta obra — aparece nos relatórios e documentos enviados, pra ele identificar rápido do que se trata.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-torg-dark mb-1">Descrição</label>

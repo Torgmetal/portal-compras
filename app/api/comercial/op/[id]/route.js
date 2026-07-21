@@ -13,6 +13,7 @@ const patchEditSchema = z.object({
   numero: z.string().min(1).optional(),
   cliente: z.string().min(1).optional(),
   obra: z.string().nullable().optional(),
+  refCliente: z.string().nullable().optional(),
   descricao: z.string().nullable().optional(),
   dataInicio: z.string().nullable().optional(),
   dataFimPrevista: z.string().nullable().optional(),
@@ -104,6 +105,7 @@ export async function PATCH(req, { params }) {
   }
   if (edit.cliente !== undefined) dataUpdate.cliente = edit.cliente.trim();
   if (edit.obra !== undefined) dataUpdate.obra = edit.obra?.trim() || null;
+  if (edit.refCliente !== undefined) dataUpdate.refCliente = edit.refCliente?.trim() || null;
   if (edit.descricao !== undefined) dataUpdate.descricao = edit.descricao?.trim() || null;
   if (edit.dataInicio !== undefined) {
     dataUpdate.dataInicio = edit.dataInicio ? new Date(edit.dataInicio) : null;
