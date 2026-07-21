@@ -7,21 +7,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { specsDoMaterial, gradesDoTexto } from "@/lib/databook-lpc";
 
 export const runtime = "nodejs";
 
-const norm = (s) => String(s || "").toUpperCase().normalize("NFD").replace(/[^A-Z0-9]/g, "");
 const extractOP = (t) => (String(t).match(/\d+/)?.[0] || "").padStart(3, "0");
-function specsDoMaterial(mat) {
-  const n = norm(mat);
-  const out = [];
-  const a = n.match(/A\d{2,4}/g); if (a) out.push(...a);       // A36, A572, A1011…
-  const sae = n.match(/SAE(\d+)/); if (sae) out.push("SAE" + sae[1], sae[1]); // SAE1020, 1020
-  const civil = n.match(/CIVIL(\d+)/); if (civil) out.push("CIVIL" + civil[1]); // USI CIVIL 350
-  if (n.includes("XADREZ")) out.push("A36");                   // chapa xadrez = A36
-  if (!out.length) out.push(n);
-  return [...new Set(out)];
-}
 
 export async function GET(_req, { params }) {
   try {
@@ -41,14 +31,16 @@ export async function GET(_req, { params }) {
   const mats = obras.length
     ? await prisma.pecaConjunto.groupBy({ by: ["material"], where: { opNumero: { in: obras } }, _count: { _all: true } })
     : [];
-  const certs = await prisma.documentoQualidade.findMany({ where: { categoria: "MATERIAL", ativo: true, opNumero: op }, select: { norma: true } });
-  const certNorms = certs.map((c) => norm(c.norma)).filter(Boolean);
+  const certs = await prisma.documentoQualidade.findMany({ where: { categoria: "MATERIAL", ativo: true, opNumero: op }, select: { norma: true, nome: true, numeroCorrida: true, numeroDocumento: true } });
+  // grau casado por norma + DESCRIÇÃO (o grau real costuma estar no nome, não na norma:
+  // A-36 vem sob A1018/TUB300…); ignora cert sem corrida E sem nº (registro incompleto).
+  const certGrades = certs.filter((c) => c.numeroCorrida || c.numeroDocumento).map((c) => gradesDoTexto(`${c.norma || ""} ${c.nome || ""}`));
 
   const materiais = mats
     .filter((m) => m.material)
     .map((m) => {
       const sp = specsDoMaterial(m.material);
-      const n = certNorms.filter((cn) => sp.some((s) => cn.includes(s))).length;
+      const n = certGrades.filter((g) => sp.some((s) => g.has(s))).length;
       return { material: m.material, pecas: m._count._all, temCertificado: n > 0, certificados: n };
     })
     .sort((a, b) => (a.temCertificado === b.temCertificado ? b.pecas - a.pecas : a.temCertificado ? 1 : -1));
