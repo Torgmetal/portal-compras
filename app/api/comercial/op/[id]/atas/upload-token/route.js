@@ -14,8 +14,10 @@ const TIPOS = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "message/rfc822",              // .eml (e-mail exportado)
+  "application/vnd.ms-outlook",  // .msg (e-mail do Outlook)
   "image/png", "image/jpeg", "image/webp",
-  "application/octet-stream",
+  "application/octet-stream",    // .msg às vezes chega assim
 ];
 
 export async function POST(req) {

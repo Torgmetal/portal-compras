@@ -171,8 +171,8 @@ function AtaEditor({ opId, ata, onChange, onDelete }) {
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] text-torg-gray">Anexos{anexos.length > 0 ? ` (${anexos.length})` : ""}</span>
             {!trav && (<>
-              <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,image/*,application/pdf" className="hidden" onChange={(e) => { anexar(Array.from(e.target.files || [])); e.target.value = ""; }} />
-              <button onClick={() => fileRef.current?.click()} disabled={subindo} className="text-[11px] text-torg-blue border border-torg-blue-200 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium hover:bg-torg-blue-50 disabled:opacity-50">{subindo ? <Loader2 size={11} className="animate-spin" /> : <Paperclip size={11} />} Anexar PDF/Word/Excel</button>
+              <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.eml,.msg,message/rfc822,application/vnd.ms-outlook,image/*,application/pdf" className="hidden" onChange={(e) => { anexar(Array.from(e.target.files || [])); e.target.value = ""; }} />
+              <button onClick={() => fileRef.current?.click()} disabled={subindo} className="text-[11px] text-torg-blue border border-torg-blue-200 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium hover:bg-torg-blue-50 disabled:opacity-50">{subindo ? <Loader2 size={11} className="animate-spin" /> : <Paperclip size={11} />} Anexar PDF, Word, Excel, e-mail…</button>
             </>)}
           </div>
           {anexos.length > 0 && (
