@@ -707,8 +707,9 @@ function LpcSecao({ secao, acaoLoading, onGerar, onPuxarProjetos }) {
                         <th className="text-left font-medium py-0.5">Posição</th>
                         <th className="text-left font-medium">Material</th>
                         <th className="text-right font-medium">Qtd</th>
-                        <th className="text-left font-medium pl-2">Rastreab. (corrida)</th>
-                        <th className="text-left font-medium pl-2">Certificado</th>
+                        <th className="text-left font-medium pl-2">Rastreab. (R)</th>
+                        <th className="text-left font-medium pl-2">Nº Certificado</th>
+                        <th className="text-left font-medium pl-2">Corrida</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -717,8 +718,9 @@ function LpcSecao({ secao, acaoLoading, onGerar, onPuxarProjetos }) {
                           <td className="py-0.5 text-torg-dark font-medium">{p.marca}</td>
                           <td className="text-torg-dark">{p.material || "—"}</td>
                           <td className="text-right text-torg-gray">{p.qtd}</td>
-                          <td className="pl-2 text-torg-gray">{p.certificados.length ? p.certificados.map((x) => x.corrida || "—").join(", ") : <span className="text-amber-600">—</span>}</td>
+                          <td className="pl-2 text-torg-blue font-medium">{p.certificados.length ? p.certificados.map((x) => (x.indiceR ? `R ${x.indiceR}` : "—")).join(", ") : <span className="text-amber-600">—</span>}</td>
                           <td className="pl-2 text-torg-gray">{p.certificados.length ? p.certificados.map((x) => x.certificado || "—").join(", ") : <span className="text-amber-600">sem certificado</span>}</td>
+                          <td className="pl-2 text-torg-gray">{p.certificados.length ? p.certificados.map((x) => x.corrida || "—").join(", ") : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
