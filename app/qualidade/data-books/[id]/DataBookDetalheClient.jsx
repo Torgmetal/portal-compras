@@ -6,7 +6,7 @@ import {
   Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, Search,
   FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Copy, Users,
 } from "lucide-react";
-import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
+import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, GRUPO_POR_SECAO, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO, tipoPerfil } from "@/lib/databook-secoes";
 import { STATUS_COR } from "@/lib/qualidade-status";
 import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 
@@ -718,7 +718,7 @@ function LpcSecao({ secao, acaoLoading, onGerar, onPuxarProjetos }) {
                       {cj.posicoes.map((p, j) => (
                         <tr key={j} className="align-top border-t border-gray-50">
                           <td className="py-0.5 text-torg-dark font-medium">{p.marca}</td>
-                          <td className="text-torg-dark">{p.material || "—"}</td>
+                          <td className="text-torg-dark">{p.material || "—"}{p.perfil && <span className="block text-[9px] text-torg-gray">{[tipoPerfil(p.perfil), p.perfil].filter(Boolean).join(" · ")}</span>}</td>
                           <td className="text-right text-torg-gray">{p.qtd}</td>
                           <td className="pl-2 text-torg-blue font-medium">{p.certificados.length ? p.certificados.map((x) => (x.indiceR ? `R ${x.indiceR}` : "—")).join(", ") : <span className="text-amber-600">—</span>}</td>
                           <td className="pl-2 text-torg-gray">{p.certificados.length ? p.certificados.map((x) => x.certificado || "—").join(", ") : <span className="text-amber-600">sem certificado</span>}</td>
