@@ -32,6 +32,7 @@ export default function AtaOPPublicaClient({ token }) {
   if (erro && !a) return <div style={wrap}><div style={{ background: "#fff", borderRadius: 12, padding: 24, marginTop: 40, color: "#b91c1c" }}>{erro}</div></div>;
 
   const cj = a.conteudoJson || {};
+  const anexos = Array.isArray(a.anexos) ? a.anexos : [];
   const jaAceito = !!a.aceiteEm || aceito;
 
   return (
@@ -56,6 +57,19 @@ export default function AtaOPPublicaClient({ token }) {
           {cj.acoes?.length > 0 && (<>
             <h3 style={{ fontSize: 14, color: C.navy, marginTop: 18, marginBottom: 0 }}>Ações e pendências</h3>
             <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13, color: C.dark, lineHeight: 1.5 }}>{cj.acoes.map((x, i) => <li key={i} style={{ marginBottom: 4 }}>{x.descricao}{x.responsavel ? ` · ${x.responsavel}` : ""}{x.prazo ? ` · prazo ${fmtD(x.prazo)}` : ""}</li>)}</ul>
+          </>)}
+
+          {anexos.length > 0 && (<>
+            <h3 style={{ fontSize: 14, color: C.navy, marginTop: 18, marginBottom: 6 }}>Anexos</h3>
+            <div style={{ border: "1px solid #E2E9F0", borderRadius: 8, overflow: "hidden" }}>
+              {anexos.map((a, i) => (
+                <a key={a.seq ?? i} href={a.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", fontSize: 13, color: C.blue, textDecoration: "none", borderTop: i ? "1px solid #EEF3F8" : "none" }}>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", fontWeight: 700, color: C.gray }}>#{nn(a.seq ?? i + 1)}</span>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.nome}</span>
+                  <span style={{ fontSize: 11, color: C.gray }}>abrir ↗</span>
+                </a>
+              ))}
+            </div>
           </>)}
 
           <div style={{ marginTop: 24, borderTop: "1px solid #E2E9F0", paddingTop: 18 }}>

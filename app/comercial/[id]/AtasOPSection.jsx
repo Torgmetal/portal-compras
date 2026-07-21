@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
-import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { upload as blobUpload } from "@vercel/blob/client";
+import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock, Paperclip, X } from "lucide-react";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
@@ -68,6 +69,9 @@ function AtaEditor({ opId, ata, onChange, onDelete }) {
   const [enviarOpen, setEnviarOpen] = useState(false);
   const [email, setEmail] = useState(ata.clienteEmail || "");
   const [enviando, setEnviando] = useState(false);
+  const [anexos, setAnexos] = useState(Array.isArray(ata.anexos) ? ata.anexos : []);
+  const [subindo, setSubindo] = useState(false);
+  const fileRef = useRef(null);
   const trav = ata.status === "ACEITA";
   const inp = "w-full text-[13px] border border-gray-200 rounded-lg px-2.5 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50";
 
@@ -104,6 +108,32 @@ function AtaEditor({ opId, ata, onChange, onDelete }) {
     const r = await fetch(`/api/comercial/op/${opId}/atas/${ata.id}`, { method: "DELETE" });
     const j = await r.json(); if (j.success) onDelete(); else alert(j.error);
   }
+  async function salvarAnexos(novos) {
+    setAnexos(novos);
+    try {
+      const r = await fetch(`/api/comercial/op/${opId}/atas/${ata.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anexos: novos }) });
+      const j = await r.json(); if (!j.success) throw new Error(j.error);
+      onChange();
+    } catch (e) { alert(e.message); }
+  }
+  async function anexar(files) {
+    if (!files?.length) return;
+    setSubindo(true);
+    try {
+      let seq = anexos.reduce((m, a) => Math.max(m, a.seq || 0), 0);
+      const novos = [...anexos];
+      for (const file of files) {
+        const safe = String(file.name || "arquivo").replace(/[^\w\d.\- ]/g, "_").slice(0, 100);
+        const blob = await blobUpload(`atas-op/${Date.now()}-${safe}`, file, { access: "public", handleUploadUrl: `/api/comercial/op/${opId}/atas/upload-token` });
+        novos.push({ seq: ++seq, nome: file.name, url: blob.url, tamanho: file.size });
+      }
+      await salvarAnexos(novos);
+    } catch (e) { alert(`Falha ao anexar: ${e.message}`); } finally { setSubindo(false); }
+  }
+  function removerAnexo(seq) {
+    if (!confirm("Remover este anexo?")) return;
+    salvarAnexos(anexos.filter((a) => a.seq !== seq));
+  }
 
   return (
     <div className="space-y-3">
@@ -132,6 +162,30 @@ function AtaEditor({ opId, ata, onChange, onDelete }) {
           {cj.resumo && <p className="text-torg-dark"><b>Resumo:</b> {cj.resumo}</p>}
           {cj.topicos?.length > 0 && <div><b className="text-torg-dark">Tópicos</b><ul className="list-disc ml-4 mt-0.5 text-torg-gray space-y-0.5">{cj.topicos.map((t, i) => <li key={i}><b className="text-torg-dark">{t.titulo}</b>{t.discussao ? ` — ${t.discussao}` : ""}</li>)}</ul></div>}
           {cj.acoes?.length > 0 && <div><b className="text-torg-dark">Ações</b><ul className="list-disc ml-4 mt-0.5 text-torg-gray space-y-0.5">{cj.acoes.map((a, i) => <li key={i}>{a.descricao}{a.responsavel ? ` · ${a.responsavel}` : ""}{a.prazo ? ` · prazo ${fmtD(a.prazo)}` : ""}</li>)}</ul></div>}
+        </div>
+      )}
+
+      {/* Anexos (PDF/Word/Excel) — cada um com nº de sequência */}
+      {(anexos.length > 0 || !trav) && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] text-torg-gray">Anexos{anexos.length > 0 ? ` (${anexos.length})` : ""}</span>
+            {!trav && (<>
+              <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,image/*,application/pdf" className="hidden" onChange={(e) => { anexar(Array.from(e.target.files || [])); e.target.value = ""; }} />
+              <button onClick={() => fileRef.current?.click()} disabled={subindo} className="text-[11px] text-torg-blue border border-torg-blue-200 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium hover:bg-torg-blue-50 disabled:opacity-50">{subindo ? <Loader2 size={11} className="animate-spin" /> : <Paperclip size={11} />} Anexar PDF/Word/Excel</button>
+            </>)}
+          </div>
+          {anexos.length > 0 && (
+            <ul className="border border-gray-100 rounded-lg divide-y divide-gray-50">
+              {anexos.map((a) => (
+                <li key={a.seq} className="px-2.5 py-1.5 flex items-center gap-2 text-[12px]">
+                  <span className="text-[10px] font-mono font-semibold text-torg-blue shrink-0">#{nn(a.seq)}</span>
+                  <a href={a.url} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 truncate text-torg-dark hover:text-torg-blue hover:underline" title={a.nome}>{a.nome}</a>
+                  {!trav && <button onClick={() => removerAnexo(a.seq)} className="text-torg-gray hover:text-red-600 shrink-0"><X size={13} /></button>}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
