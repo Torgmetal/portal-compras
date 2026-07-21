@@ -10,10 +10,10 @@ const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP"];
 
 export async function GET(_req, { params }) {
   try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
-  const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true } });
+  const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, obra: true, cliente: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
   const atas = await prisma.ataOP.findMany({ where: { opId: op.id }, orderBy: { numero: "desc" } });
-  return NextResponse.json({ success: true, atas });
+  return NextResponse.json({ success: true, atas, op: { obra: op.obra, cliente: op.cliente } });
 }
 
 export async function POST(req, { params }) {

@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
-import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock, Paperclip, X } from "lucide-react";
+import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock, Paperclip, X, Eye } from "lucide-react";
 import ModalEnviarAta from "@/components/comercial/ModalEnviarAta";
+import AtaDocumento from "@/components/comercial/AtaDocumento";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
@@ -11,12 +12,13 @@ const nn = (n) => String(n).padStart(2, "0");
 
 export default function AtasOPSection({ opId }) {
   const [atas, setAtas] = useState(null);
+  const [opInfo, setOpInfo] = useState(null);
   const [erro, setErro] = useState("");
   const [selId, setSelId] = useState(null);
   const [criando, setCriando] = useState(false);
 
   const carregar = () => fetch(`/api/comercial/op/${opId}/atas`).then((r) => r.json())
-    .then((j) => { if (j.success) setAtas(j.atas); else setErro(j.error || "Erro"); }).catch(() => setErro("Erro ao carregar"));
+    .then((j) => { if (j.success) { setAtas(j.atas); setOpInfo(j.op || null); } else setErro(j.error || "Erro"); }).catch(() => setErro("Erro ao carregar"));
   useEffect(() => { carregar(); }, [opId]);
 
   async function novaAta() {
@@ -54,7 +56,7 @@ export default function AtasOPSection({ opId }) {
             ))}
           </div>
           <div className="flex-1 min-w-0">
-            {sel ? <AtaEditor key={sel.id} opId={opId} ata={sel} onChange={carregar} onDelete={() => { setSelId(null); carregar(); }} /> : <p className="text-sm text-torg-gray py-6 text-center">Selecione uma ata na lista.</p>}
+            {sel ? <AtaEditor key={sel.id} opId={opId} ata={sel} opInfo={opInfo} onChange={carregar} onDelete={() => { setSelId(null); carregar(); }} /> : <p className="text-sm text-torg-gray py-6 text-center">Selecione uma ata na lista.</p>}
           </div>
         </div>
       )}
@@ -62,12 +64,13 @@ export default function AtasOPSection({ opId }) {
   );
 }
 
-function AtaEditor({ opId, ata, onChange, onDelete }) {
+function AtaEditor({ opId, ata, opInfo, onChange, onDelete }) {
   const [f, setF] = useState({ titulo: ata.titulo || "", dataReuniao: ata.dataReuniao ? String(ata.dataReuniao).slice(0, 10) : "", participantes: ata.participantes || "", pauta: ata.pauta || "" });
   const [cj, setCj] = useState(ata.conteudoJson || null);
   const [salvando, setSalvando] = useState(false);
   const [iaLoad, setIaLoad] = useState(false);
   const [enviarOpen, setEnviarOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [anexos, setAnexos] = useState(Array.isArray(ata.anexos) ? ata.anexos : []);
   const [subindo, setSubindo] = useState(false);
   const fileRef = useRef(null);
@@ -125,6 +128,14 @@ function AtaEditor({ opId, ata, onChange, onDelete }) {
     salvarAnexos(anexos.filter((a) => a.seq !== seq));
   }
 
+  // Prévia = como o cliente verá a ata (reflete as edições atuais, mesmo não salvas)
+  const previewAta = {
+    opNumero: ata.opNumero, numero: ata.numero, titulo: f.titulo,
+    obra: opInfo?.obra || null, cliente: opInfo?.cliente || null,
+    dataReuniao: f.dataReuniao || null, participantes: f.participantes,
+    conteudoJson: cj, pauta: f.pauta, anexos,
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -179,14 +190,28 @@ function AtaEditor({ opId, ata, onChange, onDelete }) {
         </div>
       )}
 
-      {!trav && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={salvar} disabled={salvando} className="text-[13px] bg-torg-blue text-white rounded-lg px-3.5 py-1.5 font-medium hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">{salvando && <Loader2 size={13} className="animate-spin" />} Salvar</button>
-          <button onClick={() => setEnviarOpen(true)} className="text-[13px] border border-torg-blue text-torg-blue rounded-lg px-3 py-1.5 font-medium hover:bg-torg-blue-50 inline-flex items-center gap-1.5"><Send size={13} /> {ata.status === "ENVIADA" ? "Reenviar ata" : "Enviar ao cliente / Torg"}</button>
-          {ata.status === "ENVIADA" && !ata.aceiteEm && <span className="text-[11px] text-blue-600 inline-flex items-center gap-1"><Clock size={12} /> aguardando aceite</span>}
+      <div className="flex items-center gap-2 flex-wrap">
+        {!trav && <button onClick={salvar} disabled={salvando} className="text-[13px] bg-torg-blue text-white rounded-lg px-3.5 py-1.5 font-medium hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">{salvando && <Loader2 size={13} className="animate-spin" />} Salvar</button>}
+        <button onClick={() => setPreviewOpen(true)} className="text-[13px] border border-gray-300 text-torg-dark rounded-lg px-3 py-1.5 font-medium hover:bg-gray-50 inline-flex items-center gap-1.5"><Eye size={13} /> Visualizar</button>
+        {!trav && <button onClick={() => setEnviarOpen(true)} className="text-[13px] border border-torg-blue text-torg-blue rounded-lg px-3 py-1.5 font-medium hover:bg-torg-blue-50 inline-flex items-center gap-1.5"><Send size={13} /> {ata.status === "ENVIADA" ? "Reenviar ata" : "Enviar ao cliente / Torg"}</button>}
+        {ata.status === "ENVIADA" && !ata.aceiteEm && <span className="text-[11px] text-blue-600 inline-flex items-center gap-1"><Clock size={12} /> aguardando aceite</span>}
+      </div>
+      {enviarOpen && <ModalEnviarAta opId={opId} ataId={ata.id} onClose={() => setEnviarOpen(false)} onEnviado={() => onChange()} />}
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && setPreviewOpen(false)}>
+          <div className="w-full max-w-[680px] my-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white text-[11px] font-medium bg-black/30 rounded-full px-3 py-1 inline-flex items-center gap-1.5"><Eye size={12} /> Prévia — é assim que o cliente verá a ata</span>
+              <button onClick={() => setPreviewOpen(false)} className="text-white/90 hover:text-white bg-black/30 rounded-full p-1.5"><X size={16} /></button>
+            </div>
+            <AtaDocumento ata={previewAta}>
+              <div style={{ marginTop: 24, borderTop: "1px solid #E2E9F0", paddingTop: 18 }}>
+                <div style={{ border: "1px dashed #cbd5e1", background: "#F5F8FB", borderRadius: 10, padding: "14px 16px", fontSize: 13, color: "#5C7285", textAlign: "center" }}>Aqui o cliente informa o nome e registra o <b>aceite</b> — desativado na prévia.</div>
+              </div>
+            </AtaDocumento>
+          </div>
         </div>
       )}
-      {enviarOpen && <ModalEnviarAta opId={opId} ataId={ata.id} onClose={() => setEnviarOpen(false)} onEnviado={() => onChange()} />}
     </div>
   );
 }
