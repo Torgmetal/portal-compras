@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
-import { FileText, PenTool, Upload, FolderDown, Eye, Download, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, ExternalLink, AlertCircle, CheckCircle2, Plus, FileSpreadsheet, MapPin, CalendarDays } from "lucide-react";
+import { FileText, PenTool, Upload, Eye, Download, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, ExternalLink, AlertCircle, Plus, FileSpreadsheet, MapPin, CalendarDays } from "lucide-react";
 
 const fmtTam = (n) => (n == null ? "" : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null);
@@ -16,7 +16,6 @@ export default function DesenhosOPSection({ opId, opNumero, obra }) {
   const [fechados, setFechados] = useState({});
   const [erro, setErro] = useState("");
   const [subindo, setSubindo] = useState(false);
-  const [pastaOpen, setPastaOpen] = useState(false);
   const [exportando, setExportando] = useState(false);
   const fileRef = useRef(null);
 
@@ -127,7 +126,6 @@ export default function DesenhosOPSection({ opId, opNumero, obra }) {
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={exportar} disabled={exportando || !(desenhos || []).length} className={`${btn} text-torg-gray border border-gray-300 hover:bg-gray-50 disabled:opacity-40`}>{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
           <button onClick={() => setNovoLoteAlvo({ tipo: "destino" })} className={`${btn} text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50`}><Plus size={13} /> Novo lote</button>
-          <button onClick={() => setPastaOpen(true)} className={`${btn} text-torg-blue border border-torg-blue hover:bg-torg-blue-50`}><FolderDown size={13} /> Trazer da pasta</button>
           <input ref={fileRef} type="file" multiple accept=".pdf,.dwg,.dxf,application/pdf,application/acad,image/vnd.dwg,application/octet-stream" className="hidden" onChange={(e) => { enviar(Array.from(e.target.files || [])); e.target.value = ""; }} />
           <button onClick={() => fileRef.current?.click()} disabled={subindo} className={`${btn} bg-torg-blue text-white hover:bg-torg-dark disabled:opacity-50`}>{subindo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Importar DWG/PDF</button>
         </div>
@@ -228,7 +226,6 @@ export default function DesenhosOPSection({ opId, opNumero, obra }) {
         </div>
       )}
 
-      {pastaOpen && <PastaModal opId={opId} lotes={lotes} loteInicial={loteDestino} onClose={() => setPastaOpen(false)} onImportado={() => { setPastaOpen(false); carregar(); }} />}
       {novoLoteAlvo && <NovoLoteModal opId={opId} onClose={() => setNovoLoteAlvo(null)} onCriado={(lote) => {
         setLotes((ls) => (ls.some((x) => x.id === lote.id) ? ls : [...ls, lote]));
         carregarLotes();
@@ -281,91 +278,6 @@ function NovoLoteModal({ opId, onClose, onCriado }) {
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
           <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
           <button onClick={salvar} disabled={salvando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{salvando && <Loader2 size={14} className="animate-spin" />} Criar lote</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PastaModal({ opId, lotes = [], loteInicial = "", onClose, onImportado }) {
-  const [dados, setDados] = useState(null);
-  const [sel, setSel] = useState({});
-  const [loteId, setLoteId] = useState(loteInicial || "");
-  const [carregando, setCarregando] = useState(true);
-  const [importando, setImportando] = useState(false);
-  const [erro, setErro] = useState("");
-
-  useEffect(() => {
-    fetch(`/api/comercial/op/${opId}/desenhos/pasta`).then((r) => r.json())
-      .then((j) => {
-        if (!j.success) { setErro(j.error || "Erro"); return; }
-        setDados(j);
-        const pre = {}; for (const d of j.desenhos || []) if (!d.jaImportado) pre[d.itemId] = true; setSel(pre);
-      })
-      .catch(() => setErro("Não foi possível ler a pasta da obra.")).finally(() => setCarregando(false));
-  }, [opId]);
-
-  const lista = dados?.desenhos || [];
-  const marcados = lista.filter((d) => sel[d.itemId] && !d.jaImportado);
-  const toggle = (id) => setSel((s) => ({ ...s, [id]: !s[id] }));
-
-  async function importar() {
-    if (!marcados.length) return;
-    setImportando(true); setErro("");
-    try {
-      const r = await fetch(`/api/comercial/op/${opId}/desenhos/pasta`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ desenhos: marcados, loteId: loteId || null }) });
-      const j = await r.json(); if (!j.success) throw new Error(j.error);
-      onImportado();
-    } catch (e) { setErro(e.message); setImportando(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl my-8">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-torg-dark inline-flex items-center gap-2"><FolderDown size={15} className="text-torg-blue" /> Desenhos da pasta da obra</h3>
-            {dados?.opFolder && <p className="text-[11px] text-torg-gray mt-0.5 truncate">{dados.opFolder} · Engenharia / Projetos</p>}
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-        </div>
-        <div className="px-5 py-4">
-          {carregando ? (
-            <div className="py-10 text-center text-torg-gray text-sm"><Loader2 size={22} className="mx-auto animate-spin mb-2" /> Lendo a pasta da obra no servidor…</div>
-          ) : erro && !lista.length ? (
-            <p className="py-8 text-center text-sm text-red-600">{erro}</p>
-          ) : !lista.length ? (
-            <p className="py-8 text-center text-sm text-torg-gray">{dados?.erro || "Nenhum PDF de projeto (Montagem/Conjunto) encontrado na pasta da obra."}</p>
-          ) : (
-            <div className="border border-gray-100 rounded-lg divide-y divide-gray-50 max-h-80 overflow-y-auto">
-              {lista.map((d) => (
-                <label key={d.itemId} className={`flex items-center gap-2.5 px-3 py-2 text-[13px] ${d.jaImportado ? "opacity-60" : "cursor-pointer hover:bg-gray-50"}`}>
-                  <input type="checkbox" disabled={d.jaImportado} checked={d.jaImportado || !!sel[d.itemId]} onChange={() => toggle(d.itemId)} className="accent-torg-blue" />
-                  <FileText size={15} className="text-red-500 shrink-0" />
-                  <span className="flex-1 min-w-0 truncate text-torg-dark" title={d.nome}>{d.nome}</span>
-                  {d.area && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue">{d.area}</span>}
-                  {d.jaImportado && <span className="text-[10px] text-emerald-700 inline-flex items-center gap-0.5"><CheckCircle2 size={11} /> importado</span>}
-                </label>
-              ))}
-            </div>
-          )}
-          {lista.length > 0 && (
-            <div className="mt-3 flex items-center gap-2 text-xs">
-              <span className="text-torg-gray whitespace-nowrap">Adicionar ao lote:</span>
-              <select value={loteId} onChange={(e) => setLoteId(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 bg-white flex-1 min-w-0">
-                <option value="">— sem lote —</option>
-                {lotes.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
-              </select>
-            </div>
-          )}
-          {erro && lista.length > 0 && <p className="text-xs text-red-600 mt-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
-        </div>
-        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2 rounded-b-xl">
-          <span className="text-[11px] text-torg-gray">{marcados.length} selecionado{marcados.length === 1 ? "" : "s"}</span>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
-            <button onClick={importar} disabled={importando || !marcados.length} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{importando ? <Loader2 size={14} className="animate-spin" /> : <FolderDown size={14} />} Trazer {marcados.length || ""}</button>
-          </div>
         </div>
       </div>
     </div>
