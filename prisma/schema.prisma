@@ -161,6 +161,7 @@ model OP {
   tarefasPlanejamento  TarefaPlanejamento[]
   atasOP               AtaOP[]
   lotesExpedicao       LoteExpedicao[]
+  desenhos             DesenhoOP[]
 
   @@index([numero])
   @@index([status])
@@ -513,6 +514,28 @@ model LoteExpedicao {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   op           OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@index([opId])
+}
+
+// Desenho/projeto da OP na aba Engenharia. UPLOAD (arquivo no Blob) ou SHAREPOINT
+// (referência a um item na pasta da obra, servido por proxy). DWG ou PDF.
+model DesenhoOP {
+  id        String   @id @default(cuid())
+  opId      String
+  ordem     Int      @default(0)
+  nome      String
+  ext       String? // pdf | dwg | ...
+  origem    String   @default("UPLOAD") // UPLOAD | SHAREPOINT
+  url       String? // Blob (UPLOAD)
+  driveId   String? // SHAREPOINT
+  itemId    String? // SHAREPOINT
+  webUrl    String? // link na fonte (SHAREPOINT)
+  area      String? // Montagem | Conjunto (SHAREPOINT)
+  tamanho   Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  op        OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
 
   @@index([opId])
 }
