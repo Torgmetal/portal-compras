@@ -11,6 +11,7 @@ import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 import MateriaisOPSection from "@/components/MateriaisOPSection";
 import RelatoriosOPSection from "@/components/RelatoriosOPSection";
 import AbaPlanejamento from "./AbaPlanejamento";
+import AbaExpedicao from "./AbaExpedicao";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import { fmtOP } from "@/lib/utils";
@@ -741,43 +742,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
       </>)}
 
-      {vista === "expedicao" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><Truck size={18} className="text-torg-blue" /> Programação de entrega por lote</h3>
-            {proposta?.id && Array.isArray(proposta.lotes) && proposta.lotes.length > 0 && (
-              <a href={`/api/comercial/orcamento-servico/${proposta.id}/lotes-pdf`} className="px-3 py-2 bg-torg-blue text-white text-sm rounded-lg font-medium inline-flex items-center gap-1.5 hover:bg-torg-blue-700"><FileText size={15} /> Plano de Entregas (PDF)</a>
-            )}
-          </div>
-          {!proposta ? (
-            <p className="text-sm text-torg-gray">Esta OP não está vinculada a uma proposta de serviço com lotes de entrega.</p>
-          ) : !Array.isArray(proposta.lotes) || proposta.lotes.length === 0 ? (
-            <p className="text-sm text-torg-gray">A proposta {proposta.numero ? `OS-${String(proposta.numero).padStart(3, "0")}` : "de serviço"} ainda não tem lotes de entrega. <Link href={`/comercial/orcamentos/servicos/${proposta.id}`} className="text-torg-blue hover:underline">Abrir proposta</Link> para montar os lotes.</p>
-          ) : (
-            <div className="space-y-3">
-              {proposta.lotes.map((lote, i) => (
-                <div key={lote.id || i} className="border border-gray-100 rounded-lg overflow-hidden">
-                  <div className="bg-torg-dark text-white px-4 py-2 flex items-center justify-between gap-2">
-                    <span className="font-semibold text-sm">{lote.nome || `Lote ${i + 1}`}</span>
-                    <span className="text-xs text-white/80">{[lote.data && `Entrega: ${lote.data}`, plural((lote.itens || []).length, "item", "itens")].filter(Boolean).join(" · ")}</span>
-                  </div>
-                  {lote.local && <p className="px-4 pt-2 text-xs text-torg-gray"><span className="font-semibold">Local:</span> {lote.local}</p>}
-                  <table className="w-full text-sm">
-                    <thead><tr className="text-xs text-torg-gray"><th className="text-left px-4 py-1.5 font-medium">Descrição</th><th className="text-right px-4 py-1.5 font-medium w-20">Qtd</th><th className="text-left px-4 py-1.5 font-medium w-24">Unid.</th></tr></thead>
-                    <tbody>
-                      {(lote.itens || []).map((it, j) => (
-                        <tr key={j} className="border-t border-gray-50"><td className="px-4 py-1.5 text-torg-dark">{it.descricao || "—"}{it.url && <a href={it.url} target="_blank" rel="noreferrer" className="text-torg-blue ml-1.5 text-xs underline">arquivo</a>}</td><td className="px-4 py-1.5 text-right text-torg-gray">{it.qtd || ""}</td><td className="px-4 py-1.5 text-torg-gray">{it.unidade || ""}</td></tr>
-                      ))}
-                      {(lote.itens || []).length === 0 && <tr><td colSpan={3} className="px-4 py-1.5 text-xs text-torg-gray">Sem itens.</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-              <p className="text-xs text-torg-gray">Próxima etapa: espelhar aqui a <strong>lista de expedíveis</strong> da Engenharia e os <strong>romaneios emitidos para transporte</strong>, dando baixa em cada lote conforme os romaneios saem.</p>
-            </div>
-          )}
-        </div>
-      )}
+      {vista === "expedicao" && <AbaExpedicao opId={op.id} proposta={proposta} />}
 
       {vista === "planejamento" && <AbaPlanejamento opId={op.id} />}
 

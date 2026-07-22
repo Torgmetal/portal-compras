@@ -160,6 +160,7 @@ model OP {
   romaneios            Romaneio[]
   tarefasPlanejamento  TarefaPlanejamento[]
   atasOP               AtaOP[]
+  lotesExpedicao       LoteExpedicao[]
 
   @@index([numero])
   @@index([status])
@@ -493,6 +494,26 @@ model AtaOP {
   op            OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
 
   @@unique([opId, numero])
+  @@index([opId])
+}
+
+// Lote de entrega da OP (Expedição). Importado de planilha ou manual. No início
+// costuma vir SEM peso (só prioridade/local); a Engenharia refina a lista final
+// e aí entram os pesos. status = PENDENTE | ENTREGUE (baixa por romaneio, futuro).
+model LoteExpedicao {
+  id           String    @id @default(cuid())
+  opId         String
+  ordem        Int       @default(0) // prioridade de entrega (menor = primeiro)
+  nome         String
+  local        String? // local de entrega (pode variar por lote)
+  dataPrevista DateTime?
+  pesoKg       Float? // definido depois, pela lista final da Engenharia
+  observacao   String?
+  status       String    @default("PENDENTE")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  op           OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+
   @@index([opId])
 }
 
