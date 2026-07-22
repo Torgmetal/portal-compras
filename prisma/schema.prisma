@@ -162,6 +162,7 @@ model OP {
   atasOP               AtaOP[]
   lotesExpedicao       LoteExpedicao[]
   desenhos             DesenhoOP[]
+  pecasLote            PecaLote[]
 
   @@index([numero])
   @@index([status])
@@ -515,8 +516,28 @@ model LoteExpedicao {
   updatedAt    DateTime  @updatedAt
   op           OP          @relation(fields: [opId], references: [id], onDelete: Cascade)
   desenhos     DesenhoOP[]
+  pecas        PecaLote[]
 
   @@index([opId])
+}
+
+// Peça registrada num lote de entrega — vem da LISTA DO TEKLA subida no
+// Planejamento. É daqui que sai o PESO FINAL do lote (soma de pesoTotalKg).
+model PecaLote {
+  id          String         @id @default(cuid())
+  opId        String
+  loteId      String?
+  marca       String
+  descricao   String?
+  qtd         Float?
+  pesoUnitKg  Float?
+  pesoTotalKg Float?
+  createdAt   DateTime       @default(now())
+  op          OP             @relation(fields: [opId], references: [id], onDelete: Cascade)
+  lote        LoteExpedicao? @relation(fields: [loteId], references: [id], onDelete: SetNull)
+
+  @@index([opId])
+  @@index([loteId])
 }
 
 // Desenho/projeto da OP na aba Engenharia. UPLOAD (arquivo no Blob) ou SHAREPOINT

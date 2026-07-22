@@ -42,7 +42,7 @@ export async function GET(_req, { params }) {
       orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
       select: {
         id: true, ordem: true, nome: true, local: true, dataPrevista: true, pesoKg: true, status: true,
-        _count: { select: { desenhos: true } },
+        _count: { select: { desenhos: true, pecas: true } },
       },
     }),
   ]);
