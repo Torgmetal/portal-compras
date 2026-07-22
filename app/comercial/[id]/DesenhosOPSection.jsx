@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
-import { FileText, PenTool, Upload, FolderDown, Eye, Download, Trash2, ChevronUp, ChevronDown, Loader2, X, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
+import { FileText, PenTool, Upload, FolderDown, Eye, Download, Trash2, ChevronUp, ChevronDown, Loader2, X, ExternalLink, AlertCircle, CheckCircle2, Plus } from "lucide-react";
 
 const fmtTam = (n) => (n == null ? "" : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 const iconFor = (ext) => (ext === "pdf" ? { I: FileText, c: "text-red-500" } : ext === "dwg" || ext === "dxf" ? { I: PenTool, c: "text-torg-blue" } : { I: FileText, c: "text-torg-gray" });
@@ -10,6 +10,7 @@ export default function DesenhosOPSection({ opId }) {
   const [desenhos, setDesenhos] = useState(null);
   const [lotes, setLotes] = useState([]);
   const [loteDestino, setLoteDestino] = useState("");
+  const [novoLoteAlvo, setNovoLoteAlvo] = useState(null); // {tipo:"destino"|"linha", desenhoId?}
   const [erro, setErro] = useState("");
   const [subindo, setSubindo] = useState(false);
   const [pastaOpen, setPastaOpen] = useState(false);
@@ -62,13 +63,14 @@ export default function DesenhosOPSection({ opId }) {
             <option value="">Lote: — nenhum —</option>
             {lotes.map((l) => <option key={l.id} value={l.id}>Lote: {l.nome}</option>)}
           </select>
+          <button onClick={() => setNovoLoteAlvo({ tipo: "destino" })} className="text-xs text-torg-blue hover:text-torg-dark inline-flex items-center gap-0.5 font-medium" title="Criar um lote de entrega (aparece também na Expedição)"><Plus size={13} /> Novo lote</button>
           <button onClick={() => setPastaOpen(true)} className="text-xs border border-torg-blue text-torg-blue rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-blue-50"><FolderDown size={13} /> Trazer da pasta da obra</button>
           <input ref={fileRef} type="file" multiple accept=".pdf,.dwg,.dxf,application/pdf,application/acad,image/vnd.dwg,application/octet-stream" className="hidden" onChange={(e) => { enviar(Array.from(e.target.files || [])); e.target.value = ""; }} />
           <button onClick={() => fileRef.current?.click()} disabled={subindo} className="text-xs bg-torg-blue text-white rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50">{subindo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Importar DWG/PDF</button>
         </div>
       </div>
-      <p className="text-sm text-torg-gray mb-1">Desenhos de projeto da OP, na ordem de prioridade de fabricação. Escolha o <strong>lote de entrega</strong> antes de importar (ou ajuste em cada linha) — é o que liga o desenho ao lote. PDFs abrem para visualização; DWG baixa (precisa de leitor CAD).</p>
-      {lotes.length === 0 && <p className="text-[11px] text-amber-600 mb-3 inline-flex items-center gap-1"><AlertCircle size={12} /> Ainda não há lotes de entrega — crie na aba <strong>Expedição</strong> para poder vincular cada desenho a um lote.</p>}
+      <p className="text-sm text-torg-gray mb-1">Desenhos de projeto da OP, na ordem de prioridade de fabricação. Aqui você <strong>cria os lotes de entrega</strong> e diz de qual lote cada desenho faz parte — os lotes já aparecem na aba <strong>Expedição</strong>. PDFs abrem para visualização; DWG baixa (precisa de leitor CAD).</p>
+      {lotes.length === 0 && <p className="text-[11px] text-amber-600 mb-3 inline-flex items-center gap-1"><AlertCircle size={12} /> Nenhum lote ainda — clique em <strong>Novo lote</strong> para criar o primeiro (ele vai direto para a Expedição).</p>}
       {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
 
       {desenhos === null ? (
@@ -101,9 +103,10 @@ export default function DesenhosOPSection({ opId }) {
                       : <span className="px-1.5 py-0.5 rounded-full bg-gray-100">enviado{d.tamanho ? ` · ${fmtTam(d.tamanho)}` : ""}</span>}
                   </div>
                 </div>
-                <select value={d.loteId || ""} onChange={(e) => mudarLote(d, e.target.value)} className={`text-[11px] border rounded-lg px-1.5 py-1 bg-white max-w-[140px] shrink-0 ${d.loteId ? "border-torg-blue-200 text-torg-dark" : "border-amber-200 text-amber-700"}`} title="Lote de entrega deste desenho">
+                <select value={d.loteId || ""} onChange={(e) => { if (e.target.value === "__novo__") setNovoLoteAlvo({ tipo: "linha", desenhoId: d.id }); else mudarLote(d, e.target.value); }} className={`text-[11px] border rounded-lg px-1.5 py-1 bg-white max-w-[140px] shrink-0 ${d.loteId ? "border-torg-blue-200 text-torg-dark" : "border-amber-200 text-amber-700"}`} title="Lote de entrega deste desenho">
                   <option value="">— sem lote —</option>
                   {lotes.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+                  <option value="__novo__">＋ novo lote…</option>
                 </select>
                 <a href={arq} target="_blank" rel="noopener noreferrer" className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium hover:bg-torg-blue-50 whitespace-nowrap">{isPdf ? <><Eye size={12} /> Visualizar</> : <><Download size={12} /> Baixar</>}</a>
                 {d.origem === "SHAREPOINT" && d.webUrl && <a href={d.webUrl} target="_blank" rel="noopener noreferrer" className="text-torg-gray hover:text-torg-blue" title="Abrir no SharePoint"><ExternalLink size={14} /></a>}
@@ -115,6 +118,61 @@ export default function DesenhosOPSection({ opId }) {
       )}
 
       {pastaOpen && <PastaModal opId={opId} lotes={lotes} loteInicial={loteDestino} onClose={() => setPastaOpen(false)} onImportado={() => { setPastaOpen(false); carregar(); }} />}
+      {novoLoteAlvo && <NovoLoteModal opId={opId} onClose={() => setNovoLoteAlvo(null)} onCriado={(lote) => {
+        setLotes((ls) => (ls.some((x) => x.id === lote.id) ? ls : [...ls, lote]));
+        carregarLotes();
+        if (novoLoteAlvo.tipo === "destino") setLoteDestino(lote.id);
+        else if (novoLoteAlvo.tipo === "linha" && novoLoteAlvo.desenhoId) mudarLote({ id: novoLoteAlvo.desenhoId }, lote.id);
+        setNovoLoteAlvo(null);
+      }} />}
+    </div>
+  );
+}
+
+function NovoLoteModal({ opId, onClose, onCriado }) {
+  const [f, setF] = useState({ nome: "", local: "", dataPrevista: "" });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
+
+  async function salvar() {
+    if (!f.nome.trim()) return setErro("Informe o nome do lote.");
+    setErro(""); setSalvando(true);
+    try {
+      const r = await fetch(`/api/comercial/op/${opId}/lotes-expedicao`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: f.nome.trim(), local: f.local.trim() || null, dataPrevista: f.dataPrevista || null }) });
+      const j = await r.json(); if (!j.success) throw new Error(j.error);
+      onCriado(j.lote);
+    } catch (e) { setErro(e.message); setSalvando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm my-10">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-torg-dark">Novo lote de entrega</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Lote / identificação *</label>
+            <input value={f.nome} onChange={(e) => setF((v) => ({ ...v, nome: e.target.value }))} placeholder="Ex: Lote 1 — Pilares" className={inp} autoFocus />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Local de entrega</label>
+            <input value={f.local} onChange={(e) => setF((v) => ({ ...v, local: e.target.value }))} placeholder="Ex: Obra SP — Galpão A" className={inp} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Data prevista <span className="text-torg-gray font-normal">— opcional</span></label>
+            <input type="date" value={f.dataPrevista} onChange={(e) => setF((v) => ({ ...v, dataPrevista: e.target.value }))} className={inp} />
+          </div>
+          <p className="text-[11px] text-torg-gray">O peso do lote entra depois, com a lista final — na aba Expedição.</p>
+          {erro && <p className="text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
+        </div>
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
+          <button onClick={salvar} disabled={salvando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{salvando && <Loader2 size={14} className="animate-spin" />} Criar lote</button>
+        </div>
+      </div>
     </div>
   );
 }
