@@ -38,6 +38,13 @@ export async function POST(req, { params }) {
   const sel = Array.isArray(body.desenhos) ? body.desenhos : [];
   if (!sel.length) return NextResponse.json({ error: "Nenhum desenho selecionado." }, { status: 400 });
 
+  // lote (opcional) aplicado a todos os importados; precisa ser desta OP
+  let loteId = null;
+  if (body.loteId) {
+    const l = await prisma.loteExpedicao.findFirst({ where: { id: body.loteId, opId: op.id }, select: { id: true } });
+    loteId = l ? body.loteId : null;
+  }
+
   const driveId = await resolveServidorDriveId();
   if (!driveId) return NextResponse.json({ error: "Drive SERVIDOR não resolvido." }, { status: 502 });
 
@@ -58,6 +65,7 @@ export async function POST(req, { params }) {
     itemId: String(d.itemId),
     webUrl: d.webUrl || null,
     area: d.area || null,
+    loteId,
   }));
   if (data.length) await prisma.desenhoOP.createMany({ data });
 

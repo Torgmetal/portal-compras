@@ -10,14 +10,22 @@ const extDe = (nome) => (String(nome || "").match(/\.([a-z0-9]+)$/i)?.[1] || "")
 
 export async function GET(_req, { params }) {
   try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
-  const desenhos = await prisma.desenhoOP.findMany({ where: { opId: params.id }, orderBy: [{ ordem: "asc" }, { createdAt: "asc" }] });
+  const desenhos = await prisma.desenhoOP.findMany({ where: { opId: params.id }, orderBy: [{ ordem: "asc" }, { createdAt: "asc" }], include: { lote: { select: { id: true, nome: true } } } });
   return NextResponse.json({ success: true, desenhos });
+}
+
+// loteId opcional precisa ser de um lote DESTA OP (senão vira null)
+async function loteValido(loteId, opId) {
+  if (!loteId) return null;
+  const l = await prisma.loteExpedicao.findFirst({ where: { id: loteId, opId }, select: { id: true } });
+  return l ? loteId : null;
 }
 
 const schema = z.object({
   nome: z.string().min(1).max(300),
   url: z.string().url(),
   tamanho: z.number().int().nonnegative().nullable().optional(),
+  loteId: z.string().nullable().optional(),
 });
 
 export async function POST(req, { params }) {
@@ -37,6 +45,7 @@ export async function POST(req, { params }) {
       origem: "UPLOAD",
       url: body.url,
       tamanho: body.tamanho ?? null,
+      loteId: await loteValido(body.loteId, op.id),
     },
   });
   return NextResponse.json({ success: true, desenho });

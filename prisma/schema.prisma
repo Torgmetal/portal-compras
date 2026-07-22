@@ -513,7 +513,8 @@ model LoteExpedicao {
   status       String    @default("PENDENTE")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  op           OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+  op           OP          @relation(fields: [opId], references: [id], onDelete: Cascade)
+  desenhos     DesenhoOP[]
 
   @@index([opId])
 }
@@ -533,11 +534,14 @@ model DesenhoOP {
   webUrl    String? // link na fonte (SHAREPOINT)
   area      String? // Montagem | Conjunto (SHAREPOINT)
   tamanho   Int?
+  loteId    String? // lote de entrega de que este desenho faz parte
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  op        OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+  op        OP             @relation(fields: [opId], references: [id], onDelete: Cascade)
+  lote      LoteExpedicao? @relation(fields: [loteId], references: [id], onDelete: SetNull)
 
   @@index([opId])
+  @@index([loteId])
 }
 
 model OPItem {

@@ -8,6 +8,8 @@ const iconFor = (ext) => (ext === "pdf" ? { I: FileText, c: "text-red-500" } : e
 
 export default function DesenhosOPSection({ opId }) {
   const [desenhos, setDesenhos] = useState(null);
+  const [lotes, setLotes] = useState([]);
+  const [loteDestino, setLoteDestino] = useState("");
   const [erro, setErro] = useState("");
   const [subindo, setSubindo] = useState(false);
   const [pastaOpen, setPastaOpen] = useState(false);
@@ -15,7 +17,15 @@ export default function DesenhosOPSection({ opId }) {
 
   const carregar = () => fetch(`/api/comercial/op/${opId}/desenhos`).then((r) => r.json())
     .then((j) => { if (j.success) setDesenhos(j.desenhos); else setErro(j.error || "Erro"); }).catch(() => setErro("Erro ao carregar"));
-  useEffect(() => { carregar(); }, [opId]);
+  const carregarLotes = () => fetch(`/api/comercial/op/${opId}/lotes-expedicao`).then((r) => r.json())
+    .then((j) => { if (j.success) setLotes(j.lotes || []); }).catch(() => {});
+  useEffect(() => { carregar(); carregarLotes(); }, [opId]);
+
+  async function mudarLote(d, loteId) {
+    setDesenhos((ds) => (ds || []).map((x) => (x.id === d.id ? { ...x, loteId: loteId || null } : x)));
+    await fetch(`/api/comercial/op/${opId}/desenhos/${d.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ loteId: loteId || null }) }).catch(() => {});
+    carregar();
+  }
 
   async function enviar(files) {
     if (!files?.length) return;
@@ -24,7 +34,7 @@ export default function DesenhosOPSection({ opId }) {
       for (const file of files) {
         const safe = String(file.name || "desenho").replace(/[^\w\d.\- ]/g, "_").slice(0, 120);
         const blob = await blobUpload(`desenhos-op/${opId}/${Date.now()}-${safe}`, file, { access: "public", handleUploadUrl: `/api/comercial/op/${opId}/desenhos/upload-token` });
-        const r = await fetch(`/api/comercial/op/${opId}/desenhos`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: file.name, url: blob.url, tamanho: file.size }) });
+        const r = await fetch(`/api/comercial/op/${opId}/desenhos`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: file.name, url: blob.url, tamanho: file.size, loteId: loteDestino || null }) });
         const j = await r.json(); if (!j.success) throw new Error(j.error);
       }
       carregar();
@@ -48,12 +58,17 @@ export default function DesenhosOPSection({ opId }) {
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
         <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><PenTool size={18} className="text-torg-blue" /> Projetos e desenhos</h3>
         <div className="flex items-center gap-2 flex-wrap">
+          <select value={loteDestino} onChange={(e) => setLoteDestino(e.target.value)} className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white max-w-[190px]" title="Lote de entrega dos próximos desenhos que você importar">
+            <option value="">Lote: — nenhum —</option>
+            {lotes.map((l) => <option key={l.id} value={l.id}>Lote: {l.nome}</option>)}
+          </select>
           <button onClick={() => setPastaOpen(true)} className="text-xs border border-torg-blue text-torg-blue rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-blue-50"><FolderDown size={13} /> Trazer da pasta da obra</button>
           <input ref={fileRef} type="file" multiple accept=".pdf,.dwg,.dxf,application/pdf,application/acad,image/vnd.dwg,application/octet-stream" className="hidden" onChange={(e) => { enviar(Array.from(e.target.files || [])); e.target.value = ""; }} />
           <button onClick={() => fileRef.current?.click()} disabled={subindo} className="text-xs bg-torg-blue text-white rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50">{subindo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Importar DWG/PDF</button>
         </div>
       </div>
-      <p className="text-sm text-torg-gray mb-4">Desenhos de projeto da OP. Envie DWG/PDF ou puxe os PDFs as-built da pasta da obra. PDFs abrem para visualização; DWG baixa (precisa de um leitor de CAD).</p>
+      <p className="text-sm text-torg-gray mb-1">Desenhos de projeto da OP, na ordem de prioridade de fabricação. Escolha o <strong>lote de entrega</strong> antes de importar (ou ajuste em cada linha) — é o que liga o desenho ao lote. PDFs abrem para visualização; DWG baixa (precisa de leitor CAD).</p>
+      {lotes.length === 0 && <p className="text-[11px] text-amber-600 mb-3 inline-flex items-center gap-1"><AlertCircle size={12} /> Ainda não há lotes de entrega — crie na aba <strong>Expedição</strong> para poder vincular cada desenho a um lote.</p>}
       {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
 
       {desenhos === null ? (
@@ -86,6 +101,10 @@ export default function DesenhosOPSection({ opId }) {
                       : <span className="px-1.5 py-0.5 rounded-full bg-gray-100">enviado{d.tamanho ? ` · ${fmtTam(d.tamanho)}` : ""}</span>}
                   </div>
                 </div>
+                <select value={d.loteId || ""} onChange={(e) => mudarLote(d, e.target.value)} className={`text-[11px] border rounded-lg px-1.5 py-1 bg-white max-w-[140px] shrink-0 ${d.loteId ? "border-torg-blue-200 text-torg-dark" : "border-amber-200 text-amber-700"}`} title="Lote de entrega deste desenho">
+                  <option value="">— sem lote —</option>
+                  {lotes.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+                </select>
                 <a href={arq} target="_blank" rel="noopener noreferrer" className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium hover:bg-torg-blue-50 whitespace-nowrap">{isPdf ? <><Eye size={12} /> Visualizar</> : <><Download size={12} /> Baixar</>}</a>
                 {d.origem === "SHAREPOINT" && d.webUrl && <a href={d.webUrl} target="_blank" rel="noopener noreferrer" className="text-torg-gray hover:text-torg-blue" title="Abrir no SharePoint"><ExternalLink size={14} /></a>}
                 <button onClick={() => excluir(d)} className="text-torg-gray hover:text-red-600" title="Remover"><Trash2 size={14} /></button>
@@ -95,14 +114,15 @@ export default function DesenhosOPSection({ opId }) {
         </div>
       )}
 
-      {pastaOpen && <PastaModal opId={opId} onClose={() => setPastaOpen(false)} onImportado={() => { setPastaOpen(false); carregar(); }} />}
+      {pastaOpen && <PastaModal opId={opId} lotes={lotes} loteInicial={loteDestino} onClose={() => setPastaOpen(false)} onImportado={() => { setPastaOpen(false); carregar(); }} />}
     </div>
   );
 }
 
-function PastaModal({ opId, onClose, onImportado }) {
+function PastaModal({ opId, lotes = [], loteInicial = "", onClose, onImportado }) {
   const [dados, setDados] = useState(null);
   const [sel, setSel] = useState({});
+  const [loteId, setLoteId] = useState(loteInicial || "");
   const [carregando, setCarregando] = useState(true);
   const [importando, setImportando] = useState(false);
   const [erro, setErro] = useState("");
@@ -125,7 +145,7 @@ function PastaModal({ opId, onClose, onImportado }) {
     if (!marcados.length) return;
     setImportando(true); setErro("");
     try {
-      const r = await fetch(`/api/comercial/op/${opId}/desenhos/pasta`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ desenhos: marcados }) });
+      const r = await fetch(`/api/comercial/op/${opId}/desenhos/pasta`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ desenhos: marcados, loteId: loteId || null }) });
       const j = await r.json(); if (!j.success) throw new Error(j.error);
       onImportado();
     } catch (e) { setErro(e.message); setImportando(false); }
@@ -159,6 +179,15 @@ function PastaModal({ opId, onClose, onImportado }) {
                   {d.jaImportado && <span className="text-[10px] text-emerald-700 inline-flex items-center gap-0.5"><CheckCircle2 size={11} /> importado</span>}
                 </label>
               ))}
+            </div>
+          )}
+          {lista.length > 0 && (
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <span className="text-torg-gray whitespace-nowrap">Adicionar ao lote:</span>
+              <select value={loteId} onChange={(e) => setLoteId(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 bg-white flex-1 min-w-0">
+                <option value="">— sem lote —</option>
+                {lotes.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+              </select>
             </div>
           )}
           {erro && lista.length > 0 && <p className="text-xs text-red-600 mt-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
