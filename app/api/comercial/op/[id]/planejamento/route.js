@@ -25,7 +25,7 @@ export async function GET(_req, { params }) {
 
   const where = { OR: [{ opId: op.id }, { opNumero: op.numero }] };
 
-  const [cronogramas, tarefas] = await Promise.all([
+  const [cronogramas, tarefas, lotes] = await Promise.all([
     prisma.cronograma.findMany({
       where, orderBy: { createdAt: "desc" },
       select: { id: true, titulo: true, dataInicio: true, dataFim: true, tarefas: { select: TAREFA_GANTT, orderBy: { uidMpp: "asc" } } },
@@ -36,7 +36,16 @@ export async function GET(_req, { params }) {
       select: { id: true, titulo: true, descricao: true, setor: true, status: true, responsavel: true, dataPrevista: true, dataConcluida: true, prioridade: true, semanaIso: true, ano: true, updatedAt: true },
       orderBy: [{ dataConcluida: "desc" }, { updatedAt: "desc" }],
     }),
+    // Lotes de entrega da OP (criados na Engenharia) — resumo pro Planejamento
+    prisma.loteExpedicao.findMany({
+      where: { opId: op.id },
+      orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true, ordem: true, nome: true, local: true, dataPrevista: true, pesoKg: true, status: true,
+        _count: { select: { desenhos: true } },
+      },
+    }),
   ]);
 
-  return NextResponse.json({ success: true, cronogramas, tarefas });
+  return NextResponse.json({ success: true, cronogramas, tarefas, lotes });
 }
