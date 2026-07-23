@@ -4,6 +4,9 @@ import { ClipboardList, RefreshCw, Loader2, AlertTriangle, ChevronDown, ChevronR
 
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
+// timeZone UTC: a data de saída vem do serial do Excel (meia-noite UTC) — sem
+// isso o fuso -03 jogaria a data um dia para trás no relatório.
+const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
 export default function ListaExpedicaoSection({ opId }) {
   const [dados, setDados] = useState(null);
@@ -71,13 +74,13 @@ export default function ListaExpedicaoSection({ opId }) {
           `${frentes.length} frente(s) · ${todas.length} marcas · contratado ${fmtKg(contratado)} · expedido ${fmtKg(expedido)} · faltante ${fmtKg(Math.max(0, contratado - expedido))}`,
           `${nExp} marca(s) já expedida(s) conforme os romaneios emitidos`,
         ],
-        totalColunas: 7,
+        totalColunas: 9,
         nomePlanilha: "Lista de Expedição",
         codigoDoc: "REL-EXP-003",
       });
-      ws.columns = [{ width: 14 }, { width: 20 }, { width: 34 }, { width: 9 }, { width: 14 }, { width: 15 }, { width: 12 }];
+      ws.columns = [{ width: 14 }, { width: 20 }, { width: 32 }, { width: 9 }, { width: 14 }, { width: 15 }, { width: 11 }, { width: 12 }, { width: 14 }];
       let row = linhaInicio;
-      adicionarHeaderTabela(ws, row, ["Frente", "Marca", "Descrição", "Qtd", "Peso unit. (kg)", "Peso total (kg)", "Expedido"]);
+      adicionarHeaderTabela(ws, row, ["Frente", "Marca", "Descrição", "Qtd", "Peso unit. (kg)", "Peso total (kg)", "Expedido", "Romaneio", "Data expedida"]);
       row++;
       const primeira = row;
       for (const m of todas) {
@@ -86,13 +89,15 @@ export default function ListaExpedicaoSection({ opId }) {
           m.pesoUnit != null ? Number(m.pesoUnit.toFixed(2)) : "—",
           Number((m.pesoTotal || 0).toFixed(1)),
           m.expedido === true ? "SIM" : m.expedido === false ? "não" : "—",
+          m.romaneio || "—",
+          m.dataExpedicao ? fmtD(m.dataExpedicao) : "—",
         ], {
           fillColor: m.expedido === true ? "E8F8E8" : undefined,
-          alinhamento: { 3: "right", 4: "right", 5: "right", 6: "center" },
+          alinhamento: { 3: "right", 4: "right", 5: "right", 6: "center", 7: "center", 8: "center" },
         });
         row++;
       }
-      adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", { formula: `SUM(F${primeira}:F${row - 1})` }, ""]);
+      adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", { formula: `SUM(F${primeira}:F${row - 1})` }, "", "", ""]);
       await downloadWorkbook(workbook, `Lista_Expedicao_OP-${opNum}_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (e) { setErro("Erro ao exportar: " + e.message); } finally { setExportando(false); }
   }

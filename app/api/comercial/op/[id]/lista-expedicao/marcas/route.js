@@ -36,6 +36,8 @@ export async function GET(_req, { params }) {
       // "Marca (Expedido)" do próprio arquivo. null = sem informação.
       expedido: m.expedidoRomaneio ?? (m.expedidoArquivo === true ? true : m.expedidoArquivo === false ? false : null),
       origemExpedido: m.expedidoRomaneio != null ? "romaneio" : m.expedidoArquivo != null ? "arquivo" : null,
+      romaneio: m.romaneio ?? null,          // nº do(s) romaneio(s) em que saiu
+      dataExpedicao: m.dataExpedicao ?? null, // data de saída da carga
     })),
   }));
 
