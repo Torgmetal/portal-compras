@@ -14,7 +14,7 @@ const STATUS = {
   CANCELADO: { l: "cancelado", c: "bg-gray-200 text-torg-gray" },
 };
 
-export default function ConsultaExpedicao({ opId, localObra = "" }) {
+export default function ConsultaExpedicao({ opId }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [msg, setMsg] = useState("");
@@ -30,6 +30,7 @@ export default function ConsultaExpedicao({ opId, localObra = "" }) {
   const [modal, setModal] = useState(false);
   const [ab, setAb] = useState({});
   const [ocupado, setOcupado] = useState({});
+  const [localEntrega, setLocalEntrega] = useState(""); // endereço de entrega da obra (kickoff)
   const fileRef = useRef(null);
 
   const carregarPrevios = () => fetch(`/api/comercial/op/${opId}/romaneios-previos`).then((r) => r.json())
@@ -41,6 +42,8 @@ export default function ConsultaExpedicao({ opId, localObra = "" }) {
       .catch(() => setErro("Não foi possível carregar a lista."));
     fetch(`/api/comercial/op/${opId}/lotes-expedicao`).then((r) => r.json())
       .then((j) => { if (j.success) setLotes(j.lotes || []); }).catch(() => {});
+    fetch(`/api/comercial/op/${opId}/local-entrega`).then((r) => r.json())
+      .then((j) => { if (j.success) setLocalEntrega(j.local || ""); }).catch(() => {});
     carregarPrevios();
   }, [opId]);
 
@@ -332,7 +335,7 @@ export default function ConsultaExpedicao({ opId, localObra = "" }) {
         </div>
       )}
 
-      {modal && <NovoPrevioModal opId={opId} numero={proximo} itens={marcadas} peso={pesoSel} lotes={lotes} localObra={localObra} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); carregarPrevios(); setMsg("Romaneio prévio criado."); }} />}
+      {modal && <NovoPrevioModal opId={opId} numero={proximo} itens={marcadas} peso={pesoSel} lotes={lotes} localObra={localEntrega} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); carregarPrevios(); setMsg("Romaneio prévio criado."); }} />}
     </div>
   );
 }
