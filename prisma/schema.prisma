@@ -163,6 +163,7 @@ model OP {
   lotesExpedicao       LoteExpedicao[]
   desenhos             DesenhoOP[]
   pecasLote            PecaLote[]
+  romaneiosPrevios     RomaneioPrevio[]
 
   @@index([numero])
   @@index([status])
@@ -3357,6 +3358,30 @@ model ListaExpedicao {
 // Guarda o DIFF por marca pra o Planejamento tratar: peça INCLUÍDA precisa entrar
 // num lote; peça EXCLUÍDA precisa sair (senão corre-se o risco de expedir peça
 // que não existe mais). notificadaEm = e-mail já enviado aos setores.
+// Romaneio PRÉVIO: o Planejamento marca as peças prioritárias da Lista de
+// Expedição e monta a carga antes de a Expedição emitir o romaneio de verdade.
+// Numeração sequencial ao último romaneio EMITIDO da OP. `itens` guarda as
+// marcas escolhidas (mesma chave da lista: a marca).
+model RomaneioPrevio {
+  id           String    @id @default(cuid())
+  opId         String
+  opNumero     String
+  numero       Int
+  status       String    @default("PREVISTO") // PREVISTO | CONFIRMADO | CANCELADO
+  dataPrevista DateTime?
+  local        String?
+  observacao   String?
+  itens        Json      @default("[]") // [{ frente, marca, descricao, qte, pesoTotal }]
+  pesoKg       Float     @default(0)
+  criadoPorId  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  op           OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+
+  @@unique([opId, numero])
+  @@index([opId])
+}
+
 model ListaExpedicaoRevisao {
   id              String    @id @default(cuid())
   opId            String?
