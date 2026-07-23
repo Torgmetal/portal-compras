@@ -487,6 +487,8 @@ model AtaOP {
   clienteNome   String?
   clienteEmail  String?
   enviadoEm     DateTime?
+  pdfEnviadoUrl String? // cópia EXATA do PDF anexado no envio (o que o cliente recebeu)
+  pdfEnviadoEm  DateTime?
   aceiteEm      DateTime?
   aceiteNome    String?
   aceiteIp      String?

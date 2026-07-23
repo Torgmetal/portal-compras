@@ -144,6 +144,13 @@ function AtaEditor({ opId, ata, opInfo, onChange, onDelete }) {
       </div>
       {trav && <div className="text-[12px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1.5"><CheckCircle2 size={14} /> Aceita pelo cliente ({ata.aceiteNome}) em {fmtDT(ata.aceiteEm)} — travada.</div>}
 
+      {/* cópia exata do que foi anexado no e-mail (a ata pode ter mudado depois) */}
+      {ata.pdfEnviadoUrl && (
+        <a href={ata.pdfEnviadoUrl} target="_blank" rel="noopener noreferrer" className="text-[12px] text-torg-blue border border-torg-blue-200 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1.5 font-medium hover:bg-torg-blue-50 w-fit" title="Abre o PDF exatamente como foi anexado no e-mail">
+          <FileDown size={13} /> PDF enviado ao cliente{ata.pdfEnviadoEm ? ` · ${fmtDT(ata.pdfEnviadoEm)}` : ""}
+        </a>
+      )}
+
       <input value={f.titulo} onChange={(e) => setF((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título da reunião" className={inp} disabled={trav} />
       <div className="flex gap-2 flex-wrap">
         <input type="date" value={f.dataReuniao} onChange={(e) => setF((v) => ({ ...v, dataReuniao: e.target.value }))} className={`${inp} w-40`} disabled={trav} />

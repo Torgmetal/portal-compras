@@ -11,6 +11,8 @@ import { sendEmail } from "@/lib/email";
 import { gerarTokenForte } from "@/lib/token";
 import { escapeHtml } from "@/lib/html";
 import { CONTATOS_TAREFAS } from "@/lib/contatos-tarefas";
+import { gerarAtaOPPDF } from "@/lib/ata-op-pdf";
+import { put } from "@vercel/blob";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -57,7 +59,7 @@ const schema = z.object({
   mensagem: z.string().max(2000).optional().nullable(),
 });
 
-function montarEmail({ ata, obra, refCliente, codigo, nome, tipo, mensagem, link, cj, anexos }) {
+function montarEmail({ ata, obra, refCliente, codigo, nome, tipo, mensagem, link, cj, anexos, comPdf }) {
   const isCliente = tipo === "CLIENTE";
   const saud = isCliente ? `Olá, <strong>${escapeHtml(nome || "cliente")}</strong>,` : "Olá, equipe,";
   const intro = isCliente
@@ -101,6 +103,7 @@ function montarEmail({ ata, obra, refCliente, codigo, nome, tipo, mensagem, link
       <p style="text-align:center;margin:24px 0 6px">
         <a href="${link}" style="background:#F4801F;color:#fff;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:8px;display:inline-block">${cta}</a>
       </p>
+      ${comPdf ? `<p style="font-size:12px;color:#5C7285;text-align:center;margin:0 0 10px">A ata também segue <strong>em PDF anexo</strong> a este e-mail.</p>` : ""}
       <p style="font-size:12px;color:#5C7285;text-align:center;margin:0">Ou copie este link:<br><a href="${link}" style="color:#006EAB">${link}</a></p>
     </div>
   </div>`;
@@ -136,14 +139,28 @@ export async function POST(req, { params }) {
   const anexos = Array.isArray(ata.anexos) ? ata.anexos : [];
   const mensagem = body.mensagem?.trim() || null;
 
+  // Gera o PDF da ata: vai ANEXO no e-mail e uma cópia fica guardada, pra
+  // sempre dar pra ver exatamente o que o cliente recebeu (a ata pode ser
+  // editada depois). Se falhar, o envio continua — o link segue valendo.
+  let pdfAnexo = null, pdfUrl = null;
+  try {
+    const out = await gerarAtaOPPDF(ata);
+    const buf = Buffer.from(out.bytes);
+    pdfAnexo = { filename: out.filename, content: buf.toString("base64") };
+    const blob = await put(`atas-op/${ata.id}/${Date.now()}-${out.filename}`, buf, { access: "public", contentType: "application/pdf" });
+    pdfUrl = blob.url;
+  } catch (e) {
+    console.error("[ata-op enviar] falha ao gerar/guardar o PDF:", e?.message);
+  }
+
   let ok = 0;
   for (const d of destinatarios) {
-    const html = montarEmail({ ata, obra, refCliente, codigo, nome: d.nome, tipo: d.tipo, mensagem, link, cj, anexos });
+    const html = montarEmail({ ata, obra, refCliente, codigo, nome: d.nome, tipo: d.tipo, mensagem, link, cj, anexos, comPdf: !!pdfAnexo });
     const assunto = d.tipo === "CLIENTE"
       ? `${codigo} — Ata de reunião para aceite (Torg Metal)`
       : `${codigo} — Ata de reunião (cópia) — Torg Metal`;
     try {
-      const r = await sendEmail({ to: d.email, subject: assunto, html, replyTo: user.email || undefined });
+      const r = await sendEmail({ to: d.email, subject: assunto, html, replyTo: user.email || undefined, attachments: pdfAnexo ? [pdfAnexo] : undefined });
       if (r?.ok) ok++;
     } catch { /* uma falha não impede os demais destinatários */ }
   }
@@ -170,6 +187,7 @@ export async function POST(req, { params }) {
       status: ata.status === "ACEITA" ? "ACEITA" : "ENVIADA",
       enviadoEm: new Date(),
       tokenCliente: token,
+      ...(pdfUrl ? { pdfEnviadoUrl: pdfUrl, pdfEnviadoEm: new Date() } : {}),
       ...(principal ? { clienteEmail: principal.email, clienteNome: (principal.nome || ata.op?.cliente || "Cliente").slice(0, 120) } : {}),
     },
   });
