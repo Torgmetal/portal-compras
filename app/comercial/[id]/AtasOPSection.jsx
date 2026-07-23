@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
-import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock, Paperclip, X, Eye, FileDown } from "lucide-react";
+import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock, Paperclip, X, Eye, FileDown, AlertCircle } from "lucide-react";
 import ModalEnviarAta from "@/components/comercial/ModalEnviarAta";
 import AtaDocumento from "@/components/comercial/AtaDocumento";
 
@@ -71,6 +71,7 @@ function AtaEditor({ opId, ata, opInfo, onChange, onDelete }) {
   const [iaLoad, setIaLoad] = useState(false);
   const [enviarOpen, setEnviarOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const [anexos, setAnexos] = useState(Array.isArray(ata.anexos) ? ata.anexos : []);
   const [subindo, setSubindo] = useState(false);
   const fileRef = useRef(null);
@@ -84,6 +85,17 @@ function AtaEditor({ opId, ata, opInfo, onChange, onDelete }) {
       const j = await r.json(); if (!j.success) throw new Error(j.error);
       onChange();
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
+  }
+  // O PDF é gerado no SERVIDOR, a partir do que está SALVO — então grava antes,
+  // senão o que você acabou de digitar não entra no arquivo.
+  async function abrirPDF() {
+    setGerandoPdf(true);
+    const w = window.open("", "_blank"); // abre já, pra não cair no bloqueador de pop-up
+    try {
+      if (!trav) await salvar();
+      const url = `/api/comercial/op/${opId}/atas/${ata.id}/pdf`;
+      if (w) w.location.href = url; else window.location.href = url;
+    } catch { w?.close(); } finally { setGerandoPdf(false); }
   }
   async function organizarIA() {
     if (!f.pauta.trim()) { alert("Cole o texto da reunião primeiro."); return; }
@@ -127,6 +139,9 @@ function AtaEditor({ opId, ata, opInfo, onChange, onDelete }) {
     if (!confirm("Remover este anexo?")) return;
     salvarAnexos(anexos.filter((a) => a.seq !== seq));
   }
+
+  // ata sem nada escrito ainda: não faz sentido gerar PDF nem enviar
+  const semConteudo = !f.pauta.trim() && !(cj && (cj.resumo || cj.topicos?.length || cj.acoes?.length));
 
   // Prévia = como o cliente verá a ata (reflete as edições atuais, mesmo não salvas)
   const previewAta = {
@@ -175,34 +190,37 @@ function AtaEditor({ opId, ata, opInfo, onChange, onDelete }) {
 
       {/* Anexos (PDF/Word/Excel) — cada um com nº de sequência */}
       {(anexos.length > 0 || !trav) && (
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] text-torg-gray">Anexos{anexos.length > 0 ? ` (${anexos.length})` : ""}</span>
+        <div className="border border-gray-100 rounded-lg px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Anexos{anexos.length > 0 ? ` (${anexos.length})` : ""}</span>
             {!trav && (<>
               <input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.eml,.msg,message/rfc822,application/vnd.ms-outlook,image/*,application/pdf" className="hidden" onChange={(e) => { anexar(Array.from(e.target.files || [])); e.target.value = ""; }} />
               <button onClick={() => fileRef.current?.click()} disabled={subindo} className="text-[11px] text-torg-blue border border-torg-blue-200 rounded-lg px-2 py-1 inline-flex items-center gap-1 font-medium hover:bg-torg-blue-50 disabled:opacity-50">{subindo ? <Loader2 size={11} className="animate-spin" /> : <Paperclip size={11} />} Anexar PDF, Word, Excel, e-mail…</button>
             </>)}
           </div>
-          {anexos.length > 0 && (
-            <ul className="border border-gray-100 rounded-lg divide-y divide-gray-50">
+          {anexos.length > 0 ? (
+            <ul className="mt-2 border-t border-gray-100 divide-y divide-gray-50">
               {anexos.map((a) => (
-                <li key={a.seq} className="px-2.5 py-1.5 flex items-center gap-2 text-[12px]">
+                <li key={a.seq} className="py-1.5 flex items-center gap-2 text-[12px]">
                   <span className="text-[10px] font-mono font-semibold text-torg-blue shrink-0">#{nn(a.seq)}</span>
                   <a href={a.url} target="_blank" rel="noopener noreferrer" className="flex-1 min-w-0 truncate text-torg-dark hover:text-torg-blue hover:underline" title={a.nome}>{a.nome}</a>
                   {!trav && <button onClick={() => removerAnexo(a.seq)} className="text-torg-gray hover:text-red-600 shrink-0"><X size={13} /></button>}
                 </li>
               ))}
             </ul>
+          ) : (
+            <p className="text-[11px] text-torg-gray mt-1">Nenhum anexo ainda.</p>
           )}
         </div>
       )}
 
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap border-t border-gray-100 pt-3">
         {!trav && <button onClick={salvar} disabled={salvando} className="text-[13px] bg-torg-blue text-white rounded-lg px-3.5 py-1.5 font-medium hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">{salvando && <Loader2 size={13} className="animate-spin" />} Salvar</button>}
         <button onClick={() => setPreviewOpen(true)} className="text-[13px] border border-gray-300 text-torg-dark rounded-lg px-3 py-1.5 font-medium hover:bg-gray-50 inline-flex items-center gap-1.5"><Eye size={13} /> Visualizar</button>
-        <a href={`/api/comercial/op/${opId}/atas/${ata.id}/pdf`} target="_blank" rel="noopener noreferrer" className="text-[13px] border border-gray-300 text-torg-dark rounded-lg px-3 py-1.5 font-medium hover:bg-gray-50 inline-flex items-center gap-1.5" title="Abrir a ata em PDF"><FileDown size={13} /> PDF</a>
-        {!trav && <button onClick={() => setEnviarOpen(true)} className="text-[13px] border border-torg-blue text-torg-blue rounded-lg px-3 py-1.5 font-medium hover:bg-torg-blue-50 inline-flex items-center gap-1.5"><Send size={13} /> {ata.status === "ENVIADA" ? "Reenviar ata" : "Enviar ao cliente / Torg"}</button>}
+        <button onClick={abrirPDF} disabled={semConteudo || gerandoPdf} className="text-[13px] border border-gray-300 text-torg-dark rounded-lg px-3 py-1.5 font-medium hover:bg-gray-50 disabled:opacity-40 inline-flex items-center gap-1.5" title={semConteudo ? "Preencha a ata antes de gerar o PDF" : "Salva e abre a ata em PDF"}>{gerandoPdf ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />} PDF</button>
+        {!trav && <button onClick={() => setEnviarOpen(true)} disabled={semConteudo} className="text-[13px] border border-torg-blue text-torg-blue rounded-lg px-3 py-1.5 font-medium hover:bg-torg-blue-50 disabled:opacity-40 inline-flex items-center gap-1.5" title={semConteudo ? "Preencha a ata antes de enviar" : ""}><Send size={13} /> {ata.status === "ENVIADA" ? "Reenviar ata" : "Enviar ao cliente / Torg"}</button>}
         {ata.status === "ENVIADA" && !ata.aceiteEm && <span className="text-[11px] text-blue-600 inline-flex items-center gap-1"><Clock size={12} /> aguardando aceite</span>}
+        {semConteudo && <span className="text-[11px] text-amber-600 inline-flex items-center gap-1"><AlertCircle size={12} /> ata ainda vazia — escreva o texto e clique em Salvar</span>}
       </div>
       {enviarOpen && <ModalEnviarAta opId={opId} ataId={ata.id} onClose={() => setEnviarOpen(false)} onEnviado={() => onChange()} />}
       {previewOpen && (
