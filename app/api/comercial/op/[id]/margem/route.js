@@ -16,10 +16,10 @@ export async function GET(_req, { params }) {
   const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true, obra: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 
-  const [transf, receitas, medAgg, itens, listas] = await Promise.all([
+  const [transf, receitas, medicoes, itens, listas] = await Promise.all([
     custoTransformacaoOP(op.id),
     prisma.oPReceita.findMany({ where: { opId: op.id }, select: { categoria: true, valor: true } }),
-    prisma.oPMedicao.aggregate({ where: { opId: op.id }, _sum: { valorBruto: true }, _count: { _all: true } }),
+    prisma.oPMedicao.findMany({ where: { opId: op.id }, select: { valorBruto: true, etapa: true, status: true } }),
     prisma.oPItem.findMany({ where: { opId: op.id }, select: { categoria: true, valorVerba: true, faturamentoDireto: true } }),
     prisma.listaExpedicao.findMany({ where: { OR: [{ opId: op.id }, { opNumero: op.numero }] }, select: { marcasJson: true } }),
   ]);
@@ -48,8 +48,11 @@ export async function GET(_req, { params }) {
     else entrada += v;
   }
   const baseFabricacao = fabricacao + projeto;
-  const faturado = medAgg._sum.valorBruto || 0;
-  const saldoAFaturar = baseFabricacao - faturado; // bate com o "a faturar" do portal
+  // Receita FATURADA (etapa 60) — exclui as medições "a faturar" (etapa 10/20,
+  // romaneios futuros), que são saldo, não receita gerada.
+  const naoFaturada = (m) => m.etapa === "10" || m.etapa === "20" || /n[ãa]o faturad/i.test(m.status || "");
+  const faturado = medicoes.filter((m) => !naoFaturada(m)).reduce((s, m) => s + (m.valorBruto || 0), 0);
+  const saldoAFaturar = baseFabricacao - faturado;
 
   // Material orçado (verba) — só informativo; FD é pass-through (fora da margem).
   let verbaCompra = 0, verbaFD = 0;
