@@ -8,6 +8,7 @@ import {
   CalendarClock, Zap, Clock, Pencil, CheckCircle2, ExternalLink, ChevronDown, Download, Target,
 } from "lucide-react";
 import CustoHoraClient from "@/components/CustoHoraClient";
+import ResumoMensalDiretoria from "@/components/ResumoMensalDiretoria";
 
 const fmtR$ = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
 const fmtDataHora = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
@@ -18,6 +19,7 @@ const ABAS_BASE = [
   { id: "resumo", label: "Resumo" },
   { id: "tarefas", label: "Tarefas" },
   { id: "dre", label: "DRE Alvo × Real" },
+  { id: "resumo-mensal", label: "Resumo mensal" },
   { id: "receber", label: "A receber" },
   { id: "pagar", label: "A pagar" },
   { id: "conferencia", label: "Conferência" },
@@ -199,6 +201,9 @@ export default function DiretoriaClient({ isDono, userNome }) {
         {aba === "previsao" && <PrevisaoFaturamento />}
 
         {aba === "custo-hora" && <CustoHoraClient />}
+
+        {/* ════════ RESUMO MENSAL (expedido/receita/custo por obra) ════════ */}
+        {aba === "resumo-mensal" && <ResumoMensalDiretoria />}
 
         {/* ════════ ACESSO ════════ */}
         {aba === "acesso" && isDono && (
