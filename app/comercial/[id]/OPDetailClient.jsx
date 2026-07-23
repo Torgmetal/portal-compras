@@ -16,6 +16,7 @@ import DesenhosOPSection from "./DesenhosOPSection";
 import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import AbaObra from "./AbaObra";
 import AbaProducao from "./AbaProducao";
+import MargemTransformacaoOP from "./MargemTransformacaoOP";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import { fmtOP } from "@/lib/utils";
@@ -893,6 +894,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         const diasPlan = op.dataInicio && op.dataFimPrevista ? Math.max(0, Math.round((new Date(op.dataFimPrevista) - new Date(op.dataInicio)) / DIA)) : null;
         return (
           <div className="space-y-6">
+            <MargemTransformacaoOP opId={op.id} />
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 border-b border-gray-100">
                 <div className="bg-white p-4">
