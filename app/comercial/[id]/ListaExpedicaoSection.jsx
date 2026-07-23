@@ -57,7 +57,7 @@ export default function ListaExpedicaoSection({ opId }) {
         <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><ClipboardList size={18} className="text-torg-blue" /> Lista de Expedição</h3>
         <button onClick={atualizar} disabled={atualizando} className="text-xs bg-torg-blue text-white rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50">{atualizando ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Atualizar da pasta do servidor</button>
       </div>
-      <p className="text-sm text-torg-gray mb-3">Puxada da pasta da obra no servidor (<em>4. Expedição</em>). A cada revisão nova o portal compara as marcas e mostra o que <strong>entrou</strong> e o que <strong>saiu</strong> — o Planejamento aloca ou retira do lote.</p>
+      <p className="text-sm text-torg-gray mb-3">Puxada da pasta da obra no servidor (<em>2. Engenharia › 2.6 Lista de expedição</em>). A cada revisão nova o portal compara as marcas e mostra o que <strong>entrou</strong> e o que <strong>saiu</strong> — o Planejamento aloca ou retira do lote.</p>
 
       {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
       {msg && <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-3 inline-flex items-center gap-1"><CheckCircle2 size={13} /> {msg}</p>}
@@ -102,7 +102,7 @@ export default function ListaExpedicaoSection({ opId }) {
         <div className="border border-dashed border-gray-200 rounded-lg py-8 text-center">
           <ClipboardList size={26} className="mx-auto text-gray-300 mb-2" />
           <p className="text-sm font-semibold text-torg-dark">Lista de Expedição ainda não importada</p>
-          <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">Clique em <strong>Atualizar da pasta do servidor</strong> — o portal procura a “Lista Avançada Expedição” na pasta <em>4. Expedição</em> da obra.</p>
+          <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">Clique em <strong>Atualizar da pasta do servidor</strong> — o portal procura a lista em <em>2. Engenharia › 2.6 Lista de expedição</em> da obra.</p>
         </div>
       ) : (
         <div className="overflow-x-auto border border-gray-100 rounded-lg">
