@@ -32,8 +32,10 @@ export async function GET(_req, { params }) {
       qte: m.qte ?? null,
       pesoUnit: m.pesoUnit ?? null,
       pesoTotal: m.pesoTotal ?? 0,
-      // true/false quando já cruzamos com romaneios; null = ainda não cruzado
-      expedido: m.expedidoRomaneio ?? null,
+      // expedido = romaneio emitido (fonte principal) ou, na falta, a coluna
+      // "Marca (Expedido)" do próprio arquivo. null = sem informação.
+      expedido: m.expedidoRomaneio ?? (m.expedidoArquivo === true ? true : m.expedidoArquivo === false ? false : null),
+      origemExpedido: m.expedidoRomaneio != null ? "romaneio" : m.expedidoArquivo != null ? "arquivo" : null,
     })),
   }));
 
