@@ -110,25 +110,49 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     setRevisado((prev) => new Set(prev).add(id));
   };
 
-  // Aplica os itens vindos da IA usando rmIndex (que ja casa com a RM)
+  // Preenche uma linha com o item lido do PDF
+  function preencherLinha(l, itPdf) {
+    if (itPdf.precoUnit) l.precoUnit = String(itPdf.precoUnit);
+    if (itPdf.qtdCotada || itPdf.qtd) l.qtdCotada = itPdf.qtdCotada || itPdf.qtd;
+    if (itPdf.icmsPct != null) l.icmsPct = String(itPdf.icmsPct);
+    if (itPdf.ipiPct != null) l.ipiPct = String(itPdf.ipiPct);
+    if (itPdf.observacao && !l.observacao) l.observacao = itPdf.observacao;
+    // Guarda o total que a IA leu no PDF p/ esta linha — usado pra mostrar
+    // "PDF: R$ X" e flagrar em vermelho quando não bate com preço × qtd.
+    l.pdfTotalBruto = itPdf.totalBruto != null ? Number(itPdf.totalBruto)
+      : (itPdf.total != null ? Number(itPdf.total) : null);
+  }
+
+  // Aplica os itens da IA: 1º pelo rmIndex que ela devolve; os que vieram com
+  // preço mas SEM rmIndex (a IA não casou) são casados por descrição — é o que
+  // faz os CONSUMÍVEIS (disco, eletrodo, EPI…) puxarem: a IA lê o preço mas as
+  // regras de matching dela são de aço, então devolve rmIndex null.
   function aplicarItensIA(itensIA) {
     const linhasNovas = [...linhas];
     const idsAuto = new Set();
+    const usados = new Set();
     let casados = 0;
+    const semIndice = [];
     for (const itPdf of itensIA) {
       const idx = itPdf.rmIndex;
-      if (idx == null || idx < 0 || idx >= linhasNovas.length) continue;
-      const l = linhasNovas[idx];
-      if (itPdf.precoUnit) l.precoUnit = String(itPdf.precoUnit);
-      if (itPdf.qtdCotada || itPdf.qtd) l.qtdCotada = itPdf.qtdCotada || itPdf.qtd;
-      if (itPdf.icmsPct != null) l.icmsPct = String(itPdf.icmsPct);
-      if (itPdf.ipiPct != null) l.ipiPct = String(itPdf.ipiPct);
-      if (itPdf.observacao && !l.observacao) l.observacao = itPdf.observacao;
-      // Guarda o total que a IA leu no PDF p/ esta linha — usado pra mostrar
-      // "PDF: R$ X" e flagrar em vermelho quando não bate com preço × qtd.
-      l.pdfTotalBruto = itPdf.totalBruto != null ? Number(itPdf.totalBruto) : null;
-      idsAuto.add(l.id);
-      casados++;
+      if (idx == null || idx < 0 || idx >= linhasNovas.length || usados.has(idx)) {
+        if (itPdf.precoUnit) semIndice.push(itPdf); // tenta casar por descrição depois
+        continue;
+      }
+      preencherLinha(linhasNovas[idx], itPdf);
+      usados.add(idx); idsAuto.add(linhasNovas[idx].id); casados++;
+    }
+    for (const itPdf of semIndice) {
+      let melhorIdx = -1, melhorScore = 0.5;
+      for (let i = 0; i < linhasNovas.length; i++) {
+        if (usados.has(i)) continue;
+        const sc = scoreMatchTokens(itPdf.descricao, linhasNovas[i].descricao);
+        if (sc > melhorScore) { melhorScore = sc; melhorIdx = i; }
+      }
+      if (melhorIdx >= 0) {
+        preencherLinha(linhasNovas[melhorIdx], itPdf);
+        usados.add(melhorIdx); idsAuto.add(linhasNovas[melhorIdx].id); casados++;
+      }
     }
     setLinhas(linhasNovas);
     setAutoFilled(idsAuto);
@@ -136,16 +160,23 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     return casados;
   }
 
-  // Fallback: se IA falhar, usa parser regex e casa via score local
+  // Fallback: casa PDF × RM por tokens. BIDIRECIONAL — pega o maior entre
+  // "tokens do PDF que estão na RM" e "tokens da RM que estão no PDF". Sem isso,
+  // a descrição do fornecedor (com marca/embalagem/medida a mais: "DISCO CORTE
+  // INOX 230MM 9POL") derruba o score contra a RM enxuta ("DISCO DE CORTE 9\"")
+  // e os consumíveis não casam.
   function scoreMatchTokens(descPdf, descRm) {
     const norm = (s) => (s || "")
       .toString().toLowerCase().normalize("NFD")
       .replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, " ")
       .replace(/\s+/g, " ").trim();
-    const a = norm(descPdf).split(" ").filter((t) => t.length >= 3);
-    const b = norm(descRm);
-    if (a.length === 0 || !b) return 0;
-    return a.filter((tok) => b.includes(tok)).length / a.length;
+    const toks = (s) => norm(s).split(" ").filter((t) => t.length >= 3);
+    const a = toks(descPdf), aStr = norm(descPdf);
+    const b = toks(descRm), bStr = norm(descRm);
+    if (!a.length || !b.length) return 0;
+    const dirPdf = a.filter((t) => bStr.includes(t)).length / a.length; // PDF → RM
+    const dirRm = b.filter((t) => aStr.includes(t)).length / b.length;  // RM → PDF
+    return Math.max(dirPdf, dirRm);
   }
   function aplicarItensFallback(itensPdf) {
     const linhasNovas = [...linhas];
