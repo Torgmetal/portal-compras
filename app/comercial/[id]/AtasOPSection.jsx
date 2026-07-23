@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
-import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock, Paperclip, X, Eye } from "lucide-react";
+import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock, Paperclip, X, Eye, FileDown } from "lucide-react";
 import ModalEnviarAta from "@/components/comercial/ModalEnviarAta";
 import AtaDocumento from "@/components/comercial/AtaDocumento";
 
@@ -193,6 +193,7 @@ function AtaEditor({ opId, ata, opInfo, onChange, onDelete }) {
       <div className="flex items-center gap-2 flex-wrap">
         {!trav && <button onClick={salvar} disabled={salvando} className="text-[13px] bg-torg-blue text-white rounded-lg px-3.5 py-1.5 font-medium hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5">{salvando && <Loader2 size={13} className="animate-spin" />} Salvar</button>}
         <button onClick={() => setPreviewOpen(true)} className="text-[13px] border border-gray-300 text-torg-dark rounded-lg px-3 py-1.5 font-medium hover:bg-gray-50 inline-flex items-center gap-1.5"><Eye size={13} /> Visualizar</button>
+        <a href={`/api/comercial/op/${opId}/atas/${ata.id}/pdf`} target="_blank" rel="noopener noreferrer" className="text-[13px] border border-gray-300 text-torg-dark rounded-lg px-3 py-1.5 font-medium hover:bg-gray-50 inline-flex items-center gap-1.5" title="Abrir a ata em PDF"><FileDown size={13} /> PDF</a>
         {!trav && <button onClick={() => setEnviarOpen(true)} className="text-[13px] border border-torg-blue text-torg-blue rounded-lg px-3 py-1.5 font-medium hover:bg-torg-blue-50 inline-flex items-center gap-1.5"><Send size={13} /> {ata.status === "ENVIADA" ? "Reenviar ata" : "Enviar ao cliente / Torg"}</button>}
         {ata.status === "ENVIADA" && !ata.aceiteEm && <span className="text-[11px] text-blue-600 inline-flex items-center gap-1"><Clock size={12} /> aguardando aceite</span>}
       </div>

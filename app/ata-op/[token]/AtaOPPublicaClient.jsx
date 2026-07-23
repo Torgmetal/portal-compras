@@ -36,8 +36,13 @@ export default function AtaOPPublicaClient({ token }) {
     <div style={wrap}>
       <div style={{ width: "100%", maxWidth: 680 }}>
         <AtaDocumento ata={a}>
+          {/* PDF */}
+          <div style={{ marginTop: 22, textAlign: "right" }}>
+            <a href={`/api/ata-op/${token}/pdf`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: C.orange, textDecoration: "none", fontWeight: 700 }}>⬇ Baixar esta ata em PDF</a>
+          </div>
+
           {/* Aceite */}
-          <div style={{ marginTop: 26, borderTop: `1px solid ${C.line}`, paddingTop: 20 }}>
+          <div style={{ marginTop: 14, borderTop: `1px solid ${C.line}`, paddingTop: 20 }}>
             {jaAceito ? (
               <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 10, padding: 16, color: "#047857", fontSize: 14 }}>✅ Ata <strong>aceita</strong> por <b>{a.aceiteNome || nome}</b>{a.aceiteEm ? ` em ${fmtDT(a.aceiteEm)}` : ""}. Obrigado!</div>
             ) : (<>
