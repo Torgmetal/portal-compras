@@ -15,6 +15,7 @@ import AbaExpedicao from "./AbaExpedicao";
 import DesenhosOPSection from "./DesenhosOPSection";
 import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import AbaObra from "./AbaObra";
+import AbaProducao from "./AbaProducao";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import { fmtOP } from "@/lib/utils";
@@ -882,14 +883,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         </div>
       )}
 
-      {vista === "producao" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-          <Factory size={28} className="mx-auto text-gray-300 mb-2" />
-          <p className="text-sm font-semibold text-torg-dark">Produção</p>
-          <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">O status de cada peça da obra em produção, dando baixa conforme os apontamentos do Syneco.</p>
-          <span className="inline-block mt-3 text-[10px] font-semibold uppercase tracking-wider text-torg-blue bg-torg-blue-50 px-2 py-1 rounded-full">Em breve</span>
-        </div>
-      )}
+      {vista === "producao" && <AbaProducao opId={op.id} />}
 
       {vista === "financeiro" && (() => {
         const DIA = 86400000;
