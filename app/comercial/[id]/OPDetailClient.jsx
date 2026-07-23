@@ -883,7 +883,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         </div>
       )}
 
-      {vista === "producao" && <AbaProducao opId={op.id} />}
+      {vista === "producao" && <AbaProducao opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />}
 
       {vista === "financeiro" && (() => {
         const DIA = 86400000;

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Factory, Search, Loader2, AlertCircle, X, CheckCircle2 } from "lucide-react";
+import { Factory, Search, Loader2, AlertCircle, X, CheckCircle2, FileSpreadsheet } from "lucide-react";
 
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -20,11 +20,12 @@ const ETAPA = {
 };
 const ORDEM = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
 
-export default function AbaProducao({ opId }) {
+export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [etapa, setEtapa] = useState("");
+  const [exportando, setExportando] = useState(false);
 
   useEffect(() => {
     setDados(null); setErro("");
@@ -45,11 +46,54 @@ export default function AbaProducao({ opId }) {
   }, [pecas, busca, etapa]);
   const pesoFiltrado = filtradas.reduce((s, p) => s + (p.pesoTotal || 0), 0);
 
+  async function exportar() {
+    setExportando(true); setErro("");
+    try {
+      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } = await import("@/lib/excel-relatorio");
+      const filtrando = busca.trim() || etapa;
+      const linhas = filtrando ? filtradas : pecas;
+      if (!linhas.length) throw new Error("Nada para exportar.");
+      const opNum = String(opNumero || "").padStart(3, "0");
+      const kpi = ORDEM.filter((s) => resumo.some((r) => r.setor === s)).map((s) => { const r = resumo.find((x) => x.setor === s); return `${ETAPA[s].l}: ${r.qtd}`; }).join(" · ");
+
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: `Status de Produção — OP-${opNum}`,
+        subtitulo: [obra, cliente, refCliente ? `Ref. ${refCliente}` : null, filtrando ? `filtro: ${[ETAPA[etapa]?.l, busca.trim() ? `"${busca.trim()}"` : null].filter(Boolean).join(" / ")}` : null].filter(Boolean).join(" · "),
+        kpis: [`${dados.total} peças · ${fmtKg(dados.pesoTotal)}`, kpi, dados.temSyneco ? null : "⚠ Sem apontamento do Syneco nesta OP — etapa não reflete a produção."].filter(Boolean),
+        totalColunas: 7,
+        nomePlanilha: "Produção",
+        codigoDoc: "REL-PRD-005",
+      });
+      ws.columns = [{ width: 20 }, { width: 34 }, { width: 8 }, { width: 14 }, { width: 16 }, { width: 12 }, { width: 14 }];
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, ["Marca", "Descrição", "Qtd", "Peso (kg)", "Etapa", "Romaneio", "Data expedição"]);
+      row++;
+      const primeira = row;
+      for (const p of linhas) {
+        adicionarLinhaTabela(ws, row, [
+          p.marca, p.descricao || "—", p.qte ?? "—", Number((p.pesoTotal || 0).toFixed(1)),
+          (ETAPA[p.setor] || ETAPA.PENDENTE).l,
+          p.expedido ? (p.romaneio || "—") : "—",
+          p.expedido && p.dataExpedicao ? fmtD(p.dataExpedicao) : "—",
+        ], {
+          fillColor: p.setor === "EXPEDIDO" ? "E8F8E8" : undefined,
+          alinhamento: { 2: "right", 3: "right", 4: "center", 5: "center", 6: "center" },
+        });
+        row++;
+      }
+      adicionarLinhaTotais(ws, row, ["TOTAL", "", "", { formula: `SUM(D${primeira}:D${row - 1})` }, "", "", ""]);
+      await downloadWorkbook(workbook, `Producao_OP-${opNum}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) { setErro("Erro ao exportar: " + e.message); } finally { setExportando(false); }
+  }
+
   const inp = "text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white";
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><Factory size={18} className="text-torg-blue" /> Produção</h3>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+        <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><Factory size={18} className="text-torg-blue" /> Produção</h3>
+        <button onClick={exportar} disabled={exportando || !pecas.length} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
+      </div>
       <p className="text-sm text-torg-gray mb-4">Status de cada peça da Lista de Expedição. A etapa vem do <strong>setor mais avançado com apontamento no Syneco</strong> — não do status cadastrado.</p>
 
       {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
