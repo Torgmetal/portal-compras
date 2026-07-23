@@ -54,6 +54,7 @@ const schema = z.object({
   dataPrevista: z.string().nullable().optional(),
   local: z.string().max(300).nullable().optional(),
   observacao: z.string().max(1000).nullable().optional(),
+  loteId: z.string().nullable().optional(),
 });
 
 export async function POST(req, { params }) {
@@ -83,6 +84,7 @@ export async function POST(req, { params }) {
           opId: op.id, opNumero: String(op.numero), numero: n, itens, pesoKg,
           dataPrevista: body.dataPrevista ? new Date(body.dataPrevista) : null,
           local: body.local?.trim() || null, observacao: body.observacao?.trim() || null,
+          loteId: body.loteId ? (await prisma.loteExpedicao.findFirst({ where: { id: body.loteId, opId: op.id }, select: { id: true } }))?.id ?? null : null,
           criadoPorId: user.id,
         },
       });

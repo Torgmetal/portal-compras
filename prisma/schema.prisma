@@ -517,9 +517,10 @@ model LoteExpedicao {
   status       String    @default("PENDENTE")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  op           OP          @relation(fields: [opId], references: [id], onDelete: Cascade)
+  op           OP               @relation(fields: [opId], references: [id], onDelete: Cascade)
   desenhos     DesenhoOP[]
   pecas        PecaLote[]
+  romaneios    RomaneioPrevio[]
 
   @@index([opId])
 }
@@ -3367,16 +3368,20 @@ model RomaneioPrevio {
   opId         String
   opNumero     String
   numero       Int
-  status       String    @default("PREVISTO") // PREVISTO | CONFIRMADO | CANCELADO
-  dataPrevista DateTime?
-  local        String?
-  observacao   String?
-  itens        Json      @default("[]") // [{ frente, marca, descricao, qte, pesoTotal }]
-  pesoKg       Float     @default(0)
-  criadoPorId  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  op           OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+  status        String    @default("PREVISTO") // PREVISTO (em aberto) | APROVADO | CANCELADO
+  dataPrevista  DateTime?
+  local         String?
+  observacao    String?
+  itens         Json      @default("[]") // [{ frente, marca, descricao, qte, pesoTotal }]
+  pesoKg        Float     @default(0)
+  loteId        String? // lote de entrega a que esta carga pertence
+  aprovadoEm    DateTime? // aprovado = liberado para a Expedição
+  aprovadoPorId String?
+  criadoPorId   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  op            OP             @relation(fields: [opId], references: [id], onDelete: Cascade)
+  lote          LoteExpedicao? @relation(fields: [loteId], references: [id], onDelete: SetNull)
 
   @@unique([opId, numero])
   @@index([opId])
