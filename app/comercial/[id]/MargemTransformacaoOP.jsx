@@ -4,9 +4,7 @@ import { Loader2, AlertCircle, TrendingUp, Factory, Layers, Info } from "lucide-
 
 const fmtMoeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const fmtNum = (v) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-// R$/kg-setor precisa de casas decimais — a taxa é pequena (~R$ 1,62) e
-// arredondar pra real inteiro escondia os centavos ("R$ 2" no lugar de R$ 1,62).
-const fmtRkg = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtPct = (v) => `${(Number(v || 0) * 100).toFixed(0)}%`;
 
 /**
  * Margem de transformação da OP — custo operacional da fábrica rateado por
@@ -40,7 +38,7 @@ export default function MargemTransformacaoOP({ opId }) {
   );
   if (!data) return null;
 
-  const { receita, faturado, saldoAFaturar, custoTransformacao, kgProduzido, material, resultadoAcumulado, flags, porMes } = data;
+  const { receita, faturado, saldoAFaturar, custoTransformacao, pesoObraKg, material, resultadoAcumulado, flags, porMes } = data;
 
   if (flags.semReceita) {
     return (
@@ -58,13 +56,14 @@ export default function MargemTransformacaoOP({ opId }) {
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100">
         <h3 className="text-lg font-semibold text-torg-dark inline-flex items-center gap-2"><TrendingUp size={18} className="text-torg-blue" /> Margem de transformação</h3>
-        <p className="text-xs text-torg-gray mt-1">Custo operacional da fábrica (folha + terceiros + overhead) rateado por kg produzido, contra a receita de fabricação. Material é FD/verba e fica de fora.</p>
+        <p className="text-xs text-torg-gray mt-1">Custo operacional da fábrica (folha + terceiros + overhead) rateado pela produção do mês, contra a receita de fabricação. Material é FD/verba e fica de fora.</p>
+        {pesoObraKg > 0 && <p className="text-xs text-torg-gray mt-0.5">Peso da obra (lista de expedição): <span className="font-medium text-torg-dark tabular-nums">{fmtNum(pesoObraKg)} kg</span></p>}
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 border-b border-gray-100">
         <Kpi label="Receita Torg" valor={receita.total} color="text-torg-blue" />
-        <Kpi label="Custo transf. (até agora)" valor={custoTransformacao} sub={`${fmtNum(kgProduzido)} kg·setor`} color="text-torg-orange-700" />
+        <Kpi label="Custo transf. (até agora)" valor={custoTransformacao} color="text-torg-orange-700" />
         <Kpi label="Faturado" valor={faturado} sub={flags.semFaturado ? "ainda não faturou" : `saldo a faturar ${fmtMoeda(saldoAFaturar)}`} color="text-torg-dark" />
         {flags.semFaturado ? (
           <div className="bg-white p-4">
@@ -117,13 +116,13 @@ export default function MargemTransformacaoOP({ opId }) {
                 <div className="mt-2 border-t border-gray-100 pt-2 space-y-1">
                   {porMes.map((m) => (
                     <div key={m.mes} className="flex items-center justify-between gap-2 text-[11px] text-torg-gray tabular-nums">
-                      <span className="w-14">{m.mes}</span>
-                      <span className="flex-1 text-right">{fmtNum(m.kgOp)} kg·setor × {fmtRkg(m.rkg)}</span>
+                      <span className="w-16">{m.mes}</span>
+                      <span className="flex-1 text-right">{fmtPct(m.share)} da fábrica</span>
                       <span className="w-24 text-right text-torg-dark font-medium">{fmtMoeda(m.custo)}</span>
                     </div>
                   ))}
                   <p className="text-[10px] text-torg-gray/80 leading-snug pt-1.5">
-                    <span className="font-medium">kg·setor</span> = soma das passagens por setor (corte, solda, jato, pintura…). A mesma peça conta em cada setor por onde passa, então é maior que a tonelagem da obra — é o que mede o trabalho de fábrica consumido.
+                    Por mês: a fatia da fábrica que esta obra ocupou no período × o custo operacional do mês.
                   </p>
                 </div>
               )}

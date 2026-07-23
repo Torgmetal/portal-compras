@@ -16,12 +16,26 @@ export async function GET(_req, { params }) {
   const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true, obra: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 
-  const [transf, receitas, medAgg, itens] = await Promise.all([
+  const [transf, receitas, medAgg, itens, listas] = await Promise.all([
     custoTransformacaoOP(op.id),
     prisma.oPReceita.findMany({ where: { opId: op.id }, select: { categoria: true, valor: true } }),
     prisma.oPMedicao.aggregate({ where: { opId: op.id }, _sum: { valorBruto: true }, _count: { _all: true } }),
     prisma.oPItem.findMany({ where: { opId: op.id }, select: { categoria: true, valorVerba: true, faturamentoDireto: true } }),
+    prisma.listaExpedicao.findMany({ where: { OR: [{ opId: op.id }, { opNumero: op.numero }] }, select: { marcasJson: true } }),
   ]);
+
+  // Peso da obra = SEMPRE o da lista de expedição (regra do Vitor). Dedup por
+  // marca (mantém a 1ª frente). Nunca expor o kg·setor do rateio na tela.
+  const marcasVistas = new Set();
+  let pesoObraKg = 0;
+  for (const l of listas) {
+    for (const m of Array.isArray(l.marcasJson) ? l.marcasJson : []) {
+      const k = String(m.marca || "").trim().toUpperCase();
+      if (!k || marcasVistas.has(k)) continue;
+      marcasVistas.add(k);
+      pesoObraKg += m.pesoTotal || 0;
+    }
+  }
 
   // Receita por natureza. FABRICACAO+PROJETO = base de margem ("o que sobra");
   // o resto (OUTRO/MATERIAL) é entrada/repasse acordado no início.
@@ -54,7 +68,7 @@ export async function GET(_req, { params }) {
     faturado,
     saldoAFaturar,
     custoTransformacao: custo,
-    kgProduzido: transf.kgTotal,
+    pesoObraKg,
     porMes: transf.detalhe,
     material: { verbaCompra, verbaFD, total: verbaCompra + verbaFD },
     resultadoAcumulado,
