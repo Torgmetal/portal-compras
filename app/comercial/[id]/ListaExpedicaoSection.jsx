@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { ClipboardList, RefreshCw, Loader2, AlertTriangle, ChevronDown, ChevronRight, Mail, CheckCircle2, AlertCircle } from "lucide-react";
+import { ClipboardList, RefreshCw, Loader2, AlertTriangle, ChevronDown, ChevronRight, Mail, CheckCircle2, AlertCircle, FileSpreadsheet } from "lucide-react";
 
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
@@ -12,6 +12,7 @@ export default function ListaExpedicaoSection({ opId }) {
   const [msg, setMsg] = useState("");
   const [aberto, setAberto] = useState({});
   const [ocupado, setOcupado] = useState({});
+  const [exportando, setExportando] = useState(false);
 
   const carregar = () => fetch(`/api/comercial/op/${opId}/lista-expedicao`).then((r) => r.json())
     .then((j) => { if (j.success) setDados(j); else setErro(j.error || "Erro"); }).catch(() => setErro("Erro ao carregar"));
@@ -48,6 +49,54 @@ export default function ListaExpedicaoSection({ opId }) {
     } catch { /* ignora */ } finally { setOcupado((o) => ({ ...o, [rev.id]: null })); }
   }
 
+  async function exportar() {
+    setExportando(true); setErro("");
+    try {
+      const j = await fetch(`/api/comercial/op/${opId}/lista-expedicao/marcas`).then((r) => r.json());
+      if (!j.success) throw new Error(j.error || "Erro ao buscar as marcas");
+      const frentes = j.frentes || [];
+      const todas = frentes.flatMap((f) => f.marcas.map((m) => ({ ...m, frente: f.frente })));
+      if (!todas.length) throw new Error("Nenhuma marca para exportar.");
+
+      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } = await import("@/lib/excel-relatorio");
+      const contratado = frentes.reduce((s, f) => s + (f.pesoContratado || 0), 0);
+      const expedido = frentes.reduce((s, f) => s + (f.pesoExpedido || 0), 0);
+      const nExp = todas.filter((m) => m.expedido === true).length;
+      const opNum = String(j.op?.numero || "").padStart(3, "0");
+
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: `Lista de Expedição — OP-${opNum}`,
+        subtitulo: [j.op?.obra, j.op?.cliente, j.op?.refCliente ? `Ref. ${j.op.refCliente}` : null].filter(Boolean).join(" · "),
+        kpis: [
+          `${frentes.length} frente(s) · ${todas.length} marcas · contratado ${fmtKg(contratado)} · expedido ${fmtKg(expedido)} · faltante ${fmtKg(Math.max(0, contratado - expedido))}`,
+          `${nExp} marca(s) já expedida(s) conforme os romaneios emitidos`,
+        ],
+        totalColunas: 7,
+        nomePlanilha: "Lista de Expedição",
+        codigoDoc: "REL-EXP-003",
+      });
+      ws.columns = [{ width: 14 }, { width: 20 }, { width: 34 }, { width: 9 }, { width: 14 }, { width: 15 }, { width: 12 }];
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, ["Frente", "Marca", "Descrição", "Qtd", "Peso unit. (kg)", "Peso total (kg)", "Expedido"]);
+      row++;
+      const primeira = row;
+      for (const m of todas) {
+        adicionarLinhaTabela(ws, row, [
+          m.frente, m.marca, m.descricao || "—", m.qte ?? "—",
+          m.pesoUnit != null ? Number(m.pesoUnit.toFixed(2)) : "—",
+          Number((m.pesoTotal || 0).toFixed(1)),
+          m.expedido === true ? "SIM" : m.expedido === false ? "não" : "—",
+        ], {
+          fillColor: m.expedido === true ? "E8F8E8" : undefined,
+          alinhamento: { 3: "right", 4: "right", 5: "right", 6: "center" },
+        });
+        row++;
+      }
+      adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", { formula: `SUM(F${primeira}:F${row - 1})` }, ""]);
+      await downloadWorkbook(workbook, `Lista_Expedicao_OP-${opNum}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) { setErro("Erro ao exportar: " + e.message); } finally { setExportando(false); }
+  }
+
   const listas = dados?.listas || [];
   const pendentes = dados?.pendentes || [];
 
@@ -55,7 +104,10 @@ export default function ListaExpedicaoSection({ opId }) {
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
         <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><ClipboardList size={18} className="text-torg-blue" /> Lista de Expedição</h3>
-        <button onClick={atualizar} disabled={atualizando} className="text-xs bg-torg-blue text-white rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50">{atualizando ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Atualizar da pasta do servidor</button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={exportar} disabled={exportando || listas.length === 0} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
+          <button onClick={atualizar} disabled={atualizando} className="text-xs bg-torg-blue text-white rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-dark disabled:opacity-50">{atualizando ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Atualizar da pasta do servidor</button>
+        </div>
       </div>
       <p className="text-sm text-torg-gray mb-3">Puxada da pasta da obra no servidor (<em>2. Engenharia › 2.6 Lista de expedição</em>). A cada revisão nova o portal compara as marcas e mostra o que <strong>entrou</strong> e o que <strong>saiu</strong> — o Planejamento aloca ou retira do lote. O <strong>expedido</strong> vem dos <strong>romaneios emitidos</strong> (<em>4. Expedição › 4.2 Romaneios</em>), cruzados por marca.</p>
 
