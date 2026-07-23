@@ -7,7 +7,7 @@ const fmtTam = (n) => (n == null ? "" : n < 1024 * 1024 ? `${Math.round(n / 1024
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null);
 const iconFor = (ext) => (ext === "pdf" ? { I: FileText, c: "text-red-500" } : ext === "dwg" || ext === "dxf" ? { I: PenTool, c: "text-torg-blue" } : { I: FileText, c: "text-torg-gray" });
 
-export default function DesenhosOPSection({ opId, opNumero, obra }) {
+export default function DesenhosOPSection({ opId, opNumero, obra, cliente, refCliente }) {
   const [desenhos, setDesenhos] = useState(null);
   const [lotes, setLotes] = useState([]);
   const [loteDestino, setLoteDestino] = useState("");
@@ -86,7 +86,7 @@ export default function DesenhosOPSection({ opId, opNumero, obra }) {
       const semLote = (desenhos || []).filter((d) => !d.loteId).length;
       const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
         titulo: `Projetos e Desenhos — OP-${String(opNumero || "").padStart(3, "0")}`,
-        subtitulo: [obra, `${total} desenho${total === 1 ? "" : "s"}`, `${lotes.length} lote${lotes.length === 1 ? "" : "s"}`].filter(Boolean).join(" · "),
+        subtitulo: [obra, cliente, refCliente ? `Ref. ${refCliente}` : null, `${total} desenho${total === 1 ? "" : "s"}`, `${lotes.length} lote${lotes.length === 1 ? "" : "s"}`].filter(Boolean).join(" · "),
         kpis: [semLote > 0 ? `⚠ ${semLote} desenho(s) ainda sem lote de entrega` : "✓ Todos os desenhos estão vinculados a um lote"],
         totalColunas: 7,
         nomePlanilha: "Projetos e Desenhos",

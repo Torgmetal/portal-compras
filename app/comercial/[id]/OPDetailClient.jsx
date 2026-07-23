@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet,
+  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet, Building2,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
@@ -14,6 +14,7 @@ import AbaPlanejamento from "./AbaPlanejamento";
 import AbaExpedicao from "./AbaExpedicao";
 import DesenhosOPSection from "./DesenhosOPSection";
 import ListaExpedicaoSection from "./ListaExpedicaoSection";
+import AbaObra from "./AbaObra";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import { fmtOP } from "@/lib/utils";
@@ -49,6 +50,7 @@ function calcStatus(op) {
 
 const VISTAS = [
   { key: "resumo", label: "Resumo", icon: FileText },
+  { key: "obra", label: "Obra", icon: Building2 },
   { key: "engenharia", label: "Engenharia", icon: Ruler },
   { key: "planejamento", label: "Planejamento", icon: GanttChart },
   { key: "compras", label: "Compras", icon: ShoppingCart },
@@ -788,11 +790,13 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
       {vista === "expedicao" && <AbaExpedicao opId={op.id} proposta={proposta} />}
 
+      {vista === "obra" && <AbaObra op={op} podeEditar={!encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
+
       {vista === "planejamento" && <AbaPlanejamento opId={op.id} />}
 
       {vista === "engenharia" && (
         <div className="space-y-4">
-          <DesenhosOPSection opId={op.id} opNumero={op.numero} obra={op.obra} />
+          <DesenhosOPSection opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2 mb-1"><Ruler size={18} className="text-torg-blue" /> Engenharia</h3>
             <p className="text-sm text-torg-gray mb-4">RMs emitidas e listas de material da OP.</p>
