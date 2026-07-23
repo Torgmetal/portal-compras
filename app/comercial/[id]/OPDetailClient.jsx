@@ -792,7 +792,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
       {vista === "obra" && <AbaObra op={op} podeEditar={!encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
 
-      {vista === "planejamento" && <AbaPlanejamento opId={op.id} />}
+      {vista === "planejamento" && <AbaPlanejamento opId={op.id} localObra={[op.obra, op.clienteEndereco, [op.clienteCidade, op.clienteUF].filter(Boolean).join("/")].filter(Boolean).join(" - ")} />}
 
       {vista === "engenharia" && (
         <div className="space-y-4">

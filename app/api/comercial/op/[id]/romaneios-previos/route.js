@@ -55,6 +55,7 @@ const schema = z.object({
   local: z.string().max(300).nullable().optional(),
   observacao: z.string().max(1000).nullable().optional(),
   loteId: z.string().nullable().optional(),
+  criarLote: z.boolean().optional(), // cria um LoteExpedicao "Romaneio NN" e vincula
 });
 
 export async function POST(req, { params }) {
@@ -94,6 +95,20 @@ export async function POST(req, { params }) {
   }
   if (!criado) return NextResponse.json({ error: "Não foi possível numerar o romaneio prévio." }, { status: 409 });
 
-  await prisma.auditLog.create({ data: { userId: user.id, action: "CRIAR_ROMANEIO_PREVIO", entity: "OP", entityId: op.id, diff: { numero: criado.numero, itens: itens.length, pesoKg } } }).catch(() => {});
+  // Cada romaneio vira um lote de entrega: cria "Romaneio NN" e vincula. O peso
+  // do lote é a soma das peças; local/data vêm da carga.
+  if (body.criarLote && !criado.loteId) {
+    const nome = `Romaneio ${String(criado.numero).padStart(2, "0")}`;
+    let lote = await prisma.loteExpedicao.findFirst({ where: { opId: op.id, nome }, select: { id: true } });
+    if (!lote) {
+      const ult = await prisma.loteExpedicao.findFirst({ where: { opId: op.id }, orderBy: { ordem: "desc" }, select: { ordem: true } });
+      lote = await prisma.loteExpedicao.create({
+        data: { opId: op.id, ordem: (ult?.ordem ?? 0) + 1, nome, local: criado.local, dataPrevista: criado.dataPrevista, pesoKg },
+      });
+    }
+    criado = await prisma.romaneioPrevio.update({ where: { id: criado.id }, data: { loteId: lote.id } });
+  }
+
+  await prisma.auditLog.create({ data: { userId: user.id, action: "CRIAR_ROMANEIO_PREVIO", entity: "OP", entityId: op.id, diff: { numero: criado.numero, itens: itens.length, pesoKg, loteId: criado.loteId } } }).catch(() => {});
   return NextResponse.json({ success: true, previo: criado });
 }

@@ -14,7 +14,7 @@ const STATUS = {
   CANCELADO: { l: "cancelado", c: "bg-gray-200 text-torg-gray" },
 };
 
-export default function ConsultaExpedicao({ opId }) {
+export default function ConsultaExpedicao({ opId, localObra = "" }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [msg, setMsg] = useState("");
@@ -332,17 +332,20 @@ export default function ConsultaExpedicao({ opId }) {
         </div>
       )}
 
-      {modal && <NovoPrevioModal opId={opId} numero={proximo} itens={marcadas} peso={pesoSel} lotes={lotes} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); carregarPrevios(); }} />}
+      {modal && <NovoPrevioModal opId={opId} numero={proximo} itens={marcadas} peso={pesoSel} lotes={lotes} localObra={localObra} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); carregarPrevios(); setMsg("Romaneio prévio criado."); }} />}
     </div>
   );
 }
 
-function NovoPrevioModal({ opId, numero, itens, peso, lotes, onClose, onCriado }) {
-  const [f, setF] = useState({ dataPrevista: "", local: "", observacao: "", loteId: "" });
+function NovoPrevioModal({ opId, numero, itens, peso, lotes, localObra, onClose, onCriado }) {
+  // lote: "__novo__" = criar "Romaneio NN" (padrão), "" = sem lote, ou id existente.
+  // Local já vem preenchido das informações da obra e pode ser alterado.
+  const [f, setF] = useState({ dataPrevista: "", local: localObra || "", observacao: "", loteId: "__novo__" });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
   const jaExp = itens.filter((m) => m.expedido === true).length;
+  const nn = numero ? String(numero).padStart(2, "0") : "NN";
 
   async function salvar() {
     setSalvando(true); setErro("");
@@ -351,7 +354,9 @@ function NovoPrevioModal({ opId, numero, itens, peso, lotes, onClose, onCriado }
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itens: itens.map((m) => ({ frente: m.frente, marca: m.marca, descricao: m.descricao, qte: m.qte, pesoTotal: m.pesoTotal })),
-          dataPrevista: f.dataPrevista || null, local: f.local.trim() || null, observacao: f.observacao.trim() || null, loteId: f.loteId || null,
+          dataPrevista: f.dataPrevista || null, local: f.local.trim() || null, observacao: f.observacao.trim() || null,
+          loteId: f.loteId && f.loteId !== "__novo__" ? f.loteId : null,
+          criarLote: f.loteId === "__novo__",
         }),
       });
       const j = await r.json(); if (!j.success) throw new Error(j.error);
@@ -374,9 +379,11 @@ function NovoPrevioModal({ opId, numero, itens, peso, lotes, onClose, onCriado }
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Lote de entrega</label>
             <select value={f.loteId} onChange={(e) => setF((v) => ({ ...v, loteId: e.target.value }))} className={inp}>
+              <option value="__novo__">Criar lote deste romaneio — Romaneio {nn}</option>
               <option value="">— sem lote —</option>
               {lotes.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
             </select>
+            {f.loteId === "__novo__" && <p className="text-[10px] text-torg-gray mt-0.5">Cria o lote “Romaneio {nn}” com estas {itens.length} peça(s) e o peso — aparece na Expedição.</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

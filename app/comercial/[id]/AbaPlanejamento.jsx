@@ -8,7 +8,7 @@ import ConsultaExpedicao from "./ConsultaExpedicao";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
-export default function AbaPlanejamento({ opId }) {
+export default function AbaPlanejamento({ opId, localObra }) {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -54,7 +54,7 @@ export default function AbaPlanejamento({ opId }) {
       <ResumoLotes opId={opId} lotes={lotes} onChange={carregar} />
 
       {/* Consulta da lista de expedição por peça (sem precisar exportar) */}
-      <ConsultaExpedicao opId={opId} />
+      <ConsultaExpedicao opId={opId} localObra={localObra} />
 
       {/* Histórico de tarefas */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
