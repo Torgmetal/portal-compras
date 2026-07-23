@@ -4,6 +4,7 @@ import { GanttChart, Loader2, CheckCircle2, Clock, CalendarRange } from "lucide-
 import GanttInline from "@/components/planejamento/GanttInline";
 import AtasOPSection from "./AtasOPSection";
 import ResumoLotes from "./ResumoLotes";
+import ConsultaExpedicao from "./ConsultaExpedicao";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
@@ -51,6 +52,9 @@ export default function AbaPlanejamento({ opId }) {
 
       {/* Lotes de entrega: lista do Tekla + data de entrega definida aqui */}
       <ResumoLotes opId={opId} lotes={lotes} onChange={carregar} />
+
+      {/* Consulta da lista de expedição por peça (sem precisar exportar) */}
+      <ConsultaExpedicao opId={opId} />
 
       {/* Histórico de tarefas */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
