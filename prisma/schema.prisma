@@ -3351,6 +3351,33 @@ model ListaExpedicao {
   @@index([opNumero])
 }
 
+// Mudança detectada na Lista de Expedição (nova revisão do arquivo no servidor).
+// Guarda o DIFF por marca pra o Planejamento tratar: peça INCLUÍDA precisa entrar
+// num lote; peça EXCLUÍDA precisa sair (senão corre-se o risco de expedir peça
+// que não existe mais). notificadaEm = e-mail já enviado aos setores.
+model ListaExpedicaoRevisao {
+  id              String    @id @default(cuid())
+  opId            String?
+  opNumero        String
+  frente          String
+  arquivo         String
+  revisao         String?
+  revisaoAnterior String?
+  incluidas       Json      @default("[]")
+  excluidas       Json      @default("[]")
+  alteradas       Json      @default("[]") // mesma marca, qtd/peso diferente
+  nIncluidas      Int       @default(0)
+  nExcluidas      Int       @default(0)
+  nAlteradas      Int       @default(0)
+  detectadaEm     DateTime  @default(now())
+  notificadaEm    DateTime?
+  resolvidaEm     DateTime?
+  resolvidaPorId  String?
+
+  @@index([opNumero])
+  @@index([opId])
+}
+
 model NecessidadeSemanal {
   id          String   @id @default(cuid())
   semanaIso   Int

@@ -13,6 +13,7 @@ import RelatoriosOPSection from "@/components/RelatoriosOPSection";
 import AbaPlanejamento from "./AbaPlanejamento";
 import AbaExpedicao from "./AbaExpedicao";
 import DesenhosOPSection from "./DesenhosOPSection";
+import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
 import { ESTOQUE_MATERIAL_OPCOES, TIPO_DATABOOK_OPCOES, ESTOQUE_MATERIAL_LABEL, TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
 import { fmtOP } from "@/lib/utils";
@@ -819,6 +820,9 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               );
             })()}
           </div>
+
+          {/* Lista de Expedição — puxada da pasta do servidor, com diff por revisão */}
+          <ListaExpedicaoSection opId={op.id} />
         </div>
       )}
 
