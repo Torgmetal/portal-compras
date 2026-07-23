@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Calendar, Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X,
-  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart,
+  CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet,
 } from "lucide-react";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
@@ -65,6 +65,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
   const podeAlterarVerbaDireto = isMaster || podeAlterarVerba;
 
   const [vista, setVista] = useState("resumo");
+  const [exportandoLPC, setExportandoLPC] = useState(false);
   const [modalAditivo, setModalAditivo] = useState(false);
   const [modalRevisao, setModalRevisao] = useState(false);
   const [modalPrazo, setModalPrazo] = useState(false);
@@ -82,6 +83,47 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
   const status = calcStatus(op);
   const s = STATUS_LABELS[status];
   const encerradaOuCancelada = op.status === "ENCERRADA" || op.status === "CANCELADA";
+
+  // Exporta a LPC no padrão das planilhas do portal (lib/excel-relatorio, ISO 9001)
+  async function exportarLPC() {
+    setExportandoLPC(true);
+    try {
+      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } = await import("@/lib/excel-relatorio");
+      const pesoTotal = pecas.reduce((acc, p) => acc + (p.pesoTotalKg || 0), 0);
+      const conjuntos = pecas.filter((p) => p.tipoPeca === "CONJUNTO").length;
+      const croquis = pecas.filter((p) => p.tipoPeca === "CROQUI").length;
+      const comEstoque = pecas.filter((p) => p.statusEstoque === "DISPONIVEL").length;
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: `Lista de Peças (LPC) — ${fmtOP(op.numero)}`,
+        subtitulo: [op.obra, op.cliente, op.refCliente ? `Ref. ${op.refCliente}` : null].filter(Boolean).join(" · "),
+        kpis: [`${pecas.length} peças · ${conjuntos} conjuntos / ${croquis} croquis · ${comEstoque} com estoque · ${fmtKg(pesoTotal)}`],
+        totalColunas: 5,
+        nomePlanilha: "LPC",
+        codigoDoc: "REL-ENG-002",
+      });
+      ws.columns = [{ width: 20 }, { width: 14 }, { width: 14 }, { width: 18 }, { width: 18 }];
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, ["Marca", "Tipo", "Peso (kg)", "Estoque", "Status"]);
+      row++;
+      const primeira = row;
+      for (const p of pecas) {
+        adicionarLinhaTabela(ws, row, [
+          p.marca,
+          TIPO_PECA[p.tipoPeca] || "—",
+          Number((p.pesoTotalKg || 0).toFixed(1)),
+          ESTOQUE_PECA[p.statusEstoque]?.l || "—",
+          p.statusPrep === "PREPARADO" ? "Preparado" : capStatus(p.status),
+        ], { alinhamento: { 1: "center", 2: "right", 3: "center" } });
+        row++;
+      }
+      if (pecas.length) adicionarLinhaTotais(ws, row, ["TOTAL", "", { formula: `SUM(C${primeira}:C${row - 1})` }, "", ""]);
+      await downloadWorkbook(workbook, `LPC_${fmtOP(op.numero)}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) {
+      alert("Erro ao exportar: " + e.message);
+    } finally {
+      setExportandoLPC(false);
+    }
+  }
 
   async function executarAcaoStatus(acao) {
     const confirms = {
@@ -770,7 +812,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="flex items-center justify-between flex-wrap gap-2 px-6 pt-5 pb-3">
               <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><FileText size={16} className="text-torg-blue" /> Lista de peças (LPC)</h4>
-              {op.numero && <a href={`/engenharia/op/${encodeURIComponent(op.numero)}`} className="text-xs text-torg-blue hover:underline whitespace-nowrap">abrir em Engenharia</a>}
+              <button onClick={exportarLPC} disabled={exportandoLPC || pecas.length === 0} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40 whitespace-nowrap">{exportandoLPC ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
             </div>
             {pecas.length === 0 ? (
               <div className="px-6 pb-8 pt-2 text-center">
