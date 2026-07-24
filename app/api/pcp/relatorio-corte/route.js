@@ -87,20 +87,23 @@ export async function GET(req) {
 
   // Resumo por OP/frente — TODAS as obras que têm apontamento no setor
   if (!obra) {
-    const [grupos, ocultasRows] = await Promise.all([
+    const [grupos, ocultasRows, prioridadesRows] = await Promise.all([
       prisma.mesOrdem.groupBy({
         by: ["obra"], where: base,
         _sum: { planejadoUn: true, produzidoUn: true, pesoProduzido: true },
         _count: { _all: true }, _max: { dataFim: true },
       }),
       prisma.relatorioCorteObraOculta.findMany({ where: { setor }, select: { obra: true } }),
+      prisma.producaoPrioridade.findMany({ where: { setor }, select: { obra: true, ordem: true, dataEstimada: true } }),
     ]);
     const ocultas = new Set(ocultasRows.map((o) => o.obra));
+    const prioMap = new Map(prioridadesRows.map((p) => [p.obra, p]));
     const obras = grupos.filter((g) => g.obra).map((g) => {
       const concl = concluidas.has(g.obra);
       const prog = g._sum.planejadoUn || 0;
       const cort = concl && prog > 0 ? prog : (g._sum.produzidoUn || 0); // baixa manual → 100%
-      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra), concluida: concl };
+      const prio = prioMap.get(g.obra);
+      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra), concluida: concl, prioridade: prio ? prio.ordem : null, dataEstimada: prio ? prio.dataEstimada : null };
     });
     // Ordem numérica da obra, da maior para a menor (T95, T90, T88… ; "1000" no topo).
     const numObra = (s) => { const m = String(s || "").match(/\d+/); return m ? parseInt(m[0], 10) : -1; };

@@ -1,7 +1,12 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Factory, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox, EyeOff, Eye, CheckCircle2, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { Factory, Download, Loader2, AlertCircle, RefreshCw, ChevronLeft, Inbox, EyeOff, Eye, CheckCircle2, RotateCcw, Star, ArrowUp, ArrowDown, X, Plus, Tv } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, adicionarLegenda, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
+import { useStore } from "@/lib/store";
+
+// dataEstimada (noon UTC) → valor "YYYY-MM-DD" pro <input type=date>
+const dataInputVal = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR")} kg`;
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
@@ -27,6 +32,7 @@ const SETOR_INFO = {
 const SETORES = Object.keys(SETOR_INFO);
 
 export default function RelatorioCorteClient({ isAdmin = false }) {
+  const { showToast } = useStore();
   const [setor, setSetor] = useState("CORTE");
   const [obras, setObras] = useState([]);
   const [obra, setObra] = useState("");
@@ -135,6 +141,46 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
     }
   }
 
+  // ─── Prioridades (PCP) — coluna no resumo por obra ───────────────
+  // Recarrega só o resumo do setor, sem o spinner de tela cheia (reconcilia a
+  // ordem depois de priorizar/remover/mover, já que a numeração é global no setor).
+  const refetchResumo = useCallback(async () => {
+    try {
+      const p = new URLSearchParams({ setor });
+      if (de) p.set("de", de);
+      if (ate) p.set("ate", ate);
+      const res = await fetch(`/api/pcp/relatorio-corte?${p}`);
+      const j = await res.json();
+      if (res.ok) setObras(j.obras || []);
+    } catch { /* silencioso */ }
+  }, [setor, de, ate]);
+
+  async function prioridadeReq(obra, extra) {
+    const res = await fetch("/api/pcp/relatorio-corte/prioridade", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ obra, setor, ...extra }),
+    });
+    const j = await res.json();
+    if (!res.ok || !j.ok) throw new Error(j.error || "Erro ao salvar prioridade");
+    return j;
+  }
+
+  async function togglePrioridade(obra) {
+    try { const j = await prioridadeReq(obra, { acao: "toggle" }); await refetchResumo(); showToast(j.prioridade ? `${obra} priorizada` : `Prioridade removida de ${obra}`, "success"); }
+    catch (e) { showToast(e.message, "error"); }
+  }
+  async function moverPrioridade(obra, direcao) {
+    try { await prioridadeReq(obra, { acao: "mover", direcao }); await refetchResumo(); }
+    catch (e) { showToast(e.message, "error"); }
+  }
+  async function setDataPrioridade(obra, dataEstimada) {
+    // otimista (campo único), reconcilia em caso de erro
+    setObras((prev) => prev.map((o) => (o.obra === obra ? { ...o, dataEstimada: dataEstimada ? `${dataEstimada}T12:00:00.000Z` : null } : o)));
+    try { await prioridadeReq(obra, { acao: "data", dataEstimada: dataEstimada || null }); }
+    catch (e) { showToast(e.message, "error"); refetchResumo(); }
+  }
+
   // Extrai TODAS as peças de todas as OPs num único Excel (respeita o período)
   async function exportarTodas() {
     setExportandoTodas(true);
@@ -237,6 +283,11 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
           <p className="text-xs text-torg-gray mt-0.5">Peças <strong>programadas</strong> e <strong>produzidas</strong> por obra/setor — situação, data/hora, máquina e operador (Syneco).</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Link href="/pcp/dashboard-prioridades" target="_blank"
+            title="Abrir o painel de prioridades para TV"
+            className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
+            <Tv size={15} /> Dashboard TV
+          </Link>
           {setor === "CORTE" && (
             <button onClick={() => reconciliar(false)} disabled={reconciliando}
               title="Aplica a baixa do corte do Syneco em todas as OPs agora"
@@ -369,6 +420,7 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
           <table className="w-full text-[13px]">
             <thead className="bg-gray-50/60"><tr className="text-left text-gray-500">
               <th className="px-3 py-2 font-medium">Obra</th>
+              <th className="px-3 py-2 font-medium">Prioridade</th>
               <th className="px-3 py-2 font-medium text-right">Peças</th>
               <th className="px-3 py-2 font-medium text-right">Programado</th>
               <th className="px-3 py-2 font-medium text-right">{info.acao}</th>
@@ -384,6 +436,27 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
                     {o.obra}
                     {o.concluida && <span className="ml-2 align-middle text-[10px] font-sans font-medium text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">✓ baixa manual</span>}
                     {o.oculto && <span className="ml-2 align-middle text-[10px] font-sans font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">oculta</span>}
+                  </td>
+                  <td className="px-3 py-2">
+                    {o.prioridade ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full whitespace-nowrap" title={`${o.prioridade}ª prioridade do setor`}>
+                          <Star size={11} className="fill-amber-500 text-amber-500" /> {o.prioridade}º
+                        </span>
+                        <div className="flex flex-col leading-none">
+                          <button onClick={() => moverPrioridade(o.obra, "cima")} title="Subir prioridade" className="text-torg-gray hover:text-torg-blue"><ArrowUp size={12} /></button>
+                          <button onClick={() => moverPrioridade(o.obra, "baixo")} title="Descer prioridade" className="text-torg-gray hover:text-torg-blue"><ArrowDown size={12} /></button>
+                        </div>
+                        <input type="date" value={dataInputVal(o.dataEstimada)} onChange={(e) => setDataPrioridade(o.obra, e.target.value)}
+                          title="Data estimada de finalização" className="text-[11px] border border-gray-300 rounded px-1.5 py-1 focus:border-torg-blue outline-none" />
+                        <button onClick={() => togglePrioridade(o.obra)} title="Remover prioridade" className="text-torg-gray hover:text-red-600"><X size={13} /></button>
+                      </div>
+                    ) : (
+                      <button onClick={() => togglePrioridade(o.obra)}
+                        className="text-[11px] text-torg-gray hover:text-amber-700 border border-gray-200 hover:border-amber-300 rounded-full px-2 py-0.5 inline-flex items-center gap-1 whitespace-nowrap">
+                        <Plus size={11} /> Priorizar
+                      </button>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-torg-gray">{o.pecas}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{o.programadoUn.toLocaleString("pt-BR")}</td>

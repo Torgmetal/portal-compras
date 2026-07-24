@@ -3756,6 +3756,25 @@ model RelatorioObraConcluida {
   @@unique([obra, setor])
 }
 
+// Prioridades de produção marcadas pelo PCP no Relatório de Produção, POR SETOR.
+// O PCP ordena (1º, 2º…) as obras prioritárias de cada setor e estima uma data de
+// finalização. Alimenta o Dashboard TV (nº de peças/% concluído vêm ao vivo do
+// Syneco/mesOrdem; aqui só guardamos a ordem e o prazo estimado).
+model ProducaoPrioridade {
+  id           String    @id @default(cuid())
+  obra         String
+  setor        String    @default("CORTE")
+  ordem        Int       @default(0)
+  dataEstimada DateTime?
+  criadoPor    String?
+  criadoNome   String?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @default(now()) @updatedAt
+
+  @@unique([obra, setor])
+  @@index([setor, ordem])
+}
+
 // Baixa da carteira do Dashboard do PCP: obra/frente (opNumero da PecaConjunto)
 // já finalizada, removida da "Necessidade por obra". Só esconde da VISÃO do
 // dashboard — não altera o status das peças. Reversível, ADMIN-only.

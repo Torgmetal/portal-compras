@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Wrench, Flame,
-  Wind, Paintbrush, Package, Target, ListOrdered, Sparkles, Gauge, FileText, Truck,
+  Wind, Paintbrush, Package, Target, ListOrdered, Sparkles, Gauge, FileText, Truck, Tv,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -18,6 +18,7 @@ const menu = [
   { href: "/pcp/terceirizados", label: "Terceirizados",   icon: Truck },
   { href: "/pcp/carga-corte",  label: "Carga do Corte",   icon: Gauge },
   { href: "/pcp/relatorio-corte", label: "Relatório de Produção", icon: FileText },
+  { href: "/pcp/dashboard-prioridades", label: "Prioridades (TV)", icon: Tv },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
   { href: "/pcp/solda",        label: "Solda",            icon: Flame },
   { href: "/pcp/acabamento",   label: "Acabamento",       icon: Sparkles },
