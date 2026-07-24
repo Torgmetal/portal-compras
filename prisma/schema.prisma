@@ -3766,6 +3766,9 @@ model ProducaoPrioridade {
   setor        String    @default("CORTE")
   ordem        Int       @default(0)
   dataEstimada DateTime?
+  // Escopo: obra inteira (default) ou só as peças (op codes do mesOrdem) em `pecas`.
+  obraInteira  Boolean   @default(true)
+  pecas        String[]  @default([])
   criadoPor    String?
   criadoNome   String?
   criadoEm     DateTime  @default(now())

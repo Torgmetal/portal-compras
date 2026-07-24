@@ -67,10 +67,27 @@ export async function GET() {
     const aggMap = new Map(porSetor); // setor -> Map(obra -> {prog,prod})
     const concluidas = new Set(concluidasRows.map((c) => `${c.setor}:${c.obra}`));
 
+    // Prioridades com escopo de PEÇAS específicas → soma só essas peças (op ∈ pecas).
+    const especificas = prioridades.filter((p) => !p.obraInteira && (p.pecas?.length || 0) > 0);
+    const escopoPecas = new Map(); // id -> {prog,prod}
+    await Promise.all(
+      especificas.map(async (p) => {
+        const agg = await prisma.mesOrdem.aggregate({
+          where: { AND: [whereSetorSyneco(p.setor), { obra: p.obra }, { op: { in: p.pecas } }] },
+          _sum: { planejadoUn: true, produzidoUn: true },
+        });
+        escopoPecas.set(p.id, { prog: agg._sum.planejadoUn || 0, prod: agg._sum.produzidoUn || 0 });
+      })
+    );
+
     // Monta um item por prioridade
     const itens = prioridades.map((p) => {
-      const agg = aggMap.get(p.setor)?.get(p.obra) || { prog: 0, prod: 0 };
-      const concl = concluidas.has(`${p.setor}:${p.obra}`);
+      const escopoEspecifico = !p.obraInteira && (p.pecas?.length || 0) > 0;
+      const agg = escopoEspecifico
+        ? escopoPecas.get(p.id) || { prog: 0, prod: 0 }
+        : aggMap.get(p.setor)?.get(p.obra) || { prog: 0, prod: 0 };
+      // Baixa manual só força 100% na obra inteira (não em recorte de peças).
+      const concl = !escopoEspecifico && concluidas.has(`${p.setor}:${p.obra}`);
       const total = Math.round(agg.prog);
       const feitas = concl && total > 0 ? total : Math.min(Math.round(agg.prod), total || Math.round(agg.prod));
       const restantes = Math.max(0, total - feitas);
@@ -92,6 +109,8 @@ export async function GET() {
         setorNome: SETOR_NOME[p.setor] || p.setor,
         ordem: p.ordem,
         dataEstimada: p.dataEstimada,
+        obraInteira: !escopoEspecifico,
+        qtdPecasEscopo: escopoEspecifico ? p.pecas.length : null,
         pecasTotal: total,
         pecasConcluidas: feitas,
         restantes,

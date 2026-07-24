@@ -141,19 +141,17 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
     }
   }
 
-  // ─── Prioridades (PCP) — coluna no resumo por obra ───────────────
-  // Recarrega só o resumo do setor, sem o spinner de tela cheia (reconcilia a
-  // ordem depois de priorizar/remover/mover, já que a numeração é global no setor).
-  const refetchResumo = useCallback(async () => {
-    try {
-      const p = new URLSearchParams({ setor });
-      if (de) p.set("de", de);
-      if (ate) p.set("ate", ate);
-      const res = await fetch(`/api/pcp/relatorio-corte?${p}`);
-      const j = await res.json();
-      if (res.ok) setObras(j.obras || []);
-    } catch { /* silencioso */ }
-  }, [setor, de, ate]);
+  // ─── Prioridades (PCP) ───────────────────────────────────────────
+  // A rota devolve a lista de prioridades do setor; mesclamos direto no estado
+  // (sem refazer a agregação pesada do Syneco) — resposta instantânea.
+  function aplicarPrioridades(lista) {
+    const map = new Map((lista || []).map((p) => [p.obra, p]));
+    setObras((prev) => prev.map((o) => {
+      const p = map.get(o.obra);
+      return { ...o, prioridade: p ? p.ordem : null, dataEstimada: p ? p.dataEstimada : null, obraInteira: p ? p.obraInteira : true, pecasPrioridade: p ? p.pecas : [] };
+    }));
+    setDetalhe((prev) => (prev ? { ...prev, prioridade: map.get(prev.obra) || null } : prev));
+  }
 
   async function prioridadeReq(obra, extra) {
     const res = await fetch("/api/pcp/relatorio-corte/prioridade", {
@@ -163,23 +161,15 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
     });
     const j = await res.json();
     if (!res.ok || !j.ok) throw new Error(j.error || "Erro ao salvar prioridade");
+    aplicarPrioridades(j.prioridades);
     return j;
   }
 
-  async function togglePrioridade(obra) {
-    try { const j = await prioridadeReq(obra, { acao: "toggle" }); await refetchResumo(); showToast(j.prioridade ? `${obra} priorizada` : `Prioridade removida de ${obra}`, "success"); }
-    catch (e) { showToast(e.message, "error"); }
-  }
-  async function moverPrioridade(obra, direcao) {
-    try { await prioridadeReq(obra, { acao: "mover", direcao }); await refetchResumo(); }
-    catch (e) { showToast(e.message, "error"); }
-  }
-  async function setDataPrioridade(obra, dataEstimada) {
-    // otimista (campo único), reconcilia em caso de erro
-    setObras((prev) => prev.map((o) => (o.obra === obra ? { ...o, dataEstimada: dataEstimada ? `${dataEstimada}T12:00:00.000Z` : null } : o)));
-    try { await prioridadeReq(obra, { acao: "data", dataEstimada: dataEstimada || null }); }
-    catch (e) { showToast(e.message, "error"); refetchResumo(); }
-  }
+  const togglePrioridade = (obra) => prioridadeReq(obra, { acao: "toggle" }).catch((e) => showToast(e.message, "error"));
+  const moverPrioridade = (obra, direcao) => prioridadeReq(obra, { acao: "mover", direcao }).catch((e) => showToast(e.message, "error"));
+  const setDataPrioridade = (obra, dataEstimada) => prioridadeReq(obra, { acao: "data", dataEstimada: dataEstimada || null }).catch((e) => showToast(e.message, "error"));
+  const setEscopoPrioridade = (obra, modo) => prioridadeReq(obra, { acao: "escopo", modo }).catch((e) => showToast(e.message, "error"));
+  const togglePecaPrioridade = (obra, peca, incluir) => prioridadeReq(obra, { acao: "peca", peca, incluir }).catch((e) => showToast(e.message, "error"));
 
   // Extrai TODAS as peças de todas as OPs num único Excel (respeita o período)
   async function exportarTodas() {
@@ -380,6 +370,13 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
               ✓ OP marcada como <strong>concluída (baixa manual)</strong> — apontamento forçado a 100% no relatório. O Syneco não é alterado.
             </div>
           )}
+          <PrioridadeDetalheBar
+            prioridade={detalhe.prioridade}
+            setorNome={info.nome}
+            onToggle={() => togglePrioridade(detalhe.obra)}
+            onEscopo={(modo) => setEscopoPrioridade(detalhe.obra, modo)}
+            onData={(d) => setDataPrioridade(detalhe.obra, d)}
+          />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <Kpi label="Programado" valor={`${detalhe.programadoUn.toLocaleString("pt-BR")} un`} />
             <Kpi label={info.acao} valor={`${detalhe.cortadoUn.toLocaleString("pt-BR")} un`} cor="text-emerald-700" />
@@ -389,6 +386,7 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
             <table className="w-full text-[13px] [&_td]:align-top">
               <thead className="bg-gray-50/60"><tr className="text-left text-gray-500">
+                <th className="px-2 py-2 font-medium text-center" title="Marcar peça como prioridade">★</th>
                 <th className="px-3 py-2 font-medium">Peça</th>
                 <th className="px-3 py-2 font-medium">Descrição / Perfil</th>
                 <th className="px-3 py-2 font-medium text-right">Prog.</th>
@@ -401,6 +399,9 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
               <tbody className="divide-y divide-gray-50">
                 {itensFiltrados.map((i, idx) => (
                   <tr key={idx} className="hover:bg-gray-50/50">
+                    <td className="px-2 py-2 text-center">
+                      <EstrelaPeca prioridade={detalhe.prioridade} peca={i.peca} onToggle={(peca, incluir) => togglePecaPrioridade(detalhe.obra, peca, incluir)} />
+                    </td>
                     <td className="px-3 py-2 font-mono font-medium text-torg-dark whitespace-nowrap">{i.peca}</td>
                     <td className="px-3 py-2 text-torg-gray">{i.descricao}</td>
                     <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{i.programado}</td>
@@ -440,8 +441,10 @@ export default function RelatorioCorteClient({ isAdmin = false }) {
                   <td className="px-3 py-2">
                     {o.prioridade ? (
                       <div className="flex items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full whitespace-nowrap" title={`${o.prioridade}ª prioridade do setor`}>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          title={o.obraInteira ? `${o.prioridade}ª prioridade — obra inteira` : `${o.prioridade}ª prioridade — ${o.pecasPrioridade?.length || 0} peça(s)`}>
                           <Star size={11} className="fill-amber-500 text-amber-500" /> {o.prioridade}º
+                          <span className="font-normal text-amber-600/80">{o.obraInteira ? "· obra" : `· ${o.pecasPrioridade?.length || 0} pç`}</span>
                         </span>
                         <div className="flex flex-col leading-none">
                           <button onClick={() => moverPrioridade(o.obra, "cima")} title="Subir prioridade" className="text-torg-gray hover:text-torg-blue"><ArrowUp size={12} /></button>
@@ -496,6 +499,62 @@ function Kpi({ label, valor, cor = "text-torg-dark" }) {
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
       <p className="text-[10px] text-torg-gray uppercase tracking-wide">{label}</p>
       <p className={`text-lg font-bold mt-0.5 ${cor}`}>{valor}</p>
+    </div>
+  );
+}
+
+// Estrela por peça no detalhe: marca/desmarca a peça na prioridade da obra.
+function EstrelaPeca({ prioridade, peca, onToggle }) {
+  const obraInteira = !!prioridade?.obraInteira;
+  const marcada = prioridade ? (obraInteira || (prioridade.pecas || []).includes(peca)) : false;
+  const disabled = obraInteira; // obra inteira: todas as peças já incluídas
+  return (
+    <button
+      disabled={disabled}
+      onClick={() => onToggle(peca, !((prioridade?.pecas || []).includes(peca)))}
+      title={disabled ? "Obra inteira priorizada — todas as peças incluídas" : marcada ? "Remover peça da prioridade" : "Marcar peça como prioridade"}
+      className={`p-0.5 rounded ${disabled ? "opacity-40 cursor-default" : "hover:bg-amber-50"}`}
+    >
+      <Star size={15} className={marcada ? "fill-amber-400 text-amber-500" : "text-gray-300"} />
+    </button>
+  );
+}
+
+// Barra de prioridade no detalhe da obra: define escopo (obra inteira ou peças),
+// data estimada de finalização e remove a prioridade.
+function PrioridadeDetalheBar({ prioridade, setorNome, onToggle, onEscopo, onData }) {
+  if (!prioridade) {
+    return (
+      <div className="mb-4 flex items-center gap-2 flex-wrap bg-amber-50/60 border border-amber-100 rounded-xl px-3 py-2">
+        <Star size={15} className="text-amber-500" />
+        <span className="text-[13px] text-torg-dark font-medium">Priorizar esta obra em {setorNome}:</span>
+        <button onClick={onToggle} className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-2.5 py-1 inline-flex items-center gap-1"><Plus size={12} /> Obra inteira</button>
+        <button onClick={() => onEscopo("pecas")} className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 rounded-lg px-2.5 py-1 inline-flex items-center gap-1"><Star size={12} /> Peças específicas</button>
+      </div>
+    );
+  }
+  const obraInteira = !!prioridade.obraInteira;
+  const nPecas = (prioridade.pecas || []).length;
+  return (
+    <div className="mb-4 flex items-center gap-2 flex-wrap bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+      <span className="inline-flex items-center gap-1 text-[12px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+        <Star size={12} className="fill-amber-500 text-amber-500" /> {prioridade.ordem}ª prioridade
+      </span>
+      <span className="text-[13px] text-torg-dark font-medium">
+        {obraInteira ? "Obra inteira" : `${nPecas} peça${nPecas === 1 ? "" : "s"} marcada${nPecas === 1 ? "" : "s"}`}
+      </span>
+      <label className="text-[12px] text-torg-gray inline-flex items-center gap-1 ml-1">
+        Finalizar até
+        <input type="date" value={dataInputVal(prioridade.dataEstimada)} onChange={(e) => onData(e.target.value)}
+          className="text-[12px] border border-gray-300 rounded px-1.5 py-1 focus:border-torg-blue outline-none" />
+      </label>
+      {obraInteira ? (
+        <button onClick={() => onEscopo("pecas")} className="text-[12px] text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"><Star size={12} /> Restringir a peças</button>
+      ) : (
+        <button onClick={() => onEscopo("obra")} className="text-[12px] text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1">Marcar obra inteira</button>
+      )}
+      {!obraInteira && <span className="text-[11px] text-torg-gray">— marque as peças na coluna ★</span>}
+      <button onClick={onToggle} className="ml-auto text-[12px] text-torg-gray hover:text-red-600 font-medium inline-flex items-center gap-1"><X size={13} /> Remover</button>
     </div>
   );
 }

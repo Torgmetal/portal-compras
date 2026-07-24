@@ -1,8 +1,12 @@
 // POST /api/pcp/relatorio-corte/prioridade
 // Marca/ordena prioridades de produção no Relatório de Produção, POR SETOR.
-//   { obra, setor?, acao: "toggle" }                    → prioriza (próxima ordem) ou remove
-//   { obra, setor?, acao: "data", dataEstimada|null }   → grava/limpa o prazo estimado
+// O escopo de cada prioridade é a OBRA INTEIRA (default) ou só algumas PEÇAS.
+//   { obra, setor?, acao: "toggle" }                         → prioriza obra inteira / remove
+//   { obra, setor?, acao: "data", dataEstimada|null }        → grava/limpa o prazo estimado
 //   { obra, setor?, acao: "mover", direcao: "cima"|"baixo" } → reordena no setor
+//   { obra, setor?, acao: "escopo", modo: "obra"|"pecas" }   → alterna obra inteira ↔ peças
+//   { obra, setor?, acao: "peca", peca, incluir }            → marca/desmarca uma peça
+// Cada resposta traz a lista de prioridades do setor (o client mescla sem refetch pesado).
 // Alimenta o Dashboard TV (/pcp/dashboard-prioridades). PCP/PLANEJAMENTO/ADMIN.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -15,9 +19,12 @@ const SETORES = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
 const schema = z.object({
   obra: z.string().min(1, "Obra obrigatória"),
   setor: z.string().optional(),
-  acao: z.enum(["toggle", "data", "mover"]),
+  acao: z.enum(["toggle", "data", "mover", "escopo", "peca"]),
   dataEstimada: z.string().nullable().optional(), // "YYYY-MM-DD" ou null
   direcao: z.enum(["cima", "baixo"]).optional(),
+  modo: z.enum(["obra", "pecas"]).optional(),
+  peca: z.string().optional(),
+  incluir: z.boolean().optional(),
 });
 
 // Data date-level ancorada ao meio-dia UTC (evita virada de dia por fuso).
@@ -41,6 +48,18 @@ async function recompactar(setor) {
   if (ops.length) await prisma.$transaction(ops);
 }
 
+// Lista de prioridades do setor (formato enxuto pro client mesclar sem refetch).
+async function listaSetor(setor) {
+  const rows = await prisma.producaoPrioridade.findMany({
+    where: { setor },
+    orderBy: { ordem: "asc" },
+    select: { obra: true, ordem: true, dataEstimada: true, obraInteira: true, pecas: true },
+  });
+  return rows;
+}
+
+const proximaOrdem = async (setor) => ((await prisma.producaoPrioridade.aggregate({ where: { setor }, _max: { ordem: true } }))._max.ordem || 0) + 1;
+
 export async function POST(req) {
   let user;
   try {
@@ -58,50 +77,87 @@ export async function POST(req) {
 
   const obra = body.obra;
   const setor = SETORES.includes(String(body.setor || "").toUpperCase()) ? body.setor.toUpperCase() : "CORTE";
+  const ok = async (extra = {}) => NextResponse.json({ ok: true, obra, setor, prioridades: await listaSetor(setor), ...extra });
 
   try {
+    const atual = await prisma.producaoPrioridade.findUnique({ where: { obra_setor: { obra, setor } } });
+
     if (body.acao === "toggle") {
-      const existente = await prisma.producaoPrioridade.findUnique({ where: { obra_setor: { obra, setor } } });
-      if (existente) {
-        await prisma.producaoPrioridade.delete({ where: { id: existente.id } });
+      if (atual) {
+        await prisma.producaoPrioridade.delete({ where: { id: atual.id } });
         await recompactar(setor);
         await audit(user, "PRIORIDADE_REMOVER", obra, setor, { obra, setor });
-        return NextResponse.json({ ok: true, obra, setor, prioridade: null, dataEstimada: null });
+        return ok();
       }
-      const max = await prisma.producaoPrioridade.aggregate({ where: { setor }, _max: { ordem: true } });
-      const ordem = (max._max.ordem || 0) + 1;
-      const dataEstimada = parseData(body.dataEstimada);
+      const ordem = await proximaOrdem(setor);
       await prisma.producaoPrioridade.create({
-        data: { obra, setor, ordem, dataEstimada, criadoPor: user.id, criadoNome: user.name || null },
+        data: { obra, setor, ordem, dataEstimada: parseData(body.dataEstimada), obraInteira: true, pecas: [], criadoPor: user.id, criadoNome: user.name || null },
       });
       await audit(user, "PRIORIDADE_ADICIONAR", obra, setor, { obra, setor, ordem });
-      return NextResponse.json({ ok: true, obra, setor, prioridade: ordem, dataEstimada });
+      return ok();
     }
 
     if (body.acao === "data") {
-      const dataEstimada = parseData(body.dataEstimada);
-      const p = await prisma.producaoPrioridade
-        .update({ where: { obra_setor: { obra, setor } }, data: { dataEstimada } })
-        .catch(() => null);
-      if (!p) return NextResponse.json({ error: "Obra não está priorizada." }, { status: 404 });
+      if (!atual) return NextResponse.json({ error: "Obra não está priorizada." }, { status: 404 });
+      await prisma.producaoPrioridade.update({ where: { id: atual.id }, data: { dataEstimada: parseData(body.dataEstimada) } });
       await audit(user, "PRIORIDADE_DATA", obra, setor, { obra, setor, dataEstimada: body.dataEstimada || null });
-      return NextResponse.json({ ok: true, obra, setor, prioridade: p.ordem, dataEstimada });
+      return ok();
     }
 
     if (body.acao === "mover") {
-      const atual = await prisma.producaoPrioridade.findUnique({ where: { obra_setor: { obra, setor } } });
       if (!atual) return NextResponse.json({ error: "Obra não está priorizada." }, { status: 404 });
       const vizinho =
         body.direcao === "cima"
           ? await prisma.producaoPrioridade.findFirst({ where: { setor, ordem: { lt: atual.ordem } }, orderBy: { ordem: "desc" } })
           : await prisma.producaoPrioridade.findFirst({ where: { setor, ordem: { gt: atual.ordem } }, orderBy: { ordem: "asc" } });
-      if (!vizinho) return NextResponse.json({ ok: true, obra, setor, prioridade: atual.ordem }); // já no topo/fim
-      await prisma.$transaction([
-        prisma.producaoPrioridade.update({ where: { id: atual.id }, data: { ordem: vizinho.ordem } }),
-        prisma.producaoPrioridade.update({ where: { id: vizinho.id }, data: { ordem: atual.ordem } }),
-      ]);
-      await audit(user, "PRIORIDADE_MOVER", obra, setor, { obra, setor, direcao: body.direcao });
-      return NextResponse.json({ ok: true, obra, setor, prioridade: vizinho.ordem });
+      if (vizinho) {
+        await prisma.$transaction([
+          prisma.producaoPrioridade.update({ where: { id: atual.id }, data: { ordem: vizinho.ordem } }),
+          prisma.producaoPrioridade.update({ where: { id: vizinho.id }, data: { ordem: atual.ordem } }),
+        ]);
+        await audit(user, "PRIORIDADE_MOVER", obra, setor, { obra, setor, direcao: body.direcao });
+      }
+      return ok();
+    }
+
+    if (body.acao === "escopo") {
+      const modo = body.modo || "obra";
+      const rec = atual || (await prisma.producaoPrioridade.create({
+        data: { obra, setor, ordem: await proximaOrdem(setor), obraInteira: modo === "obra", pecas: [], criadoPor: user.id, criadoNome: user.name || null },
+      }));
+      await prisma.producaoPrioridade.update({
+        where: { id: rec.id },
+        data: modo === "obra" ? { obraInteira: true, pecas: [] } : { obraInteira: false },
+      });
+      await audit(user, "PRIORIDADE_ESCOPO", obra, setor, { obra, setor, modo });
+      return ok();
+    }
+
+    if (body.acao === "peca") {
+      if (!body.peca) return NextResponse.json({ error: "Peça obrigatória." }, { status: 400 });
+      const incluir = body.incluir !== false;
+      if (!atual) {
+        if (!incluir) return ok(); // desmarcar sem prioridade → nada
+        await prisma.producaoPrioridade.create({
+          data: { obra, setor, ordem: await proximaOrdem(setor), obraInteira: false, pecas: [body.peca], criadoPor: user.id, criadoNome: user.name || null },
+        });
+        await audit(user, "PRIORIDADE_PECA", obra, setor, { obra, setor, peca: body.peca, incluir: true });
+        return ok();
+      }
+      // Base: se estava "obra inteira", começar do vazio ao mexer em peça.
+      const baseSet = new Set(atual.obraInteira ? [] : atual.pecas);
+      if (incluir) baseSet.add(body.peca);
+      else baseSet.delete(body.peca);
+      const novo = [...baseSet];
+      if (novo.length === 0 && !atual.obraInteira) {
+        // desmarcou todas as peças → deixa de ser prioridade
+        await prisma.producaoPrioridade.delete({ where: { id: atual.id } });
+        await recompactar(setor);
+      } else {
+        await prisma.producaoPrioridade.update({ where: { id: atual.id }, data: { obraInteira: false, pecas: novo } });
+      }
+      await audit(user, "PRIORIDADE_PECA", obra, setor, { obra, setor, peca: body.peca, incluir });
+      return ok();
     }
 
     return NextResponse.json({ error: "Ação inválida" }, { status: 400 });

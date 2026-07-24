@@ -94,7 +94,7 @@ export async function GET(req) {
         _count: { _all: true }, _max: { dataFim: true },
       }),
       prisma.relatorioCorteObraOculta.findMany({ where: { setor }, select: { obra: true } }),
-      prisma.producaoPrioridade.findMany({ where: { setor }, select: { obra: true, ordem: true, dataEstimada: true } }),
+      prisma.producaoPrioridade.findMany({ where: { setor }, select: { obra: true, ordem: true, dataEstimada: true, obraInteira: true, pecas: true } }),
     ]);
     const ocultas = new Set(ocultasRows.map((o) => o.obra));
     const prioMap = new Map(prioridadesRows.map((p) => [p.obra, p]));
@@ -103,7 +103,7 @@ export async function GET(req) {
       const prog = g._sum.planejadoUn || 0;
       const cort = concl && prog > 0 ? prog : (g._sum.produzidoUn || 0); // baixa manual → 100%
       const prio = prioMap.get(g.obra);
-      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra), concluida: concl, prioridade: prio ? prio.ordem : null, dataEstimada: prio ? prio.dataEstimada : null };
+      return { obra: g.obra, pecas: g._count._all, programadoUn: Math.round(prog), cortadoUn: Math.round(cort), pesoCortado: Math.round(g._sum.pesoProduzido || 0), pct: prog > 0 ? Math.round((cort / prog) * 100) : 0, ultima: g._max.dataFim, oculto: ocultas.has(g.obra), concluida: concl, prioridade: prio ? prio.ordem : null, dataEstimada: prio ? prio.dataEstimada : null, obraInteira: prio ? prio.obraInteira : true, pecasPrioridade: prio ? prio.pecas : [] };
     });
     // Ordem numérica da obra, da maior para a menor (T95, T90, T88… ; "1000" no topo).
     const numObra = (s) => { const m = String(s || "").match(/\d+/); return m ? parseInt(m[0], 10) : -1; };
@@ -122,10 +122,15 @@ export async function GET(req) {
     return db - da || String(a.op).localeCompare(String(b.op));
   });
   const itens = rows.map((r) => mapItem(r, verbo, concluidas));
+  const prioridade = await prisma.producaoPrioridade.findUnique({
+    where: { obra_setor: { obra, setor } },
+    select: { ordem: true, dataEstimada: true, obraInteira: true, pecas: true },
+  });
   return NextResponse.json({
     setor,
     obra,
     concluida: concluidas.has(obra),
+    prioridade, // null se não priorizada; senão { ordem, dataEstimada, obraInteira, pecas }
     total: itens.length,
     cortadas: itens.filter((i) => i.estado === "FEITO").length,
     parciais: itens.filter((i) => i.estado === "PARCIAL").length,

@@ -134,6 +134,9 @@ function SetorBloco({ it }) {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-bold uppercase tracking-wide text-slate-200">{it.setorNome}</span>
           <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold ${sit.chip}`}>{sit.label}</span>
+          {!it.obraInteira && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/15 text-amber-300 font-semibold">★ {it.qtdPecasEscopo} peça{it.qtdPecasEscopo === 1 ? "" : "s"}</span>
+          )}
         </div>
         <p className="text-lg font-bold text-white leading-tight mt-0.5">
           {numBR(it.pecasConcluidas)} <span className="text-slate-400 font-normal">/ {numBR(it.pecasTotal)} peças</span>
