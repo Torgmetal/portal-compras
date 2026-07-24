@@ -7,6 +7,7 @@ import { ArrowLeft, FileText } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import MapaCotacaoClient from "./MapaCotacaoClient";
 import OPAcoesClient from "./OPAcoesClient";
+import BotaoResumoFD from "./BotaoResumoFD";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
 import FDAvulsosSection from "@/components/FDAvulsosSection";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
@@ -315,15 +316,18 @@ export default async function PainelOPDetalhe({ params }) {
         <div id="rms-vinculadas" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden scroll-mt-4">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-lg font-semibold text-torg-dark">RMs vinculadas ({data.rms.length})</h3>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-torg-gray">
-                {pedidosFlat.filter((p) => p.status === "CRIADO").length} pedidos no Omie
-              </span>
-              {pedidosFlat.filter((p) => p.status === "CRIADO").length > 0 && (
-                <span className="text-torg-orange-700 font-medium tabular-nums">
-                  {fmtMoeda(pedidosFlat.filter((p) => p.status === "CRIADO").reduce((s, p) => s + (p.total || 0), 0))}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-torg-gray">
+                  {pedidosFlat.filter((p) => p.status === "CRIADO").length} pedidos no Omie
                 </span>
-              )}
+                {pedidosFlat.filter((p) => p.status === "CRIADO").length > 0 && (
+                  <span className="text-torg-orange-700 font-medium tabular-nums">
+                    {fmtMoeda(pedidosFlat.filter((p) => p.status === "CRIADO").reduce((s, p) => s + (p.total || 0), 0))}
+                  </span>
+                )}
+              </div>
+              <BotaoResumoFD opId={op.id} numero={op.numero} />
             </div>
           </div>
           <ul className="divide-y divide-gray-100">
