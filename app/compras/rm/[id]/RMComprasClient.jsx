@@ -58,6 +58,7 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
   const [modalCancelarItem, setModalCancelarItem] = useState(null);
   const [modalAtenderEstoque, setModalAtenderEstoque] = useState(null);
   const [modalEditarItem, setModalEditarItem] = useState(null);
+  const [modalAddItem, setModalAddItem] = useState(false);
   const [modalEncerrarRM, setModalEncerrarRM] = useState(false);
   const [modalEnviarCot, setModalEnviarCot] = useState(false);
   const [modalPedidoDireto, setModalPedidoDireto] = useState(false);
@@ -392,8 +393,17 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
 
       {/* Itens */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold text-torg-dark">Itens ({rm.itens.length})</h3>
+          {(isAdmin || userRole === "COMPRAS") && !ehServicoDireto && (
+            <button
+              onClick={() => setModalAddItem(true)}
+              className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
+              title="Adicionar um item esquecido — entra nas cotações abertas pro fornecedor cotar"
+            >
+              <Plus size={14} /> Adicionar item
+            </button>
+          )}
         </div>
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full text-sm">
@@ -590,6 +600,13 @@ export default function RMComprasClient({ rm, outrasRMs = [], userRole, dadosMap
           rmId={rm.id}
           onClose={() => setModalEditarItem(null)}
           onSaved={() => { setModalEditarItem(null); router.refresh(); }}
+        />
+      )}
+      {modalAddItem && (
+        <ModalAdicionarItem
+          rmId={rm.id}
+          onClose={() => setModalAddItem(false)}
+          onSaved={() => { setModalAddItem(false); router.refresh(); }}
         />
       )}
       {modalEncerrarRM && (
@@ -3399,6 +3416,107 @@ function AnexosSection({ rmId, anexos: anexosIniciais, editavel }) {
 // Modal de edicao dos dados do item da RM. Permite ajustar descricao, qtd,
 // peso, unidade, codigo, material, comprimento, largura, tratamento. Bloqueado
 // pra itens em PEDIDO_GERADO / CANCELADO.
+function ModalAdicionarItem({ rmId, onClose, onSaved }) {
+  const [form, setForm] = useState({ descricao: "", unidade: "", qtd: "", material: "", comprimento: "", largura: "", peso: "", observacao: "" });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const parseNum = (s) => { const n = parseFloat(String(s).replace(",", ".")); return isNaN(n) ? null : n; };
+
+  const submit = async () => {
+    setErro("");
+    if (!form.descricao.trim()) return setErro("Descrição é obrigatória.");
+    if (!form.unidade.trim()) return setErro("Unidade é obrigatória.");
+    const qtd = parseNum(form.qtd);
+    if (!qtd || qtd <= 0) return setErro("Quantidade tem que ser maior que zero.");
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/rm/${rmId}/itens`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          descricao: form.descricao.trim(),
+          unidade: form.unidade.trim(),
+          qtd,
+          material: form.material.trim() || null,
+          comprimento: form.comprimento.trim() || null,
+          largura: form.largura.trim() || null,
+          peso: parseNum(form.peso),
+          observacao: form.observacao.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao adicionar item");
+      onSaved();
+    } catch (e) {
+      setErro(e.message);
+      setSalvando(false);
+    }
+  };
+
+  const inputCls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue";
+
+  return (
+    <Modal titulo="Adicionar item à RM" onClose={onClose}>
+      <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        {erro && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
+            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
+          </div>
+        )}
+        <div className="bg-torg-blue-50/60 border border-torg-blue-100 text-torg-dark text-xs rounded px-3 py-2 flex items-start gap-2">
+          <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-torg-blue" />
+          <span>O item entra automaticamente nas <strong>cotações abertas</strong> desta RM (preço 0) pro fornecedor cotar. Depois use <strong>&quot;Reenviar email&quot;</strong> na cotação pra avisar quem já tinha recebido.</span>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Descrição *</label>
+          <input value={form.descricao} onChange={(e) => set("descricao", e.target.value)} className={inputCls} placeholder="Ex: CHAPA ACO CARBONO A-36 ESP 6,30MM" autoFocus />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Quantidade *</label>
+            <input value={form.qtd} onChange={(e) => set("qtd", e.target.value)} className={`${inputCls} tabular-nums`} placeholder="Ex: 10" inputMode="decimal" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Unidade *</label>
+            <input value={form.unidade} onChange={(e) => set("unidade", e.target.value)} className={inputCls} placeholder="KG, PÇ, barra(s), M…" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Material</label>
+            <input value={form.material} onChange={(e) => set("material", e.target.value)} className={inputCls} placeholder="Ex: A36, A572-GR.50 (opcional)" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Peso (kg)</label>
+            <input value={form.peso} onChange={(e) => set("peso", e.target.value)} className={`${inputCls} tabular-nums`} placeholder="opcional" inputMode="decimal" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Comprimento</label>
+            <input value={form.comprimento} onChange={(e) => set("comprimento", e.target.value)} className={inputCls} placeholder="opcional" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Largura</label>
+            <input value={form.largura} onChange={(e) => set("largura", e.target.value)} className={inputCls} placeholder="opcional" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Observação</label>
+          <input value={form.observacao} onChange={(e) => set("observacao", e.target.value)} className={inputCls} placeholder="opcional" />
+        </div>
+      </div>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</button>
+        <button onClick={submit} disabled={salvando} className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50">
+          {salvando ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Adicionar item
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
   const [form, setForm] = useState({
     descricao: item.descricao || "",
