@@ -3417,7 +3417,7 @@ function AnexosSection({ rmId, anexos: anexosIniciais, editavel }) {
 // peso, unidade, codigo, material, comprimento, largura, tratamento. Bloqueado
 // pra itens em PEDIDO_GERADO / CANCELADO.
 function ModalAdicionarItem({ rmId, onClose, onSaved }) {
-  const [form, setForm] = useState({ descricao: "", unidade: "", qtd: "", material: "", comprimento: "", largura: "", peso: "", observacao: "" });
+  const [form, setForm] = useState({ descricao: "", unidade: "", qtd: "", codigoOmie: "", material: "", comprimento: "", largura: "", peso: "", observacao: "" });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -3438,6 +3438,7 @@ function ModalAdicionarItem({ rmId, onClose, onSaved }) {
           descricao: form.descricao.trim(),
           unidade: form.unidade.trim(),
           qtd,
+          codigoOmie: form.codigoOmie.trim() || null,
           material: form.material.trim() || null,
           comprimento: form.comprimento.trim() || null,
           largura: form.largura.trim() || null,
@@ -3481,6 +3482,11 @@ function ModalAdicionarItem({ rmId, onClose, onSaved }) {
             <label className="block text-xs font-medium text-torg-dark mb-1">Unidade *</label>
             <input value={form.unidade} onChange={(e) => set("unidade", e.target.value)} className={inputCls} placeholder="KG, PÇ, barra(s), M…" />
           </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">Código Omie do produto</label>
+          <input value={form.codigoOmie} onChange={(e) => set("codigoOmie", e.target.value)} className={`${inputCls} tabular-nums`} placeholder="Código do produto no Omie — necessário pra gerar o pedido" />
+          <p className="text-[10px] text-torg-gray mt-1">Sem ele, o pedido não reconhece o produto no Omie e cai na busca por descrição.</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -3553,6 +3559,7 @@ function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
           unidade: form.unidade.trim(),
           qtd: parseNum(form.qtd) ?? 0,
           codigo: form.codigo.trim() || null,
+          codigoOmieEstoque: form.codigo.trim() || null,
           material: form.material.trim() || null,
           comprimento: form.comprimento.trim() || null,
           largura: form.largura.trim() || null,
@@ -3616,10 +3623,11 @@ function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-torg-dark mb-1">Código</label>
+            <label className="block text-xs font-medium text-torg-dark mb-1">Código Omie</label>
             <input
               type="text" value={form.codigo}
               onChange={(e) => set("codigo", e.target.value)}
+              placeholder="Código do produto no Omie (pra gerar o pedido)"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
             />
           </div>

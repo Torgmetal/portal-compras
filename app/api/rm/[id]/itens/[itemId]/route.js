@@ -12,6 +12,7 @@ const schema = z.object({
   unidade: z.string().min(1).optional(),
   qtd: z.number().min(0).optional(),
   codigo: z.string().nullable().optional(),
+  codigoOmieEstoque: z.string().nullable().optional(),
   material: z.string().nullable().optional(),
   comprimento: z.string().nullable().optional(),
   largura: z.string().nullable().optional(),

@@ -11,6 +11,7 @@ const schema = z.object({
   descricao: z.string().min(1),
   unidade: z.string().min(1),
   qtd: z.number().positive(),
+  codigoOmie: z.string().nullable().optional(),
   material: z.string().nullable().optional(),
   comprimento: z.string().nullable().optional(),
   largura: z.string().nullable().optional(),
@@ -51,6 +52,10 @@ export async function POST(req, { params }) {
       descricao: body.descricao.trim(),
       unidade: body.unidade.trim(),
       qtd: body.qtd,
+      // Código Omie: o pedido usa codigoOmieEstoque; seto os dois (igual à
+      // criação normal da RM) pra o pedido reconhecer o produto.
+      codigo: body.codigoOmie?.trim() || null,
+      codigoOmieEstoque: body.codigoOmie?.trim() || null,
       material: body.material?.trim() || null,
       comprimento: body.comprimento?.trim() || null,
       largura: body.largura?.trim() || null,
