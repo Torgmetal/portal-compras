@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { ArrowLeft } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
+import { calcularVerbaOP } from "@/lib/verba-op";
 import RMComprasClient from "./RMComprasClient";
 import ConsultaEstoqueSection from "@/components/compras/ConsultaEstoqueSection";
 
@@ -235,6 +236,29 @@ export default async function RMComprasDetail({ params }) {
     orderBy: { createdAt: "desc" },
   });
 
+  // Verba de material da OP (orçado − comprometido = disponível) pra comparar
+  // com os preços cotados desta RM. Pedidos são da OP INTEIRA (não só desta RM).
+  let verbaMaterial = null;
+  if (rm.opId) {
+    const pedidosOP = await prisma.pedidoOmie.findMany({
+      where: { opId: rm.opId },
+      select: { total: true, status: true, criadoManualmente: true },
+    });
+    verbaMaterial = calcularVerbaOP(rm.op, pedidosOP);
+  }
+  // Menor preço cotado desta RM (por item, o menor entre as propostas recebidas)
+  const menorPorItem = {};
+  for (const c of cotacoesRelacionadas) {
+    if (c.status !== "RECEBIDA") continue;
+    for (const ci of c.itens || []) {
+      if (ci.rmItem?.rm?.id !== rm.id || (ci.precoUnit || 0) <= 0) continue;
+      const tot = (ci.precoUnit || 0) * (ci.qtdCotada || ci.rmItem?.qtd || 0);
+      if (tot <= 0) continue;
+      if (menorPorItem[ci.rmItemId] == null || tot < menorPorItem[ci.rmItemId]) menorPorItem[ci.rmItemId] = tot;
+    }
+  }
+  const menorCotacaoRM = Object.keys(menorPorItem).length ? Object.values(menorPorItem).reduce((s, v) => s + v, 0) : null;
+
   // Categorias custom de fornecedor pra filtro/chips no modal de envio
   const categoriasCustom = await prisma.categoriaFornecedor.findMany({
     where: { ativa: true },
@@ -264,6 +288,8 @@ export default async function RMComprasDetail({ params }) {
         apiBaseMapa={apiBaseMapa}
         categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}
         pedidos={JSON.parse(JSON.stringify(pedidosVinculados))}
+        verbaMaterial={verbaMaterial ? JSON.parse(JSON.stringify(verbaMaterial)) : null}
+        menorCotacaoRM={menorCotacaoRM}
       />
       <ConsultaEstoqueSection rmId={rm.id} />
     </div>
