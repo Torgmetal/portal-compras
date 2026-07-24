@@ -62,7 +62,11 @@ export async function POST(req, { params }) {
       ],
     },
     include: {
-      itens: { where: { vencedor: true } },
+      // TODOS os itens (não só vencedores): preciso saber quantos itens o
+      // fornecedor cotou pra detectar split — o rescale de preço pro totalProposta
+      // só vale quando o pedido cobre a proposta inteira. O loop de agrupamento
+      // abaixo filtra os vencedores.
+      itens: true,
     },
   });
 
@@ -133,13 +137,31 @@ export async function POST(req, { params }) {
     });
     const totalCalculado = itensPayloadBase.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
 
+    // Rescale dos preços pro total do pedido bater com a proposta do fornecedor.
+    // SÓ vale quando o pedido cobre a proposta INTEIRA: todos os itens que o
+    // fornecedor cotou (preço>0) são vencedores e entram neste pedido. Em split — o
+    // comprador levou só parte dos itens desse fornecedor, o resto foi pra outro —
+    // o totalProposta é o total da proposta cheia e NÃO tem relação com o subconjunto
+    // vencedor; rescalar aí INFLA os preços (num caso real chegou a 21x num item que
+    // ficou sozinho no pedido). Também barra totalProposta grosseiramente divergente
+    // (digitado errado/desatualizado): só ajusta diferença pequena, tipo frete ou
+    // arredondamento de fechamento (até 15%). Fora disso, usa o preço unitário
+    // cotado direto — que é o que o comprador viu e selecionou como vencedor.
     const totalProposta = Number(cotacao.totalProposta) || 0;
+    const itensComPrecoCot = (cotacao.itens || []).filter((i) => Number(i.precoUnit) > 0);
+    const cobrePropostaInteira =
+      itensComPrecoCot.length > 0 && linhas.length === itensComPrecoCot.length;
+    const fatorProposta =
+      totalProposta > 0 && totalCalculado > 0 ? totalProposta / totalCalculado : 1;
+    const aplicarRescale =
+      cobrePropostaInteira &&
+      Math.abs(fatorProposta - 1) <= 0.15 &&
+      Math.abs(totalCalculado - totalProposta) > 0.01;
     let itensPayload = itensPayloadBase;
-    if (totalProposta > 0 && totalCalculado > 0 && Math.abs(totalCalculado - totalProposta) > 0.01) {
-      const fator = totalProposta / totalCalculado;
+    if (aplicarRescale) {
       itensPayload = itensPayloadBase.map((it) => ({
         ...it,
-        precoUnit: Math.round(it.precoUnit * fator * 10000) / 10000,
+        precoUnit: Math.round(it.precoUnit * fatorProposta * 10000) / 10000,
       }));
     }
 
@@ -149,7 +171,7 @@ export async function POST(req, { params }) {
     const observacaoBase = [
       `Pedido via Workspace Torg — RM ${rm.numero} (${rm.descricao || "Interna"})`,
       temIPI ? "Preço unitário inclui IPI" : null,
-      totalProposta > 0 && Math.abs(totalCalculado - totalProposta) > 0.01
+      aplicarRescale
         ? `Preços ajustados pro total bater com proposta (R$ ${totalProposta.toFixed(2)})` : null,
       cotacao.numeroProposta ? `Proposta forn.: ${cotacao.numeroProposta}` : null,
       cotacao.observacao || null,

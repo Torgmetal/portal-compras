@@ -82,7 +82,11 @@ export async function POST(req, { params }) {
       ],
     },
     include: {
-      itens: { where: { vencedor: true } },
+      // TODOS os itens (não só vencedores): preciso da contagem de itens que o
+      // fornecedor cotou pra detectar split — o rescale de preço pro totalProposta
+      // só vale quando o pedido cobre a proposta inteira. O loop de agrupamento
+      // abaixo filtra os vencedores.
+      itens: true,
     },
   });
 
@@ -179,19 +183,32 @@ export async function POST(req, { params }) {
     });
     const totalCalculado = itensPayloadBase.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
 
-    // Se a cotacao tem totalProposta setado (valor exato do PDF do fornecedor),
-    // escala todos os precos proporcionalmente pra bater com esse total.
-    // Garante que o pedido no Omie = total da NF do fornecedor.
+    // Rescale dos preços pro total do pedido bater com a proposta do fornecedor.
+    // SÓ vale quando o pedido cobre a proposta INTEIRA: todos os itens que o
+    // fornecedor cotou (preço>0) são vencedores e entram neste pedido. Em split — o
+    // comprador dividiu os itens desse fornecedor com outro, ou o grupo é só a fatia
+    // FD/NORMAL da cotação — o totalProposta é o total da proposta cheia e NÃO tem
+    // relação com o subconjunto: rescalar aí INFLA os preços (num caso real da GERDAU
+    // deu 29x num item que ficou sozinho no pedido). Também barra totalProposta
+    // grosseiramente divergente (digitado errado/desatualizado): só ajusta diferença
+    // pequena de frete/arredondamento de fechamento (até 15%). Fora disso, usa o preço
+    // unitário cotado direto — que é o que o comprador viu e selecionou como vencedor.
     const totalProposta = Number(cotacao.totalProposta) || 0;
+    const itensComPrecoCot = (cotacao.itens || []).filter((i) => Number(i.precoUnit) > 0);
+    const cobrePropostaInteira =
+      itensComPrecoCot.length > 0 && linhas.length === itensComPrecoCot.length;
+    const fatorProposta =
+      totalProposta > 0 && totalCalculado > 0 ? totalProposta / totalCalculado : 1;
+    const totalAjustado =
+      cobrePropostaInteira &&
+      Math.abs(fatorProposta - 1) <= 0.15 &&
+      Math.abs(totalCalculado - totalProposta) > 0.01;
     let itensPayload = itensPayloadBase;
-    let totalAjustado = false;
-    if (totalProposta > 0 && totalCalculado > 0 && Math.abs(totalCalculado - totalProposta) > 0.01) {
-      const fator = totalProposta / totalCalculado;
+    if (totalAjustado) {
       itensPayload = itensPayloadBase.map((it) => ({
         ...it,
-        precoUnit: Math.round(it.precoUnit * fator * 10000) / 10000, // 4 casas pra precisao
+        precoUnit: Math.round(it.precoUnit * fatorProposta * 10000) / 10000, // 4 casas pra precisao
       }));
-      totalAjustado = true;
     }
 
     const total = itensPayload.reduce((s, it) => s + it.qtd * it.precoUnit, 0);
