@@ -35,9 +35,10 @@ export async function GET() {
   const agoraBRT = new Date(Date.now() - 3 * 3600 * 1000);
   const mesAtual = `${agoraBRT.getUTCFullYear()}-${String(agoraBRT.getUTCMonth() + 1).padStart(2, "0")}`;
 
-  const [medicoes, contas, listas, apts, ops, venda] = await Promise.all([
+  const [medicoes, contas, contasReceber, listas, apts, ops, venda] = await Promise.all([
     prisma.oPMedicao.findMany({ where: { data: { gte: ini, lt: fim } }, select: { opId: true, data: true, valorBruto: true, etapa: true, status: true } }),
-    prisma.contaPagar.findMany({ where: { dataVencimento: { gte: ini, lt: fim } }, select: { dataVencimento: true, categoriaNome: true, valor: true, projetoCodigo: true } }),
+    prisma.contaPagar.findMany({ where: { dataVencimento: { gte: ini, lt: fim } }, select: { dataVencimento: true, categoriaNome: true, valor: true, valorPago: true, status: true, projetoCodigo: true } }),
+    prisma.contaReceber.findMany({ where: { dataEmissao: { gte: ini, lt: fim } }, select: { dataEmissao: true, valor: true, valorRecebido: true, status: true } }),
     prisma.listaExpedicao.findMany({ select: { opId: true, opNumero: true, marcasJson: true } }),
     prisma.mesApontamento.findMany({ where: { dataInicio: { gte: janela }, opId: { not: null } }, select: { opId: true, dataInicio: true, produzidoKg: true } }),
     prisma.oP.findMany({ select: { id: true, numero: true, obra: true } }),
@@ -57,20 +58,23 @@ export async function GET() {
   for (const a of await prisma.mesApontamento.findMany({ where: { dataInicio: { lt: janela }, opId: { not: null } }, select: { opId: true, produzidoKg: true } })) kg2025.set(a.opId, (kg2025.get(a.opId) || 0) + (a.produzidoKg || 0));
 
   const meses = new Map();
-  const getMes = (chave) => { if (!meses.has(chave)) meses.set(chave, { chave, label: mesLabel(chave), custoTransf: 0, materialTotal: 0, materialAlocado: 0, receitaTotal: 0, expedidoTotal: 0, ops: new Map() }); return meses.get(chave); };
+  const getMes = (chave) => { if (!meses.has(chave)) meses.set(chave, { chave, label: mesLabel(chave), custoTransf: 0, materialTotal: 0, materialAlocado: 0, receitaTotal: 0, expedidoTotal: 0, aReceber: 0, recebido: 0, aPagar: 0, pago: 0, ops: new Map() }); return meses.get(chave); };
   const getOp = (mes, op) => { if (!mes.ops.has(op.id)) mes.ops.set(op.id, { numero: op.numero, obra: op.obra || "", expedidoKg: 0, receita: 0, material: 0, transformacao: 0, share: 0 }); return mes.ops.get(op.id); };
 
-  // 1) Custo do mês + matéria-prima por obra
+  // 1) A pagar / pago (TODAS as contas do mês) + custo do mês + matéria-prima por obra
   for (const c of contas) {
+    const mes = getMes(mesKeyDate(c.dataVencimento));
+    if (c.status !== "CANCELADO") { mes.aPagar += c.valor || 0; mes.pago += c.valorPago || 0; }
     const g = grupoConta(c.categoriaNome);
     if (g !== "transformacao" && g !== "material") continue;
-    const mes = getMes(mesKeyDate(c.dataVencimento));
     const valor = c.valor || 0;
     if (g === "transformacao") { mes.custoTransf += valor; continue; }
     mes.materialTotal += valor;
     const op = c.projetoCodigo ? projToOp.get(String(c.projetoCodigo)) : null;
     if (op) { mes.materialAlocado += valor; getOp(mes, op).material += valor; }
   }
+  // 1b) A receber (faturado) / recebido do mês — total da empresa (ContaReceber por emissão)
+  for (const c of contasReceber) { if (!c.dataEmissao || c.status === "CANCELADO") continue; const mes = getMes(mesKeyDate(c.dataEmissao)); mes.aReceber += c.valor || 0; mes.recebido += c.valorRecebido || 0; }
   // 2) Receita GERADA por obra no mês = só medições FATURADAS (etapa 60).
   // As "a faturar" (etapa 10/20, romaneios futuros) são saldo, não receita.
   const naoFaturada = (m) => m.etapa === "10" || m.etapa === "20" || /n[ãa]o faturad/i.test(m.status || "");
@@ -111,6 +115,8 @@ export async function GET() {
       materialNaoAlocado: mes.materialTotal - mes.materialAlocado,
       custoTotal: mes.custoTransf + mes.materialTotal,
       receitaTotal: mes.receitaTotal, expedidoTotal: mes.expedidoTotal,
+      aReceber: mes.aReceber, recebido: mes.recebido, aPagar: mes.aPagar, pago: mes.pago,
+      resultado: mes.aReceber - mes.aPagar, resultadoCaixa: mes.recebido - mes.pago,
       ops: [...mes.ops.values()].map((o) => ({ ...o, margem: o.receita > 0 ? o.receita - o.material - o.transformacao : null })).sort((a, b) => b.expedidoKg - a.expedidoKg || b.receita - a.receita),
     }));
 

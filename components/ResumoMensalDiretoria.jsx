@@ -98,14 +98,23 @@ export default function ResumoMensalDiretoria() {
                 <span className="text-sm font-semibold text-torg-dark capitalize w-24">{mes.label}</span>
                 <div className="flex-1 flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-[11px]">
                   <Tot label="Expedido" valor={fmtKg(mes.expedidoTotal)} cor="text-torg-gray" />
-                  <Tot label="Faturado no mês" valor={fmtR$(mes.receitaTotal)} cor="text-torg-blue" />
-                  <Tot label="Matéria-prima" valor={fmtR$(mes.materialTotal)} cor="text-torg-orange-700" />
-                  <Tot label="Custo operac." valor={fmtR$(mes.custoTransf)} cor="text-torg-dark" />
-                  <Tot label="Custo do mês" valor={fmtR$(mes.custoTotal)} cor="text-torg-dark" forte />
+                  <Tot label="Faturado" valor={fmtR$(mes.aReceber)} cor="text-torg-blue" />
+                  <Tot label="A pagar" valor={fmtR$(mes.aPagar)} cor="text-torg-orange-700" />
+                  <Tot label="Resultado" valor={fmtR$(mes.resultado)} cor={mes.resultado >= 0 ? "text-emerald-700" : "text-red-600"} forte />
                 </div>
               </button>
               {aberto && (
                 <div className="border-t border-gray-100">
+                  <div className="px-5 py-3 bg-gray-50/40 border-b border-gray-100 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-[11px]">
+                    <Tot label="Faturado" valor={fmtR$(mes.aReceber)} cor="text-torg-blue" />
+                    <Tot label="Recebido" valor={fmtR$(mes.recebido)} cor="text-emerald-700" />
+                    <span className="text-gray-300">|</span>
+                    <Tot label="A pagar" valor={fmtR$(mes.aPagar)} cor="text-torg-orange-700" />
+                    <Tot label="Pago" valor={fmtR$(mes.pago)} cor="text-torg-orange-700" />
+                    <span className="text-gray-300">|</span>
+                    <Tot label="Resultado caixa" valor={fmtR$(mes.resultadoCaixa)} cor={mes.resultadoCaixa >= 0 ? "text-emerald-700" : "text-red-600"} forte />
+                    <span className="text-torg-gray/70 ml-auto">do que se paga: matéria-prima {fmtR$(mes.materialTotal)} · operacional {fmtR$(mes.custoTransf)}</span>
+                  </div>
                   {opsAtivas.length === 0 ? (
                     <p className="px-5 py-4 text-sm text-torg-gray">Sem movimento por obra neste mês.</p>
                   ) : (
