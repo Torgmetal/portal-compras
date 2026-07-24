@@ -66,11 +66,16 @@ export default function DashboardPrioridadesClient() {
     <div ref={rootRef} className="bg-torg-dark text-white rounded-2xl overflow-auto min-h-[80vh] p-6 print:hidden">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
-        <div className="flex items-center gap-3">
-          <div className="bg-amber-400/20 p-2.5 rounded-xl"><Trophy size={28} className="text-amber-300" /></div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Prioridades de Produção</h1>
-            <p className="text-sm text-slate-300">Metas por obra — atualiza sozinho a cada minuto</p>
+        <div className="flex items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/torg-logo-white.png" alt="Torg Metal" className="h-9 sm:h-10 w-auto" />
+          <div className="h-9 w-px bg-white/15" />
+          <div className="flex items-center gap-3">
+            <div className="bg-amber-400/20 p-2.5 rounded-xl"><Trophy size={28} className="text-amber-300" /></div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Prioridades de Produção</h1>
+              <p className="text-sm text-slate-300">Metas por obra — atualiza sozinho a cada minuto</p>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -163,7 +168,7 @@ function SetorBloco({ it }) {
             <div>
               <p className="text-[11px] text-slate-400 uppercase tracking-wide flex items-center gap-1"><CalendarClock size={12} /> Prazo</p>
               <p className="text-base font-bold text-white leading-none">{fmtData(it.dataEstimada)}</p>
-              <p className="text-[11px] text-slate-400">{it.diasRestantes} dia{it.diasRestantes === 1 ? "" : "s"} útil{it.diasRestantes === 1 ? "" : "eis"}</p>
+              <p className="text-[11px] text-slate-400">{it.diasRestantes} {it.diasRestantes === 1 ? "dia útil" : "dias úteis"}</p>
             </div>
           </div>
         )}

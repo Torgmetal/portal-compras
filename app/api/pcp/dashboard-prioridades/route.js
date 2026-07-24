@@ -14,21 +14,22 @@ export const maxDuration = 30;
 const FLUXO = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
 const SETOR_NOME = { CORTE: "Corte", MONTAGEM: "Montagem", SOLDA: "Solda", ACABAMENTO: "Acabamento", JATO: "Jato", PINTURA: "Pintura" };
 
-// Dias ÚTEIS (seg–sex) de hoje até a data alvo, inclusive. Sem calendário de
-// feriados (assunção combinada). Se o alvo já passou → 0.
+// Dias ÚTEIS (seg–sex) de HOJE (BRT) até a data alvo, inclusive. Sem calendário
+// de feriados (assunção combinada). Se o alvo já passou → 0.
+// Robusto a fuso: ancora tudo ao meio-dia UTC e usa getUTCDay (independe do TZ
+// do servidor); "hoje" é o dia-calendário em America/Sao_Paulo.
 function diasUteisRestantes(dataAlvo) {
   if (!dataAlvo) return null;
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const alvo = new Date(dataAlvo);
-  alvo.setHours(0, 0, 0, 0);
-  if (alvo < hoje) return 0;
+  const alvoYMD = new Date(dataAlvo).toISOString().slice(0, 10);
+  const hojeYMD = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const cur = new Date(`${hojeYMD}T12:00:00.000Z`);
+  const alvo = new Date(`${alvoYMD}T12:00:00.000Z`);
+  if (alvo < cur) return 0;
   let dias = 0;
-  const d = new Date(hoje);
-  while (d <= alvo) {
-    const wd = d.getDay();
+  while (cur <= alvo) {
+    const wd = cur.getUTCDay();
     if (wd !== 0 && wd !== 6) dias++;
-    d.setDate(d.getDate() + 1);
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return dias;
 }
