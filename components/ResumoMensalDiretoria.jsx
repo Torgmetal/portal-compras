@@ -98,7 +98,7 @@ export default function ResumoMensalDiretoria() {
                 <span className="text-sm font-semibold text-torg-dark capitalize w-24">{mes.label}</span>
                 <div className="flex-1 flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-[11px]">
                   <Tot label="Expedido" valor={fmtKg(mes.expedidoTotal)} cor="text-torg-gray" />
-                  <Tot label="Receita" valor={fmtR$(mes.receitaTotal)} cor="text-torg-blue" />
+                  <Tot label="Faturado no mês" valor={fmtR$(mes.receitaTotal)} cor="text-torg-blue" />
                   <Tot label="Matéria-prima" valor={fmtR$(mes.materialTotal)} cor="text-torg-orange-700" />
                   <Tot label="Custo operac." valor={fmtR$(mes.custoTransf)} cor="text-torg-dark" />
                   <Tot label="Custo do mês" valor={fmtR$(mes.custoTotal)} cor="text-torg-dark" forte />
@@ -116,7 +116,7 @@ export default function ResumoMensalDiretoria() {
                             <th className="px-5 py-2 text-left font-medium">Obra</th>
                             <th className="px-3 py-2 text-right font-medium">% mês</th>
                             <th className="px-4 py-2 text-right font-medium">Expedido</th>
-                            <th className="px-4 py-2 text-right font-medium">Receita</th>
+                            <th className="px-4 py-2 text-right font-medium">Faturado</th>
                             <th className="px-4 py-2 text-right font-medium">Matéria-prima</th>
                             <th className="px-4 py-2 text-right font-medium">Transformação</th>
                             <th className="px-4 py-2 text-right font-medium">Margem</th>
