@@ -4,8 +4,11 @@ import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 // Roda em Node — SDK Anthropic precisa
 export const runtime = "nodejs";
-// Permite até 60s pra processar (PDFs grandes podem demorar)
-export const maxDuration = 60;
+// Extraímos o TEXTO do PDF antes e mandamos texto (rápido). Ler o PDF como
+// documento/visão é ~4x mais lento e estourava o timeout de 60s em RMs
+// grandes (ex: 43 itens → FUNCTION_INVOCATION_TIMEOUT, o fornecedor caía no
+// regex fraco e "casava 0"). 120s dá folga p/ cold start + variação da API.
+export const maxDuration = 120;
 
 // Rota pública (portal do fornecedor) que consome créditos Anthropic —
 // rate-limit por IP e cap de payload contra abuso/queima de créditos.
@@ -55,6 +58,17 @@ REGRAS DE MATCHING (rmIndex):
   • "L3''X1/4''" ↔ "CANT 3X1/4" (cantoneira em polegadas)
   • "W150X13" ↔ "PF I W150X13" ↔ "PERFIL W 150 X 13" (mesmo perfil)
   • "A572-GR.50" ↔ "A572GR50" ↔ "CIVIL 300" (mesmo grau de aço)
+- NOMENCLATURA DE USINA (Gerdau/CSN/ArcelorMittal) — MUITO comum, aprenda:
+  • "PF H" / "PF I" / "PF W" = PERFIL H ou W (viga). A BITOLA é o que casa:
+    "PF H HP250X62" ↔ "PERFIL H … HP250 X 62,0KG/M"; "PF I W150X18" ↔ "PERFIL W … W150 X 18,0KG/M".
+  • "PF U" = PERFIL U (canal). "CANT" = CANTONEIRA. "BARRED"/"BR" = BARRA REDONDA.
+    "FX…T" ou "FX…KG" no fim é o fardo/lote — IGNORE, não é dimensão.
+  • DIMENSÃO EM MILÍMETROS ↔ POLEGADAS: a usina cota U, cantoneira e barra em MM, a RM em
+    POLEGADAS. Converta: 76,2mm=3", 88,9mm=3.1/2", 101,6mm=4", 127mm=5", 152,4mm=6",
+    177,8mm=7", 203,2mm=8", 228,6mm=9", 254mm=10", 304,8mm=12".
+    Ex: "PF U 76,2X4,32MM" ↔ "PERFIL U … 3POL X 6,10KG/M" (76,2mm=3"; a espessura 4,32mm
+    define o kg/m — case pelo mais próximo). "CANT 2X1/4" ↔ "CANTONEIRA … 1/4 X 2POL"
+    (2POL de aba, 1/4 de espessura — a ordem aba×espessura pode inverter). "BARRED 3/4" ↔ "BARRA REDONDA … 3/4POL".
 - Mesma CATEGORIA + mesma dimensão principal (tolerância ±0,5mm pra chapas) + grade compatível → match
 - CONSUMÍVEIS/INSUMOS (casa por tipo + medida/bitola, ignorando marca):
   • "DISCO DE CORTE 9\"" ↔ "DISCO CORTE 230MM" (9" = 230mm)
@@ -223,10 +237,24 @@ export async function POST(request) {
 
     if (pdfBase64) {
       const cleanB64 = pdfBase64.includes(",") ? pdfBase64.split(",")[1] : pdfBase64;
-      content.push({
-        type: "document",
-        source: { type: "base64", media_type: "application/pdf", data: cleanB64 },
-      });
+      // Extrai o TEXTO do PDF e manda como texto — MUITO mais rápido que ler o
+      // PDF como documento (visão), que estourava o timeout. Só cai na visão se
+      // o PDF for escaneado/imagem (sem texto extraível).
+      let pdfTexto = "";
+      try {
+        const { extractText, getDocumentProxy } = await import("unpdf");
+        const bytes = new Uint8Array(Buffer.from(cleanB64, "base64"));
+        const r = await extractText(await getDocumentProxy(bytes), { mergePages: true });
+        pdfTexto = String(r?.text || "").trim();
+      } catch { /* sem texto extraível — cai na visão abaixo */ }
+      if (pdfTexto.length > 150) {
+        content.push({ type: "text", text: `Cotação (texto extraído do PDF):\n\n${pdfTexto.slice(0, MAX_TEXT_LEN)}` });
+      } else {
+        content.push({
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: cleanB64 },
+        });
+      }
     }
 
     if (imageBase64) {
