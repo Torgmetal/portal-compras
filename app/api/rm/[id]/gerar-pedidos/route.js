@@ -143,10 +143,12 @@ export async function POST(req, { params }) {
     // comprador levou só parte dos itens desse fornecedor, o resto foi pra outro —
     // o totalProposta é o total da proposta cheia e NÃO tem relação com o subconjunto
     // vencedor; rescalar aí INFLA os preços (num caso real chegou a 21x num item que
-    // ficou sozinho no pedido). Também barra totalProposta grosseiramente divergente
-    // (digitado errado/desatualizado): só ajusta diferença pequena, tipo frete ou
-    // arredondamento de fechamento (até 15%). Fora disso, usa o preço unitário
-    // cotado direto — que é o que o comprador viu e selecionou como vencedor.
+    // ficou sozinho no pedido).
+    // Cobrindo a proposta inteira, o totalProposta é o total da NF do fornecedor —
+    // em fornecedor tipo GERDAU já vem com frete/ICMS-ST/demais cobranças embutidos,
+    // então o pedido DEVE bater com ele mesmo ficando acima da soma dos itens. Aceita
+    // frete pra cima (até 3x) e desconto de fechamento pra baixo (até 15%); fora dessa
+    // faixa o totalProposta é suspeito (typo/extra-zero) → usa o preço cotado direto.
     const totalProposta = Number(cotacao.totalProposta) || 0;
     const itensComPrecoCot = (cotacao.itens || []).filter((i) => Number(i.precoUnit) > 0);
     const cobrePropostaInteira =
@@ -155,7 +157,8 @@ export async function POST(req, { params }) {
       totalProposta > 0 && totalCalculado > 0 ? totalProposta / totalCalculado : 1;
     const aplicarRescale =
       cobrePropostaInteira &&
-      Math.abs(fatorProposta - 1) <= 0.15 &&
+      fatorProposta >= 0.85 &&
+      fatorProposta <= 3 &&
       Math.abs(totalCalculado - totalProposta) > 0.01;
     let itensPayload = itensPayloadBase;
     if (aplicarRescale) {
