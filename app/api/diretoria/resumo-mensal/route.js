@@ -48,9 +48,12 @@ export async function GET() {
   const opById = new Map(ops.map((o) => [o.id, o]));
   const opByNum = new Map(); for (const o of ops) { const k = numKey(o.numero); if (k != null && !opByNum.has(k)) opByNum.set(k, o); }
   // Faturado por OP (Omie) + mapa projeto→OP (lista completa de projetos do Omie)
-  const faturadoPorOp = new Map(); const projToOp = new Map();
-  if (venda?.obras) for (const o of venda.obras) { const k = numKey(o.numeroOp); if (k != null) faturadoPorOp.set(k, (faturadoPorOp.get(k) || 0) + (o.faturado || 0)); }
+  const faturadoPorOp = new Map(); const aFaturarPorOp = new Map(); const projToOp = new Map();
+  if (venda?.obras) for (const o of venda.obras) { const k = numKey(o.numeroOp); if (k != null) { faturadoPorOp.set(k, (faturadoPorOp.get(k) || 0) + (o.faturado || 0)); aFaturarPorOp.set(k, (aFaturarPorOp.get(k) || 0) + (o.aFaturar || 0)); } }
   if (venda?.projetos) for (const pr of venda.projetos) { const num = numKey(opDoNome(pr.nome)); if (num != null && opByNum.has(num)) projToOp.set(String(pr.codProj), opByNum.get(num)); }
+  // Receita de contrato por OP (OPReceita) — base da projeção de resultado.
+  const receitasOP = await prisma.oPReceita.groupBy({ by: ["opId"], _sum: { valor: true } });
+  const receitaContratoPorOp = new Map(receitasOP.map((r) => [r.opId, r._sum.valor || 0]));
 
   // fatia de produção por OP por mês (kg-op) — só janela válida (2026+)
   const totalKgMes = {}, opKgMes = new Map(), kg2025 = new Map();
@@ -79,17 +82,21 @@ export async function GET() {
   // As "a faturar" (etapa 10/20, romaneios futuros) são saldo, não receita.
   const naoFaturada = (m) => m.etapa === "10" || m.etapa === "20" || /n[ãa]o faturad/i.test(m.status || "");
   for (const m of medicoes) { if (!m.data || naoFaturada(m)) continue; const op = opById.get(m.opId); if (!op) continue; const mes = getMes(mesKeyDate(m.data)); const v = m.valorBruto || 0; mes.receitaTotal += v; getOp(mes, op).receita += v; }
-  // 3) Expedido por obra (peso da lista, dedup por OP+marca)
-  const vistas = new Set();
+  // 3) Expedido por obra (peso da lista, por mês) + planejado por obra (TODAS as marcas)
+  const planejadoPorOp = new Map();
+  const vistasPlan = new Set(), vistasExp = new Set();
   for (const l of listas) {
     const op = l.opId ? opById.get(l.opId) : (numKey(l.opNumero) != null ? opByNum.get(numKey(l.opNumero)) : null);
     if (!op) continue;
     for (const mk of Array.isArray(l.marcasJson) ? l.marcasJson : []) {
-      if (!mk.expedidoRomaneio || !mk.dataExpedicao) continue;
-      const marca = String(mk.marca || "").trim().toUpperCase(); const dk = `${op.id}|${marca}`;
-      if (!marca || vistas.has(dk)) continue; vistas.add(dk);
-      const chave = String(mk.dataExpedicao).slice(0, 7); if (!/^\d{4}-\d{2}$/.test(chave)) continue;
-      const mes = getMes(chave); const peso = mk.pesoTotal || 0; mes.expedidoTotal += peso; getOp(mes, op).expedidoKg += peso;
+      const marca = String(mk.marca || "").trim().toUpperCase(); if (!marca) continue;
+      const key = `${op.id}|${marca}`;
+      if (!vistasPlan.has(key)) { vistasPlan.add(key); planejadoPorOp.set(op.id, (planejadoPorOp.get(op.id) || 0) + (mk.pesoTotal || 0)); }
+      if (mk.expedidoRomaneio && mk.dataExpedicao && !vistasExp.has(key)) {
+        vistasExp.add(key);
+        const chave = String(mk.dataExpedicao).slice(0, 7); if (!/^\d{4}-\d{2}$/.test(chave)) continue;
+        const mes = getMes(chave); const peso = mk.pesoTotal || 0; mes.expedidoTotal += peso; getOp(mes, op).expedidoKg += peso;
+      }
     }
   }
   // 4) Transformação por obra no mês (só 2026+): fatia de produção × pool do mês
@@ -133,8 +140,19 @@ export async function GET() {
     const custoTotal = r.material + r.transformacao;
     const margem = receita > 0 ? receita - custoTotal : null;
     const incompleto2025 = op ? (kg2025.get(op.id) || 0) > 1000 : false;
-    return { numero: r.numero, obra: r.obra, expedidoKg: r.expedidoKg, receita, receitaOmie: fatOmie != null && fatOmie > 0, material: r.material, transformacao: r.transformacao, custoTotal, margem, margemPct: margem != null && receita > 0 ? (margem / receita) * 100 : null, incompleto2025 };
-  }).sort((a, b) => (b.margem ?? -Infinity) - (a.margem ?? -Infinity) || b.expedidoKg - a.expedidoKg);
+    // Projeção: avanço físico (lista) → custo restante de transformação → resultado no fim
+    const planejado = op ? (planejadoPorOp.get(op.id) || 0) : 0;
+    const avanco = planejado > 0 ? Math.min(r.expedidoKg / planejado, 1) : null;
+    const kgRestante = Math.max(0, planejado - r.expedidoKg);
+    const rkg = r.expedidoKg > 0 ? r.transformacao / r.expedidoKg : null;
+    const custoRestante = rkg != null ? kgRestante * rkg : null;
+    const custoTotalProj = custoRestante != null ? custoTotal + custoRestante : null;
+    const receitaContrato = op ? (receitaContratoPorOp.get(op.id) || 0) : 0;
+    const receitaProj = receitaContrato > 0 ? receitaContrato : ((fatOmie || 0) + (op ? (aFaturarPorOp.get(numKey(r.numero)) || 0) : 0));
+    const resultadoProjetado = custoTotalProj != null && receitaProj > 0 ? receitaProj - custoTotalProj : null;
+    const margemProjPct = resultadoProjetado != null && receitaProj > 0 ? (resultadoProjetado / receitaProj) * 100 : null;
+    return { numero: r.numero, obra: r.obra, expedidoKg: r.expedidoKg, receita, receitaOmie: fatOmie != null && fatOmie > 0, material: r.material, transformacao: r.transformacao, custoTotal, margem, margemPct: margem != null && receita > 0 ? (margem / receita) * 100 : null, incompleto2025, avanco, planejadoKg: planejado, custoRestante, receitaProj, resultadoProjetado, margemProjPct };
+  }).sort((a, b) => (a.resultadoProjetado ?? Infinity) - (b.resultadoProjetado ?? Infinity) || (b.expedidoKg - a.expedidoKg));
 
   return NextResponse.json({ meses: mesesOut, ranking, omieOk: !!venda });
 }

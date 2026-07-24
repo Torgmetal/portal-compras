@@ -49,41 +49,45 @@ export default function ResumoMensalDiretoria() {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap">
           <TrendingUp size={16} className="text-torg-blue" />
-          <h3 className="text-sm font-semibold text-torg-dark">Comparativo de obras</h3>
-          <span className="text-[11px] text-torg-gray">margem = receita (faturado Omie) − matéria-prima − transformação · ordenado por margem</span>
+          <h3 className="text-sm font-semibold text-torg-dark">Obras por risco de resultado</h3>
+          <span className="text-[11px] text-torg-gray">resultado projetado no fim da obra · da mais arriscada pra melhor</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50/60 text-[11px] uppercase text-gray-500">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Obra</th>
-                <th className="px-4 py-2 text-right font-medium">Expedido</th>
+                <th className="px-3 py-2 text-right font-medium">Avanço</th>
                 <th className="px-4 py-2 text-right font-medium">Receita</th>
-                <th className="px-4 py-2 text-right font-medium">Matéria-prima</th>
-                <th className="px-4 py-2 text-right font-medium">Transformação</th>
-                <th className="px-4 py-2 text-right font-medium">Margem</th>
-                <th className="px-4 py-2 text-right font-medium">%</th>
+                <th className="px-4 py-2 text-right font-medium">Margem atual</th>
+                <th className="px-4 py-2 text-right font-medium">Custo restante</th>
+                <th className="px-4 py-2 text-right font-medium">Result. projetado</th>
+                <th className="px-3 py-2 text-right font-medium">% proj</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {data.ranking.map((o) => (
-                <tr key={o.numero} className="hover:bg-gray-50">
+              {data.ranking.map((o) => {
+                const perigo = o.resultadoProjetado != null && o.resultadoProjetado < 0;
+                return (
+                <tr key={o.numero} className={`hover:bg-gray-50 ${perigo ? "bg-red-50/40" : ""}`}>
                   <td className="px-4 py-2 whitespace-nowrap">
+                    {perigo && <span className="text-red-600 mr-1" aria-label="risco">⚠</span>}
                     <span className="font-mono text-xs text-torg-blue">{fmtOP(o.numero)}</span> <span className="text-torg-dark">{o.obra}</span>
-                    {o.incompleto2025 && <span title="Tem produção de 2025 (Syneco não capturava) — transformação subestimada, margem otimista" className="ml-1.5 text-[10px] text-amber-600">⚠</span>}
+                    {o.incompleto2025 && <span title="Produção de 2025 (Syneco não capturava) — custo subestimado, resultado otimista" className="ml-1.5 text-[10px] text-amber-600">⚠2025</span>}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums text-torg-gray whitespace-nowrap">{o.expedidoKg > 0 ? fmtKg(o.expedidoKg) : "—"}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-torg-dark whitespace-nowrap">{o.receita > 0 ? fmtR$(o.receita) : "—"}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-torg-orange-700 whitespace-nowrap">{o.material > 0 ? fmtR$(o.material) : "—"}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-torg-gray whitespace-nowrap">{o.transformacao > 0 ? fmtR$(o.transformacao) : "—"}</td>
-                  <td className={`px-4 py-2 text-right tabular-nums font-medium whitespace-nowrap ${o.margem == null ? "text-gray-300" : o.margem >= 0 ? "text-emerald-700" : "text-red-600"}`}>{o.margem != null ? fmtR$(o.margem) : "—"}</td>
-                  <td className={`px-4 py-2 text-right tabular-nums whitespace-nowrap ${o.margemPct == null ? "text-gray-300" : o.margemPct >= 0 ? "text-emerald-700" : "text-red-600"}`}>{o.margemPct != null ? `${o.margemPct.toFixed(0)}%` : "—"}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-torg-gray whitespace-nowrap">{o.avanco != null ? `${(o.avanco * 100).toFixed(0)}%` : "—"}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-torg-dark whitespace-nowrap">{o.receitaProj > 0 ? fmtR$(o.receitaProj) : "—"}</td>
+                  <td className={`px-4 py-2 text-right tabular-nums whitespace-nowrap ${o.margem == null ? "text-gray-300" : o.margem >= 0 ? "text-torg-dark" : "text-red-600"}`}>{o.margem != null ? fmtR$(o.margem) : "—"}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-torg-orange-700 whitespace-nowrap">{o.custoRestante != null ? fmtR$(o.custoRestante) : "—"}</td>
+                  <td className={`px-4 py-2 text-right tabular-nums font-medium whitespace-nowrap ${o.resultadoProjetado == null ? "text-gray-300" : o.resultadoProjetado >= 0 ? "text-emerald-700" : "text-red-600"}`}>{o.resultadoProjetado != null ? fmtR$(o.resultadoProjetado) : "—"}</td>
+                  <td className={`px-3 py-2 text-right tabular-nums whitespace-nowrap ${o.margemProjPct == null ? "text-gray-300" : o.margemProjPct >= 0 ? "text-emerald-700" : "text-red-600"}`}>{o.margemProjPct != null ? `${o.margemProjPct.toFixed(0)}%` : "—"}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
-        <p className="px-5 py-2.5 text-[11px] text-torg-gray border-t border-gray-50">Receita = faturado do Omie (completo, traz obras sem medição no portal). Transformação só conta 2026+ (antes o Syneco não capturava a fábrica); obras marcadas ⚠ têm custo subestimado. Material sem projeto vinculado não entra por obra.</p>
+        <p className="px-5 py-2.5 text-[11px] text-torg-gray border-t border-gray-50">Resultado projetado = receita de contrato − (matéria-prima + transformação projetada pelo avanço físico). Avanço = expedido ÷ planejado da lista; se a lista está incompleta o avanço sai alto e o resultado otimista — abra a OP (aba Financeiro) pra ajustar o peso planejado. Só 2026+; ⚠2025 = custo subestimado. "Margem atual" = realizado até agora.</p>
       </div>
 
       {/* Por mês */}
