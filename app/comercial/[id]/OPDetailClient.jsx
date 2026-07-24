@@ -62,14 +62,17 @@ const VISTAS = [
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
 
-export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, proposta = null, comprasSlot = null, pecas = [] }) {
+export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba = false, podeVerFinanceiro = false, proposta = null, comprasSlot = null, pecas = [] }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
+  // Blindagem: Resumo e Financeiro só pra quem pode ver dinheiro (os dados
+  // financeiros já vêm removidos do payload no servidor pros demais).
+  const vistasVisiveis = podeVerFinanceiro ? VISTAS : VISTAS.filter((v) => v.key !== "resumo" && v.key !== "financeiro");
   // Permissao pra aplicar alteracao de verba direto, sem virar solicitacao
   // pendente. Inclui ADMIN e COMERCIAL com a flag podeAlterarVerba.
   const podeAlterarVerbaDireto = isMaster || podeAlterarVerba;
 
-  const [vista, setVista] = useState("resumo");
+  const [vista, setVista] = useState(podeVerFinanceiro ? "resumo" : "obra");
   const [exportandoLPC, setExportandoLPC] = useState(false);
   const [modalAditivo, setModalAditivo] = useState(false);
   const [modalRevisao, setModalRevisao] = useState(false);
@@ -209,7 +212,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1.5 flex gap-1 overflow-x-auto">
-        {VISTAS.map((v) => { const Icon = v.icon; return (
+        {vistasVisiveis.map((v) => { const Icon = v.icon; return (
           <button key={v.key} onClick={() => setVista(v.key)} className={`px-4 py-2 text-sm font-medium rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap transition-colors ${vista === v.key ? "bg-torg-blue text-white" : "text-torg-gray hover:bg-gray-50"}`}>
             <Icon size={15} /> {v.label}
           </button>

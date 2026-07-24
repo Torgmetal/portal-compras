@@ -5,17 +5,24 @@
 // modelo de margem (lib/rateio-transformacao.js + torg_financeiro_margem).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireUser } from "@/lib/session";
+import { temAcessoDiretoria } from "@/lib/diretoria";
 import { custoTransformacaoOP } from "@/lib/rateio-transformacao";
 import { listarPedidosVendaAbertos } from "@/lib/omie-pedidos-abertos";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO"];
 const numKey = (n) => { const i = parseInt(n, 10); return Number.isNaN(i) ? null : i; };
 
+// Blindagem financeira: só ADMIN e allowlist da Diretoria veem a previsão.
+async function gateFinanceiro() {
+  const user = await requireUser();
+  if (user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email))) return user;
+  throw new Error("Forbidden");
+}
+
 export async function GET(_req, { params }) {
-  try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  try { await gateFinanceiro(); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true, obra: true, dataFimPrevista: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 

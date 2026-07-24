@@ -3,16 +3,23 @@
 // Material é FD/verba (pass-through) e fica fora; a margem sai da fabricação.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireUser } from "@/lib/session";
+import { temAcessoDiretoria } from "@/lib/diretoria";
 import { custoTransformacaoOP } from "@/lib/rateio-transformacao";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO"];
 const MAT_CATS = ["MATERIA_PRIMA", "TINTA", "PARAFUSOS", "PLACA_WALL", "STEEL_DECK", "TELHAS", "CALHAS_RUFOS"];
 
+// Blindagem financeira: só ADMIN e allowlist da Diretoria veem custo/margem.
+async function gateFinanceiro() {
+  const user = await requireUser();
+  if (user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email))) return user;
+  throw new Error("Forbidden");
+}
+
 export async function GET(_req, { params }) {
-  try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  try { await gateFinanceiro(); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true, obra: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 

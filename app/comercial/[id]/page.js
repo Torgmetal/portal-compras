@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { temAcessoDiretoria } from "@/lib/diretoria";
 import { ArrowLeft, Clock } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
@@ -352,6 +353,20 @@ export default async function OPDetailPage({ params }) {
   opData.resumoMedicoes = resumoMedicoes;
   opData.pedidosFdAvulsos = pedidosFdAvulsos;
 
+  // Blindagem financeira: as abas Resumo e Financeiro (custos, margem, receita,
+  // medições) só pra ADMIN e quem tem acesso à Diretoria. Pros demais, REMOVE os
+  // dados financeiros do payload — não basta esconder a aba no front. O Compras
+  // mantém a verba (valorVerba nos itens), que é informação do comprador.
+  const podeVerFinanceiro = user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email));
+  if (!podeVerFinanceiro) {
+    delete opData.kpisFinanceiros;
+    delete opData.resumoMedicoes;
+    delete opData.resumoPedidos;
+    delete opData.medicoes;
+    delete opData.receitas;
+    delete opData.faturamento;
+  }
+
   return (
     <div className="space-y-6 max-w-7xl">
       <Link href="/comercial" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
@@ -369,7 +384,7 @@ export default async function OPDetailPage({ params }) {
         </div>
       )}
 
-      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
+      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} podeVerFinanceiro={podeVerFinanceiro} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
     </div>
   );
 }
