@@ -1375,6 +1375,7 @@ function CotacoesList({ rm, outrasRMs = [] }) {
   const [emailsCache, setEmailsCache] = useState({}); // cotId -> { html, text, to, subject }
   const [cancelando, setCancelando] = useState(null);
   const [confirmCancelar, setConfirmCancelar] = useState(null);
+  const [enviandoEmail, setEnviandoEmail] = useState(null); // cotId em envio direto
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const handleCancelarCotacao = async (cotId) => {
@@ -1408,29 +1409,22 @@ function CotacoesList({ rm, outrasRMs = [] }) {
     });
   }, [rm.cotacoes]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleEnviarEmail = (cot) => {
+  // Reenvia a cotação por e-mail DIRETO pela plataforma (Resend) — não copia
+  // mais pro clipboard nem abre o Outlook. Se o Resend não estiver configurado,
+  // o endpoint devolve 503 com instrução pra usar "Copiar link".
+  const handleEnviarEmail = async (cot) => {
     setEmailToast(null);
-    const cached = emailsCache[cot.id];
-    if (!cached) {
-      setEmailToast({ id: cot.id, ok: false, msg: "Email ainda carregando, aguarde 1s e tente de novo." });
-      // tenta buscar e cachear pra proxima tentativa
-      fetch(`/api/cotacao/${cot.id}/preview-email?format=json`)
-        .then((r) => r.ok ? r.json() : null)
-        .then((d) => d && setEmailsCache((prev) => ({ ...prev, [cot.id]: d })));
-      return;
-    }
+    setEnviandoEmail(cot.id);
     try {
-      const r = enviarEmailComCache(cached);
-      setEmailToast({
-        id: cot.id,
-        ok: true,
-        msg: r.copiouHtml
-          ? "Outlook abrindo + email copiado. Cole no corpo (Ctrl+V). Se vier vazio, clique 'Copiar de novo' e cole de novo."
-          : "Outlook aberto. Clique 'Copiar de novo' e depois cole (Ctrl+V).",
-      });
-      setTimeout(() => setEmailToast(null), 15000);
+      const res = await fetch(`/api/cotacao/${cot.id}/enviar-email`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Falha ao enviar e-mail");
+      setEmailToast({ id: cot.id, ok: true, msg: `E-mail enviado para ${data.emailEnviadoPara || cot.fornecedorEmail || "o fornecedor"}` });
+      setTimeout(() => setEmailToast(null), 6000);
     } catch (e) {
       setEmailToast({ id: cot.id, ok: false, msg: e.message });
+    } finally {
+      setEnviandoEmail(null);
     }
   };
 
@@ -1572,10 +1566,12 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                 )}
                 <button
                   onClick={() => handleEnviarEmail(c)}
-                  className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1"
-                  title="Copia o email com link clicavel e abre o Outlook — basta colar e enviar"
+                  disabled={enviandoEmail === c.id}
+                  className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1 disabled:opacity-60"
+                  title="Envia o e-mail com o link da cotação direto pelo sistema (Resend) — não precisa colar no Outlook"
                 >
-                  <Mail size={12} /> {c.recebidaEm ? "Reenviar email" : "Enviar email"}
+                  {enviandoEmail === c.id ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+                  {enviandoEmail === c.id ? "Enviando…" : (c.recebidaEm ? "Reenviar email" : "Enviar email")}
                 </button>
               </div>
               {emailToast?.id === c.id && (
@@ -1590,33 +1586,6 @@ function CotacoesList({ rm, outrasRMs = [] }) {
                     </span>
                     <button onClick={() => setEmailToast(null)} className="opacity-60 hover:opacity-100">×</button>
                   </div>
-                  {emailToast.ok && (
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      <button
-                        onClick={() => {
-                          const cached = emailsCache[c.id];
-                          const ok = reCopiarEmail(cached);
-                          setEmailToast({
-                            id: c.id,
-                            ok,
-                            msg: ok ? "Email recopiado. Cole no Outlook (Ctrl+V)." : "Falha ao recopiar.",
-                          });
-                        }}
-                        className="px-2 py-1 rounded font-medium bg-emerald-600 text-white hover:bg-emerald-700 whitespace-nowrap"
-                      >
-                        Copiar de novo
-                      </button>
-                      <button
-                        onClick={() => {
-                          const cached = emailsCache[c.id];
-                          if (cached) abrirOutlookMailto(cached.to, cached.subject);
-                        }}
-                        className="px-2 py-1 rounded font-medium bg-torg-blue text-white hover:bg-torg-blue-700 whitespace-nowrap"
-                      >
-                        Abrir Outlook
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </li>
