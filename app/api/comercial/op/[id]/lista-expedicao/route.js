@@ -4,7 +4,7 @@
 // POST  — puxa/atualiza da pasta do servidor (SharePoint) e registra o diff.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, requireUser } from "@/lib/session";
 import { importarListasOP } from "@/lib/lista-avancada-sharepoint";
 
 export const runtime = "nodejs";
@@ -41,7 +41,8 @@ async function montar(opId, opNumero) {
 }
 
 export async function GET(_req, { params }) {
-  try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  // Leitura da aba aberta a todos os setores (dado operacional, sem financeiro).
+  try { await requireUser(); } catch (e) { return NextResponse.json({ error: e.message }, { status: 401 }); }
   const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true } });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
   return NextResponse.json({ success: true, ...(await montar(op.id, op.numero)) });

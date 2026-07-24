@@ -4,7 +4,7 @@
 // concluídas). Ata por OP entra em endpoint próprio.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,7 @@ const TAREFA_GANTT = {
 };
 
 export async function GET(_req, { params }) {
-  try { await requireRole(["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP"]); }
+  try { await requireUser(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true } });

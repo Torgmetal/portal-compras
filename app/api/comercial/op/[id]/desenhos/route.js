@@ -2,14 +2,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireRole, requireUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 const ROLES = ["ADMIN", "ENGENHARIA", "COMERCIAL", "PLANEJAMENTO", "PCP"];
 const extDe = (nome) => (String(nome || "").match(/\.([a-z0-9]+)$/i)?.[1] || "").toLowerCase() || null;
 
 export async function GET(_req, { params }) {
-  try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  // Leitura da aba aberta a todos os setores (dado operacional, sem financeiro).
+  try { await requireUser(); } catch (e) { return NextResponse.json({ error: e.message }, { status: 401 }); }
   const desenhos = await prisma.desenhoOP.findMany({ where: { opId: params.id }, orderBy: [{ ordem: "asc" }, { createdAt: "asc" }], include: { lote: { select: { id: true, nome: true } } } });
   return NextResponse.json({ success: true, desenhos });
 }

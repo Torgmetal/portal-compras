@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { fmtOP } from "@/lib/utils";
-import { requireRole } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 import { PlusCircle, FolderKanban } from "lucide-react";
 import OPRowActions from "./OPRowActions";
 
@@ -29,7 +29,7 @@ const fmtMoeda = (v) =>
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 
 export default async function ComercialHome({ searchParams }) {
-  const user = await requireRole(["ADMIN", "COMERCIAL"]);
+  const user = await requireUser(); // lista de OPs aberta a todos os setores
   const verFinalizadas = searchParams?.finalizadas === "1";
 
   // Duas queries paralelas:

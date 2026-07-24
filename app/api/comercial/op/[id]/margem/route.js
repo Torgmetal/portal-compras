@@ -11,10 +11,12 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 const MAT_CATS = ["MATERIA_PRIMA", "TINTA", "PARAFUSOS", "PLACA_WALL", "STEEL_DECK", "TELHAS", "CALHAS_RUFOS"];
 
-// Blindagem financeira: só ADMIN e allowlist da Diretoria veem custo/margem.
+// Blindagem financeira: ADMIN, módulos COMERCIAL/FINANCEIRO e allowlist da
+// Diretoria veem custo/margem. Demais setores ficam de fora.
 async function gateFinanceiro() {
   const user = await requireUser();
-  if (user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email))) return user;
+  const mods = user.modulos || [];
+  if (user.tipo === "ADMIN" || mods.includes("COMERCIAL") || mods.includes("FINANCEIRO") || (await temAcessoDiretoria(user.email))) return user;
   throw new Error("Forbidden");
 }
 

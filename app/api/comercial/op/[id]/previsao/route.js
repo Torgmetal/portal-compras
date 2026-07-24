@@ -14,10 +14,12 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 const numKey = (n) => { const i = parseInt(n, 10); return Number.isNaN(i) ? null : i; };
 
-// Blindagem financeira: só ADMIN e allowlist da Diretoria veem a previsão.
+// Blindagem financeira: ADMIN, módulos COMERCIAL/FINANCEIRO e allowlist da
+// Diretoria veem a previsão. Demais setores ficam de fora.
 async function gateFinanceiro() {
   const user = await requireUser();
-  if (user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email))) return user;
+  const mods = user.modulos || [];
+  if (user.tipo === "ADMIN" || mods.includes("COMERCIAL") || mods.includes("FINANCEIRO") || (await temAcessoDiretoria(user.email))) return user;
   throw new Error("Forbidden");
 }
 

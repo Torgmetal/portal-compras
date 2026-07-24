@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 import { temAcessoDiretoria } from "@/lib/diretoria";
 import { ArrowLeft, Clock } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
@@ -11,7 +11,9 @@ import PedidosOmieSection from "@/components/PedidosOmieSection";
 
 
 export default async function OPDetailPage({ params }) {
-  const user = await requireRole(["ADMIN", "COMERCIAL"]);
+  // OP acessível a TODOS os setores (Vitor, 24/07) — cada um vê só as abas do
+  // seu escopo; o financeiro (Resumo + Financeiro) é blindado abaixo.
+  const user = await requireUser();
 
   const op = await prisma.oP.findUnique({
     where: { id: params.id },
@@ -357,7 +359,8 @@ export default async function OPDetailPage({ params }) {
   // medições) só pra ADMIN e quem tem acesso à Diretoria. Pros demais, REMOVE os
   // dados financeiros do payload — não basta esconder a aba no front. O Compras
   // mantém a verba (valorVerba nos itens), que é informação do comprador.
-  const podeVerFinanceiro = user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email));
+  const mods = user.modulos || [];
+  const podeVerFinanceiro = user.tipo === "ADMIN" || mods.includes("COMERCIAL") || mods.includes("FINANCEIRO") || (await temAcessoDiretoria(user.email));
   if (!podeVerFinanceiro) {
     delete opData.kpisFinanceiros;
     delete opData.resumoMedicoes;
