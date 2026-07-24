@@ -30,11 +30,13 @@ import TorgLogo from "@/components/TorgLogo";
 const MODULOS = [
   {
     href: "/comercial",
-    label: "Comercial",
-    desc: "OPs, contratos e medições",
+    label: "OPs",
+    desc: "Ordens de Produção — acompanhamento por obra",
     icon: FolderKanban,
     cor: "bg-blue-100 text-blue-700",
-    modulos: ["COMERCIAL"], // null = liberado pra todos; array = requer um desses módulos ou ADMIN
+    // Aberto a TODOS os setores (Vitor, 24/07): cada um vê as abas do seu
+    // escopo; o financeiro é blindado. Antes era só ["COMERCIAL"].
+    modulos: null,
   },
   {
     href: "/engenharia",
