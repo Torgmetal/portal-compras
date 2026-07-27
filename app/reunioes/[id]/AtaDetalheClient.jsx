@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, NotebookPen, Loader2, Send, Trash2, Plus, X, CheckCircle2, Clock, AlertCircle, Users, Link2, Copy, Check, History, Pencil, Paperclip, Sparkles, FolderKanban, FileDown } from "lucide-react";
@@ -42,13 +42,18 @@ export default function AtaDetalheClient({ id }) {
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState("");
   const [modalRev, setModalRev] = useState(false);
+  const jaCarregou = useRef(false);
 
   const carregar = useCallback(() => {
-    setLoading(true);
+    // Spinner de tela cheia só na 1ª carga. Nas recargas (após salvar/responder/
+    // enviar) o conteúdo fica montado e os dados trocam no lugar — a página não pula
+    // pro topo, então o usuário continua de onde estava.
+    if (!jaCarregou.current) setLoading(true);
     fetch(`/api/reunioes/${id}`).then((r) => r.json().then((j) => ({ ok: r.ok, j })))
       .then(({ ok, j }) => {
         if (!ok || !j?.ata) return setErro(j?.error || "Ata não encontrada");
         setAta(j.ata); setGerente(!!j.podeGerenciar); setEu(j.eu || null);
+        jaCarregou.current = true;
       })
       .catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
   }, [id]);
