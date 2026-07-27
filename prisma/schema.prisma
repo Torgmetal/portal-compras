@@ -3224,6 +3224,8 @@ model AtaAtividade {
   responsavel     String?
   prazo           DateTime?
   origemAtaNumero Int? // arrastada de uma ata anterior (nº da ata de ORIGEM — mantém a mais antiga)
+  ehDesdobramento     Boolean @default(false) // tarefa NOVA criada ao responder (desdobramento), ≠ arrastada
+  desdobramentoDeDesc String? // descrição da tarefa de origem (rastreio do desdobramento)
   status          String     @default("PENDENTE") // PENDENTE (=atrasada, sem resposta) | EM_ANDAMENTO | CONCLUIDA
   resposta      String? // informação preenchida pelo setor
   evidencia     String? // evidência (texto)

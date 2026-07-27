@@ -153,7 +153,7 @@ export default function AtaDetalheClient({ id }) {
       ) : (
         <>
           <EnvolvidosView ata={ata} confMap={confMap} onFlash={flash} gerente={gerente} />
-          <AtividadesView ata={ata} id={id} eu={eu} onSaved={carregar} />
+          <AtividadesView ata={ata} id={id} eu={eu} onSaved={carregar} onFlash={flash} />
         </>
       )}
 
@@ -211,7 +211,7 @@ function EnvolvidosView({ ata, confMap, onFlash, gerente }) {
 }
 
 /* ── Atividades (enviada): read-only + respostas ──────────────── */
-function AtividadesView({ ata, id, eu, onSaved }) {
+function AtividadesView({ ata, id, eu, onSaved, onFlash }) {
   const todas = ata.atividades || [];
   const meuSetor = (eu?.setor || "").toUpperCase();
 
@@ -238,10 +238,18 @@ function AtividadesView({ ata, id, eu, onSaved }) {
     if (!(cur.resposta || "").trim() && !(cur.evidencia || "").trim()) { setErroId(a.id); return; }
     setEnviandoId(a.id); setErroId("");
     try {
-      const r = await fetch(`/api/reunioes/${id}/responder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "responder", atividadeId: a.id, resposta: cur.resposta || "", evidencia: cur.evidencia || "", status: cur.status || "EM_ANDAMENTO" }) });
+      const desdobramento = (cur.ddDescricao || "").trim()
+        ? { descricao: cur.ddDescricao.trim(), prazo: cur.ddPrazo || null, setor: (cur.ddSetor || "").trim() || null }
+        : null;
+      const r = await fetch(`/api/reunioes/${id}/responder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: "responder", atividadeId: a.id, resposta: cur.resposta || "", evidencia: cur.evidencia || "", status: cur.status || "EM_ANDAMENTO", desdobramento }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao enviar");
       setEditando((e) => ({ ...e, [a.id]: false }));
+      setR(a.id, { ddAberto: false, ddDescricao: "", ddPrazo: "", ddSetor: "" });
+      if (j.desdobramento && onFlash) {
+        const d = j.desdobramento;
+        onFlash(d.mesmaSemana ? "Desdobramento criado nesta ata." : `Desdobramento criado na ATA-${String(d.ataNumero).padStart(3, "0")}${d.ataCriada ? " (novo rascunho)" : ""}.`);
+      }
       onSaved();
     } catch (e) { alert(e.message); } finally { setEnviandoId(""); }
   }
@@ -299,7 +307,9 @@ function AtividadesView({ ata, id, eu, onSaved }) {
                             <p className="text-[14px] text-torg-dark font-medium leading-snug">{a.descricao}</p>
                             <div className="flex items-center gap-2 flex-wrap mt-2 text-[11px]">
                               {meu && <span className="px-2 py-0.5 rounded-full bg-torg-blue-100 text-torg-blue font-bold">seu setor</span>}
-                              {a.origemAtaNumero != null && <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold" title="Tarefa que veio de uma ata anterior e continua em acompanhamento">arrasta da ATA-{String(a.origemAtaNumero).padStart(3, "0")}</span>}
+                              {a.ehDesdobramento
+                                ? <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold" title={a.desdobramentoDeDesc ? `Desdobramento de: ${a.desdobramentoDeDesc}` : "Nova tarefa gerada ao responder outra"}>desdobramento{a.origemAtaNumero != null ? ` da ATA-${String(a.origemAtaNumero).padStart(3, "0")}` : ""}</span>
+                                : a.origemAtaNumero != null && <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold" title="Tarefa que veio de uma ata anterior e continua em acompanhamento">arrasta da ATA-{String(a.origemAtaNumero).padStart(3, "0")}</span>}
                               {a.setor ? <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 text-torg-gray font-medium">{sl(a.setor)}</span> : <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-medium">sem setor</span>}
                               {a.responsavel && <span className="text-torg-gray">Resp.: {a.responsavel}</span>}
                               {a.prazo && <span className="text-torg-gray">prazo {fmtD(a.prazo)}</span>}
@@ -336,6 +346,26 @@ function AtividadesView({ ata, id, eu, onSaved }) {
                               })}
                             </div>
                             {erroId === a.id && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> Preencha a informação e/ou a evidência.</p>}
+
+                            {/* Desdobramento — nova tarefa a partir desta */}
+                            {!cur.ddAberto ? (
+                              <button type="button" onClick={() => setR(a.id, { ddAberto: true })} className="text-[12px] text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"><Plus size={13} /> Gerar desdobramento</button>
+                            ) : (
+                              <div className="rounded-md border border-torg-blue-100 bg-torg-blue-50/40 p-2.5 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-semibold text-torg-blue">Desdobramento — nova tarefa</span>
+                                  <button type="button" onClick={() => setR(a.id, { ddAberto: false, ddDescricao: "", ddPrazo: "", ddSetor: "" })} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                                </div>
+                                <input value={cur.ddDescricao || ""} onChange={(e) => setR(a.id, { ddDescricao: e.target.value })} placeholder="O que precisa ser feito" className="w-full text-[13px] border border-gray-200 rounded-md px-2.5 py-1.5" />
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <label className="text-[11px] text-torg-gray">Prazo:</label>
+                                  <input type="date" value={cur.ddPrazo || ""} onChange={(e) => setR(a.id, { ddPrazo: e.target.value })} className="text-[12px] border border-gray-200 rounded-md px-2 py-1" />
+                                  <input value={cur.ddSetor || ""} onChange={(e) => setR(a.id, { ddSetor: e.target.value })} placeholder="setor (opcional)" className="flex-1 min-w-[120px] text-[12px] border border-gray-200 rounded-md px-2 py-1" />
+                                </div>
+                                <p className="text-[10.5px] text-torg-gray leading-snug">Prazo nesta semana entra nesta ata; em semana futura, vai pra ata daquela semana (criada se preciso).</p>
+                              </div>
+                            )}
+
                             <div className="flex items-center gap-2">
                               <button onClick={() => responder(a)} disabled={enviandoId === a.id} className="px-3.5 py-1.5 bg-torg-blue text-white text-[13px] rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{enviandoId === a.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} {jaResp ? "Salvar alteração" : "Enviar resposta"}</button>
                               {jaResp && <button onClick={() => setEditando((e) => ({ ...e, [a.id]: false }))} className="px-3 py-1.5 border border-gray-300 text-torg-gray text-[13px] rounded-lg hover:bg-gray-50">cancelar</button>}

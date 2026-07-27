@@ -66,21 +66,52 @@ export async function POST(req) {
   // número da ata = número da semana ISO da reunião (ata semanal → ATA-029 = semana 29)
   const numero = semana;
 
-  const ata = await prisma.ataReuniao.create({
-    data: {
-      numero, semanaIso: semana, ano, titulo: body.titulo.trim(), dataReuniao,
-      pauta: body.pauta?.trim() || null, envolvidos: body.envolvidos, createdById: user.id,
-      atividades: {
-        create: body.atividades.map((a, i) => ({
-          descricao: a.descricao.trim(), op: a.op?.trim() || null, setor: a.setor?.trim() || null,
-          responsavel: a.responsavel?.trim() || null, origemAtaNumero: a.origemAtaNumero ?? null,
-          prazo: a.prazo ? new Date(a.prazo + "T12:00:00Z") : null, ordem: i,
-        })),
-      },
-    },
-    select: { id: true },
+  // Uma ata por semana: se já existe um RASCUNHO dessa semana (ex.: criado por um
+  // desdobramento gerado ao responder), reaproveita — atualiza os dados e ACRESCENTA
+  // as atividades — em vez de duplicar a ata da semana.
+  const existente = await prisma.ataReuniao.findFirst({
+    where: { ano, semanaIso: semana, status: "RASCUNHO" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, atividades: { orderBy: { ordem: "desc" }, take: 1, select: { ordem: true } } },
   });
 
-  await prisma.auditLog.create({ data: { userId: user.id, action: "CRIAR_ATA", entity: "AtaReuniao", entityId: ata.id, diff: { numero, titulo: body.titulo } } }).catch(() => {});
-  return NextResponse.json({ success: true, id: ata.id, numero });
+  let ataId;
+  let reaproveitou = false;
+  if (existente) {
+    reaproveitou = true;
+    ataId = existente.id;
+    const ordemBase = (existente.atividades[0]?.ordem ?? -1) + 1;
+    await prisma.$transaction([
+      prisma.ataReuniao.update({
+        where: { id: ataId },
+        data: { titulo: body.titulo.trim(), dataReuniao, pauta: body.pauta?.trim() || null, envolvidos: body.envolvidos, createdById: user.id },
+      }),
+      ...(body.atividades.length ? [prisma.ataAtividade.createMany({
+        data: body.atividades.map((a, i) => ({
+          ataId, descricao: a.descricao.trim(), op: a.op?.trim() || null, setor: a.setor?.trim() || null,
+          responsavel: a.responsavel?.trim() || null, origemAtaNumero: a.origemAtaNumero ?? null,
+          prazo: a.prazo ? new Date(a.prazo + "T12:00:00Z") : null, ordem: ordemBase + i,
+        })),
+      })] : []),
+    ]);
+  } else {
+    const ata = await prisma.ataReuniao.create({
+      data: {
+        numero, semanaIso: semana, ano, titulo: body.titulo.trim(), dataReuniao,
+        pauta: body.pauta?.trim() || null, envolvidos: body.envolvidos, createdById: user.id,
+        atividades: {
+          create: body.atividades.map((a, i) => ({
+            descricao: a.descricao.trim(), op: a.op?.trim() || null, setor: a.setor?.trim() || null,
+            responsavel: a.responsavel?.trim() || null, origemAtaNumero: a.origemAtaNumero ?? null,
+            prazo: a.prazo ? new Date(a.prazo + "T12:00:00Z") : null, ordem: i,
+          })),
+        },
+      },
+      select: { id: true },
+    });
+    ataId = ata.id;
+  }
+
+  await prisma.auditLog.create({ data: { userId: user.id, action: "CRIAR_ATA", entity: "AtaReuniao", entityId: ataId, diff: { numero, titulo: body.titulo, reaproveitou } } }).catch(() => {});
+  return NextResponse.json({ success: true, id: ataId, numero, reaproveitou });
 }
