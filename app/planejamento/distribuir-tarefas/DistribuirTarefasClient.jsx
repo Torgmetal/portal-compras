@@ -91,7 +91,7 @@ export default function DistribuirTarefasClient() {
   const removerArquivo = (i) => setArquivos((arr) => arr.filter((_, j) => j !== i));
 
   async function analisar() {
-    if (!texto.trim() && arquivos.length === 0) { setErro("Cole o texto da ata/transcrição ou envie ao menos um arquivo (PDF/TXT)."); return; }
+    if (!texto.trim() && arquivos.length === 0) { setErro("Cole o texto da ata/transcrição ou envie ao menos um arquivo (PDF/Word/TXT)."); return; }
     setAnalisando(true); setErro(""); setResultado(null);
     try {
       const documentos = [];
@@ -162,7 +162,7 @@ export default function DistribuirTarefasClient() {
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-torg-dark flex items-center gap-2"><Sparkles size={20} className="text-torg-blue" /> Distribuir tarefas com IA</h1>
-        <p className="text-[12px] text-torg-gray mt-0.5">Cole a ata/transcrição e/ou envie vários arquivos (PDF/TXT, até 10). A IA lê tudo em conjunto, extrai as tarefas, sugere o setor responsável e você revisa antes de distribuir.</p>
+        <p className="text-[12px] text-torg-gray mt-0.5">Cole a ata/transcrição e/ou envie vários arquivos (PDF/Word/TXT, até 10). A IA lê tudo em conjunto, extrai as tarefas, sugere o setor responsável e você revisa antes de distribuir.</p>
       </div>
 
       {erro && <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm"><AlertCircle size={18} /> {erro}<button onClick={() => setErro("")} className="ml-auto"><X size={14} /></button></div>}
@@ -332,8 +332,8 @@ export default function DistribuirTarefasClient() {
 
           <div>
             <label className={`text-[12px] inline-flex items-center gap-2 ${arquivos.length >= 10 ? "text-torg-gray/40 cursor-not-allowed" : "text-torg-blue cursor-pointer hover:text-torg-dark"}`}>
-              <FileUp size={15} /> {arquivos.length >= 10 ? "limite de 10 arquivos atingido" : "Adicionar arquivos (PDF/TXT) — pode selecionar vários"}
-              <input type="file" accept=".pdf,.txt,.csv" multiple disabled={arquivos.length >= 10} className="hidden" onChange={addFiles} />
+              <FileUp size={15} /> {arquivos.length >= 10 ? "limite de 10 arquivos atingido" : "Adicionar arquivos (PDF/Word/TXT) — pode selecionar vários"}
+              <input type="file" accept=".pdf,.txt,.csv,.docx" multiple disabled={arquivos.length >= 10} className="hidden" onChange={addFiles} />
             </label>
             {arquivos.length > 0 && (
               <ul className="mt-2 space-y-1">
