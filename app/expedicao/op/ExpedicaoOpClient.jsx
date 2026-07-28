@@ -6,7 +6,15 @@ import { useStore } from "@/lib/store";
 import {
   PackageCheck, Search, Loader2, AlertCircle, ArrowLeft, RefreshCw, Package,
   CheckCircle2, Clock, FileText, Weight, CloudDownload, Boxes,
+  Filter, ArrowUp, ArrowDown, ChevronsUpDown, Check, X,
 } from "lucide-react";
+
+// Grupo/prefixo da marca (tira os dígitos finais): T64A1→T64A, T84-AC10→T84-AC, "6"→"#".
+const grupoDe = (marca) => {
+  const s = String(marca || "").trim();
+  const g = s.replace(/[\s-]*\d+$/, "").trim();
+  return g || "#";
+};
 
 const fmtKg = (v) => (v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg` : "—");
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -76,6 +84,18 @@ function VisaoOP({ op, onVoltar, showToast }) {
   const [sincronizando, setSincronizando] = useState(false);
   const [filtro, setFiltro] = useState("todas"); // todas | expedidas | pendentes
   const [q, setQ] = useState("");
+  const [sortCol, setSortCol] = useState("marca");
+  const [sortDir, setSortDir] = useState("asc");
+  const [gruposSel, setGruposSel] = useState(() => new Set()); // vazio = todos
+  const [painelGrupo, setPainelGrupo] = useState(false);
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortCol(col); setSortDir("asc"); }
+  };
+  const setaSort = (col) => sortCol !== col
+    ? <ChevronsUpDown size={12} className="text-gray-300" />
+    : sortDir === "asc" ? <ArrowUp size={12} className="text-torg-blue" /> : <ArrowDown size={12} className="text-torg-blue" />;
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -100,16 +120,35 @@ function VisaoOP({ op, onVoltar, showToast }) {
     } catch (e) { showToast(e.message, "error"); } finally { setSincronizando(false); }
   }
 
+  // Grupos de marca (prefixos) com contagem, para o filtro estilo Excel.
+  const grupos = useMemo(() => {
+    const map = new Map();
+    for (const m of dados?.marcas || []) { const g = grupoDe(m.marca); map.set(g, (map.get(g) || 0) + 1); }
+    return [...map.entries()].map(([grupo, n]) => ({ grupo, n }))
+      .sort((a, b) => a.grupo.localeCompare(b.grupo, undefined, { numeric: true, sensitivity: "base" }));
+  }, [dados]);
+
   const marcasFiltradas = useMemo(() => {
     let base = dados?.marcas || [];
     if (filtro === "expedidas") base = base.filter((m) => m.expedido);
     else if (filtro === "pendentes") base = base.filter((m) => !m.expedido);
+    if (gruposSel.size) base = base.filter((m) => gruposSel.has(grupoDe(m.marca)));
     if (q.trim()) {
       const s = q.toLowerCase();
       base = base.filter((m) => String(m.marca).toLowerCase().includes(s) || String(m.descricao || "").toLowerCase().includes(s));
     }
-    return base;
-  }, [dados, filtro, q]);
+    const dir = sortDir === "asc" ? 1 : -1;
+    const cmp = {
+      marca: (a, b) => String(a.marca).localeCompare(String(b.marca), undefined, { numeric: true, sensitivity: "base" }),
+      qte: (a, b) => (a.qte || 0) - (b.qte || 0),
+      peso: (a, b) => (a.pesoTotal || 0) - (b.pesoTotal || 0),
+      status: (a, b) => (a.expedido ? 1 : 0) - (b.expedido ? 1 : 0),
+      data: (a, b) => new Date(a.dataExpedicao || 0) - new Date(b.dataExpedicao || 0),
+    }[sortCol] || (() => 0);
+    return [...base].sort((a, b) => dir * cmp(a, b));
+  }, [dados, filtro, q, gruposSel, sortCol, sortDir]);
+
+  const toggleGrupo = (g) => setGruposSel((prev) => { const n = new Set(prev); n.has(g) ? n.delete(g) : n.add(g); return n; });
 
   return (
     <div className="space-y-5">
@@ -179,6 +218,18 @@ function VisaoOP({ op, onVoltar, showToast }) {
                   className={`px-3 py-1.5 font-medium ${filtro === v ? "bg-torg-blue text-white" : "text-torg-gray hover:bg-gray-50"}`}>{label}</button>
               ))}
             </div>
+            {/* Filtro por grupo de marca (autofilter estilo Excel) */}
+            <div className="relative">
+              <button onClick={() => setPainelGrupo((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium ${gruposSel.size ? "border-torg-blue text-torg-blue bg-torg-blue-50" : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
+                <Filter size={14} /> Grupo{gruposSel.size ? ` (${gruposSel.size})` : ""}
+              </button>
+              {painelGrupo && (
+                <PainelGrupos grupos={grupos} gruposSel={gruposSel} onToggle={toggleGrupo}
+                  onTodos={() => setGruposSel(new Set())} onFechar={() => setPainelGrupo(false)} />
+              )}
+            </div>
+
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar marca ou descrição..."
@@ -187,17 +238,35 @@ function VisaoOP({ op, onVoltar, showToast }) {
             <span className="text-xs text-torg-gray ml-auto">{marcasFiltradas.length} de {dados.marcas.length} marcas</span>
           </div>
 
+          {/* Chips dos grupos selecionados */}
+          {gruposSel.size > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap -mt-2">
+              <span className="text-[11px] text-torg-gray">Grupos:</span>
+              {[...gruposSel].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map((g) => (
+                <button key={g} onClick={() => toggleGrupo(g)} className="inline-flex items-center gap-1 text-[11px] bg-torg-blue-50 text-torg-blue border border-torg-blue-200 rounded-full px-2 py-0.5 hover:bg-torg-blue-100">
+                  {g} <X size={11} />
+                </button>
+              ))}
+              <button onClick={() => setGruposSel(new Set())} className="text-[11px] text-torg-gray hover:text-torg-dark underline">limpar</button>
+            </div>
+          )}
+
           {/* Tabela de marcas */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
             <table className="w-full text-[13px]">
-              <thead className="bg-gray-50/60"><tr className="text-left text-gray-500">
-                <th className="px-3 py-2 font-medium">Marca</th>
-                <th className="px-3 py-2 font-medium">Descrição</th>
-                <th className="px-3 py-2 font-medium text-right">Qtd</th>
-                <th className="px-3 py-2 font-medium text-right">Peso</th>
-                <th className="px-3 py-2 font-medium text-center">Status</th>
-                <th className="px-3 py-2 font-medium">Romaneio</th>
-                <th className="px-3 py-2 font-medium">Data</th>
+              <thead className="bg-gray-50/60"><tr className="text-gray-500">
+                <th className="px-3 py-2 font-medium text-left">
+                  <span className="inline-flex items-center gap-1.5">
+                    <button onClick={() => toggleSort("marca")} className="inline-flex items-center gap-1 hover:text-torg-dark">Marca {setaSort("marca")}</button>
+                    <button onClick={() => setPainelGrupo((v) => !v)} title="Filtrar por grupo de marca" className={`p-0.5 rounded ${gruposSel.size ? "text-torg-blue" : "text-gray-300 hover:text-torg-gray"}`}><Filter size={12} /></button>
+                  </span>
+                </th>
+                <th className="px-3 py-2 font-medium text-left">Descrição</th>
+                <th className="px-3 py-2 font-medium text-right"><button onClick={() => toggleSort("qte")} className="inline-flex items-center gap-1 hover:text-torg-dark">Qtd {setaSort("qte")}</button></th>
+                <th className="px-3 py-2 font-medium text-right"><button onClick={() => toggleSort("peso")} className="inline-flex items-center gap-1 hover:text-torg-dark">Peso {setaSort("peso")}</button></th>
+                <th className="px-3 py-2 font-medium text-center"><button onClick={() => toggleSort("status")} className="inline-flex items-center gap-1 hover:text-torg-dark mx-auto">Status {setaSort("status")}</button></th>
+                <th className="px-3 py-2 font-medium text-left">Romaneio</th>
+                <th className="px-3 py-2 font-medium text-left"><button onClick={() => toggleSort("data")} className="inline-flex items-center gap-1 hover:text-torg-dark">Data {setaSort("data")}</button></th>
               </tr></thead>
               <tbody className="divide-y divide-gray-50">
                 {marcasFiltradas.length === 0 ? (
@@ -250,5 +319,44 @@ function Kpi({ Icon, cor, label, valor, sub }) {
         {sub && <p className="text-[10px] text-torg-gray truncate">{sub}</p>}
       </div>
     </div>
+  );
+}
+
+// Painel autofilter (estilo Excel) para escolher grupos de marca (T64A, T64B…).
+function PainelGrupos({ grupos, gruposSel, onToggle, onTodos, onFechar }) {
+  const [q, setQ] = useState("");
+  const lista = q.trim() ? grupos.filter((g) => g.grupo.toLowerCase().includes(q.toLowerCase())) : grupos;
+  return (
+    <>
+      <button className="fixed inset-0 z-40 cursor-default" onClick={onFechar} aria-hidden tabIndex={-1} />
+      <div className="absolute z-50 mt-1 left-0 w-64 bg-white rounded-xl border border-gray-200 shadow-lg p-2">
+        <div className="flex items-center justify-between px-1 pb-1.5">
+          <span className="text-[11px] font-semibold text-torg-dark uppercase tracking-wide">Grupo de marca</span>
+          <button onClick={onFechar} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+        </div>
+        <div className="relative mb-1.5">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar grupo..." autoFocus
+            className="w-full pl-8 pr-2 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:border-torg-blue outline-none" />
+        </div>
+        <button onClick={onTodos} className={`w-full text-left text-[12px] px-2 py-1.5 rounded-lg mb-0.5 ${gruposSel.size === 0 ? "bg-torg-blue-50 text-torg-blue font-medium" : "text-torg-gray hover:bg-gray-50"}`}>
+          Todos os grupos
+        </button>
+        <div className="max-h-64 overflow-y-auto">
+          {lista.map((g) => {
+            const on = gruposSel.has(g.grupo);
+            return (
+              <button key={g.grupo} onClick={() => onToggle(g.grupo)}
+                className={`w-full flex items-center gap-2 text-left text-[12px] px-2 py-1.5 rounded-lg ${on ? "bg-torg-blue-50" : "hover:bg-gray-50"}`}>
+                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${on ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>{on && <Check size={11} className="text-white" />}</span>
+                <span className="font-mono text-torg-dark flex-1 truncate">{g.grupo}</span>
+                <span className="text-[10px] text-torg-gray">{g.n}</span>
+              </button>
+            );
+          })}
+          {lista.length === 0 && <p className="text-[11px] text-torg-gray text-center py-3">Nenhum grupo.</p>}
+        </div>
+      </div>
+    </>
   );
 }
