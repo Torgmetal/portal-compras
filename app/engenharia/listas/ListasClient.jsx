@@ -13,7 +13,7 @@ function bufToBase64(buffer) {
   return btoa(bin);
 }
 
-function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [] }) {
+function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], ops = [] }) {
   const [op, setOp] = useState("");
   const [sobrescrever, setSobrescrever] = useState(false);
   const [carregando, setCarregando] = useState(false);
@@ -113,11 +113,18 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [] }) 
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <input value={op} onChange={(e) => setOp(e.target.value.toUpperCase())} placeholder="OP (opcional)" className="w-28 text-sm border border-gray-300 rounded-lg px-3 py-2" />
+        <select value={op} onChange={(e) => setOp(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 max-w-[320px]" title="Escolha a OP (direciona o arquivo pra pasta certa). Em branco, o portal detecta a OP pela própria lista.">
+          <option value="">OP — detectar automaticamente</option>
+          {ops.map((o) => (
+            <option key={o.numero} value={o.numero}>
+              OP {o.numero}{o.obra ? ` · ${o.obra}` : o.cliente ? ` · ${o.cliente}` : ""}
+            </option>
+          ))}
+        </select>
         <label className="inline-flex items-center gap-1.5 text-[12px] text-torg-gray">
           <input type="checkbox" checked={sobrescrever} onChange={(e) => setSobrescrever(e.target.checked)} className="accent-torg-blue" /> sobrescrever
         </label>
-        <label className={`ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer ${carregando ? "bg-gray-100 text-gray-400" : "bg-torg-blue text-white hover:bg-torg-dark"}`}>
+        <label className={`ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${carregando ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-torg-blue text-white hover:bg-torg-dark cursor-pointer"}`}>
           {carregando ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
           {carregando ? "Importando…" : "Importar xlsx"}
           <input ref={inputRef} type="file" accept=".xlsx,.xls" disabled={carregando} className="hidden" onChange={(e) => importar(e.target.files?.[0])} />
@@ -180,10 +187,15 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [] }) 
 
 export default function ListasClient() {
   const [destinatarios, setDestinatarios] = useState([]);
+  const [ops, setOps] = useState([]);
   useEffect(() => {
     fetch("/api/engenharia/listas/destinatarios")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setDestinatarios(j?.destinatarios || []))
+      .catch(() => {});
+    fetch("/api/engenharia/listas/ops")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setOps(j?.ops || []))
       .catch(() => {});
   }, []);
 
@@ -204,6 +216,7 @@ export default function ListasClient() {
         endpoint="/api/producao/pecas/importar-lpc"
         cor="bg-sky-100 text-sky-700"
         destinatarios={destinatarios}
+        ops={ops}
       />
       <CardImport
         titulo="Lista de Expedição"
@@ -212,6 +225,7 @@ export default function ListasClient() {
         endpoint="/api/producao/pecas/importar-le"
         cor="bg-teal-100 text-teal-700"
         destinatarios={destinatarios}
+        ops={ops}
       />
 
       <div className="rounded-xl border border-torg-blue-100 bg-torg-blue-50/40 p-4 text-[13px] text-torg-dark flex items-start gap-2">
