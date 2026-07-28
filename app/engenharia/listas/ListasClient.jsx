@@ -97,7 +97,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
       const r = await fetch("/api/engenharia/listas/avisar-revisao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipo: sigla, opNumero: String(res.opNumero || op.trim()), obra: res.obra || null, revisao: revLabel, mudancas: mudancas.trim() || null, destinatarios: [...sel] }),
+        body: JSON.stringify({ tipo: sigla, opNumero: String(res.opNumero || op.trim()), obra: res.obra || null, revisao: revLabel, ehRevisao: !!ehRevisao, mudancas: mudancas.trim() || null, destinatarios: [...sel] }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Falha ao enviar");
@@ -154,14 +154,14 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
               ? <p className="mt-2 text-[12px] text-torg-gray">Revisão do arquivo: <b className="text-torg-dark">{revLabel}</b>. Reenviar a mesma revisão substitui o arquivo no servidor.</p>
               : <p className="mt-2 text-[12px] text-amber-700 flex items-start gap-1.5"><AlertCircle size={13} className="mt-0.5 flex-shrink-0" /> O nome do arquivo não traz o número da revisão (ex.: R01) — confira se é a versão certa.</p>
           )}
-          {ehRevisao && (
+          {res && (
             <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-              <p className="text-[12px] text-amber-800 flex items-start gap-1.5"><Info size={13} className="mt-0.5 flex-shrink-0" /> <span>Esta OP já tinha lista importada — é uma <b>revisão</b>. Avise quem precisa saber:</span></p>
+              <p className="text-[12px] text-amber-800 flex items-start gap-1.5"><Info size={13} className="mt-0.5 flex-shrink-0" /> <span>{ehRevisao ? <>Esta OP já tinha lista — é uma <b>revisão</b>. Avise os setores:</> : <><b>Avise os setores</b> que a lista foi importada:</>}</span></p>
               {avisoRes ? (
-                <p className="mt-2 text-[12px] text-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Aviso de revisão enviado a {avisoRes.enviados} pessoa(s).</p>
+                <p className="mt-2 text-[12px] text-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Aviso enviado a {avisoRes.enviados} pessoa(s).</p>
               ) : (
                 <>
-                  <textarea value={mudancas} onChange={(e) => setMudancas(e.target.value)} rows={2} placeholder="O que mudou nesta revisão? (opcional — vai junto no aviso)" className="mt-2 w-full text-[13px] border border-amber-200 rounded-md px-2.5 py-2 bg-white" />
+                  <textarea value={mudancas} onChange={(e) => setMudancas(e.target.value)} rows={2} placeholder="Observação / o que mudou (opcional — vai junto no aviso)" className="mt-2 w-full text-[13px] border border-amber-200 rounded-md px-2.5 py-2 bg-white" />
                   <div className="mt-2 flex items-center gap-3 text-[11px]">
                     <button type="button" onClick={() => setSel(new Set(destinatarios.map((d) => d.email)))} className="text-torg-blue hover:underline">todos</button>
                     <button type="button" onClick={() => setSel(new Set())} className="text-torg-gray hover:underline">nenhum</button>
@@ -177,7 +177,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
                   </div>
                   {avisoErro && <p className="mt-1.5 text-[12px] text-red-600">{avisoErro}</p>}
                   <button onClick={enviarAviso} disabled={enviandoAviso || sel.size === 0} className="mt-2 px-3.5 py-1.5 bg-amber-600 text-white text-[13px] rounded-lg hover:bg-amber-700 font-medium inline-flex items-center gap-1.5 disabled:opacity-50">
-                    {enviandoAviso ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Enviar aviso de revisão
+                    {enviandoAviso ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Enviar aviso aos setores
                   </button>
                 </>
               )}
