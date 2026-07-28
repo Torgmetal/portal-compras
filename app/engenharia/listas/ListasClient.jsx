@@ -24,11 +24,18 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
   const [enviandoAviso, setEnviandoAviso] = useState(false);
   const [avisoRes, setAvisoRes] = useState(null);
   const [avisoErro, setAvisoErro] = useState("");
+  const [revArquivo, setRevArquivo] = useState(null); // { num: number|null } — revisão lida do nome
+  const [mudancas, setMudancas] = useState("");
   const inputRef = useRef(null);
+
+  const revLabel = revArquivo && revArquivo.num != null ? "R" + String(revArquivo.num).padStart(2, "0") : null;
 
   async function importar(file) {
     if (!file) return;
-    setCarregando(true); setErro(""); setRes(null); setServidor(null); setAvisoRes(null); setSel(new Set()); setAvisoErro("");
+    setCarregando(true); setErro(""); setRes(null); setServidor(null); setAvisoRes(null); setSel(new Set()); setAvisoErro(""); setMudancas("");
+    // Lê o número da revisão do NOME do arquivo (R1/R01/R2/R02…). Avisa se não achar.
+    const mRev = (file.name || "").match(/(?:^|[\s._-])r0*(\d{1,3})(?=[\s._-]|\.[a-z0-9]+$|$)/i);
+    setRevArquivo({ num: mRev ? parseInt(mRev[1], 10) : null });
     try {
       const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
@@ -90,7 +97,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
       const r = await fetch("/api/engenharia/listas/avisar-revisao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipo: sigla, opNumero: String(res.opNumero || op.trim()), obra: res.obra || null, destinatarios: [...sel] }),
+        body: JSON.stringify({ tipo: sigla, opNumero: String(res.opNumero || op.trim()), obra: res.obra || null, revisao: revLabel, mudancas: mudancas.trim() || null, destinatarios: [...sel] }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Falha ao enviar");
@@ -144,6 +151,11 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
             {res.marcas != null && <span>Marcas: {fmt(res.marcas)}</span>}
             {res.pesoTotal != null && <span>Peso: {fmt(Math.round(res.pesoTotal))} kg</span>}
           </div>
+          {revArquivo && (
+            revLabel
+              ? <p className="mt-2 text-[12px] text-torg-gray">Revisão do arquivo: <b className="text-torg-dark">{revLabel}</b>. Reenviar a mesma revisão substitui o arquivo no servidor.</p>
+              : <p className="mt-2 text-[12px] text-amber-700 flex items-start gap-1.5"><AlertCircle size={13} className="mt-0.5 flex-shrink-0" /> O nome do arquivo não traz o número da revisão (ex.: R01) — confira se é a versão certa.</p>
+          )}
           {ehRevisao && (
             <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
               <p className="text-[12px] text-amber-800 flex items-start gap-1.5"><Info size={13} className="mt-0.5 flex-shrink-0" /> <span>Esta OP já tinha lista importada — é uma <b>revisão</b>. Avise quem precisa saber:</span></p>
@@ -151,6 +163,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
                 <p className="mt-2 text-[12px] text-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Aviso de revisão enviado a {avisoRes.enviados} pessoa(s).</p>
               ) : (
                 <>
+                  <textarea value={mudancas} onChange={(e) => setMudancas(e.target.value)} rows={2} placeholder="O que mudou nesta revisão? (opcional — vai junto no aviso)" className="mt-2 w-full text-[13px] border border-amber-200 rounded-md px-2.5 py-2 bg-white" />
                   <div className="mt-2 flex items-center gap-3 text-[11px]">
                     <button type="button" onClick={() => setSel(new Set(destinatarios.map((d) => d.email)))} className="text-torg-blue hover:underline">todos</button>
                     <button type="button" onClick={() => setSel(new Set())} className="text-torg-gray hover:underline">nenhum</button>
