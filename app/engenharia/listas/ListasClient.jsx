@@ -13,6 +13,28 @@ function bufToBase64(buffer) {
   return btoa(bin);
 }
 
+// Monta a aba "Revisão" (AoA) que vai embutida no xlsx salvo no servidor: metadados
+// + o diff automático (marcas incluídas / removidas / alteradas por peso).
+function montarAbaRevisao({ sigla, j, revLabel }) {
+  const d = j.diff || {};
+  const nome = sigla === "LPC" ? "Lista de Peças por Conjunto (LPC)" : "Lista de Expedição (LE)";
+  return [
+    ["REVISÃO DA LISTA"],
+    ["Tipo", nome],
+    ["OP", j.opNumero || ""],
+    ["Obra", j.obra || ""],
+    ["Revisão", revLabel || ""],
+    ["Importado em", new Date().toLocaleString("pt-BR")],
+    [],
+    ["Resumo", `${d.nIncluidas || 0} incluídas · ${d.nRemovidas || 0} removidas · ${d.nAlteradas || 0} alteradas`],
+    [],
+    ["Marca", "Situação", "Peso anterior (kg)", "Peso novo (kg)"],
+    ...(d.incluidas || []).map((x) => [x.marca, "INCLUÍDA", "", x.peso]),
+    ...(d.alteradas || []).map((x) => [x.marca, "ALTERADA", x.de, x.para]),
+    ...(d.removidas || []).map((x) => [x.marca, "REMOVIDA", x.peso, ""]),
+  ];
+}
+
 // Lê a resposta como JSON; se vier HTML (timeout/413/500), mostra o motivo real
 // em vez do críptico "Unexpected token < in JSON".
 async function lerResposta(r) {
@@ -49,7 +71,8 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
     setCarregando(true); setErro(""); setRes(null); setServidor(null); setAvisoRes(null); setSel(new Set()); setAvisoErro(""); setMudancas("");
     // Lê o número da revisão do NOME do arquivo (R1/R01/R2/R02…). Avisa se não achar.
     const mRev = (file.name || "").match(/(?:^|[\s._-])r0*(\d{1,3})(?=[\s._-]|\.[a-z0-9]+$|$)/i);
-    setRevArquivo({ num: mRev ? parseInt(mRev[1], 10) : null });
+    const revNum = mRev ? parseInt(mRev[1], 10) : null;
+    setRevArquivo({ num: revNum });
     try {
       const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
@@ -70,7 +93,20 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
       if (opFinal) {
         setServidor({ estado: "salvando" });
         try {
-          const b64 = bufToBase64(buffer);
+          // Numa revisão (R01+), embute uma aba "Revisao" com o diff no xlsx antes de
+          // salvar no servidor — assim o arquivo vigente carrega o que foi revisado.
+          let bufParaSalvar = buffer;
+          const ehRev = revNum != null ? revNum >= 1 : Number(j.atualizados) > 0;
+          if (ehRev && j.diff) {
+            try {
+              const revLabelLocal = revNum != null ? "R" + String(revNum).padStart(2, "0") : null;
+              const idx = wb.SheetNames.indexOf("Revisao");
+              if (idx >= 0) { wb.SheetNames.splice(idx, 1); delete wb.Sheets["Revisao"]; }
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(montarAbaRevisao({ sigla, j, revLabel: revLabelLocal })), "Revisao");
+              bufParaSalvar = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+            } catch { bufParaSalvar = buffer; }
+          }
+          const b64 = bufToBase64(bufParaSalvar);
           const sr = await fetch("/api/engenharia/listas/servidor", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -115,7 +151,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
       const r = await fetch("/api/engenharia/listas/avisar-revisao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipo: sigla, opNumero: String(res.opNumero || op.trim()), obra: res.obra || null, revisao: revLabel, ehRevisao: !!ehRevisao, mudancas: mudancas.trim() || null, destinatarios: [...sel] }),
+        body: JSON.stringify({ tipo: sigla, opNumero: String(res.opNumero || op.trim()), obra: res.obra || null, revisao: revLabel, ehRevisao: !!ehRevisao, mudancas: mudancas.trim() || null, diff: res.diff || null, destinatarios: [...sel] }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Falha ao enviar");

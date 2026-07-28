@@ -51,6 +51,23 @@ export async function POST(req) {
   // Resolve OP no banco
   const op = await prisma.oP.findUnique({ where: { numero: opNumero } });
 
+  // Diff da revisão (o que mudou vs a lista anterior): snapshot das marcas+peso
+  // ANTES do upsert. incluídas = novas; removidas = sumiram; alteradas = peso mudou.
+  const antesPecas = await prisma.pecaConjunto.findMany({ where: { opNumero, fonte: "LPC_IMPORT" }, select: { marca: true, pesoTotalKg: true } });
+  const pesoAntes = new Map(antesPecas.map((p) => [p.marca, Number(p.pesoTotalKg) || 0]));
+  const novasPecas = new Map();
+  for (const c of [...parsed.conjuntos, ...parsed.croquis, ...parsed.avulsas]) novasPecas.set(c.marca, Number(c.pesoTotalKg) || 0);
+  const diffIncluidas = [], diffAlteradas = [];
+  for (const [marca, peso] of novasPecas) {
+    if (!pesoAntes.has(marca)) diffIncluidas.push({ marca, peso });
+    else if (Math.abs(pesoAntes.get(marca) - peso) > 0.01) diffAlteradas.push({ marca, de: pesoAntes.get(marca), para: peso });
+  }
+  const diffRemovidas = [...pesoAntes.entries()].filter(([m]) => !novasPecas.has(m)).map(([marca, peso]) => ({ marca, peso }));
+  const diff = {
+    incluidas: diffIncluidas, removidas: diffRemovidas, alteradas: diffAlteradas,
+    nIncluidas: diffIncluidas.length, nRemovidas: diffRemovidas.length, nAlteradas: diffAlteradas.length,
+  };
+
   // Sobrescrever: deleta pecas LPC anteriores (cascade deleta ConjuntoCroqui)
   if (sobrescrever) {
     await prisma.pecaConjunto.deleteMany({
@@ -286,6 +303,7 @@ export async function POST(req) {
     ignorados,
     pesoTotal: parsed.pesoTotal,
     areaTotal: parsed.areaTotal,
+    diff,
   });
 
   } catch (e) {

@@ -17,6 +17,12 @@ const schema = z.object({
   revisao: z.string().max(20).optional().nullable(), // ex.: "R01"
   ehRevisao: z.boolean().optional().default(false), // false = 1ª importação da lista
   mudancas: z.string().max(2000).optional().nullable(), // o que mudou (quem importou descreve)
+  diff: z.object({ // diff automático (marcas)
+    nIncluidas: z.number().optional(), nRemovidas: z.number().optional(), nAlteradas: z.number().optional(),
+    incluidas: z.array(z.object({ marca: z.string() }).passthrough()).optional(),
+    removidas: z.array(z.object({ marca: z.string() }).passthrough()).optional(),
+    alteradas: z.array(z.object({ marca: z.string() }).passthrough()).optional(),
+  }).optional().nullable(),
   destinatarios: z.array(z.string().email()).min(1).max(200),
 });
 
@@ -42,6 +48,24 @@ export async function POST(req) {
        </div>`
     : "";
 
+  const d = body.diff;
+  const temDiff = !!(d && (d.nIncluidas || d.nRemovidas || d.nAlteradas));
+  const listaMarcas = (arr, lim = 12) => {
+    const ms = (arr || []).map((x) => escapeHtml(x.marca)).slice(0, lim);
+    const extra = (arr || []).length - ms.length;
+    return ms.join(", ") + (extra > 0 ? ` … (+${extra})` : "");
+  };
+  const diffBloco = temDiff
+    ? `<div style="margin-top:14px;padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">
+         <p style="margin:0 0 6px;font-weight:700;font-size:13px;">O que mudou vs a revisão anterior</p>
+         <p style="margin:0 0 6px;font-size:13px;"><b>${d.nIncluidas || 0}</b> incluídas · <b>${d.nRemovidas || 0}</b> removidas · <b>${d.nAlteradas || 0}</b> alteradas</p>
+         ${d.nIncluidas ? `<p style="margin:2px 0;font-size:12px;color:#065f46;"><b>Incluídas:</b> ${listaMarcas(d.incluidas)}</p>` : ""}
+         ${d.nRemovidas ? `<p style="margin:2px 0;font-size:12px;color:#991b1b;"><b>Removidas:</b> ${listaMarcas(d.removidas)}</p>` : ""}
+         ${d.nAlteradas ? `<p style="margin:2px 0;font-size:12px;color:#92400e;"><b>Alteradas:</b> ${listaMarcas(d.alteradas)}</p>` : ""}
+         <p style="margin:6px 0 0;font-size:11px;color:#94a3b8;">Detalhe completo na aba "Revisao" da planilha no servidor.</p>
+       </div>`
+    : "";
+
   let html, text, subject;
   if (ehRev) {
     // Revisão: e-mail ALARMANTE — faixa vermelha, "OBSOLETA", assunto com ⚠.
@@ -53,10 +77,11 @@ export async function POST(req) {
       <div style="padding:20px 24px;font-size:15px;color:#111;line-height:1.6;">
         <p>A <b>${escapeHtml(nomeLista)}</b> da <b>OP ${escapeHtml(body.opNumero)}</b>${obraTxt} foi <b style="color:#DC2626;">revisada${revTxt}</b>.</p>
         <div style="background:#FEF2F2;border:1px solid #FECACA;border-left:4px solid #DC2626;border-radius:6px;padding:12px 14px;margin:12px 0;color:#991B1B;font-weight:700;">&#9940; Pare de usar a revisão anterior e atualize o acompanhamento do seu setor com esta versão.</div>
+        ${diffBloco}
         ${mudancasBloco}
         <p style="color:#64748b;font-size:12px;margin-top:18px;">Aviso disparado por ${escapeHtml(user.name || user.email || "")} pelo Workspace Torg (Portal de Engenharia).</p>
       </div>`;
-    text = `*** ATENÇÃO — REVISÃO DE LISTA ***\n\nA ${nomeLista} da OP ${body.opNumero}${body.obra ? " — " + body.obra : ""} foi REVISADA${body.revisao ? " " + body.revisao : ""}.\nA versão anterior está OBSOLETA — pare de usá-la e use a mais recente.${body.mudancas && body.mudancas.trim() ? "\n\nO que mudou:\n" + body.mudancas.trim() : ""}`;
+    text = `*** ATENÇÃO — REVISÃO DE LISTA ***\n\nA ${nomeLista} da OP ${body.opNumero}${body.obra ? " — " + body.obra : ""} foi REVISADA${body.revisao ? " " + body.revisao : ""}.\nA versão anterior está OBSOLETA — pare de usá-la e use a mais recente.${temDiff ? `\n\nMudanças: ${d.nIncluidas || 0} incluídas, ${d.nRemovidas || 0} removidas, ${d.nAlteradas || 0} alteradas.` : ""}${body.mudancas && body.mudancas.trim() ? "\n\nO que mudou:\n" + body.mudancas.trim() : ""}`;
     subject = `⚠ REVISÃO${body.revisao ? " " + body.revisao : ""} — ${nomeLista} da OP ${body.opNumero}`;
   } else {
     html = `${cabecalhoEmail("Lista importada — " + escapeHtml(nomeLista))}
