@@ -8,7 +8,7 @@ import { parseFormularioLE } from "@/lib/parse-le-form21";
 import * as XLSX from "xlsx";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // LE grande faz upsert peca a peca; 60s estourava (timeout -> HTML/504)
 
 export async function POST(req) {
   let user;
@@ -42,33 +42,63 @@ export async function POST(req) {
     return NextResponse.json({ error: "Falha ao processar planilha: " + e.message }, { status: 400 });
   }
 
+  const opNumero = String(parsed.opNumero);
+
   // Resolve opId — busca no banco se parsed.opNumero é string valida
   let op = null;
   try {
     if (parsed.opNumero) {
-      op = await prisma.oP.findUnique({ where: { numero: String(parsed.opNumero) } });
+      op = await prisma.oP.findUnique({ where: { numero: opNumero } });
     }
   } catch (e) {
     console.error("[importar-le] findUnique OP erro:", e?.message);
   }
 
-  // Se sobrescrever, deleta todas as pecas da OP primeiro
+  // Diff da revisão (o que mudou vs a LE anterior): snapshot marcas+peso ANTES do
+  // upsert (e antes do sobrescrever). incluídas = novas; removidas = sumiram;
+  // alteradas = peso mudou.
+  const antesLE = await prisma.pecaConjunto.findMany({
+    where: { opNumero, fonte: "LE_IMPORT" },
+    select: { marca: true, pesoTotalKg: true },
+  });
+  const pesoAntes = new Map(antesLE.map((p) => [p.marca, Number(p.pesoTotalKg) || 0]));
+  const novasPecas = new Map();
+  for (const p of parsed.pecas) novasPecas.set(p.marca, Number(p.pesoTotalKg) || 0);
+  const diffIncluidas = [], diffAlteradas = [];
+  for (const [marca, peso] of novasPecas) {
+    if (!pesoAntes.has(marca)) diffIncluidas.push({ marca, peso });
+    else if (Math.abs(pesoAntes.get(marca) - peso) > 0.01) diffAlteradas.push({ marca, de: pesoAntes.get(marca), para: peso });
+  }
+  const diffRemovidas = [...pesoAntes.entries()].filter(([m]) => !novasPecas.has(m)).map(([marca, peso]) => ({ marca, peso }));
+  const diff = {
+    incluidas: diffIncluidas, removidas: diffRemovidas, alteradas: diffAlteradas,
+    nIncluidas: diffIncluidas.length, nRemovidas: diffRemovidas.length, nAlteradas: diffAlteradas.length,
+  };
+
+  // Se sobrescrever, deleta todas as pecas LE da OP primeiro
   if (sobrescrever) {
     await prisma.pecaConjunto.deleteMany({
-      where: { opNumero: String(parsed.opNumero), fonte: "LE_IMPORT" },
+      where: { opNumero, fonte: "LE_IMPORT" },
     });
   }
+
+  // Upsert em lote: 1 findMany (marca -> id) em vez de um findUnique por peca —
+  // corta metade dos round-trips ao Neon (era isso que estourava os 60s -> 504).
+  // Depois do sobrescrever pra o mapa refletir o estado ja deletado.
+  const existentes = await prisma.pecaConjunto.findMany({
+    where: { opNumero },
+    select: { id: true, marca: true },
+  });
+  const idPorMarca = new Map(existentes.map((e) => [e.marca, e.id]));
 
   let criados = 0, atualizados = 0, ignorados = 0;
   for (const p of parsed.pecas) {
     try {
-      const existente = await prisma.pecaConjunto.findUnique({
-        where: { opNumero_marca: { opNumero: parsed.opNumero, marca: p.marca } },
-      });
-      if (existente) {
+      const existId = idPorMarca.get(p.marca);
+      if (existId) {
         // So' atualiza os campos basicos, preserva status/dataConcluida
         await prisma.pecaConjunto.update({
-          where: { id: existente.id },
+          where: { id: existId },
           data: {
             item: p.item,
             descricao: p.descricao,
@@ -79,10 +109,10 @@ export async function POST(req) {
         });
         atualizados++;
       } else {
-        await prisma.pecaConjunto.create({
+        const novo = await prisma.pecaConjunto.create({
           data: {
             opId: op?.id || null,
-            opNumero: parsed.opNumero,
+            opNumero,
             item: p.item,
             marca: p.marca,
             descricao: p.descricao,
@@ -94,6 +124,7 @@ export async function POST(req) {
             fonte: "LE_IMPORT",
           },
         });
+        idPorMarca.set(p.marca, novo.id); // marca repetida na mesma planilha vira update
         criados++;
       }
     } catch (e) {
@@ -105,11 +136,13 @@ export async function POST(req) {
     ok: true,
     opNumero: parsed.opNumero,
     opEncontrada: !!op,
+    obra: parsed.obra || null,
     totalNoArquivo: parsed.pecas.length,
     criados,
     atualizados,
     ignorados,
     pesoTotal: parsed.pesoTotal,
     qteTotal: parsed.qteTotal,
+    diff,
   });
 }
