@@ -8,7 +8,7 @@ import { parseLPC } from "@/lib/parse-lpc";
 import { classificarMaquina } from "@/lib/maquina-corte";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // LPC grande faz upsert peça a peça; 60s estourava (timeout → HTML → "token JSON")
 
 export async function POST(req) {
   let user;

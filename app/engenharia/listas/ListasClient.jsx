@@ -13,6 +13,20 @@ function bufToBase64(buffer) {
   return btoa(bin);
 }
 
+// Lê a resposta como JSON; se vier HTML (timeout/413/500), mostra o motivo real
+// em vez do críptico "Unexpected token < in JSON".
+async function lerResposta(r) {
+  const txt = await r.text();
+  try { return JSON.parse(txt); }
+  catch {
+    const dica = r.status === 413 ? " — arquivo/lista grande demais pro envio"
+      : (r.status === 504 || r.status === 502) ? " — o servidor demorou demais (lista grande); tente de novo"
+      : r.status >= 500 ? " — erro no servidor"
+      : "";
+    throw new Error(`O servidor não respondeu em JSON (HTTP ${r.status}${dica}).`);
+  }
+}
+
 function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], ops = [] }) {
   const [op, setOp] = useState("");
   const [sobrescrever, setSobrescrever] = useState(false);
@@ -47,7 +61,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows, opNumero: op.trim() || null, sobrescrever }),
       });
-      const j = await r.json();
+      const j = await lerResposta(r);
       if (!r.ok) throw new Error(j.error || "Erro ao importar");
       setRes(j);
 
@@ -62,7 +76,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tipo: sigla, opNumero: String(opFinal), fileNome: file.name, fileBase64: b64 }),
           });
-          const sj = await sr.json();
+          const sj = await lerResposta(sr);
           if (!sr.ok) throw new Error(sj.error || "Falha ao salvar no servidor");
           setServidor({ estado: "ok", ...sj });
         } catch (e2) {
