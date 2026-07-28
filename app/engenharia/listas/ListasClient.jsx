@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { Upload, Loader2, CheckCircle2, AlertCircle, ListChecks, FileSpreadsheet, Info, Send } from "lucide-react";
+import CoberturaListas from "./CoberturaListas";
 
 const fmt = (n) => Number(n || 0).toLocaleString("pt-BR");
 
@@ -273,6 +274,8 @@ export default function ListasClient() {
           <p className="text-sm text-torg-gray">Importe as listas exportadas do Tekla. Quando já existir uma lista da mesma obra, o portal registra a revisão.</p>
         </div>
       </header>
+
+      <CoberturaListas />
 
       <CardImport
         titulo="Lista de Peças por Conjunto"

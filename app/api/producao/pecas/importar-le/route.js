@@ -44,11 +44,22 @@ export async function POST(req) {
 
   const opNumero = String(parsed.opNumero);
 
-  // Resolve opId — busca no banco se parsed.opNumero é string valida
+  // Resolve opId — busca no banco se parsed.opNumero é string valida.
+  // A FORM21 traz o número sem zero à esquerda ("78"), mas a OP é "078": tenta
+  // exato e, se falhar, casa pelo número ignorando zero à esquerda/sufixo.
   let op = null;
   try {
     if (parsed.opNumero) {
       op = await prisma.oP.findUnique({ where: { numero: opNumero } });
+      if (!op) {
+        const m = opNumero.match(/\d+/);
+        const alvo = m ? parseInt(m[0], 10) : null;
+        if (alvo != null) {
+          const cands = await prisma.oP.findMany({ select: { id: true, numero: true } });
+          const casa = cands.filter((o) => { const mm = String(o.numero).match(/\d+/); return mm && parseInt(mm[0], 10) === alvo; });
+          if (casa.length === 1) op = casa[0]; // só liga quando o match é único
+        }
+      }
     }
   } catch (e) {
     console.error("[importar-le] findUnique OP erro:", e?.message);
