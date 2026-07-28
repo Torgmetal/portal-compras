@@ -1,6 +1,6 @@
 "use client";
-import { useState, useRef } from "react";
-import { Upload, Loader2, CheckCircle2, AlertCircle, ListChecks, FileSpreadsheet, Info } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Upload, Loader2, CheckCircle2, AlertCircle, ListChecks, FileSpreadsheet, Info, Send } from "lucide-react";
 
 const fmt = (n) => Number(n || 0).toLocaleString("pt-BR");
 
@@ -13,18 +13,22 @@ function bufToBase64(buffer) {
   return btoa(bin);
 }
 
-function CardImport({ titulo, sigla, desc, endpoint, cor }) {
+function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [] }) {
   const [op, setOp] = useState("");
   const [sobrescrever, setSobrescrever] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [res, setRes] = useState(null);
   const [erro, setErro] = useState("");
   const [servidor, setServidor] = useState(null); // { estado:"salvando"|"ok"|"erro", ... }
+  const [sel, setSel] = useState(() => new Set()); // destinatários do aviso de revisão
+  const [enviandoAviso, setEnviandoAviso] = useState(false);
+  const [avisoRes, setAvisoRes] = useState(null);
+  const [avisoErro, setAvisoErro] = useState("");
   const inputRef = useRef(null);
 
   async function importar(file) {
     if (!file) return;
-    setCarregando(true); setErro(""); setRes(null); setServidor(null);
+    setCarregando(true); setErro(""); setRes(null); setServidor(null); setAvisoRes(null); setSel(new Set()); setAvisoErro("");
     try {
       const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
@@ -68,6 +72,36 @@ function CardImport({ titulo, sigla, desc, endpoint, cor }) {
 
   const ehRevisao = res && Number(res.atualizados) > 0;
 
+  // Na revisão, já vem todos os destinatários marcados (Vitor: "deixe todos,
+  // porém deixar pra selecionar").
+  useEffect(() => {
+    if (ehRevisao && destinatarios.length && sel.size === 0 && !avisoRes) {
+      setSel(new Set(destinatarios.map((d) => d.email)));
+    }
+  }, [ehRevisao, destinatarios]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleSel = (email) =>
+    setSel((s) => { const n = new Set(s); n.has(email) ? n.delete(email) : n.add(email); return n; });
+
+  async function enviarAviso() {
+    if (sel.size === 0) { setAvisoErro("Selecione ao menos um destinatário."); return; }
+    setEnviandoAviso(true); setAvisoErro("");
+    try {
+      const r = await fetch("/api/engenharia/listas/avisar-revisao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: sigla, opNumero: String(res.opNumero || op.trim()), obra: res.obra || null, destinatarios: [...sel] }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Falha ao enviar");
+      setAvisoRes({ enviados: j.enviados });
+    } catch (e) {
+      setAvisoErro(e.message);
+    } finally {
+      setEnviandoAviso(false);
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
       <div className="flex items-start gap-3">
@@ -104,7 +138,32 @@ function CardImport({ titulo, sigla, desc, endpoint, cor }) {
             {res.pesoTotal != null && <span>Peso: {fmt(Math.round(res.pesoTotal))} kg</span>}
           </div>
           {ehRevisao && (
-            <p className="mt-2 text-[12px] text-amber-700 flex items-start gap-1.5"><Info size={13} className="mt-0.5 flex-shrink-0" /> Esta OP já tinha lista importada — é uma <b>revisão</b>. O aviso por e-mail aos setores entra no próximo passo (ver nota abaixo).</p>
+            <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+              <p className="text-[12px] text-amber-800 flex items-start gap-1.5"><Info size={13} className="mt-0.5 flex-shrink-0" /> <span>Esta OP já tinha lista importada — é uma <b>revisão</b>. Avise quem precisa saber:</span></p>
+              {avisoRes ? (
+                <p className="mt-2 text-[12px] text-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Aviso de revisão enviado a {avisoRes.enviados} pessoa(s).</p>
+              ) : (
+                <>
+                  <div className="mt-2 flex items-center gap-3 text-[11px]">
+                    <button type="button" onClick={() => setSel(new Set(destinatarios.map((d) => d.email)))} className="text-torg-blue hover:underline">todos</button>
+                    <button type="button" onClick={() => setSel(new Set())} className="text-torg-gray hover:underline">nenhum</button>
+                    <span className="text-torg-gray">{sel.size} de {destinatarios.length} selecionado(s)</span>
+                  </div>
+                  <div className="mt-2 max-h-40 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 pr-1">
+                    {destinatarios.map((d) => (
+                      <label key={d.email} className="flex items-center gap-2 text-[12px] text-torg-dark cursor-pointer">
+                        <input type="checkbox" checked={sel.has(d.email)} onChange={() => toggleSel(d.email)} className="accent-torg-blue flex-shrink-0" />
+                        <span className="truncate">{d.nome}{d.setor ? <span className="text-torg-gray"> · {d.setor}</span> : null}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {avisoErro && <p className="mt-1.5 text-[12px] text-red-600">{avisoErro}</p>}
+                  <button onClick={enviarAviso} disabled={enviandoAviso || sel.size === 0} className="mt-2 px-3.5 py-1.5 bg-amber-600 text-white text-[13px] rounded-lg hover:bg-amber-700 font-medium inline-flex items-center gap-1.5 disabled:opacity-50">
+                    {enviandoAviso ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Enviar aviso de revisão
+                  </button>
+                </>
+              )}
+            </div>
           )}
           {servidor && (
             <p className={`mt-2 text-[12px] flex items-start gap-1.5 ${servidor.estado === "ok" ? "text-emerald-700" : servidor.estado === "erro" ? "text-red-600" : "text-torg-gray"}`}>
@@ -120,6 +179,14 @@ function CardImport({ titulo, sigla, desc, endpoint, cor }) {
 }
 
 export default function ListasClient() {
+  const [destinatarios, setDestinatarios] = useState([]);
+  useEffect(() => {
+    fetch("/api/engenharia/listas/destinatarios")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setDestinatarios(j?.destinatarios || []))
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-5">
       <header className="flex items-center gap-3">
@@ -136,6 +203,7 @@ export default function ListasClient() {
         desc="Marcas, conjuntos e croquis por frente/OP. Alimenta a carteira de Engenharia e o corte."
         endpoint="/api/producao/pecas/importar-lpc"
         cor="bg-sky-100 text-sky-700"
+        destinatarios={destinatarios}
       />
       <CardImport
         titulo="Lista de Expedição"
@@ -143,13 +211,14 @@ export default function ListasClient() {
         desc="Marcas a expedir por obra (FORM 21). Base da expedição e do status da obra."
         endpoint="/api/producao/pecas/importar-le"
         cor="bg-teal-100 text-teal-700"
+        destinatarios={destinatarios}
       />
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-[13px] text-amber-800 flex items-start gap-2">
-        <Info size={16} className="mt-0.5 flex-shrink-0" />
+      <div className="rounded-xl border border-torg-blue-100 bg-torg-blue-50/40 p-4 text-[13px] text-torg-dark flex items-start gap-2">
+        <Info size={16} className="mt-0.5 flex-shrink-0 text-torg-blue" />
         <div>
-          <p className="font-semibold">Falta 1 ligação</p>
-          <p className="mt-0.5">O <b>salvamento no servidor</b> já está ativo — o arquivo vai automático pra pasta da OP no SharePoint (LE em <i>2.6 Lista de Expedição</i>; LPC em <i>2.5.2.1 Lista de Liberação</i>). Falta só o <b>e-mail automático aos setores</b> na revisão — aguardando confirmar os destinatários.</p>
+          <p className="font-semibold">Como funciona</p>
+          <p className="mt-0.5">Ao importar, o arquivo é <b>salvo automático no servidor</b> (pasta da OP no SharePoint). Quando a OP já tinha a lista, é uma <b>revisão</b> — aí aparece o seletor pra <b>avisar por e-mail</b> quem você quiser (todos vêm marcados; é só desmarcar quem não precisa).</p>
         </div>
       </div>
     </div>
