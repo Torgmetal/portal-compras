@@ -11,6 +11,7 @@ import {
   criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela,
   adicionarLinhaTotais, downloadWorkbook, CORES,
 } from "@/lib/excel-relatorio";
+import { ordenarACNoFim } from "@/lib/marca-ac";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { fmtOP } from "@/lib/utils";
 import { MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, calcularResumoBarras, parsePerfil } from "@/lib/maquina-corte";
@@ -167,22 +168,23 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
       kpis: [
         `Total: ${totalPecas} pç  |  Produzido: ${totalProd} pç (${pctGeral}%)  |  Peso: ${Math.round(totalPeso).toLocaleString("pt-BR")} kg`,
       ],
-      totalColunas: 14,
+      totalColunas: 15,
       nomePlanilha: "Peças",
     });
 
     ws.columns = [
       { width: 8 }, { width: 14 }, { width: 10 }, { width: 24 }, { width: 14 },
       { width: 7 }, { width: 11 }, { width: 11 }, { width: 10 }, { width: 8 },
-      { width: 10 }, { width: 16 }, { width: 12 }, { width: 12 },
+      { width: 10 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 24 },
     ];
 
     let row = linhaInicio;
-    const headers = ["OP", "Marca", "Tipo", "Descrição", "Material", "Qte", "Peso Unit.", "Peso Total", "Produzido", "Falta", "% Atend.", "Máquina", "Status", "Data Prod."];
+    const headers = ["OP", "Marca", "Tipo", "Descrição", "Material", "Qte", "Peso Unit.", "Peso Total", "Produzido", "Falta", "% Atend.", "Máquina", "Status", "Data Prod.", "Observação"];
     adicionarHeaderTabela(ws, row, headers);
     row++;
 
-    for (const p of pecasFiltradas) {
+    // Itens AC (aço comercial) sempre no fim da planilha exportada.
+    for (const p of ordenarACNoFim(pecasFiltradas, (p) => p.marca)) {
       const prod = p.qteProduzida || 0;
       const total = p.qte || 1;
       const falta = Math.max(0, total - prod);
@@ -208,6 +210,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
         p.maquina ? (MAQUINA_LABEL[p.maquina] || p.maquina) : "",
         STATUS_LABEL[p.status] || p.status,
         p.dataProducao ? new Date(p.dataProducao).toLocaleDateString("pt-BR") : "",
+        p.observacao || "",
       ], {
         fillColor,
         fontColors,
@@ -223,7 +226,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
 
     adicionarLinhaTotais(ws, row, [
       "TOTAL", "", "", "", "", totalPecas, "", totalPeso.toFixed(1),
-      totalProd, totalPecas - totalProd, `${pctGeral}%`, "", "", "",
+      totalProd, totalPecas - totalProd, `${pctGeral}%`, "", "", "", "",
     ]);
 
     const filtroDesc = [
