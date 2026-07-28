@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
 import { useStore } from "@/lib/store";
+import MontarRomaneio from "./MontarRomaneio";
 import {
   PackageCheck, Search, Loader2, AlertCircle, ArrowLeft, RefreshCw, Package,
   CheckCircle2, Clock, FileText, Weight, CloudDownload, Boxes,
@@ -82,6 +83,7 @@ function VisaoOP({ op, onVoltar, showToast }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [sincronizando, setSincronizando] = useState(false);
+  const [aba, setAba] = useState("lista"); // lista | montar
   const [filtro, setFiltro] = useState("todas"); // todas | expedidas | pendentes
   const [q, setQ] = useState("");
   const [sortCol, setSortCol] = useState("marca");
@@ -94,8 +96,8 @@ function VisaoOP({ op, onVoltar, showToast }) {
     else { setSortCol(col); setSortDir("asc"); }
   };
   const setaSort = (col) => sortCol !== col
-    ? <ChevronsUpDown size={12} className="text-gray-300" />
-    : sortDir === "asc" ? <ArrowUp size={12} className="text-torg-blue" /> : <ArrowDown size={12} className="text-torg-blue" />;
+    ? <ChevronsUpDown size={13} className="text-torg-gray/70" />
+    : sortDir === "asc" ? <ArrowUp size={13} className="text-torg-blue" /> : <ArrowDown size={13} className="text-torg-blue" />;
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -191,6 +193,20 @@ function VisaoOP({ op, onVoltar, showToast }) {
         </div>
       ) : (
         <>
+          {/* Abas: Lista da OP × Montar romaneio */}
+          <div className="flex items-center gap-1 border-b border-gray-200">
+            <button onClick={() => setAba("lista")} className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${aba === "lista" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+              <Boxes size={14} className="inline mr-1.5 -mt-0.5" /> Lista da OP
+            </button>
+            <button onClick={() => setAba("montar")} className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${aba === "montar" ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+              <FileText size={14} className="inline mr-1.5 -mt-0.5" /> Montar romaneio
+            </button>
+          </div>
+
+          {aba === "montar" ? (
+            <MontarRomaneio op={op} marcas={dados.marcas} onCriado={carregar} showToast={showToast} />
+          ) : (
+          <>
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Kpi Icon={CheckCircle2} cor="bg-emerald-600" label="Marcas expedidas" valor={`${dados.kpis.marcasExpedidas}/${dados.kpis.marcasTotal}`} sub={pct(dados.kpis.pctMarcas)} />
@@ -212,16 +228,16 @@ function VisaoOP({ op, onVoltar, showToast }) {
 
           {/* Filtros */}
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+            <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-sm">
               {[["todas", "Todas"], ["pendentes", "Pendentes"], ["expedidas", "Expedidas"]].map(([v, label]) => (
                 <button key={v} onClick={() => setFiltro(v)}
-                  className={`px-3 py-1.5 font-medium ${filtro === v ? "bg-torg-blue text-white" : "text-torg-gray hover:bg-gray-50"}`}>{label}</button>
+                  className={`px-3 py-1.5 font-medium ${filtro === v ? "bg-torg-blue text-white" : "text-torg-dark hover:bg-gray-100"}`}>{label}</button>
               ))}
             </div>
             {/* Filtro por grupo de marca (autofilter estilo Excel) */}
             <div className="relative">
               <button onClick={() => setPainelGrupo((v) => !v)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium ${gruposSel.size ? "border-torg-blue text-torg-blue bg-torg-blue-50" : "border-gray-200 text-torg-gray hover:bg-gray-50"}`}>
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-semibold ${gruposSel.size ? "border-torg-blue text-torg-blue bg-torg-blue-50" : "border-gray-300 text-torg-dark hover:bg-gray-100"}`}>
                 <Filter size={14} /> Grupo{gruposSel.size ? ` (${gruposSel.size})` : ""}
               </button>
               {painelGrupo && (
@@ -254,19 +270,19 @@ function VisaoOP({ op, onVoltar, showToast }) {
           {/* Tabela de marcas */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
             <table className="w-full text-[13px]">
-              <thead className="bg-gray-50/60"><tr className="text-gray-500">
-                <th className="px-3 py-2 font-medium text-left">
+              <thead className="bg-gray-100 border-b border-gray-200"><tr className="text-torg-dark">
+                <th className="px-3 py-2.5 font-semibold text-left">
                   <span className="inline-flex items-center gap-1.5">
-                    <button onClick={() => toggleSort("marca")} className="inline-flex items-center gap-1 hover:text-torg-dark">Marca {setaSort("marca")}</button>
-                    <button onClick={() => setPainelGrupo((v) => !v)} title="Filtrar por grupo de marca" className={`p-0.5 rounded ${gruposSel.size ? "text-torg-blue" : "text-gray-300 hover:text-torg-gray"}`}><Filter size={12} /></button>
+                    <button onClick={() => toggleSort("marca")} className="inline-flex items-center gap-1 hover:text-torg-blue">Marca {setaSort("marca")}</button>
+                    <button onClick={() => setPainelGrupo((v) => !v)} title="Filtrar por grupo de marca" className={`p-1 rounded border ${gruposSel.size ? "text-torg-blue border-torg-blue bg-torg-blue-50" : "text-torg-gray border-gray-300 hover:bg-white"}`}><Filter size={12} /></button>
                   </span>
                 </th>
-                <th className="px-3 py-2 font-medium text-left">Descrição</th>
-                <th className="px-3 py-2 font-medium text-right"><button onClick={() => toggleSort("qte")} className="inline-flex items-center gap-1 hover:text-torg-dark">Qtd {setaSort("qte")}</button></th>
-                <th className="px-3 py-2 font-medium text-right"><button onClick={() => toggleSort("peso")} className="inline-flex items-center gap-1 hover:text-torg-dark">Peso {setaSort("peso")}</button></th>
-                <th className="px-3 py-2 font-medium text-center"><button onClick={() => toggleSort("status")} className="inline-flex items-center gap-1 hover:text-torg-dark mx-auto">Status {setaSort("status")}</button></th>
-                <th className="px-3 py-2 font-medium text-left">Romaneio</th>
-                <th className="px-3 py-2 font-medium text-left"><button onClick={() => toggleSort("data")} className="inline-flex items-center gap-1 hover:text-torg-dark">Data {setaSort("data")}</button></th>
+                <th className="px-3 py-2.5 font-semibold text-left">Descrição</th>
+                <th className="px-3 py-2.5 font-semibold text-right"><button onClick={() => toggleSort("qte")} className="inline-flex items-center gap-1 hover:text-torg-blue">Qtd {setaSort("qte")}</button></th>
+                <th className="px-3 py-2.5 font-semibold text-right"><button onClick={() => toggleSort("peso")} className="inline-flex items-center gap-1 hover:text-torg-blue">Peso {setaSort("peso")}</button></th>
+                <th className="px-3 py-2.5 font-semibold text-center"><button onClick={() => toggleSort("status")} className="inline-flex items-center gap-1 hover:text-torg-blue mx-auto">Status {setaSort("status")}</button></th>
+                <th className="px-3 py-2.5 font-semibold text-left">Romaneio</th>
+                <th className="px-3 py-2.5 font-semibold text-left"><button onClick={() => toggleSort("data")} className="inline-flex items-center gap-1 hover:text-torg-blue">Data {setaSort("data")}</button></th>
               </tr></thead>
               <tbody className="divide-y divide-gray-50">
                 {marcasFiltradas.length === 0 ? (
@@ -302,6 +318,8 @@ function VisaoOP({ op, onVoltar, showToast }) {
                 </span>
               ))}
             </div>
+          )}
+          </>
           )}
         </>
       )}
