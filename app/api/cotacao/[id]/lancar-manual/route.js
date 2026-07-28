@@ -66,8 +66,8 @@ export async function POST(req, { params }) {
   }
 
   const cnpjLimpo = body.cnpj.replace(/\D/g, "");
-  if (cnpjLimpo.length !== 14) {
-    return NextResponse.json({ error: "CNPJ deve ter 14 dígitos." }, { status: 400 });
+  if (cnpjLimpo.length !== 14 && cnpjLimpo.length !== 11) {
+    return NextResponse.json({ error: "Informe CNPJ (14 dígitos) ou CPF (11 dígitos)." }, { status: 400 });
   }
 
   // Resolve fornecedor no Omie (mesmo padrao do submeter publico)

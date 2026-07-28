@@ -93,7 +93,7 @@ export async function POST(req, { params }) {
   const cnpjLimpo = body.cnpj ? body.cnpj.replace(/\D/g, "") : "";
   let nCodOmieResolvido = cotacao.nCodOmie || null;
   let omieLookupErro = null;
-  if (cnpjLimpo && cnpjLimpo.length === 14 && !nCodOmieResolvido) {
+  if (cnpjLimpo && (cnpjLimpo.length === 14 || cnpjLimpo.length === 11) && !nCodOmieResolvido) {
     try {
       const r = await resolverFornecedorPorCnpj(
         cnpjLimpo,

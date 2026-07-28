@@ -1932,7 +1932,7 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
   const submit = async () => {
     setErro("");
     const cnpjLimpo = cnpj.replace(/\D/g, "");
-    if (cnpjLimpo.length !== 14) return setErro("Informe o CNPJ (14 dígitos).");
+    if (cnpjLimpo.length !== 14 && cnpjLimpo.length !== 11) return setErro("Informe o CNPJ (14 dígitos) ou o CPF (11 dígitos).");
     // Itens: o cotacaoItem precisa ser identificado. Como o admin pode lancar pra
     // RMItens que talvez nao estejam na cotacao original, mapeamos pelo rmItemId
     // → busca/cria cotacaoItem correspondente no submit (API ja faz match).
@@ -2074,7 +2074,7 @@ function ModalLancarManual({ cotacao, rm, onClose }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-torg-gray mb-1">CNPJ *</label>
+              <label className="block text-xs font-medium text-torg-gray mb-1">CNPJ ou CPF *</label>
               <input
                 type="text" value={cnpj} onChange={(e) => setCnpj(e.target.value)}
                 placeholder="00.000.000/0001-00"

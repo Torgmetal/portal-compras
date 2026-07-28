@@ -384,8 +384,8 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       return setErro("Preencha pelo menos um preco unitario maior que zero.");
     }
     const cnpjLimpo = cnpj.replace(/\D/g, "");
-    if (cnpjLimpo.length !== 14) {
-      return setErro("Informe o CNPJ da sua empresa (14 digitos).");
+    if (cnpjLimpo.length !== 14 && cnpjLimpo.length !== 11) {
+      return setErro("Informe o CNPJ (14 dígitos) ou o CPF (11 dígitos) da pessoa física.");
     }
     if (!numeroProposta.trim()) {
       return setErro("Informe o numero da proposta.");
@@ -1030,7 +1030,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-torg-dark mb-1">CNPJ *</label>
+                <label className="block text-sm font-medium text-torg-dark mb-1">CNPJ ou CPF *</label>
                 <input
                   type="text"
                   value={cnpj}
