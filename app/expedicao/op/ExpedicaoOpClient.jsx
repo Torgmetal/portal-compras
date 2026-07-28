@@ -1,0 +1,254 @@
+"use client";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
+import { fmtOP } from "@/lib/utils";
+import { useStore } from "@/lib/store";
+import {
+  PackageCheck, Search, Loader2, AlertCircle, ArrowLeft, RefreshCw, Package,
+  CheckCircle2, Clock, FileText, Weight, CloudDownload, Boxes,
+} from "lucide-react";
+
+const fmtKg = (v) => (v != null ? `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg` : "—");
+const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
+const fmtDataHora = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
+const pct = (v) => `${Math.round(v || 0)}%`;
+
+export default function ExpedicaoOpClient({ ops }) {
+  const { showToast } = useStore();
+  const [opSel, setOpSel] = useState(null);
+  const [busca, setBusca] = useState("");
+
+  const opsFiltradas = useMemo(() => {
+    if (!busca.trim()) return ops;
+    const q = busca.toLowerCase();
+    return ops.filter((o) => o.numero?.toLowerCase().includes(q) || o.cliente?.toLowerCase().includes(q) || o.obra?.toLowerCase().includes(q));
+  }, [ops, busca]);
+
+  return (
+    <div className="space-y-6 max-w-7xl">
+      <div>
+        <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-3">
+          <PackageCheck size={28} className="text-torg-blue" /> Expedição por OP
+        </h2>
+        <p className="text-sm text-torg-gray mt-1">
+          Lista de expedição por OP — previsto (Engenharia) × expedido, e geração de romaneios.
+        </p>
+      </div>
+
+      {!opSel ? (
+        <div className="space-y-4">
+          <div className="relative max-w-md">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text" value={busca} onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar OP por número, cliente ou obra..."
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+            />
+          </div>
+          {opsFiltradas.length === 0 ? (
+            <div className="text-center py-12 text-torg-gray">
+              <Package size={32} className="mx-auto mb-2 text-gray-300" /> <p className="text-sm">Nenhuma OP encontrada.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {opsFiltradas.map((op) => (
+                <button key={op.id} onClick={() => setOpSel(op)}
+                  className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-left hover:border-torg-blue hover:shadow-md transition-all group">
+                  <p className="font-mono text-lg font-bold text-torg-blue group-hover:text-torg-blue-700">{fmtOP(op.numero)}</p>
+                  <p className="text-sm text-torg-dark mt-1 truncate">{op.cliente}</p>
+                  {op.obra && <p className="text-xs text-torg-gray truncate">{op.obra}</p>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <VisaoOP op={opSel} onVoltar={() => setOpSel(null)} showToast={showToast} />
+      )}
+    </div>
+  );
+}
+
+function VisaoOP({ op, onVoltar, showToast }) {
+  const [dados, setDados] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  const [sincronizando, setSincronizando] = useState(false);
+  const [filtro, setFiltro] = useState("todas"); // todas | expedidas | pendentes
+  const [q, setQ] = useState("");
+
+  const carregar = useCallback(async () => {
+    setLoading(true); setErro("");
+    try {
+      const res = await fetch(`/api/expedicao/op/${op.id}`);
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Erro ao carregar");
+      setDados(j);
+    } catch (e) { setErro(e.message); } finally { setLoading(false); }
+  }, [op.id]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  async function sincronizar() {
+    setSincronizando(true);
+    try {
+      const res = await fetch(`/api/expedicao/op/${op.id}`, { method: "POST" });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Erro ao sincronizar");
+      setDados(j);
+      showToast("Lista sincronizada do SharePoint", "success");
+    } catch (e) { showToast(e.message, "error"); } finally { setSincronizando(false); }
+  }
+
+  const marcasFiltradas = useMemo(() => {
+    let base = dados?.marcas || [];
+    if (filtro === "expedidas") base = base.filter((m) => m.expedido);
+    else if (filtro === "pendentes") base = base.filter((m) => !m.expedido);
+    if (q.trim()) {
+      const s = q.toLowerCase();
+      base = base.filter((m) => String(m.marca).toLowerCase().includes(s) || String(m.descricao || "").toLowerCase().includes(s));
+    }
+    return base;
+  }, [dados, filtro, q]);
+
+  return (
+    <div className="space-y-5">
+      {/* Header da OP */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <button onClick={onVoltar} className="text-sm text-torg-blue hover:text-torg-blue-700 flex items-center gap-1 mb-2"><ArrowLeft size={14} /> Voltar às OPs</button>
+          <h3 className="text-2xl font-extrabold text-torg-dark tracking-tight">
+            <span className="font-mono text-torg-blue">{fmtOP(op.numero)}</span>
+            <span className="text-lg font-normal text-torg-gray ml-2">— {op.cliente}</span>
+          </h3>
+          {op.obra && <p className="text-sm text-torg-gray">{op.obra}</p>}
+        </div>
+        <button onClick={sincronizar} disabled={sincronizando}
+          title="Re-importa a Lista de Expedição da pasta da Engenharia no SharePoint"
+          className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
+          {sincronizando ? <Loader2 size={15} className="animate-spin" /> : <CloudDownload size={15} />} Sincronizar SharePoint
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-16 text-torg-gray"><Loader2 size={26} className="animate-spin mx-auto mb-2" /> Carregando lista da OP…</div>
+      ) : erro ? (
+        <div className="text-center py-16">
+          <AlertCircle size={26} className="mx-auto text-red-500 mb-2" /><p className="text-red-600 text-sm mb-3">{erro}</p>
+          <button onClick={carregar} className="text-sm text-torg-blue inline-flex items-center gap-1"><RefreshCw size={13} /> Tentar novamente</button>
+        </div>
+      ) : !dados?.temLista ? (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm text-center py-16 px-6">
+          <Boxes size={36} className="mx-auto mb-3 text-gray-300" />
+          <p className="text-sm font-medium text-torg-dark">Nenhuma Lista de Expedição importada para esta OP</p>
+          <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">
+            A lista vem de <strong>2. Engenharia / 2.6 Lista de expedição</strong> no SharePoint (arquivo “LE”).
+            Clique em <strong>Sincronizar SharePoint</strong> para importar.
+          </p>
+          <button onClick={sincronizar} disabled={sincronizando}
+            className="mt-4 text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
+            {sincronizando ? <Loader2 size={15} className="animate-spin" /> : <CloudDownload size={15} />} Sincronizar agora
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Kpi Icon={CheckCircle2} cor="bg-emerald-600" label="Marcas expedidas" valor={`${dados.kpis.marcasExpedidas}/${dados.kpis.marcasTotal}`} sub={pct(dados.kpis.pctMarcas)} />
+            <Kpi Icon={Clock} cor="bg-amber-500" label="Marcas pendentes" valor={String(dados.kpis.marcasPendentes)} sub="a expedir" />
+            <Kpi Icon={Weight} cor="bg-torg-blue" label="Peso expedido" valor={fmtKg(dados.kpis.pesoExpedido)} sub={`${pct(dados.kpis.pctPeso)} de ${fmtKg(dados.kpis.pesoContratado)}`} />
+            <Kpi Icon={Package} cor="bg-torg-dark" label="Peso faltante" valor={fmtKg(dados.kpis.pesoFaltante)} sub="restante" />
+          </div>
+
+          {/* Barra de progresso */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-torg-dark">Progresso de expedição (peso)</p>
+              <p className="text-sm font-bold text-torg-blue">{pct(dados.kpis.pctPeso)}</p>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-3">
+              <div className="bg-torg-blue h-3 rounded-full transition-all" style={{ width: `${Math.min(dados.kpis.pctPeso, 100)}%` }} />
+            </div>
+          </div>
+
+          {/* Filtros */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+              {[["todas", "Todas"], ["pendentes", "Pendentes"], ["expedidas", "Expedidas"]].map(([v, label]) => (
+                <button key={v} onClick={() => setFiltro(v)}
+                  className={`px-3 py-1.5 font-medium ${filtro === v ? "bg-torg-blue text-white" : "text-torg-gray hover:bg-gray-50"}`}>{label}</button>
+              ))}
+            </div>
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar marca ou descrição..."
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
+            </div>
+            <span className="text-xs text-torg-gray ml-auto">{marcasFiltradas.length} de {dados.marcas.length} marcas</span>
+          </div>
+
+          {/* Tabela de marcas */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead className="bg-gray-50/60"><tr className="text-left text-gray-500">
+                <th className="px-3 py-2 font-medium">Marca</th>
+                <th className="px-3 py-2 font-medium">Descrição</th>
+                <th className="px-3 py-2 font-medium text-right">Qtd</th>
+                <th className="px-3 py-2 font-medium text-right">Peso</th>
+                <th className="px-3 py-2 font-medium text-center">Status</th>
+                <th className="px-3 py-2 font-medium">Romaneio</th>
+                <th className="px-3 py-2 font-medium">Data</th>
+              </tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {marcasFiltradas.length === 0 ? (
+                  <tr><td colSpan={7} className="px-3 py-10 text-center text-torg-gray text-sm">Nenhuma marca {filtro !== "todas" ? `(${filtro})` : ""} para o filtro atual.</td></tr>
+                ) : marcasFiltradas.map((m) => (
+                  <tr key={m.marca} className={`hover:bg-gray-50/50 ${m.expedido ? "bg-emerald-50/20" : ""}`}>
+                    <td className="px-3 py-2 font-mono font-semibold text-torg-dark whitespace-nowrap">{m.marca}</td>
+                    <td className="px-3 py-2 text-torg-gray max-w-[320px] truncate" title={m.descricao || ""}>{m.descricao || "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{m.qte ?? "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{fmtKg(m.pesoTotal)}</td>
+                    <td className="px-3 py-2 text-center">
+                      {m.expedido ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full"><CheckCircle2 size={11} /> Expedido</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"><Clock size={11} /> Pendente</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-torg-blue font-medium">{m.romaneio || "—"}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-torg-gray">{fmtData(m.dataExpedicao)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Rodapé: frentes/arquivos importados */}
+          {dados.frentes?.length > 0 && (
+            <div className="text-[11px] text-torg-gray flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="inline-flex items-center gap-1"><FileText size={12} /> Fonte:</span>
+              {dados.frentes.map((f) => (
+                <span key={f.frente} title={`Importado ${fmtDataHora(f.importadoEm)}`}>
+                  <strong className="text-torg-dark">{f.arquivo}</strong>{f.revisao ? ` (R${f.revisao})` : ""} · {f.marcas} marcas
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function Kpi({ Icon, cor, label, valor, sub }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+      <div className={`${cor} p-2.5 rounded-lg flex-shrink-0`}><Icon size={20} className="text-white" /></div>
+      <div className="min-w-0">
+        <p className="text-xs text-torg-gray truncate">{label}</p>
+        <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate">{valor}</p>
+        {sub && <p className="text-[10px] text-torg-gray truncate">{sub}</p>}
+      </div>
+    </div>
+  );
+}
