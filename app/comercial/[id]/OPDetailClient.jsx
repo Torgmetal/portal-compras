@@ -794,11 +794,21 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
 
       </>)}
 
-      {vista === "expedicao" && <AbaExpedicao opId={op.id} proposta={proposta} />}
+      {vista === "expedicao" && (
+        <div className="space-y-6">
+          <ListaExpedicaoSection opId={op.id} />
+          <AbaExpedicao opId={op.id} proposta={proposta} />
+        </div>
+      )}
 
       {vista === "obra" && <AbaObra op={op} podeEditar={!encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
 
-      {vista === "planejamento" && <AbaPlanejamento opId={op.id} />}
+      {vista === "planejamento" && (
+        <div className="space-y-6">
+          <ListaExpedicaoSection opId={op.id} />
+          <AbaPlanejamento opId={op.id} />
+        </div>
+      )}
 
       {vista === "engenharia" && (
         <div className="space-y-4">
@@ -888,7 +898,12 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         </div>
       )}
 
-      {vista === "producao" && <AbaProducao opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />}
+      {vista === "producao" && (
+        <div className="space-y-6">
+          <ListaExpedicaoSection opId={op.id} />
+          <AbaProducao opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
+        </div>
+      )}
 
       {vista === "financeiro" && (() => {
         const DIA = 86400000;
