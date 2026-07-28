@@ -1,18 +1,21 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Upload, BarChart3 } from "lucide-react";
+import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, BarChart3, FolderKanban, ListChecks } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
-// Itens ativos (Fase 1). Os demais aparecem como "em breve" pra comunicar o
-// roadmap dentro do próprio produto (viram links conforme forem construídos).
-const ITENS = [{ href: "/engenharia", label: "Visão Geral", icon: LayoutDashboard, exact: true }];
+// Itens ativos. Os demais aparecem como "em breve" pra comunicar o roadmap dentro
+// do próprio produto (viram links conforme forem construídos).
+const ITENS = [
+  { href: "/engenharia", label: "Visão Geral", icon: LayoutDashboard, exact: true },
+  { href: "/comercial", label: "OPs", icon: FolderKanban },
+  { href: "/engenharia/listas", label: "Listas (LE / LPC)", icon: ListChecks },
+];
 const EM_BREVE = [
   { label: "Detalhamento por OP", icon: FileText, hint: "abre clicando numa OP da carteira" },
   { label: "Reconciliação de Peso", icon: GitCompareArrows },
   { label: "Revisões & Retrabalho", icon: RotateCcw },
-  { label: "Importar do Tekla", icon: Upload },
   { label: "Indicadores", icon: BarChart3 },
 ];
 
