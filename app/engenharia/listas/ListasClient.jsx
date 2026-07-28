@@ -123,9 +123,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
         <select value={op} onChange={(e) => setOp(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 max-w-[320px]" title="Escolha a OP (direciona o arquivo pra pasta certa). Em branco, o portal detecta a OP pela própria lista.">
           <option value="">OP — detectar automaticamente</option>
           {ops.map((o) => (
-            <option key={o.numero} value={o.numero}>
-              OP {o.numero}{o.obra ? ` · ${o.obra}` : o.cliente ? ` · ${o.cliente}` : ""}
-            </option>
+            <option key={o.nome || o.numero} value={o.numero}>{o.nome || `OP ${o.numero}`}</option>
           ))}
         </select>
         <label className="inline-flex items-center gap-1.5 text-[12px] text-torg-gray">
