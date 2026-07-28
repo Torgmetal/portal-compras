@@ -10,13 +10,13 @@ import PedidosOmieSection from "@/components/PedidosOmieSection";
 // Sempre busca dados frescos do banco
 
 
-export default async function OPDetailPage({ params }) {
-  // OP acessível a TODOS os setores (Vitor, 24/07) — cada um vê só as abas do
-  // seu escopo; o financeiro (Resumo + Financeiro) é blindado abaixo.
-  const user = await requireUser();
-
+// Carrega + calcula TODOS os dados do detalhe de uma OP (fetch pesado, KPIs,
+// blindagem financeira). Compartilhado entre /comercial/[id] e /engenharia/ops/[id]
+// pra a OP existir dentro de cada portal (mantendo a lateral) sem duplicar a
+// lógica. Retorna null se a OP não existe.
+export async function carregarDetalheOP(id, user) {
   const op = await prisma.oP.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       createdBy: { select: { name: true, email: true } },
       itens: {
@@ -60,7 +60,7 @@ export default async function OPDetailPage({ params }) {
     },
   });
 
-  if (!op) notFound();
+  if (!op) return null;
 
   // Pendência: proposta de serviço que gerou esta OP e ainda não foi assinada
   // pelo cliente (derivado — some sozinho quando o cliente aprova).
@@ -97,8 +97,8 @@ export default async function OPDetailPage({ params }) {
   const pedidosRaw = await prisma.pedidoOmie.findMany({
     where: {
       OR: [
-        { cotacao: { rm: { opId: params.id } } },
-        { opId: params.id },
+        { cotacao: { rm: { opId: id } } },
+        { opId: id },
       ],
     },
     orderBy: { createdAt: "desc" },
@@ -370,9 +370,16 @@ export default async function OPDetailPage({ params }) {
     delete opData.faturamento;
   }
 
+  return { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro };
+}
+
+// UI do detalhe (compartilhada). O destino do "Voltar" muda por portal via
+// `voltarHref` — assim a OP abre dentro do portal atual, sem migrar pro Comercial.
+export function DetalheOPUI({ data, user, voltarHref = "/comercial" }) {
+  const { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro } = data;
   return (
     <div className="space-y-6 max-w-7xl">
-      <Link href="/comercial" className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
+      <Link href={voltarHref} className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
         <ArrowLeft size={14} /> Voltar pra lista de OPs
       </Link>
 
@@ -390,4 +397,11 @@ export default async function OPDetailPage({ params }) {
       <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} podeVerFinanceiro={podeVerFinanceiro} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
     </div>
   );
+}
+
+export default async function OPDetailPage({ params }) {
+  const user = await requireUser();
+  const data = await carregarDetalheOP(params.id, user);
+  if (!data) notFound();
+  return <DetalheOPUI data={data} user={user} voltarHref="/comercial" />;
 }

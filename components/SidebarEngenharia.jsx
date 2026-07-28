@@ -9,7 +9,7 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 // do próprio produto (viram links conforme forem construídos).
 const ITENS = [
   { href: "/engenharia", label: "Visão Geral", icon: LayoutDashboard, exact: true },
-  { href: "/comercial", label: "OPs", icon: FolderKanban },
+  { href: "/engenharia/ops", label: "OPs", icon: FolderKanban },
   { href: "/engenharia/listas", label: "Listas (LE / LPC)", icon: ListChecks },
 ];
 const EM_BREVE = [
