@@ -91,7 +91,11 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
     }
   }
 
-  const ehRevisao = res && Number(res.atualizados) > 0;
+  // R00 = lista NOVA da OP (aviso calmo, "importada"); R01+ = revisão (alerta de
+  // obsoleto). Sem nº de revisão no nome, cai no heurístico "a OP já tinha a lista".
+  const ehRevisao = revArquivo && revArquivo.num != null
+    ? revArquivo.num >= 1
+    : !!(res && Number(res.atualizados) > 0);
 
   // Na revisão, já vem todos os destinatários marcados (Vitor: "deixe todos,
   // porém deixar pra selecionar").
