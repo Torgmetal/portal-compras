@@ -116,6 +116,7 @@ export async function POST(req) {
             qte: p.qte,
             pesoUnitKg: p.pesoUnitKg,
             pesoTotalKg: p.pesoTotalKg,
+            ...(p.observacao ? { observacao: p.observacao } : {}), // só sobrescreve se a lista trouxer
           },
         });
         atualizados++;
@@ -131,6 +132,7 @@ export async function POST(req) {
             pesoUnitKg: p.pesoUnitKg,
             pesoTotalKg: p.pesoTotalKg,
             fluxoEspecial: p.fluxoEspecial,
+            observacao: p.observacao || null,
             status: "PENDENTE",
             fonte: "LE_IMPORT",
           },

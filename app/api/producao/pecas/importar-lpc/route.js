@@ -96,6 +96,7 @@ export async function POST(req) {
             pesoTotalKg: c.pesoTotalKg,
             tipoPeca: "CONJUNTO",
             areaPinturaM2: c.areaPinturaM2,
+            observacao: c.observacao ?? undefined, // undefined = não mexe (preserva no update; null no create)
           },
         });
         pieceIds.set(c.marca, existing.id);
@@ -112,6 +113,7 @@ export async function POST(req) {
             pesoTotalKg: c.pesoTotalKg,
             tipoPeca: "CONJUNTO",
             areaPinturaM2: c.areaPinturaM2,
+            observacao: c.observacao ?? undefined, // undefined = não mexe (preserva no update; null no create)
             status: "PENDENTE",
             fonte: "LPC_IMPORT",
           },
@@ -144,6 +146,7 @@ export async function POST(req) {
             pesoTotalKg: cr.pesoTotalKg,
             tipoPeca: "CROQUI",
             areaPinturaM2: cr.areaPinturaM2,
+            observacao: cr.observacao ?? undefined,
             statusPrep: existing.statusPrep || "PENDENTE",
             maquina: maq || existing.maquina,
           },
@@ -165,6 +168,7 @@ export async function POST(req) {
             pesoTotalKg: cr.pesoTotalKg,
             tipoPeca: "CROQUI",
             areaPinturaM2: cr.areaPinturaM2,
+            observacao: cr.observacao ?? undefined,
             statusPrep: "PENDENTE",
             status: "PENDENTE",
             fonte: "LPC_IMPORT",
@@ -198,6 +202,7 @@ export async function POST(req) {
             pesoUnitKg: a.pesoUnitKg,
             pesoTotalKg: a.pesoTotalKg,
             areaPinturaM2: a.areaPinturaM2,
+            observacao: a.observacao ?? undefined,
             maquina: maq || existing.maquina,
           },
         });
@@ -217,6 +222,7 @@ export async function POST(req) {
             pesoUnitKg: a.pesoUnitKg,
             pesoTotalKg: a.pesoTotalKg,
             areaPinturaM2: a.areaPinturaM2,
+            observacao: a.observacao ?? undefined,
             status: "PENDENTE",
             fonte: "LPC_IMPORT",
             maquina: maq,
