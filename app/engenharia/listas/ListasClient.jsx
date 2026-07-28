@@ -4,17 +4,27 @@ import { Upload, Loader2, CheckCircle2, AlertCircle, ListChecks, FileSpreadsheet
 
 const fmt = (n) => Number(n || 0).toLocaleString("pt-BR");
 
+// base64 em chunks (spread de array grande estoura a pilha)
+function bufToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
 function CardImport({ titulo, sigla, desc, endpoint, cor }) {
   const [op, setOp] = useState("");
   const [sobrescrever, setSobrescrever] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [res, setRes] = useState(null);
   const [erro, setErro] = useState("");
+  const [servidor, setServidor] = useState(null); // { estado:"salvando"|"ok"|"erro", ... }
   const inputRef = useRef(null);
 
   async function importar(file) {
     if (!file) return;
-    setCarregando(true); setErro(""); setRes(null);
+    setCarregando(true); setErro(""); setRes(null); setServidor(null);
     try {
       const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
@@ -29,6 +39,25 @@ function CardImport({ titulo, sigla, desc, endpoint, cor }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao importar");
       setRes(j);
+
+      // Salva o arquivo no servidor (SharePoint), na pasta da OP importada.
+      const opFinal = j.opNumero || op.trim();
+      if (opFinal) {
+        setServidor({ estado: "salvando" });
+        try {
+          const b64 = bufToBase64(buffer);
+          const sr = await fetch("/api/engenharia/listas/servidor", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tipo: sigla, opNumero: String(opFinal), fileNome: file.name, fileBase64: b64 }),
+          });
+          const sj = await sr.json();
+          if (!sr.ok) throw new Error(sj.error || "Falha ao salvar no servidor");
+          setServidor({ estado: "ok", ...sj });
+        } catch (e2) {
+          setServidor({ estado: "erro", erro: e2.message });
+        }
+      }
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -75,7 +104,14 @@ function CardImport({ titulo, sigla, desc, endpoint, cor }) {
             {res.pesoTotal != null && <span>Peso: {fmt(Math.round(res.pesoTotal))} kg</span>}
           </div>
           {ehRevisao && (
-            <p className="mt-2 text-[12px] text-amber-700 flex items-start gap-1.5"><Info size={13} className="mt-0.5 flex-shrink-0" /> Esta OP já tinha lista importada — é uma <b>revisão</b>. O aviso por e-mail aos setores e o salvamento no servidor entram no próximo passo (ver nota abaixo).</p>
+            <p className="mt-2 text-[12px] text-amber-700 flex items-start gap-1.5"><Info size={13} className="mt-0.5 flex-shrink-0" /> Esta OP já tinha lista importada — é uma <b>revisão</b>. O aviso por e-mail aos setores entra no próximo passo (ver nota abaixo).</p>
+          )}
+          {servidor && (
+            <p className={`mt-2 text-[12px] flex items-start gap-1.5 ${servidor.estado === "ok" ? "text-emerald-700" : servidor.estado === "erro" ? "text-red-600" : "text-torg-gray"}`}>
+              {servidor.estado === "salvando" && <><Loader2 size={13} className="mt-0.5 animate-spin flex-shrink-0" /> Salvando o arquivo no servidor…</>}
+              {servidor.estado === "ok" && <><CheckCircle2 size={13} className="mt-0.5 flex-shrink-0" /> Arquivo salvo no servidor · {servidor.pastaOp}</>}
+              {servidor.estado === "erro" && <><AlertCircle size={13} className="mt-0.5 flex-shrink-0" /> Importado, mas não salvou no servidor: {servidor.erro}</>}
+            </p>
           )}
         </div>
       )}
@@ -112,8 +148,8 @@ export default function ListasClient() {
       <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-[13px] text-amber-800 flex items-start gap-2">
         <Info size={16} className="mt-0.5 flex-shrink-0" />
         <div>
-          <p className="font-semibold">Em alinhamento com o Vitor</p>
-          <p className="mt-0.5">Falta ligar duas coisas nesta aba: (1) <b>e-mail automático aos setores</b> quando a lista for revisada, e (2) <b>salvar o arquivo no servidor</b> (SharePoint) no caminho certo de cada lista. Preciso das pastas corretas da LE e da LPC pra alinhar os caminhos.</p>
+          <p className="font-semibold">Falta 1 ligação</p>
+          <p className="mt-0.5">O <b>salvamento no servidor</b> já está ativo — o arquivo vai automático pra pasta da OP no SharePoint (LE em <i>2.6 Lista de Expedição</i>; LPC em <i>2.5.2.1 Lista de Liberação</i>). Falta só o <b>e-mail automático aos setores</b> na revisão — aguardando confirmar os destinatários.</p>
         </div>
       </div>
     </div>
