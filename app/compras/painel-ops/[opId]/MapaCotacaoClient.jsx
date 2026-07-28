@@ -922,8 +922,8 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
   const gerarUm = async (cotacaoId, fornecedorNome) => {
     if (!validarConfig()) return;
     const cnpjLimpo = (cnpjPorCotacao[cotacaoId] || "").replace(/\D/g, "");
-    if (cnpjLimpo.length !== 14) {
-      setErroGeral(`Preencha o CNPJ (14 dígitos) de ${fornecedorNome}.`);
+    if (cnpjLimpo.length !== 14 && cnpjLimpo.length !== 11) {
+      setErroGeral(`Preencha o CNPJ (14 dígitos) ou o CPF (11 dígitos) de ${fornecedorNome}.`);
       return;
     }
     setErroGeral("");
