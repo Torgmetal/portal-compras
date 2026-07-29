@@ -12,7 +12,11 @@ const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP"];
 export async function GET(_req, { params }) {
   // Leitura da aba aberta a todos os setores (dado operacional, sem financeiro).
   try { await requireUser(); } catch (e) { return NextResponse.json({ error: e.message }, { status: 401 }); }
-  const lotes = await prisma.loteExpedicao.findMany({ where: { opId: params.id }, orderBy: [{ ordem: "asc" }, { createdAt: "asc" }] });
+  const lotes = await prisma.loteExpedicao.findMany({
+    where: { opId: params.id },
+    orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
+    include: { romaneios: { select: { id: true, numero: true, emitidoEm: true, revisao: true }, orderBy: { numero: "desc" }, take: 1 } },
+  });
   return NextResponse.json({ success: true, lotes });
 }
 

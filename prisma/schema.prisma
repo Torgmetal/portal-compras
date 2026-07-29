@@ -3383,6 +3383,10 @@ model RomaneioPrevio {
   loteId        String? // lote de entrega a que esta carga pertence
   aprovadoEm    DateTime? // aprovado = liberado para a Expedição
   aprovadoPorId String?
+  emitidoEm     DateTime? // null = não emitido; setado ao gerar o romaneio consolidado
+  emitidoPorId  String?
+  revisao       Int       @default(0) // 0 = 1ª emissão (R00); 1+ = revisões (R01, R02…)
+  historico     Json      @default("[]") // [{ revisao, emitidoEm, mudanca, porQuem }]
   criadoPorId   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

@@ -19,11 +19,13 @@ const schema = z.object({
   contato: z.string().max(100).nullable().optional(),
   data: z.string().nullable().optional(),
   marcas: z.array(z.string()).optional(), // subconjunto de marcas a incluir (se vazio/ausente, todas)
+  mudanca: z.string().max(2000).nullable().optional(), // o que mudou (obrigatório na revisão)
 });
 
 export async function POST(req, { params }) {
+  let user;
   try {
-    await requireRole(["ADMIN", "EXPEDICAO", "COMERCIAL", "PLANEJAMENTO", "PCP", "ENGENHARIA"]);
+    user = await requireRole(["ADMIN", "EXPEDICAO", "COMERCIAL", "PLANEJAMENTO", "PCP", "ENGENHARIA"]);
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
@@ -73,6 +75,21 @@ export async function POST(req, { params }) {
     if (!itens.length) return NextResponse.json({ error: "Nenhuma marca selecionada." }, { status: 400 });
   }
 
+  // Emissão × revisão: 1ª vez emite R00; se já foi emitido, é revisão (exige motivo).
+  const jaEmitido = !!previo.emitidoEm;
+  const novaRevisao = jaEmitido ? (previo.revisao || 0) + 1 : 0;
+  if (jaEmitido && !(body.mudanca && body.mudanca.trim())) {
+    return NextResponse.json({ error: "Descreva o que mudou nesta revisão." }, { status: 400 });
+  }
+  const agora = new Date();
+  const histAtual = Array.isArray(previo.historico) ? previo.historico : [];
+  const historico = [...histAtual, {
+    revisao: novaRevisao,
+    emitidoEm: agora.toISOString(),
+    mudanca: novaRevisao === 0 ? "Primeira emissão" : body.mudanca.trim(),
+    porQuem: user.name || user.email || null,
+  }];
+
   // Persiste o transportador no lote (pra não redigitar depois).
   await prisma.loteExpedicao.update({ where: { id: lote.id }, data: { transportadora, motorista, placaVeiculo: placa, contatoTransporte: contato } }).catch(() => {});
 
@@ -80,17 +97,28 @@ export async function POST(req, { params }) {
     op,
     romaneio: { numero, data, transportadora, contatoTransporte: contato },
     itens,
+    historico: novaRevisao > 0 ? historico : null, // aba Histórico só na revisão
   });
   const cli = (op.cliente || "").slice(0, 40).trim();
-  const fileNome = `Romaneio ${numero} - OP-${op.numero}${cli ? ` - ${cli}` : ""}.xlsx`;
+  const prefixo = `Romaneio ${numero} - OP-${op.numero}`; // base do nome (acha a versão anterior na revisão)
+  const fileNome = `${prefixo}${cli ? ` - ${cli}` : ""}.xlsx`;
 
   let sharepoint = null;
   try {
-    const r = await salvarRomaneioNoServidor({ opNumero: op.numero, fileNome, buffer: buf });
+    // Na revisão, move a versão anterior desse romaneio pra Obsoleto antes de salvar.
+    const r = await salvarRomaneioNoServidor({ opNumero: op.numero, fileNome, buffer: buf, moverPrefixo: jaEmitido ? prefixo : undefined });
     sharepoint = { ok: true, nome: r.nome, caminho: r.caminho, webUrl: r.webUrl };
   } catch (e) {
     sharepoint = { ok: false, erro: e?.message || "Falha ao salvar no SharePoint." };
   }
 
-  return NextResponse.json({ ok: true, numero, nome: fileNome, arquivo: buf.toString("base64"), sharepoint });
+  // Marca como emitido / atualiza a revisão + histórico no prévio.
+  await prisma.romaneioPrevio.update({
+    where: { id: previo.id },
+    data: { emitidoEm: agora, emitidoPorId: user.id, revisao: novaRevisao, historico },
+  }).catch(() => {});
+
+  await prisma.auditLog.create({ data: { userId: user.id, action: novaRevisao === 0 ? "EMITIR_ROMANEIO" : "REVISAR_ROMANEIO", entity: "RomaneioPrevio", entityId: previo.id, diff: { numero, revisao: novaRevisao, itens: itens.length } } }).catch(() => {});
+
+  return NextResponse.json({ ok: true, numero, revisao: novaRevisao, nome: fileNome, arquivo: buf.toString("base64"), sharepoint });
 }
