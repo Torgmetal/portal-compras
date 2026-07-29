@@ -145,6 +145,13 @@ export async function POST(req) {
     }
   }
 
+  // Peso REAL da LE da OP = soma das peças LE_IMPORT no banco (deduplicadas por
+  // marca), NÃO a soma bruta do arquivo. O FORM 21 lista conjunto + componentes,
+  // então parsed.pesoTotal dobra (Vitor 29/07: OP 104 = 13,6 t, não 27,2). A LE é
+  // a fonte canônica do peso da OP.
+  const aggLE = await prisma.pecaConjunto.aggregate({ where: { opNumero, fonte: "LE_IMPORT" }, _sum: { pesoTotalKg: true } });
+  const pesoRealLE = Math.round((aggLE._sum.pesoTotalKg || 0) * 100) / 100;
+
   return NextResponse.json({
     ok: true,
     opNumero: parsed.opNumero,
@@ -154,7 +161,7 @@ export async function POST(req) {
     criados,
     atualizados,
     ignorados,
-    pesoTotal: parsed.pesoTotal,
+    pesoTotal: pesoRealLE, // peso real da LE (deduplicado), não a soma bruta do arquivo
     qteTotal: parsed.qteTotal,
     diff,
   });
