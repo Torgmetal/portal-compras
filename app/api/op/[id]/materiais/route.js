@@ -126,6 +126,15 @@ export async function GET(req, { params }) {
           material: it.material,
           unidade: it.peso > 0 ? "KG" : it.unidade,
           quantidade: it.peso > 0 ? it.peso : it.qtd,
+          // Solicitado detalhado: peso (kg) e barras. Pra item de aço, qtd = nº de
+          // barras; item sem peso (peso=0) usa qtd na própria unidade.
+          peso: Number(it.peso) || 0,
+          barras: it.peso > 0 && it.qtd > 0 ? it.qtd : null,
+          qtdSolicitada: it.qtd,
+          unidadeItem: it.unidade,
+          // Quantidade REAL recebida (soma dos recebimentos do item, mesma unidade
+          // do "quantidade" acima: kg pra aço, un pra o resto).
+          qtdRecebida: recebidoQtd,
           status: it.status,
           // Dados do pedido
           pedidoRecebido,

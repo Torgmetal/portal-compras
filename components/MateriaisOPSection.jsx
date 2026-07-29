@@ -8,6 +8,14 @@ import {
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+const fmtNum = (v) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
+
+// "Solicitado" e "Recebido" respeitam a unidade natural do item: aço (peso>0) em
+// kg (+ nº de barras); demais na própria unidade.
+const solicitadoTxt = (it) => (it.peso > 0 ? `${fmtKg(it.peso)}${it.barras ? ` · ${fmtNum(it.barras)} br` : ""}` : `${fmtNum(it.qtdSolicitada)} ${it.unidadeItem || ""}`.trim());
+const recebidoTxt = (it) => (it.qtdRecebida > 0 ? (it.peso > 0 ? fmtKg(it.qtdRecebida) : `${fmtNum(it.qtdRecebida)} ${it.unidadeItem || ""}`.trim()) : null);
+const recebidoCompleto = (it) => { const alvo = it.peso > 0 ? it.peso : it.qtdSolicitada; return alvo > 0 && it.qtdRecebida >= alvo * 0.98; };
 
 // Status derivado de cada item baseado em RMItem.status + PedidoOmie.statusEntrega
 const STATUS_CONFIG = {
@@ -116,34 +124,37 @@ export default function MateriaisOPSection({ opId }) {
         EM_COTACAO: "B45309", NAO_COMPRADO: "DC2626", CANCELADO: "94A3B8",
       };
 
-      const headers = ["RM", "Material", "Descrição", "Qtd", "Un", "Status", "Fornecedor", "Pedido", "NF", "Recebido em"];
-      const pesoKg = filtrados.reduce((s, it) => s + (it.unidade === "KG" ? Number(it.quantidade || 0) : 0), 0);
+      const headers = ["RM", "Material", "Descrição", "Peso solic. (kg)", "Barras solic.", "Qtd solic.", "Un", "Recebido", "Status", "Fornecedor", "Pedido", "NF", "Recebido em"];
+      const pesoKg = filtrados.reduce((s, it) => s + (Number(it.peso) || 0), 0);
+      const pesoRecebido = filtrados.reduce((s, it) => s + (it.peso > 0 ? Number(it.qtdRecebida) || 0 : 0), 0);
       const { workbook, sheet: ws, linhaInicio } = await xl.criarRelatorioTorg({
         titulo: `Materiais da OP ${numero || ""} — Compras`,
         subtitulo: `Situacao de compra por item${filtro !== "TODOS" ? ` · filtro: ${STATUS_CONFIG[filtro]?.label}` : " · todos os status"}`,
         kpis: [
           `Recebido: ${resumo.RECEBIDO}  |  Aguardando entrega: ${resumo.COMPRADO}  |  Atendido por estoque: ${resumo.ESTOQUE}  |  Em cotacao: ${resumo.EM_COTACAO}  |  Nao comprado: ${resumo.NAO_COMPRADO}  |  Cancelado: ${resumo.CANCELADO}`,
-          `${filtrados.length} itens${pesoKg > 0 ? `  |  Peso total (kg): ${pesoKg.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}` : ""}`,
+          `${filtrados.length} itens${pesoKg > 0 ? `  |  Peso solicitado (kg): ${pesoKg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}  |  Peso recebido (kg): ${pesoRecebido.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : ""}`,
         ],
         totalColunas: headers.length,
         nomePlanilha: `Materiais OP ${numero || ""}`.slice(0, 31),
         codigoDoc: "REL-CMP-001",
       });
-      ws.columns = [{ width: 12 }, { width: 14 }, { width: 42 }, { width: 11 }, { width: 6 }, { width: 20 }, { width: 20 }, { width: 10 }, { width: 12 }, { width: 14 }];
+      ws.columns = [{ width: 12 }, { width: 14 }, { width: 40 }, { width: 14 }, { width: 12 }, { width: 11 }, { width: 6 }, { width: 12 }, { width: 20 }, { width: 20 }, { width: 10 }, { width: 12 }, { width: 14 }];
       let row = linhaInicio;
       xl.adicionarHeaderTabela(ws, row, headers); row++;
       for (const it of filtrados) {
         const st = derivarStatus(it);
         xl.adicionarLinhaTabela(ws, row, [
           it.rmNumero, it.material || "—", it.descricao,
-          Number(it.quantidade || 0), it.unidade || "",
+          it.peso > 0 ? Number(it.peso) : "", it.barras || "",
+          Number(it.qtdSolicitada || 0), it.unidadeItem || "",
+          it.qtdRecebida > 0 ? Number(it.qtdRecebida) : "",
           STATUS_CONFIG[st].label, it.fornecedor || "—",
           it.pedidoNumero ? `#${it.pedidoNumero}` : "—",
           it.nfNumero || "—",
           st === "RECEBIDO" && it.recebidoEm ? fmtData(it.recebidoEm) : "—",
         ], {
-          fillColor: FILL[st], fontColors: { 5: FONT[st] },
-          alinhamento: { 3: "right", 4: "center", 5: "center", 7: "center", 8: "center", 9: "center" },
+          fillColor: FILL[st], fontColors: { 8: FONT[st] },
+          alinhamento: { 3: "right", 4: "right", 5: "right", 6: "center", 7: "right", 8: "center", 10: "center", 11: "center", 12: "center" },
         });
         row++;
       }
@@ -297,13 +308,14 @@ export default function MateriaisOPSection({ opId }) {
             <table className="w-full text-sm">
               <thead className="bg-gray-50/60">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">RM</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Info</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">RM</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Peso e nº de barras solicitados">Solicitado</th>
+                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Pedido</th>
+                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">NF</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" title="Quantidade real recebida">Recebido</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -311,53 +323,43 @@ export default function MateriaisOPSection({ opId }) {
                   const st = derivarStatus(item);
                   const cfg = STATUS_CONFIG[st];
                   const Icon = cfg.icon;
+                  const receb = recebidoTxt(item);
                   return (
-                    <tr key={item.id} className={`hover:bg-gray-50 ${st === "CANCELADO" ? "opacity-50" : ""}`}>
-                      <td className="px-4 py-2 font-mono text-xs text-torg-blue whitespace-nowrap">
+                    <tr key={item.id} className={`hover:bg-gray-50 ${st === "CANCELADO" ? "opacity-50" : ""}`} title={st === "CANCELADO" && item.canceladoMotivo ? `Cancelado: ${item.canceladoMotivo}` : undefined}>
+                      <td className="px-3 py-2 font-mono text-xs text-torg-blue whitespace-nowrap align-top">
                         {item.rmNumero}
                       </td>
-                      <td className="px-4 py-2 text-xs text-torg-gray whitespace-nowrap">
-                        {item.material || "—"}
+                      <td className="px-3 py-2 align-top max-w-[240px]">
+                        <div className="text-torg-dark text-xs font-medium truncate" title={item.descricao}>{item.descricao}</div>
+                        {item.material && <div className="text-[11px] text-torg-gray truncate">{item.material}</div>}
                       </td>
-                      <td className="px-4 py-2 text-torg-dark max-w-xs truncate" title={item.descricao}>
-                        {item.descricao}
+                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap align-top text-torg-dark text-xs">
+                        {solicitadoTxt(item)}
                       </td>
-                      <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
-                        {Number(item.quantidade).toLocaleString("pt-BR")} {item.unidade}
+                      <td className="px-3 py-2 text-center whitespace-nowrap align-top">
+                        {item.pedidoNumero ? <span className="font-mono text-xs text-torg-dark">#{item.pedidoNumero}</span> : <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-4 py-2 whitespace-nowrap">
+                      <td className="px-3 py-2 text-center whitespace-nowrap align-top">
+                        {item.nfNumero ? <span className="font-mono text-xs text-torg-dark">{item.nfNumero}</span> : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap align-top text-xs" title={item.recebidoEm ? `Recebido em ${fmtData(item.recebidoEm)}` : undefined}>
+                        {receb ? <span className={`font-semibold ${recebidoCompleto(item) ? "text-emerald-700" : "text-amber-700"}`}>{receb}</span> : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap align-top">
                         <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium ${cfg.bg} ${cfg.color}`}>
                           <Icon size={11} />
                           {cfg.label}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-xs text-torg-dark truncate max-w-[150px]" title={item.fornecedor || ""}>
+                      <td className="px-3 py-2 text-xs text-torg-dark truncate max-w-[150px] align-top" title={item.fornecedor || ""}>
                         {item.fornecedor || "—"}
-                      </td>
-                      <td className="px-4 py-2 text-xs text-torg-gray whitespace-nowrap">
-                        {(st === "RECEBIDO" || st === "COMPRADO") && (item.pedidoNumero || item.nfNumero) && (
-                          <span>
-                            {item.pedidoNumero ? `Pedido #${item.pedidoNumero}` : ""}
-                            {st === "RECEBIDO" && item.nfNumero ? `${item.pedidoNumero ? " • " : ""}NF ${item.nfNumero}` : ""}
-                            {st === "RECEBIDO" && item.recebidoEm ? ` • ${fmtData(item.recebidoEm)}` : ""}
-                          </span>
-                        )}
-                        {st === "ESTOQUE" && (
-                          <span>
-                            {item.estoquePreco > 0 ? fmtMoeda(item.estoquePreco) + "/un" : ""}
-                            {item.estoqueData ? ` • ${fmtData(item.estoqueData)}` : ""}
-                          </span>
-                        )}
-                        {st === "CANCELADO" && item.canceladoEm && (
-                          <span>{fmtData(item.canceladoEm)}</span>
-                        )}
                       </td>
                     </tr>
                   );
                 })}
                 {itensFiltrados.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-torg-gray">
+                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-torg-gray">
                       Nenhum item com este status.
                     </td>
                   </tr>
