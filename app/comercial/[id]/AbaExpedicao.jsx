@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, Fragment } from "react";
 import * as XLSX from "xlsx";
-import { Truck, Plus, Pencil, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Truck, Plus, Pencil, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2, FileSpreadsheet } from "lucide-react";
 
 const fmtKg = (n) => (n == null ? null : `${Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -79,6 +79,7 @@ export default function AbaExpedicao({ opId, proposta = null }) {
   const [importOpen, setImportOpen] = useState(false);
   const [abertos, setAbertos] = useState({});   // lotes expandidos (ver marcas)
   const [pecasLote, setPecasLote] = useState({}); // marcas por lote
+  const [exportar, setExportar] = useState(null); // { lote } sendo exportado
 
   const carregar = () => fetch(`/api/comercial/op/${opId}/lotes-expedicao`).then((r) => r.json())
     .then((j) => { if (j.success) setLotes(j.lotes); else setErro(j.error || "Erro"); }).catch(() => setErro("Erro ao carregar"));
@@ -176,6 +177,7 @@ export default function AbaExpedicao({ opId, proposta = null }) {
                     <td className="px-3 py-2 text-right whitespace-nowrap">{l.pesoKg != null ? <span className="text-torg-dark tabular-nums">{fmtKg(l.pesoKg)}</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">a definir</span>}</td>
                     <td className="px-2 py-2">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button onClick={() => setExportar({ lote: l })} className="text-torg-gray hover:text-torg-blue" title="Exportar romaneio (FORM 22)"><FileSpreadsheet size={14} /></button>
                         <button onClick={() => setModal({ lote: l })} className="text-torg-gray hover:text-torg-blue" title="Editar"><Pencil size={14} /></button>
                         <button onClick={() => excluir(l)} className="text-torg-gray hover:text-red-600" title="Excluir"><Trash2 size={14} /></button>
                       </div>
@@ -243,6 +245,7 @@ export default function AbaExpedicao({ opId, proposta = null }) {
 
       {modal && <LoteModal opId={opId} lote={modal.lote} onClose={() => setModal(null)} onSaved={() => { setModal(null); carregar(); }} />}
       {importOpen && <ImportarModal opId={opId} temLotes={(lotes || []).length > 0} onClose={() => setImportOpen(false)} onImportado={() => { setImportOpen(false); carregar(); }} />}
+      {exportar && <ExportarRomaneioModal opId={opId} lote={exportar.lote} onClose={() => setExportar(null)} />}
     </div>
   );
 }
@@ -403,6 +406,66 @@ function ImportarModal({ opId, temLotes, onClose, onImportado }) {
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
           <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
           <button onClick={importar} disabled={!linhas || importando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{importando ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Importar {linhas ? `${linhas.length} lote${linhas.length === 1 ? "" : "s"}` : ""}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── modal exportar romaneio (FORM 22) ─────────────────────────────────────────
+function ExportarRomaneioModal({ opId, lote, onClose }) {
+  const [f, setF] = useState({
+    transportadora: "", motorista: "", placa: "", contato: "",
+    data: lote?.dataPrevista ? String(lote.dataPrevista).slice(0, 10) : "",
+  });
+  const [gerando, setGerando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [ok, setOk] = useState(null);
+  const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
+
+  async function gerar() {
+    setErro(""); setGerando(true);
+    try {
+      const r = await fetch(`/api/comercial/op/${opId}/lotes-expedicao/${lote.id}/romaneio`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transportadora: f.transportadora.trim() || null, motorista: f.motorista.trim() || null,
+          placa: f.placa.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao gerar o romaneio");
+      const bin = atob(j.arquivo);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const a = document.createElement("a"); a.href = url; a.download = j.nome; a.click(); URL.revokeObjectURL(url);
+      setOk(j);
+    } catch (e) { setErro(e.message); } finally { setGerando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-torg-dark inline-flex items-center gap-2"><FileSpreadsheet size={15} className="text-torg-blue" /> Exportar romaneio — {lote?.nome}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-xs text-torg-gray">Dados do transportador. O romaneio (FORM 22) sai com as marcas do lote e é salvo na pasta <strong>4.2 Romaneios</strong> da OP.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block col-span-2"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Transportadora</span><input value={f.transportadora} onChange={(e) => setF({ ...f, transportadora: e.target.value })} className={inp} placeholder="Transportadora" /></label>
+            <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Motorista</span><input value={f.motorista} onChange={(e) => setF({ ...f, motorista: e.target.value })} className={inp} placeholder="Motorista" /></label>
+            <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Placa</span><input value={f.placa} onChange={(e) => setF({ ...f, placa: e.target.value })} className={inp} placeholder="Placa" /></label>
+            <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Contato / Fone</span><input value={f.contato} onChange={(e) => setF({ ...f, contato: e.target.value })} className={inp} placeholder="Telefone" /></label>
+            <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Data de saída</span><input type="date" value={f.data} onChange={(e) => setF({ ...f, data: e.target.value })} className={inp} /></label>
+          </div>
+          {erro && <p className="text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
+          {ok && <p className="text-xs text-emerald-700 inline-flex items-start gap-1"><CheckCircle2 size={13} className="mt-0.5 shrink-0" /> Romaneio {ok.numero} gerado{ok.sharepoint?.ok ? " e salvo no servidor (4.2 Romaneios)" : ok.sharepoint ? ` — mas não salvou no SharePoint: ${ok.sharepoint.erro}` : ""}.</p>}
+        </div>
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Fechar</button>
+          <button onClick={gerar} disabled={gerando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{gerando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Gerar romaneio</button>
         </div>
       </div>
     </div>
