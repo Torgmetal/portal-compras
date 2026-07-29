@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pesoRealPecas } from "@/lib/peso-op";
 import { requireRole } from "@/lib/session";
 
 /**
@@ -39,10 +40,10 @@ export async function GET(req, { params }) {
   // 1) Peso total e distribuicao por status (PecaConjunto)
   const pecas = await prisma.pecaConjunto.findMany({
     where: { opNumero: opNum },
-    select: { pesoTotalKg: true, status: true, qte: true },
+    select: { pesoTotalKg: true, status: true, qte: true, fonte: true, tipoPeca: true },
   });
 
-  const pesoTotal = pecas.reduce((s, p) => s + p.pesoTotalKg, 0);
+  const pesoTotal = pesoRealPecas(pecas); // peso real (sem dobrar croqui/LE+LPC)
   const totalPecas = pecas.length;
   const totalQte = pecas.reduce((s, p) => s + p.qte, 0);
 
