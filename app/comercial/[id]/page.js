@@ -74,7 +74,7 @@ export async function carregarDetalheOP(id, user) {
   const pecas = await prisma.pecaConjunto.findMany({
     where: { opId: op.id },
     orderBy: [{ marca: "asc" }],
-    select: { id: true, marca: true, tipoPeca: true, pesoTotalKg: true, status: true, statusPrep: true, statusEstoque: true },
+    select: { id: true, marca: true, tipoPeca: true, fonte: true, pesoTotalKg: true, status: true, statusPrep: true, statusEstoque: true },
     take: 3000,
   });
 

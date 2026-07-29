@@ -9,6 +9,7 @@ import {
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import ControleFinanceiroOP from "@/components/ControleFinanceiroOP";
 import MateriaisOPSection from "@/components/MateriaisOPSection";
+import { pesoRealPecas } from "@/lib/peso-op";
 import RelatoriosOPSection from "@/components/RelatoriosOPSection";
 import AbaPlanejamento from "./AbaPlanejamento";
 import AbaExpedicao from "./AbaExpedicao";
@@ -97,7 +98,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
     setExportandoLPC(true);
     try {
       const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } = await import("@/lib/excel-relatorio");
-      const pesoTotal = pecas.reduce((acc, p) => acc + (p.pesoTotalKg || 0), 0);
+      const pesoTotal = pesoRealPecas(pecas); // peso real (sem dobrar croqui/LE+LPC)
       const conjuntos = pecas.filter((p) => p.tipoPeca === "CONJUNTO").length;
       const croquis = pecas.filter((p) => p.tipoPeca === "CROQUI").length;
       const comEstoque = pecas.filter((p) => p.statusEstoque === "DISPONIVEL").length;
@@ -841,7 +842,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
                 <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">Importe o Tekla/LPC no módulo <strong>Engenharia</strong> — a lista de peças aparece aqui automaticamente, sem precisar subir arquivo.</p>
               </div>
             ) : (() => {
-              const pesoTotal = pecas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+              const pesoTotal = pesoRealPecas(pecas); // peso real (sem dobrar croqui/LE+LPC)
               const conjuntos = pecas.filter((p) => p.tipoPeca === "CONJUNTO").length;
               const croquis = pecas.filter((p) => p.tipoPeca === "CROQUI").length;
               const comEstoque = pecas.filter((p) => p.statusEstoque === "DISPONIVEL").length;
