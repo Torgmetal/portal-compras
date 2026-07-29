@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pesoRealPecas } from "@/lib/peso-op";
 import { requireRole } from "@/lib/session";
 
 /**
@@ -62,7 +63,7 @@ export async function GET(req) {
       dataFimPrevista: true, dataInicio: true,
       pecasConjunto: {
         select: {
-          id: true, pesoTotalKg: true, status: true, qte: true, marca: true, descricao: true, tipoPeca: true, ordemCampo: true,
+          id: true, pesoTotalKg: true, status: true, qte: true, marca: true, descricao: true, tipoPeca: true, fonte: true, ordemCampo: true,
           entregas: { select: { id: true, destino: true, quantidade: true }, orderBy: { destino: "asc" } },
         },
       },
@@ -150,8 +151,8 @@ export async function GET(req) {
 
   // Monta grade por obra
   const obras = opsAtivas.map((op) => {
-    const pesoTotal = op.pecasConjunto.reduce((s, p) => s + p.pesoTotalKg, 0);
-    const pesoExpedido = op.pecasConjunto.filter((p) => p.status === "EXPEDIDO").reduce((s, p) => s + p.pesoTotalKg, 0);
+    const pesoTotal = pesoRealPecas(op.pecasConjunto); // peso real (sem dobrar croqui/LE+LPC)
+    const pesoExpedido = pesoRealPecas(op.pecasConjunto.filter((p) => p.status === "EXPEDIDO"));
     const pesoPendente = pesoTotal - pesoExpedido;
 
     // Distribuição por etapa pelo setor REAL do Syneco (não pelo status armazenado):

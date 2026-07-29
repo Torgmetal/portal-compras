@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pesoRealPecas } from "@/lib/peso-op";
 import { requireRole } from "@/lib/session";
 
 export async function GET() {
@@ -16,7 +17,7 @@ export async function GET() {
       id: true, numero: true, cliente: true, obra: true, status: true,
       dataInicio: true, dataFimPrevista: true,
       pecasConjunto: {
-        select: { status: true, pesoTotalKg: true, qte: true },
+        select: { status: true, pesoTotalKg: true, qte: true, fonte: true, tipoPeca: true },
       },
     },
     orderBy: { dataFimPrevista: "asc" },
@@ -25,9 +26,9 @@ export async function GET() {
   const ops = opsAtivas.map((op) => {
     const totalPecas = op.pecasConjunto.length;
     const totalQte = op.pecasConjunto.reduce((s, p) => s + p.qte, 0);
-    const pesoTotal = op.pecasConjunto.reduce((s, p) => s + p.pesoTotalKg, 0);
+    const pesoTotal = pesoRealPecas(op.pecasConjunto); // peso real (sem dobrar croqui/LE+LPC)
     const expedidas = op.pecasConjunto.filter((p) => p.status === "EXPEDIDO");
-    const pesoExpedido = expedidas.reduce((s, p) => s + p.pesoTotalKg, 0);
+    const pesoExpedido = pesoRealPecas(expedidas);
     const qteExpedida = expedidas.reduce((s, p) => s + p.qte, 0);
 
     const porSetor = {};

@@ -6,6 +6,7 @@
 // - Resumo geral de progresso
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pesoRealPecas } from "@/lib/peso-op";
 import { requireRole } from "@/lib/session";
 import { isExpedivel, FLUXO_PECAS } from "@/lib/expedicao";
 
@@ -52,6 +53,8 @@ export async function GET(req) {
       pesoUnitKg: true,
       pesoTotalKg: true,
       status: true,
+      fonte: true,
+      tipoPeca: true,
       ultimoSetor: true,
       dataConcluida: true,
       romaneioItens: {
@@ -68,11 +71,9 @@ export async function GET(req) {
   // Calcula progresso das peças
   const pecasResumo = {
     total: pecas.length,
-    totalPesoKg: pecas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0),
+    totalPesoKg: pesoRealPecas(pecas), // peso real (sem dobrar croqui/LE+LPC)
     expedidas: pecas.filter((p) => p.status === "EXPEDIDO").length,
-    pesoExpedidoKg: pecas
-      .filter((p) => p.status === "EXPEDIDO")
-      .reduce((s, p) => s + (p.pesoTotalKg || 0), 0),
+    pesoExpedidoKg: pesoRealPecas(pecas.filter((p) => p.status === "EXPEDIDO")),
     porStatus: {},
   };
   for (const s of FLUXO_PECAS) {

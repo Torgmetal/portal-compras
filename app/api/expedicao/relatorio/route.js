@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pesoRealPecas } from "@/lib/peso-op";
 import { requireRole } from "@/lib/session";
 
 export const maxDuration = 60;
@@ -45,6 +46,8 @@ export async function GET(req) {
             id: true,
             pesoTotalKg: true,
             status: true,
+            fonte: true,
+            tipoPeca: true,
           },
         },
       },
@@ -57,7 +60,7 @@ export async function GET(req) {
       const valorExpedido = op.romaneios.reduce((s, r) => s + (r.valorTotal || 0), 0);
       const totalPecas = op.pecasConjunto.length;
       const pecasExpedidas = op.pecasConjunto.filter((p) => p.status === "EXPEDIDO").length;
-      const pesoTotalPecas = op.pecasConjunto.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+      const pesoTotalPecas = pesoRealPecas(op.pecasConjunto); // peso real (sem dobrar croqui/LE+LPC)
 
       return {
         id: op.id,
@@ -147,6 +150,8 @@ export async function GET(req) {
       status: true,
       material: true,
       perfil: true,
+      fonte: true,
+      tipoPeca: true,
       romaneioItens: {
         select: {
           qtd: true,
@@ -158,9 +163,9 @@ export async function GET(req) {
   });
 
   // KPIs
-  const pesoTotalPecas = pecas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+  const pesoTotalPecas = pesoRealPecas(pecas); // peso real (sem dobrar croqui/LE+LPC)
   const pecasExpedidas = pecas.filter((p) => p.status === "EXPEDIDO");
-  const pesoExpedidoPecas = pecasExpedidas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+  const pesoExpedidoPecas = pesoRealPecas(pecasExpedidas);
 
   const totalPesoRomaneios = romaneios.reduce((s, r) => s + (r.pesoRealKg || 0), 0);
   const totalValorRomaneios = romaneios.reduce((s, r) => s + (r.valorTotal || 0), 0);

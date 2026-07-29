@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { pesoRealPecas } from "@/lib/peso-op";
 import { requireRole } from "@/lib/session";
 import { validarProntidaoExpedicao } from "@/lib/expedicao";
 
@@ -47,7 +48,7 @@ export async function GET() {
           pecasConjunto: {
             select: {
               id: true, marca: true, descricao: true, qte: true,
-              pesoTotalKg: true, status: true,
+              pesoTotalKg: true, status: true, fonte: true, tipoPeca: true,
               planejamentoCargaItens: { select: { id: true } },
               romaneioItens: { select: { qtd: true } },
             },
@@ -122,8 +123,8 @@ export async function GET() {
         });
       }
 
-      const pesoTotal = pecas.reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
-      const pesoExpedido = pecas.filter((p) => p.status === "EXPEDIDO").reduce((s, p) => s + (p.pesoTotalKg || 0), 0);
+      const pesoTotal = pesoRealPecas(pecas); // peso real (sem dobrar croqui/LE+LPC)
+      const pesoExpedido = pesoRealPecas(pecas.filter((p) => p.status === "EXPEDIDO"));
 
       progressoOPs.push({
         id: op.id,
