@@ -37,15 +37,19 @@ function parseColados(texto) {
 const ORIGEM = {
   carga: { label: "Carga", cls: "bg-torg-blue-50 text-torg-blue border-torg-blue-200" },
   reprogramado: { label: "Prioridade", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  op: { label: "Peça da OP", cls: "bg-slate-50 text-slate-600 border-slate-200" },
   manual: { label: "Incluída", cls: "bg-gray-50 text-gray-500 border-gray-200" },
 };
 
 export default function MontarRomaneio({ op, marcas, onCriado, showToast }) {
+  const [pecasOp, setPecasOp] = useState([]); // peças LPC da OP (fallback sem carga/LE)
+
   const marcasMap = useMemo(() => {
     const m = new Map();
-    for (const x of marcas || []) m.set(up(x.marca), x);
+    for (const x of pecasOp || []) m.set(up(x.marca), x);  // peças LPC da OP
+    for (const x of marcas || []) m.set(up(x.marca), x);   // LE tem prioridade (peso contratado)
     return m;
-  }, [marcas]);
+  }, [marcas, pecasOp]);
 
   const [texto, setTexto] = useState("");
   const [linhas, setLinhas] = useState([]); // { key, marca, qtd, descricao, pesoUnit, encontrada, cargaItemId?, cargaId?, pecaConjuntoId?, origem }
@@ -73,7 +77,21 @@ export default function MontarRomaneio({ op, marcas, onCriado, showToast }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setCargas(j?.planejamentos || []))
       .catch(() => {});
+    fetch(`/api/expedicao/op/${op.id}/pecas`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setPecasOp(j?.pecas || []))
+      .catch(() => {});
   }, [op.id]);
+
+  // Carrega direto todas as peças (LPC) da OP — pra montar sem carga do Planejamento.
+  function carregarPecasOp() {
+    setLinhas(pecasOp.map((x) => ({
+      key: uid(), marca: up(x.marca), qtd: x.qte || 1, descricao: x.descricao || "",
+      pesoUnit: x.pesoUnit ?? (x.qte ? (x.pesoTotal || 0) / x.qte : null), encontrada: true,
+      pecaConjuntoId: x.pecaConjuntoId || null, cargaItemId: null, cargaId: null, origem: "op",
+    })));
+    setCargaSel(null); setRemovidos([]); setStatusMap({});
+  }
 
   const cargasDisp = useMemo(() => cargas.filter((c) => !c.romaneio && ["PLANEJADO", "EM_CARGA"].includes(c.status)), [cargas]);
   const nReprog = useMemo(() => cargas.reduce((s, c) => s + (c.itens || []).filter((it) => it.status === "REPROGRAMADO").length, 0), [cargas]);
@@ -216,6 +234,14 @@ export default function MontarRomaneio({ op, marcas, onCriado, showToast }) {
               </div>
             ))}
             {nReprog > 0 && <p className="text-[11px] text-amber-700 inline-flex items-center gap-1"><RotateCcw size={12} /> {nReprog} peça(s) reprogramada(s) (prioridade) entram junto ao carregar.</p>}
+          </div>
+        )}
+        {pecasOp.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <button onClick={carregarPecasOp} className="text-sm font-semibold text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5">
+              <Package size={14} /> Carregar as {pecasOp.length} peças da OP
+            </button>
+            <p className="text-[11px] text-torg-gray mt-0.5">Sem carga do Planejamento? Monta o romaneio direto das peças (LPC) da OP.</p>
           </div>
         )}
       </div>
