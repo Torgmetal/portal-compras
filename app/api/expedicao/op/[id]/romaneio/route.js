@@ -7,6 +7,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { syncExpedicaoProducao } from "@/lib/expedicao";
+import { gerarRomaneioForm22 } from "@/lib/romaneio-form22";
+import { salvarRomaneioNoServidor } from "@/lib/sharepoint-lista";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -32,7 +34,14 @@ export async function POST(req, { params }) {
   try { user = await requireRole(["ADMIN", "EXPEDICAO", "PLANEJAMENTO", "PCP"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const op = await prisma.oP.findUnique({ where: { id: params.id }, select: { id: true, numero: true, cliente: true, obra: true } });
+  const op = await prisma.oP.findUnique({
+    where: { id: params.id },
+    select: {
+      id: true, numero: true, cliente: true, obra: true, clienteRazaoSocial: true,
+      clienteEndereco: true, clienteCidade: true, clienteUF: true, clienteCep: true,
+      clienteCnpj: true, clienteIE: true, clienteContato: true, clienteEmail: true,
+    },
+  });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 
   let body;
@@ -76,5 +85,20 @@ export async function POST(req, { params }) {
 
   try { await syncExpedicaoProducao(op.id, data); } catch (e) { console.error("syncExpedicaoProducao:", e.message); }
 
-  return NextResponse.json({ success: true, id: created.id, numero });
+  // Gera o FORM 22 preenchido e salva na pasta 4.2 Romaneios da OP no SharePoint.
+  // É o que fecha o loop do "expedido" (o portal lê essa pasta). Best-effort: se o
+  // SharePoint falhar, o romaneio já está salvo no portal — devolve o erro pra UI.
+  let sharepoint = null;
+  try {
+    const buf = await gerarRomaneioForm22({ op, romaneio: { ...created, numero, data }, itens: body.itens });
+    const cli = (op.cliente || "").slice(0, 40).trim();
+    const fileNome = `Romaneio ${numero} - OP-${op.numero}${cli ? ` - ${cli}` : ""}.xlsx`;
+    const r = await salvarRomaneioNoServidor({ opNumero: op.numero, fileNome, buffer: buf });
+    sharepoint = { ok: true, nome: r.nome, caminho: r.caminho, webUrl: r.webUrl };
+  } catch (e) {
+    console.error("[romaneio] FORM22/SharePoint:", e?.message);
+    sharepoint = { ok: false, erro: e?.message || "Falha ao salvar no SharePoint." };
+  }
+
+  return NextResponse.json({ success: true, id: created.id, numero, sharepoint });
 }

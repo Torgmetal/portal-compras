@@ -111,7 +111,9 @@ export default function MontarRomaneio({ op, marcas, onCriado, showToast }) {
       });
       const j = await res.json();
       if (!res.ok || !j.success) throw new Error(j.error || "Erro ao gerar romaneio");
-      showToast(`Romaneio ${j.numero} gerado`, "success");
+      if (j.sharepoint?.ok) showToast(`Romaneio ${j.numero} gerado e salvo no servidor (4.2 Romaneios)`, "success");
+      else if (j.sharepoint) showToast(`Romaneio ${j.numero} gerado — mas não salvou no SharePoint: ${j.sharepoint.erro}`, "error");
+      else showToast(`Romaneio ${j.numero} gerado`, "success");
       window.open(`/expedicao/romaneio/${j.id}/imprimir`, "_blank");
       setLinhas([]); setStatusMap({});
       setDestino(""); setTransportadora(""); setMotorista(""); setPlaca(""); setContato(""); setObservacao("");
