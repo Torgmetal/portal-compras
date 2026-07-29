@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import * as XLSX from "xlsx";
-import { Truck, Plus, Pencil, Trash2, ChevronUp, ChevronDown, Loader2, X, Upload, Download, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Truck, Plus, Pencil, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2 } from "lucide-react";
 
 const fmtKg = (n) => (n == null ? null : `${Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -77,6 +77,8 @@ export default function AbaExpedicao({ opId, proposta = null }) {
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(null); // { lote } (novo = {})
   const [importOpen, setImportOpen] = useState(false);
+  const [abertos, setAbertos] = useState({});   // lotes expandidos (ver marcas)
+  const [pecasLote, setPecasLote] = useState({}); // marcas por lote
 
   const carregar = () => fetch(`/api/comercial/op/${opId}/lotes-expedicao`).then((r) => r.json())
     .then((j) => { if (j.success) setLotes(j.lotes); else setErro(j.error || "Erro"); }).catch(() => setErro("Erro ao carregar"));
@@ -95,6 +97,15 @@ export default function AbaExpedicao({ opId, proposta = null }) {
     setLotes(novo);
     await fetch(`/api/comercial/op/${opId}/lotes-expedicao/reordenar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ordem: novo.map((l) => l.id) }) }).catch(() => {});
     carregar();
+  }
+  // Expande o lote e busca as marcas (PecaLote ou, se vazio, as do romaneio prévio).
+  async function verMarcas(l) {
+    const aberto = !abertos[l.id];
+    setAbertos((a) => ({ ...a, [l.id]: aberto }));
+    if (aberto && pecasLote[l.id] === undefined) {
+      const j = await fetch(`/api/comercial/op/${opId}/lotes-expedicao/pecas?loteId=${l.id}`).then((r) => r.json()).catch(() => null);
+      setPecasLote((p) => ({ ...p, [l.id]: j?.pecas || [] }));
+    }
   }
 
   const totalPeso = (lotes || []).reduce((s, l) => s + (l.pesoKg || 0), 0);
@@ -141,8 +152,12 @@ export default function AbaExpedicao({ opId, proposta = null }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {lotes.map((l, i) => (
-                  <tr key={l.id} className="hover:bg-gray-50/60 align-middle">
+                {lotes.map((l, i) => {
+                  const aberto = !!abertos[l.id];
+                  const marcas = pecasLote[l.id];
+                  return (
+                  <Fragment key={l.id}>
+                  <tr className="hover:bg-gray-50/60 align-middle">
                     <td className="px-2 py-2">
                       <div className="flex items-center gap-1">
                         <span className="text-xs font-mono font-semibold text-torg-blue tabular-nums w-5 text-center">{i + 1}</span>
@@ -152,7 +167,10 @@ export default function AbaExpedicao({ opId, proposta = null }) {
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-torg-dark font-medium">{l.nome}{l.observacao && <span className="block text-[11px] text-torg-gray font-normal">{l.observacao}</span>}</td>
+                    <td className="px-3 py-2 text-torg-dark font-medium">
+                      <button onClick={() => verMarcas(l)} className="text-torg-gray hover:text-torg-blue mr-1 align-middle" title="Ver marcas">{aberto ? <ChevronDown size={14} className="inline" /> : <ChevronRight size={14} className="inline" />}</button>
+                      {l.nome}{l.observacao && <span className="block text-[11px] text-torg-gray font-normal">{l.observacao}</span>}
+                    </td>
                     <td className="px-3 py-2 text-torg-gray">{l.local || <span className="text-gray-300">—</span>}</td>
                     <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{l.dataPrevista ? fmtD(l.dataPrevista) : <span className="text-gray-300">—</span>}</td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">{l.pesoKg != null ? <span className="text-torg-dark tabular-nums">{fmtKg(l.pesoKg)}</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">a definir</span>}</td>
@@ -163,7 +181,41 @@ export default function AbaExpedicao({ opId, proposta = null }) {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  {aberto && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-2 bg-gray-50/60">
+                        {marcas === undefined ? (
+                          <p className="text-[11px] text-torg-gray inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> carregando marcas…</p>
+                        ) : !marcas.length ? (
+                          <p className="text-[11px] text-torg-gray">Nenhuma marca neste lote ainda — entram com o romaneio prévio (Lista de Expedição) ou a lista do Tekla.</p>
+                        ) : (
+                          <div className="max-h-56 overflow-y-auto border border-gray-100 rounded bg-white">
+                            <table className="w-full text-[12px]">
+                              <thead className="bg-white sticky top-0 text-torg-gray"><tr>
+                                <th className="text-left px-2 py-1 font-medium">Marca</th>
+                                <th className="text-left px-2 py-1 font-medium">Descrição</th>
+                                <th className="text-right px-2 py-1 font-medium w-16">Qtd</th>
+                                <th className="text-right px-2 py-1 font-medium w-24">Peso</th>
+                              </tr></thead>
+                              <tbody className="divide-y divide-gray-50">
+                                {marcas.map((pc) => (
+                                  <tr key={pc.id}>
+                                    <td className="px-2 py-1 font-mono text-torg-dark">{pc.marca}</td>
+                                    <td className="px-2 py-1 text-torg-gray">{pc.descricao || "—"}</td>
+                                    <td className="px-2 py-1 text-right text-torg-gray tabular-nums">{pc.qtd ?? "—"}</td>
+                                    <td className="px-2 py-1 text-right text-torg-gray tabular-nums whitespace-nowrap">{pc.pesoTotalKg != null ? fmtKg(pc.pesoTotalKg) : "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

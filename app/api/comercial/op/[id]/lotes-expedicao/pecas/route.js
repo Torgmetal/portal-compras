@@ -20,6 +20,21 @@ export async function GET(req, { params }) {
     orderBy: [{ marca: "asc" }],
     take: 2000,
   });
+  if (pecas.length) return NextResponse.json({ success: true, pecas });
+
+  // Sem PecaLote (lista do Tekla não subida): cai pras marcas do(s) romaneio(s)
+  // prévio(s) do lote — vêm da Lista de Expedição, gravadas no JSON do prévio.
+  if (loteId) {
+    const previos = await prisma.romaneioPrevio.findMany({ where: { opId: params.id, loteId }, select: { itens: true } });
+    const doPrevio = [];
+    for (const rp of previos) {
+      for (const it of Array.isArray(rp.itens) ? rp.itens : []) {
+        if (!it?.marca) continue;
+        doPrevio.push({ id: `prev-${doPrevio.length}`, marca: it.marca, descricao: it.descricao || null, qtd: it.qte ?? null, pesoTotalKg: it.pesoTotal ?? null });
+      }
+    }
+    if (doPrevio.length) return NextResponse.json({ success: true, pecas: doPrevio, origem: "previo" });
+  }
   return NextResponse.json({ success: true, pecas });
 }
 
