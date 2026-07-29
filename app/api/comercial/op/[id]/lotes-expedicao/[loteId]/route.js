@@ -15,6 +15,10 @@ const schema = z.object({
   observacao: z.string().max(1000).nullable().optional(),
   ordem: z.number().int().optional(),
   status: z.enum(["PENDENTE", "ENTREGUE"]).optional(),
+  transportadora: z.string().max(200).nullable().optional(),
+  motorista: z.string().max(200).nullable().optional(),
+  placaVeiculo: z.string().max(20).nullable().optional(),
+  contatoTransporte: z.string().max(100).nullable().optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -32,6 +36,9 @@ export async function PATCH(req, { params }) {
   if (body.observacao !== undefined) data.observacao = body.observacao?.trim() || null;
   if (body.ordem !== undefined) data.ordem = body.ordem;
   if (body.status !== undefined) data.status = body.status;
+  for (const k of ["transportadora", "motorista", "placaVeiculo", "contatoTransporte"]) {
+    if (body[k] !== undefined) data[k] = body[k]?.trim() || null;
+  }
 
   const atualizado = await prisma.loteExpedicao.update({ where: { id: lote.id }, data });
   return NextResponse.json({ success: true, lote: atualizado });

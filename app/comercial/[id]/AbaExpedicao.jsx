@@ -186,6 +186,9 @@ export default function AbaExpedicao({ opId, proposta = null }) {
                   {aberto && (
                     <tr>
                       <td colSpan={6} className="px-3 py-2 bg-gray-50/60">
+                        {(l.transportadora || l.motorista || l.placaVeiculo || l.contatoTransporte) && (
+                          <p className="text-[11px] text-torg-gray mb-1.5 inline-flex items-center gap-1"><Truck size={11} /> {[l.transportadora, l.motorista, l.placaVeiculo, l.contatoTransporte].filter(Boolean).join(" · ")}</p>
+                        )}
                         {marcas === undefined ? (
                           <p className="text-[11px] text-torg-gray inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> carregando marcas…</p>
                         ) : !marcas.length ? (
@@ -259,6 +262,10 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
     dataPrevista: lote?.dataPrevista ? String(lote.dataPrevista).slice(0, 10) : "",
     pesoKg: lote?.pesoKg != null ? String(lote.pesoKg) : "",
     observacao: lote?.observacao || "",
+    transportadora: lote?.transportadora || "",
+    motorista: lote?.motorista || "",
+    placaVeiculo: lote?.placaVeiculo || "",
+    contatoTransporte: lote?.contatoTransporte || "",
   });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -273,6 +280,10 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
       dataPrevista: f.dataPrevista || null,
       pesoKg: pesoNum != null && !isNaN(pesoNum) ? pesoNum : null,
       observacao: f.observacao.trim() || null,
+      transportadora: f.transportadora.trim() || null,
+      motorista: f.motorista.trim() || null,
+      placaVeiculo: f.placaVeiculo.trim() || null,
+      contatoTransporte: f.contatoTransporte.trim() || null,
     };
     try {
       const url = edit ? `/api/comercial/op/${opId}/lotes-expedicao/${lote.id}` : `/api/comercial/op/${opId}/lotes-expedicao`;
@@ -311,6 +322,15 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Observação</label>
             <input value={f.observacao} onChange={(e) => setF((v) => ({ ...v, observacao: e.target.value }))} placeholder="Opcional" className={inp} />
+          </div>
+          <div className="pt-2 border-t border-gray-100">
+            <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-2">Transportador <span className="font-normal normal-case">— sai no romaneio; salvo aqui pra não redigitar</span></p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2"><label className="block text-xs font-medium text-torg-dark mb-1">Transportadora</label><input value={f.transportadora} onChange={(e) => setF((v) => ({ ...v, transportadora: e.target.value }))} placeholder="Transportadora" className={inp} /></div>
+              <div><label className="block text-xs font-medium text-torg-dark mb-1">Motorista</label><input value={f.motorista} onChange={(e) => setF((v) => ({ ...v, motorista: e.target.value }))} className={inp} /></div>
+              <div><label className="block text-xs font-medium text-torg-dark mb-1">Placa</label><input value={f.placaVeiculo} onChange={(e) => setF((v) => ({ ...v, placaVeiculo: e.target.value }))} className={inp} /></div>
+              <div className="col-span-2"><label className="block text-xs font-medium text-torg-dark mb-1">Contato / Fone</label><input value={f.contatoTransporte} onChange={(e) => setF((v) => ({ ...v, contatoTransporte: e.target.value }))} placeholder="Telefone" className={inp} /></div>
+            </div>
           </div>
           {erro && <p className="text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
         </div>
@@ -415,15 +435,30 @@ function ImportarModal({ opId, temLotes, onClose, onImportado }) {
 // ── modal exportar romaneio (FORM 22) ─────────────────────────────────────────
 function ExportarRomaneioModal({ opId, lote, onClose }) {
   const [f, setF] = useState({
-    transportadora: "", motorista: "", placa: "", contato: "",
+    transportadora: lote?.transportadora || "", motorista: lote?.motorista || "",
+    placa: lote?.placaVeiculo || "", contato: lote?.contatoTransporte || "",
     data: lote?.dataPrevista ? String(lote.dataPrevista).slice(0, 10) : "",
   });
+  const [marcas, setMarcas] = useState(null); // [{marca, descricao, qtd, pesoTotalKg}]
+  const [sel, setSel] = useState(new Set());  // marcas selecionadas
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState("");
   const [ok, setOk] = useState(null);
   const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
 
+  useEffect(() => {
+    fetch(`/api/comercial/op/${opId}/lotes-expedicao/pecas?loteId=${lote.id}`)
+      .then((r) => r.json())
+      .then((j) => { const ms = j?.pecas || []; setMarcas(ms); setSel(new Set(ms.map((m) => m.marca))); })
+      .catch(() => { setMarcas([]); });
+  }, [opId, lote.id]);
+
+  const toggle = (m) => setSel((s) => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n; });
+  const selecionadas = marcas ? marcas.filter((m) => sel.has(m.marca)) : [];
+  const pesoSel = selecionadas.reduce((s, m) => s + (m.pesoTotalKg || 0), 0);
+
   async function gerar() {
+    if (!selecionadas.length) { setErro("Selecione ao menos uma marca."); return; }
     setErro(""); setGerando(true);
     try {
       const r = await fetch(`/api/comercial/op/${opId}/lotes-expedicao/${lote.id}/romaneio`, {
@@ -431,6 +466,7 @@ function ExportarRomaneioModal({ opId, lote, onClose }) {
         body: JSON.stringify({
           transportadora: f.transportadora.trim() || null, motorista: f.motorista.trim() || null,
           placa: f.placa.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
+          marcas: marcas && selecionadas.length < marcas.length ? [...sel] : undefined,
         }),
       });
       const j = await r.json();
@@ -452,7 +488,30 @@ function ExportarRomaneioModal({ opId, lote, onClose }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-3">
-          <p className="text-xs text-torg-gray">Dados do transportador. O romaneio (FORM 22) sai com as marcas do lote e é salvo na pasta <strong>4.2 Romaneios</strong> da OP.</p>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Marcas do romaneio</span>
+              {marcas && <span className="text-[11px] text-torg-gray tabular-nums">{selecionadas.length}/{marcas.length} · {fmtKg(pesoSel)}</span>}
+            </div>
+            {marcas === null ? (
+              <p className="text-[11px] text-torg-gray inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> carregando marcas…</p>
+            ) : !marcas.length ? (
+              <p className="text-[11px] text-torg-gray">Sem marcas neste lote.</p>
+            ) : (
+              <div className="max-h-44 overflow-y-auto border border-gray-100 rounded">
+                {marcas.map((m) => (
+                  <label key={m.marca} className="flex items-center gap-2 px-2 py-1 text-[12px] hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+                    <input type="checkbox" checked={sel.has(m.marca)} onChange={() => toggle(m.marca)} className="accent-torg-blue" />
+                    <span className="font-mono text-torg-dark">{m.marca}</span>
+                    <span className="text-torg-gray truncate flex-1">{m.descricao || ""}</span>
+                    <span className="text-torg-gray tabular-nums whitespace-nowrap">{m.pesoTotalKg != null ? fmtKg(m.pesoTotalKg) : ""}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-torg-gray mt-1">Desmarque o que não vai neste romaneio.</p>
+          </div>
+          <p className="text-xs text-torg-gray">Dados do transportador (salvos no lote pra não redigitar). O FORM 22 é salvo na pasta <strong>4.2 Romaneios</strong> da OP.</p>
           <div className="grid grid-cols-2 gap-3">
             <label className="block col-span-2"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Transportadora</span><input value={f.transportadora} onChange={(e) => setF({ ...f, transportadora: e.target.value })} className={inp} placeholder="Transportadora" /></label>
             <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Motorista</span><input value={f.motorista} onChange={(e) => setF({ ...f, motorista: e.target.value })} className={inp} placeholder="Motorista" /></label>

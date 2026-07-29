@@ -514,6 +514,10 @@ model LoteExpedicao {
   dataPrevista DateTime?
   pesoKg       Float? // definido depois, pela lista final da Engenharia
   observacao   String?
+  transportadora    String? // dados do transportador (salvos aqui pra não redigitar no romaneio)
+  motorista         String?
+  placaVeiculo      String?
+  contatoTransporte String?
   status       String    @default("PENDENTE")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

@@ -22,6 +22,10 @@ const schema = z.object({
   dataPrevista: z.string().nullable().optional(),
   pesoKg: z.number().nonnegative().nullable().optional(),
   observacao: z.string().max(1000).nullable().optional(),
+  transportadora: z.string().max(200).nullable().optional(),
+  motorista: z.string().max(200).nullable().optional(),
+  placaVeiculo: z.string().max(20).nullable().optional(),
+  contatoTransporte: z.string().max(100).nullable().optional(),
 });
 
 export async function POST(req, { params }) {
@@ -41,6 +45,10 @@ export async function POST(req, { params }) {
       dataPrevista: body.dataPrevista ? new Date(body.dataPrevista) : null,
       pesoKg: body.pesoKg ?? null,
       observacao: body.observacao?.trim() || null,
+      transportadora: body.transportadora?.trim() || null,
+      motorista: body.motorista?.trim() || null,
+      placaVeiculo: body.placaVeiculo?.trim() || null,
+      contatoTransporte: body.contatoTransporte?.trim() || null,
     },
   });
   return NextResponse.json({ success: true, lote });

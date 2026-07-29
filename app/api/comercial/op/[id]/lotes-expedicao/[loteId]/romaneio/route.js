@@ -18,6 +18,7 @@ const schema = z.object({
   placa: z.string().max(20).nullable().optional(),
   contato: z.string().max(100).nullable().optional(),
   data: z.string().nullable().optional(),
+  marcas: z.array(z.string()).optional(), // subconjunto de marcas a incluir (se vazio/ausente, todas)
 });
 
 export async function POST(req, { params }) {
@@ -41,25 +42,43 @@ export async function POST(req, { params }) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
+  const lote = await prisma.loteExpedicao.findFirst({ where: { id: params.loteId, opId: op.id } });
+  if (!lote) return NextResponse.json({ error: "Lote não encontrado" }, { status: 404 });
+
   // Marcas vêm do romaneio prévio (mais recente) vinculado ao lote.
   const previo = await prisma.romaneioPrevio.findFirst({
     where: { opId: op.id, loteId: params.loteId },
     orderBy: { numero: "desc" },
   });
   if (!previo) return NextResponse.json({ error: "Este lote não tem romaneio prévio com marcas." }, { status: 400 });
-  const marcas = Array.isArray(previo.itens) ? previo.itens : [];
-  if (!marcas.length) return NextResponse.json({ error: "O romaneio prévio está sem marcas." }, { status: 400 });
+  const marcasPrevio = Array.isArray(previo.itens) ? previo.itens : [];
+  if (!marcasPrevio.length) return NextResponse.json({ error: "O romaneio prévio está sem marcas." }, { status: 400 });
+
+  // Transportador: usa o do corpo; se ausente, cai pro salvo no lote.
+  const transportadora = (body.transportadora ?? lote.transportadora) || null;
+  const motorista = (body.motorista ?? lote.motorista) || null;
+  const placa = (body.placa ?? lote.placaVeiculo) || null;
+  const contato = (body.contato ?? lote.contatoTransporte) || null;
 
   const numero = `R${previo.numero}`;
   const data = body.data ? new Date(body.data) : (previo.dataPrevista || new Date());
-  const itens = marcas.filter((m) => m?.marca).map((m) => ({
+  let itens = marcasPrevio.filter((m) => m?.marca).map((m) => ({
     marca: m.marca, descricao: m.descricao || null,
     qtd: Number(m.qte) || 0, pesoKg: Number(m.pesoTotal) || 0,
   }));
+  // Ajuste de marcas: se veio uma seleção, exporta só essas.
+  if (body.marcas?.length) {
+    const sel = new Set(body.marcas.map((s) => String(s).trim().toUpperCase()));
+    itens = itens.filter((it) => sel.has(String(it.marca).trim().toUpperCase()));
+    if (!itens.length) return NextResponse.json({ error: "Nenhuma marca selecionada." }, { status: 400 });
+  }
+
+  // Persiste o transportador no lote (pra não redigitar depois).
+  await prisma.loteExpedicao.update({ where: { id: lote.id }, data: { transportadora, motorista, placaVeiculo: placa, contatoTransporte: contato } }).catch(() => {});
 
   const buf = await gerarRomaneioForm22({
     op,
-    romaneio: { numero, data, transportadora: body.transportadora, contatoTransporte: body.contato },
+    romaneio: { numero, data, transportadora, contatoTransporte: contato },
     itens,
   });
   const cli = (op.cliente || "").slice(0, 40).trim();
