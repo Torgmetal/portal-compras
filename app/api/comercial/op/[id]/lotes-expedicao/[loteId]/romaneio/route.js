@@ -20,6 +20,7 @@ const schema = z.object({
   data: z.string().nullable().optional(),
   marcas: z.array(z.string()).optional(), // subconjunto de marcas a incluir (se vazio/ausente, todas)
   mudanca: z.string().max(2000).nullable().optional(), // o que mudou (obrigatório na revisão)
+  previa: z.boolean().optional(), // true = só gera pra conferir (não salva, não emite)
 });
 
 export async function POST(req, { params }) {
@@ -75,6 +76,17 @@ export async function POST(req, { params }) {
     if (!itens.length) return NextResponse.json({ error: "Nenhuma marca selecionada." }, { status: 400 });
   }
 
+  // Persiste o transportador no lote (vale pra prévia e final — conveniência).
+  await prisma.loteExpedicao.update({ where: { id: lote.id }, data: { transportadora, motorista, placaVeiculo: placa, contatoTransporte: contato } }).catch(() => {});
+  const cli = (op.cliente || "").slice(0, 40).trim();
+
+  // PRÉVIA: só gera o FORM 22 pra conferir — não salva no SharePoint, não marca
+  // emitido, não vira revisão.
+  if (body.previa) {
+    const buf = await gerarRomaneioForm22({ op, romaneio: { numero, data, transportadora, contatoTransporte: contato }, itens });
+    return NextResponse.json({ ok: true, previa: true, numero, nome: `PREVIA Romaneio ${numero} - OP-${op.numero}${cli ? ` - ${cli}` : ""}.xlsx`, arquivo: buf.toString("base64") });
+  }
+
   // Emissão × revisão: 1ª vez emite R00; se já foi emitido, é revisão (exige motivo).
   const jaEmitido = !!previo.emitidoEm;
   const novaRevisao = jaEmitido ? (previo.revisao || 0) + 1 : 0;
@@ -90,16 +102,12 @@ export async function POST(req, { params }) {
     porQuem: user.name || user.email || null,
   }];
 
-  // Persiste o transportador no lote (pra não redigitar depois).
-  await prisma.loteExpedicao.update({ where: { id: lote.id }, data: { transportadora, motorista, placaVeiculo: placa, contatoTransporte: contato } }).catch(() => {});
-
   const buf = await gerarRomaneioForm22({
     op,
     romaneio: { numero, data, transportadora, contatoTransporte: contato },
     itens,
     historico: novaRevisao > 0 ? historico : null, // aba Histórico só na revisão
   });
-  const cli = (op.cliente || "").slice(0, 40).trim();
   const prefixo = `Romaneio ${numero} - OP-${op.numero}`; // base do nome (acha a versão anterior na revisão)
   const fileNome = `${prefixo}${cli ? ` - ${cli}` : ""}.xlsx`;
 

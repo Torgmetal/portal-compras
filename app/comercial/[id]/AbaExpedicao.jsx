@@ -453,6 +453,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
   const [marcas, setMarcas] = useState(null);
   const [sel, setSel] = useState(new Set());
   const [gerando, setGerando] = useState(false);
+  const [gerandoPrevia, setGerandoPrevia] = useState(false);
   const [erro, setErro] = useState("");
   const [ok, setOk] = useState(null);
   const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
@@ -491,6 +492,29 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
       const a = document.createElement("a"); a.href = url; a.download = j.nome; a.click(); URL.revokeObjectURL(url);
       setOk(j);
     } catch (e) { setErro(e.message); setGerando(false); }
+  }
+
+  // Prévia: gera o FORM 22 só pra conferir/imprimir — não salva no servidor, não emite.
+  async function gerarPrevia() {
+    if (!selecionadas.length) { setErro("Selecione ao menos uma marca."); setPasso(1); return; }
+    setErro(""); setGerandoPrevia(true);
+    try {
+      const r = await fetch(`/api/comercial/op/${opId}/lotes-expedicao/${lote.id}/romaneio`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transportadora: f.transportadora.trim() || null, motorista: f.motorista.trim() || null,
+          placa: f.placa.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
+          marcas: marcas && selecionadas.length < marcas.length ? [...sel] : undefined,
+          previa: true,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao gerar a prévia");
+      const bin = atob(j.arquivo); const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const a = document.createElement("a"); a.href = url; a.download = j.nome; a.click(); URL.revokeObjectURL(url);
+    } catch (e) { setErro(e.message); } finally { setGerandoPrevia(false); }
   }
 
   const PASSOS = [[1, "Marcas"], [2, "Transportador"], [3, emitido ? "Revisão" : "Emitir"]];
@@ -569,7 +593,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                   <span className="text-[11px] text-torg-gray">A versão anterior vai pra pasta Obsoleto; o novo Excel ganha a aba Histórico.</span>
                 </label>
               ) : (
-                <p className="text-xs text-torg-gray">Ao emitir, o FORM 22 é gerado, salvo na pasta <strong>4.2 Romaneios</strong> e baixado. Depois disso, novas gerações viram <strong>revisão</strong>.</p>
+                <p className="text-xs text-torg-gray"><strong>Baixar prévia</strong>: confere/imprime sem emitir (não salva no servidor). <strong>Emitir</strong>: gera o FORM 22, salva na pasta <strong>4.2 Romaneios</strong> e baixa — a partir daí, novas gerações viram <strong>revisão</strong>.</p>
               )}
             </>
           )}
@@ -584,7 +608,10 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
             {passo < 3 ? (
               <button onClick={() => setPasso(passo + 1)} disabled={passo === 1 && !selecionadas.length} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium disabled:opacity-50">Avançar</button>
             ) : (
-              <button onClick={emitir} disabled={gerando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{gerando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} {emitido ? "Emitir revisão" : "Emitir romaneio"}</button>
+              <div className="flex items-center gap-2">
+                <button onClick={gerarPrevia} disabled={gerando || gerandoPrevia} title="Baixa o romaneio pra conferir/imprimir, sem emitir" className="px-3 py-1.5 text-sm text-torg-blue border border-torg-blue/40 rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{gerandoPrevia ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Baixar prévia</button>
+                <button onClick={emitir} disabled={gerando || gerandoPrevia} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{gerando ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} {emitido ? "Emitir revisão" : "Emitir romaneio"}</button>
+              </div>
             )}
           </>)}
         </div>
