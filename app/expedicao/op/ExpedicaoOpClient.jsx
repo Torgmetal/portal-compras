@@ -178,19 +178,6 @@ function VisaoOP({ op, onVoltar, showToast }) {
           <AlertCircle size={26} className="mx-auto text-red-500 mb-2" /><p className="text-red-600 text-sm mb-3">{erro}</p>
           <button onClick={carregar} className="text-sm text-torg-blue inline-flex items-center gap-1"><RefreshCw size={13} /> Tentar novamente</button>
         </div>
-      ) : !dados?.temLista ? (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm text-center py-16 px-6">
-          <Boxes size={36} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-sm font-medium text-torg-dark">Nenhuma Lista de Expedição importada para esta OP</p>
-          <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">
-            A lista vem de <strong>2. Engenharia / 2.6 Lista de expedição</strong> no SharePoint (arquivo “LE”).
-            Clique em <strong>Sincronizar SharePoint</strong> para importar.
-          </p>
-          <button onClick={sincronizar} disabled={sincronizando}
-            className="mt-4 text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
-            {sincronizando ? <Loader2 size={15} className="animate-spin" /> : <CloudDownload size={15} />} Sincronizar agora
-          </button>
-        </div>
       ) : (
         <>
           {/* Abas: Lista da OP × Montar romaneio */}
@@ -204,7 +191,19 @@ function VisaoOP({ op, onVoltar, showToast }) {
           </div>
 
           {aba === "montar" ? (
-            <MontarRomaneio op={op} marcas={dados.marcas} onCriado={carregar} showToast={showToast} />
+            <MontarRomaneio op={op} marcas={dados.marcas || []} onCriado={carregar} showToast={showToast} />
+          ) : !dados?.temLista ? (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm text-center py-16 px-6">
+              <Boxes size={36} className="mx-auto mb-3 text-gray-300" />
+              <p className="text-sm font-medium text-torg-dark">Nenhuma Lista de Expedição importada para esta OP</p>
+              <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">
+                A lista vem de <strong>2. Engenharia / 2.6 Lista de expedição</strong> no SharePoint (arquivo “LE”). Clique em <strong>Sincronizar SharePoint</strong> para importar. Você já pode <strong>montar o romaneio</strong> pela aba ao lado a partir das cargas do Planejamento.
+              </p>
+              <button onClick={sincronizar} disabled={sincronizando}
+                className="mt-4 text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-50">
+                {sincronizando ? <Loader2 size={15} className="animate-spin" /> : <CloudDownload size={15} />} Sincronizar agora
+              </button>
+            </div>
           ) : (
           <>
           {/* KPIs */}
