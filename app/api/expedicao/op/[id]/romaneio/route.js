@@ -21,12 +21,21 @@ const schema = z.object({
   placaVeiculo: z.string().max(20).nullable().optional(),
   contatoTransporte: z.string().max(100).nullable().optional(),
   observacao: z.string().max(2000).nullable().optional(),
+  cargaId: z.string().nullable().optional(), // PlanejamentoCarga que originou o romaneio
   itens: z.array(z.object({
     marca: z.string().min(1),
     descricao: z.string().nullable().optional(),
     qtd: z.number().min(0),
     pesoKg: z.number().min(0).nullable().optional(),
+    pecaConjuntoId: z.string().nullable().optional(), // vínculo real da peça (quando vem da carga)
+    cargaItemId: z.string().nullable().optional(),     // item da PlanejamentoCarga levado nesta carga
   })).min(1, "Inclua ao menos uma marca na carga."),
+  // Itens tirados da carga: motivo obrigatório + se volta pro próximo romaneio.
+  removidos: z.array(z.object({
+    cargaItemId: z.string().min(1),
+    motivo: z.string().min(1, "Motivo obrigatório ao tirar uma peça."),
+    reprogramar: z.boolean().default(false),
+  })).optional(),
 });
 
 export async function POST(req, { params }) {
@@ -60,6 +69,8 @@ export async function POST(req, { params }) {
     marca: it.marca,
     qtd: it.qtd,
     pesoKg: it.pesoKg ?? null,
+    pecaConjuntoId: it.pecaConjuntoId || null,
+    cargaItemId: it.cargaItemId || null,
   }));
   const pesoRealKg = Math.round(itens.reduce((s, it) => s + (it.pesoKg || 0), 0) * 100) / 100;
   const data = body.data ? new Date(body.data) : new Date();
@@ -75,9 +86,31 @@ export async function POST(req, { params }) {
       observacao: body.observacao?.trim() || null,
       nfStatus: "PENDENTE",
       createdById: user.id,
-      itens: { create: itens.map((it) => ({ tipo: it.tipo, descricao: it.descricao, qtd: it.qtd, pesoKg: it.pesoKg })) },
+      itens: { create: itens.map((it) => ({ tipo: it.tipo, descricao: it.descricao, qtd: it.qtd, pesoKg: it.pesoKg, pecaConjuntoId: it.pecaConjuntoId })) },
     },
   });
+
+  // Vínculo com a carga do Planejamento (quando o romaneio saiu de uma carga):
+  // itens levados → CARREGADO; tirados → NAO_ENVIADO (não volta) ou REPROGRAMADO
+  // (reaparece na próxima montagem), com o motivo; e a carga vira CONCLUIDO.
+  let carga = null;
+  if (body.cargaId) {
+    try {
+      const tx = [];
+      for (const it of itens) {
+        if (it.cargaItemId) tx.push(prisma.planejamentoCargaItem.update({ where: { id: it.cargaItemId }, data: { status: "CARREGADO", qtdCarregada: it.qtd } }));
+      }
+      for (const rem of body.removidos || []) {
+        tx.push(prisma.planejamentoCargaItem.update({ where: { id: rem.cargaItemId }, data: { status: rem.reprogramar ? "REPROGRAMADO" : "NAO_ENVIADO", motivoNaoEnvio: rem.motivo } }));
+      }
+      tx.push(prisma.planejamentoCarga.update({ where: { id: body.cargaId }, data: { romaneioId: created.id, status: "CONCLUIDO" } }));
+      await prisma.$transaction(tx);
+      carga = { ok: true, levados: itens.filter((i) => i.cargaItemId).length, removidos: (body.removidos || []).length };
+    } catch (e) {
+      console.error("[romaneio] vínculo carga:", e?.message);
+      carga = { ok: false, erro: e?.message };
+    }
+  }
 
   await prisma.auditLog.create({
     data: { userId: user.id, action: "EXPEDICAO_GERAR_ROMANEIO", entity: "Romaneio", entityId: created.id, diff: { depois: { numero, opId: op.id, itens: itens.length, pesoRealKg } } },
@@ -100,5 +133,5 @@ export async function POST(req, { params }) {
     sharepoint = { ok: false, erro: e?.message || "Falha ao salvar no SharePoint." };
   }
 
-  return NextResponse.json({ success: true, id: created.id, numero, sharepoint });
+  return NextResponse.json({ success: true, id: created.id, numero, sharepoint, carga });
 }
