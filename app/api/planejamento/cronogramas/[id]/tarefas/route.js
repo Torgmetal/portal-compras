@@ -6,6 +6,7 @@ import { z } from "zod";
 const createSchema = z.object({
   nome: z.string().min(1).max(200),
   departamento: z.enum(["COMERCIAL", "ENGENHARIA", "SUPRIMENTOS", "FABRICACAO", "EXPEDICAO", "MONTAGEM"]),
+  area: z.string().max(120).nullable().optional(),
   dataInicioPrevista: z.string().datetime().nullable().optional(),
   dataFimPrevista: z.string().datetime().nullable().optional(),
   isSummary: z.boolean().default(false),
@@ -46,6 +47,7 @@ export async function POST(req, { params }) {
       uidMpp: nextUid,
       nome: parsed.data.nome,
       departamento: parsed.data.departamento,
+      area: parsed.data.area?.trim() || null,
       dataInicioPrevista: parsed.data.dataInicioPrevista ? new Date(parsed.data.dataInicioPrevista) : null,
       dataFimPrevista: parsed.data.dataFimPrevista ? new Date(parsed.data.dataFimPrevista) : null,
       isSummary: parsed.data.isSummary,

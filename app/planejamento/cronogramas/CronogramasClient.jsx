@@ -11,7 +11,7 @@ import {
   GanttChart, Package, FileText, CircleDot, Mail, Calendar,
   History, FileDown, Milestone, Plus, Trash2, Weight, BarChart3,
   List, Link2, Unlink, RotateCcw, Lock, Archive, ArchiveRestore, Search,
-  Pencil, Check,
+  Pencil, Check, Layers,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -1735,10 +1735,40 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   const [newTaskFim, setNewTaskFim] = useState("");
   const [newTaskDuracao, setNewTaskDuracao] = useState(0);
   const [newTaskAntecessoras, setNewTaskAntecessoras] = useState([]);
+  const [newTaskArea, setNewTaskArea] = useState("");
+  const [areasCollapsed, setAreasCollapsed] = useState(() => new Set());
   const [savingTask, setSavingTask] = useState(false);
   const Icon = DEPT_ICONS[dept] || Factory;
   const colors = DEPT_COLORS[dept] || "text-gray-600 bg-gray-50 border-gray-200";
   const atrasadas = tasks.filter((t) => !t.isSummary && t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100);
+
+  // Agrupamento por Área dentro do setor (Setor → Área → Tarefa). Sem nenhuma
+  // área definida, a lista sai plana (idêntico ao comportamento anterior).
+  const mapaAreas = new Map();
+  for (const t of tasks) {
+    const k = t.area && t.area.trim() ? t.area.trim() : "";
+    if (!mapaAreas.has(k)) mapaAreas.set(k, []);
+    mapaAreas.get(k).push(t);
+  }
+  const gruposArea = [...mapaAreas.entries()];
+  const temAreas = gruposArea.some(([a]) => a);
+  const areasExistentes = gruposArea.map(([a]) => a).filter(Boolean);
+  const toggleArea = (area) => setAreasCollapsed((s) => { const n = new Set(s); n.has(area) ? n.delete(area) : n.add(area); return n; });
+  const renomearArea = async (area) => {
+    const novo = window.prompt(`Renomear área "${area}" para:`, area);
+    if (novo == null) return;
+    const nome = novo.trim();
+    if (!nome || nome === area) return;
+    const alvo = tasks.filter((t) => (t.area || "").trim() === area);
+    try {
+      await Promise.all(alvo.map((t) => fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ area: nome }),
+      })));
+      onRefresh();
+    } catch { /* ignora */ }
+  };
+  const addNaArea = (area) => { setNewTaskArea(area); setAddingTask(true); };
+  const linhaTarefa = (t) => <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} dataBase={dataBase} tipoDias={tipoDias} readOnly={readOnly} />;
 
   const abrirModalCobranca = async (e) => {
     e.stopPropagation();
@@ -1848,9 +1878,39 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
 
       {!collapsed && (
         <div className="ml-6 space-y-1">
-          {tasks.map((t) => (
-            <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} dataBase={dataBase} tipoDias={tipoDias} readOnly={readOnly} />
-          ))}
+          {!temAreas
+            ? tasks.map((t) => linhaTarefa(t))
+            : gruposArea.map(([area, ts]) =>
+                area ? (
+                  <div key={area} className="rounded-lg border border-amber-100/70 bg-amber-50/20">
+                    <div className="flex items-center gap-1.5 px-1.5 py-1">
+                      <button onClick={() => toggleArea(area)} className="text-torg-gray hover:text-torg-blue">
+                        {areasCollapsed.has(area) ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                      </button>
+                      <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-200 rounded px-2 py-0.5 flex items-center gap-1">
+                        <Layers size={10} /> {area}
+                      </span>
+                      <span className="text-[10px] text-torg-gray">{ts.length} tarefa{ts.length > 1 ? "s" : ""}</span>
+                      {!readOnly && (
+                        <>
+                          <button onClick={() => renomearArea(area)} title="Renomear área (renomeia em todas as tarefas)" className="text-torg-gray hover:text-torg-blue p-0.5"><Pencil size={11} /></button>
+                          <button onClick={() => addNaArea(area)} title="Adicionar tarefa nesta área" className="text-torg-gray hover:text-torg-blue p-0.5"><Plus size={12} /></button>
+                        </>
+                      )}
+                    </div>
+                    {!areasCollapsed.has(area) && (
+                      <div className="ml-3 pl-2 border-l border-amber-100 space-y-1 pb-1">
+                        {ts.map((t) => linhaTarefa(t))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div key="__sem_area__" className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-torg-gray/70 px-1 pt-1">Sem área</p>
+                    {ts.map((t) => linhaTarefa(t))}
+                  </div>
+                )
+              )}
           {tasks.length === 0 && (
             <p className="text-xs text-torg-gray italic py-2">Nenhuma tarefa neste departamento.</p>
           )}
@@ -1873,7 +1933,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && newTaskName.trim()) adicionarTarefa();
-                  if (e.key === "Escape") { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); }
+                  if (e.key === "Escape") { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); setNewTaskArea(""); }
                 }}
               />
               <div className="flex items-center gap-2 flex-wrap">
@@ -1891,6 +1951,20 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                   <span className="text-[9px] text-torg-gray">{(tipoDias || "DU") === "DU" ? "DU" : "DC"}</span>
                 </div>
               </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-torg-gray">Área:</span>
+                <input
+                  value={newTaskArea}
+                  onChange={(e) => setNewTaskArea(e.target.value)}
+                  list={`areas-add-${dept}`}
+                  placeholder="A, B, Galpão… (opcional)"
+                  className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white w-44"
+                />
+                <datalist id={`areas-add-${dept}`}>
+                  {areasExistentes.map((a) => <option key={a} value={a} />)}
+                </datalist>
+                <span className="text-[9px] text-torg-gray">agrupa dentro do setor</span>
+              </div>
               {/* Antecessoras na criação */}
               <AntecessorasPicker
                 tarefaId={null}
@@ -1901,7 +1975,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
               />
               <div className="flex items-center gap-1 justify-end">
                   <button
-                    onClick={() => { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); setNewTaskDuracao(0); setNewTaskAntecessoras([]); }}
+                    onClick={() => { setAddingTask(false); setNewTaskName(""); setNewTaskInicio(""); setNewTaskFim(""); setNewTaskDuracao(0); setNewTaskAntecessoras([]); setNewTaskArea(""); }}
                     className="px-2 py-1 text-[10px] text-torg-gray hover:text-torg-dark"
                   >
                     Cancelar
@@ -2031,6 +2105,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
       if (newTaskInicio) body.dataInicioPrevista = new Date(newTaskInicio + "T12:00:00Z").toISOString();
       if (newTaskFim) body.dataFimPrevista = new Date(newTaskFim + "T12:00:00Z").toISOString();
       if (newTaskDuracao > 0) body.duracaoDias = newTaskDuracao;
+      if (newTaskArea.trim()) body.area = newTaskArea.trim();
       if (newTaskAntecessoras.length > 0) body.antecessoraIds = newTaskAntecessoras;
 
       const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/tarefas`, {
@@ -2045,6 +2120,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
       setNewTaskFim("");
       setNewTaskDuracao(0);
       setNewTaskAntecessoras([]);
+      setNewTaskArea("");
       onRefresh();
     } catch {
       // keep form open
@@ -2057,6 +2133,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
 function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, readOnly }) {
   const [editing, setEditing] = useState(false);
   const [editNome, setEditNome] = useState(tarefa.nome);
+  const [editArea, setEditArea] = useState(tarefa.area || "");
   const [pct, setPct] = useState(tarefa.percentualRealizado);
   const [obs, setObs] = useState(tarefa.observacao || "");
   const [dataExec, setDataExec] = useState(tarefa.dataRealizacao ? new Date(tarefa.dataRealizacao).toISOString().split("T")[0] : "");
@@ -2135,6 +2212,7 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
         dataFimReal: fimReal ? new Date(fimReal + "T12:00:00Z").toISOString() : null,
       };
       if (editNome !== t.nome) body.nome = editNome;
+      { const areaNova = editArea.trim() || null; if (areaNova !== (t.area || null)) body.area = areaNova; }
       if (justificativa.trim()) body.justificativa = justificativa.trim();
       if (pesoPlan !== t.qtdePlanejada) body.qtdePlanejada = pesoPlan;
       if (pesoReal !== t.qtdeRealizada) body.qtdeRealizada = pesoReal;
@@ -2246,6 +2324,26 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
           ) : (
             <span className={`text-xs font-medium truncate ${concluida ? "text-torg-gray line-through" : "text-torg-dark"}`}>
               {t.nome}
+            </span>
+          )}
+          {editing && (
+            <>
+              <input
+                value={editArea}
+                onChange={(e) => setEditArea(e.target.value)}
+                list={`areas-row-${t.departamento || "x"}`}
+                placeholder="Área"
+                title="Área / parte da obra — agrupa a tarefa dentro do setor"
+                className="text-[11px] px-1.5 py-0.5 border border-amber-300 rounded bg-amber-50/40 w-28 outline-none focus:border-amber-500 shrink-0"
+              />
+              <datalist id={`areas-row-${t.departamento || "x"}`}>
+                {[...new Set((allTarefas || []).filter((x) => x.departamento === t.departamento && x.area && x.area.trim()).map((x) => x.area.trim()))].map((a) => <option key={a} value={a} />)}
+              </datalist>
+            </>
+          )}
+          {!editing && t.area && (
+            <span className="text-[9px] text-amber-800 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0" title={`Área: ${t.area}`}>
+              <Layers size={8} /> {t.area}
             </span>
           )}
           {t.isSummary && <span className="text-[9px] text-torg-gray bg-gray-100 px-1 rounded">grupo</span>}

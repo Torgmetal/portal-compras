@@ -3077,6 +3077,7 @@ model CronogramaTarefa {
   uidMpp              Int
   nome                String
   departamento        DepartamentoCronograma?
+  area                String? // Área/parte da obra (letra, número ou nome) — agrupa tarefas dentro do setor (Setor → Área → Tarefa). Vira summary no XML.
   dataInicioPrevista  DateTime?
   dataFimPrevista     DateTime?
   dataInicioBase      DateTime? // Baseline start (snapshot na data base)

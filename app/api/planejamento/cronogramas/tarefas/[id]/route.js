@@ -6,6 +6,7 @@ import { recalcularCronograma, rollupPercentualDepartamentos, calcularDefasagem 
 
 const patchSchema = z.object({
   nome: z.string().min(1).max(200).optional(),
+  area: z.string().max(120).nullable().optional(),
   percentualRealizado: z.number().min(0).max(100).optional(),
   observacao: z.string().max(500).nullable().optional(),
   dataRealizacao: z.string().datetime().nullable().optional(),
@@ -72,6 +73,10 @@ export async function PATCH(req, { params }) {
     diffAntes.nome = tarefa.nome;
     diffDepois.nome = parsed.data.nome;
     data.nome = parsed.data.nome;
+  }
+  if (parsed.data.area !== undefined) {
+    // Área é só rótulo de agrupamento (Setor → Área → Tarefa) — não recalcula nada.
+    data.area = parsed.data.area?.trim() || null;
   }
   if (parsed.data.percentualRealizado !== undefined && parsed.data.percentualRealizado !== tarefa.percentualRealizado) {
     diffAntes.percentualRealizado = tarefa.percentualRealizado;
