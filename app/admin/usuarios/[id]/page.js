@@ -32,6 +32,7 @@ const MODULOS_OPCOES = [
   { value: "PCP",          label: "PCP" },
   { value: "REQUISICOES",  label: "Requisições" },
   { value: "QUALIDADE",    label: "Qualidade" },
+  { value: "FISCAL",       label: "Fiscal" },
 ];
 
 export default function PageEditarUsuario() {

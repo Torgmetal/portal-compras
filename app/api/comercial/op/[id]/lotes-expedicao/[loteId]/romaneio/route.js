@@ -144,9 +144,13 @@ export async function POST(req, { params }) {
   }
 
   // Marca como emitido / atualiza a revisão + histórico no prévio.
+  // Guarda a URL do arquivo no SharePoint (quando salvou) — o Fiscal usa pra abrir o FORM 22.
   await prisma.romaneioPrevio.update({
     where: { id: previo.id },
-    data: { emitidoEm: agora, emitidoPorId: user.id, revisao: novaRevisao, historico },
+    data: {
+      emitidoEm: agora, emitidoPorId: user.id, revisao: novaRevisao, historico,
+      ...(sharepoint?.ok && sharepoint.webUrl ? { arquivoUrl: sharepoint.webUrl } : {}),
+    },
   }).catch(() => {});
 
   await prisma.auditLog.create({ data: { userId: user.id, action: novaRevisao === 0 ? "EMITIR_ROMANEIO" : "REVISAR_ROMANEIO", entity: "RomaneioPrevio", entityId: previo.id, diff: { numero, revisao: novaRevisao, itens: itens.length } } }).catch(() => {});

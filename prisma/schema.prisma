@@ -3388,6 +3388,13 @@ model RomaneioPrevio {
   emitidoPorId  String?
   revisao       Int       @default(0) // 0 = 1ª emissão (R00); 1+ = revisões (R01, R02…)
   historico     Json      @default("[]") // [{ revisao, emitidoEm, mudanca, porQuem }]
+  arquivoUrl    String? // webUrl do FORM 22 no SharePoint (setado na emissão) — link no Fiscal
+  // ── Fiscal (aba Fiscal) — emitido cai aqui aguardando NF; finalizado = nº + tipo ──
+  nfNumero          String? // número da NF informado pelo dept fiscal
+  nfTipo            String? // VENDA | SERVICO | REMESSA
+  nfEmitidaEm       DateTime? // quando o dept registrou a NF (= finalizado)
+  nfObservacao      String?
+  nfRegistradoPorId String?
   criadoPorId   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

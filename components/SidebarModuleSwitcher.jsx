@@ -22,6 +22,7 @@ import {
   Lock,
   FileBarChart2,
   NotebookPen,
+  ReceiptText,
 } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 
@@ -85,6 +86,14 @@ const MODULOS = [
     icon: Truck,
     cor: "bg-teal-100 text-teal-700",
     modulos: ["EXPEDICAO"],
+  },
+  {
+    href: "/fiscal",
+    label: "Fiscal",
+    desc: "Romaneios emitidos aguardando NF",
+    icon: ReceiptText,
+    cor: "bg-violet-100 text-violet-700",
+    modulos: ["FISCAL", "FINANCEIRO"],
   },
   {
     href: "/qualidade",
