@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/session";
 import { MODS_RELATORIOS } from "@/lib/relatorios";
 import { gerarRelatorioStatusPDF } from "@/lib/relatorio-status-pdf";
 import { sendEmail } from "@/lib/email";
-import { escapeHtml } from "@/lib/html";
+import { escapeHtml, textoParaHtml } from "@/lib/html";
 import { gerarTokenForte } from "@/lib/token";
 import { z } from "zod";
 
@@ -46,7 +46,7 @@ export async function POST(req, { params }) {
   const nomeArq = out.filename.replace(/["\r\n]/g, "");
   const assuntoFinal = assunto || `Relatório de Status${rel.obra ? " — " + rel.obra : rel.cliente ? " — " + rel.cliente : ""} · Torg Metal`;
   const corpo = (mensagem || "").trim()
-    ? `<div style="white-space:pre-wrap">${escapeHtml(mensagem)}</div>`
+    ? `<div style="white-space:pre-wrap">${textoParaHtml(mensagem)}</div>`
     : `<p>Segue o relatório de status${rel.obra ? " da obra <strong>" + escapeHtml(rel.obra) + "</strong>" : ""}.</p>`;
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#002945">
     <div style="background:#0D1F3C;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0"><strong>TORG METAL — Relatório de Status</strong></div>

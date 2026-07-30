@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
-import { escapeHtml } from "@/lib/html";
+import { escapeHtml, textoParaHtml } from "@/lib/html";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -44,7 +44,7 @@ export async function POST(req) {
   const mudancasBloco = body.mudancas && body.mudancas.trim()
     ? `<div style="margin-top:14px;padding:12px 14px;background:#fffbeb;border-left:4px solid #F4801F;border-radius:4px;">
          <p style="margin:0 0 4px;font-weight:700;font-size:13px;color:#92400e;">${ehRev ? "O que mudou nesta revisão" : "Observação"}</p>
-         <p style="margin:0;white-space:pre-wrap;">${escapeHtml(body.mudancas.trim())}</p>
+         <p style="margin:0;white-space:pre-wrap;">${textoParaHtml(body.mudancas.trim())}</p>
        </div>`
     : "";
 

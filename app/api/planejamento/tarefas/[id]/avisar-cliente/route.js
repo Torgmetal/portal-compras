@@ -6,7 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
-import { escapeHtml } from "@/lib/html";
+import { escapeHtml, textoParaHtml } from "@/lib/html";
 import { gerarTokenForte } from "@/lib/token";
 
 export const runtime = "nodejs";
@@ -72,7 +72,7 @@ export async function POST(req, { params }) {
           ${prazo ? `<p style="margin:6px 0 0;font-size:13px;color:#576D7E;">Data combinada: <b>${prazo}</b></p>` : ""}
           ${tarefa.descricao ? `<p style="margin:6px 0 0;font-size:13px;color:#576D7E;">${escapeHtml(tarefa.descricao)}</p>` : ""}
         </div>
-        ${body.mensagem ? `<p style="font-size:13px;color:#002945;background:#eef6fb;border-radius:8px;padding:10px 14px;margin:0 0 14px;">${escapeHtml(body.mensagem)}</p>` : ""}
+        ${body.mensagem ? `<p style="font-size:13px;color:#002945;background:#eef6fb;border-radius:8px;padding:10px 14px;margin:0 0 14px;">${textoParaHtml(body.mensagem)}</p>` : ""}
         <p style="font-size:13px;color:#576D7E;margin:0 0 10px;">Responda com 1 clique:</p>
         <table cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr>
           <td style="padding:4px;">

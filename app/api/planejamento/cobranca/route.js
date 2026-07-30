@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
-import { escapeHtml } from "@/lib/html";
+import { escapeHtml, textoParaHtml } from "@/lib/html";
 import { fmtOP } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -134,7 +134,7 @@ export async function POST(req) {
       </div>
     <div style="height:4px;background:#F4801F;"></div>
       <div style="background:#f9fafb;padding:20px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
-        ${mensagem ? `<p style="font-size:13px;color:#002945;background:#eef6fb;border-radius:8px;padding:10px 14px;margin:0 0 14px;">${escapeHtml(mensagem)}</p>` : ""}
+        ${mensagem ? `<p style="font-size:13px;color:#002945;background:#eef6fb;border-radius:8px;padding:10px 14px;margin:0 0 14px;">${textoParaHtml(mensagem)}</p>` : ""}
         <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
           <thead><tr style="background:#f3f4f6;">
             <th style="text-align:left;padding:7px 10px;font-size:11px;color:#576D7E;">Marco</th>

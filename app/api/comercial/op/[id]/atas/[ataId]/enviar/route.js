@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { gerarTokenForte } from "@/lib/token";
-import { escapeHtml } from "@/lib/html";
+import { escapeHtml, textoParaHtml } from "@/lib/html";
 import { CONTATOS_TAREFAS } from "@/lib/contatos-tarefas";
 import { gerarAtaOPPDF } from "@/lib/ata-op-pdf";
 import { put } from "@vercel/blob";
@@ -93,7 +93,7 @@ function montarEmail({ ata, obra, refCliente, codigo, nome, tipo, mensagem, link
     <div style="border:1px solid #E2E9F0;border-top:0;border-radius:0 0 12px 12px;padding:24px">
       <p style="font-size:15px;margin:0 0 12px">${saud}</p>
       <p style="font-size:14px;line-height:1.55;color:#123549;margin:0">${intro}</p>
-      ${mensagem ? `<p style="font-size:14px;line-height:1.55;color:#123549;margin:14px 0 0;white-space:pre-wrap">${escapeHtml(mensagem)}</p>` : ""}
+      ${mensagem ? `<p style="font-size:14px;line-height:1.55;color:#123549;margin:14px 0 0;white-space:pre-wrap">${textoParaHtml(mensagem)}</p>` : ""}
       <div style="background:#F5F8FB;border:1px solid #E2E9F0;border-radius:10px;padding:16px 18px;margin:18px 0">
         ${ata.titulo ? `<p style="margin:0 0 8px;font-size:15px;font-weight:700;color:#00263F">${escapeHtml(ata.titulo)}</p>` : ""}
         ${meta ? `<table style="width:100%;font-size:13px;border-collapse:collapse">${meta}</table>` : ""}

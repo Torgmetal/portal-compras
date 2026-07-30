@@ -10,7 +10,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
-import { escapeHtml } from "@/lib/html";
+import { escapeHtml, textoParaHtml } from "@/lib/html";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -209,7 +209,7 @@ export async function POST(req, { params }) {
     <div style="font-family:-apple-system,system-ui,sans-serif;max-width:720px;margin:0 auto;color:#2d3748;">
       ${banner("É hora do kick off — bora fazer acontecer, time! 💪")}
       <div style="border:1px solid #e2e8f0;border-top:0;border-radius:0 0 12px 12px;padding:22px 28px;">
-        ${body.mensagem ? `<div style="background:#fff8f1;border-left:4px solid #F4801F;padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:14px;"><p style="margin:0;font-size:14px;color:#2d3748;white-space:pre-wrap;">${esc(body.mensagem)}</p></div>` : ""}
+        ${body.mensagem ? `<div style="background:#fff8f1;border-left:4px solid #F4801F;padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:14px;"><p style="margin:0;font-size:14px;color:#2d3748;white-space:pre-wrap;">${textoParaHtml(body.mensagem)}</p></div>` : ""}
 
         <table style="width:100%;border-collapse:collapse;font-size:14px;">
           <tr><td style="padding:3px 0;color:#718096;width:190px;">Cliente</td><td style="padding:3px 0;"><strong>${esc(op.cliente)}</strong>${op.obra ? ` — ${esc(op.obra)}` : ""}</td></tr>
@@ -257,7 +257,7 @@ export async function POST(req, { params }) {
     <div style="font-family:-apple-system,system-ui,sans-serif;max-width:720px;margin:0 auto;color:#2d3748;">
       ${banner("É hora do kick off — comunicado fiscal & financeiro da obra 💼")}
       <div style="border:1px solid #e2e8f0;border-top:0;border-radius:0 0 10px 10px;padding:20px 24px;">
-        ${body.mensagem ? `<div style="background:#ebf8ff;border-left:4px solid #006EAB;padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:14px;"><p style="margin:0;font-size:14px;color:#2d3748;white-space:pre-wrap;">${esc(body.mensagem)}</p></div>` : ""}
+        ${body.mensagem ? `<div style="background:#ebf8ff;border-left:4px solid #006EAB;padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:14px;"><p style="margin:0;font-size:14px;color:#2d3748;white-space:pre-wrap;">${textoParaHtml(body.mensagem)}</p></div>` : ""}
 
         <p style="margin:0 0 6px 0;color:#006EAB;font-size:13px;font-weight:700;text-transform:uppercase;">Dados fiscais do cliente</p>
         <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:8px;">
