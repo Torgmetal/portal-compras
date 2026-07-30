@@ -415,6 +415,7 @@ function NovoCronogramaModal({ onClose, onCreated }) {
   const [dataFim, setDataFim] = useState("");
   const [usarTemplate, setUsarTemplate] = useState(false);
   const [opManual, setOpManual] = useState("");
+  const [areasTexto, setAreasTexto] = useState("");
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState("");
 
@@ -444,6 +445,8 @@ function NovoCronogramaModal({ onClose, onCreated }) {
       };
       if (dataInicio) body.dataInicio = new Date(dataInicio + "T12:00:00Z").toISOString();
       if (dataFim) body.dataFim = new Date(dataFim + "T12:00:00Z").toISOString();
+      const areasLista = areasTexto.split(/[\n,;]/).map((s) => s.trim()).filter(Boolean);
+      if (areasLista.length) body.areas = areasLista;
 
       const res = await fetch("/api/planejamento/cronogramas/manual", {
         method: "POST",
@@ -567,6 +570,19 @@ function NovoCronogramaModal({ onClose, onCreated }) {
                 className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg"
               />
             </div>
+          </div>
+
+          {/* Áreas da obra */}
+          <div>
+            <label className="text-xs font-medium text-torg-dark mb-1 block">Áreas da obra <span className="text-gray-400">(opcional)</span></label>
+            <input
+              type="text"
+              value={areasTexto}
+              onChange={(e) => setAreasTexto(e.target.value)}
+              placeholder="Ex.: A, B, C  ou  Galpão 1, Mezanino…"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
+            />
+            <p className="text-[10px] text-torg-gray mt-1">Separe por vírgula. Cada área ganha uma <b>cor fixa</b> e fica disponível pra classificar as tarefas de <b>qualquer setor</b>.</p>
           </div>
 
           {/* Template */}
@@ -1378,12 +1394,12 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
         <>
           {DEPT_ORDER.filter((d) => byDept[d]).map((dept) => {
             const { summary, tasks } = byDept[dept];
-            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} readOnly={readOnly} />;
+            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} areas={detail.areas} readOnly={readOnly} />;
           })}
           {/* Departamentos fora da ordem padrao (se houver) */}
           {Object.keys(byDept).filter((d) => !DEPT_ORDER.includes(d)).map((dept) => {
             const { summary, tasks } = byDept[dept];
-            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} readOnly={readOnly} />;
+            return <DeptSection key={dept} dept={dept} summary={summary} tasks={tasks} now={now} onRefresh={onRefresh} cronogramaId={cronogramaId} allTarefas={tarefas} dataBase={detail.dataBase} tipoDias={detail.tipoDias} areas={detail.areas} readOnly={readOnly} />;
           })}
         </>
       )}
@@ -1721,7 +1737,7 @@ function ImportarPesoModal({ cronogramaId, onClose, onImported }) {
   );
 }
 
-function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTarefas, dataBase, tipoDias, readOnly }) {
+function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTarefas, dataBase, tipoDias, areas, readOnly }) {
   const [collapsed, setCollapsed] = useState(false);
   const [cobrando, setCobrando] = useState(false);
   const [cobrResult, setCobrResult] = useState(null);
@@ -1756,23 +1772,28 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   }
   const gruposArea = [...mapaAreas.entries()];
   const temAreas = gruposArea.some(([a]) => a);
-  const areasExistentes = gruposArea.map(([a]) => a).filter(Boolean);
+  // Sugestões dos datalists: áreas cadastradas no cronograma + as em uso nas tarefas.
+  const areasExistentes = [...new Set([
+    ...(Array.isArray(areas) ? areas.map((a) => a?.nome).filter(Boolean) : []),
+    ...gruposArea.map(([a]) => a).filter(Boolean),
+  ])];
   const toggleArea = (area) => setAreasCollapsed((s) => { const n = new Set(s); n.has(area) ? n.delete(area) : n.add(area); return n; });
+  // Renomear preserva a COR (endpoint atualiza a lista de áreas + as tarefas de uma vez).
   const renomearArea = async (area) => {
     const novo = window.prompt(`Renomear área "${area}" para:`, area);
     if (novo == null) return;
     const nome = novo.trim();
     if (!nome || nome === area) return;
-    const alvo = tasks.filter((t) => (t.area || "").trim() === area);
     try {
-      await Promise.all(alvo.map((t) => fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ area: nome }),
-      })));
+      await fetch(`/api/planejamento/cronogramas/${cronogramaId}/areas`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "renomear", de: area, para: nome }),
+      });
       onRefresh();
     } catch { /* ignora */ }
   };
   const addNaArea = (area) => { setNewTaskArea(area); setAddingTask(true); };
-  const linhaTarefa = (t) => <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} dataBase={dataBase} tipoDias={tipoDias} readOnly={readOnly} />;
+  const linhaTarefa = (t) => <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} dataBase={dataBase} tipoDias={tipoDias} areas={areas} readOnly={readOnly} />;
 
   // Reordenar (staged): move client-side com ↑/↓ e só grava ao "Salvar ordem".
   const iniciarReordenar = () => { setOrdemLocal(tasks.filter((t) => !t.isSummary)); setReordenando(true); };
@@ -1922,7 +1943,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                   </button>
                 </div>
               </div>
-              <ReorderTarefas ordem={ordemLocal} onMove={moverLocal} />
+              <ReorderTarefas ordem={ordemLocal} onMove={moverLocal} areas={areas} />
             </>
           ) : (
           <>
@@ -1935,7 +1956,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                     {ts.map((t) => linhaTarefa(t))}
                   </div>
                 );
-                const cor = corDaArea(area);
+                const cor = corDaArea(area, areas);
                 return (
                   <div key={area} className="rounded-lg border" style={{ borderColor: cor.border + "55", backgroundColor: cor.bg + "22" }}>
                     <div className="flex items-center gap-1.5 px-1.5 py-1">
@@ -2184,11 +2205,11 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
 }
 
 // Lista de reordenação (staged): move com ↑/↓, sem tocar no servidor até salvar.
-function ReorderTarefas({ ordem, onMove }) {
+function ReorderTarefas({ ordem, onMove, areas }) {
   return (
     <div className="space-y-1">
       {ordem.map((t, i) => {
-        const c = t.area ? corDaArea(t.area) : null;
+        const c = t.area ? corDaArea(t.area, areas) : null;
         return (
           <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 border border-gray-100 rounded bg-white">
             <div className="flex flex-col leading-none">
@@ -2209,7 +2230,7 @@ function ReorderTarefas({ ordem, onMove }) {
   );
 }
 
-function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, readOnly }) {
+function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, areas, readOnly }) {
   const [editing, setEditing] = useState(false);
   const [editNome, setEditNome] = useState(tarefa.nome);
   const [editArea, setEditArea] = useState(tarefa.area || "");
@@ -2416,11 +2437,14 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
                 className="text-[11px] px-1.5 py-0.5 border border-amber-300 rounded bg-amber-50/40 w-28 outline-none focus:border-amber-500 shrink-0"
               />
               <datalist id={`areas-row-${t.departamento || "x"}`}>
-                {[...new Set((allTarefas || []).filter((x) => x.departamento === t.departamento && x.area && x.area.trim()).map((x) => x.area.trim()))].map((a) => <option key={a} value={a} />)}
+                {[...new Set([
+                  ...(Array.isArray(areas) ? areas.map((a) => a?.nome).filter(Boolean) : []),
+                  ...((allTarefas || []).map((x) => x.area).filter((a) => a && a.trim()).map((a) => a.trim())),
+                ])].map((a) => <option key={a} value={a} />)}
               </datalist>
             </>
           )}
-          {!editing && t.area && (() => { const c = corDaArea(t.area); return (
+          {!editing && t.area && (() => { const c = corDaArea(t.area, areas); return (
             <span className="text-[9px] px-1.5 py-0.5 rounded border flex items-center gap-0.5 shrink-0" style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text }} title={`Área: ${t.area}`}>
               <Layers size={8} /> {t.area}
             </span>

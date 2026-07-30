@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { registrarArea } from "@/lib/cronograma-areas";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -56,6 +57,9 @@ export async function POST(req, { params }) {
       antecessoraIds: parsed.data.antecessoraIds || [],
     },
   });
+
+  // Cadastra a área (cor fixa) se ainda não estiver na lista do cronograma.
+  if (parsed.data.area?.trim()) await registrarArea(prisma, id, parsed.data.area.trim()).catch(() => {});
 
   await prisma.auditLog.create({
     data: {

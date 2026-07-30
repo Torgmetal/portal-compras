@@ -19,7 +19,22 @@ const createSchema = z.object({
   dataInicio: z.string().datetime().optional(),
   dataFim: z.string().datetime().optional(),
   usarTemplate: z.boolean().default(true),
+  areas: z.array(z.string().max(120)).optional(), // áreas da obra (cor fixa por ordem)
 });
+
+// Monta [{nome, cor}] sem duplicar nome (cor = ordem).
+function montarAreas(nomes) {
+  const vistos = new Set();
+  const lista = [];
+  for (const n of Array.isArray(nomes) ? nomes : []) {
+    const nome = String(n || "").trim();
+    const key = nome.toLowerCase();
+    if (!nome || vistos.has(key)) continue;
+    vistos.add(key);
+    lista.push({ nome, cor: lista.length % 10 });
+  }
+  return lista;
+}
 
 export async function POST(req) {
   let user;
@@ -36,7 +51,7 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const { opNumero, titulo, dataInicio, dataFim, usarTemplate } = parsed.data;
+  const { opNumero, titulo, dataInicio, dataFim, usarTemplate, areas } = parsed.data;
 
   // Permite MÚLTIPLOS cronogramas por OP (prédios/frentes/solicitações novas) —
   // como o sharepointPath é único, cada cronograma manual ganha um sufixo
@@ -85,6 +100,7 @@ export async function POST(req) {
       sharepointPath: manualPath,
       dataInicio: dataInicio ? new Date(dataInicio) : null,
       dataFim: dataFim ? new Date(dataFim) : null,
+      areas: montarAreas(areas),
       tarefas: tarefas.length > 0 ? { create: tarefas } : undefined,
     },
     include: { tarefas: true },

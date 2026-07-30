@@ -3057,6 +3057,7 @@ model Cronograma {
   dataFim        DateTime?
   dataBase       DateTime? // Data base (baseline) — referencia do cronograma
   tipoDias       String               @default("DU") // DU = dias uteis, DC = dias corridos
+  areas          Json                 @default("[]") // Áreas da obra: [{nome, cor}] — cor FIXA por área (índice da paleta), estável no rename; definível na criação
   ultimoSync     DateTime             @default(now())
   ativo          Boolean              @default(true)
   createdAt      DateTime             @default(now())

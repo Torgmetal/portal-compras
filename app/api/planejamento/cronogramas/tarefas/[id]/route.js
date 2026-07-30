@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { recalcularCronograma, rollupPercentualDepartamentos, calcularDefasagem } from "@/lib/cronograma-recalcular";
+import { registrarArea } from "@/lib/cronograma-areas";
 
 const patchSchema = z.object({
   nome: z.string().min(1).max(200).optional(),
@@ -226,6 +227,9 @@ export async function PATCH(req, { params }) {
   }
 
   await prisma.$transaction(ops);
+
+  // Cadastra a área (cor fixa) se veio uma nova ainda não listada no cronograma.
+  if (data.area) await registrarArea(prisma, tarefa.cronograma.id, data.area).catch(() => {});
 
   // Se antecessoras mudaram OU progresso mudou, recalcula datas automaticamente
   // (progresso de uma antecessora pode destravar sucessoras)
