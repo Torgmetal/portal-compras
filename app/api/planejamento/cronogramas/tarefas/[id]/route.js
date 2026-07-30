@@ -231,10 +231,14 @@ export async function PATCH(req, { params }) {
   // Cadastra a área (cor fixa) se veio uma nova ainda não listada no cronograma.
   if (data.area) await registrarArea(prisma, tarefa.cronograma.id, data.area).catch(() => {});
 
-  // Se antecessoras mudaram OU progresso mudou, recalcula datas automaticamente
-  // (progresso de uma antecessora pode destravar sucessoras)
+  // Recalcula datas automaticamente quando: antecessoras mudaram, progresso mudou
+  // (pode destravar sucessoras) OU a DATA PREVISTA desta tarefa mudou — assim, ao
+  // mexer na data de uma antecessora, as sucessoras deslocam sozinhas (finish-to-start).
+  // A própria tarefa editada é preservada: raiz (sem antecessora) o recalc pula, e
+  // com antecessora a `defasagemDias` gravada segura a data que o usuário digitou.
   const progressoMudou = diffDepois.percentualRealizado !== undefined;
-  if (antecessorasChanged || progressoMudou) {
+  const datasPrevistasMudaram = diffDepois.dataInicioPrevista !== undefined || diffDepois.dataFimPrevista !== undefined;
+  if (antecessorasChanged || progressoMudou || datasPrevistasMudaram) {
     try {
       await recalcularCronograma(tarefa.cronograma.id, user.id);
     } catch (e) {
