@@ -16,9 +16,11 @@ const schema = z.object({
   transportadora: z.string().max(200).nullable().optional(),
   motorista: z.string().max(200).nullable().optional(),
   placa: z.string().max(20).nullable().optional(),
+  placaCarreta: z.string().max(20).nullable().optional(),
   contato: z.string().max(100).nullable().optional(),
   data: z.string().nullable().optional(),
-  marcas: z.array(z.string()).optional(), // subconjunto de marcas a incluir (se vazio/ausente, todas)
+  marcas: z.array(z.string()).optional(), // (legado) subconjunto de marcas — sem quantidade
+  itensSel: z.array(z.object({ marca: z.string().min(1), qtd: z.number().min(0) })).optional(), // marcas + quantidade
   mudanca: z.string().max(2000).nullable().optional(), // o que mudou (obrigatório na revisão)
   previa: z.boolean().optional(), // true = só gera pra conferir (não salva, não emite)
 });
@@ -61,29 +63,50 @@ export async function POST(req, { params }) {
   const transportadora = (body.transportadora ?? lote.transportadora) || null;
   const motorista = (body.motorista ?? lote.motorista) || null;
   const placa = (body.placa ?? lote.placaVeiculo) || null;
+  const placaCarreta = (body.placaCarreta ?? lote.placaCarreta) || null;
   const contato = (body.contato ?? lote.contatoTransporte) || null;
 
   const numero = `R${previo.numero}`;
   const data = body.data ? new Date(body.data) : (previo.dataPrevista || new Date());
-  let itens = marcasPrevio.filter((m) => m?.marca).map((m) => ({
-    marca: m.marca, descricao: m.descricao || null,
-    qtd: Number(m.qte) || 0, pesoKg: Number(m.pesoTotal) || 0,
-  }));
-  // Ajuste de marcas: se veio uma seleção, exporta só essas.
-  if (body.marcas?.length) {
-    const sel = new Set(body.marcas.map((s) => String(s).trim().toUpperCase()));
-    itens = itens.filter((it) => sel.has(String(it.marca).trim().toUpperCase()));
-    if (!itens.length) return NextResponse.json({ error: "Nenhuma marca selecionada." }, { status: 400 });
+  let itens;
+  if (body.itensSel?.length) {
+    // Seleção com quantidade: o prévio traz o peso da qtd cheia; ao mudar a
+    // quantidade, o peso vai proporcional (pesoUnit = pesoTotal / qte).
+    const porMarca = new Map(
+      marcasPrevio.filter((m) => m?.marca).map((m) => [String(m.marca).trim().toUpperCase(), m])
+    );
+    itens = body.itensSel
+      .map((s) => {
+        const pm = porMarca.get(String(s.marca).trim().toUpperCase());
+        if (!pm) return null;
+        const qteOrig = Number(pm.qte) || 0;
+        const pesoOrig = Number(pm.pesoTotal) || 0;
+        const pesoUnit = qteOrig > 0 ? pesoOrig / qteOrig : pesoOrig;
+        const qtd = Number(s.qtd) || 0;
+        return { marca: pm.marca, descricao: pm.descricao || null, qtd, pesoKg: pesoUnit * qtd };
+      })
+      .filter((it) => it && it.qtd > 0);
+  } else {
+    itens = marcasPrevio.filter((m) => m?.marca).map((m) => ({
+      marca: m.marca, descricao: m.descricao || null,
+      qtd: Number(m.qte) || 0, pesoKg: Number(m.pesoTotal) || 0,
+    }));
+    // Ajuste de marcas (legado): se veio uma seleção sem quantidade, exporta só essas.
+    if (body.marcas?.length) {
+      const sel = new Set(body.marcas.map((s) => String(s).trim().toUpperCase()));
+      itens = itens.filter((it) => sel.has(String(it.marca).trim().toUpperCase()));
+    }
   }
+  if (!itens.length) return NextResponse.json({ error: "Nenhuma marca/quantidade selecionada." }, { status: 400 });
 
   // Persiste o transportador no lote (vale pra prévia e final — conveniência).
-  await prisma.loteExpedicao.update({ where: { id: lote.id }, data: { transportadora, motorista, placaVeiculo: placa, contatoTransporte: contato } }).catch(() => {});
+  await prisma.loteExpedicao.update({ where: { id: lote.id }, data: { transportadora, motorista, placaVeiculo: placa, placaCarreta, contatoTransporte: contato } }).catch(() => {});
   const cli = (op.cliente || "").slice(0, 40).trim();
 
   // PRÉVIA: só gera o FORM 22 pra conferir — não salva no SharePoint, não marca
   // emitido, não vira revisão.
   if (body.previa) {
-    const buf = await gerarRomaneioForm22({ op, romaneio: { numero, data, transportadora, contatoTransporte: contato }, itens });
+    const buf = await gerarRomaneioForm22({ op, romaneio: { numero, data, transportadora, motorista, placa, placaCarreta, contatoTransporte: contato }, itens });
     return NextResponse.json({ ok: true, previa: true, numero, nome: `PREVIA Romaneio ${numero} - OP-${op.numero}${cli ? ` - ${cli}` : ""}.xlsx`, arquivo: buf.toString("base64") });
   }
 
@@ -104,7 +127,7 @@ export async function POST(req, { params }) {
 
   const buf = await gerarRomaneioForm22({
     op,
-    romaneio: { numero, data, transportadora, contatoTransporte: contato },
+    romaneio: { numero, data, transportadora, motorista, placa, placaCarreta, contatoTransporte: contato },
     itens,
     historico: novaRevisao > 0 ? historico : null, // aba Histórico só na revisão
   });

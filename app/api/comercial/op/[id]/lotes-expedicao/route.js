@@ -29,6 +29,7 @@ const schema = z.object({
   transportadora: z.string().max(200).nullable().optional(),
   motorista: z.string().max(200).nullable().optional(),
   placaVeiculo: z.string().max(20).nullable().optional(),
+  placaCarreta: z.string().max(20).nullable().optional(),
   contatoTransporte: z.string().max(100).nullable().optional(),
 });
 
@@ -52,6 +53,7 @@ export async function POST(req, { params }) {
       transportadora: body.transportadora?.trim() || null,
       motorista: body.motorista?.trim() || null,
       placaVeiculo: body.placaVeiculo?.trim() || null,
+      placaCarreta: body.placaCarreta?.trim() || null,
       contatoTransporte: body.contatoTransporte?.trim() || null,
     },
   });

@@ -516,7 +516,8 @@ model LoteExpedicao {
   observacao   String?
   transportadora    String? // dados do transportador (salvos aqui pra não redigitar no romaneio)
   motorista         String?
-  placaVeiculo      String?
+  placaVeiculo      String? // placa do caminhão/cavalo
+  placaCarreta      String? // placa da carreta (quando é carreta, tem 2 placas)
   contatoTransporte String?
   status       String    @default("PENDENTE")
   createdAt    DateTime  @default(now())

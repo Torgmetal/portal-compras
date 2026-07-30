@@ -274,6 +274,7 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
     transportadora: lote?.transportadora || "",
     motorista: lote?.motorista || "",
     placaVeiculo: lote?.placaVeiculo || "",
+    placaCarreta: lote?.placaCarreta || "",
     contatoTransporte: lote?.contatoTransporte || "",
   });
   const [salvando, setSalvando] = useState(false);
@@ -292,6 +293,7 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
       transportadora: f.transportadora.trim() || null,
       motorista: f.motorista.trim() || null,
       placaVeiculo: f.placaVeiculo.trim() || null,
+      placaCarreta: f.placaCarreta.trim() || null,
       contatoTransporte: f.contatoTransporte.trim() || null,
     };
     try {
@@ -337,8 +339,9 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2"><label className="block text-xs font-medium text-torg-dark mb-1">Transportadora</label><input value={f.transportadora} onChange={(e) => setF((v) => ({ ...v, transportadora: e.target.value }))} placeholder="Transportadora" className={inp} /></div>
               <div><label className="block text-xs font-medium text-torg-dark mb-1">Motorista</label><input value={f.motorista} onChange={(e) => setF((v) => ({ ...v, motorista: e.target.value }))} className={inp} /></div>
-              <div><label className="block text-xs font-medium text-torg-dark mb-1">Placa</label><input value={f.placaVeiculo} onChange={(e) => setF((v) => ({ ...v, placaVeiculo: e.target.value }))} className={inp} /></div>
-              <div className="col-span-2"><label className="block text-xs font-medium text-torg-dark mb-1">Contato / Fone</label><input value={f.contatoTransporte} onChange={(e) => setF((v) => ({ ...v, contatoTransporte: e.target.value }))} placeholder="Telefone" className={inp} /></div>
+              <div><label className="block text-xs font-medium text-torg-dark mb-1">Contato / Fone</label><input value={f.contatoTransporte} onChange={(e) => setF((v) => ({ ...v, contatoTransporte: e.target.value }))} placeholder="Telefone" className={inp} /></div>
+              <div><label className="block text-xs font-medium text-torg-dark mb-1">Placa (caminhão)</label><input value={f.placaVeiculo} onChange={(e) => setF((v) => ({ ...v, placaVeiculo: e.target.value }))} placeholder="ABC1D23" className={inp} /></div>
+              <div><label className="block text-xs font-medium text-torg-dark mb-1">Placa carreta <span className="text-torg-gray font-normal">— se houver</span></label><input value={f.placaCarreta} onChange={(e) => setF((v) => ({ ...v, placaCarreta: e.target.value }))} placeholder="XYZ4E56" className={inp} /></div>
             </div>
           </div>
           {erro && <p className="text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
@@ -446,12 +449,14 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
   const [passo, setPasso] = useState(1);
   const [f, setF] = useState({
     transportadora: lote?.transportadora || "", motorista: lote?.motorista || "",
-    placa: lote?.placaVeiculo || "", contato: lote?.contatoTransporte || "",
+    placa: lote?.placaVeiculo || "", placaCarreta: lote?.placaCarreta || "",
+    contato: lote?.contatoTransporte || "",
     data: lote?.dataPrevista ? String(lote.dataPrevista).slice(0, 10) : "",
     mudanca: "",
   });
   const [marcas, setMarcas] = useState(null);
   const [sel, setSel] = useState(new Set());
+  const [qtds, setQtds] = useState({}); // marca -> quantidade escolhida
   const [gerando, setGerando] = useState(false);
   const [gerandoPrevia, setGerandoPrevia] = useState(false);
   const [erro, setErro] = useState("");
@@ -461,13 +466,23 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
   useEffect(() => {
     fetch(`/api/comercial/op/${opId}/lotes-expedicao/pecas?loteId=${lote.id}`)
       .then((r) => r.json())
-      .then((j) => { const ms = j?.pecas || []; setMarcas(ms); setSel(new Set(ms.map((m) => m.marca))); })
+      .then((j) => {
+        const ms = j?.pecas || [];
+        setMarcas(ms); setSel(new Set(ms.map((m) => m.marca)));
+        setQtds(Object.fromEntries(ms.map((m) => [m.marca, m.qtd ?? 1])));
+      })
       .catch(() => { setMarcas([]); });
   }, [opId, lote.id]);
 
   const toggle = (m) => setSel((s) => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n; });
+  // Peso proporcional à quantidade escolhida (o prévio traz o peso da qtd cheia).
+  const pesoAjustado = (m) => {
+    const q = Number(qtds[m.marca]);
+    if (!q || !m.qtd) return Number(m.pesoTotalKg) || 0;
+    return (Number(m.pesoTotalKg) || 0) * (q / m.qtd);
+  };
   const selecionadas = marcas ? marcas.filter((m) => sel.has(m.marca)) : [];
-  const pesoSel = selecionadas.reduce((s, m) => s + (m.pesoTotalKg || 0), 0);
+  const pesoSel = selecionadas.reduce((s, m) => s + pesoAjustado(m), 0);
 
   async function emitir() {
     if (!selecionadas.length) { setErro("Selecione ao menos uma marca."); setPasso(1); return; }
@@ -478,8 +493,8 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transportadora: f.transportadora.trim() || null, motorista: f.motorista.trim() || null,
-          placa: f.placa.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
-          marcas: marcas && selecionadas.length < marcas.length ? [...sel] : undefined,
+          placa: f.placa.trim() || null, placaCarreta: f.placaCarreta.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
+          itensSel: selecionadas.map((m) => ({ marca: m.marca, qtd: Number(qtds[m.marca]) || 0 })),
           mudanca: emitido ? f.mudanca.trim() : undefined,
         }),
       });
@@ -503,8 +518,8 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transportadora: f.transportadora.trim() || null, motorista: f.motorista.trim() || null,
-          placa: f.placa.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
-          marcas: marcas && selecionadas.length < marcas.length ? [...sel] : undefined,
+          placa: f.placa.trim() || null, placaCarreta: f.placaCarreta.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
+          itensSel: selecionadas.map((m) => ({ marca: m.marca, qtd: Number(qtds[m.marca]) || 0 })),
           previa: true,
         }),
       });
@@ -557,17 +572,21 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                 <p className="text-[11px] text-torg-gray">Sem marcas neste lote.</p>
               ) : (
                 <div className="max-h-56 overflow-y-auto border border-gray-100 rounded">
+                  <div className="flex items-center gap-2 px-2 py-1 text-[10px] uppercase tracking-wide text-torg-gray bg-gray-50 border-b border-gray-100 sticky top-0">
+                    <span className="w-4" /><span className="w-20 shrink-0">Marca</span><span className="flex-1">Descrição</span><span className="w-16 text-right">Qtd</span><span className="w-16 text-right">Peso</span>
+                  </div>
                   {marcas.map((m) => (
-                    <label key={m.marca} className="flex items-center gap-2 px-2 py-1 text-[12px] hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0">
+                    <div key={m.marca} className="flex items-center gap-2 px-2 py-1 text-[12px] hover:bg-gray-50 border-b border-gray-50 last:border-0">
                       <input type="checkbox" checked={sel.has(m.marca)} onChange={() => toggle(m.marca)} className="accent-torg-blue" />
-                      <span className="font-mono text-torg-dark">{m.marca}</span>
+                      <span className="font-mono text-torg-dark w-20 shrink-0 truncate">{m.marca}</span>
                       <span className="text-torg-gray truncate flex-1">{m.descricao || ""}</span>
-                      <span className="text-torg-gray tabular-nums whitespace-nowrap">{m.pesoTotalKg != null ? fmtKg(m.pesoTotalKg) : ""}</span>
-                    </label>
+                      <input type="number" min="0" value={qtds[m.marca] ?? ""} onChange={(e) => setQtds((q) => ({ ...q, [m.marca]: e.target.value === "" ? "" : Number(e.target.value) }))} disabled={!sel.has(m.marca)} title="Quantidade" className="w-16 text-right text-[12px] border border-gray-300 rounded px-1.5 py-0.5 disabled:bg-gray-100 disabled:text-gray-400 outline-none focus:border-torg-blue" />
+                      <span className="text-torg-gray tabular-nums whitespace-nowrap w-16 text-right">{m.pesoTotalKg != null ? fmtKg(pesoAjustado(m)) : ""}</span>
+                    </div>
                   ))}
                 </div>
               )}
-              <p className="text-[11px] text-torg-gray">Desmarque o que não vai neste romaneio.</p>
+              <p className="text-[11px] text-torg-gray">Desmarque o que não vai e ajuste a <strong>quantidade</strong> de cada marca — o peso acompanha.</p>
             </>
           ) : passo === 2 ? (
             <>
@@ -575,7 +594,8 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block col-span-2"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Transportadora</span><input value={f.transportadora} onChange={(e) => setF({ ...f, transportadora: e.target.value })} className={inp} placeholder="Transportadora" /></label>
                 <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Motorista</span><input value={f.motorista} onChange={(e) => setF({ ...f, motorista: e.target.value })} className={inp} /></label>
-                <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Placa</span><input value={f.placa} onChange={(e) => setF({ ...f, placa: e.target.value })} className={inp} /></label>
+                <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Placa (caminhão)</span><input value={f.placa} onChange={(e) => setF({ ...f, placa: e.target.value })} className={inp} placeholder="ABC1D23" /></label>
+                <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Placa carreta</span><input value={f.placaCarreta} onChange={(e) => setF({ ...f, placaCarreta: e.target.value })} className={inp} placeholder="se houver" /></label>
                 <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Contato / Fone</span><input value={f.contato} onChange={(e) => setF({ ...f, contato: e.target.value })} className={inp} placeholder="Telefone" /></label>
                 <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Data de saída</span><input type="date" value={f.data} onChange={(e) => setF({ ...f, data: e.target.value })} className={inp} /></label>
               </div>
