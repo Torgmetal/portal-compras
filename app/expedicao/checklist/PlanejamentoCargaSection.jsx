@@ -390,10 +390,15 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
   );
   const [descricao, setDescricao] = useState("");
   const [selecionados, setSelecionados] = useState(new Set());
+  const [qtds, setQtds] = useState({}); // key -> quantidade escolhida (default = qtd disponível)
   const [buscaItem, setBuscaItem] = useState("");
   const [soProntas, setSoProntas] = useState(false); // mostra só peças prontas (Pintura)
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState("");
+
+  // Quantidade escolhida por item (default = qtd disponível) + peso proporcional.
+  const qtdEscolhida = (i) => { const v = qtds[i.key]; return Number(v ?? i.qtd) || 0; };
+  const pesoEscolhido = (i) => (i.qtd > 0 ? (i.pesoKg / i.qtd) * qtdEscolhida(i) : i.pesoKg);
 
   // Monta lista de itens selecionaveis (nao expedidos)
   const itensSelecionaveis = useMemo(() => {
@@ -479,7 +484,7 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
 
   const pesoTotal = itensSelecionaveis
     .filter((i) => selecionados.has(i.key))
-    .reduce((s, i) => s + (i.pesoKg || 0), 0);
+    .reduce((s, i) => s + (pesoEscolhido(i) || 0), 0);
 
   const handleSalvar = async () => {
     if (selecionados.size === 0) {
@@ -491,14 +496,24 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
 
     const itens = itensSelecionaveis
       .filter((i) => selecionados.has(i.key))
-      .map((i) => ({
-        tipo: i.tipo,
-        descricao: i.descricao,
-        pecaConjuntoId: i.tipo === "PECA" ? i.id : null,
-        rmItemId: i.tipo === "ACESSORIO" ? i.id : null,
-        qtdPlanejada: i.qtd,
-        pesoEstimadoKg: i.pesoKg || null,
-      }));
+      .map((i) => {
+        const q = Math.min(Math.max(qtdEscolhida(i), 0), i.qtd); // não passa da qtd disponível
+        return {
+          tipo: i.tipo,
+          descricao: i.descricao,
+          pecaConjuntoId: i.tipo === "PECA" ? i.id : null,
+          rmItemId: i.tipo === "ACESSORIO" ? i.id : null,
+          qtdPlanejada: q,
+          pesoEstimadoKg: (i.qtd > 0 ? (i.pesoKg / i.qtd) * q : i.pesoKg) || null,
+        };
+      })
+      .filter((it) => it.qtdPlanejada > 0);
+
+    if (itens.length === 0) {
+      setErro("Defina uma quantidade maior que zero nos itens selecionados.");
+      setSaving(false);
+      return;
+    }
 
     try {
       const r = await fetch("/api/expedicao/planejamento", {
@@ -634,6 +649,9 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
                     item={item}
                     checked={selecionados.has(item.key)}
                     onToggle={() => toggleItem(item.key)}
+                    qtd={qtds[item.key] ?? item.qtd}
+                    onQtd={(v) => setQtds((m) => ({ ...m, [item.key]: v === "" ? "" : Number(v) }))}
+                    pesoEscolhido={pesoEscolhido(item)}
                   />
                 ))}
               </div>
@@ -654,6 +672,9 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
                     item={item}
                     checked={selecionados.has(item.key)}
                     onToggle={() => toggleItem(item.key)}
+                    qtd={qtds[item.key] ?? item.qtd}
+                    onQtd={(v) => setQtds((m) => ({ ...m, [item.key]: v === "" ? "" : Number(v) }))}
+                    pesoEscolhido={pesoEscolhido(item)}
                   />
                 ))}
               </div>
@@ -761,7 +782,7 @@ function AlertasProntidao({ itensSelecionaveis, selecionados }) {
 
 // ─── Checkbox de item ──────────────────────────────────────────
 
-function ItemCheckbox({ item, checked, onToggle }) {
+function ItemCheckbox({ item, checked, onToggle, qtd, onQtd, pesoEscolhido }) {
   const temAlerta = item.prontidao && !item.prontidao.pronta;
   const isBloqueio = item.prontidao?.nivel === "BLOQUEIO";
   const isAtencao = item.prontidao?.nivel === "ATENCAO";
@@ -797,8 +818,21 @@ function ItemCheckbox({ item, checked, onToggle }) {
           )}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-torg-gray">
-            Qtd: {item.qtd} {item.pesoKg > 0 && `• ${fmtKg(item.pesoKg)}`}
+          <span
+            className="inline-flex items-center gap-1 text-[10px] text-torg-gray"
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          >
+            Qtd:
+            <input
+              type="number" min="0" max={item.qtd} step="any"
+              value={qtd ?? item.qtd}
+              disabled={!checked}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => onQtd?.(e.target.value)}
+              title={checked ? `Máximo ${item.qtd}` : "Selecione o item pra ajustar a quantidade"}
+              className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-[11px] tabular-nums disabled:bg-gray-100 disabled:text-gray-400 outline-none focus:border-torg-blue"
+            />
+            de {item.qtd}{item.pesoKg > 0 && ` • ${fmtKg(checked && pesoEscolhido != null ? pesoEscolhido : item.pesoKg)}`}
           </span>
           {item.statusProd && (
             <span className={`text-[10px] px-1 rounded ${
