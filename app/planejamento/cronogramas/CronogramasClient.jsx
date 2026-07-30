@@ -2022,6 +2022,7 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                 selecionadas={newTaskAntecessoras}
                 onChange={setNewTaskAntecessoras}
                 compact
+                areaAtual={newTaskArea}
               />
               <div className="flex items-center gap-1 justify-end">
                   <button
@@ -2721,6 +2722,7 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
             allTarefas={allTarefas}
             selecionadas={antecessoraIds}
             onChange={setAntecessoraIds}
+            areaAtual={editArea}
           />
           {/* Bloqueio externo */}
           <div className="space-y-1.5">
@@ -3383,10 +3385,12 @@ function HistoricoTab({ revisoes }) {
 }
 
 // ─── Seletor de Antecessoras (agrupado por departamento + busca) ──────
-function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, compact }) {
+function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, compact, areaAtual }) {
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState("");
+  const [soArea, setSoArea] = useState(true); // qd a tarefa tem área: mostra só a mesma área (menos confuso)
   const ref = useRef(null);
+  const areaTrim = (areaAtual || "").trim();
 
   // Fecha ao clicar fora
   useEffect(() => {
@@ -3400,6 +3404,8 @@ function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, comp
 
   const disponiveis = (allTarefas || []).filter(
     (x) => x.id !== tarefaId && !x.isSummary && x.outlineLevel > 1 && !selecionadas.includes(x.id)
+      // Se a tarefa atual tem área, por padrão só lista as da MESMA área (menos confusão).
+      && (!areaTrim || !soArea || (x.area || "").trim() === areaTrim)
   );
 
   const filtradas = busca.trim()
@@ -3484,11 +3490,20 @@ function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, comp
               </button>
             </div>
 
+            {/* Filtro por área — só aparece quando a tarefa atual tem área */}
+            {areaTrim && (
+              <div className="flex items-center gap-1.5 px-2 py-1 border-b border-gray-100 bg-purple-50/40">
+                <span className="text-[9px] text-torg-gray shrink-0">Mostrar:</span>
+                <button onClick={() => setSoArea(true)} className={`text-[9px] px-1.5 py-0.5 rounded ${soArea ? "bg-purple-600 text-white font-semibold" : "text-purple-700 hover:bg-purple-100"}`}>Só a área {areaTrim}</button>
+                <button onClick={() => setSoArea(false)} className={`text-[9px] px-1.5 py-0.5 rounded ${!soArea ? "bg-purple-600 text-white font-semibold" : "text-purple-700 hover:bg-purple-100"}`}>Todas</button>
+              </div>
+            )}
+
             {/* Lista agrupada */}
             <div className="max-h-48 overflow-y-auto">
               {Object.keys(grupos).length === 0 ? (
                 <p className="text-[10px] text-torg-gray text-center py-3 italic">
-                  {busca ? "Nenhuma tarefa encontrada" : "Sem tarefas disponíveis"}
+                  {busca ? "Nenhuma tarefa encontrada" : (areaTrim && soArea ? `Nenhuma tarefa na área "${areaTrim}". Clique em "Todas" pra ver as outras.` : "Sem tarefas disponíveis")}
                 </p>
               ) : (
                 DEPT_ORDER.filter((d) => grupos[d]).map((dept) => (
