@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import GanttInline from "@/components/planejamento/GanttInline";
 import { fmtOP } from "@/lib/utils";
@@ -3413,17 +3414,45 @@ function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, comp
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState("");
   const [soArea, setSoArea] = useState(true); // qd a tarefa tem área: mostra só a mesma área (menos confuso)
-  const ref = useRef(null);
+  const [pos, setPos] = useState(null); // posição fixa do menu (portal), ancorada no botão
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
   const areaTrim = (areaAtual || "").trim();
 
-  // Fecha ao clicar fora
+  // Abre calculando a posição a partir do botão: se falta espaço embaixo (perto do
+  // fim da página) o menu VIRA pra cima. É renderizado num portal (fixed) pra não
+  // ser cortado por ancestrais com overflow-hidden.
+  const LARGURA = compact ? 288 : 384; // w-72 / max-w-sm
+  const abrir = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) {
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - LARGURA - 8));
+      const espacoAbaixo = window.innerHeight - r.bottom;
+      const dropUp = espacoAbaixo < 300 && r.top > espacoAbaixo;
+      setPos(dropUp
+        ? { left, bottom: window.innerHeight - r.top + 4, width: LARGURA }
+        : { left, top: r.bottom + 4, width: LARGURA });
+    }
+    setBusca("");
+    setAberto(true);
+  };
+
+  // Fecha ao clicar fora (botão OU menu, que está em portal) e some ao rolar/redimensionar.
   useEffect(() => {
     if (!aberto) return;
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setAberto(false);
+    const fora = (e) => {
+      if (btnRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setAberto(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const fechar = () => setAberto(false);
+    document.addEventListener("mousedown", fora);
+    window.addEventListener("scroll", fechar, true);
+    window.addEventListener("resize", fechar);
+    return () => {
+      document.removeEventListener("mousedown", fora);
+      window.removeEventListener("scroll", fechar, true);
+      window.removeEventListener("resize", fechar);
+    };
   }, [aberto]);
 
   const disponiveis = (allTarefas || []).filter(
@@ -3457,7 +3486,7 @@ function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, comp
   };
 
   return (
-    <div className={`space-y-1.5 ${compact ? "" : ""}`} ref={ref}>
+    <div className={`space-y-1.5 ${compact ? "" : ""}`}>
       {!compact && (
         <div className="flex items-center gap-1.5">
           <Link2 size={11} className="text-purple-500" />
@@ -3485,19 +3514,23 @@ function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, comp
 
       {/* Botão de abrir / Input de busca */}
       <div className="relative">
-        {!aberto ? (
-          <button
-            onClick={() => { setAberto(true); setBusca(""); }}
-            className={`flex items-center gap-1.5 text-[10px] px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-50 text-torg-gray ${compact ? "w-auto" : "w-full max-w-xs"}`}
+        <button
+          ref={btnRef}
+          onClick={() => (aberto ? setAberto(false) : abrir())}
+          className={`flex items-center gap-1.5 text-[10px] px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-50 text-torg-gray ${compact ? "w-auto" : "w-full max-w-xs"}`}
+        >
+          <Link2 size={10} className="text-purple-400" />
+          {compact ? "Antecessoras" : (selecionadas.length > 0 ? "+ Adicionar outra antecessora..." : "+ Adicionar antecessora (pode mais de uma)...")}
+          {selecionadas.length > 0 && !compact && (
+            <span className="ml-auto text-[9px] text-purple-600 font-semibold">{selecionadas.length}</span>
+          )}
+        </button>
+        {aberto && pos && createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width }}
+            className="border border-purple-300 rounded-lg bg-white shadow-xl z-[9999]"
           >
-            <Link2 size={10} className="text-purple-400" />
-            {compact ? "Antecessoras" : (selecionadas.length > 0 ? "+ Adicionar outra antecessora..." : "+ Adicionar antecessora (pode mais de uma)...")}
-            {selecionadas.length > 0 && !compact && (
-              <span className="ml-auto text-[9px] text-purple-600 font-semibold">{selecionadas.length}</span>
-            )}
-          </button>
-        ) : (
-          <div className={`border border-purple-300 rounded-lg bg-white shadow-lg ${compact ? "w-72" : "w-full max-w-sm"} absolute z-30`}>
             {/* Barra de busca */}
             <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-gray-100">
               <Search size={12} className="text-torg-gray shrink-0" />
@@ -3574,7 +3607,8 @@ function AntecessorasPicker({ tarefaId, allTarefas, selecionadas, onChange, comp
                 </div>
               ))}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>
