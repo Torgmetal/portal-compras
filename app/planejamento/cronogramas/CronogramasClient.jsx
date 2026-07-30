@@ -3,15 +3,16 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import GanttInline from "@/components/planejamento/GanttInline";
 import { fmtOP } from "@/lib/utils";
+import { corDaArea } from "@/lib/cronograma-area-cor";
 import ModalEnviarCronograma from "@/components/planejamento/ModalEnviarCronograma";
 import {
-  Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronRight,
+  Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronRight, ChevronUp,
   Clock, CheckCircle2, AlertTriangle, Download, MessageSquarePlus,
   Send, X, Briefcase, Wrench, ShoppingCart, Factory, Truck, HardHat,
   GanttChart, Package, FileText, CircleDot, Mail, Calendar,
   History, FileDown, Milestone, Plus, Trash2, Weight, BarChart3,
   List, Link2, Unlink, RotateCcw, Lock, Archive, ArchiveRestore, Search,
-  Pencil, Check, Layers,
+  Pencil, Check, Layers, ArrowUpDown,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -1737,6 +1738,9 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   const [newTaskAntecessoras, setNewTaskAntecessoras] = useState([]);
   const [newTaskArea, setNewTaskArea] = useState("");
   const [areasCollapsed, setAreasCollapsed] = useState(() => new Set());
+  const [reordenando, setReordenando] = useState(false);
+  const [ordemLocal, setOrdemLocal] = useState([]);
+  const [salvandoOrdem, setSalvandoOrdem] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
   const Icon = DEPT_ICONS[dept] || Factory;
   const colors = DEPT_COLORS[dept] || "text-gray-600 bg-gray-50 border-gray-200";
@@ -1769,6 +1773,26 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
   };
   const addNaArea = (area) => { setNewTaskArea(area); setAddingTask(true); };
   const linhaTarefa = (t) => <TarefaRow key={t.id} tarefa={t} now={now} onRefresh={onRefresh} allTarefas={allTarefas} dataBase={dataBase} tipoDias={tipoDias} readOnly={readOnly} />;
+
+  // Reordenar (staged): move client-side com ↑/↓ e só grava ao "Salvar ordem".
+  const iniciarReordenar = () => { setOrdemLocal(tasks.filter((t) => !t.isSummary)); setReordenando(true); };
+  const moverLocal = (idx, dir) => setOrdemLocal((arr) => {
+    const j = idx + dir;
+    if (j < 0 || j >= arr.length) return arr;
+    const n = arr.slice(); [n[idx], n[j]] = [n[j], n[idx]]; return n;
+  });
+  const salvarOrdem = async () => {
+    setSalvandoOrdem(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/reordenar`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ordem: ordemLocal.map((t) => t.id) }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); alert(`Erro ao salvar a ordem: ${e.error || "erro"}`); return; }
+      setReordenando(false);
+      onRefresh();
+    } catch { alert("Erro de conexão ao salvar a ordem."); } finally { setSalvandoOrdem(false); }
+  };
 
   const abrirModalCobranca = async (e) => {
     e.stopPropagation();
@@ -1860,6 +1884,15 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
               Cobrar
             </button>
           )}
+          {!readOnly && !reordenando && tasks.filter((t) => !t.isSummary).length >= 2 && (
+            <button
+              onClick={iniciarReordenar}
+              className="px-2 py-1 text-[10px] font-medium text-torg-blue bg-torg-blue-50 border border-torg-blue-100 rounded-lg hover:bg-torg-blue-100 flex items-center gap-1"
+              title="Reordenar as tarefas deste setor (mover com ↑ ↓ e salvar)"
+            >
+              <ArrowUpDown size={10} /> Reordenar
+            </button>
+          )}
           {summary && (
             <span className={`text-xs font-bold ${summary.percentualRealizado >= 100 ? "text-emerald-600" : summary.percentualRealizado > 0 ? "text-torg-blue" : "text-torg-gray"}`}>
               {summary.percentualRealizado}%
@@ -1878,16 +1911,38 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
 
       {!collapsed && (
         <div className="ml-6 space-y-1">
+          {reordenando ? (
+            <>
+              <div className="flex items-center gap-2 px-1 pb-1 flex-wrap">
+                <span className="text-[11px] text-torg-blue font-medium">Mova com ↑ ↓ e clique em <b>Salvar ordem</b>. O Gantt e o MS Project atualizam depois de salvar.</span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <button onClick={() => setReordenando(false)} className="text-[11px] text-torg-gray hover:text-torg-dark px-2 py-1">Cancelar</button>
+                  <button onClick={salvarOrdem} disabled={salvandoOrdem} className="text-[11px] font-semibold text-white bg-torg-blue hover:bg-torg-blue-700 px-3 py-1 rounded disabled:opacity-50 flex items-center gap-1">
+                    {salvandoOrdem ? <Loader2 size={11} className="animate-spin" /> : <Check size={12} />} Salvar ordem
+                  </button>
+                </div>
+              </div>
+              <ReorderTarefas ordem={ordemLocal} onMove={moverLocal} />
+            </>
+          ) : (
+          <>
           {!temAreas
             ? tasks.map((t) => linhaTarefa(t))
-            : gruposArea.map(([area, ts]) =>
-                area ? (
-                  <div key={area} className="rounded-lg border border-amber-100/70 bg-amber-50/20">
+            : gruposArea.map(([area, ts]) => {
+                if (!area) return (
+                  <div key="__sem_area__" className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-torg-gray/70 px-1 pt-1">Sem área</p>
+                    {ts.map((t) => linhaTarefa(t))}
+                  </div>
+                );
+                const cor = corDaArea(area);
+                return (
+                  <div key={area} className="rounded-lg border" style={{ borderColor: cor.border + "55", backgroundColor: cor.bg + "22" }}>
                     <div className="flex items-center gap-1.5 px-1.5 py-1">
                       <button onClick={() => toggleArea(area)} className="text-torg-gray hover:text-torg-blue">
                         {areasCollapsed.has(area) ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
                       </button>
-                      <span className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-200 rounded px-2 py-0.5 flex items-center gap-1">
+                      <span className="text-[11px] font-bold rounded px-2 py-0.5 flex items-center gap-1 border" style={{ backgroundColor: cor.bg, borderColor: cor.border, color: cor.text }}>
                         <Layers size={10} /> {area}
                       </span>
                       <span className="text-[10px] text-torg-gray">{ts.length} tarefa{ts.length > 1 ? "s" : ""}</span>
@@ -1899,18 +1954,13 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
                       )}
                     </div>
                     {!areasCollapsed.has(area) && (
-                      <div className="ml-3 pl-2 border-l border-amber-100 space-y-1 pb-1">
+                      <div className="ml-3 pl-2 border-l space-y-1 pb-1" style={{ borderColor: cor.border + "77" }}>
                         {ts.map((t) => linhaTarefa(t))}
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div key="__sem_area__" className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-wide text-torg-gray/70 px-1 pt-1">Sem área</p>
-                    {ts.map((t) => linhaTarefa(t))}
-                  </div>
-                )
-              )}
+                );
+              })}
           {tasks.length === 0 && (
             <p className="text-xs text-torg-gray italic py-2">Nenhuma tarefa neste departamento.</p>
           )}
@@ -1990,6 +2040,8 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
               </div>
             </div>
           ))}
+          </>
+          )}
         </div>
       )}
     </div>
@@ -2128,6 +2180,32 @@ function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTa
       setSavingTask(false);
     }
   }
+}
+
+// Lista de reordenação (staged): move com ↑/↓, sem tocar no servidor até salvar.
+function ReorderTarefas({ ordem, onMove }) {
+  return (
+    <div className="space-y-1">
+      {ordem.map((t, i) => {
+        const c = t.area ? corDaArea(t.area) : null;
+        return (
+          <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 border border-gray-100 rounded bg-white">
+            <div className="flex flex-col leading-none">
+              <button onClick={() => onMove(i, -1)} disabled={i === 0} className="text-torg-gray hover:text-torg-blue disabled:opacity-25"><ChevronUp size={13} /></button>
+              <button onClick={() => onMove(i, 1)} disabled={i === ordem.length - 1} className="text-torg-gray hover:text-torg-blue disabled:opacity-25"><ChevronDown size={13} /></button>
+            </div>
+            <span className="text-[10px] text-torg-gray w-5 text-right tabular-nums">{i + 1}</span>
+            <span className="text-xs text-torg-dark truncate flex-1">{t.nome}</span>
+            {c && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded border shrink-0" style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text }}>
+                {t.area}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, readOnly }) {
@@ -2341,11 +2419,11 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, rea
               </datalist>
             </>
           )}
-          {!editing && t.area && (
-            <span className="text-[9px] text-amber-800 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0" title={`Área: ${t.area}`}>
+          {!editing && t.area && (() => { const c = corDaArea(t.area); return (
+            <span className="text-[9px] px-1.5 py-0.5 rounded border flex items-center gap-0.5 shrink-0" style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text }} title={`Área: ${t.area}`}>
               <Layers size={8} /> {t.area}
             </span>
-          )}
+          ); })()}
           {t.isSummary && <span className="text-[9px] text-torg-gray bg-gray-100 px-1 rounded">grupo</span>}
           {!editing && bloqueada && (() => {
             const nomes = antecessorasIncompletas.map((aid) => {
