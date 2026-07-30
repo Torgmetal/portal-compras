@@ -1108,6 +1108,7 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const [gerarInicio, setGerarInicio] = useState("");
   const [gerarPreview, setGerarPreview] = useState(null);
   const [gerando, setGerando] = useState(false);
+  const [encadearSetor, setEncadearSetor] = useState(true); // encadeia tarefas do mesmo setor em sequência
 
   const now = new Date();
   const tarefas = detail.tarefas || [];
@@ -1142,7 +1143,7 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const gerarDatas = async (aplicar) => {
     setGerando(true);
     try {
-      const body = { aplicar };
+      const body = { aplicar, encadearSetor };
       if (gerarInicio) body.dataInicioProjeto = new Date(gerarInicio + "T12:00:00Z").toISOString();
       const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/gerar-datas`, {
         method: "POST",
@@ -1325,6 +1326,11 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
                   {gerando ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Calcular prévia
                 </button>
               </div>
+
+              <label className="flex items-start gap-2 text-[11px] text-torg-dark cursor-pointer select-none bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg px-2.5 py-1.5">
+                <input type="checkbox" checked={encadearSetor} onChange={(e) => { setEncadearSetor(e.target.checked); setGerarPreview(null); }} className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+                <span>Encadear as tarefas do <b>mesmo setor</b> em sequência quando não têm antecessora — assim basta a <b>duração</b> de cada uma pra montar o cronograma (não precisa amarrar antecessora em tudo).</span>
+              </label>
 
               {gerarPreview?.erro && (
                 <div className="px-3 py-2 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-1.5">
@@ -2327,6 +2333,39 @@ function ReorderTarefas({ ordem, onMove, areas }) {
   );
 }
 
+// Duração editável DIRETO na linha (o "Gerar Datas" usa isso). Salva no blur/Enter.
+function DuracaoInline({ tarefa, tipoDias, onSaved }) {
+  const [v, setV] = useState(tarefa.duracaoDias || 0);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setV(tarefa.duracaoDias || 0); }, [tarefa.duracaoDias]);
+  const salvar = async () => {
+    const nova = Math.max(0, Math.min(9999, parseInt(v) || 0));
+    if (nova === (tarefa.duracaoDias || 0)) return;
+    setSaving(true);
+    try {
+      await fetch(`/api/planejamento/cronogramas/tarefas/${tarefa.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ duracaoDias: nova }),
+      });
+      onSaved?.();
+    } catch { /* silencioso */ } finally { setSaving(false); }
+  };
+  const un = (tipoDias || "DU") === "DU" ? "du" : "dc";
+  return (
+    <span className="inline-flex items-center gap-0.5 shrink-0" title={`Duração em dias (${un === "du" ? "úteis" : "corridos"}) — usada no Gerar Datas`}>
+      <input
+        type="number" min={0} max={9999}
+        value={v || ""}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={salvar}
+        onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+        placeholder="dias"
+        className="w-12 text-[10px] text-center border border-gray-200 rounded px-1 py-0.5 focus:border-torg-blue outline-none"
+      />
+      <span className="text-[9px] text-torg-gray w-3">{saving ? "…" : un}</span>
+    </span>
+  );
+}
+
 function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, areas, readOnly }) {
   const [editing, setEditing] = useState(false);
   const [editNome, setEditNome] = useState(tarefa.nome);
@@ -2587,7 +2626,7 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, are
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[10px] text-torg-gray whitespace-nowrap">
             {fmtData(t.dataInicioPrevista)} — {fmtData(t.dataFimPrevista)}
-            {t.duracaoDias > 0 && (
+            {t.duracaoDias > 0 && (readOnly || t.isSummary) && (
               <span className="ml-1 text-torg-blue font-semibold" title={`Duração: ${t.duracaoDias} ${(tipoDias || "DU") === "DU" ? "dias úteis" : "dias corridos"}`}>
                 ({t.duracaoDias}d)
               </span>
@@ -2611,6 +2650,9 @@ function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDias, are
             </span>
           )}
 
+          {!readOnly && !editing && !t.isSummary && (
+            <DuracaoInline tarefa={t} tipoDias={tipoDias} onSaved={onRefresh} />
+          )}
           {!readOnly && !editing && !t.isSummary && (
             <button
               onClick={() => setEditing(true)}

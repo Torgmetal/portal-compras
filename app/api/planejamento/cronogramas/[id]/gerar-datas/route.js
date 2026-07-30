@@ -14,6 +14,7 @@ export const maxDuration = 20;
 const schema = z.object({
   dataInicioProjeto: z.string().datetime().optional(),
   aplicar: z.boolean().default(false),
+  encadearSetor: z.boolean().default(false), // encadeia tarefas do mesmo setor em sequência (quando sem antecessora)
 });
 
 export async function POST(req, { params }) {
@@ -53,6 +54,7 @@ export async function POST(req, { params }) {
   const { preview, error } = gerarDatasCronograma(cronograma.tarefas, {
     dataInicioProjeto: inicioProjeto,
     tipoDias: cronograma.tipoDias,
+    encadearSetor: parsed.data.encadearSetor,
   });
   if (error) {
     return NextResponse.json({ success: false, error }, { status: 400 });
