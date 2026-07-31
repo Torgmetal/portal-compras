@@ -81,6 +81,7 @@ export async function GET(req) {
     return {
       id: t.id,
       nome: t.nome,
+      area: t.area || null, // parte/frente da obra — distingue linhas de mesmo nome (ex.: "Aprovação do projeto" por área)
       departamento: t.departamento,
       dataInicioPrevista: t.dataInicioPrevista,
       dataFimPrevista: t.dataFimPrevista,

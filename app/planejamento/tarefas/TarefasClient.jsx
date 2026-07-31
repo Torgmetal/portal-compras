@@ -1141,12 +1141,12 @@ function AtividadesCronograma({ showToast }) {
         subtitulo: filtros || `${atividades.length} atividades · ${new Date().toLocaleDateString("pt-BR")}`,
         nomePlanilha: "Cronogramas",
         codigoDoc: "REL-PLN-001",
-        totalColunas: 9,
-        kpis: [`Total: ${atividades.length}  |  Atrasadas: ${atrasadas}  |  Em andamento: ${emAndamento}  |  Cumpridas: ${concluidas}`],
+        totalColunas: 10,
+        kpis: [`Total: ${atividades.length}  |  Atrasadas: ${atrasadas}  |  Em andamento: ${emAndamento}  |  Em hold: ${emHold}  |  Cumpridas: ${concluidas}`],
       });
-      [4, 10, 22, 14, 42, 11, 11, 6, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+      [4, 10, 20, 13, 34, 30, 10, 10, 6, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
       let row = linhaInicio;
-      adicionarHeaderTabela(ws, row, ["Nº", "OP", "Cliente", "Setor", "Atividade", "Início", "Prazo", "%", "Status"]);
+      adicionarHeaderTabela(ws, row, ["Nº", "OP", "Cliente", "Setor", "Atividade", "Área", "Início", "Prazo", "%", "Status"]);
       row++;
       const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
       const ordenadas = [...atividades].sort((a, b) =>
@@ -1157,7 +1157,7 @@ function AtividadesCronograma({ showToast }) {
         const status = a.concluida ? "Cumprida" : a.bloqueada ? "Hold / Bloqueada" : a.atrasada ? `Atrasada ${a.diasAtraso}d` : "No prazo";
         adicionarLinhaTabela(ws, row, [
           i + 1, fmtOP(a.opNumero), a.opCliente || "", DEPT_LABEL[a.departamento] || a.departamento || "",
-          a.nome, fmtD(a.dataInicioPrevista), fmtD(a.dataFimPrevista), `${a.percentualRealizado}%`, status,
+          a.nome, a.area || "", fmtD(a.dataInicioPrevista), fmtD(a.dataFimPrevista), `${a.percentualRealizado}%`, status,
         ]);
         row++;
       });
@@ -1288,7 +1288,10 @@ function AtividadesCronograma({ showToast }) {
                               <span className="text-xs font-bold text-torg-blue font-mono">{fmtOP(a.opNumero)}</span>
                               {a.opCliente && <p className="text-[10px] text-torg-gray truncate max-w-[120px]">{a.opCliente}</p>}
                             </td>
-                            <td className="px-3 py-2.5"><p className="text-xs font-medium text-torg-dark">{a.nome}</p></td>
+                            <td className="px-3 py-2.5">
+                              <p className="text-xs font-medium text-torg-dark">{a.nome}</p>
+                              {a.area && <p className="text-[10px] text-torg-gray">{a.area}</p>}
+                            </td>
                             <td className="px-3 py-2.5 text-center whitespace-nowrap"><span className="text-xs text-torg-dark">{fmtData(a.dataFimPrevista)}</span></td>
                             <td className="px-3 py-2.5 text-center"><span className={`text-xs font-bold ${a.atrasada ? "text-red-600" : "text-torg-dark"}`}>{a.percentualRealizado}%</span></td>
                             <td className="px-3 py-2.5 text-center">
@@ -1324,7 +1327,7 @@ function AtividadesCronograma({ showToast }) {
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         {cumpridas.map((a) => (
                           <span key={a.id} className="text-[10px] text-torg-gray bg-white border border-emerald-100 rounded px-1.5 py-0.5">
-                            <span className="font-mono text-emerald-700">{fmtOP(a.opNumero)}</span> · <span className="line-through">{a.nome}</span>
+                            <span className="font-mono text-emerald-700">{fmtOP(a.opNumero)}</span> · <span className="line-through">{a.nome}</span>{a.area ? <span className="text-torg-gray/70"> · {a.area}</span> : null}
                           </span>
                         ))}
                       </div>
@@ -1397,7 +1400,7 @@ function ModalPreencher({ atividade, onClose, onSalvo, onErro }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <p className="text-xs text-torg-gray mb-4">
-          <span className="font-mono font-semibold">{fmtOP(atividade.opNumero)}</span> · {DEPT_LABEL[atividade.departamento] || atividade.departamento} · {atividade.nome}
+          <span className="font-mono font-semibold">{fmtOP(atividade.opNumero)}</span> · {DEPT_LABEL[atividade.departamento] || atividade.departamento} · {atividade.nome}{atividade.area ? ` · ${atividade.area}` : ""}
         </p>
 
         <div className="mb-3">
