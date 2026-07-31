@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
   CheckCircle2, Clock, Circle, ListTodo, Bell, Send,
   GanttChart, AlertTriangle, Mail, User, Building2, CalendarClock, LayoutGrid, List,
-  MessageSquarePlus, ChevronDown, ChevronRight,
+  MessageSquarePlus, ChevronDown, ChevronRight, Pencil, Download,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
@@ -1078,6 +1078,8 @@ function AtividadesCronograma({ showToast }) {
   const [filtroOp, setFiltroOp] = useState("");
   const [notificarAtiv, setNotificarAtiv] = useState(null);
   const [expandidasCumpridas, setExpandidasCumpridas] = useState(() => new Set()); // setores com as "cumpridas" abertas
+  const [exportando, setExportando] = useState(false);
+  const [preencherAtiv, setPreencherAtiv] = useState(null); // atividade sendo preenchida (grava no cronograma)
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -1122,6 +1124,50 @@ function AtividadesCronograma({ showToast }) {
     return ordem.filter((d) => map.has(d)).map((d) => map.get(d));
   })();
 
+  // Exporta as atividades (respeitando os filtros) no padrão de planilha da Torg.
+  async function exportarRelatorio() {
+    if (!atividades.length) return;
+    setExportando(true);
+    try {
+      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, downloadWorkbook } = await import("@/lib/excel-relatorio");
+      const filtros = [
+        filtroDepto && `Setor: ${DEPT_LABEL[filtroDepto] || filtroDepto}`,
+        filtroStatus && `Status: ${filtroStatus}`,
+        filtroOp.trim() && `OP: ${filtroOp.trim()}`,
+      ].filter(Boolean).join("  |  ");
+      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
+        titulo: "Atividades dos Cronogramas — Planejamento",
+        subtitulo: filtros || `${atividades.length} atividades · ${new Date().toLocaleDateString("pt-BR")}`,
+        nomePlanilha: "Cronogramas",
+        codigoDoc: "REL-PLN-001",
+        totalColunas: 9,
+        kpis: [`Total: ${atividades.length}  |  Atrasadas: ${atrasadas}  |  Em andamento: ${emAndamento}  |  Cumpridas: ${concluidas}`],
+      });
+      [4, 10, 22, 14, 42, 11, 11, 6, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+      let row = linhaInicio;
+      adicionarHeaderTabela(ws, row, ["Nº", "OP", "Cliente", "Setor", "Atividade", "Início", "Prazo", "%", "Status"]);
+      row++;
+      const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
+      const ordenadas = [...atividades].sort((a, b) =>
+        (DEPTOS.indexOf(a.departamento) - DEPTOS.indexOf(b.departamento)) ||
+        (new Date(a.dataFimPrevista || 0) - new Date(b.dataFimPrevista || 0))
+      );
+      ordenadas.forEach((a, i) => {
+        const status = a.concluida ? "Cumprida" : a.atrasada ? `Atrasada ${a.diasAtraso}d` : "No prazo";
+        adicionarLinhaTabela(ws, row, [
+          i + 1, fmtOP(a.opNumero), a.opCliente || "", DEPT_LABEL[a.departamento] || a.departamento || "",
+          a.nome, fmtD(a.dataInicioPrevista), fmtD(a.dataFimPrevista), `${a.percentualRealizado}%`, status,
+        ]);
+        row++;
+      });
+      await downloadWorkbook(workbook, `Torg_Cronogramas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e) {
+      showToast?.("Erro ao exportar: " + e.message, "erro");
+    } finally {
+      setExportando(false);
+    }
+  }
+
   return (
     <>
       {/* Filtros */}
@@ -1152,6 +1198,11 @@ function AtividadesCronograma({ showToast }) {
         </button>
         <button onClick={carregar} className="p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100">
           <RefreshCw size={14} />
+        </button>
+        <button onClick={exportarRelatorio} disabled={exportando || !atividades.length}
+          className="px-3 py-1.5 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50"
+          title="Exportar as atividades filtradas em Excel (padrão Torg)">
+          {exportando ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Exportar
         </button>
       </div>
 
@@ -1237,7 +1288,8 @@ function AtividadesCronograma({ showToast }) {
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-medium rounded-full"><Clock size={10} /> No prazo</span>
                               )}
                             </td>
-                            <td className="px-3 py-2.5 text-center">
+                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                              <button onClick={() => setPreencherAtiv(a)} className="p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100 transition-colors" title="Preencher / atualizar direto no cronograma"><Pencil size={14} /></button>
                               <button onClick={() => setNotificarAtiv(a)} className="p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100 transition-colors" title="Notificar por e-mail"><Mail size={14} /></button>
                             </td>
                           </tr>
@@ -1281,7 +1333,90 @@ function AtividadesCronograma({ showToast }) {
           onErro={(msg) => showToast(msg, "erro")}
         />
       )}
+
+      {preencherAtiv && (
+        <ModalPreencher
+          atividade={preencherAtiv}
+          onClose={() => setPreencherAtiv(null)}
+          onSalvo={(msg) => { setPreencherAtiv(null); showToast(msg, "sucesso"); carregar(); }}
+          onErro={(msg) => showToast(msg, "erro")}
+        />
+      )}
     </>
+  );
+}
+
+// ─── Modal Preencher — atualiza a atividade DIRETO no cronograma (CronogramaTarefa) ──
+function ModalPreencher({ atividade, onClose, onSalvo, onErro }) {
+  const [pct, setPct] = useState(Number(atividade.percentualRealizado) || 0);
+  const [dataReal, setDataReal] = useState("");
+  const [obs, setObs] = useState(atividade.observacao || "");
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      const body = {
+        percentualRealizado: Math.max(0, Math.min(100, Number(pct) || 0)),
+        observacao: obs.trim() || null,
+      };
+      if (dataReal) body.dataFimReal = new Date(dataReal + "T12:00:00Z").toISOString();
+      const res = await fetch(`/api/planejamento/cronogramas/tarefas/${atividade.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      const j = await res.json();
+      if (!res.ok || j.success === false) throw new Error(j.error || "Erro ao salvar");
+      onSalvo("Cronograma atualizado.");
+    } catch (e) {
+      onErro?.(e.message);
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-1">
+          <p className="text-base font-bold text-torg-dark flex items-center gap-2"><Pencil size={16} className="text-torg-blue" /> Preencher no cronograma</p>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <p className="text-xs text-torg-gray mb-4">
+          <span className="font-mono font-semibold">{fmtOP(atividade.opNumero)}</span> · {DEPT_LABEL[atividade.departamento] || atividade.departamento} · {atividade.nome}
+        </p>
+
+        <div className="mb-3">
+          <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">% concluído</span>
+          <div className="flex items-center gap-2 mt-1">
+            <input type="number" min={0} max={100} value={pct} onChange={(e) => setPct(e.target.value)}
+              className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue outline-none" />
+            <button onClick={() => setPct(100)} className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2 hover:bg-emerald-100 flex items-center gap-1">
+              <CheckCircle2 size={13} /> Marcar cumprida (100%)
+            </button>
+          </div>
+        </div>
+
+        <label className="block mb-3">
+          <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Data de conclusão <span className="text-gray-400">(opcional)</span></span>
+          <input type="date" value={dataReal} onChange={(e) => setDataReal(e.target.value)}
+            className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue outline-none" />
+        </label>
+
+        <label className="block mb-4">
+          <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Observação / evento</span>
+          <textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={3}
+            placeholder="O que foi feito / status desta atividade…"
+            className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue outline-none" />
+        </label>
+
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onClose} className="text-sm text-torg-gray hover:text-torg-dark px-3 py-1.5">Cancelar</button>
+          <button onClick={salvar} disabled={salvando}
+            className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-dark px-4 py-1.5 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50">
+            {salvando ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Salvar no cronograma
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
