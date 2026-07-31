@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
   CheckCircle2, Clock, Circle, ListTodo, Bell, Send,
   GanttChart, AlertTriangle, Mail, User, Building2, CalendarClock, LayoutGrid, List,
-  MessageSquarePlus, ChevronDown, ChevronRight, Pencil, Download,
+  MessageSquarePlus, ChevronDown, ChevronRight, Pencil, Download, Lock,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
@@ -1109,7 +1109,8 @@ function AtividadesCronograma({ showToast }) {
 
   const atrasadas = atividades.filter((a) => a.atrasada).length;
   const concluidas = atividades.filter((a) => a.concluida).length;
-  const emAndamento = atividades.length - atrasadas - concluidas;
+  const emHold = atividades.filter((a) => a.bloqueada).length;
+  const emAndamento = atividades.length - atrasadas - concluidas - emHold;
 
   const toggleCumpridas = (dept) => setExpandidasCumpridas((s) => { const n = new Set(s); n.has(dept) ? n.delete(dept) : n.add(dept); return n; });
   // Agrupa por SETOR: ativas (detalhadas) + cumpridas (100% → só "cumprida", sem descrever).
@@ -1153,7 +1154,7 @@ function AtividadesCronograma({ showToast }) {
         (new Date(a.dataFimPrevista || 0) - new Date(b.dataFimPrevista || 0))
       );
       ordenadas.forEach((a, i) => {
-        const status = a.concluida ? "Cumprida" : a.atrasada ? `Atrasada ${a.diasAtraso}d` : "No prazo";
+        const status = a.concluida ? "Cumprida" : a.bloqueada ? "Hold / Bloqueada" : a.atrasada ? `Atrasada ${a.diasAtraso}d` : "No prazo";
         adicionarLinhaTabela(ws, row, [
           i + 1, fmtOP(a.opNumero), a.opCliente || "", DEPT_LABEL[a.departamento] || a.departamento || "",
           a.nome, fmtD(a.dataInicioPrevista), fmtD(a.dataFimPrevista), `${a.percentualRealizado}%`, status,
@@ -1221,6 +1222,11 @@ function AtividadesCronograma({ showToast }) {
               {emAndamento} em andamento
             </span>
           )}
+          {emHold > 0 && (
+            <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-[11px] font-medium rounded-full border border-slate-200 flex items-center gap-1">
+              <Lock size={11} /> {emHold} em hold
+            </span>
+          )}
           {concluidas > 0 && (
             <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[11px] font-medium rounded-full border border-emerald-200">
               {concluidas} concluída{concluidas > 1 ? "s" : ""}
@@ -1251,6 +1257,7 @@ function AtividadesCronograma({ showToast }) {
         <div className="space-y-3">
           {gruposSetor.map(({ dept, ativas, cumpridas }) => {
             const atrasadasDept = ativas.filter((a) => a.atrasada).length;
+            const emHoldDept = ativas.filter((a) => a.bloqueada).length;
             return (
               <div key={dept} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 {/* Cabeçalho do setor */}
@@ -1261,6 +1268,9 @@ function AtividadesCronograma({ showToast }) {
                   <span className="text-[11px] text-torg-gray">{ativas.length} pendente{ativas.length !== 1 ? "s" : ""}</span>
                   {atrasadasDept > 0 && (
                     <span className="text-[11px] font-semibold text-red-600 flex items-center gap-0.5"><AlertTriangle size={10} /> {atrasadasDept} atrasada{atrasadasDept > 1 ? "s" : ""}</span>
+                  )}
+                  {emHoldDept > 0 && (
+                    <span className="text-[11px] font-medium text-slate-600 flex items-center gap-0.5"><Lock size={10} /> {emHoldDept} em hold</span>
                   )}
                   {cumpridas.length > 0 && (
                     <span className="text-[11px] text-emerald-600 flex items-center gap-0.5 ml-auto"><CheckCircle2 size={10} /> {cumpridas.length} cumprida{cumpridas.length > 1 ? "s" : ""}</span>
@@ -1282,7 +1292,9 @@ function AtividadesCronograma({ showToast }) {
                             <td className="px-3 py-2.5 text-center whitespace-nowrap"><span className="text-xs text-torg-dark">{fmtData(a.dataFimPrevista)}</span></td>
                             <td className="px-3 py-2.5 text-center"><span className={`text-xs font-bold ${a.atrasada ? "text-red-600" : "text-torg-dark"}`}>{a.percentualRealizado}%</span></td>
                             <td className="px-3 py-2.5 text-center">
-                              {a.atrasada ? (
+                              {a.bloqueada ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-semibold rounded-full" title={a.motivoBloqueio || "Em hold"}><Lock size={10} /> Hold</span>
+                              ) : a.atrasada ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-semibold rounded-full"><AlertTriangle size={10} /> {a.diasAtraso}d</span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-medium rounded-full"><Clock size={10} /> No prazo</span>
@@ -1351,6 +1363,8 @@ function ModalPreencher({ atividade, onClose, onSalvo, onErro }) {
   const [pct, setPct] = useState(Number(atividade.percentualRealizado) || 0);
   const [dataReal, setDataReal] = useState("");
   const [obs, setObs] = useState(atividade.observacao || "");
+  const [hold, setHold] = useState(!!atividade.bloqueada);
+  const [motivoBloq, setMotivoBloq] = useState(atividade.motivoBloqueio || "");
   const [salvando, setSalvando] = useState(false);
 
   async function salvar() {
@@ -1359,6 +1373,8 @@ function ModalPreencher({ atividade, onClose, onSalvo, onErro }) {
       const body = {
         percentualRealizado: Math.max(0, Math.min(100, Number(pct) || 0)),
         observacao: obs.trim() || null,
+        // Hold/Bloqueio: motivo preenchido = bloqueada (não conta atrasada + trava no cronograma); vazio = libera.
+        motivoBloqueio: hold ? (motivoBloq.trim() || "Em hold — aguardando liberação") : null,
       };
       if (dataReal) body.dataFimReal = new Date(dataReal + "T12:00:00Z").toISOString();
       const res = await fetch(`/api/planejamento/cronogramas/tarefas/${atividade.id}`, {
@@ -1393,6 +1409,20 @@ function ModalPreencher({ atividade, onClose, onSalvo, onErro }) {
               <CheckCircle2 size={13} /> Marcar cumprida (100%)
             </button>
           </div>
+        </div>
+
+        {/* Hold / Bloqueio */}
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/40 p-3">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={hold} onChange={(e) => setHold(e.target.checked)} className="rounded border-gray-300 text-amber-600 focus:ring-amber-500" />
+            <span className="text-xs font-semibold text-amber-800 flex items-center gap-1"><Lock size={13} /> Colocar em Hold / Bloqueio</span>
+          </label>
+          {hold && (
+            <input value={motivoBloq} onChange={(e) => setMotivoBloq(e.target.value)}
+              placeholder="Motivo (ex.: aguardando liberação do cliente)"
+              className="mt-2 w-full border border-amber-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-500" />
+          )}
+          <p className="text-[10px] text-amber-700 mt-1.5">Em hold, a tarefa <b>não conta como atrasada</b> e <b>trava a sequência no cronograma</b>. Ao liberar, é só desmarcar.</p>
         </div>
 
         <label className="block mb-3">

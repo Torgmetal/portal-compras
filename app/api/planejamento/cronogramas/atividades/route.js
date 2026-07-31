@@ -73,26 +73,32 @@ export async function GET(req) {
   });
 
   const now = new Date();
-  const result = tarefas.map((t) => ({
-    id: t.id,
-    nome: t.nome,
-    departamento: t.departamento,
-    dataInicioPrevista: t.dataInicioPrevista,
-    dataFimPrevista: t.dataFimPrevista,
-    percentualRealizado: t.percentualRealizado,
-    observacao: t.observacao,
-    opNumero: t.cronograma.opNumero,
-    opCliente: t.cronograma.op?.cliente || null,
-    opClienteEmail: t.cronograma.op?.clienteEmail || null,
-    opClienteContato: t.cronograma.op?.clienteContato || null,
-    cronogramaId: t.cronograma.id,
-    cronogramaTitulo: t.cronograma.titulo,
-    atrasada: !!(t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100),
-    concluida: t.percentualRealizado >= 100,
-    diasAtraso: t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100
-      ? Math.ceil((now - new Date(t.dataFimPrevista)) / 86400000)
-      : 0,
-  }));
+  const result = tarefas.map((t) => {
+    // Em hold/bloqueada = tem motivo de bloqueio e ainda NÃO foi liberada.
+    // Enquanto bloqueada NÃO conta como atrasada (aguardando liberação, ex.: do cliente).
+    const bloqueada = !!(t.motivoBloqueio && !t.dataLiberacao);
+    const venceu = !!(t.dataFimPrevista && new Date(t.dataFimPrevista) < now && t.percentualRealizado < 100);
+    return {
+      id: t.id,
+      nome: t.nome,
+      departamento: t.departamento,
+      dataInicioPrevista: t.dataInicioPrevista,
+      dataFimPrevista: t.dataFimPrevista,
+      percentualRealizado: t.percentualRealizado,
+      observacao: t.observacao,
+      opNumero: t.cronograma.opNumero,
+      opCliente: t.cronograma.op?.cliente || null,
+      opClienteEmail: t.cronograma.op?.clienteEmail || null,
+      opClienteContato: t.cronograma.op?.clienteContato || null,
+      cronogramaId: t.cronograma.id,
+      cronogramaTitulo: t.cronograma.titulo,
+      atrasada: venceu && !bloqueada,
+      concluida: t.percentualRealizado >= 100,
+      bloqueada,
+      motivoBloqueio: t.motivoBloqueio || null,
+      diasAtraso: venceu && !bloqueada ? Math.ceil((now - new Date(t.dataFimPrevista)) / 86400000) : 0,
+    };
+  });
 
   return NextResponse.json({ success: true, atividades: result });
 }
