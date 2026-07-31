@@ -3,22 +3,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Wrench, Flame,
-  Wind, Paintbrush, Package, Target, ListOrdered, Sparkles, Gauge, FileText, Truck, Tv,
+  Wind, Paintbrush, Package, Target, ListOrdered, Sparkles, Gauge, FileText, Truck, Tv, FolderKanban,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
+  // Ordem definida pelo Vitor (30/07). "OPs" é atalho pro módulo comercial.
   // O acompanhamento ao vivo do corte (Syneco) vive dentro do Painel —
   // a página /pcp/corte segue existindo, linkada por lá ("detalhes").
+  { href: "/comercial",        label: "OPs",              icon: FolderKanban },
   { href: "/pcp",              label: "Painel",           icon: LayoutDashboard, exact: true },
+  { href: "/pcp/relatorio-corte", label: "Relatório de Produção", icon: FileText },
   { href: "/pcp/pmp",          label: "PMP",              icon: Target },
+  { href: "/pcp/dashboard-prioridades", label: "Prioridades (TV)", icon: Tv },
   { href: "/pcp/pecas-corte",  label: "Programação",      icon: Package },
-  { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
   { href: "/pcp/terceirizados", label: "Terceirizados",   icon: Truck },
   { href: "/pcp/carga-corte",  label: "Carga do Corte",   icon: Gauge },
-  { href: "/pcp/relatorio-corte", label: "Relatório de Produção", icon: FileText },
-  { href: "/pcp/dashboard-prioridades", label: "Prioridades (TV)", icon: Tv },
+  { href: "/pcp/fila-corte",   label: "Corte",            icon: ListOrdered },
   { href: "/pcp/montagem",     label: "Montagem",         icon: Wrench },
   { href: "/pcp/solda",        label: "Solda",            icon: Flame },
   { href: "/pcp/acabamento",   label: "Acabamento",       icon: Sparkles },
