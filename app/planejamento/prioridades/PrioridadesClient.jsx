@@ -131,7 +131,7 @@ function ObraCard({ obra }) {
           {obra.atrasoMax > 0 && <p className="text-[11px] font-bold text-red-300 mt-0.5">⚠ {obra.atrasoMax}d atraso</p>}
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {obra.setores.map((s) => <SetorLinha key={s.setor} s={s} />)}
       </div>
     </div>
@@ -143,36 +143,38 @@ function SetorLinha({ s }) {
   const cor = COR[sit] || COR.SEM_DATA;
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] font-bold uppercase tracking-wide text-slate-200 w-[92px] shrink-0">{SETOR_LABEL[s.setor] || s.setor}</span>
-        <div className="flex-1 h-2.5 rounded-full bg-white/10 overflow-hidden">
-          <div className={`h-full rounded-full ${cor.barra}`} style={{ width: `${Math.min(100, s.pct)}%`, transition: "width .6s ease" }} />
-        </div>
-        <span className={`text-[13px] font-bold tabular-nums w-9 text-right ${cor.texto}`}>{s.pct}%</span>
-        <span className="w-[74px] text-right text-[12px] shrink-0">
+      {/* Linha 1: rótulo do setor + % e status (sem disputar espaço com a barra) */}
+      <div className="flex items-baseline justify-between gap-2 mb-1">
+        <span className="text-[13px] font-bold uppercase tracking-wide text-slate-200 truncate">{SETOR_LABEL[s.setor] || s.setor}</span>
+        <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+          <span className={`text-sm font-bold tabular-nums ${cor.texto}`}>{s.pct}%</span>
           {s.concluida ? (
-            <span className="text-emerald-300 inline-flex items-center gap-0.5 justify-end"><CheckCircle2 size={12} /> ok</span>
+            <span className="text-[12px] text-emerald-300 inline-flex items-center gap-0.5"><CheckCircle2 size={12} /> ok</span>
           ) : s.bloqueada ? (
-            <span className="text-slate-300 inline-flex items-center gap-0.5 justify-end"><Lock size={11} /> hold</span>
+            <span className="text-[12px] text-slate-300 inline-flex items-center gap-0.5"><Lock size={11} /> hold</span>
           ) : s.atrasoDias > 0 ? (
-            <span className="text-red-300 font-bold inline-flex items-center gap-0.5 justify-end"><AlertTriangle size={11} /> {s.atrasoDias}d</span>
+            <span className="text-[12px] text-red-300 font-bold inline-flex items-center gap-0.5"><AlertTriangle size={11} /> {s.atrasoDias}d atraso</span>
           ) : (
-            <span className="text-slate-300 inline-flex items-center gap-0.5 justify-end"><CalendarClock size={11} /> {fmtData(s.entrega)}</span>
+            <span className="text-[12px] text-slate-300 inline-flex items-center gap-0.5"><CalendarClock size={11} /> {fmtData(s.entrega)}</span>
           )}
-        </span>
+        </div>
+      </div>
+      {/* Linha 2: barra de progresso em LARGURA CHEIA (não cobre mais nada) */}
+      <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+        <div className={`h-full rounded-full ${cor.barra}`} style={{ width: `${Math.min(100, s.pct)}%`, transition: "width .6s ease" }} />
       </div>
       {/* Fabricação: sub-etapas (separada) ou dias de execução (unificada) */}
       {s.setor === "FABRICACAO" && s.subEtapas && (
-        <div className="flex flex-wrap gap-1 mt-1 ml-[100px]">
+        <div className="flex flex-wrap gap-1 mt-1.5">
           {s.subEtapas.map((e, i) => (
-            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-slate-300 border border-white/10">
+            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-slate-300 border border-white/10 whitespace-nowrap">
               {e.nome} <span className="text-slate-400">{e.pct}%{e.entrega ? ` · ${fmtData(e.entrega)}` : ""}</span>
             </span>
           ))}
         </div>
       )}
       {s.setor === "FABRICACAO" && s.unificada && !s.concluida && (
-        <p className="text-[10px] text-slate-400 mt-0.5 ml-[100px]">Unificada · ~{s.duracaoFab || "?"} dia{s.duracaoFab === 1 ? "" : "s"} de execução na produção</p>
+        <p className="text-[10px] text-slate-400 mt-1">Unificada · ~{s.duracaoFab || "?"} dia{s.duracaoFab === 1 ? "" : "s"} de execução na produção</p>
       )}
     </div>
   );
