@@ -47,7 +47,15 @@ const opMaeNumero = (p) => {
   const raw = p.op?.numero || (String(p.opNumero || "").match(/\d+/) || [])[0] || "";
   return raw ? String(parseInt(raw, 10)) : "";
 };
-const parteDe = (p) => String(p.opNumero || "").replace(/^T?\d+/i, "").toUpperCase() || "—";
+// Parte/fase da obra = letra(s) logo após o número da OP. Vem da MARCA (T104A1 → "A",
+// T104B3 → "B", T104-AC1 → "AC") — padrão Tekla confiável; o opNumero às vezes vem só
+// com o número (ex.: "104"), por isso a marca é a fonte primária. Sem letra → "—".
+const parteDe = (p) => {
+  const daMarca = (String(p.marca || "").toUpperCase().replace(/^T?\s*\d+\s*[-_.]?\s*/, "").match(/^[A-Z]+/) || [])[0];
+  if (daMarca) return daMarca;
+  const doOp = String(p.opNumero || "").replace(/^T?\d+/i, "").toUpperCase();
+  return doOp || "—";
+};
 // Tipo de perfil = letras iniciais da descrição/perfil: "CH9.50X113"→"CH",
 // "W200X26.6"→"W", "L1.1/2X1/8"→"L", "TUBO250X150"→"TUBO".
 const tipoPerfil = (p) => {
