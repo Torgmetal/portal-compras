@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, RefreshCw, Scissors, Clock, PackageSearch, Gauge } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Scissors, Clock, PackageSearch, Gauge, ChevronDown, ChevronRight } from "lucide-react";
 import { MAQUINA_COR } from "@/lib/maquina-corte";
 
 const fmtKg = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
@@ -11,6 +11,25 @@ export default function CargaCorteClient() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(null);
+  const [expandidas, setExpandidas] = useState(() => new Set()); // máquinas expandidas
+  const [pecasMaq, setPecasMaq] = useState({}); // maquina -> peças (carregadas sob demanda)
+  const [loadingMaq, setLoadingMaq] = useState({});
+
+  // Expande/recolhe uma máquina; busca as peças do backlog na 1ª vez.
+  const toggleMaq = async (maq) => {
+    setExpandidas((s) => { const n = new Set(s); n.has(maq) ? n.delete(maq) : n.add(maq); return n; });
+    if (pecasMaq[maq] !== undefined) return;
+    setLoadingMaq((l) => ({ ...l, [maq]: true }));
+    try {
+      const res = await fetch(`/api/pcp/carga-corte/pecas?maquina=${encodeURIComponent(maq)}`);
+      const j = await res.json();
+      setPecasMaq((pm) => ({ ...pm, [maq]: j.pecas || [] }));
+    } catch {
+      setPecasMaq((pm) => ({ ...pm, [maq]: [] }));
+    } finally {
+      setLoadingMaq((l) => ({ ...l, [maq]: false }));
+    }
+  };
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -132,10 +151,15 @@ export default function CargaCorteClient() {
                       style={{ width: `${Math.min(100, ((m.diasCarga || 0) / maxDias) * 100)}%` }}
                     />
                   </div>
-                  <p className="text-[11px] text-torg-gray mt-1 tabular-nums">
+                  <button
+                    onClick={() => toggleMaq(m.maquina)}
+                    className="text-[11px] text-torg-gray mt-1 tabular-nums flex items-center gap-1 hover:text-torg-blue"
+                    title="Ver as peças lançadas nesta máquina"
+                  >
+                    {expandidas.has(m.maquina) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                     {m.backlogPecas} peças · {fmtKg(m.backlogKg)}
                     {m.iniciadas > 0 && <span className="text-amber-600"> · {m.iniciadas} já iniciadas</span>}
-                  </p>
+                  </button>
                 </div>
 
                 {/* Em andamento agora (Syneco) */}
@@ -158,6 +182,44 @@ export default function CargaCorteClient() {
                     </span>
                   )}
                 </div>
+
+                {/* Peças lançadas na máquina (expandível) */}
+                {expandidas.has(m.maquina) && (
+                  <div className="pt-2 border-t border-gray-100">
+                    {loadingMaq[m.maquina] ? (
+                      <p className="text-[11px] text-torg-gray flex items-center gap-1.5 py-1"><Loader2 size={12} className="animate-spin" /> carregando peças…</p>
+                    ) : pecasMaq[m.maquina]?.length ? (
+                      <div className="max-h-72 overflow-y-auto overflow-x-auto -mx-1">
+                        <table className="w-full text-[11px]">
+                          <thead className="text-torg-gray bg-gray-50/70 sticky top-0"><tr className="text-left">
+                            <th className="px-1.5 py-1 font-medium">Marca</th>
+                            <th className="px-1.5 py-1 font-medium">OP</th>
+                            <th className="px-1.5 py-1 font-medium">Perfil / descrição</th>
+                            <th className="px-1.5 py-1 font-medium text-right">Qtd</th>
+                            <th className="px-1.5 py-1 font-medium text-right">Peso</th>
+                          </tr></thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {pecasMaq[m.maquina].map((p) => (
+                              <tr key={p.id} className={p.iniciada ? "bg-amber-50/40" : ""}>
+                                <td className="px-1.5 py-1 font-mono text-torg-dark whitespace-nowrap">
+                                  {p.marca}{p.iniciada && <span className="ml-1 text-[9px] text-amber-600">iniciada</span>}
+                                </td>
+                                <td className="px-1.5 py-1 text-torg-gray whitespace-nowrap">{p.op || "—"}</td>
+                                <td className="px-1.5 py-1 text-torg-gray truncate max-w-[190px]" title={`${p.perfil || ""} ${p.descricao || ""}`.trim()}>
+                                  {p.perfil || p.descricao || "—"}{p.comprimentoMm ? ` · ${(p.comprimentoMm / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} m` : ""}
+                                </td>
+                                <td className="px-1.5 py-1 text-right tabular-nums whitespace-nowrap">{p.restante}{p.qteProduzida > 0 ? ` / ${p.qte}` : ""}</td>
+                                <td className="px-1.5 py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(p.pesoKg)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-torg-gray py-1">Sem peças no backlog desta máquina.</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
