@@ -94,6 +94,11 @@ export async function GET() {
       if (atrasoDias > atrasoMax) atrasoMax = atrasoDias;
     }
 
+    // A TV mostra só o que falta: tira as etapas 100% concluídas — e a obra inteira
+    // quando não sobra nenhuma etapa pendente (obra 100%).
+    const setoresVisiveis = setores.filter((s) => !s.concluida);
+    if (!setoresVisiveis.length) continue;
+
     const pctGeral = Math.round(c.tarefas.reduce((a, t) => a + (t.percentualRealizado || 0), 0) / c.tarefas.length);
     obras.push({
       cronogramaId: c.id,
@@ -103,7 +108,16 @@ export async function GET() {
       pctGeral,
       atrasoMax,
       urgenciaFim: urgenciaFim ? urgenciaFim.toISOString() : null,
-      setores: setores.map((s) => ({ ...s, entrega: s.entrega?.toISOString() || null, inicio: s.inicio?.toISOString() || null, subEtapas: s.subEtapas?.map((e) => ({ ...e, entrega: e.entrega?.toISOString() || null })) || null })),
+      setores: setoresVisiveis.map((s) => {
+        // Dentro da Fabricação, também esconde as fases (sub-etapas) já 100%.
+        const sub = s.subEtapas ? s.subEtapas.filter((e) => (e.pct || 0) < 100) : null;
+        return {
+          ...s,
+          entrega: s.entrega?.toISOString() || null,
+          inicio: s.inicio?.toISOString() || null,
+          subEtapas: sub && sub.length ? sub.map((e) => ({ ...e, entrega: e.entrega?.toISOString() || null })) : null,
+        };
+      }),
     });
   }
 
