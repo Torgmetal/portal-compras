@@ -77,8 +77,10 @@ export async function DELETE(req) {
     return NextResponse.json({ error: e.message }, { status });
   }
 
-  // Suporta exclusao em lote via body JSON { ops: ["85","86"] } OU single via ?op=X
+  // Suporta: ?op=X (uma OP), body { ops: [...] } (várias OPs) OU body { ids: [...] }
+  // (peças específicas selecionadas na tela).
   let opsParaDeletar = [];
+  let idsParaDeletar = [];
   const opQuery = new URL(req.url, "http://n").searchParams.get("op");
   if (opQuery) {
     opsParaDeletar = [opQuery];
@@ -88,35 +90,39 @@ export async function DELETE(req) {
       if (Array.isArray(body.ops) && body.ops.length > 0) {
         opsParaDeletar = body.ops.filter((o) => typeof o === "string" && o.trim());
       }
+      if (Array.isArray(body.ids) && body.ids.length > 0) {
+        idsParaDeletar = body.ids.filter((i) => typeof i === "string" && i.trim());
+      }
     } catch {
-      // body vazio — segue sem ops
+      // body vazio — segue sem ops/ids
     }
   }
 
-  if (opsParaDeletar.length === 0) {
-    return NextResponse.json({ error: "Informe ao menos uma OP para excluir (query ?op= ou body { ops: [] })" }, { status: 400 });
+  if (opsParaDeletar.length === 0 && idsParaDeletar.length === 0) {
+    return NextResponse.json({ error: "Informe OP(s) (?op= ou body { ops: [] }) ou peças (body { ids: [] })" }, { status: 400 });
   }
 
   try {
+    const porIds = idsParaDeletar.length > 0;
     const deleted = await prisma.pecaConjunto.deleteMany({
-      where: { opNumero: { in: opsParaDeletar } },
+      where: porIds ? { id: { in: idsParaDeletar } } : { opNumero: { in: opsParaDeletar } },
     });
 
     try {
       await prisma.auditLog.create({
         data: {
           userId: user.id,
-          action: "DELETE_PECAS_LOTE",
+          action: porIds ? "DELETE_PECAS_SELECIONADAS" : "DELETE_PECAS_LOTE",
           entity: "PecaConjunto",
-          entityId: opsParaDeletar.join(","),
-          diff: { ops: opsParaDeletar, totalRemovidas: deleted.count },
+          entityId: (porIds ? idsParaDeletar : opsParaDeletar).slice(0, 50).join(","),
+          diff: porIds ? { ids: idsParaDeletar.length, totalRemovidas: deleted.count } : { ops: opsParaDeletar, totalRemovidas: deleted.count },
         },
       });
     } catch (auditErr) {
       console.error("[pecas DELETE] falha no audit log:", auditErr?.message);
     }
 
-    return NextResponse.json({ ok: true, removidas: deleted.count, ops: opsParaDeletar });
+    return NextResponse.json({ ok: true, removidas: deleted.count, ...(porIds ? { ids: idsParaDeletar.length } : { ops: opsParaDeletar }) });
   } catch (e) {
     console.error("[pecas DELETE] erro:", e?.message);
     return NextResponse.json({ error: e?.message || "Erro ao excluir" }, { status: 500 });

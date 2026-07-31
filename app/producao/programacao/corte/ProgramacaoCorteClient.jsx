@@ -519,6 +519,28 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
     }
   }
 
+  // Excluir as peças SELECIONADAS (subconjunto por id).
+  async function excluirSelecionados() {
+    const ids = [...selecionados];
+    if (!ids.length) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/producao/pecas`, {
+        method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro");
+      const setIds = new Set(ids);
+      setPecas((prev) => prev.filter((p) => !setIds.has(p.id)));
+      setSelecionados(new Set());
+    } catch (e) {
+      alert("Erro ao excluir: " + e.message);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(null);
+    }
+  }
+
   // Importar producao do Syneco
   async function importarSyneco() {
     const opNum = synecoOpSelecionada || filtroOp;
@@ -1297,6 +1319,17 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                 Reverter para Pendente
               </button>
             )}
+            {isAdmin && (
+              <button
+                onClick={() => setConfirmDelete({ tipo: "selecionadas", count: selecionados.size })}
+                disabled={deleting}
+                title="Excluir as peças selecionadas"
+                className="px-3 py-1.5 text-red-600 border border-red-200 text-xs rounded-lg hover:bg-red-50 font-medium flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                Excluir selecionadas
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1727,11 +1760,14 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
         onConfirm={() => {
           if (confirmDelete?.tipo === "lote") deletarLoteOp(confirmDelete.opNumero);
           else if (confirmDelete?.tipo === "peca") deletarPeca(confirmDelete.id);
+          else if (confirmDelete?.tipo === "selecionadas") excluirSelecionados();
         }}
-        titulo={confirmDelete?.tipo === "lote" ? "Excluir todas as peças da OP?" : "Excluir peça?"}
+        titulo={confirmDelete?.tipo === "lote" ? "Excluir todas as peças da OP?" : confirmDelete?.tipo === "selecionadas" ? "Excluir peças selecionadas?" : "Excluir peça?"}
         mensagem={
           confirmDelete?.tipo === "lote"
             ? `Todas as peças da ${fmtOP(confirmDelete?.opNumero)} serão removidas permanentemente. Esta ação não pode ser desfeita.`
+            : confirmDelete?.tipo === "selecionadas"
+            ? `${confirmDelete?.count || 0} peça(s) selecionada(s) serão removidas permanentemente. Esta ação não pode ser desfeita.`
             : `A peça "${confirmDelete?.marca}" da ${fmtOP(confirmDelete?.opNumero)} será removida permanentemente.`
         }
         labelConfirmar="Excluir"
