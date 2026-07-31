@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle, Truck } from "lucide-react";
 
 const AUTO_REFRESH_MS = 60_000;
 
@@ -123,8 +123,8 @@ function ObraCard({ obra }) {
       <div className="flex items-start gap-2">
         <span className="text-sm font-bold text-torg-dark bg-amber-300 rounded-full w-8 h-8 flex items-center justify-center shrink-0" title={`${obra.ordem}ª prioridade`}>{obra.ordem}º</span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-extrabold tracking-tight truncate" title={obra.obra}>{obra.obra}</h2>
-          <p className="text-[11px] text-slate-400 truncate">OP-{obra.opNumero}{obra.cliente ? ` · ${obra.cliente}` : ""}</p>
+          <h2 className="text-2xl font-extrabold tracking-tight tabular-nums leading-none">OP-{obra.opNumero}</h2>
+          <p className="text-[12px] text-slate-300 truncate mt-1" title={obra.obra}>{obra.obra}{obra.cliente ? ` · ${obra.cliente}` : ""}</p>
         </div>
         <div className="text-right shrink-0">
           <p className="text-xl font-extrabold tabular-nums leading-none">{obra.pctGeral}%</p>
@@ -141,6 +141,9 @@ function ObraCard({ obra }) {
 function SetorLinha({ s }) {
   const sit = sitSetor(s);
   const cor = COR[sit] || COR.SEM_DATA;
+  // Fabricação e Expedição são as etapas que definem a entrega ao cliente:
+  // a data ganha destaque (caixa própria, fonte grande) e aparece mesmo em atraso.
+  const entregaDestaque = (s.setor === "FABRICACAO" || s.setor === "EXPEDICAO") && !s.concluida && !s.bloqueada && !!s.entrega;
   return (
     <div>
       {/* Linha 1: rótulo do setor + % e status (sem disputar espaço com a barra) */}
@@ -152,6 +155,13 @@ function SetorLinha({ s }) {
             <span className="text-[12px] text-emerald-300 inline-flex items-center gap-0.5"><CheckCircle2 size={12} /> ok</span>
           ) : s.bloqueada ? (
             <span className="text-[12px] text-slate-300 inline-flex items-center gap-0.5"><Lock size={11} /> hold</span>
+          ) : entregaDestaque ? (
+            <span className={`inline-flex items-baseline gap-1 px-2 py-0.5 rounded-md border ${s.atrasoDias > 0 ? "bg-red-500/20 border-red-400/40 text-red-200" : "bg-amber-400/15 border-amber-400/30 text-amber-200"}`}>
+              <Truck size={12} className="self-center opacity-90" />
+              <span className="text-[10px] uppercase tracking-wide opacity-80">entrega</span>
+              <span className="text-[15px] font-extrabold tabular-nums leading-none">{fmtData(s.entrega)}</span>
+              {s.atrasoDias > 0 && <span className="text-[11px] font-bold">· {s.atrasoDias}d</span>}
+            </span>
           ) : s.atrasoDias > 0 ? (
             <span className="text-[12px] text-red-300 font-bold inline-flex items-center gap-0.5"><AlertTriangle size={11} /> {s.atrasoDias}d atraso</span>
           ) : (
