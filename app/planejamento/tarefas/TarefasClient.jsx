@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, RefreshCw, Plus, X, Trash2, Filter,
   CheckCircle2, Clock, Circle, ListTodo, Bell, Send,
   GanttChart, AlertTriangle, Mail, User, Building2, CalendarClock, LayoutGrid, List,
-  MessageSquarePlus,
+  MessageSquarePlus, ChevronDown, ChevronRight,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 
@@ -1077,6 +1077,7 @@ function AtividadesCronograma({ showToast }) {
   const [filtroStatus, setFiltroStatus] = useState(""); // "" | "atrasada" | "no_prazo" | "concluida"
   const [filtroOp, setFiltroOp] = useState("");
   const [notificarAtiv, setNotificarAtiv] = useState(null);
+  const [expandidasCumpridas, setExpandidasCumpridas] = useState(() => new Set()); // setores com as "cumpridas" abertas
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -1107,6 +1108,19 @@ function AtividadesCronograma({ showToast }) {
   const atrasadas = atividades.filter((a) => a.atrasada).length;
   const concluidas = atividades.filter((a) => a.concluida).length;
   const emAndamento = atividades.length - atrasadas - concluidas;
+
+  const toggleCumpridas = (dept) => setExpandidasCumpridas((s) => { const n = new Set(s); n.has(dept) ? n.delete(dept) : n.add(dept); return n; });
+  // Agrupa por SETOR: ativas (detalhadas) + cumpridas (100% → só "cumprida", sem descrever).
+  const gruposSetor = (() => {
+    const map = new Map();
+    for (const a of atividades) {
+      const d = a.departamento || "OUTROS";
+      if (!map.has(d)) map.set(d, { dept: d, ativas: [], cumpridas: [] });
+      (a.concluida ? map.get(d).cumpridas : map.get(d).ativas).push(a);
+    }
+    const ordem = [...DEPTOS, ...[...map.keys()].filter((d) => !DEPTOS.includes(d))];
+    return ordem.filter((d) => map.has(d)).map((d) => map.get(d));
+  })();
 
   return (
     <>
@@ -1183,74 +1197,79 @@ function AtividadesCronograma({ showToast }) {
           <p className="text-xs text-torg-gray mt-1">Ajuste os filtros ou crie tarefas nos cronogramas.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50/60">
-              <tr>
-                <th className="px-4 py-2 text-left text-[10px] font-semibold text-torg-gray uppercase">OP</th>
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-torg-gray uppercase">Atividade</th>
-                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Depto</th>
-                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Prazo</th>
-                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">%</th>
-                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Status</th>
-                <th className="px-3 py-2 text-center text-[10px] font-semibold text-torg-gray uppercase">Ação</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {atividades.map((a) => (
-                <tr key={a.id} className={`hover:bg-gray-50/50 transition-colors ${a.concluida ? "opacity-50" : ""}`}>
-                  <td className="px-4 py-2.5">
-                    <span className="text-xs font-bold text-torg-blue font-mono">{fmtOP(a.opNumero)}</span>
-                    {a.opCliente && <p className="text-[10px] text-torg-gray truncate max-w-[120px]">{a.opCliente}</p>}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <p className={`text-xs font-medium ${a.concluida ? "line-through text-torg-gray" : "text-torg-dark"}`}>{a.nome}</p>
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${DEPT_COR[a.departamento] || "bg-gray-50 text-torg-gray border-gray-200"}`}>
-                      {DEPT_LABEL[a.departamento] || a.departamento}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <span className="text-xs text-torg-dark">{fmtData(a.dataFimPrevista)}</span>
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <span className={`text-xs font-bold ${
-                      a.concluida ? "text-emerald-600" : a.atrasada ? "text-red-600" : "text-torg-dark"
-                    }`}>
-                      {a.percentualRealizado}%
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    {a.concluida ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-full">
-                        <CheckCircle2 size={10} /> OK
-                      </span>
-                    ) : a.atrasada ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-semibold rounded-full">
-                        <AlertTriangle size={10} /> {a.diasAtraso}d
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-medium rounded-full">
-                        <Clock size={10} /> No prazo
-                      </span>
+        <div className="space-y-3">
+          {gruposSetor.map(({ dept, ativas, cumpridas }) => {
+            const atrasadasDept = ativas.filter((a) => a.atrasada).length;
+            return (
+              <div key={dept} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                {/* Cabeçalho do setor */}
+                <div className="px-4 py-2 bg-gray-50/70 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+                  <span className={`px-2 py-0.5 text-[11px] font-bold rounded border ${DEPT_COR[dept] || "bg-gray-50 text-torg-gray border-gray-200"}`}>
+                    {DEPT_LABEL[dept] || dept}
+                  </span>
+                  <span className="text-[11px] text-torg-gray">{ativas.length} pendente{ativas.length !== 1 ? "s" : ""}</span>
+                  {atrasadasDept > 0 && (
+                    <span className="text-[11px] font-semibold text-red-600 flex items-center gap-0.5"><AlertTriangle size={10} /> {atrasadasDept} atrasada{atrasadasDept > 1 ? "s" : ""}</span>
+                  )}
+                  {cumpridas.length > 0 && (
+                    <span className="text-[11px] text-emerald-600 flex items-center gap-0.5 ml-auto"><CheckCircle2 size={10} /> {cumpridas.length} cumprida{cumpridas.length > 1 ? "s" : ""}</span>
+                  )}
+                </div>
+
+                {/* Ativas — detalhadas (a "programação" de fato) */}
+                {ativas.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <tbody className="divide-y divide-gray-50">
+                        {ativas.map((a) => (
+                          <tr key={a.id} className="hover:bg-gray-50/50">
+                            <td className="px-4 py-2.5 align-top w-[130px]">
+                              <span className="text-xs font-bold text-torg-blue font-mono">{fmtOP(a.opNumero)}</span>
+                              {a.opCliente && <p className="text-[10px] text-torg-gray truncate max-w-[120px]">{a.opCliente}</p>}
+                            </td>
+                            <td className="px-3 py-2.5"><p className="text-xs font-medium text-torg-dark">{a.nome}</p></td>
+                            <td className="px-3 py-2.5 text-center whitespace-nowrap"><span className="text-xs text-torg-dark">{fmtData(a.dataFimPrevista)}</span></td>
+                            <td className="px-3 py-2.5 text-center"><span className={`text-xs font-bold ${a.atrasada ? "text-red-600" : "text-torg-dark"}`}>{a.percentualRealizado}%</span></td>
+                            <td className="px-3 py-2.5 text-center">
+                              {a.atrasada ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-semibold rounded-full"><AlertTriangle size={10} /> {a.diasAtraso}d</span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-medium rounded-full"><Clock size={10} /> No prazo</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              <button onClick={() => setNotificarAtiv(a)} className="p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100 transition-colors" title="Notificar por e-mail"><Mail size={14} /></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="px-4 py-3 text-xs text-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={13} /> Tudo cumprido neste setor.</p>
+                )}
+
+                {/* Cumpridas — 100% não descreve, fica só como "cumprida" (colapsado) */}
+                {cumpridas.length > 0 && (
+                  <div className="px-4 py-2 border-t border-gray-50 bg-emerald-50/20">
+                    <button onClick={() => toggleCumpridas(dept)} className="text-[11px] text-emerald-700 font-medium flex items-center gap-1 hover:text-emerald-800">
+                      {expandidasCumpridas.has(dept) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      <CheckCircle2 size={11} /> {cumpridas.length} tarefa{cumpridas.length > 1 ? "s" : ""} cumprida{cumpridas.length > 1 ? "s" : ""}
+                    </button>
+                    {expandidasCumpridas.has(dept) && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {cumpridas.map((a) => (
+                          <span key={a.id} className="text-[10px] text-torg-gray bg-white border border-emerald-100 rounded px-1.5 py-0.5">
+                            <span className="font-mono text-emerald-700">{fmtOP(a.opNumero)}</span> · <span className="line-through">{a.nome}</span>
+                          </span>
+                        ))}
+                      </div>
                     )}
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    {!a.concluida && (
-                      <button
-                        onClick={() => setNotificarAtiv(a)}
-                        className="p-1.5 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100 transition-colors"
-                        title="Notificar por e-mail"
-                      >
-                        <Mail size={14} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
