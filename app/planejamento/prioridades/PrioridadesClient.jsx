@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle, Truck } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle, Truck, Columns3, LayoutGrid } from "lucide-react";
 
 const AUTO_REFRESH_MS = 60_000;
 
@@ -25,8 +25,21 @@ const COR = {
   SEM_DATA: { barra: "bg-slate-500", texto: "text-slate-400", pill: "bg-slate-500/15 text-slate-400" },
 };
 
+// ---- Modo "Por setor" (progresso em kg) ----
+const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR")} kg`;
+// Cor de destaque (borda de topo) por setor, na ordem do fluxo.
+const LANE_ACC = { CORTE: "#f59e0b", MONTAGEM: "#3b82f6", SOLDA: "#f97316", ACABAMENTO: "#14b8a6", JATO: "#0ea5e9", PINTURA: "#8b5cf6", EXPEDICAO: "#22c55e" };
+function corCardSetor(op) {
+  if (op.atrasoDias > 0) return { bar: "bg-red-500", pct: "text-red-300" };
+  if (op.pct >= 80) return { bar: "bg-emerald-500", pct: "text-emerald-300" };
+  if (op.pct > 0) return { bar: "bg-torg-blue", pct: "text-sky-300" };
+  return { bar: "bg-slate-500", pct: "text-slate-400" };
+}
+
 export default function PrioridadesClient() {
+  const [modo, setModo] = useState("setor");
   const [dados, setDados] = useState(null);
+  const [dadosSetor, setDadosSetor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [agora, setAgora] = useState(() => new Date());
@@ -37,16 +50,17 @@ export default function PrioridadesClient() {
     if (!silent) setLoading(true);
     setErro("");
     try {
-      const res = await fetch("/api/planejamento/prioridades", { cache: "no-store" });
+      const url = modo === "setor" ? "/api/planejamento/prioridades-setor" : "/api/planejamento/prioridades";
+      const res = await fetch(url, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Erro ao carregar");
-      setDados(j);
+      if (modo === "setor") setDadosSetor(j); else setDados(j);
     } catch (e) {
       setErro(e.message);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [modo]);
 
   useEffect(() => { carregar(); }, [carregar]);
   useEffect(() => {
@@ -66,6 +80,8 @@ export default function PrioridadesClient() {
 
   const obras = dados?.obras || [];
   const atrasadas = obras.filter((o) => o.atrasoMax > 0).length;
+  const lanes = dadosSetor?.lanes || [];
+  const temSetor = lanes.some((l) => l.ops.length);
 
   return (
     <div ref={rootRef} className="bg-torg-dark text-white rounded-2xl overflow-auto min-h-[80vh] p-6 print:hidden">
@@ -78,12 +94,16 @@ export default function PrioridadesClient() {
             <div className="bg-amber-400/20 p-2.5 rounded-xl"><Trophy size={28} className="text-amber-300" /></div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Prioridades — Planejamento</h1>
-              <p className="text-sm text-slate-300">Obras por etapa (Engenharia → Expedição) · ordenadas por urgência · atualiza sozinho</p>
+              <p className="text-sm text-slate-300">{modo === "setor" ? "Cada setor com a sua fila · progresso em kg (LPC + Syneco) · role para o lado" : "Obras por etapa (Engenharia → Expedição) · ordenadas por urgência"}</p>
             </div>
           </div>
         </div>
+        <div className="flex items-center bg-white/10 rounded-xl p-1">
+          <button onClick={() => setModo("setor")} className={`px-3 py-1.5 rounded-lg text-sm font-semibold inline-flex items-center gap-1.5 transition-colors ${modo === "setor" ? "bg-white/20 text-white" : "text-slate-300 hover:text-white"}`}><Columns3 size={16} /> Por setor</button>
+          <button onClick={() => setModo("obra")} className={`px-3 py-1.5 rounded-lg text-sm font-semibold inline-flex items-center gap-1.5 transition-colors ${modo === "obra" ? "bg-white/20 text-white" : "text-slate-300 hover:text-white"}`}><LayoutGrid size={16} /> Por obra</button>
+        </div>
         <div className="flex items-center gap-4">
-          {atrasadas > 0 && (
+          {modo === "obra" && atrasadas > 0 && (
             <span className="px-3 py-1.5 rounded-xl bg-red-500/15 text-red-300 font-semibold text-sm flex items-center gap-1.5"><AlertTriangle size={16} /> {atrasadas} atrasada{atrasadas > 1 ? "s" : ""}</span>
           )}
           <div className="text-right leading-tight">
@@ -102,17 +122,78 @@ export default function PrioridadesClient() {
           <AlertCircle size={40} className="text-red-400 mb-3" /><p className="text-red-300 mb-3">{erro}</p>
           <button onClick={() => carregar(false)} className="text-sm text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg inline-flex items-center gap-2"><RefreshCw size={14} /> Tentar novamente</button>
         </div>
+      ) : modo === "setor" ? (
+        temSetor ? (
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {lanes.map((l) => <LaneSetor key={l.setor} lane={l} />)}
+          </div>
+        ) : (
+          <EmptyBox titulo="Nada pendente na fábrica" texto="Assim que as OPs tiverem lista (LE/LPC) e apontamento no Syneco, as filas de cada setor aparecem aqui — em kg, por urgência." />
+        )
       ) : obras.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-center text-slate-300">
-          <Inbox size={44} className="mb-3 opacity-50" />
-          <p className="text-lg font-semibold text-white">Nenhum cronograma ativo</p>
-          <p className="text-sm mt-1 max-w-md">Crie/ative cronogramas em <strong>Planejamento → Cronogramas</strong> — as obras e etapas aparecem aqui automaticamente, por urgência.</p>
-        </div>
+        <EmptyBox titulo="Nenhum cronograma ativo" texto="Crie/ative cronogramas em Planejamento → Cronogramas — as obras e etapas aparecem aqui automaticamente, por urgência." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {obras.map((o) => <ObraCard key={o.cronogramaId} obra={o} />)}
         </div>
       )}
+    </div>
+  );
+}
+
+function EmptyBox({ titulo, texto }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-32 text-center text-slate-300">
+      <Inbox size={44} className="mb-3 opacity-50" />
+      <p className="text-lg font-semibold text-white">{titulo}</p>
+      <p className="text-sm mt-1 max-w-md">{texto}</p>
+    </div>
+  );
+}
+
+function LaneSetor({ lane }) {
+  const acc = LANE_ACC[lane.setor] || "#64748b";
+  return (
+    <div className="min-w-[248px] max-w-[248px] bg-white/[0.03] border border-white/10 rounded-xl p-3 flex flex-col gap-2" style={{ borderTopColor: acc, borderTopWidth: 3 }}>
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[13px] font-extrabold uppercase tracking-wide text-white truncate">{lane.label}</span>
+          <span className="text-[10px] text-slate-400 shrink-0">{lane.ops.length} OP{lane.ops.length !== 1 ? "s" : ""}</span>
+        </div>
+        <div className="text-[10px] text-slate-400 mt-0.5">fila {fmtKg(lane.filaKg)}{lane.setor === "CORTE" ? " · meta 6.000 kg/dia" : ""}</div>
+      </div>
+      {lane.ops.length ? (
+        lane.ops.map((op, i) => <OpCardSetor key={`${op.opNumero}-${i}`} op={op} />)
+      ) : (
+        <div className="text-[11px] text-slate-500 py-8 text-center">nada pendente</div>
+      )}
+    </div>
+  );
+}
+
+function OpCardSetor({ op }) {
+  const cor = corCardSetor(op);
+  return (
+    <div className="bg-white/[0.04] border border-white/10 rounded-lg p-2.5">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[11px] font-bold text-torg-dark bg-amber-300 rounded-full w-5 h-5 flex items-center justify-center shrink-0">{op.ordem}º</span>
+        <span className="text-base font-extrabold tabular-nums text-white">OP-{op.opNumero}</span>
+        <span className="ml-auto text-[10px] whitespace-nowrap">
+          {op.atrasoDias > 0 ? (
+            <span className="text-red-300 font-bold inline-flex items-center gap-0.5"><AlertTriangle size={10} /> {op.atrasoDias}d</span>
+          ) : op.entrega ? (
+            <span className="text-slate-300 inline-flex items-center gap-0.5"><CalendarClock size={10} /> {fmtData(op.entrega)}</span>
+          ) : null}
+        </span>
+      </div>
+      <div className="text-[10px] text-slate-400 truncate mt-0.5 ml-[26px]" title={op.obra}>{op.obra}</div>
+      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mt-1.5">
+        <div className={`h-full rounded-full ${cor.bar}`} style={{ width: `${Math.min(100, op.pct)}%`, transition: "width .6s ease" }} />
+      </div>
+      <div className="flex justify-between items-baseline mt-1">
+        <span className="text-[10px] text-slate-300 tabular-nums">{fmtKg(op.feitoKg)} / {fmtKg(op.totalKg)}</span>
+        <span className={`text-xs font-bold ${cor.pct}`}>{op.pct}%</span>
+      </div>
     </div>
   );
 }
