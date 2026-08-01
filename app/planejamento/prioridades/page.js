@@ -4,7 +4,8 @@ import PrioridadesClient from "./PrioridadesClient";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Planejamento — Prioridades (TV)" };
 
-export default async function PrioridadesPage() {
+export default async function PrioridadesPage({ searchParams }) {
   await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO", "PCP", "COMERCIAL"]);
-  return <PrioridadesClient />;
+  const sp = searchParams ? await searchParams : {};
+  return <PrioridadesClient telaInicial={sp?.tela || null} />;
 }
