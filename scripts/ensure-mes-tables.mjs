@@ -35,6 +35,21 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MesInativo_item_idx" ON "MesInativo"("item")`);
   console.log("[ensure-mes-tables] OK — MesInativo garantida.");
 
+  // PrioridadeTvOp (OPs fixadas manualmente na TV de Prioridades por setor). Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "PrioridadeTvOp" (
+      "id"          TEXT         NOT NULL,
+      "opNumero"    TEXT         NOT NULL,
+      "opId"        TEXT,
+      "criadoPorId" TEXT,
+      "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "PrioridadeTvOp_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PrioridadeTvOp_opNumero_key" ON "PrioridadeTvOp"("opNumero")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PrioridadeTvOp_opId_idx" ON "PrioridadeTvOp"("opId")`);
+  console.log("[ensure-mes-tables] OK — PrioridadeTvOp garantida.");
+
   // Colunas do FluxoCaixa para import do extrato Omie (idempotente).
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "origemOmieId" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "contaCorrente" TEXT`);
