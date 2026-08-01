@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle, Truck, Columns3, LayoutGrid, ArrowLeft, RotateCw, Flag, ListOrdered, Maximize } from "lucide-react";
 
 const AUTO_REFRESH_MS = 60_000;
@@ -127,6 +128,7 @@ function Hub({ setTela }) {
           <button onClick={() => setModo("obra")} className={`px-3 py-1.5 rounded-lg text-sm font-semibold inline-flex items-center gap-1.5 transition-colors ${modo === "obra" ? "bg-white/20 text-white" : "text-slate-300 hover:text-white"}`}><LayoutGrid size={16} /> Por obra</button>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/planejamento/prioridades/marcar" className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-sm font-semibold inline-flex items-center gap-1.5"><Flag size={15} /> Marcar prioridades</Link>
           {modo === "obra" && atrasadas > 0 && (
             <span className="px-3 py-1.5 rounded-xl bg-red-500/15 text-red-300 font-semibold text-sm flex items-center gap-1.5"><AlertTriangle size={16} /> {atrasadas} atrasada{atrasadas > 1 ? "s" : ""}</span>
           )}
