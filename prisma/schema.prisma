@@ -3569,6 +3569,18 @@ model SolicitacaoProducao {
   @@index([opNumero])
 }
 
+// OPs fixadas manualmente na TV de Prioridades por setor (as rápidas, sem cronograma).
+// Tabela criada via SQL (db push bloqueado por drift); só client gerado a partir daqui.
+model PrioridadeTvOp {
+  id          String   @id @default(cuid())
+  opNumero    String   @unique
+  opId        String?
+  criadoPorId String?
+  createdAt   DateTime @default(now())
+
+  @@index([opId])
+}
+
 // Pedido de expedição: o Planejamento "envia para a Expedição" as entregas
 // (qtd + local) definidas por conjunto (ConjuntoEntrega). Uma por obra. A
 // Expedição lê as entregas vivas agrupadas por destino, monta o romaneio,

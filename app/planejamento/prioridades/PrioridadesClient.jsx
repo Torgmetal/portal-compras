@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle, Truck, Columns3, LayoutGrid, ArrowLeft, RotateCw, Flag, ListOrdered, Maximize } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle, Truck, Columns3, LayoutGrid, ArrowLeft, RotateCw, Flag, ListOrdered, Maximize, X, Plus, Trash2 } from "lucide-react";
 
 const AUTO_REFRESH_MS = 60_000;
 
@@ -69,6 +69,7 @@ function Hub({ setTela }) {
   const [erro, setErro] = useState("");
   const [agora, setAgora] = useState(() => new Date());
   const [fullscreen, setFullscreen] = useState(false);
+  const [gerenciarOps, setGerenciarOps] = useState(false);
   const rootRef = useRef(null);
 
   const carregar = useCallback(async (silent = false) => {
@@ -129,6 +130,7 @@ function Hub({ setTela }) {
         </div>
         <div className="flex items-center gap-4">
           <Link href="/planejamento/prioridades/marcar" className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-sm font-semibold inline-flex items-center gap-1.5"><Flag size={15} /> Marcar prioridades</Link>
+          <button onClick={() => setGerenciarOps(true)} className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-sm font-semibold inline-flex items-center gap-1.5"><Plus size={15} /> OPs manuais</button>
           {modo === "obra" && atrasadas > 0 && (
             <span className="px-3 py-1.5 rounded-xl bg-red-500/15 text-red-300 font-semibold text-sm flex items-center gap-1.5"><AlertTriangle size={16} /> {atrasadas} atrasada{atrasadas > 1 ? "s" : ""}</span>
           )}
@@ -166,6 +168,83 @@ function Hub({ setTela }) {
           {obras.map((o) => <ObraCard key={o.cronogramaId} obra={o} />)}
         </div>
       )}
+      <GerenciarOpsManuais open={gerenciarOps} onClose={() => setGerenciarOps(false)} onChange={() => carregar(false)} />
+    </div>
+  );
+}
+
+function GerenciarOpsManuais({ open, onClose, onChange }) {
+  const [dados, setDados] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [sel, setSel] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch("/api/planejamento/prioridade-op-manual", { cache: "no-store" });
+      const j = await r.json();
+      setDados(r.ok ? j : { fixadas: [], disponiveis: [] });
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { if (open) { setSel(""); carregar(); } }, [open, carregar]);
+
+  if (!open) return null;
+  const fixadas = dados?.fixadas || [];
+  const disponiveis = dados?.disponiveis || [];
+
+  const add = async () => {
+    const op = disponiveis.find((o) => o.opNumero === sel);
+    if (!op) return;
+    setBusy(true);
+    try {
+      await fetch("/api/planejamento/prioridade-op-manual", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ opNumero: op.opNumero, opId: op.opId }) });
+      setSel(""); await carregar(); onChange?.();
+    } finally { setBusy(false); }
+  };
+  const remover = async (opNumero) => {
+    setBusy(true);
+    try {
+      await fetch(`/api/planejamento/prioridade-op-manual?opNumero=${encodeURIComponent(opNumero)}`, { method: "DELETE" });
+      await carregar(); onChange?.();
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg text-torg-dark" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+          <h3 className="font-bold text-lg">OPs manuais na TV</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+        </div>
+        <div className="p-4 space-y-4">
+          <p className="text-xs text-torg-gray">Fixe OPs que têm lista (peças) mas não abriram cronograma — as rápidas. Elas entram nas filas por setor pelo peso.</p>
+          <div className="flex gap-2">
+            <select value={sel} onChange={(e) => setSel(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm">
+              <option value="">{loading ? "carregando…" : `Escolher OP… (${disponiveis.length} disponíveis)`}</option>
+              {disponiveis.map((o) => <option key={o.opNumero} value={o.opNumero}>OP-{o.opNumero} — {o.obra || "—"}</option>)}
+            </select>
+            <button onClick={add} disabled={!sel || busy} className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg disabled:opacity-50 inline-flex items-center gap-1.5"><Plus size={15} /> Fixar</button>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-torg-gray mb-1.5">Fixadas ({fixadas.length})</div>
+            {fixadas.length === 0 ? (
+              <div className="text-sm text-gray-400 italic py-2">nenhuma OP fixada</div>
+            ) : (
+              <ul className="divide-y divide-gray-50 border border-gray-100 rounded-lg max-h-64 overflow-y-auto">
+                {fixadas.map((o) => (
+                  <li key={o.opNumero} className="flex items-center gap-2 px-3 py-2 text-sm">
+                    <span className="font-semibold tabular-nums">OP-{o.opNumero}</span>
+                    <span className="text-torg-gray truncate flex-1">{o.obra || "—"}</span>
+                    {!o.temPecas && <span className="text-[10px] text-amber-600 shrink-0">sem peças</span>}
+                    <button onClick={() => remover(o.opNumero)} disabled={busy} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 shrink-0"><Trash2 size={15} /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
