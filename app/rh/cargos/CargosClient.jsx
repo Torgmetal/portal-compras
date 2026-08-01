@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Briefcase, PlusCircle, Loader2, AlertCircle, X, Users, ChevronDown,
-  Download, Upload, FileSpreadsheet, CheckCircle2, XCircle,
+  Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Pencil,
 } from "lucide-react";
 
 const NIVEIS = [
@@ -22,8 +22,10 @@ export default function CargosClient() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(false);
+  const [editandoId, setEditandoId] = useState(null); // null = novo; id = editando
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", cbo: "" });
+  const [nota, setNota] = useState(null); // feedback pós-edição { tipo: "ok"|"warn", texto }
 
   // Import Excel
   const fileRef = useRef(null);
@@ -41,9 +43,32 @@ export default function CargosClient() {
 
   useEffect(() => { carregar(); }, []);
 
+  const fecharModal = () => { setModal(false); setEditandoId(null); };
+
+  const abrirNovo = () => {
+    setEditandoId(null);
+    setErro("");
+    setForm({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", cbo: "" });
+    setModal(true);
+  };
+
+  const abrirEditar = (c) => {
+    setEditandoId(c.id);
+    setErro("");
+    setForm({
+      nome: c.nome || "",
+      nivel: c.nivel || "OPERACIONAL",
+      categoria: c.categoria || "",
+      salarioBase: c.salarioBase ?? "",
+      cbo: c.cbo || "",
+    });
+    setModal(true);
+  };
+
   const salvar = async () => {
     setSalvando(true);
     setErro("");
+    setNota(null);
     try {
       const body = {
         ...form,
@@ -52,13 +77,29 @@ export default function CargosClient() {
         cbo: form.cbo || null,
         nivel: form.nivel || null,
       };
-      const res = await fetch("/api/rh/cargos", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      });
+      const res = await fetch(
+        editandoId ? `/api/rh/cargos/${editandoId}` : "/api/rh/cargos",
+        { method: editandoId ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setCargos((prev) => [...prev, { ...data.data, _count: { funcionarios: 0 } }]);
-      setModal(false);
+
+      if (editandoId) {
+        // Mantém o _count existente (editar o cargo não muda a lotação)
+        setCargos((prev) => prev.map((c) => (c.id === editandoId ? { ...c, ...data.data } : c)));
+        if (data.funcionariosAfetados > 0) {
+          if (data.planilha?.success) {
+            setNota({ tipo: "ok", texto: `Cargo atualizado. Planilha de controle atualizada (${data.planilha.atualizados} de ${data.funcionariosAfetados} funcionário${data.funcionariosAfetados !== 1 ? "s" : ""}).` });
+          } else {
+            setNota({ tipo: "warn", texto: "Cargo atualizado no portal, mas a planilha de controle no SharePoint não pôde ser atualizada agora. Verifique a integração." });
+          }
+        } else {
+          setNota({ tipo: "ok", texto: "Cargo atualizado." });
+        }
+      } else {
+        setCargos((prev) => [...prev, { ...data.data, _count: { funcionarios: 0 } }]);
+      }
+      fecharModal();
       setForm({ nome: "", nivel: "OPERACIONAL", categoria: "", salarioBase: "", cbo: "" });
     } catch (e) {
       setErro(e.message);
@@ -138,7 +179,7 @@ export default function CargosClient() {
             {importando ? "Importando…" : "Importar planilha"}
           </button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={importarPlanilha} className="hidden" />
-          <button onClick={() => setModal(true)}
+          <button onClick={abrirNovo}
             className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2">
             <PlusCircle size={16} /> Novo Cargo
           </button>
@@ -148,6 +189,14 @@ export default function CargosClient() {
       {erro && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertCircle size={14} className="mt-0.5" /> {erro}
+        </div>
+      )}
+
+      {nota && (
+        <div className={`text-sm rounded-lg px-3 py-2 flex items-start gap-2 border ${nota.tipo === "warn" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
+          {nota.tipo === "warn" ? <AlertCircle size={14} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={14} className="mt-0.5 shrink-0" />}
+          <span>{nota.texto}</span>
+          <button onClick={() => setNota(null)} className="ml-auto opacity-60 hover:opacity-100"><X size={14} /></button>
         </div>
       )}
 
@@ -177,6 +226,7 @@ export default function CargosClient() {
                         <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">CBO</th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Salário base</th>
                         <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Funcionários</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase w-16">Editar</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -187,6 +237,12 @@ export default function CargosClient() {
                           <td className="px-4 py-2.5 font-mono text-xs text-torg-gray">{c.cbo || "—"}</td>
                           <td className="px-4 py-2.5 text-right text-torg-dark tabular-nums">{fmtMoeda(c.salarioBase)}</td>
                           <td className="px-4 py-2.5 text-right text-torg-gray">{c._count?.funcionarios || 0}</td>
+                          <td className="px-4 py-2.5 text-right">
+                            <button onClick={() => abrirEditar(c)} title="Editar cargo"
+                              className="p-1.5 text-gray-400 hover:text-torg-blue hover:bg-torg-blue/5 rounded-lg transition-colors">
+                              <Pencil size={14} />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -198,15 +254,24 @@ export default function CargosClient() {
         </div>
       )}
 
-      {/* Modal Novo Cargo */}
+      {/* Modal Novo / Editar Cargo */}
       {modal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-torg-dark">Novo Cargo</h3>
-              <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              <h3 className="text-lg font-bold text-torg-dark">{editandoId ? "Editar cargo" : "Novo Cargo"}</h3>
+              <button onClick={fecharModal} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
+              {editandoId && (() => {
+                const usados = cargos.find((c) => c.id === editandoId)?._count?.funcionarios || 0;
+                return usados > 0 ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-xs text-blue-800 flex items-start gap-2">
+                    <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                    <span>{usados} funcionário{usados !== 1 ? "s" : ""} usam este cargo. Ao renomear, o novo nome será atualizado também na planilha de controle (SharePoint).</span>
+                  </div>
+                ) : null;
+              })()}
               <div>
                 <label className="block text-xs font-medium text-torg-gray mb-1">Nome do cargo *</label>
                 <input type="text" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })}
@@ -246,11 +311,11 @@ export default function CargosClient() {
               </div>
             </div>
             <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+              <button onClick={fecharModal} className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
               <button onClick={salvar} disabled={salvando || !form.nome}
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
-                {salvando ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-                {salvando ? "Salvando…" : "Criar Cargo"}
+                {salvando ? <Loader2 size={14} className="animate-spin" /> : editandoId ? <Pencil size={14} /> : <PlusCircle size={14} />}
+                {salvando ? "Salvando…" : editandoId ? "Salvar alterações" : "Criar Cargo"}
               </button>
             </div>
           </div>
