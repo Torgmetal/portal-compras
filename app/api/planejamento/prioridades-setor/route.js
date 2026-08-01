@@ -4,7 +4,7 @@
 // com a tela de um setor só).
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
-import { FLUXO_SETORES, progressoPorSetor } from "@/lib/prioridades-setor";
+import { FLUXO_SETORES, progressoPorSetor, entregaDoSetor } from "@/lib/prioridades-setor";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
 
 export const runtime = "nodejs";
@@ -27,22 +27,17 @@ export async function GET() {
 
   const { porObra, now } = await carregarPrioridadesPorObra();
 
-  const obras = porObra.map((o) => {
-    const setores = progressoPorSetor(o.universo, o.realMap);
-    const exped = setores.find((s) => s.setor === "EXPEDICAO");
-    const expedidoOk = exped && exped.pct != null && exped.pct >= 100;
-    const atrasoDias = o.entrega && !expedidoOk && new Date(o.entrega) < now ? Math.ceil((now - new Date(o.entrega)) / 86400000) : 0;
-    return { ...o, setores, atrasoDias };
-  });
+  const obras = porObra.map((o) => ({ ...o, setores: progressoPorSetor(o.universo, o.realMap) }));
 
   const lanes = FLUXO_SETORES.map((s) => {
     const ops = [];
     for (const o of obras) {
       const st = o.setores.find((x) => x.setor === s.key);
       if (!st || st.totalKg <= 0 || (st.pct != null && st.pct >= 100)) continue;
+      const es = entregaDoSetor(o.datasSetor, s.key, o.entrega, now);
       ops.push({
         opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
-        entrega: o.entrega ? o.entrega.toISOString() : null, atrasoDias: o.atrasoDias,
+        entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor,
         totalKg: st.totalKg, feitoKg: st.feitoKg, pendenteKg: st.pendenteKg, pct: st.pct ?? 0,
       });
     }
@@ -51,5 +46,16 @@ export async function GET() {
     return { setor: s.key, label: s.label, filaKg: ops.reduce((acc, op) => acc + op.pendenteKg, 0), ops };
   });
 
-  return NextResponse.json({ lanes, geradoEm: new Date().toISOString() });
+  // Obras com cronograma ativo mas SEM lista (LE/LPC) importada — não entram nas filas
+  // (não têm kg), mas ficam sinalizadas pra não serem esquecidas.
+  const aguardando = obrasAguardandoLista(porObra);
+
+  return NextResponse.json({ lanes, aguardando, geradoEm: new Date().toISOString() });
+}
+
+export function obrasAguardandoLista(porObra) {
+  return porObra
+    .filter((o) => o.universo.length === 0)
+    .map((o) => ({ opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, entrega: o.entrega ? o.entrega.toISOString() : null }))
+    .sort((a, b) => (a.entrega && b.entrega ? new Date(a.entrega) - new Date(b.entrega) : a.entrega ? -1 : 1));
 }

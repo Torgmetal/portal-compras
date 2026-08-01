@@ -4,9 +4,9 @@
 // Devolve também um `resumo` de todos os setores (fila/nº de OPs) pras abas de navegação.
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
-import { FLUXO_SETORES, progressoPorSetor, pecasPendentesNoSetor } from "@/lib/prioridades-setor";
+import { FLUXO_SETORES, progressoPorSetor, pecasPendentesNoSetor, entregaDoSetor } from "@/lib/prioridades-setor";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
-import { ordenarUrgencia } from "../route";
+import { ordenarUrgencia, obrasAguardandoLista } from "../route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,25 +28,20 @@ export async function GET(req, { params }) {
   const { porObra, now } = await carregarPrioridadesPorObra();
 
   // Progresso de todos os setores por obra (uma vez), pra montar a fila do setor e o resumo.
-  const comSetores = porObra.map((o) => {
-    const setores = progressoPorSetor(o.universo, o.realMap);
-    const exped = setores.find((s) => s.setor === "EXPEDICAO");
-    const expedidoOk = exped && exped.pct != null && exped.pct >= 100;
-    const atrasoDias = o.entrega && !expedidoOk && new Date(o.entrega) < now ? Math.ceil((now - new Date(o.entrega)) / 86400000) : 0;
-    return { o, setores, atrasoDias };
-  });
+  const comSetores = porObra.map((o) => ({ o, setores: progressoPorSetor(o.universo, o.realMap) }));
 
   // Fila detalhada do setor pedido.
   const ops = [];
-  for (const { o, setores, atrasoDias } of comSetores) {
+  for (const { o, setores } of comSetores) {
     const st = setores.find((x) => x.setor === setorKey);
     if (!st || st.totalKg <= 0 || (st.pct != null && st.pct >= 100)) continue;
     const pend = pecasPendentesNoSetor(o.universo, o.realMap, setorKey);
     const prioritarias = pend.filter((p) => p.prioridade != null);
     const sequencia = pend.filter((p) => p.prioridade == null);
+    const es = entregaDoSetor(o.datasSetor, setorKey, o.entrega, now);
     ops.push({
       opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
-      entrega: o.entrega ? o.entrega.toISOString() : null, atrasoDias,
+      entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor,
       totalKg: st.totalKg, feitoKg: st.feitoKg, pendenteKg: st.pendenteKg, pct: st.pct ?? 0,
       qtdPecas: pend.length, qtdPrioritarias: prioritarias.length,
       prioritarias: prioritarias.slice(0, 16),
@@ -69,6 +64,7 @@ export async function GET(req, { params }) {
   return NextResponse.json({
     setor: setorKey, label: meta.label,
     filaKg: ops.reduce((a, op) => a + op.pendenteKg, 0),
-    ops, resumo, geradoEm: new Date().toISOString(),
+    ops, resumo, aguardando: obrasAguardandoLista(porObra),
+    geradoEm: new Date().toISOString(),
   });
 }

@@ -149,13 +149,16 @@ function Hub({ setTela }) {
           <button onClick={() => carregar(false)} className="text-sm text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg inline-flex items-center gap-2"><RefreshCw size={14} /> Tentar novamente</button>
         </div>
       ) : modo === "setor" ? (
-        temSetor ? (
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {lanes.map((l) => <LaneSetor key={l.setor} lane={l} onAbrir={() => setTela(slugDoSetor(l.setor))} />)}
-          </div>
-        ) : (
-          <EmptyBox titulo="Nada pendente na fábrica" texto="Assim que as OPs tiverem lista (LE/LPC) e apontamento no Syneco, as filas de cada setor aparecem aqui — em kg, por urgência." />
-        )
+        <>
+          {temSetor ? (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {lanes.map((l) => <LaneSetor key={l.setor} lane={l} onAbrir={() => setTela(slugDoSetor(l.setor))} />)}
+            </div>
+          ) : (
+            <EmptyBox titulo="Nada pendente na fábrica" texto="Assim que as OPs tiverem lista (LE/LPC) e apontamento no Syneco, as filas de cada setor aparecem aqui — em kg, por urgência." />
+          )}
+          <AguardandoLista obras={dadosSetor?.aguardando} />
+        </>
       ) : obras.length === 0 ? (
         <EmptyBox titulo="Nenhum cronograma ativo" texto="Crie/ative cronogramas em Planejamento → Cronogramas — as obras e etapas aparecem aqui automaticamente, por urgência." />
       ) : (
@@ -337,6 +340,25 @@ function TelaSetorUnico({ tela, setTela }) {
           </div>
         </>
       )}
+      <AguardandoLista obras={dados?.aguardando} />
+    </div>
+  );
+}
+
+function AguardandoLista({ obras }) {
+  if (!obras || !obras.length) return null;
+  return (
+    <div className="mt-5 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] p-3">
+      <div className="flex items-center gap-2 text-amber-200 text-sm font-semibold mb-2">
+        <AlertTriangle size={15} /> {obras.length} obra{obras.length > 1 ? "s" : ""} com cronograma aguardando lista (LE/LPC)
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {obras.map((o) => (
+          <span key={o.opNumero} className="text-xs px-2.5 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-slate-200">
+            <b className="tabular-nums">OP-{o.opNumero}</b> <span className="text-slate-400">{o.obra}</span>{o.entrega ? <span className="text-amber-200/80"> · {fmtData(o.entrega)}</span> : null}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -373,9 +395,11 @@ function OpCardDetalhe({ op }) {
         </div>
         <div className="text-right shrink-0">
           {op.atrasoDias > 0 ? (
-            <div className="text-xs font-bold text-red-300 inline-flex items-center gap-0.5"><AlertTriangle size={12} /> {op.atrasoDias}d</div>
+            <div className="text-xs font-bold text-red-300 inline-flex items-center gap-0.5" title={op.doSetor ? "Data do setor vencida" : "Entrega da obra vencida (setor sem data)"}><AlertTriangle size={12} /> {op.atrasoDias}d</div>
           ) : op.entrega ? (
-            <div className="text-xs text-amber-200 font-semibold inline-flex items-center gap-0.5"><CalendarClock size={12} /> {fmtData(op.entrega)}</div>
+            <div className={`text-xs font-semibold inline-flex items-center gap-0.5 ${op.doSetor ? "text-amber-200" : "text-slate-300"}`} title={op.doSetor ? "Data do setor" : "Sem data do setor — usando a entrega da obra"}>
+              <CalendarClock size={12} /> {fmtData(op.entrega)}{!op.doSetor && <span className="text-[9px] text-slate-500 ml-0.5">obra</span>}
+            </div>
           ) : null}
           <div className={`text-2xl font-extrabold tabular-nums leading-none mt-1 ${cor.pct}`}>{op.pct}%</div>
         </div>
