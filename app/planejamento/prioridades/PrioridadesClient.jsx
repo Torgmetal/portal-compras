@@ -58,7 +58,8 @@ function MarcaTorg({ children }) {
   return (
     <div className="flex items-center gap-3 min-w-0">
       {children}
-      <span className="text-xl font-extrabold text-white tracking-wide">TORG<span className="text-torg-orange">.</span></span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/torg-logo-white.png" alt="Torg Metal" className="h-8 sm:h-9 w-auto shrink-0" />
       <div className="w-px h-6 bg-white/20 hidden sm:block" />
       <span className="text-sm text-torg-blue-200 font-medium hidden sm:block">Prioridades de produção</span>
     </div>
