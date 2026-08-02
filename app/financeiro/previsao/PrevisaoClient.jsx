@@ -166,7 +166,11 @@ export default function PrevisaoClient() {
                   {ops.map((op) => (
                     <tr key={op.id} className="hover:bg-torg-blue-50/30">
                       <td className="px-5 py-2"><span className="font-semibold text-torg-dark tabular-nums">OP-{op.numero}</span> <span className="text-torg-gray">{op.obra || ""}</span></td>
-                      <td className="px-3 py-2 text-right tabular-nums text-torg-gray whitespace-nowrap">{op.valorTotalContrato ? fmtR$(op.valorTotalContrato) : "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-torg-gray whitespace-nowrap">
+                        {op.valorTotalContrato ? (
+                          <>{fmtR$(op.valorTotalContrato)}{op.contratoAuto && <span className="ml-1 text-[9px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded uppercase font-semibold" title="Contrato implícito (receita)">auto</span>}</>
+                        ) : "—"}
+                      </td>
                       <td className="px-5 py-2">
                         <div className="flex items-center justify-end gap-2">
                           <div className="relative">

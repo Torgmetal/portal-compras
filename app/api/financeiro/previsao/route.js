@@ -59,10 +59,16 @@ export async function GET() {
   const porMes = [...mesMap.values()].sort((a, b) => a.mes.localeCompare(b.mes));
 
   // OPs ativas (pra painel de R$/kg — Comercial preenche mesmo antes de ter carga).
-  const ops = await prisma.oP.findMany({
+  // Contrato "efetivo": explícito (OP.valorTotalContrato) ou implícito (Σ receita) quando nulo.
+  const opsRaw = await prisma.oP.findMany({
     where: { status: { in: ["ABERTA", "EM_EXECUCAO", "ATRASADA"] } },
-    select: { id: true, numero: true, obra: true, cliente: true, valorTotalContrato: true, valorFaturarPorKg: true },
+    select: { id: true, numero: true, obra: true, cliente: true, valorTotalContrato: true, valorFaturarPorKg: true, receitas: { select: { valor: true } } },
     orderBy: { numero: "asc" },
+  });
+  const ops = opsRaw.map((o) => {
+    const receita = o.receitas.reduce((a, r) => a + (r.valor || 0), 0);
+    const contrato = o.valorTotalContrato != null ? o.valorTotalContrato : (receita > 0 ? Math.round(receita) : null);
+    return { id: o.id, numero: o.numero, obra: o.obra, cliente: o.cliente, valorTotalContrato: contrato, contratoAuto: o.valorTotalContrato == null && receita > 0, valorFaturarPorKg: o.valorFaturarPorKg };
   });
 
   const totalPrevisto = linhas.reduce((a, l) => a + (l.valor || 0), 0);
