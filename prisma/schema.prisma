@@ -133,6 +133,7 @@ model OP {
   clienteTelefone      String?
   clienteUF            String?
   valorTotalContrato   Float?
+  valorFaturarPorKg    Float? // R$/kg a faturar (Comercial) — base da previsão de faturamento por carga
   // Definidos na abertura da OP
   estoqueMaterial      String? // "PROPRIO_TORG" | "CLIENTE_TERCEIRO"
   tipoDataBook         String? // "PADRAO_TORG" | "SNQC" | "RELATORIO_ACOMPANHAMENTO"

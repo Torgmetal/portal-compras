@@ -50,6 +50,10 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PrioridadeTvOp_opId_idx" ON "PrioridadeTvOp"("opId")`);
   console.log("[ensure-mes-tables] OK — PrioridadeTvOp garantida.");
 
+  // OP.valorFaturarPorKg (R$/kg a faturar — base da previsão de faturamento). Idempotente.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "valorFaturarPorKg" DOUBLE PRECISION`);
+  console.log("[ensure-mes-tables] OK — OP.valorFaturarPorKg garantida.");
+
   // Colunas do FluxoCaixa para import do extrato Omie (idempotente).
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "origemOmieId" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "contaCorrente" TEXT`);

@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, ArrowDownCircle, ArrowUpCircle, Building2, CheckCircle2 } from "lucide-react";
+import { FileText, ArrowDownCircle, ArrowUpCircle, Building2, CheckCircle2, TrendingUp } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   // Aba "Fluxo de Caixa" (/financeiro) removida do menu — será reformulada depois.
+  { href: "/financeiro/previsao", label: "Previsão de faturamento", icon: TrendingUp },
   { href: "/financeiro/faturamento", label: "Faturamento por obra", icon: FileText },
   { href: "/financeiro/a-pagar-por-obra", label: "A pagar por obra", icon: Building2 },
   { href: "/financeiro/contas-pagar", label: "Contas a Pagar", icon: ArrowDownCircle },
