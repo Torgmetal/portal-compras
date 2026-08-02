@@ -18,6 +18,7 @@ const patchEditSchema = z.object({
   dataInicio: z.string().nullable().optional(),
   dataFimPrevista: z.string().nullable().optional(),
   valorTotalContrato: z.number().min(0).nullable().optional(),
+  valorFaturarPorKg: z.number().min(0).nullable().optional(),
   estoqueMaterial: z.enum(["PROPRIO_TORG", "CLIENTE_TERCEIRO"]).nullable().optional(),
   tipoDataBook: z.enum(["PADRAO_TORG", "SNQC", "RELATORIO_ACOMPANHAMENTO"]).nullable().optional(),
 });
@@ -115,6 +116,9 @@ export async function PATCH(req, { params }) {
   }
   if (edit.valorTotalContrato !== undefined) {
     dataUpdate.valorTotalContrato = edit.valorTotalContrato;
+  }
+  if (edit.valorFaturarPorKg !== undefined) {
+    dataUpdate.valorFaturarPorKg = edit.valorFaturarPorKg;
   }
   if (edit.estoqueMaterial !== undefined) dataUpdate.estoqueMaterial = edit.estoqueMaterial || null;
   if (edit.tipoDataBook !== undefined) dataUpdate.tipoDataBook = edit.tipoDataBook || null;

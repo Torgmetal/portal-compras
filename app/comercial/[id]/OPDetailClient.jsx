@@ -1611,6 +1611,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
     dataInicio: fmtDateInput(op.dataInicio),
     dataFimPrevista: fmtDateInput(op.dataFimPrevista),
     valorTotalContrato: op.valorTotalContrato != null ? String(op.valorTotalContrato) : "",
+    valorFaturarPorKg: op.valorFaturarPorKg != null ? String(op.valorFaturarPorKg) : "",
     estoqueMaterial: op.estoqueMaterial || "",
     tipoDataBook: op.tipoDataBook || "",
   });
@@ -1636,6 +1637,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
     setSalvando(true);
     try {
       const valorTotalNum = parseFloat(String(form.valorTotalContrato).replace(",", "."));
+      const valorKgNum = parseFloat(String(form.valorFaturarPorKg).replace(",", "."));
       const res = await fetch(`/api/comercial/op/${opId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1648,6 +1650,7 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
           dataInicio: form.dataInicio || null,
           dataFimPrevista: form.dataFimPrevista || null,
           valorTotalContrato: !isNaN(valorTotalNum) && valorTotalNum > 0 ? valorTotalNum : null,
+          valorFaturarPorKg: !isNaN(valorKgNum) && valorKgNum > 0 ? valorKgNum : null,
           estoqueMaterial: form.estoqueMaterial || null,
           tipoDataBook: form.tipoDataBook || null,
         }),
@@ -1752,21 +1755,37 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-torg-dark mb-1">
-            Valor total do contrato (R$)
-          </label>
-          <input
-            type="number" step="0.01" min="0"
-            value={form.valorTotalContrato}
-            onChange={(e) => set("valorTotalContrato", e.target.value)}
-            placeholder="Ex: 250000.00"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
-          />
-          <p className="text-[11px] text-torg-gray mt-1">
-            Valor cheio acordado com o cliente — inclui receita Torg + tudo que será faturado em <strong>Faturamento Direto</strong> (em nome do cliente).
-            Se deixar vazio, o sistema calcula automaticamente como <em>Receita + Verba FD</em>.
-          </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">
+              Valor total do contrato (R$)
+            </label>
+            <input
+              type="number" step="0.01" min="0"
+              value={form.valorTotalContrato}
+              onChange={(e) => set("valorTotalContrato", e.target.value)}
+              placeholder="Ex: 250000.00"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
+            />
+            <p className="text-[11px] text-torg-gray mt-1">
+              Valor cheio acordado com o cliente (receita Torg + Faturamento Direto). Vazio = <em>Receita + Verba FD</em>.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1">
+              R$/kg a faturar
+            </label>
+            <input
+              type="number" step="0.01" min="0"
+              value={form.valorFaturarPorKg}
+              onChange={(e) => set("valorFaturarPorKg", e.target.value)}
+              placeholder="Ex: 8.50"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
+            />
+            <p className="text-[11px] text-torg-gray mt-1">
+              Preço por kg da <strong>Previsão de faturamento</strong> (Financeiro): valor de cada carga = peso × este R$/kg.
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
