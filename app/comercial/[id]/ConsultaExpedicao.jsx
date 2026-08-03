@@ -54,12 +54,15 @@ export default function ConsultaExpedicao({ opId }) {
   const conhecidas = useMemo(() => { const mp = new Map(); for (const m of todas) mp.set(String(m.marca).trim().toUpperCase(), m); return mp; }, [todas]);
 
   // Total / expedido / pendente por marca. expedido = soma dos romaneios EMITIDOS
-  // (vem da API). pendente = total − expedido. Situação derivada da quantidade.
+  // (expedidoQtd, da API). Sem quantidade, cai no booleano legado (m.expedido =
+  // romaneio do arquivo/backfill ou coluna "Marca (Expedido)"). pendente = total − expedido.
   const totQ = (m) => (Number(m.qte) > 0 ? Number(m.qte) : null);
   const expQ = (m) => Math.max(0, Number(m.expedidoQtd) || 0);
-  const pendQ = (m) => { const t = totQ(m); return t == null ? null : Math.max(0, t - expQ(m)); };
   const unitPeso = (m) => { const t = totQ(m); return t ? (m.pesoTotal || 0) / t : (m.pesoTotal || 0); };
-  const situacaoM = (m) => { const t = totQ(m), e = expQ(m); if (t != null && t > 0 && e >= t) return "expedida"; if (e > 0) return "parcial"; return "pendente"; };
+  const expedidaFull = (m) => { const t = totQ(m), e = expQ(m); if (e > 0 && t != null && t > 0) return e >= t; return m.expedido === true; };
+  const situacaoM = (m) => { if (expedidaFull(m)) return "expedida"; if (expQ(m) > 0) return "parcial"; return "pendente"; };
+  const pendQ = (m) => { const t = totQ(m); if (t == null) return null; if (expedidaFull(m)) return 0; return Math.max(0, t - expQ(m)); };
+  const pesoExpM = (m) => (expedidaFull(m) ? (m.pesoTotal || 0) : unitPeso(m) * expQ(m));
 
   const filtradas = useMemo(() => {
     const b = norm(busca);
@@ -77,7 +80,7 @@ export default function ConsultaExpedicao({ opId }) {
   const contratado = frentes.reduce((s, f) => s + (f.pesoContratado || 0), 0);
   const nFull = todas.filter((m) => situacaoM(m) === "expedida").length;
   const nParcial = todas.filter((m) => situacaoM(m) === "parcial").length;
-  const pesoExpedidoReal = todas.reduce((s, m) => s + unitPeso(m) * expQ(m), 0);
+  const pesoExpedidoReal = todas.reduce((s, m) => s + pesoExpM(m), 0);
   const pesoFiltrado = filtradas.reduce((s, m) => s + (m.pesoTotal || 0), 0);
 
   // Seleção p/ o PRÓXIMO romaneio: parte do PENDENTE (não dá pra reexpedir o que já saiu).
@@ -292,8 +295,11 @@ export default function ConsultaExpedicao({ opId }) {
                         )}
                       </td>
                       <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
-                        {exp > 0 ? <span className="text-emerald-700 font-semibold">{exp.toLocaleString("pt-BR")}</span> : <span className="text-gray-300">0</span>}
-                        {pend != null && pend > 0 && exp > 0 && <span className="block text-[10px] text-amber-600">faltam {pend.toLocaleString("pt-BR")}</span>}
+                        {sit === "expedida"
+                          ? <span className="text-emerald-700 font-semibold">{exp > 0 ? exp.toLocaleString("pt-BR") : (tot != null ? tot.toLocaleString("pt-BR") : "✓")}</span>
+                          : exp > 0 ? <span className="text-emerald-700 font-semibold">{exp.toLocaleString("pt-BR")}</span>
+                          : <span className="text-gray-300">0</span>}
+                        {sit === "parcial" && pend != null && pend > 0 && <span className="block text-[10px] text-amber-600">faltam {pend.toLocaleString("pt-BR")}</span>}
                       </td>
                       <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums whitespace-nowrap">{fmtKg(sel[k] ? pesoUsar(m) : m.pesoTotal)}</td>
                       <td className="px-3 py-1.5 whitespace-nowrap">
