@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ListTodo, GanttChart, Truck, ClipboardCheck, Sparkles, Mail, Tv } from "lucide-react";
+import { ListTodo, GanttChart, Truck, ClipboardCheck, Sparkles, Mail, Tv, CalendarClock } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/planejamento/cronogramas", label: "Cronogramas", icon: GanttChart },
+  { href: "/planejamento/datas-setor", label: "Datas por setor", icon: CalendarClock },
   { href: "/planejamento/distribuir-tarefas", label: "Distribuir tarefas (IA)", icon: Sparkles },
   { href: "/planejamento/comunicacao", label: "Matriz de comunicação", icon: Mail },
   { href: "/planejamento/expedicao-semanal", label: "Expedição Semanal", icon: Truck },
