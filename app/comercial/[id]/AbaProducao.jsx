@@ -169,7 +169,7 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
                     <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{p.qte ?? "—"}</td>
                     <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums whitespace-nowrap">{fmtKg(p.pesoTotal)}</td>
                     <td className="px-3 py-1.5"><span className={`text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 ${e.c}`}><span className={`w-1.5 h-1.5 rounded-full ${p.setor === "EXPEDIDO" ? "bg-white" : e.dot}`} /> {e.l}</span></td>
-                    <td className="px-3 py-1.5 text-[11px] text-torg-gray whitespace-nowrap">{p.temExpedicao ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={11} /> Rom. {p.romaneio || "—"} · {fmtD(p.dataExpedicao)}{!p.expedido && <span className="text-amber-600 ml-1">(parcial)</span>}</span> : "—"}</td>
+                    <td className="px-3 py-1.5 text-[11px] text-torg-gray whitespace-nowrap">{p.temExpedicao ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 size={11} /> Rom. {p.romaneio || "—"}{!p.expedido && <span className="text-amber-600 ml-1">(parcial)</span>}</span> : "—"}</td>
                   </tr>
                 );
               })}
