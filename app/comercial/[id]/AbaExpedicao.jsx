@@ -286,6 +286,23 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
   const [erro, setErro] = useState("");
   const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
 
+  // Transportadoras do Vendor List (categoria "Transporte") — puxa e auto-preenche.
+  const [transps, setTransps] = useState([]);
+  useEffect(() => {
+    fetch(`/api/fornecedores?categoria=TRANSPORTE&ativos=1`).then((r) => r.json())
+      .then((j) => setTransps(Array.isArray(j) ? j : (j.fornecedores || j.data || [])))
+      .catch(() => {});
+  }, []);
+  const escolherTransp = (id) => {
+    const t = transps.find((x) => x.id === id);
+    if (!t) return;
+    setF((v) => ({
+      ...v,
+      transportadora: t.nomeFantasia || t.razaoSocial || v.transportadora,
+      contatoTransporte: t.telefone || t.contato || v.contatoTransporte,
+    }));
+  };
+
   async function salvar() {
     if (!f.nome.trim()) return setErro("Informe o nome/identificação do lote.");
     setErro(""); setSalvando(true);
@@ -342,6 +359,17 @@ function LoteModal({ opId, lote, onClose, onSaved }) {
           <div className="pt-2 border-t border-gray-100">
             <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-2">Transportador <span className="font-normal normal-case">— sai no romaneio; salvo aqui pra não redigitar</span></p>
             <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-torg-dark mb-1">Puxar do Vendor List <span className="text-torg-gray font-normal">— categoria Transporte</span></label>
+                {transps.length > 0 ? (
+                  <select onChange={(e) => escolherTransp(e.target.value)} defaultValue="" className={inp}>
+                    <option value="">— selecionar transportadora cadastrada —</option>
+                    {transps.map((t) => <option key={t.id} value={t.id}>{t.nomeFantasia || t.razaoSocial}{t.cidade ? ` — ${t.cidade}${t.uf ? "/" + t.uf : ""}` : ""}</option>)}
+                  </select>
+                ) : (
+                  <p className="text-[11px] text-torg-gray bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">Cadastre as transportadoras no <strong>Vendor List</strong> (categoria <strong>Transporte</strong>) que elas aparecem aqui pra puxar os dados automaticamente.</p>
+                )}
+              </div>
               <div className="col-span-2"><label className="block text-xs font-medium text-torg-dark mb-1">Transportadora</label><input value={f.transportadora} onChange={(e) => setF((v) => ({ ...v, transportadora: e.target.value }))} placeholder="Transportadora" className={inp} /></div>
               <div><label className="block text-xs font-medium text-torg-dark mb-1">Motorista</label><input value={f.motorista} onChange={(e) => setF((v) => ({ ...v, motorista: e.target.value }))} className={inp} /></div>
               <div><label className="block text-xs font-medium text-torg-dark mb-1">Contato / Fone</label><input value={f.contatoTransporte} onChange={(e) => setF((v) => ({ ...v, contatoTransporte: e.target.value }))} placeholder="Telefone" className={inp} /></div>
