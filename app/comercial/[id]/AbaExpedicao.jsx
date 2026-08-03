@@ -72,7 +72,7 @@ function baixarModelo() {
 }
 
 // ── componente ────────────────────────────────────────────────────────────────
-export default function AbaExpedicao({ opId, proposta = null }) {
+export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = true }) {
   const [lotes, setLotes] = useState(null);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(null); // { lote } (novo = {})
@@ -117,11 +117,13 @@ export default function AbaExpedicao({ opId, proposta = null }) {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
           <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><Truck size={18} className="text-torg-blue" /> Lotes de entrega</h3>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={baixarModelo} className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-50"><Download size={13} /> Modelo</button>
-            <button onClick={() => setImportOpen(true)} className="text-xs border border-torg-blue text-torg-blue rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-blue-50"><Upload size={13} /> Importar planilha</button>
-            <button onClick={() => setModal({})} className="text-xs bg-torg-blue text-white rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-dark"><Plus size={13} /> Adicionar lote</button>
-          </div>
+          {podeEditarLotes && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={baixarModelo} className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-50"><Download size={13} /> Modelo</button>
+              <button onClick={() => setImportOpen(true)} className="text-xs border border-torg-blue text-torg-blue rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-blue-50"><Upload size={13} /> Importar planilha</button>
+              <button onClick={() => setModal({})} className="text-xs bg-torg-blue text-white rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-dark"><Plus size={13} /> Adicionar lote</button>
+            </div>
+          )}
         </div>
         <p className="text-sm text-torg-gray mb-4">Prioridades e locais de entrega da obra. Os <strong>pesos entram depois</strong>, quando a Engenharia gera a lista final de expedição.</p>
         {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
@@ -132,7 +134,7 @@ export default function AbaExpedicao({ opId, proposta = null }) {
           <div className="border border-dashed border-gray-200 rounded-lg py-10 text-center">
             <Truck size={26} className="mx-auto text-gray-300 mb-2" />
             <p className="text-sm font-semibold text-torg-dark">Nenhum lote de entrega ainda</p>
-            <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">Importe uma planilha (prioridade, local e — se já tiver — peso) ou adicione os lotes manualmente. Dá pra refinar depois.</p>
+            <p className="text-xs text-torg-gray mt-1 max-w-md mx-auto">{podeEditarLotes ? "Importe uma planilha (prioridade, local e — se já tiver — peso) ou adicione os lotes manualmente. Dá pra refinar depois." : "Os lotes de entrega são criados no módulo OPs (Comercial/Planejamento). Aqui a Expedição vê os lotes e emite os romaneios."}</p>
           </div>
         ) : (<>
           <div className="grid grid-cols-3 gap-px bg-gray-100 border border-gray-100 rounded-lg overflow-hidden mb-3">
@@ -165,10 +167,12 @@ export default function AbaExpedicao({ opId, proposta = null }) {
                     <td className="px-2 py-2">
                       <div className="flex items-center gap-1">
                         <span className="text-xs font-mono font-semibold text-torg-blue tabular-nums w-5 text-center">{i + 1}</span>
-                        <div className="flex flex-col">
-                          <button onClick={() => mover(i, -1)} disabled={i === 0} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none"><ChevronUp size={13} /></button>
-                          <button onClick={() => mover(i, 1)} disabled={i === lotes.length - 1} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none"><ChevronDown size={13} /></button>
-                        </div>
+                        {podeEditarLotes && (
+                          <div className="flex flex-col">
+                            <button onClick={() => mover(i, -1)} disabled={i === 0} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none"><ChevronUp size={13} /></button>
+                            <button onClick={() => mover(i, 1)} disabled={i === lotes.length - 1} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none"><ChevronDown size={13} /></button>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-torg-dark font-medium">
@@ -187,8 +191,8 @@ export default function AbaExpedicao({ opId, proposta = null }) {
                         <button onClick={() => setExportar({ lote: l, emitido })} className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap" title={emitido ? "Gerar uma revisão do romaneio" : "Emitir o romaneio (FORM 22)"}>
                           <FileSpreadsheet size={12} /> {emitido ? "Revisar" : "Emitir"}
                         </button>
-                        <button onClick={() => setModal({ lote: l })} className="text-torg-gray hover:text-torg-blue" title="Editar"><Pencil size={14} /></button>
-                        <button onClick={() => excluir(l)} className="text-torg-gray hover:text-red-600" title="Excluir"><Trash2 size={14} /></button>
+                        {podeEditarLotes && <button onClick={() => setModal({ lote: l })} className="text-torg-gray hover:text-torg-blue" title="Editar"><Pencil size={14} /></button>}
+                        {podeEditarLotes && <button onClick={() => excluir(l)} className="text-torg-gray hover:text-red-600" title="Excluir"><Trash2 size={14} /></button>}
                       </div>
                     </td>
                   </tr>

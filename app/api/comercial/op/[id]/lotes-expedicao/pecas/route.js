@@ -10,10 +10,13 @@ import { requireRole } from "@/lib/session";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 const ROLES = ["ADMIN", "ENGENHARIA", "COMERCIAL", "PLANEJAMENTO", "PCP"];
+// Leitura (GET) inclui EXPEDIÇÃO — o espelho da Expedição lê as marcas do lote
+// (ver marcas / wizard de emitir romaneio). A importação do Tekla (POST) não.
+const ROLES_READ = [...ROLES, "EXPEDICAO"];
 const chave = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 
 export async function GET(req, { params }) {
-  try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  try { await requireRole(ROLES_READ); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   const loteId = new URL(req.url).searchParams.get("loteId");
   const pecas = await prisma.pecaLote.findMany({
     where: { opId: params.id, ...(loteId ? { loteId } : {}) },
