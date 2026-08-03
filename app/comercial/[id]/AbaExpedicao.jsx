@@ -114,6 +114,9 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
   const pesoLote = (l) => (l.romaneios?.[0]?.pesoKg != null ? l.romaneios[0].pesoKg : l.pesoKg);
   const totalPeso = (lotes || []).reduce((s, l) => s + (pesoLote(l) || 0), 0);
   const semPeso = (lotes || []).filter((l) => pesoLote(l) == null).length;
+  // Ordena pelo número do romaneio (01, 02, 03…) — ordem natural, sem reordenar manual.
+  const numRom = (l) => (l.romaneios?.[0]?.numero ?? parseInt(String(l.nome || "").match(/\d+/)?.[0] ?? "9999", 10));
+  const lotesOrd = [...(lotes || [])].sort((a, b) => numRom(a) - numRom(b));
 
   return (
     <div className="space-y-4">
@@ -158,7 +161,7 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {lotes.map((l, i) => {
+                {lotesOrd.map((l, i) => {
                   const aberto = !!abertos[l.id];
                   const marcas = pecasLote[l.id];
                   const rom = l.romaneios?.[0];
