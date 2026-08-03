@@ -66,7 +66,7 @@ export default function PrevisaoClient() {
           <div className="bg-torg-blue-50 p-2.5 rounded-xl"><TrendingUp size={24} className="text-torg-blue" /></div>
           <div>
             <h1 className="text-2xl font-bold text-torg-dark">Previsão de faturamento</h1>
-            <p className="text-sm text-torg-gray">Por carga programada · valor = peso × R$/kg · vira real quando o romaneio sai</p>
+            <p className="text-sm text-torg-gray">Por carga programada · valor = peso × R$/kg (ou nº de peças × R$/peça, quando o pedido é por peça) · vira real quando o romaneio sai</p>
           </div>
         </div>
         <button onClick={() => carregar(false)} className="p-2.5 rounded-xl bg-white border border-torg-blue-100 hover:border-torg-blue-300 text-torg-dark"><RefreshCw size={18} className={loading ? "animate-spin" : ""} /></button>
@@ -131,8 +131,8 @@ export default function PrevisaoClient() {
                       <th className="px-5 py-2 font-medium">Data</th>
                       <th className="px-3 py-2 font-medium">OP / Obra</th>
                       <th className="px-3 py-2 font-medium">Situação</th>
-                      <th className="px-3 py-2 font-medium text-right">Peso</th>
-                      <th className="px-3 py-2 font-medium text-right">R$/kg</th>
+                      <th className="px-3 py-2 font-medium text-right">Peso / Peças</th>
+                      <th className="px-3 py-2 font-medium text-right">R$ unit.</th>
                       <th className="px-5 py-2 font-medium text-right">Valor previsto</th>
                     </tr>
                   </thead>
@@ -146,10 +146,14 @@ export default function PrevisaoClient() {
                           {c.dataOriginal && <span className="text-[10px] text-torg-gray-light ml-1.5">era {fmtData(c.dataOriginal)}</span>}
                         </td>
                         <td className="px-3 py-2.5 text-right tabular-nums text-torg-dark whitespace-nowrap">
-                          {fmtKg(c.peso)}
+                          {c.base === "peca" ? `${Number(c.nPecas || 0).toLocaleString("pt-BR")} pç` : fmtKg(c.peso)}
                           <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded ${c.fonte === "real" ? "bg-emerald-50 text-emerald-700" : "bg-torg-blue-50 text-torg-blue"}`}>{c.fonte === "real" ? "real" : "estim."}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums text-torg-gray whitespace-nowrap">{c.rsKg != null ? fmtR$(c.rsKg, 2) : "—"}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-torg-gray whitespace-nowrap">
+                          {c.base === "peca"
+                            ? (c.rsPeca != null ? `${fmtR$(c.rsPeca, 2)}/pç` : "—")
+                            : (c.rsKg != null ? `${fmtR$(c.rsKg, 2)}/kg` : "—")}
+                        </td>
                         <td className="px-5 py-2.5 text-right whitespace-nowrap">
                           {c.valor != null ? <b className="text-torg-dark tabular-nums">{fmtR$(c.valor)}</b> : <span className="text-torg-orange text-xs font-semibold">em aberto</span>}
                         </td>

@@ -33,31 +33,52 @@ export async function GET() {
     orderBy: { dataPrevista: "asc" },
     select: {
       id: true, opId: true, dataPrevista: true, dataOriginal: true, situacao: true, status: true, descricao: true, romaneioId: true,
-      itens: { select: { pesoEstimadoKg: true } },
+      itens: { select: { tipo: true, qtdPlanejada: true, pesoEstimadoKg: true } },
       romaneio: { select: { pesoRealKg: true, data: true } },
     },
   });
 
   const opIds = [...new Set(cargas.map((c) => c.opId).filter(Boolean))];
   const opsCarga = opIds.length
-    ? await prisma.oP.findMany({ where: { id: { in: opIds } }, select: { id: true, numero: true, obra: true, cliente: true, valorFaturarPorKg: true } })
+    ? await prisma.oP.findMany({ where: { id: { in: opIds } }, select: { id: true, numero: true, obra: true, cliente: true, valorFaturarPorKg: true, receitas: { select: { tipoPreco: true, quantidade: true, valor: true } } } })
     : [];
   const opMap = new Map(opsCarga.map((o) => [o.id, o]));
+
+  // Base de faturamento por OP: se tem linha de receita POR_PECA → a OP é cobrada
+  // POR PEÇA (R$/peça = Σ valor ÷ Σ qtd das linhas por-peça). Senão, POR KG (R$/kg da OP).
+  const opBase = new Map();
+  for (const o of opsCarga) {
+    const pl = (o.receitas || []).filter((r) => r.tipoPreco === "POR_PECA" && (r.quantidade || 0) > 0);
+    const somaQtd = pl.reduce((a, r) => a + (r.quantidade || 0), 0);
+    const somaVal = pl.reduce((a, r) => a + (r.valor || 0), 0);
+    const rsPeca = somaQtd > 0 ? somaVal / somaQtd : null;
+    opBase.set(o.id, { modo: rsPeca != null ? "PECA" : "KG", rsKg: o.valorFaturarPorKg ?? null, rsPeca });
+  }
 
   const now = new Date();
   const todas = cargas.map((c) => {
     const op = opMap.get(c.opId);
+    const base = opBase.get(c.opId) || { modo: "KG", rsKg: op?.valorFaturarPorKg ?? null, rsPeca: null };
     const temRomaneio = !!c.romaneio;
     const peso = temRomaneio ? (c.romaneio.pesoRealKg || 0) : c.itens.reduce((a, i) => a + (i.pesoEstimadoKg || 0), 0);
-    const rsKg = op?.valorFaturarPorKg ?? null;
-    const valor = peso > 0 && rsKg ? Math.round(peso * rsKg) : null;
+    const nPecas = c.itens.reduce((a, i) => a + (i.tipo === "PECA" ? (i.qtdPlanejada || 0) : 0), 0);
+    // Por peça quando a OP é cobrada por peça (tem R$/peça); senão por kg.
+    let valor = null, baseCalc = null;
+    if (base.modo === "PECA" && base.rsPeca != null) {
+      valor = nPecas > 0 ? Math.round(nPecas * base.rsPeca) : null;
+      baseCalc = "peca";
+    } else if (base.rsKg) {
+      valor = peso > 0 ? Math.round(peso * base.rsKg) : null;
+      baseCalc = "kg";
+    }
     const dataBase = temRomaneio && c.romaneio.data ? c.romaneio.data : c.dataPrevista;
     const s = statusCarga(c, now);
     return {
       id: c.id, opNumero: op?.numero || null, obra: op?.obra || null, cliente: op?.cliente || null,
       data: dataBase ? dataBase.toISOString() : null,
       dataOriginal: s.dataOriginal ? new Date(s.dataOriginal).toISOString() : null,
-      peso: Math.round(peso), fonte: temRomaneio ? "real" : "estimado", rsKg, valor,
+      peso: Math.round(peso), nPecas, base: baseCalc, fonte: temRomaneio ? "real" : "estimado",
+      rsKg: base.rsKg, rsPeca: base.rsPeca, valor,
       situacao: s.key, situacaoLabel: s.label, descricao: c.descricao || null,
     };
   });
