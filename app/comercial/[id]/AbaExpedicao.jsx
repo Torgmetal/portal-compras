@@ -496,6 +496,19 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
   const [ok, setOk] = useState(null);
   const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
 
+  // Transportadoras do Vendor List (categoria "Transporte") — puxa e auto-preenche.
+  const [transps, setTransps] = useState([]);
+  useEffect(() => {
+    fetch(`/api/fornecedores?categoria=TRANSPORTE&ativos=1`).then((r) => r.json())
+      .then((j) => setTransps(Array.isArray(j) ? j : (j.fornecedores || [])))
+      .catch(() => {});
+  }, []);
+  const escolherTransp = (id) => {
+    const t = transps.find((x) => x.id === id);
+    if (!t) return;
+    setF((v) => ({ ...v, transportadora: t.nomeFantasia || t.razaoSocial || v.transportadora, contato: t.telefone || t.contato || v.contato }));
+  };
+
   useEffect(() => {
     fetch(`/api/comercial/op/${opId}/lotes-expedicao/pecas?loteId=${lote.id}`)
       .then((r) => r.json())
@@ -625,6 +638,17 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
             <>
               <p className="text-xs text-torg-gray">Dados do transportador — salvos no lote pra não redigitar.</p>
               <div className="grid grid-cols-2 gap-3">
+                <label className="block col-span-2">
+                  <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Puxar do Vendor List <span className="normal-case font-normal">— categoria Transporte</span></span>
+                  {transps.length > 0 ? (
+                    <select onChange={(e) => escolherTransp(e.target.value)} defaultValue="" className={inp}>
+                      <option value="">— selecionar transportadora cadastrada —</option>
+                      {transps.map((t) => <option key={t.id} value={t.id}>{t.nomeFantasia || t.razaoSocial}{t.cidade ? ` — ${t.cidade}${t.uf ? "/" + t.uf : ""}` : ""}</option>)}
+                    </select>
+                  ) : (
+                    <p className="text-[11px] text-torg-gray bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mt-0.5">Cadastre as transportadoras no <strong>Vendor List</strong> (categoria <strong>Transporte</strong>) que elas aparecem aqui pra puxar os dados.</p>
+                  )}
+                </label>
                 <label className="block col-span-2"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Transportadora</span><input value={f.transportadora} onChange={(e) => setF({ ...f, transportadora: e.target.value })} className={inp} placeholder="Transportadora" /></label>
                 <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Motorista</span><input value={f.motorista} onChange={(e) => setF({ ...f, motorista: e.target.value })} className={inp} /></label>
                 <label className="block"><span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Placa (caminhão)</span><input value={f.placa} onChange={(e) => setF({ ...f, placa: e.target.value })} className={inp} placeholder="ABC1D23" /></label>
