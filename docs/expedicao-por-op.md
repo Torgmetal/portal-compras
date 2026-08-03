@@ -53,12 +53,17 @@ Criavam um `Romaneio` paralelo (outra entidade) que **o Fiscal não enxergava** 
 gerava numeração/arquivo duplicados. A Visão previsto×expedido + filtros Excel
 saiu junto (era da nossa versão; não fazia parte do fluxo do Vitor).
 
-## ⚠️ A confirmar (infra)
-- **Um único drive SharePoint.** A importação da LE usa `SHAREPOINT_DRIVE_ID`
-  (`/Ordem de Servico/01. OP`); o save do romaneio usa `SHAREPOINT_SERVIDOR_DRIVE_ID`
-  (biblioteca "SERVIDOR"). **Confirmar se apontam pro mesmo lugar** — senão o
-  "expedido" salvo não é lido pela sincronização. (Não bloqueia o espelho; é do
-  ciclo de leitura do expedido.)
+## Um modelo só de SharePoint (unificado 03/08)
+Antes a **importação** da Lista/expedido usava `SHAREPOINT_DRIVE_ID` e o **save** do
+romaneio usava o drive SERVIDOR (`resolveServidorDriveId`) — risco de divergência.
+**Unificado:** `lib/lista-avancada-sharepoint.js` agora resolve o drive pelo MESMO
+`resolveServidorDriveId()` do `sharepoint-lpc`/`sharepoint-lista` (biblioteca
+SERVIDOR; fallback = `SHAREPOINT_DRIVE_ID`) e usa `SHAREPOINT_OP_BASE_FOLDER`. Assim
+**leitura e escrita ficam no mesmo drive/base por construção** — o romaneio salvo é
+lido pela sincronização (o ciclo do "expedido" fecha). Um modelo só, caminhos do Vitor.
+
+> Nota: `SHAREPOINT_SERVIDOR_DRIVE_ID` não está setado em produção; a resolução acha
+> a biblioteca "SERVIDOR" por nome ou cai no fallback. Se quiser fixar, definir a env.
 
 ## Ideias futuras (não feitas)
 - Levar as **bolinhas de status do Syneco por marca** (montagem/solda) — que
