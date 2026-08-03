@@ -25,14 +25,37 @@ export async function GET(_req, { params }) {
     where: { OR: [{ opId: op.id }, { opNumero: op.numero }] },
     select: { frente: true, marcasJson: true },
   });
+  // Romaneios EMITIDOS no portal → expedido por marca (quantidade + nº do romaneio + data).
+  const previosEmitidos = await prisma.romaneioPrevio.findMany({
+    where: { OR: [{ opId: op.id }, { opNumero: String(op.numero) }], emitidoEm: { not: null } },
+    select: { numero: true, emitidoEm: true, itens: true },
+  });
+  const expMap = new Map();
+  for (const r of previosEmitidos) for (const it of (Array.isArray(r.itens) ? r.itens : [])) {
+    const kk = normMarca(it.marca); if (!kk) continue;
+    const cur = expMap.get(kk) || { qtd: 0, romaneios: new Set(), data: null };
+    cur.qtd += Number(it.qte) || 0;
+    cur.romaneios.add(String(r.numero).padStart(2, "0"));
+    if (r.emitidoEm && (!cur.data || r.emitidoEm > cur.data)) cur.data = r.emitidoEm;
+    expMap.set(kk, cur);
+  }
+
   const marcas = new Map();
   for (const l of listas) {
     for (const m of Array.isArray(l.marcasJson) ? l.marcasJson : []) {
       const k = normMarca(m.marca);
       if (!k || marcas.has(k)) continue;
+      const ex = expMap.get(k);
+      const qte = m.qte ?? null;
+      const expedidoQtd = ex ? (qte != null ? Math.min(ex.qtd, qte) : ex.qtd) : 0;
+      // 100% expedida (setor EXPEDIDO) por quantidade; senão cai no booleano legado.
+      const full = expedidoQtd > 0 && qte != null && qte > 0 ? expedidoQtd >= qte : m.expedidoRomaneio === true;
       marcas.set(k, {
-        frente: l.frente, marca: m.marca, descricao: m.descricao || "", qte: m.qte ?? null, pesoTotal: m.pesoTotal || 0,
-        expedido: m.expedidoRomaneio === true, romaneio: m.romaneio || null, dataExpedicao: m.dataExpedicao || null,
+        frente: l.frente, marca: m.marca, descricao: m.descricao || "", qte, pesoTotal: m.pesoTotal || 0,
+        expedidoQtd, expedido: full,
+        temExpedicao: expedidoQtd > 0 || m.expedidoRomaneio === true, // saiu algo → mostra romaneio/data
+        romaneio: ex ? [...ex.romaneios].sort().join(", ") : (m.romaneio || null),
+        dataExpedicao: ex?.data ?? m.dataExpedicao ?? null,
       });
     }
   }
