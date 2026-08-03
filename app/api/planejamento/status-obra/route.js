@@ -57,8 +57,8 @@ export async function GET(req) {
     const op = padOp(l.opNumero);
     let portal = expFrente.get(`${op}|${k(l.frente)}`) || 0;
     if (portal === 0 && nFrentesOp.get(op) === 1) portal = expOp.get(op) || 0; // frente única
-    const pesoExpedido = portal > 0 ? Math.round(portal) : l.pesoExpedido;
-    const pesoFaltante = Math.max(0, Math.round((l.pesoContratado || 0) - (pesoExpedido || 0)));
+    const pesoExpedido = portal > 0 ? portal : l.pesoExpedido;
+    const pesoFaltante = Math.max(0, (l.pesoContratado || 0) - (pesoExpedido || 0));
     return { ...l, pesoExpedido, pesoFaltante };
   });
   return NextResponse.json({ listas: listasOut });

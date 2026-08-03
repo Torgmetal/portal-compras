@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, Fragment } from "react";
 import * as XLSX from "xlsx";
 import { Truck, Plus, Pencil, Trash2, ChevronUp, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2, FileSpreadsheet } from "lucide-react";
 
-const fmtKg = (n) => (n == null ? null : `${Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
+const fmtKg = (n) => (n == null ? null : `${Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`);
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const _norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 

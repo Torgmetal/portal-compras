@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Factory, Search, Loader2, AlertCircle, X, CheckCircle2, FileSpreadsheet } from "lucide-react";
 
-const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
+const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const norm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const LIMITE = 300;
@@ -71,7 +71,7 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
       const primeira = row;
       for (const p of linhas) {
         adicionarLinhaTabela(ws, row, [
-          p.marca, p.descricao || "—", p.qte ?? "—", Number((p.pesoTotal || 0).toFixed(1)),
+          p.marca, p.descricao || "—", p.qte ?? "—", Number((p.pesoTotal || 0).toFixed(2)),
           (ETAPA[p.setor] || ETAPA.PENDENTE).l,
           p.temExpedicao ? (p.romaneio || "—") : "—",
           p.temExpedicao && p.dataExpedicao ? fmtD(p.dataExpedicao) : "—",

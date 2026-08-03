@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import { Truck, Upload, Loader2, X, AlertCircle, CheckCircle2, ChevronRight, ChevronDown, Download } from "lucide-react";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
-const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
+const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
 const _norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
 // ── parse da lista do Tekla (no navegador) ───────────────────────────────────

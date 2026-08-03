@@ -37,8 +37,8 @@ async function montar(opId, opNumero) {
   const listas = listasRaw.map((l) => {
     let portal = expPorFrente.get(k(l.frente)) || 0;
     if (portal === 0 && listasRaw.length === 1) portal = totalPortal; // frente única: item pode não trazer a frente
-    const pesoExpedido = portal > 0 ? Math.round(portal) : l.pesoExpedido;
-    const pesoFaltante = Math.max(0, Math.round((l.pesoContratado || 0) - (pesoExpedido || 0)));
+    const pesoExpedido = portal > 0 ? portal : l.pesoExpedido;
+    const pesoFaltante = Math.max(0, (l.pesoContratado || 0) - (pesoExpedido || 0));
     return { ...l, pesoExpedido, pesoFaltante };
   });
 
