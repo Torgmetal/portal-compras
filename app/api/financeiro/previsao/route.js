@@ -15,8 +15,8 @@ const ROLES = ["ADMIN", "FINANCEIRO", "COMERCIAL"];
 // Automáticos: Emitida (romaneio saiu), Alterada (data mudou), Atrasada (venceu sem romaneio).
 // Manuais: Confirmada, Cancelada (situacao). Pendente é o padrão.
 function statusCarga(c, now) {
-  if (c.situacao === "CANCELADA") return { key: "CANCELADA", label: "Cancelada" };
-  if (c.romaneio) return { key: "EMITIDA", label: "Emitida" };
+  if (c.situacao === "CANCELADA" || c.status === "CANCELADO") return { key: "CANCELADA", label: "Cancelada" };
+  if (c.romaneio || c.status === "CONCLUIDO") return { key: "EMITIDA", label: "Emitida" };
   const ini = c.dataOriginal ? new Date(c.dataOriginal).getTime() : null;
   const atual = c.dataPrevista ? new Date(c.dataPrevista).getTime() : null;
   if (ini && atual && ini !== atual) return { key: "ALTERADA", label: "Alterada", dataOriginal: c.dataOriginal };

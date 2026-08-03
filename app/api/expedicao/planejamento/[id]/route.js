@@ -45,6 +45,7 @@ export async function GET(_req, { params }) {
 
 const patchSchema = z.object({
   status: z.enum(["PLANEJADO", "EM_CARGA", "CONCLUIDO", "CANCELADO"]).optional(),
+  situacao: z.enum(["PENDENTE", "CONFIRMADA", "CANCELADA"]).optional(), // situação p/ a previsão de faturamento
   dataPrevista: z.string().optional(),
   descricao: z.string().nullable().optional(),
   romaneioId: z.string().nullable().optional(),
@@ -62,7 +63,7 @@ const patchSchema = z.object({
 export async function PATCH(req, { params }) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "EXPEDICAO"]);
+    user = await requireRole(["ADMIN", "EXPEDICAO", "PLANEJAMENTO"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });
@@ -94,6 +95,7 @@ export async function PATCH(req, { params }) {
   // Monta update do planejamento
   const updateData = {};
   if (body.status) updateData.status = body.status;
+  if (body.situacao) updateData.situacao = body.situacao;
   if (body.dataPrevista) updateData.dataPrevista = new Date(body.dataPrevista);
   if (body.descricao !== undefined) updateData.descricao = body.descricao;
   if (body.romaneioId !== undefined) updateData.romaneioId = body.romaneioId;

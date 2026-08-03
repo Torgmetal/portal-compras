@@ -293,7 +293,20 @@ function GrupoCarga({ titulo, cor, cargas, destaque, isAdmin, onChanged }) {
 function CargaCard({ carga, borderClass, isAdmin, onChanged }) {
   const st = STATUS_COR[carga.status] || STATUS_COR.PLANEJADO;
   const [cancelando, setCancelando] = useState(false);
+  const [salvandoSit, setSalvandoSit] = useState(false);
   const podeCancelar = isAdmin && carga.status !== "CONCLUIDO" && carga.status !== "CANCELADO";
+
+  async function salvarSituacao(sit) {
+    setSalvandoSit(true);
+    try {
+      const r = await fetch(`/api/expedicao/planejamento/${carga.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ situacao: sit }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar situação");
+      onChanged?.();
+    } catch (e) { alert(e.message); } finally { setSalvandoSit(false); }
+  }
 
   async function cancelar() {
     if (!confirm(`Cancelar a programacao de carga de ${fmtOP(carga.opNumero)}${carga.descricao ? ` (${carga.descricao})` : ""}? Os itens voltam a ficar sem carga.`)) return;
@@ -342,6 +355,15 @@ function CargaCard({ carga, borderClass, isAdmin, onChanged }) {
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 whitespace-nowrap">
                   <Clock size={10} /> Vencida
                 </span>
+              )}
+              {carga.status !== "CANCELADO" && carga.status !== "CONCLUIDO" && (
+                <select value={carga.situacao || "PENDENTE"} onChange={(e) => salvarSituacao(e.target.value)} disabled={salvandoSit}
+                  className="text-[10px] border border-gray-200 rounded px-1.5 py-0.5 bg-white text-torg-dark focus:border-torg-blue outline-none disabled:opacity-50"
+                  title="Situação para a previsão de faturamento (Financeiro)">
+                  <option value="PENDENTE">Pendente</option>
+                  <option value="CONFIRMADA">Confirmada</option>
+                  <option value="CANCELADA">Cancelada (previsão)</option>
+                </select>
               )}
             </div>
             {carga.descricao && (
