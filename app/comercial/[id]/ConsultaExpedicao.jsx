@@ -24,6 +24,7 @@ export default function ConsultaExpedicao({ opId }) {
   const [exportando, setExportando] = useState(false);
   const [importando, setImportando] = useState(false);
   const [sel, setSel] = useState({});
+  const [qtdImport, setQtdImport] = useState({}); // chave(marca) -> qtd desta carga (da lista ou ajustada). Sem entrada = qtd total da marca.
   const [previos, setPrevios] = useState([]);
   const [lotes, setLotes] = useState([]);
   const [proximo, setProximo] = useState(null);
@@ -66,18 +67,57 @@ export default function ConsultaExpedicao({ opId }) {
   const expedido = frentes.reduce((s, f) => s + (f.pesoExpedido || 0), 0);
   const nExp = todas.filter((m) => m.expedido === true).length;
   const pesoFiltrado = filtradas.reduce((s, m) => s + (m.pesoTotal || 0), 0);
-  const marcadas = useMemo(() => todas.filter((m) => sel[chave(m)]), [todas, sel]);
-  const pesoSel = marcadas.reduce((s, m) => s + (m.pesoTotal || 0), 0);
+  // Quantidade/peso a levar nesta carga. Sem override (qtdImport) = a marca inteira.
+  // Com override (lista importada ou ajuste manual) = a qtd escolhida, com peso PROPORCIONAL.
+  const baseQte = (m) => (Number(m.qte) > 0 ? Number(m.qte) : null); // null = qtd desconhecida
+  const unitPeso = (m) => { const b = baseQte(m); return b ? (m.pesoTotal || 0) / b : (m.pesoTotal || 0); };
+  const qteUsar = (m) => {
+    const q = qtdImport[chave(m)];
+    const b = baseQte(m);
+    if (q == null) return b ?? 1;                       // sem override → total
+    return b ? Math.max(0, Math.min(q, b)) : Math.max(0, q); // com override → cap no total da marca
+  };
+  const pesoUsar = (m) => unitPeso(m) * qteUsar(m);
 
-  /** Casa o texto do arquivo com as marcas conhecidas — não precisa adivinhar
-   *  coluna: procura no conteúdo inteiro por marcas que existem nesta OP. */
-  function casar(texto) {
-    const achadas = new Map();
-    for (const tok of String(texto).split(/[\s,;|"'\t\r\n]+/)) {
+  const marcadas = useMemo(() => todas.filter((m) => sel[chave(m)]), [todas, sel]);
+  const pesoSel = marcadas.reduce((s, m) => s + pesoUsar(m), 0);
+  const unSel = marcadas.reduce((s, m) => s + qteUsar(m), 0);
+  const parciais = marcadas.filter((m) => baseQte(m) != null && qteUsar(m) < baseQte(m)).length;
+
+  // Extrai a 1ª marca conhecida de uma célula/texto (tokeniza — aceita "T45 - Viga").
+  function marcaNaCelula(cell) {
+    for (const tok of String(cell ?? "").split(/[\s,;|"'\t]+/)) {
       const t = tok.trim().toUpperCase().replace(/^[.,;:(\[]+|[.,;:)\]]+$/g, "");
       if (t.length < 2) continue;
       const m = conhecidas.get(t);
-      if (m) achadas.set(t, m);
+      if (m) return { m, key: t };
+    }
+    return null;
+  }
+
+  /** Casa linhas (Excel = arrays de células; PDF = linhas de texto) com as marcas da
+   *  OP E lê a QUANTIDADE de cada uma: detecta a coluna de qtd pelo cabeçalho. Sem
+   *  cabeçalho de qtd (ex.: PDF), deixa a qtd em aberto (assume a marca inteira). */
+  function casarLinhas(rows) {
+    const nrm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const inteiro = (v) => { const n = parseInt(String(v ?? "").replace(/[^\d-]/g, ""), 10); return Number.isFinite(n) && n > 0 ? n : null; };
+    // 1) coluna de "quantidade" pelo cabeçalho (primeiras linhas)
+    let qtdCol = -1;
+    for (let r = 0; r < Math.min(rows.length, 10) && qtdCol < 0; r++) {
+      (rows[r] || []).forEach((cell, c) => {
+        if (qtdCol < 0 && /\b(qtd|qtde|qte|quant|quantidade|pcs|pecas|unid)\b/.test(nrm(cell))) qtdCol = c;
+      });
+    }
+    // 2) varre as linhas: marca + qtd da mesma linha (mesma marca repetida → soma)
+    const achadas = new Map(); // key -> { m, qtd }
+    for (const row of rows) {
+      if (!row || !row.length) continue;
+      let hit = null;
+      for (const cell of row) { hit = marcaNaCelula(cell); if (hit) break; }
+      if (!hit) continue;
+      const qtd = qtdCol >= 0 ? inteiro(row[qtdCol]) : null;
+      const ex = achadas.get(hit.key);
+      achadas.set(hit.key, { m: hit.m, qtd: qtd == null ? (ex?.qtd ?? null) : (ex?.qtd ?? 0) + qtd });
     }
     return achadas;
   }
@@ -86,28 +126,31 @@ export default function ConsultaExpedicao({ opId }) {
     if (!file) return;
     setImportando(true); setErro(""); setMsg("");
     try {
-      let texto = "";
+      let rows = [];
       if (/\.pdf$/i.test(file.name)) {
         const fd = new FormData(); fd.append("arquivo", file);
         const j = await fetch(`/api/comercial/op/${opId}/lista-expedicao/ler-arquivo`, { method: "POST", body: fd }).then((r) => r.json());
         if (!j.success) throw new Error(j.error);
-        texto = j.texto;
+        rows = String(j.texto || "").split(/\r?\n/).map((l) => l.split(/ {2,}|\t/));
       } else {
         const XLSX = await import("xlsx");
         const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-        const partes = [];
         for (const nome of wb.SheetNames) {
-          for (const r of XLSX.utils.sheet_to_json(wb.Sheets[nome], { header: 1, defval: null, blankrows: false })) {
-            for (const c of r || []) if (c != null) partes.push(String(c));
-          }
+          for (const r of XLSX.utils.sheet_to_json(wb.Sheets[nome], { header: 1, defval: null, blankrows: false })) rows.push(r || []);
         }
-        texto = partes.join("\n");
       }
-      const achadas = casar(texto);
+      const achadas = casarLinhas(rows);
       if (!achadas.size) { setErro(`Nenhuma marca de "${file.name}" bate com a lista de expedição desta OP.`); return; }
-      setSel((s) => { const n = { ...s }; for (const m of achadas.values()) n[chave(m)] = true; return n; });
-      const jaExp = [...achadas.values()].filter((m) => m.expedido === true).length;
-      setMsg(`${achadas.size} peça(s) de "${file.name}" selecionada(s)${jaExp ? ` — atenção: ${jaExp} já constam como expedidas` : ""}.`);
+      const vals = [...achadas.values()];
+      const comQtd = vals.filter((a) => a.qtd != null).length;
+      setSel((s) => { const n = { ...s }; for (const a of vals) n[chave(a.m)] = true; return n; });
+      setQtdImport((q) => { const n = { ...q }; for (const a of vals) if (a.qtd != null) n[chave(a.m)] = a.qtd; return n; });
+      const jaExp = vals.filter((a) => a.m.expedido === true).length;
+      setMsg(
+        `${achadas.size} peça(s) de "${file.name}" selecionada(s)` +
+        (comQtd ? ` · ${comQtd} com a quantidade da lista` : ` · sem coluna de quantidade — ajuste na coluna Qtd`) +
+        (jaExp ? ` — atenção: ${jaExp} já constam como expedidas` : "") + "."
+      );
     } catch (e) { setErro(e.message); } finally { setImportando(false); }
   }
 
@@ -136,8 +179,8 @@ export default function ConsultaExpedicao({ opId }) {
   const acrescentar = (p) => {
     const novos = marcadas.filter((m) => !(p.itens || []).some((i) => String(i.marca).toUpperCase() === String(m.marca).toUpperCase()));
     if (!novos.length) return setErro("As peças selecionadas já estão nesta carga.");
-    patchPrevio(p, { itens: [...(p.itens || []), ...novos.map((m) => ({ frente: m.frente, marca: m.marca, descricao: m.descricao, qte: m.qte, pesoTotal: m.pesoTotal }))] }, "itens");
-    setSel({});
+    patchPrevio(p, { itens: [...(p.itens || []), ...novos.map((m) => ({ frente: m.frente, marca: m.marca, descricao: m.descricao, qte: qteUsar(m), pesoTotal: pesoUsar(m) }))] }, "itens");
+    setSel({}); setQtdImport({});
   };
   const removerItem = (p, marca) => {
     const itens = (p.itens || []).filter((i) => String(i.marca).toUpperCase() !== String(marca).toUpperCase());
@@ -164,7 +207,7 @@ export default function ConsultaExpedicao({ opId }) {
           <h3 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><PackageSearch size={15} className="text-torg-blue" /> Lista de expedição <span className="text-torg-gray font-normal">· consulta por peça</span></h3>
           <button onClick={exportar} disabled={exportando || !todas.length} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
         </div>
-        <p className="text-[11px] text-torg-gray mb-3">Marque as peças uma a uma <strong>ou importe um Excel/PDF</strong> com a relação — o portal casa as marcas e seleciona sozinho. Depois monte o <strong>romaneio prévio</strong>.</p>
+        <p className="text-[11px] text-torg-gray mb-3">Marque as peças uma a uma <strong>ou importe um Excel/PDF</strong> com a relação — o portal casa as marcas, <strong>lê a quantidade</strong> e seleciona sozinho (ajuste na coluna Qtd se precisar). Depois monte o <strong>romaneio prévio</strong>.</p>
 
         {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
         {msg && <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-2 inline-flex items-center gap-1"><CheckCircle2 size={13} /> {msg}</p>}
@@ -208,9 +251,9 @@ export default function ConsultaExpedicao({ opId }) {
 
           {marcadas.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap mb-2 bg-torg-blue-50/60 border border-torg-blue-200 rounded-lg px-3 py-2 text-xs">
-              <span className="font-semibold text-torg-dark">{marcadas.length} peça(s) · {fmtKg(pesoSel)}</span>
+              <span className="font-semibold text-torg-dark">{marcadas.length} peça(s){unSel ? ` · ${unSel} un` : ""} · {fmtKg(pesoSel)}{parciais ? <span className="text-amber-600"> · {parciais} parcial(is)</span> : ""}</span>
               <button onClick={() => setModal(true)} className="bg-torg-blue text-white rounded-lg px-2.5 py-1 font-medium inline-flex items-center gap-1 hover:bg-torg-dark"><Truck size={12} /> Gerar romaneio prévio{proximo ? ` ${String(proximo).padStart(2, "0")}` : ""}</button>
-              <button onClick={() => setSel({})} className="text-torg-gray hover:text-torg-dark ml-auto">limpar seleção</button>
+              <button onClick={() => { setSel({}); setQtdImport({}); }} className="text-torg-gray hover:text-torg-dark ml-auto">limpar seleção</button>
             </div>
           )}
 
@@ -236,8 +279,25 @@ export default function ConsultaExpedicao({ opId }) {
                       <td className="px-2 py-1.5"><input type="checkbox" checked={!!sel[k]} onChange={() => setSel((s) => { const n = { ...s }; if (n[k]) delete n[k]; else n[k] = true; return n; })} className="accent-torg-blue" /></td>
                       <td className="px-3 py-1.5 font-mono text-torg-dark whitespace-nowrap">{m.marca}</td>
                       <td className="px-3 py-1.5 text-torg-gray truncate max-w-[240px]" title={m.descricao}>{m.descricao || "—"}</td>
-                      <td className="px-3 py-1.5 text-right text-torg-gray tabular-nums">{m.qte ?? "—"}</td>
-                      <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums whitespace-nowrap">{fmtKg(m.pesoTotal)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
+                        {sel[k] ? (
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            <input
+                              type="number" min={0} max={baseQte(m) ?? undefined} step="1"
+                              value={qteUsar(m)}
+                              onChange={(e) => { const v = e.target.value; setQtdImport((q) => ({ ...q, [k]: v === "" ? 0 : Math.max(0, Math.floor(Number(v) || 0)) })); }}
+                              className="w-14 text-right border border-torg-blue-300 rounded px-1 py-0.5 text-[12px] tabular-nums outline-none focus:border-torg-blue bg-white"
+                            />
+                            {baseQte(m) != null && <span className="text-[10px] text-torg-gray">/{m.qte}</span>}
+                          </span>
+                        ) : (
+                          <span className="text-torg-gray">{m.qte ?? "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums whitespace-nowrap">
+                        {fmtKg(sel[k] ? pesoUsar(m) : m.pesoTotal)}
+                        {sel[k] && baseQte(m) != null && qteUsar(m) < baseQte(m) && <span className="text-[10px] text-amber-600 ml-1">parcial</span>}
+                      </td>
                       <td className="px-3 py-1.5 whitespace-nowrap">
                         {m.expedido === true
                           ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium inline-flex items-center gap-1"><CheckCircle2 size={10} /> expedida</span>
@@ -335,7 +395,7 @@ export default function ConsultaExpedicao({ opId }) {
         </div>
       )}
 
-      {modal && <NovoPrevioModal opId={opId} numero={proximo} itens={marcadas} peso={pesoSel} lotes={lotes} localObra={localEntrega} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); carregarPrevios(); setMsg("Romaneio prévio criado."); }} />}
+      {modal && <NovoPrevioModal opId={opId} numero={proximo} itens={marcadas.map((m) => ({ ...m, qte: qteUsar(m), pesoTotal: pesoUsar(m) }))} peso={pesoSel} lotes={lotes} localObra={localEntrega} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); setQtdImport({}); carregarPrevios(); setMsg("Romaneio prévio criado."); }} />}
     </div>
   );
 }
