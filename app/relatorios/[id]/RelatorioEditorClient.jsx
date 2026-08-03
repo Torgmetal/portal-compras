@@ -56,6 +56,7 @@ export default function RelatorioEditorClient({ id }) {
   const [enviando, setEnviando] = useState(false);
   const [aceite, setAceite] = useState(null);
   const [enviosHist, setEnviosHist] = useState([]);
+  const [verEnviados, setVerEnviados] = useState(false);
   const [numero, setNumero] = useState(null);
 
   const marcar = () => setDirty(true);
@@ -199,13 +200,38 @@ export default function RelatorioEditorClient({ id }) {
       </div>
 
       {(enviosHist.length > 0 || aceite) && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-2.5 text-xs text-torg-gray flex items-center gap-x-4 gap-y-1 flex-wrap">
-          {enviosHist.length > 0 && <span>📤 Enviado ao cliente {enviosHist.length}× · último {new Date(enviosHist[enviosHist.length - 1].em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>}
-          {aceite ? (
-            <span className="inline-flex items-center gap-1 text-green-700 font-medium"><CheckCircle2 size={13} /> Aceito por {aceite.nome} em {new Date(aceite.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-          ) : enviosHist.length > 0 ? (
-            <span className="text-amber-600 font-medium">aguardando aceite do cliente</span>
-          ) : null}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-2.5 text-xs text-torg-gray">
+          <div className="flex items-center gap-x-4 gap-y-1 flex-wrap">
+            {enviosHist.length > 0 && (
+              <button onClick={() => setVerEnviados((v) => !v)} title="Ver histórico de envios (para quem)"
+                className="inline-flex items-center gap-1 hover:text-torg-dark">
+                📤 Enviado ao cliente {enviosHist.length}× · último {new Date(enviosHist[enviosHist.length - 1].em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                <ChevronDown size={13} className={`transition-transform ${verEnviados ? "rotate-180" : ""}`} />
+              </button>
+            )}
+            {aceite ? (
+              <span className="inline-flex items-center gap-1 text-green-700 font-medium"><CheckCircle2 size={13} /> Aceito por {aceite.nome} em {new Date(aceite.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+            ) : enviosHist.length > 0 ? (
+              <span className="text-amber-600 font-medium">aguardando aceite do cliente</span>
+            ) : null}
+          </div>
+
+          {verEnviados && enviosHist.length > 0 && (
+            <ul className="mt-2 border-t border-gray-100 pt-2 space-y-1.5">
+              {enviosHist.slice().reverse().map((e, idx) => (
+                <li key={idx} className="flex flex-col sm:flex-row sm:items-baseline gap-x-2">
+                  <span className="text-torg-dark font-medium whitespace-nowrap tabular-nums">
+                    {new Date(e.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <span className="text-torg-gray">
+                    para <span className="text-torg-dark">{(e.para || []).join(", ") || "—"}</span>
+                    {(e.cc || []).length > 0 && <> · cc <span className="text-torg-dark">{e.cc.join(", ")}</span></>}
+                    {e.porNome && <> · por {e.porNome}</>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
