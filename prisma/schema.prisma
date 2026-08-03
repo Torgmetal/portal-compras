@@ -378,9 +378,10 @@ model OPReceita {
   descricao           String
   cfop                String?
   codigoServico       String?
-  tipoPreco           String   @default("VALOR") // VALOR (fechado) | POR_KG (kg × R$/kg) | POR_PECA (qtd × valor unit.)
-  quantidade          Float? // kg (POR_KG) ou nº de peças (POR_PECA)
-  valorUnitario       Float? // R$/kg ou R$/peça — valor = quantidade × valorUnitario
+  tipoPreco           String   @default("VALOR") // VALOR (fechado) | POR_UNIDADE (quantidade × valorUnitario)
+  unidade             String? // unidade de medida da linha (pç, kg, t, m, m², un, cj, vb…)
+  quantidade          Float? // quantidade na unidade escolhida
+  valorUnitario       Float? // valor por unidade — valor = quantidade × valorUnitario
   valor               Float
   icmsPct             Float?
   ipiPct              Float?

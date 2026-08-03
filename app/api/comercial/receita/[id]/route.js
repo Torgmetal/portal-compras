@@ -6,7 +6,8 @@ import { requireRole } from "@/lib/session";
 const schema = z.object({
   categoria: z.string().min(1).optional(),
   descricao: z.string().min(1).optional(),
-  tipoPreco: z.enum(["VALOR", "POR_KG", "POR_PECA"]).optional(),
+  tipoPreco: z.enum(["VALOR", "POR_UNIDADE", "POR_KG", "POR_PECA"]).optional(),
+  unidade: z.string().max(20).optional().nullable(),
   quantidade: z.number().min(0).optional().nullable(),
   valorUnitario: z.number().min(0).optional().nullable(),
   valor: z.number().min(0).optional(),
@@ -47,6 +48,7 @@ export async function PATCH(req, { params }) {
   if (body.tipoPreco !== undefined) {
     const tipo = body.tipoPreco || "VALOR";
     data.tipoPreco = tipo;
+    data.unidade = tipo === "VALOR" ? null : (body.unidade?.trim() || null);
     data.quantidade = tipo === "VALOR" ? null : (body.quantidade ?? null);
     data.valorUnitario = tipo === "VALOR" ? null : (body.valorUnitario ?? null);
     if (tipo !== "VALOR" && data.quantidade != null && data.valorUnitario != null) {

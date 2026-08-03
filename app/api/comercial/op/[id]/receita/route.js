@@ -7,7 +7,8 @@ import { requireRole } from "@/lib/session";
 const schema = z.object({
   categoria: z.string().min(1),
   descricao: z.string().min(1),
-  tipoPreco: z.enum(["VALOR", "POR_KG", "POR_PECA"]).optional(),
+  tipoPreco: z.enum(["VALOR", "POR_UNIDADE", "POR_KG", "POR_PECA"]).optional(),
+  unidade: z.string().max(20).optional().nullable(),
   quantidade: z.number().min(0).optional().nullable(),
   valorUnitario: z.number().min(0).optional().nullable(),
   valor: z.number().min(0),
@@ -50,6 +51,7 @@ export async function POST(req, { params }) {
   // Detalhamento por linha: kg × R$/kg ou peças × valor unit. O valor da linha é
   // sempre derivado (qtd × unitário) quando não é valor fechado.
   const tipoPreco = body.tipoPreco || "VALOR";
+  const unidade = tipoPreco === "VALOR" ? null : (body.unidade?.trim() || null);
   const quantidade = tipoPreco === "VALOR" ? null : (body.quantidade ?? null);
   const valorUnitario = tipoPreco === "VALOR" ? null : (body.valorUnitario ?? null);
   const valorLinha = tipoPreco !== "VALOR" && quantidade != null && valorUnitario != null
@@ -63,6 +65,7 @@ export async function POST(req, { params }) {
       categoria: body.categoria,
       descricao: body.descricao,
       tipoPreco,
+      unidade,
       quantidade,
       valorUnitario,
       valor: valorLinha,

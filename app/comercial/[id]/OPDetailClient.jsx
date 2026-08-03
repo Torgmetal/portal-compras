@@ -2160,7 +2160,7 @@ function ReceitasTabela({ receitas, onEditar }) {
                   {r.descricao}
                   {r.tipoPreco && r.tipoPreco !== "VALOR" && r.quantidade != null && (
                     <span className="block text-[10px] text-torg-gray tabular-nums">
-                      {Number(r.quantidade).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} {r.tipoPreco === "POR_KG" ? "kg" : "pç"} × {fmtMoeda(r.valorUnitario)}
+                      {Number(r.quantidade).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} {r.unidade || (r.tipoPreco === "POR_KG" ? "kg" : "pç")} × {fmtMoeda(r.valorUnitario)}
                     </span>
                   )}
                 </td>
@@ -2221,7 +2221,8 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
   const [form, setForm] = useState({
     categoria: receita?.categoria || "PROJETO",
     descricao: receita?.descricao || "",
-    tipoPreco: receita?.tipoPreco || "VALOR",
+    tipoPreco: receita?.tipoPreco === "POR_KG" || receita?.tipoPreco === "POR_PECA" ? "POR_UNIDADE" : (receita?.tipoPreco || "VALOR"),
+    unidade: receita?.unidade || (receita?.tipoPreco === "POR_KG" ? "kg" : receita?.tipoPreco === "POR_PECA" ? "pç" : ""),
     quantidade: receita?.quantidade ?? "",
     valorUnitario: receita?.valorUnitario ?? "",
     valor: receita?.valor ?? 0,
@@ -2246,7 +2247,8 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
   // Calculos em tempo real
   const qtdNum = Number(form.quantidade) || 0;
   const unitNum = Number(form.valorUnitario) || 0;
-  const porUnidade = form.tipoPreco === "POR_KG" || form.tipoPreco === "POR_PECA";
+  const porUnidade = form.tipoPreco === "POR_UNIDADE";
+  const un = (form.unidade || "un").trim() || "un";
   const valorNum = porUnidade ? qtdNum * unitNum : (Number(form.valor) || 0);
   const aliquotas = ["icmsPct","ipiPct","pisPct","cofinsPct","issPct","irrfPct","csllPct"];
   const aliqTotal = aliquotas.reduce((s, k) => s + (Number(form[k]) || 0), 0);
@@ -2257,8 +2259,9 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
     setErro("");
     if (!form.descricao.trim()) return setErro("Descrição é obrigatória.");
     if (porUnidade) {
-      if (qtdNum <= 0) return setErro(form.tipoPreco === "POR_KG" ? "Informe a quantidade em kg." : "Informe a quantidade de peças.");
-      if (unitNum <= 0) return setErro(form.tipoPreco === "POR_KG" ? "Informe o R$/kg." : "Informe o valor unitário.");
+      if (!form.unidade.trim()) return setErro("Informe a unidade de medida (pç, kg, m², vb…).");
+      if (qtdNum <= 0) return setErro("Informe a quantidade.");
+      if (unitNum <= 0) return setErro("Informe o valor unitário.");
     } else if (!valorNum || valorNum <= 0) {
       return setErro("Valor da receita deve ser maior que zero.");
     }
@@ -2268,6 +2271,7 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
         categoria: form.categoria,
         descricao: form.descricao.trim(),
         tipoPreco: form.tipoPreco,
+        unidade: porUnidade ? un : null,
         quantidade: porUnidade ? qtdNum : null,
         valorUnitario: porUnidade ? unitNum : null,
         valor: valorNum,
@@ -2345,16 +2349,29 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue bg-white"
             >
               <option value="VALOR">Valor fechado</option>
-              <option value="POR_KG">Por kg (kg × R$/kg)</option>
-              <option value="POR_PECA">Por peça (qtd × valor unit.)</option>
+              <option value="POR_UNIDADE">Por unidade (qtd × valor unit.)</option>
             </select>
           </div>
         </div>
 
         {porUnidade ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-torg-blue-50/40 border border-torg-blue-100 rounded-lg p-3">
             <div>
-              <label className="block text-xs font-medium text-torg-dark mb-1">{form.tipoPreco === "POR_KG" ? "Quantidade (kg) *" : "Quantidade (peças) *"}</label>
+              <label className="block text-xs font-medium text-torg-dark mb-1">Unidade *</label>
+              <input
+                type="text" list="unidades-receita"
+                value={form.unidade}
+                onChange={(e) => set("unidade", e.target.value)}
+                placeholder="pç"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+              />
+              <datalist id="unidades-receita">
+                <option value="pç" /><option value="un" /><option value="cj" /><option value="kg" /><option value="t" />
+                <option value="m" /><option value="m²" /><option value="m³" /><option value="vb" /><option value="h" />
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-torg-dark mb-1">Quantidade *</label>
               <input
                 type="number" step="0.01" min="0"
                 value={form.quantidade}
@@ -2364,7 +2381,7 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-torg-dark mb-1">{form.tipoPreco === "POR_KG" ? "R$/kg *" : "Valor unitário (R$) *"}</label>
+              <label className="block text-xs font-medium text-torg-dark mb-1">Valor unit. (R$/{un}) *</label>
               <input
                 type="number" step="0.0001" min="0"
                 value={form.valorUnitario}

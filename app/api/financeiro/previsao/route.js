@@ -40,15 +40,20 @@ export async function GET() {
 
   const opIds = [...new Set(cargas.map((c) => c.opId).filter(Boolean))];
   const opsCarga = opIds.length
-    ? await prisma.oP.findMany({ where: { id: { in: opIds } }, select: { id: true, numero: true, obra: true, cliente: true, valorFaturarPorKg: true, receitas: { select: { tipoPreco: true, quantidade: true, valor: true } } } })
+    ? await prisma.oP.findMany({ where: { id: { in: opIds } }, select: { id: true, numero: true, obra: true, cliente: true, valorFaturarPorKg: true, receitas: { select: { tipoPreco: true, unidade: true, quantidade: true, valor: true } } } })
     : [];
   const opMap = new Map(opsCarga.map((o) => [o.id, o]));
 
-  // Base de faturamento por OP: se tem linha de receita POR_PECA → a OP é cobrada
-  // POR PEÇA (R$/peça = Σ valor ÷ Σ qtd das linhas por-peça). Senão, POR KG (R$/kg da OP).
+  // Unidades "por peça" (o Comercial escolhe a unidade livre por linha).
+  const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const PECA_UNITS = new Set(["pc", "pca", "peca", "pecas", "un", "und", "unid", "unidade", "cj", "conj", "pcs"]);
+  const ehPeca = (r) => r.tipoPreco === "POR_PECA" || ((r.tipoPreco === "POR_UNIDADE") && PECA_UNITS.has(norm(r.unidade)));
+
+  // Base de faturamento por OP: se tem linha de receita cobrada POR PEÇA (unidade pç/un/cj…),
+  // a carga vale nº de peças × R$/peça (Σ valor ÷ Σ qtd dessas linhas). Senão, peso × R$/kg.
   const opBase = new Map();
   for (const o of opsCarga) {
-    const pl = (o.receitas || []).filter((r) => r.tipoPreco === "POR_PECA" && (r.quantidade || 0) > 0);
+    const pl = (o.receitas || []).filter((r) => ehPeca(r) && (r.quantidade || 0) > 0);
     const somaQtd = pl.reduce((a, r) => a + (r.quantidade || 0), 0);
     const somaVal = pl.reduce((a, r) => a + (r.valor || 0), 0);
     const rsPeca = somaQtd > 0 ? somaVal / somaQtd : null;
