@@ -680,10 +680,11 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
               Receitas do contrato ({(op.receitas || []).length})
             </h3>
             <p className="text-xs text-torg-gray mt-0.5">
-              Linhas de receita por categoria (projeto, montagem, fabricação, etc.) com impostos por CFOP.
+              Os <strong>valores de venda</strong> do contrato — uma linha por item do pedido de compra, por <strong>kg</strong>, por <strong>peça/unidade</strong> ou <strong>valor fechado</strong>. A soma é o valor do contrato.
+              {encerradaOuCancelada && isMaster && <span className="text-amber-600"> · OP encerrada — edição liberada para revisão.</span>}
             </p>
           </div>
-          {!encerradaOuCancelada && (
+          {(!encerradaOuCancelada || isMaster) && (
             <button
               onClick={() => setModalReceita("nova")}
               className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs font-medium rounded-lg hover:bg-torg-blue-50 inline-flex items-center gap-1"
