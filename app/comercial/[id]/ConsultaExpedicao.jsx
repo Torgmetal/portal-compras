@@ -345,6 +345,7 @@ export default function ConsultaExpedicao({ opId }) {
                       {p.dataPrevista && <span className="text-[11px] text-torg-gray inline-flex items-center gap-0.5"><CalendarDays size={11} /> {fmtD(p.dataPrevista)}</span>}
                       {p.local && <span className="text-[11px] text-torg-gray inline-flex items-center gap-0.5"><MapPin size={11} /> {p.local}</span>}
                       {nomeLote(p.loteId) && <span className="text-[10px] px-2 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue font-medium">lote: {nomeLote(p.loteId)}</span>}
+                      {p.nfNumero && <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium inline-flex items-center gap-1" title={p.nfEmitidaEm ? `NF registrada em ${fmtD(p.nfEmitidaEm)}` : "NF vinculada pelo Fiscal"}>NF {p.nfNumero}{p.nfTipo ? ` · ${p.nfTipo}` : ""}</span>}
                       <div className="ml-auto flex items-center gap-2">
                         {p.status !== "APROVADO"
                           ? <button onClick={() => aprovar(p)} disabled={!!busy} className="text-[12px] bg-emerald-600 text-white rounded-lg px-2 py-1 font-medium inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50">{busy === "ok" ? <Loader2 size={11} className="animate-spin" /> : <ThumbsUp size={11} />} Aprovar entrega</button>

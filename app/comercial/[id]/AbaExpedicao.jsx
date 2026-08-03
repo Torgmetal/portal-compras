@@ -181,6 +181,7 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
                       {emitido
                         ? <span className="ml-2 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 align-middle">emitido {revLabel}</span>
                         : <span className="ml-2 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200 align-middle">não emitido</span>}
+                      {emitido && rom?.nfNumero && <span className="ml-1.5 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 align-middle" title="NF vinculada pelo Fiscal">NF {rom.nfNumero}{rom.nfTipo ? ` · ${rom.nfTipo}` : ""}</span>}
                       {l.observacao && <span className="block text-[11px] text-torg-gray font-normal">{l.observacao}</span>}
                     </td>
                     <td className="px-3 py-2 text-torg-gray">{l.local || <span className="text-gray-300">—</span>}</td>
