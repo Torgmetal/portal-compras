@@ -31,7 +31,7 @@ export async function GET(_req, { params }) {
       const k = String(it.marca || "").trim().toUpperCase();
       if (!k) continue;
       const cur = expMap.get(k) || { qtd: 0, romaneios: new Set(), data: null };
-      cur.qtd += Number(it.qte) || 0;
+      cur.qtd += Number(it.qte ?? it.qtd) || 0;
       cur.romaneios.add(String(r.numero).padStart(2, "0"));
       if (r.emitidoEm && (!cur.data || r.emitidoEm > cur.data)) cur.data = r.emitidoEm;
       expMap.set(k, cur);

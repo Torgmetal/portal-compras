@@ -72,9 +72,15 @@ export async function POST(req, { params }) {
   if (body.itensSel?.length) {
     // Seleção com quantidade: o prévio traz o peso da qtd cheia; ao mudar a
     // quantidade, o peso vai proporcional (pesoUnit = pesoTotal / qte).
-    const porMarca = new Map(
-      marcasPrevio.filter((m) => m?.marca).map((m) => [String(m.marca).trim().toUpperCase(), m])
-    );
+    // Universo = marcas do prévio + TODAS as da Lista de Expedição (permite INCLUIR
+    // peça nova na revisão, não só as que já estavam no romaneio). pesoUnit = pesoTotal/qte.
+    const porMarca = new Map();
+    const listasOP = await prisma.listaExpedicao.findMany({ where: { OR: [{ opId: op.id }, { opNumero: String(op.numero) }] }, select: { frente: true, marcasJson: true } });
+    for (const l of listasOP) for (const mm of (Array.isArray(l.marcasJson) ? l.marcasJson : [])) {
+      const kk = String(mm.marca || "").trim().toUpperCase();
+      if (kk && !porMarca.has(kk)) porMarca.set(kk, { marca: mm.marca, descricao: mm.descricao, frente: l.frente, qte: mm.qte, pesoTotal: mm.pesoTotal });
+    }
+    for (const m of marcasPrevio) if (m?.marca) porMarca.set(String(m.marca).trim().toUpperCase(), m);
     itens = body.itensSel
       .map((s) => {
         const pm = porMarca.get(String(s.marca).trim().toUpperCase());
@@ -83,13 +89,15 @@ export async function POST(req, { params }) {
         const pesoOrig = Number(pm.pesoTotal) || 0;
         const pesoUnit = qteOrig > 0 ? pesoOrig / qteOrig : pesoOrig;
         const qtd = Number(s.qtd) || 0;
-        return { marca: pm.marca, descricao: pm.descricao || null, qtd, pesoKg: pesoUnit * qtd };
+        // grava os dois nomes (qtd/pesoKg p/ o FORM 22; qte/pesoTotal/frente p/ o cruzamento de expedido)
+        return { marca: pm.marca, descricao: pm.descricao || null, frente: pm.frente || null, qtd, qte: qtd, pesoKg: pesoUnit * qtd, pesoTotal: pesoUnit * qtd };
       })
       .filter((it) => it && it.qtd > 0);
   } else {
     itens = marcasPrevio.filter((m) => m?.marca).map((m) => ({
-      marca: m.marca, descricao: m.descricao || null,
-      qtd: Number(m.qte) || 0, pesoKg: Number(m.pesoTotal) || 0,
+      marca: m.marca, descricao: m.descricao || null, frente: m.frente || null,
+      qtd: Number(m.qte) || 0, qte: Number(m.qte) || 0,
+      pesoKg: Number(m.pesoTotal) || 0, pesoTotal: Number(m.pesoTotal) || 0,
     }));
     // Ajuste de marcas (legado): se veio uma seleção sem quantidade, exporta só essas.
     if (body.marcas?.length) {

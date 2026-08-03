@@ -509,6 +509,30 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
     setF((v) => ({ ...v, transportadora: t.nomeFantasia || t.razaoSocial || v.transportadora, contato: t.telefone || t.contato || v.contato }));
   };
 
+  // Todas as marcas da OP (pra INCLUIR peça que não está no romaneio). pendente = total − expedido.
+  const [opMarcas, setOpMarcas] = useState([]);
+  const [buscaAdd, setBuscaAdd] = useState("");
+  useEffect(() => {
+    fetch(`/api/comercial/op/${opId}/lista-expedicao/marcas`).then((r) => r.json())
+      .then((j) => setOpMarcas((j.frentes || []).flatMap((fr) => (fr.marcas || []).map((m) => ({
+        marca: m.marca, descricao: m.descricao || "", qtd: m.qte ?? null, pesoTotalKg: m.pesoTotal ?? null,
+        pendente: Math.max(0, (Number(m.qte) || 0) - Math.max(0, Number(m.expedidoQtd) || 0)),
+      })))))
+      .catch(() => {});
+  }, [opId]);
+  const sugestoesAdd = (() => {
+    const q = buscaAdd.trim().toLowerCase();
+    if (!q) return [];
+    const jaTem = new Set((marcas || []).map((m) => String(m.marca).toUpperCase()));
+    return opMarcas.filter((m) => !jaTem.has(String(m.marca).toUpperCase()) && (String(m.marca).toLowerCase().includes(q) || String(m.descricao).toLowerCase().includes(q))).slice(0, 8);
+  })();
+  const adicionarMarca = (m) => {
+    setMarcas((cur) => [...(cur || []), { marca: m.marca, descricao: m.descricao, qtd: m.qtd, pesoTotalKg: m.pesoTotalKg }]);
+    setSel((s) => new Set(s).add(m.marca));
+    setQtds((q) => ({ ...q, [m.marca]: m.pendente > 0 ? m.pendente : (m.qtd || 1) }));
+    setBuscaAdd("");
+  };
+
   useEffect(() => {
     fetch(`/api/comercial/op/${opId}/lotes-expedicao/pecas?loteId=${lote.id}`)
       .then((r) => r.json())
@@ -632,7 +656,25 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                   ))}
                 </div>
               )}
-              <p className="text-[11px] text-torg-gray">Desmarque o que não vai e ajuste a <strong>quantidade</strong> de cada marca — o peso acompanha.</p>
+              <p className="text-[11px] text-torg-gray">Desmarque o que não vai (volta pro pendente) e ajuste a <strong>quantidade</strong> — o peso acompanha.</p>
+
+              <div className="border-t border-gray-100 pt-2">
+                <span className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Incluir peça</span>
+                <input value={buscaAdd} onChange={(e) => setBuscaAdd(e.target.value)} placeholder="Digite a marca ou descrição da peça a acrescentar…" className={`${inp} mt-1`} />
+                {sugestoesAdd.length > 0 && (
+                  <div className="mt-1 border border-gray-100 rounded max-h-40 overflow-y-auto">
+                    {sugestoesAdd.map((m) => (
+                      <button key={m.marca} onClick={() => adicionarMarca(m)} className="w-full flex items-center gap-2 px-2 py-1.5 text-[12px] text-left hover:bg-torg-blue-50 border-b border-gray-50 last:border-0">
+                        <Plus size={12} className="text-torg-blue shrink-0" />
+                        <span className="font-mono text-torg-dark w-20 shrink-0 truncate">{m.marca}</span>
+                        <span className="text-torg-gray truncate flex-1">{m.descricao || ""}</span>
+                        <span className="text-torg-gray tabular-nums whitespace-nowrap">{m.pendente > 0 ? `${m.pendente} pend.` : "0 pend."}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {buscaAdd.trim() && sugestoesAdd.length === 0 && <p className="text-[11px] text-torg-gray mt-1">Nenhuma marca com esse termo (ou já está na lista acima).</p>}
+              </div>
             </>
           ) : passo === 2 ? (
             <>

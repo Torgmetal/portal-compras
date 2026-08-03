@@ -46,7 +46,7 @@ export async function GET(req) {
   const expFrente = new Map(); // padOp|FRENTE -> peso
   const expOp = new Map();      // padOp -> peso
   for (const r of previos) for (const it of (Array.isArray(r.itens) ? r.itens : [])) {
-    const peso = Number(it.pesoTotal) || 0;
+    const peso = Number(it.pesoTotal ?? it.pesoKg) || 0;
     const op = padOp(r.opNumero);
     expFrente.set(`${op}|${k(it.frente)}`, (expFrente.get(`${op}|${k(it.frente)}`) || 0) + peso);
     expOp.set(op, (expOp.get(op) || 0) + peso);

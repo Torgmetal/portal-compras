@@ -30,7 +30,7 @@ async function montar(opId, opNumero) {
   const expPorFrente = new Map();
   let totalPortal = 0;
   for (const r of previosEmitidos) for (const it of (Array.isArray(r.itens) ? r.itens : [])) {
-    const peso = Number(it.pesoTotal) || 0;
+    const peso = Number(it.pesoTotal ?? it.pesoKg) || 0;
     expPorFrente.set(k(it.frente), (expPorFrente.get(k(it.frente)) || 0) + peso);
     totalPortal += peso;
   }
