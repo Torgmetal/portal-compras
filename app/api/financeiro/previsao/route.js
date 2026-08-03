@@ -11,6 +11,20 @@ export const dynamic = "force-dynamic";
 
 const ROLES = ["ADMIN", "FINANCEIRO", "COMERCIAL"];
 
+// Situação da carga (precedência): Cancelada → Emitida → Alterada → Atrasada → Confirmada → Pendente.
+// Automáticos: Emitida (romaneio saiu), Alterada (data mudou), Atrasada (venceu sem romaneio).
+// Manuais: Confirmada, Cancelada (situacao). Pendente é o padrão.
+function statusCarga(c, now) {
+  if (c.situacao === "CANCELADA") return { key: "CANCELADA", label: "Cancelada" };
+  if (c.romaneio) return { key: "EMITIDA", label: "Emitida" };
+  const ini = c.dataOriginal ? new Date(c.dataOriginal).getTime() : null;
+  const atual = c.dataPrevista ? new Date(c.dataPrevista).getTime() : null;
+  if (ini && atual && ini !== atual) return { key: "ALTERADA", label: "Alterada", dataOriginal: c.dataOriginal };
+  if (atual && atual < now.getTime()) return { key: "ATRASADA", label: "Atrasada" };
+  if (c.situacao === "CONFIRMADA") return { key: "CONFIRMADA", label: "Confirmada" };
+  return { key: "PENDENTE", label: "Pendente" };
+}
+
 export async function GET() {
   try { await requireRole(ROLES); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
@@ -18,7 +32,7 @@ export async function GET() {
   const cargas = await prisma.planejamentoCarga.findMany({
     orderBy: { dataPrevista: "asc" },
     select: {
-      id: true, opId: true, dataPrevista: true, status: true, descricao: true, romaneioId: true,
+      id: true, opId: true, dataPrevista: true, dataOriginal: true, situacao: true, status: true, descricao: true, romaneioId: true,
       itens: { select: { pesoEstimadoKg: true } },
       romaneio: { select: { pesoRealKg: true, data: true } },
     },
@@ -30,20 +44,26 @@ export async function GET() {
     : [];
   const opMap = new Map(opsCarga.map((o) => [o.id, o]));
 
-  const linhas = cargas.map((c) => {
+  const now = new Date();
+  const todas = cargas.map((c) => {
     const op = opMap.get(c.opId);
     const temRomaneio = !!c.romaneio;
     const peso = temRomaneio ? (c.romaneio.pesoRealKg || 0) : c.itens.reduce((a, i) => a + (i.pesoEstimadoKg || 0), 0);
     const rsKg = op?.valorFaturarPorKg ?? null;
     const valor = peso > 0 && rsKg ? Math.round(peso * rsKg) : null;
     const dataBase = temRomaneio && c.romaneio.data ? c.romaneio.data : c.dataPrevista;
+    const s = statusCarga(c, now);
     return {
       id: c.id, opNumero: op?.numero || null, obra: op?.obra || null, cliente: op?.cliente || null,
       data: dataBase ? dataBase.toISOString() : null,
+      dataOriginal: s.dataOriginal ? new Date(s.dataOriginal).toISOString() : null,
       peso: Math.round(peso), fonte: temRomaneio ? "real" : "estimado", rsKg, valor,
-      status: c.status, descricao: c.descricao || null,
+      situacao: s.key, situacaoLabel: s.label, descricao: c.descricao || null,
     };
   });
+  // Canceladas não entram na previsão (mas ficam registradas).
+  const linhas = todas.filter((l) => l.situacao !== "CANCELADA");
+  const canceladas = todas.filter((l) => l.situacao === "CANCELADA");
 
   // Fluxo mensal.
   const mesMap = new Map();
@@ -75,7 +95,7 @@ export async function GET() {
   const totalReal = linhas.filter((l) => l.fonte === "real").reduce((a, l) => a + (l.valor || 0), 0);
   const nAberto = linhas.filter((l) => l.valor == null).length;
 
-  return NextResponse.json({ cargas: linhas, porMes, ops, totalPrevisto, totalReal, nAberto, geradoEm: new Date().toISOString() });
+  return NextResponse.json({ cargas: linhas, canceladas, porMes, ops, totalPrevisto, totalReal, nAberto, geradoEm: new Date().toISOString() });
 }
 
 // Comercial define o R$/kg a faturar da OP.

@@ -93,6 +93,7 @@ export async function POST(req) {
     data: {
       opId: body.opId,
       dataPrevista: new Date(body.dataPrevista),
+      dataOriginal: new Date(body.dataPrevista),
       descricao: body.descricao || null,
       status: "PLANEJADO",
       createdById: user.id,

@@ -10,6 +10,14 @@ const fmtMes = (m) => {
   const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
   return `${nomes[Number(mo) - 1]}/${y.slice(2)}`;
 };
+const STATUS_BADGE = {
+  PENDENTE: "bg-slate-100 text-slate-600",
+  CONFIRMADA: "bg-torg-blue-50 text-torg-blue",
+  ALTERADA: "bg-amber-100 text-amber-700",
+  ATRASADA: "bg-red-100 text-red-700",
+  EMITIDA: "bg-emerald-100 text-emerald-700",
+  CANCELADA: "bg-slate-100 text-slate-500 line-through",
+};
 
 export default function PrevisaoClient() {
   const [dados, setDados] = useState(null);
@@ -122,6 +130,7 @@ export default function PrevisaoClient() {
                     <tr className="text-left text-xs text-torg-gray uppercase border-y border-torg-blue-50 bg-torg-blue-50/40">
                       <th className="px-5 py-2 font-medium">Data</th>
                       <th className="px-3 py-2 font-medium">OP / Obra</th>
+                      <th className="px-3 py-2 font-medium">Situação</th>
                       <th className="px-3 py-2 font-medium text-right">Peso</th>
                       <th className="px-3 py-2 font-medium text-right">R$/kg</th>
                       <th className="px-5 py-2 font-medium text-right">Valor previsto</th>
@@ -132,6 +141,10 @@ export default function PrevisaoClient() {
                       <tr key={c.id} className="hover:bg-torg-blue-50/30">
                         <td className="px-5 py-2.5 tabular-nums text-torg-dark whitespace-nowrap">{fmtData(c.data)}</td>
                         <td className="px-3 py-2.5"><span className="font-semibold text-torg-dark tabular-nums">OP-{c.opNumero || "?"}</span> <span className="text-torg-gray">{c.obra || ""}</span></td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[c.situacao] || STATUS_BADGE.PENDENTE}`}>{c.situacaoLabel}</span>
+                          {c.dataOriginal && <span className="text-[10px] text-torg-gray-light ml-1.5">era {fmtData(c.dataOriginal)}</span>}
+                        </td>
                         <td className="px-3 py-2.5 text-right tabular-nums text-torg-dark whitespace-nowrap">
                           {fmtKg(c.peso)}
                           <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded ${c.fonte === "real" ? "bg-emerald-50 text-emerald-700" : "bg-torg-blue-50 text-torg-blue"}`}>{c.fonte === "real" ? "real" : "estim."}</span>
@@ -147,6 +160,20 @@ export default function PrevisaoClient() {
               </div>
             )}
           </div>
+
+          {/* Canceladas (registro, fora do total) */}
+          {(dados.canceladas || []).length > 0 && (
+            <div className="bg-white rounded-xl border border-torg-blue-100 p-5">
+              <h2 className="font-bold text-torg-dark mb-1">Cargas canceladas <span className="text-torg-gray font-normal text-sm">— fora da previsão, mantidas por registro</span></h2>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {dados.canceladas.map((c) => (
+                  <span key={c.id} className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-500">
+                    <b className="tabular-nums">OP-{c.opNumero}</b> {c.obra || ""} · {fmtData(c.data)}{c.valor != null ? ` · ${fmtR$(c.valor)}` : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* R$/kg por obra (Comercial define) */}
           <div className="bg-white rounded-xl border border-torg-blue-100 overflow-hidden">

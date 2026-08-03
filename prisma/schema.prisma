@@ -257,8 +257,10 @@ model PlanejamentoCarga {
   id           String                       @id @default(cuid())
   opId         String
   dataPrevista DateTime
+  dataOriginal DateTime? // data prevista na criação — se dataPrevista mudar, a carga fica "alterada"
   descricao    String?
   status       String                       @default("PLANEJADO")
+  situacao     String                       @default("PENDENTE") // PENDENTE | CONFIRMADA | CANCELADA (previsão de faturamento)
   romaneioId   String?                      @unique
   createdById  String?
   createdAt    DateTime                     @default(now())

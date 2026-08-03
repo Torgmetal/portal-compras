@@ -54,6 +54,11 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "valorFaturarPorKg" DOUBLE PRECISION`);
   console.log("[ensure-mes-tables] OK — OP.valorFaturarPorKg garantida.");
 
+  // PlanejamentoCarga: situação (previsão de faturamento) + data original (detecta "alterada"). Idempotente.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PlanejamentoCarga" ADD COLUMN IF NOT EXISTS "dataOriginal" TIMESTAMP(3)`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PlanejamentoCarga" ADD COLUMN IF NOT EXISTS "situacao" TEXT NOT NULL DEFAULT 'PENDENTE'`);
+  console.log("[ensure-mes-tables] OK — PlanejamentoCarga.situacao/dataOriginal garantidas.");
+
   // Colunas do FluxoCaixa para import do extrato Omie (idempotente).
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "origemOmieId" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "contaCorrente" TEXT`);
