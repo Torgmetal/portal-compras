@@ -109,8 +109,11 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
     }
   }
 
-  const totalPeso = (lotes || []).reduce((s, l) => s + (l.pesoKg || 0), 0);
-  const semPeso = (lotes || []).filter((l) => l.pesoKg == null).length;
+  // Peso REAL do lote = o do romaneio emitido (o que de fato saiu); só cai no
+  // lote.pesoKg (planejado) enquanto não há romaneio — assim o total bate com a realidade.
+  const pesoLote = (l) => (l.romaneios?.[0]?.pesoKg != null ? l.romaneios[0].pesoKg : l.pesoKg);
+  const totalPeso = (lotes || []).reduce((s, l) => s + (pesoLote(l) || 0), 0);
+  const semPeso = (lotes || []).filter((l) => pesoLote(l) == null).length;
 
   return (
     <div className="space-y-4">
@@ -165,15 +168,7 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
                   <Fragment key={l.id}>
                   <tr className="hover:bg-gray-50/60 align-middle">
                     <td className="px-2 py-2">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-mono font-semibold text-torg-blue tabular-nums w-5 text-center">{i + 1}</span>
-                        {podeEditarLotes && (
-                          <div className="flex flex-col">
-                            <button onClick={() => mover(i, -1)} disabled={i === 0} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none"><ChevronUp size={13} /></button>
-                            <button onClick={() => mover(i, 1)} disabled={i === lotes.length - 1} className="text-gray-300 hover:text-torg-blue disabled:opacity-30 leading-none"><ChevronDown size={13} /></button>
-                          </div>
-                        )}
-                      </div>
+                      <span className="text-xs font-mono font-semibold text-torg-blue tabular-nums w-5 text-center inline-block">{i + 1}</span>
                     </td>
                     <td className="px-3 py-2 text-torg-dark font-medium">
                       <button onClick={() => verMarcas(l)} className="text-torg-gray hover:text-torg-blue mr-1 align-middle" title="Ver marcas">{aberto ? <ChevronDown size={14} className="inline" /> : <ChevronRight size={14} className="inline" />}</button>
@@ -186,7 +181,7 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
                     </td>
                     <td className="px-3 py-2 text-torg-gray">{l.local || <span className="text-gray-300">—</span>}</td>
                     <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{l.dataPrevista ? fmtD(l.dataPrevista) : <span className="text-gray-300">—</span>}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{l.pesoKg != null ? <span className="text-torg-dark tabular-nums">{fmtKg(l.pesoKg)}</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">a definir</span>}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{pesoLote(l) != null ? <span className="text-torg-dark tabular-nums">{fmtKg(pesoLote(l))}</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">a definir</span>}</td>
                     <td className="px-2 py-2">
                       <div className="flex items-center justify-end gap-1.5">
                         <button onClick={() => setExportar({ lote: l, emitido })} className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap" title={emitido ? "Gerar uma revisão do romaneio" : "Emitir o romaneio (FORM 22)"}>

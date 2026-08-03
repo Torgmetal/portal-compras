@@ -15,7 +15,7 @@ export async function GET(_req, { params }) {
   const lotes = await prisma.loteExpedicao.findMany({
     where: { opId: params.id },
     orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
-    include: { romaneios: { select: { id: true, numero: true, emitidoEm: true, revisao: true, nfNumero: true, nfTipo: true, nfEmitidaEm: true }, orderBy: { numero: "desc" }, take: 1 } },
+    include: { romaneios: { select: { id: true, numero: true, emitidoEm: true, revisao: true, pesoKg: true, nfNumero: true, nfTipo: true, nfEmitidaEm: true }, orderBy: { numero: "desc" }, take: 1 } },
   });
   return NextResponse.json({ success: true, lotes });
 }

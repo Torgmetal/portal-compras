@@ -153,9 +153,13 @@ export async function POST(req, { params }) {
 
   // Marca como emitido / atualiza a revisão + histórico no prévio.
   // Guarda a URL do arquivo no SharePoint (quando salvou) — o Fiscal usa pra abrir o FORM 22.
+  // Salva os ITENS realmente emitidos (incluir/tirar peça na revisão) + o peso real,
+  // pra a lista de expedição (expedido/pendente) e o peso do card baterem com a realidade.
+  const pesoKgReal = itens.reduce((s, it) => s + (Number(it.pesoKg ?? it.pesoTotal) || 0), 0);
   await prisma.romaneioPrevio.update({
     where: { id: previo.id },
     data: {
+      itens, pesoKg: pesoKgReal,
       emitidoEm: agora, emitidoPorId: user.id, revisao: novaRevisao, historico,
       ...(sharepoint?.ok && sharepoint.webUrl ? { arquivoUrl: sharepoint.webUrl } : {}),
     },
