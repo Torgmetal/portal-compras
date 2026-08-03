@@ -13,6 +13,7 @@ import { pesoRealPecas } from "@/lib/peso-op";
 import RelatoriosOPSection from "@/components/RelatoriosOPSection";
 import AbaPlanejamento from "./AbaPlanejamento";
 import AbaExpedicao from "./AbaExpedicao";
+import ConsultaExpedicao from "./ConsultaExpedicao";
 import DesenhosOPSection from "./DesenhosOPSection";
 import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import AbaObra from "./AbaObra";
@@ -800,6 +801,7 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
         <div className="space-y-6">
           <ListaExpedicaoSection opId={op.id} />
           <AbaExpedicao opId={op.id} proposta={proposta} />
+          <ConsultaExpedicao opId={op.id} readOnly />
         </div>
       )}
 

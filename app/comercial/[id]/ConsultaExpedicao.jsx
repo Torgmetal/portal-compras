@@ -14,7 +14,7 @@ const STATUS = {
   CANCELADO: { l: "cancelado", c: "bg-gray-200 text-torg-gray" },
 };
 
-export default function ConsultaExpedicao({ opId }) {
+export default function ConsultaExpedicao({ opId, readOnly = false }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [msg, setMsg] = useState("");
@@ -203,7 +203,9 @@ export default function ConsultaExpedicao({ opId }) {
           <h3 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><PackageSearch size={15} className="text-torg-blue" /> Lista de expedição <span className="text-torg-gray font-normal">· consulta por peça</span></h3>
           <button onClick={exportar} disabled={exportando || !todas.length} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
         </div>
-        <p className="text-[11px] text-torg-gray mb-3">Marque as peças uma a uma <strong>ou importe um Excel/PDF</strong> com a relação — abre uma <strong>prévia</strong> pra você confirmar qual coluna é a marca e qual é a <strong>quantidade</strong>, casa com as peças e seleciona. Depois monte o <strong>romaneio prévio</strong>.</p>
+        {readOnly
+          ? <p className="text-[11px] text-torg-gray mb-3">Acompanhamento por peça — o que já foi <strong>expedido</strong>, o que <strong>falta</strong> e em qual <strong>romaneio</strong> saiu.</p>
+          : <p className="text-[11px] text-torg-gray mb-3">Marque as peças uma a uma <strong>ou importe um Excel/PDF</strong> com a relação — abre uma <strong>prévia</strong> pra você confirmar qual coluna é a marca e qual é a <strong>quantidade</strong>, casa com as peças e seleciona. Depois monte o <strong>romaneio prévio</strong>.</p>}
 
         {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
         {msg && <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-2 inline-flex items-center gap-1"><CheckCircle2 size={13} /> {msg}</p>}
@@ -233,10 +235,12 @@ export default function ConsultaExpedicao({ opId }) {
               <option value="pendentes">Só pendentes</option>
             </select>
             {/* importar relação de peças (ao lado do filtro, como pedido) */}
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.pdf" className="hidden" onChange={(e) => { prepararImport(e.target.files?.[0]); e.target.value = ""; }} />
-            <button onClick={() => fileRef.current?.click()} disabled={importando} className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-blue-50 disabled:opacity-50" title="Excel ou PDF com a relação de peças — seleciono as marcas automaticamente">
-              {importando ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Selecionar por arquivo
-            </button>
+            {!readOnly && <>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.pdf" className="hidden" onChange={(e) => { prepararImport(e.target.files?.[0]); e.target.value = ""; }} />
+              <button onClick={() => fileRef.current?.click()} disabled={importando} className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-blue-50 disabled:opacity-50" title="Excel ou PDF com a relação de peças — seleciono as marcas automaticamente">
+                {importando ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Selecionar por arquivo
+              </button>
+            </>}
             {frentes.length > 1 && (
               <select value={frente} onChange={(e) => setFrente(e.target.value)} className={`${inp} max-w-[150px]`}>
                 <option value="">Todas as frentes</option>
@@ -246,7 +250,7 @@ export default function ConsultaExpedicao({ opId }) {
             <span className="text-[11px] text-torg-gray whitespace-nowrap">{filtradas.length} de {todas.length} · {fmtKg(pesoFiltrado)}</span>
           </div>
 
-          {marcadas.length > 0 && (
+          {!readOnly && marcadas.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap mb-2 bg-torg-blue-50/60 border border-torg-blue-200 rounded-lg px-3 py-2 text-xs">
               <span className="font-semibold text-torg-dark">{marcadas.length} peça(s){unSel ? ` · ${unSel} un` : ""} · {fmtKg(pesoSel)}{parciais ? <span className="text-amber-600"> · {parciais} parcial(is)</span> : ""}</span>
               <button onClick={() => setModal(true)} className="bg-torg-blue text-white rounded-lg px-2.5 py-1 font-medium inline-flex items-center gap-1 hover:bg-torg-dark"><Truck size={12} /> Gerar romaneio prévio{proximo ? ` ${String(proximo).padStart(2, "0")}` : ""}</button>
@@ -258,7 +262,7 @@ export default function ConsultaExpedicao({ opId }) {
             <table className="w-full text-sm min-w-[760px]">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr className="text-[11px] text-torg-gray uppercase">
-                  <th className="px-2 py-2 w-8"></th>
+                  {!readOnly && <th className="px-2 py-2 w-8"></th>}
                   <th className="text-left px-3 py-2 font-medium">Marca</th>
                   <th className="text-left px-3 py-2 font-medium">Descrição</th>
                   <th className="text-right px-3 py-2 font-medium w-16">Qtd</th>
@@ -276,7 +280,7 @@ export default function ConsultaExpedicao({ opId }) {
                   const semPendente = pend != null && pend <= 0;
                   return (
                     <tr key={`${k}-${i}`} className={sel[k] ? "bg-torg-blue-50/50" : sit === "expedida" ? "bg-emerald-50/40" : sit === "parcial" ? "bg-amber-50/30" : ""}>
-                      <td className="px-2 py-1.5"><input type="checkbox" checked={!!sel[k]} disabled={semPendente} onChange={() => setSel((s) => { const n = { ...s }; if (n[k]) delete n[k]; else n[k] = true; return n; })} className="accent-torg-blue disabled:opacity-30" title={semPendente ? "Marca totalmente expedida" : ""} /></td>
+                      {!readOnly && <td className="px-2 py-1.5"><input type="checkbox" checked={!!sel[k]} disabled={semPendente} onChange={() => setSel((s) => { const n = { ...s }; if (n[k]) delete n[k]; else n[k] = true; return n; })} className="accent-torg-blue disabled:opacity-30" title={semPendente ? "Marca totalmente expedida" : ""} /></td>}
                       <td className="px-3 py-1.5 font-mono text-torg-dark whitespace-nowrap">{m.marca}</td>
                       <td className="px-3 py-1.5 text-torg-gray truncate max-w-[240px]" title={m.descricao}>{m.descricao || "—"}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
@@ -314,7 +318,7 @@ export default function ConsultaExpedicao({ opId }) {
                     </tr>
                   );
                 })}
-                {!filtradas.length && <tr><td colSpan={9} className="px-3 py-6 text-center text-sm text-torg-gray">Nenhuma peça encontrada com esse filtro.</td></tr>}
+                {!filtradas.length && <tr><td colSpan={readOnly ? 8 : 9} className="px-3 py-6 text-center text-sm text-torg-gray">Nenhuma peça encontrada com esse filtro.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -323,7 +327,7 @@ export default function ConsultaExpedicao({ opId }) {
       </div>
 
       {/* ── romaneios prévios ── */}
-      {(previos.length > 0 || todas.length > 0) && (
+      {!readOnly && (previos.length > 0 || todas.length > 0) && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
           <h3 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1"><Truck size={15} className="text-torg-blue" /> Romaneios prévios <span className="text-torg-gray font-normal">· prioridade de entrega</span></h3>
           <p className="text-[11px] text-torg-gray mb-3">A carga fica <strong>em aberto</strong> até ser aprovada. Aprovada, vale para a Expedição. A numeração segue o último romaneio emitido{proximo ? ` — o próximo é o ${String(proximo).padStart(2, "0")}` : ""}.</p>

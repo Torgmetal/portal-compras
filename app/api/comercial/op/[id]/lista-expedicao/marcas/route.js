@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-const ROLES = ["ADMIN", "ENGENHARIA", "COMERCIAL", "PLANEJAMENTO", "PCP"];
+const ROLES = ["ADMIN", "ENGENHARIA", "COMERCIAL", "PLANEJAMENTO", "PCP", "EXPEDICAO"];
 
 export async function GET(_req, { params }) {
   try { await requireRole(ROLES); } catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }

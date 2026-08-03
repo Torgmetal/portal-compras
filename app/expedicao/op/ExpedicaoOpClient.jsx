@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { fmtOP } from "@/lib/utils";
 import { PackageCheck, Search, Package, ArrowLeft } from "lucide-react";
 import AbaExpedicao from "@/app/comercial/[id]/AbaExpedicao";
+import ConsultaExpedicao from "@/app/comercial/[id]/ConsultaExpedicao";
 
 // Espelho da expedição do módulo OPs: a Expedição escolhe a OP e vê os LOTES DE
 // ENTREGA + emite/revisa o romaneio (FORM 22) — o MESMO fluxo/entidades do módulo
@@ -70,6 +71,8 @@ export default function ExpedicaoOpClient({ ops }) {
 
           {/* Mesmo workspace do módulo OPs — Expedição vê os lotes e emite/revisa romaneio */}
           <AbaExpedicao opId={opSel.id} proposta={null} podeEditarLotes={false} />
+          {/* Quadro informativo (só leitura): expedido/pendente por peça */}
+          <ConsultaExpedicao opId={opSel.id} readOnly />
         </div>
       )}
     </div>
