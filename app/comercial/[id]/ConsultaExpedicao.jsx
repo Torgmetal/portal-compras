@@ -25,6 +25,7 @@ export default function ConsultaExpedicao({ opId }) {
   const [importando, setImportando] = useState(false);
   const [sel, setSel] = useState({});
   const [qtdImport, setQtdImport] = useState({}); // chave(marca) -> qtd desta carga (da lista ou ajustada). Sem entrada = qtd total da marca.
+  const [imp, setImp] = useState(null); // { rows, nome } — arquivo em prévia de importação
   const [previos, setPrevios] = useState([]);
   const [lotes, setLotes] = useState([]);
   const [proximo, setProximo] = useState(null);
@@ -95,34 +96,9 @@ export default function ConsultaExpedicao({ opId }) {
     return null;
   }
 
-  /** Casa linhas (Excel = arrays de células; PDF = linhas de texto) com as marcas da
-   *  OP E lê a QUANTIDADE de cada uma: detecta a coluna de qtd pelo cabeçalho. Sem
-   *  cabeçalho de qtd (ex.: PDF), deixa a qtd em aberto (assume a marca inteira). */
-  function casarLinhas(rows) {
-    const nrm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-    const inteiro = (v) => { const n = parseInt(String(v ?? "").replace(/[^\d-]/g, ""), 10); return Number.isFinite(n) && n > 0 ? n : null; };
-    // 1) coluna de "quantidade" pelo cabeçalho (primeiras linhas)
-    let qtdCol = -1;
-    for (let r = 0; r < Math.min(rows.length, 10) && qtdCol < 0; r++) {
-      (rows[r] || []).forEach((cell, c) => {
-        if (qtdCol < 0 && /\b(qtd|qtde|qte|quant|quantidade|pcs|pecas|unid)\b/.test(nrm(cell))) qtdCol = c;
-      });
-    }
-    // 2) varre as linhas: marca + qtd da mesma linha (mesma marca repetida → soma)
-    const achadas = new Map(); // key -> { m, qtd }
-    for (const row of rows) {
-      if (!row || !row.length) continue;
-      let hit = null;
-      for (const cell of row) { hit = marcaNaCelula(cell); if (hit) break; }
-      if (!hit) continue;
-      const qtd = qtdCol >= 0 ? inteiro(row[qtdCol]) : null;
-      const ex = achadas.get(hit.key);
-      achadas.set(hit.key, { m: hit.m, qtd: qtd == null ? (ex?.qtd ?? null) : (ex?.qtd ?? 0) + qtd });
-    }
-    return achadas;
-  }
-
-  async function importarSelecao(file) {
+  // Lê o arquivo (Excel/CSV = linhas de células; PDF = linhas de texto) e abre a
+  // PRÉVIA de importação pra você conferir/mapear as colunas antes de aplicar.
+  async function prepararImport(file) {
     if (!file) return;
     setImportando(true); setErro(""); setMsg("");
     try {
@@ -131,7 +107,7 @@ export default function ConsultaExpedicao({ opId }) {
         const fd = new FormData(); fd.append("arquivo", file);
         const j = await fetch(`/api/comercial/op/${opId}/lista-expedicao/ler-arquivo`, { method: "POST", body: fd }).then((r) => r.json());
         if (!j.success) throw new Error(j.error);
-        rows = String(j.texto || "").split(/\r?\n/).map((l) => l.split(/ {2,}|\t/));
+        rows = String(j.texto || "").split(/\r?\n/).map((l) => l.split(/ {2,}|\t/)).filter((r) => r.some((c) => String(c ?? "").trim()));
       } else {
         const XLSX = await import("xlsx");
         const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
@@ -139,19 +115,25 @@ export default function ConsultaExpedicao({ opId }) {
           for (const r of XLSX.utils.sheet_to_json(wb.Sheets[nome], { header: 1, defval: null, blankrows: false })) rows.push(r || []);
         }
       }
-      const achadas = casarLinhas(rows);
-      if (!achadas.size) { setErro(`Nenhuma marca de "${file.name}" bate com a lista de expedição desta OP.`); return; }
-      const vals = [...achadas.values()];
-      const comQtd = vals.filter((a) => a.qtd != null).length;
-      setSel((s) => { const n = { ...s }; for (const a of vals) n[chave(a.m)] = true; return n; });
-      setQtdImport((q) => { const n = { ...q }; for (const a of vals) if (a.qtd != null) n[chave(a.m)] = a.qtd; return n; });
-      const jaExp = vals.filter((a) => a.m.expedido === true).length;
-      setMsg(
-        `${achadas.size} peça(s) de "${file.name}" selecionada(s)` +
-        (comQtd ? ` · ${comQtd} com a quantidade da lista` : ` · sem coluna de quantidade — ajuste na coluna Qtd`) +
-        (jaExp ? ` — atenção: ${jaExp} já constam como expedidas` : "") + "."
-      );
+      if (!rows.length) { setErro(`"${file.name}" está vazio.`); return; }
+      setImp({ rows, nome: file.name });
     } catch (e) { setErro(e.message); } finally { setImportando(false); }
+  }
+
+  // Aplica o resultado da prévia: marca as peças e grava as quantidades lidas/ajustadas.
+  function aplicarImport(achadas, nome) {
+    const vals = [...achadas.values()];
+    if (!vals.length) { setErro("Nenhuma marca reconhecida na lista."); return; }
+    const comQtd = vals.filter((a) => a.qtd != null).length;
+    setSel((s) => { const n = { ...s }; for (const a of vals) n[chave(a.m)] = true; return n; });
+    setQtdImport((q) => { const n = { ...q }; for (const a of vals) if (a.qtd != null) n[chave(a.m)] = a.qtd; return n; });
+    const jaExp = vals.filter((a) => a.m.expedido === true).length;
+    setImp(null);
+    setMsg(
+      `${vals.length} peça(s) de "${nome}" selecionada(s)` +
+      (comQtd ? ` · ${comQtd} com a quantidade da lista` : ` · quantidades não lidas — ajuste na coluna Qtd`) +
+      (jaExp ? ` — atenção: ${jaExp} já constam como expedidas` : "") + "."
+    );
   }
 
   async function exportar() {
@@ -207,7 +189,7 @@ export default function ConsultaExpedicao({ opId }) {
           <h3 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><PackageSearch size={15} className="text-torg-blue" /> Lista de expedição <span className="text-torg-gray font-normal">· consulta por peça</span></h3>
           <button onClick={exportar} disabled={exportando || !todas.length} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
         </div>
-        <p className="text-[11px] text-torg-gray mb-3">Marque as peças uma a uma <strong>ou importe um Excel/PDF</strong> com a relação — o portal casa as marcas, <strong>lê a quantidade</strong> e seleciona sozinho (ajuste na coluna Qtd se precisar). Depois monte o <strong>romaneio prévio</strong>.</p>
+        <p className="text-[11px] text-torg-gray mb-3">Marque as peças uma a uma <strong>ou importe um Excel/PDF</strong> com a relação — abre uma <strong>prévia</strong> pra você confirmar qual coluna é a marca e qual é a <strong>quantidade</strong>, casa com as peças e seleciona. Depois monte o <strong>romaneio prévio</strong>.</p>
 
         {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
         {msg && <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-2 inline-flex items-center gap-1"><CheckCircle2 size={13} /> {msg}</p>}
@@ -236,7 +218,7 @@ export default function ConsultaExpedicao({ opId }) {
               <option value="pendentes">Só pendentes</option>
             </select>
             {/* importar relação de peças (ao lado do filtro, como pedido) */}
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.pdf" className="hidden" onChange={(e) => { importarSelecao(e.target.files?.[0]); e.target.value = ""; }} />
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.pdf" className="hidden" onChange={(e) => { prepararImport(e.target.files?.[0]); e.target.value = ""; }} />
             <button onClick={() => fileRef.current?.click()} disabled={importando} className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-torg-blue-50 disabled:opacity-50" title="Excel ou PDF com a relação de peças — seleciono as marcas automaticamente">
               {importando ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Selecionar por arquivo
             </button>
@@ -395,7 +377,128 @@ export default function ConsultaExpedicao({ opId }) {
         </div>
       )}
 
+      {imp && <ImportarListaModal rows={imp.rows} nome={imp.nome} marcaNaCelula={marcaNaCelula} onAplicar={aplicarImport} onClose={() => setImp(null)} />}
       {modal && <NovoPrevioModal opId={opId} numero={proximo} itens={marcadas.map((m) => ({ ...m, qte: qteUsar(m), pesoTotal: pesoUsar(m) }))} peso={pesoSel} lotes={lotes} localObra={localEntrega} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); setQtdImport({}); carregarPrevios(); setMsg("Romaneio prévio criado."); }} />}
+    </div>
+  );
+}
+
+// Prévia da importação: mostra as linhas do arquivo, deixa MAPEAR a coluna da marca
+// e a da quantidade, e exibe o resultado casado antes de aplicar. À prova de layout.
+function ImportarListaModal({ rows, nome, marcaNaCelula, onAplicar, onClose }) {
+  const nCols = useMemo(() => rows.reduce((mx, r) => Math.max(mx, (r || []).length), 0), [rows]);
+  const nrm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const inteiro = (v) => { const n = parseInt(String(v ?? "").replace(/[^\d-]/g, ""), 10); return Number.isFinite(n) && n > 0 ? n : null; };
+
+  // Auto-detecção: marca = coluna com mais marcas conhecidas; qtd = coluna cujo cabeçalho bate.
+  const auto = useMemo(() => {
+    const marcaHits = Array(nCols).fill(0);
+    for (const r of rows) for (let c = 0; c < nCols; c++) if (marcaNaCelula((r || [])[c])) marcaHits[c]++;
+    let marcaCol = -1, best = 0;
+    marcaHits.forEach((h, c) => { if (h > best) { best = h; marcaCol = c; } });
+    let qtdCol = -1;
+    for (let ri = 0; ri < Math.min(rows.length, 12) && qtdCol < 0; ri++) {
+      (rows[ri] || []).forEach((cell, c) => {
+        if (qtdCol < 0 && c !== marcaCol && /(^|[^a-z])(qtd|qtde|qte|qt|quant|quantidade|pc|pcs|pca|pcas|peca|pecas|un|und|unid|unidade|expedir|enviar|saldo|remessa)([^a-z]|$)/.test(nrm(cell))) qtdCol = c;
+      });
+    }
+    return { marcaCol, qtdCol };
+  }, [rows, nCols]);
+
+  const [marcaCol, setMarcaCol] = useState(auto.marcaCol);
+  const [qtdCol, setQtdCol] = useState(auto.qtdCol);
+
+  const achadas = useMemo(() => {
+    const map = new Map();
+    for (const r of rows) {
+      let hit = marcaCol >= 0 ? marcaNaCelula((r || [])[marcaCol]) : null;
+      if (!hit && marcaCol < 0) for (const cc of (r || [])) { hit = marcaNaCelula(cc); if (hit) break; }
+      if (!hit) continue;
+      const qtd = qtdCol >= 0 ? inteiro((r || [])[qtdCol]) : null;
+      const ex = map.get(hit.key);
+      map.set(hit.key, { m: hit.m, qtd: qtd == null ? (ex?.qtd ?? null) : (ex?.qtd ?? 0) + qtd });
+    }
+    return map;
+  }, [rows, marcaCol, qtdCol]);
+  const vals = [...achadas.values()];
+  const comQtd = vals.filter((a) => a.qtd != null).length;
+
+  const cols = Array.from({ length: nCols }, (_, i) => i);
+  const preview = rows.slice(0, 12);
+  const setCol = (c, papel) => {
+    if (papel === "marca") { setMarcaCol(c); if (qtdCol === c) setQtdCol(-1); }
+    else if (papel === "qtd") { setQtdCol(c); if (marcaCol === c) setMarcaCol(-1); }
+    else { if (marcaCol === c) setMarcaCol(-1); if (qtdCol === c) setQtdCol(-1); }
+  };
+  const papelDe = (c) => (c === marcaCol ? "marca" : c === qtdCol ? "qtd" : "");
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-torg-dark inline-flex items-center gap-2"><FileSpreadsheet size={15} className="text-torg-blue" /> Conferir importação — {nome}</h3>
+            <p className="text-[11px] text-torg-gray mt-0.5 max-w-lg">Confirme qual coluna é a <strong>marca</strong> e qual é a <strong>quantidade a enviar</strong>. O portal casa com as peças da OP e mostra o resultado antes de aplicar.</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-5 py-4 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <span className={`px-2 py-1 rounded-lg font-medium ${vals.length ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{vals.length} marca(s) reconhecida(s)</span>
+            <span className={`px-2 py-1 rounded-lg font-medium ${comQtd ? "bg-torg-blue-50 text-torg-blue" : "bg-gray-100 text-torg-gray"}`}>{comQtd} com quantidade lida</span>
+            {qtdCol < 0 && <span className="text-amber-700">— escolha a coluna de <strong>Quantidade</strong> no cabeçalho abaixo</span>}
+          </div>
+
+          <div className="overflow-x-auto border border-gray-100 rounded-lg max-h-[300px] overflow-y-auto">
+            <table className="text-[11px]">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>{cols.map((c) => (
+                  <th key={c} className="px-2 py-1.5 border-l first:border-l-0 border-gray-100">
+                    <select value={papelDe(c)} onChange={(e) => setCol(c, e.target.value)} className={`text-[11px] rounded px-1 py-0.5 border outline-none cursor-pointer ${c === marcaCol ? "border-torg-blue text-torg-blue bg-torg-blue-50 font-semibold" : c === qtdCol ? "border-emerald-400 text-emerald-700 bg-emerald-50 font-semibold" : "border-gray-200 text-torg-gray"}`}>
+                      <option value="">col {c + 1}</option>
+                      <option value="marca">Marca</option>
+                      <option value="qtd">Quantidade</option>
+                    </select>
+                  </th>
+                ))}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {preview.map((r, ri) => (
+                  <tr key={ri} className="hover:bg-gray-50/40">
+                    {cols.map((c) => {
+                      const val = (r || [])[c];
+                      return <td key={c} className={`px-2 py-1 border-l first:border-l-0 border-gray-50 whitespace-nowrap ${c === marcaCol ? "font-mono text-torg-dark" : c === qtdCol ? "text-emerald-700 text-right tabular-nums" : "text-torg-gray"}`}>{val == null || val === "" ? "" : String(val)}</td>;
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {rows.length > preview.length && <p className="text-[10px] text-torg-gray">Mostrando as {preview.length} primeiras de {rows.length} linhas — a importação usa todas.</p>}
+
+          {vals.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-torg-dark mb-1">Vai importar:</p>
+              <div className="border border-gray-100 rounded-lg max-h-[150px] overflow-y-auto">
+                <table className="w-full text-[11px]">
+                  <thead className="bg-gray-50 sticky top-0 text-torg-gray"><tr><th className="text-left px-3 py-1 font-medium">Marca</th><th className="text-right px-3 py-1 font-medium">Qtd da lista</th></tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {vals.slice(0, 80).map((a, i) => (
+                      <tr key={i}><td className="px-3 py-1 font-mono text-torg-dark">{a.m.marca}</td><td className="px-3 py-1 text-right tabular-nums">{a.qtd != null ? a.qtd : <span className="text-amber-600">total da marca</span>}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="text-xs text-torg-gray border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">Cancelar</button>
+          <button onClick={() => onAplicar(achadas, nome)} disabled={!vals.length} className="text-xs font-semibold text-white bg-torg-blue rounded-lg px-4 py-1.5 hover:bg-torg-dark disabled:opacity-40 inline-flex items-center gap-1.5"><CheckCircle2 size={13} /> Aplicar {vals.length || ""} peça(s)</button>
+        </div>
+      </div>
     </div>
   );
 }
