@@ -53,30 +53,41 @@ export default function ConsultaExpedicao({ opId }) {
   const todas = useMemo(() => frentes.flatMap((f) => f.marcas.map((m) => ({ ...m, frente: f.frente }))), [frentes]);
   const conhecidas = useMemo(() => { const mp = new Map(); for (const m of todas) mp.set(String(m.marca).trim().toUpperCase(), m); return mp; }, [todas]);
 
+  // Total / expedido / pendente por marca. expedido = soma dos romaneios EMITIDOS
+  // (vem da API). pendente = total − expedido. Situação derivada da quantidade.
+  const totQ = (m) => (Number(m.qte) > 0 ? Number(m.qte) : null);
+  const expQ = (m) => Math.max(0, Number(m.expedidoQtd) || 0);
+  const pendQ = (m) => { const t = totQ(m); return t == null ? null : Math.max(0, t - expQ(m)); };
+  const unitPeso = (m) => { const t = totQ(m); return t ? (m.pesoTotal || 0) / t : (m.pesoTotal || 0); };
+  const situacaoM = (m) => { const t = totQ(m), e = expQ(m); if (t != null && t > 0 && e >= t) return "expedida"; if (e > 0) return "parcial"; return "pendente"; };
+
   const filtradas = useMemo(() => {
     const b = norm(busca);
     return todas.filter((m) => {
       if (frente && m.frente !== frente) return false;
-      if (situacao === "expedidas" && m.expedido !== true) return false;
-      if (situacao === "pendentes" && m.expedido === true) return false;
+      const sit = situacaoM(m);
+      if (situacao === "expedidas" && sit !== "expedida") return false;
+      if (situacao === "pendentes" && sit === "expedida") return false;
+      if (situacao === "parciais" && sit !== "parcial") return false;
       if (!b) return true;
       return norm(m.marca).includes(b) || norm(m.descricao).includes(b) || norm(m.romaneio).includes(b);
     });
   }, [todas, busca, situacao, frente]);
 
   const contratado = frentes.reduce((s, f) => s + (f.pesoContratado || 0), 0);
-  const expedido = frentes.reduce((s, f) => s + (f.pesoExpedido || 0), 0);
-  const nExp = todas.filter((m) => m.expedido === true).length;
+  const nFull = todas.filter((m) => situacaoM(m) === "expedida").length;
+  const nParcial = todas.filter((m) => situacaoM(m) === "parcial").length;
+  const pesoExpedidoReal = todas.reduce((s, m) => s + unitPeso(m) * expQ(m), 0);
   const pesoFiltrado = filtradas.reduce((s, m) => s + (m.pesoTotal || 0), 0);
-  // Quantidade/peso a levar nesta carga. Sem override (qtdImport) = a marca inteira.
-  // Com override (lista importada ou ajuste manual) = a qtd escolhida, com peso PROPORCIONAL.
-  const baseQte = (m) => (Number(m.qte) > 0 ? Number(m.qte) : null); // null = qtd desconhecida
-  const unitPeso = (m) => { const b = baseQte(m); return b ? (m.pesoTotal || 0) / b : (m.pesoTotal || 0); };
+
+  // Seleção p/ o PRÓXIMO romaneio: parte do PENDENTE (não dá pra reexpedir o que já saiu).
+  // Peso é PROPORCIONAL (unidade = pesoTotal ÷ total da marca).
+  const baseQte = (m) => pendQ(m);
   const qteUsar = (m) => {
     const q = qtdImport[chave(m)];
     const b = baseQte(m);
-    if (q == null) return b ?? 1;                       // sem override → total
-    return b ? Math.max(0, Math.min(q, b)) : Math.max(0, q); // com override → cap no total da marca
+    if (q == null) return b ?? 1;
+    return b != null ? Math.max(0, Math.min(q, b)) : Math.max(0, q);
   };
   const pesoUsar = (m) => unitPeso(m) * qteUsar(m);
 
@@ -201,9 +212,9 @@ export default function ConsultaExpedicao({ opId }) {
         ) : (<>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-lg overflow-hidden mb-3">
             <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Marcas</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{todas.length}</p></div>
-            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Expedidas</p><p className="text-lg font-extrabold text-emerald-700 tabular-nums">{nExp}</p></div>
-            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Pendentes</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{todas.length - nExp}</p></div>
-            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Peso expedido</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtKg(expedido)}</p><p className="text-[10px] text-torg-gray">de {fmtKg(contratado)}</p></div>
+            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Expedidas</p><p className="text-lg font-extrabold text-emerald-700 tabular-nums">{nFull}</p>{nParcial > 0 && <p className="text-[10px] text-amber-600">+ {nParcial} parcial(is)</p>}</div>
+            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Pendentes</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{todas.length - nFull}</p></div>
+            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Peso expedido</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtKg(pesoExpedidoReal)}</p><p className="text-[10px] text-torg-gray">de {fmtKg(contratado)}</p></div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -215,6 +226,7 @@ export default function ConsultaExpedicao({ opId }) {
             <select value={situacao} onChange={(e) => setSituacao(e.target.value)} className={inp}>
               <option value="todas">Todas</option>
               <option value="expedidas">Só expedidas</option>
+              <option value="parciais">Só parciais</option>
               <option value="pendentes">Só pendentes</option>
             </select>
             {/* importar relação de peças (ao lado do filtro, como pedido) */}
@@ -247,8 +259,9 @@ export default function ConsultaExpedicao({ opId }) {
                   <th className="text-left px-3 py-2 font-medium">Marca</th>
                   <th className="text-left px-3 py-2 font-medium">Descrição</th>
                   <th className="text-right px-3 py-2 font-medium w-16">Qtd</th>
+                  <th className="text-right px-3 py-2 font-medium w-24">Expedido</th>
                   <th className="text-right px-3 py-2 font-medium w-24">Peso</th>
-                  <th className="text-left px-3 py-2 font-medium w-28">Situação</th>
+                  <th className="text-left px-3 py-2 font-medium w-32">Situação</th>
                   <th className="text-left px-3 py-2 font-medium w-24">Romaneio</th>
                   <th className="text-left px-3 py-2 font-medium w-28">Expedida em</th>
                 </tr>
@@ -256,33 +269,38 @@ export default function ConsultaExpedicao({ opId }) {
               <tbody className="divide-y divide-gray-50">
                 {filtradas.slice(0, LIMITE).map((m, i) => {
                   const k = chave(m);
+                  const exp = expQ(m), tot = totQ(m), pend = pendQ(m), sit = situacaoM(m);
+                  const semPendente = pend != null && pend <= 0;
                   return (
-                    <tr key={`${k}-${i}`} className={sel[k] ? "bg-torg-blue-50/50" : m.expedido === true ? "bg-emerald-50/40" : ""}>
-                      <td className="px-2 py-1.5"><input type="checkbox" checked={!!sel[k]} onChange={() => setSel((s) => { const n = { ...s }; if (n[k]) delete n[k]; else n[k] = true; return n; })} className="accent-torg-blue" /></td>
+                    <tr key={`${k}-${i}`} className={sel[k] ? "bg-torg-blue-50/50" : sit === "expedida" ? "bg-emerald-50/40" : sit === "parcial" ? "bg-amber-50/30" : ""}>
+                      <td className="px-2 py-1.5"><input type="checkbox" checked={!!sel[k]} disabled={semPendente} onChange={() => setSel((s) => { const n = { ...s }; if (n[k]) delete n[k]; else n[k] = true; return n; })} className="accent-torg-blue disabled:opacity-30" title={semPendente ? "Marca totalmente expedida" : ""} /></td>
                       <td className="px-3 py-1.5 font-mono text-torg-dark whitespace-nowrap">{m.marca}</td>
                       <td className="px-3 py-1.5 text-torg-gray truncate max-w-[240px]" title={m.descricao}>{m.descricao || "—"}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
                         {sel[k] ? (
                           <span className="inline-flex items-center gap-1 justify-end">
                             <input
-                              type="number" min={0} max={baseQte(m) ?? undefined} step="1"
+                              type="number" min={0} max={pend ?? undefined} step="1"
                               value={qteUsar(m)}
                               onChange={(e) => { const v = e.target.value; setQtdImport((q) => ({ ...q, [k]: v === "" ? 0 : Math.max(0, Math.floor(Number(v) || 0)) })); }}
                               className="w-14 text-right border border-torg-blue-300 rounded px-1 py-0.5 text-[12px] tabular-nums outline-none focus:border-torg-blue bg-white"
                             />
-                            {baseQte(m) != null && <span className="text-[10px] text-torg-gray">/{m.qte}</span>}
+                            {pend != null && <span className="text-[10px] text-torg-gray">/{pend}</span>}
                           </span>
                         ) : (
-                          <span className="text-torg-gray">{m.qte ?? "—"}</span>
+                          <span className="text-torg-gray">{tot ?? "—"}</span>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums whitespace-nowrap">
-                        {fmtKg(sel[k] ? pesoUsar(m) : m.pesoTotal)}
-                        {sel[k] && baseQte(m) != null && qteUsar(m) < baseQte(m) && <span className="text-[10px] text-amber-600 ml-1">parcial</span>}
+                      <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">
+                        {exp > 0 ? <span className="text-emerald-700 font-semibold">{exp.toLocaleString("pt-BR")}</span> : <span className="text-gray-300">0</span>}
+                        {pend != null && pend > 0 && exp > 0 && <span className="block text-[10px] text-amber-600">faltam {pend.toLocaleString("pt-BR")}</span>}
                       </td>
+                      <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums whitespace-nowrap">{fmtKg(sel[k] ? pesoUsar(m) : m.pesoTotal)}</td>
                       <td className="px-3 py-1.5 whitespace-nowrap">
-                        {m.expedido === true
+                        {sit === "expedida"
                           ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium inline-flex items-center gap-1"><CheckCircle2 size={10} /> expedida</span>
+                          : sit === "parcial"
+                          ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium inline-flex items-center gap-1"><Clock size={10} /> parcial {exp}/{tot}</span>
                           : <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray font-medium inline-flex items-center gap-1"><Clock size={10} /> pendente</span>}
                       </td>
                       <td className="px-3 py-1.5 text-torg-gray whitespace-nowrap">{m.romaneio || "—"}</td>
@@ -290,7 +308,7 @@ export default function ConsultaExpedicao({ opId }) {
                     </tr>
                   );
                 })}
-                {!filtradas.length && <tr><td colSpan={8} className="px-3 py-6 text-center text-sm text-torg-gray">Nenhuma peça encontrada com esse filtro.</td></tr>}
+                {!filtradas.length && <tr><td colSpan={9} className="px-3 py-6 text-center text-sm text-torg-gray">Nenhuma peça encontrada com esse filtro.</td></tr>}
               </tbody>
             </table>
           </div>
