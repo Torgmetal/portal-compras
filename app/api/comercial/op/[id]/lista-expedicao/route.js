@@ -14,14 +14,33 @@ const k = (s) => String(s || "").trim().toUpperCase();
 
 async function montar(opId, opNumero) {
   const where = { OR: [{ opId }, { opNumero: String(opNumero) }] };
-  const [listas, revisoes, pecas] = await Promise.all([
+  const [listasRaw, revisoes, pecas, previosEmitidos] = await Promise.all([
     prisma.listaExpedicao.findMany({
       where, orderBy: { frente: "asc" },
       select: { id: true, frente: true, arquivo: true, revisao: true, marcas: true, qtdItens: true, pesoContratado: true, pesoExpedido: true, pesoFaltante: true, importadoEm: true, fileModificado: true },
     }),
     prisma.listaExpedicaoRevisao.findMany({ where: { AND: [where, { resolvidaEm: null }] }, orderBy: { detectadaEm: "desc" }, take: 20 }),
     prisma.pecaLote.findMany({ where: { opId }, select: { marca: true, loteId: true, lote: { select: { nome: true } } } }),
+    prisma.romaneioPrevio.findMany({ where: { AND: [where, { emitidoEm: { not: null } }] }, select: { itens: true } }),
   ]);
+
+  // Expedido REAL por frente = Σ peso dos romaneios EMITIDOS no portal. Sobrescreve o
+  // pesoExpedido/faltante gravado quando há romaneio no portal; senão mantém o backfill
+  // (arquivos do SharePoint), pra não regredir OPs antigas.
+  const expPorFrente = new Map();
+  let totalPortal = 0;
+  for (const r of previosEmitidos) for (const it of (Array.isArray(r.itens) ? r.itens : [])) {
+    const peso = Number(it.pesoTotal) || 0;
+    expPorFrente.set(k(it.frente), (expPorFrente.get(k(it.frente)) || 0) + peso);
+    totalPortal += peso;
+  }
+  const listas = listasRaw.map((l) => {
+    let portal = expPorFrente.get(k(l.frente)) || 0;
+    if (portal === 0 && listasRaw.length === 1) portal = totalPortal; // frente única: item pode não trazer a frente
+    const pesoExpedido = portal > 0 ? Math.round(portal) : l.pesoExpedido;
+    const pesoFaltante = Math.max(0, Math.round((l.pesoContratado || 0) - (pesoExpedido || 0)));
+    return { ...l, pesoExpedido, pesoFaltante };
+  });
 
   const porMarca = new Map();
   for (const p of pecas) if (!porMarca.has(k(p.marca))) porMarca.set(k(p.marca), p);

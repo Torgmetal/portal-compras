@@ -36,5 +36,30 @@ export async function GET(req) {
     },
     orderBy: [{ opNumero: "asc" }, { frente: "asc" }],
   });
-  return NextResponse.json({ listas });
+
+  // Expedido REAL = Σ peso dos romaneios EMITIDOS no portal (por OP+frente).
+  // Sobrescreve o pesoExpedido gravado quando há romaneio no portal; senão mantém o
+  // backfill do SharePoint (não regride OPs antigas).
+  const k = (s) => String(s || "").trim().toUpperCase();
+  const padOp = (s) => String(s || "").replace(/\D/g, "").padStart(3, "0");
+  const previos = await prisma.romaneioPrevio.findMany({ where: { emitidoEm: { not: null } }, select: { opNumero: true, itens: true } });
+  const expFrente = new Map(); // padOp|FRENTE -> peso
+  const expOp = new Map();      // padOp -> peso
+  for (const r of previos) for (const it of (Array.isArray(r.itens) ? r.itens : [])) {
+    const peso = Number(it.pesoTotal) || 0;
+    const op = padOp(r.opNumero);
+    expFrente.set(`${op}|${k(it.frente)}`, (expFrente.get(`${op}|${k(it.frente)}`) || 0) + peso);
+    expOp.set(op, (expOp.get(op) || 0) + peso);
+  }
+  const nFrentesOp = new Map();
+  for (const l of listas) { const op = padOp(l.opNumero); nFrentesOp.set(op, (nFrentesOp.get(op) || 0) + 1); }
+  const listasOut = listas.map((l) => {
+    const op = padOp(l.opNumero);
+    let portal = expFrente.get(`${op}|${k(l.frente)}`) || 0;
+    if (portal === 0 && nFrentesOp.get(op) === 1) portal = expOp.get(op) || 0; // frente única
+    const pesoExpedido = portal > 0 ? Math.round(portal) : l.pesoExpedido;
+    const pesoFaltante = Math.max(0, Math.round((l.pesoContratado || 0) - (pesoExpedido || 0)));
+    return { ...l, pesoExpedido, pesoFaltante };
+  });
+  return NextResponse.json({ listas: listasOut });
 }
