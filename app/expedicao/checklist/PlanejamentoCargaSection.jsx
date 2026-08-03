@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Truck, Plus, Calendar, Package, Wrench, CheckCircle2, Clock,
   AlertTriangle, ChevronDown, ChevronRight, Loader2, X, Search,
@@ -37,12 +37,12 @@ const CATEGORIA_LABEL = {
   OUTRO: "Outro",
 };
 
-export default function PlanejamentoCargaSection({ opId, pecas, acessorios }) {
+export default function PlanejamentoCargaSection({ opId, pecas, acessorios, defaultAberta = false }) {
   const [planejamentos, setPlanejamentos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [erro, setErro] = useState("");
-  const [aberta, setAberta] = useState(false);
+  const [aberta, setAberta] = useState(defaultAberta);
   const [modalAberto, setModalAberto] = useState(false);
   const [detalhesAberto, setDetalhesAberto] = useState(null);
 
@@ -70,6 +70,10 @@ export default function PlanejamentoCargaSection({ opId, pecas, acessorios }) {
       carregarPlanejamentos();
     }
   };
+
+  // Página dedicada (Planejamento): já abre expandido e carrega as cargas.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (defaultAberta && !loaded) carregarPlanejamentos(); }, []);
 
   const onCriado = (novoPlan) => {
     setPlanejamentos((prev) => [novoPlan, ...prev]);

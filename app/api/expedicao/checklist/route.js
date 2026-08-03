@@ -12,7 +12,7 @@ import { isExpedivel, FLUXO_PECAS } from "@/lib/expedicao";
 
 export async function GET(req) {
   try {
-    await requireRole(["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA"]);
+    await requireRole(["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA", "PLANEJAMENTO"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });

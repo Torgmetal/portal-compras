@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 
-const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA"];
+const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ENGENHARIA", "PLANEJAMENTO"];
 
 // ─── GET ────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ const createSchema = z.object({
 export async function POST(req) {
   let user;
   try {
-    user = await requireRole(["ADMIN", "EXPEDICAO"]);
+    user = await requireRole(["ADMIN", "EXPEDICAO", "PLANEJAMENTO"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ success: false, error: e.message }, { status });
