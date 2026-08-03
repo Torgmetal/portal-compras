@@ -122,7 +122,7 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
     <div className="space-y-4">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><Truck size={18} className="text-torg-blue" /> Lotes de entrega</h3>
+          <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><Truck size={18} className="text-torg-blue" /> Romaneios</h3>
           {podeEditarLotes && (
             <div className="flex items-center gap-2 flex-wrap">
               <button onClick={baixarModelo} className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-50"><Download size={13} /> Modelo</button>
