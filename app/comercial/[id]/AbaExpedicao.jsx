@@ -532,6 +532,11 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
     setQtds((q) => ({ ...q, [m.marca]: m.pendente > 0 ? m.pendente : (m.qtd || 1) }));
     setBuscaAdd("");
   };
+  const removerMarca = (marca) => {
+    setMarcas((cur) => (cur || []).filter((x) => x.marca !== marca));
+    setSel((s) => { const n = new Set(s); n.delete(marca); return n; });
+    setQtds((q) => { const n = { ...q }; delete n[marca]; return n; });
+  };
 
   useEffect(() => {
     fetch(`/api/comercial/op/${opId}/lotes-expedicao/pecas?loteId=${lote.id}`)
@@ -652,11 +657,12 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                       <span className="text-torg-gray truncate flex-1">{m.descricao || ""}</span>
                       <input type="number" min="0" value={qtds[m.marca] ?? ""} onChange={(e) => setQtds((q) => ({ ...q, [m.marca]: e.target.value === "" ? "" : Number(e.target.value) }))} disabled={!sel.has(m.marca)} title="Quantidade" className="w-16 text-right text-[12px] border border-gray-300 rounded px-1.5 py-0.5 disabled:bg-gray-100 disabled:text-gray-400 outline-none focus:border-torg-blue" />
                       <span className="text-torg-gray tabular-nums whitespace-nowrap w-16 text-right">{m.pesoTotalKg != null ? fmtKg(pesoAjustado(m)) : ""}</span>
+                      <button onClick={() => removerMarca(m.marca)} className="text-gray-300 hover:text-red-600 shrink-0 ml-0.5" title="Tirar esta peça do romaneio"><X size={13} /></button>
                     </div>
                   ))}
                 </div>
               )}
-              <p className="text-[11px] text-torg-gray">Desmarque o que não vai (volta pro pendente) e ajuste a <strong>quantidade</strong> — o peso acompanha.</p>
+              <p className="text-[11px] text-torg-gray">Ajuste a <strong>quantidade</strong>, ou clique no <strong>X</strong> pra tirar a peça do romaneio (volta pro pendente) — o peso acompanha.</p>
 
               <div className="border-t border-gray-100 pt-2">
                 <span className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Incluir peça</span>
