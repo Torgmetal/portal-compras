@@ -71,8 +71,13 @@ export default function ResumoLotes({ opId, lotes = [], onChange }) {
   const [pecas, setPecas] = useState({});
   const [salvandoData, setSalvandoData] = useState({});
 
-  const pesoTotal = lotes.reduce((s, l) => s + (l.pesoKg || 0), 0);
-  const semPeso = lotes.filter((l) => l.pesoKg == null).length;
+  // Peso REAL do lote = o do romaneio emitido (o que de fato saiu); só cai no
+  // lote.pesoKg (planejado) enquanto não há romaneio. Ordena pelo nº do romaneio.
+  const pesoLote = (l) => (l.romaneios?.[0]?.pesoKg != null ? l.romaneios[0].pesoKg : l.pesoKg);
+  const numRom = (l) => (l.romaneios?.[0]?.numero ?? parseInt(String(l.nome || "").match(/\d+/)?.[0] ?? "9999", 10));
+  const lotesOrd = [...lotes].sort((a, b) => numRom(a) - numRom(b));
+  const pesoTotal = lotes.reduce((s, l) => s + (pesoLote(l) || 0), 0);
+  const semPeso = lotes.filter((l) => pesoLote(l) == null).length;
   const totDesenhos = lotes.reduce((s, l) => s + (l._count?.desenhos || 0), 0);
   const totPecas = lotes.reduce((s, l) => s + (l._count?.pecas || 0), 0);
 
@@ -122,7 +127,7 @@ export default function ResumoLotes({ opId, lotes = [], onChange }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {lotes.map((l) => {
+              {lotesOrd.map((l, i) => {
                 const aberto = !!abertos[l.id];
                 const lista = pecas[l.id];
                 return (
@@ -131,7 +136,7 @@ export default function ResumoLotes({ opId, lotes = [], onChange }) {
                       <td className="px-2 py-2">
                         <div className="flex items-center gap-1">
                           <button onClick={() => alternar(l)} className="text-torg-gray hover:text-torg-dark" title="Ver peças">{aberto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</button>
-                          <span className="text-[11px] font-mono font-bold text-white bg-torg-blue rounded px-1.5 py-0.5">{l.ordem}</span>
+                          <span className="text-[11px] font-mono font-bold text-white bg-torg-blue rounded px-1.5 py-0.5">{i + 1}</span>
                         </div>
                       </td>
                       <td className="px-3 py-2 text-torg-dark font-medium">{l.nome}</td>
@@ -144,7 +149,7 @@ export default function ResumoLotes({ opId, lotes = [], onChange }) {
                       </td>
                       <td className="px-3 py-2 text-right text-torg-gray tabular-nums">{l._count?.pecas ?? 0}</td>
                       <td className="px-3 py-2 text-right text-torg-gray tabular-nums">{l._count?.desenhos ?? 0}</td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">{l.pesoKg != null ? <span className="text-torg-dark tabular-nums font-medium">{fmtKg(l.pesoKg)}</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">a definir</span>}</td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">{pesoLote(l) != null ? <span className="text-torg-dark tabular-nums font-medium">{fmtKg(pesoLote(l))}</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">a definir</span>}</td>
                     </tr>
                     {aberto && (
                       <tr key={`${l.id}-pecas`}>

@@ -43,6 +43,7 @@ export async function GET(_req, { params }) {
       select: {
         id: true, ordem: true, nome: true, local: true, dataPrevista: true, pesoKg: true, status: true,
         _count: { select: { desenhos: true, pecas: true } },
+        romaneios: { select: { numero: true, pesoKg: true, emitidoEm: true, revisao: true }, orderBy: { numero: "desc" }, take: 1 },
       },
     }),
   ]);
