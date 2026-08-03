@@ -7,6 +7,9 @@ import { requireRole } from "@/lib/session";
 const schema = z.object({
   categoria: z.string().min(1),
   descricao: z.string().min(1),
+  tipoPreco: z.enum(["VALOR", "POR_KG", "POR_PECA"]).optional(),
+  quantidade: z.number().min(0).optional().nullable(),
+  valorUnitario: z.number().min(0).optional().nullable(),
   valor: z.number().min(0),
   cfop: z.string().optional().nullable(),
   codigoServico: z.string().optional().nullable(),
@@ -44,13 +47,25 @@ export async function POST(req, { params }) {
 
   const maxOrdem = op.receitas.reduce((m, r) => Math.max(m, r.ordem), -1);
 
+  // Detalhamento por linha: kg × R$/kg ou peças × valor unit. O valor da linha é
+  // sempre derivado (qtd × unitário) quando não é valor fechado.
+  const tipoPreco = body.tipoPreco || "VALOR";
+  const quantidade = tipoPreco === "VALOR" ? null : (body.quantidade ?? null);
+  const valorUnitario = tipoPreco === "VALOR" ? null : (body.valorUnitario ?? null);
+  const valorLinha = tipoPreco !== "VALOR" && quantidade != null && valorUnitario != null
+    ? quantidade * valorUnitario
+    : body.valor;
+
   const created = await prisma.oPReceita.create({
     data: {
       opId: op.id,
       ordem: maxOrdem + 1,
       categoria: body.categoria,
       descricao: body.descricao,
-      valor: body.valor,
+      tipoPreco,
+      quantidade,
+      valorUnitario,
+      valor: valorLinha,
       cfop: body.cfop || null,
       codigoServico: body.codigoServico || null,
       icmsPct: body.icmsPct ?? null,

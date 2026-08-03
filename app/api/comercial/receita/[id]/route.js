@@ -6,6 +6,9 @@ import { requireRole } from "@/lib/session";
 const schema = z.object({
   categoria: z.string().min(1).optional(),
   descricao: z.string().min(1).optional(),
+  tipoPreco: z.enum(["VALOR", "POR_KG", "POR_PECA"]).optional(),
+  quantidade: z.number().min(0).optional().nullable(),
+  valorUnitario: z.number().min(0).optional().nullable(),
   valor: z.number().min(0).optional(),
   cfop: z.string().optional().nullable(),
   codigoServico: z.string().optional().nullable(),
@@ -39,7 +42,19 @@ export async function PATCH(req, { params }) {
   const receita = await prisma.oPReceita.findUnique({ where: { id: params.id } });
   if (!receita) return NextResponse.json({ error: "Receita nao encontrada." }, { status: 404 });
 
-  const updated = await prisma.oPReceita.update({ where: { id: params.id }, data: body });
+  // Recalcula o valor da linha quando é kg × R$/kg ou peças × valor unit.
+  const data = { ...body };
+  if (body.tipoPreco !== undefined) {
+    const tipo = body.tipoPreco || "VALOR";
+    data.tipoPreco = tipo;
+    data.quantidade = tipo === "VALOR" ? null : (body.quantidade ?? null);
+    data.valorUnitario = tipo === "VALOR" ? null : (body.valorUnitario ?? null);
+    if (tipo !== "VALOR" && data.quantidade != null && data.valorUnitario != null) {
+      data.valor = data.quantidade * data.valorUnitario;
+    }
+  }
+
+  const updated = await prisma.oPReceita.update({ where: { id: params.id }, data });
 
   await prisma.auditLog.create({
     data: {
