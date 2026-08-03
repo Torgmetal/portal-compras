@@ -121,8 +121,6 @@ export default function ResumoLotes({ opId, lotes = [], onChange }) {
                 <th className="text-left px-3 py-2 font-medium">Lote</th>
                 <th className="text-left px-3 py-2 font-medium">Local de entrega</th>
                 <th className="text-left px-3 py-2 font-medium w-36">Data de entrega</th>
-                <th className="text-right px-3 py-2 font-medium w-20">Peças</th>
-                <th className="text-right px-3 py-2 font-medium w-20">Des.</th>
                 <th className="text-right px-3 py-2 font-medium w-28">Peso</th>
               </tr>
             </thead>
@@ -147,13 +145,11 @@ export default function ResumoLotes({ opId, lotes = [], onChange }) {
                           {salvandoData[l.id] && <Loader2 size={11} className="animate-spin text-torg-gray" />}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-right text-torg-gray tabular-nums">{l._count?.pecas ?? 0}</td>
-                      <td className="px-3 py-2 text-right text-torg-gray tabular-nums">{l._count?.desenhos ?? 0}</td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">{pesoLote(l) != null ? <span className="text-torg-dark tabular-nums font-medium">{fmtKg(pesoLote(l))}</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">a definir</span>}</td>
                     </tr>
                     {aberto && (
                       <tr key={`${l.id}-pecas`}>
-                        <td colSpan={7} className="px-3 py-2 bg-gray-50/60">
+                        <td colSpan={5} className="px-3 py-2 bg-gray-50/60">
                           {lista === undefined ? (
                             <p className="text-[11px] text-torg-gray inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> carregando peças…</p>
                           ) : !lista.length ? (
@@ -191,8 +187,6 @@ export default function ResumoLotes({ opId, lotes = [], onChange }) {
               <tfoot>
                 <tr className="bg-gray-50 font-semibold text-torg-dark">
                   <td className="px-2 py-2" colSpan={4}>Total</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{totPecas}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{totDesenhos}</td>
                   <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{fmtKg(pesoTotal)}</td>
                 </tr>
               </tfoot>

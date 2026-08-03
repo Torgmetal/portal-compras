@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { ClipboardList, RefreshCw, Loader2, AlertTriangle, ChevronDown, ChevronRight, Mail, CheckCircle2, AlertCircle, FileSpreadsheet } from "lucide-react";
 import { exportarListaExpedicao } from "@/lib/export-lista-expedicao";
 
-const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
+const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
 export default function ListaExpedicaoSection({ opId }) {
