@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { fmtOP } from "@/lib/utils";
 import {
   ClipboardPaste, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, FileText,
-  Truck, Weight, Package, Printer, X, Boxes, RotateCcw, Layers,
+  Truck, Weight, Package, Printer, X, Boxes, RotateCcw, Layers, Search,
 } from "lucide-react";
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -143,6 +143,25 @@ export default function MontarRomaneio({ op, marcas, onCriado, showToast }) {
     setTexto("");
   }
 
+  // Busca de peça (digitar o número/marca → selecionar da lista), sem precisar colar.
+  const [busca, setBusca] = useState("");
+  const naCarga = useMemo(() => new Set(linhas.map((l) => l.marca)), [linhas]);
+  const sugestoes = useMemo(() => {
+    const q = up(busca.trim());
+    if (!q) return [];
+    const out = [];
+    for (const [k, ref] of marcasMap) {
+      if (naCarga.has(k)) continue;
+      if (k.includes(q) || up(ref.descricao || "").includes(q)) out.push(ref);
+      if (out.length >= 12) break;
+    }
+    return out;
+  }, [busca, marcasMap, naCarga]);
+  const adicionarUma = (marca) => {
+    setLinhas((prev) => (prev.some((l) => l.marca === up(marca)) ? prev : [...prev, montarLinha(marca, null)]));
+    setBusca("");
+  };
+
   const setQtd = (key, v) => setLinhas((prev) => prev.map((l) => (l.key === key ? { ...l, qtd: v === "" ? "" : Number(v) } : l)));
   // Tirar peça: se veio da carga, exige justificar (modal); se foi incluída na mão, sai direto.
   const remover = (key) => {
@@ -244,6 +263,30 @@ export default function MontarRomaneio({ op, marcas, onCriado, showToast }) {
             <p className="text-[11px] text-torg-gray mt-0.5">Sem carga do Planejamento? Monta o romaneio direto das peças (LPC) da OP.</p>
           </div>
         )}
+      </div>
+
+      {/* Buscar peça (digitar → selecionar) */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <p className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-2"><Search size={16} className="text-torg-blue" /> Buscar peça pra adicionar</p>
+        <div className="relative">
+          <input value={busca} onChange={(e) => setBusca(e.target.value)}
+            placeholder="Digite o número/marca da peça (ex.: T64A10) e selecione…"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent" />
+          {busca.trim() && (
+            <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto">
+              {sugestoes.length === 0 ? (
+                <div className="px-3 py-2.5 text-xs text-torg-gray">Nenhuma peça encontrada (ou já está na carga).</div>
+              ) : sugestoes.map((ref) => (
+                <button key={ref.marca} onClick={() => adicionarUma(ref.marca)}
+                  className="w-full text-left px-3 py-2.5 hover:bg-torg-blue-50 flex items-center justify-between gap-3 border-b border-gray-50 last:border-0">
+                  <span className="min-w-0 truncate"><span className="font-mono font-semibold text-torg-dark">{up(ref.marca)}</span> <span className="text-xs text-torg-gray">{ref.descricao || ""}</span></span>
+                  <Plus size={16} className="text-torg-blue shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="text-[11px] text-torg-gray mt-1.5">Digite parte do número e clique pra adicionar uma peça. Pra colar várias de uma vez, use o campo abaixo.</p>
       </div>
 
       {/* Incluir marcas na mão */}

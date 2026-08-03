@@ -538,7 +538,7 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
@@ -590,7 +590,7 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
                 type="text"
                 value={buscaItem}
                 onChange={(e) => setBuscaItem(e.target.value)}
-                placeholder="Buscar itens..."
+                placeholder="Buscar por número/marca da peça…"
                 className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
               />
             </div>
@@ -642,7 +642,7 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
                 <Package size={14} className="text-teal-500" />
                 Pecas estruturais ({pecasFiltradas.length})
               </p>
-              <div className="space-y-1 max-h-48 overflow-y-auto border border-gray-100 rounded-lg p-2">
+              <div className="space-y-1 max-h-[40vh] overflow-y-auto border border-gray-100 rounded-lg p-2">
                 {pecasFiltradas.map((item) => (
                   <ItemCheckbox
                     key={item.key}
@@ -665,7 +665,7 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
                 <Wrench size={14} className="text-amber-500" />
                 Acessorios ({acessFiltrados.length})
               </p>
-              <div className="space-y-1 max-h-48 overflow-y-auto border border-gray-100 rounded-lg p-2">
+              <div className="space-y-1 max-h-[40vh] overflow-y-auto border border-gray-100 rounded-lg p-2">
                 {acessFiltrados.map((item) => (
                   <ItemCheckbox
                     key={item.key}
