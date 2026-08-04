@@ -83,6 +83,41 @@ reunido num lugar só.
 - Deep-link: `ExpedicaoOpClient` aceita `?op=<id>` (via `page.js` `searchParams`) e já
   abre a OP selecionada no espelho.
 
+## Limpeza da aba Romaneios (04/08)
+Na tela principal (`/expedicao`) saíram os **4 KPIs de valores**, o botão
+**"+ Novo Romaneio"** (+ modal) e a tabela **"Romaneios emitidos"** — era o fluxo
+manual antigo (`Romaneio`, peso/R$kg) que ninguém alimentava. Ficou: filtro por OP +
+**Pré-romaneios do Planejamento** + **Romaneios SharePoint (por OP)**. `page.js` não
+busca mais os `Romaneio` manuais.
+
+## Nova aba "Romaneios Terceirizados" (04/08)
+Controle **À PARTE** (sem vínculo com o romaneio da obra) de material enviado a
+terceiros pra trabalhar (galvanização, usinagem, pintura, jato…) — **envio e retorno**.
+Menu: **Expedição → Terceirizados** (`/expedicao/terceiros`).
+
+- **Model** `RomaneioTerceiro` (schema.prisma, tabela criada via `prisma db execute`,
+  aditiva): série própria `numero` (RT-##), `terceiroNome` (+ `fornecedorId` opcional
+  do Vendor List), `servico`, `opRefId/opRefNumero` (só rastreio, denormalizado, **sem
+  FK**), transporte, `itens` Json `[{marca,descricao,qte,pesoUn,pesoTotal}]`,
+  `pesoEnviadoKg`, `retornos` Json `[{id,data,itens,pesoKg,observacao,porNome}]`,
+  `pesoRetornadoKg`, `status` (ENVIADO/PARCIAL/RETORNADO/CANCELADO), datas.
+- **Status derivado do retorno**: 0 = ENVIADO; parcial = PARCIAL; ≥ enviado = RETORNADO.
+- **API** (`/api/expedicao/terceiros`, roles `ADMIN/EXPEDICAO/PRODUCAO/COMERCIAL/ALMOXARIFADO`):
+  `route.js` (GET list + proximoNumero, POST cria), `[id]/route.js` (GET/PATCH/DELETE),
+  `[id]/retorno/route.js` (POST retorno parcial por peça + DELETE desfazer),
+  `[id]/romaneio/route.js` (GET baixa Excel). Zod + AuditLog + 401/403.
+- **Excel**: `lib/romaneio-terceiro-excel.js` — documento próprio no espírito do FORM 22
+  (cabeçalho Torg, tabela Marca/Descrição/Qtd/Peso, total, assinaturas), **não** usa o
+  template da obra. Download direto (sem SharePoint por enquanto).
+- **UI**: `app/expedicao/terceiros/{page.js,TerceirizadosClient.jsx}` — KPIs (no terceiro/
+  peso pendente/atrasados/retornados no mês), filtros por status + busca, tabela com
+  linha expansível (itens + histórico de retornos), modal criar/editar (terceiro combobox
+  Vendor List+livre, serviço, OP ref dropdown, itens, transporte, datas), modal
+  **Registrar retorno** (marca a marca, parcial), baixar Excel, editar, excluir.
+- Item do menu em `components/SidebarExpedicao.jsx` (ícone `Factory`).
+- Validado: model (create/delete no banco) e Excel (buffer 7,7 KB) OK; telas compilam.
+
 ## Ideias futuras (não feitas)
+- Salvar o Excel do romaneio terceirizado no SharePoint (definir pasta — não é da OP).
 - Levar as **bolinhas de status do Syneco por marca** (montagem/solda) — que
   estavam no nosso `MontarRomaneio` — pro wizard de emitir do Vitor.

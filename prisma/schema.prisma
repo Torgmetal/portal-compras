@@ -3859,3 +3859,43 @@ model CronHeartbeat {
   duracaoMs Int?
   updatedAt DateTime  @updatedAt
 }
+
+// ── Romaneios Terceirizados (Expedição) ───────────────────────────────────────
+// Controle À PARTE (sem vínculo com o romaneio da obra): material enviado a um
+// terceiro pra trabalhar (galvanização, usinagem, pintura…) e o seu RETORNO.
+// Série de numeração própria (RT-01, RT-02…). Referência à OP é só rastreio
+// (opRefId/opRefNumero denormalizados — NÃO liga no fluxo da OP).
+model RomaneioTerceiro {
+  id                String    @id @default(cuid())
+  numero            Int       @unique // série própria RT-##
+  // terceiro (Vendor List opcional + nome sempre gravado)
+  fornecedorId      String?
+  terceiroNome      String
+  servico           String? // ex.: galvanização, usinagem, pintura, jato
+  // referência opcional à OP (só rastreio)
+  opRefId           String?
+  opRefNumero       String?
+  // transporte
+  transportadora    String?
+  motorista         String?
+  placaVeiculo      String?
+  placaCarreta      String?
+  contatoTransporte String?
+  // material enviado: [{ marca, descricao, qte, pesoUn, pesoTotal }]
+  itens             Json      @default("[]")
+  pesoEnviadoKg     Float     @default(0)
+  // retornos parciais: [{ id, data, itens:[{marca, qte, pesoTotal}], pesoKg, observacao, porNome }]
+  retornos          Json      @default("[]")
+  pesoRetornadoKg   Float     @default(0)
+  status            String    @default("ENVIADO") // ENVIADO | PARCIAL | RETORNADO | CANCELADO
+  dataEnvio         DateTime?
+  dataPrevRetorno   DateTime?
+  observacao        String?
+  arquivoUrl        String?
+  criadoPorId       String?
+  criadoNome        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status])
+}
