@@ -23,7 +23,9 @@ export default function SidebarQualidade() {
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {menu.map((m) => {
           const Icon = m.icon;
-          const active = m.exact ? pathname === m.href : pathname.startsWith(m.href);
+          // Casa por SEGMENTO (href exato ou href + "/") — senão "/qualidade/auditorias"
+          // acenderia junto em "/qualidade/auditorias-internas" (prefixo compartilhado).
+          const active = m.exact ? pathname === m.href : (pathname === m.href || pathname.startsWith(m.href + "/"));
           if (m.breve) {
             return (
               <div
