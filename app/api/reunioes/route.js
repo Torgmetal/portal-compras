@@ -48,7 +48,7 @@ const schema = z.object({
   dataReuniao: z.string().optional().nullable(),
   pauta: z.string().max(4000).optional().nullable(),
   envolvidos: z.array(z.object({ nome: z.string().min(1), email: z.string().email(), setor: z.string().optional().nullable() })).default([]),
-  atividades: z.array(z.object({ op: z.string().optional().nullable(), descricao: z.string().min(1), setor: z.string().optional().nullable(), responsavel: z.string().optional().nullable(), prazo: z.string().optional().nullable(), origemAtaNumero: z.number().int().optional().nullable() })).default([]),
+  atividades: z.array(z.object({ op: z.string().optional().nullable(), descricao: z.string().min(1), setor: z.string().optional().nullable(), responsavel: z.string().optional().nullable(), prazo: z.string().optional().nullable(), origemAtaNumero: z.preprocess((v) => { if (v === "" || v == null) return null; const n = Number(v); return Number.isFinite(n) ? Math.trunc(n) : null; }, z.number().int().nullable()).optional() })).default([]),
 });
 
 export async function POST(req) {
@@ -58,7 +58,7 @@ export async function POST(req) {
 
   let body;
   try { body = schema.parse(await req.json()); }
-  catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
+  catch (e) { const i = e.issues?.[0]; return NextResponse.json({ error: i ? `${(i.path || []).join(".") || "campo"}: ${i.message}` : "Dados inválidos" }, { status: 400 }); }
 
   const dataReuniao = body.dataReuniao ? new Date(body.dataReuniao + "T12:00:00Z") : new Date();
   const { semana, ano } = getISOWeek(dataReuniao);

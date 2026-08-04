@@ -404,6 +404,8 @@ function RascunhoEditor({ ata, onSaved }) {
     const envs = envolvidos.filter((e) => e.nome.trim() && e.email.trim());
     const atvs = achatarSecoes(secoes);
     if (!envs.length) return setErro("Adicione ao menos um envolvido.");
+    const emailRuim = envs.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email.trim()));
+    if (emailRuim) return setErro(`E-mail inválido: "${emailRuim.email}" (${emailRuim.nome}). Corrija ou remova o envolvido.`);
     setSalvando(true);
     try {
       const r = await fetch(`/api/reunioes/${ata.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ titulo: titulo.trim(), dataReuniao, pauta: pauta.trim() || null, envolvidos: envs, atividades: atvs }) });
@@ -483,6 +485,8 @@ function ModalRevisao({ ata, onClose, onSaved }) {
     setErro("");
     if (!motivo.trim()) return setErro("Descreva o motivo da revisão (fica registrado no histórico ISO).");
     const envs = envolvidos.filter((e) => e.nome.trim() && e.email.trim());
+    const emailRuim = envs.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email.trim()));
+    if (emailRuim) return setErro(`E-mail inválido: "${emailRuim.email}" (${emailRuim.nome}). Corrija ou remova o envolvido.`);
     setSalvando(true);
     try {
       const r = await fetch(`/api/reunioes/${ata.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ titulo: titulo.trim(), dataReuniao, pauta: pauta.trim() || null, envolvidos: envs, motivoRevisao: motivo.trim() }) });
