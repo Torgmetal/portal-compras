@@ -1,10 +1,11 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
 import {
   FileText, Plus, Loader2, AlertCircle, X, Pencil, Trash2,
-  Truck, Package, Activity,
+  Truck, Package, Activity, ClipboardList, ExternalLink, ArrowRight,
 } from "lucide-react";
 import RomaneiosSharepoint from "@/components/RomaneiosSharepoint";
 
@@ -18,6 +19,28 @@ export default function ExpedicaoClient({ ops, romaneios }) {
   const router = useRouter();
   const [modal, setModal] = useState(null);
   const [filtroOp, setFiltroOp] = useState("");
+
+  // Fila de pré-romaneios (RomaneioPrevio) que o Planejamento cria dentro da OP.
+  // É o mesmo que a Expedição vê dentro do módulo OPs, reunido aqui.
+  const [previos, setPrevios] = useState(null); // null = carregando
+  const [erroPrevios, setErroPrevios] = useState("");
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/expedicao/romaneios-previos")
+      .then((r) => r.json())
+      .then((j) => { if (!vivo) return; if (j.success) setPrevios(j.previos); else { setPrevios([]); setErroPrevios(j.error || "Erro"); } })
+      .catch(() => { if (vivo) { setPrevios([]); setErroPrevios("Erro ao carregar"); } });
+    return () => { vivo = false; };
+  }, []);
+
+  const previosFiltrados = useMemo(() => {
+    const lista = previos || [];
+    return filtroOp ? lista.filter((p) => p.opId === filtroOp) : lista;
+  }, [previos, filtroOp]);
+  const previosPendentes = useMemo(
+    () => (previos || []).filter((p) => !p.emitido).length,
+    [previos]
+  );
 
   const hoje = new Date();
   const ano = hoje.getFullYear(), mes = hoje.getMonth();
@@ -106,6 +129,83 @@ export default function ExpedicaoClient({ ops, romaneios }) {
         </span>
       </div>
 
+      {/* Pré-romaneios do Planejamento (fila da Expedição) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2">
+              <ClipboardList size={18} className="text-torg-blue" /> Pré-romaneios do Planejamento
+            </h3>
+            <p className="text-xs text-torg-gray mt-0.5">
+              Cargas montadas pelo Planejamento dentro da OP. Clique em "Abrir na OP" para emitir o romaneio (FORM 22).
+            </p>
+          </div>
+          {previosPendentes > 0 && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+              {previosPendentes} aguardando emissão
+            </span>
+          )}
+        </div>
+        {previos === null ? (
+          <p className="px-6 py-8 text-sm text-torg-gray text-center inline-flex items-center gap-2 justify-center w-full">
+            <Loader2 size={16} className="animate-spin" /> Carregando pré-romaneios…
+          </p>
+        ) : erroPrevios ? (
+          <p className="px-6 py-8 text-sm text-red-600 text-center">{erroPrevios}</p>
+        ) : previosFiltrados.length === 0 ? (
+          <p className="px-6 py-8 text-sm text-torg-gray text-center">
+            Nenhum pré-romaneio {filtroOp ? "pra essa OP" : "pendente"}. Eles aparecem aqui assim que o Planejamento monta uma carga na OP.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50/60">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nº</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">OP / Cliente</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Marcas</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Peso</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data prev.</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {previosFiltrados.map((p) => (
+                  <tr key={p.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 font-mono text-torg-dark text-xs whitespace-nowrap">
+                      R{String(p.numero).padStart(2, "0")}
+                    </td>
+                    <td className="px-4 py-2 text-xs">
+                      <span className="font-mono text-torg-blue">{fmtOP(p.op?.numero)}</span>
+                      <span className="text-torg-gray block text-[10px] truncate max-w-[220px]">{p.op?.cliente}{p.op?.obra ? ` — ${p.op.obra}` : ""}</span>
+                    </td>
+                    <td className="px-4 py-2 text-right text-torg-gray tabular-nums text-xs">{p.itensCount}</td>
+                    <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{fmtKg(p.pesoKg)}</td>
+                    <td className="px-4 py-2 text-xs text-torg-gray whitespace-nowrap">{p.dataPrevista ? fmtData(p.dataPrevista) : "—"}</td>
+                    <td className="px-4 py-2"><SituacaoBadge p={p} /></td>
+                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-2 justify-end">
+                        {p.emitido && p.arquivoUrl && (
+                          <a href={p.arquivoUrl} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1" title="Abrir o FORM 22 no SharePoint">
+                            <ExternalLink size={12} /> Excel
+                          </a>
+                        )}
+                        <Link href={`/expedicao/op?op=${p.opId}`}
+                          className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1">
+                          Abrir na OP <ArrowRight size={12} />
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Tabela */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
@@ -181,6 +281,27 @@ export default function ExpedicaoClient({ ops, romaneios }) {
       )}
     </div>
   );
+}
+
+function SituacaoBadge({ p }) {
+  if (p.emitido) {
+    return (
+      <span className="inline-flex items-center gap-1 flex-wrap">
+        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+          Emitido R{String(p.revisao ?? 0).padStart(2, "0")}
+        </span>
+        {p.nfNumero && (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+            NF {p.nfNumero}{p.nfTipo ? ` · ${p.nfTipo}` : ""}
+          </span>
+        )}
+      </span>
+    );
+  }
+  if (p.situacao === "APROVADO") {
+    return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue border border-torg-blue-100 whitespace-nowrap">Liberado</span>;
+  }
+  return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">Em aberto</span>;
 }
 
 function KpiCard({ label, value, subtitle, color, Icon }) {

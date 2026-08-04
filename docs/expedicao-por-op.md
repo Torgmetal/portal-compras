@@ -1,7 +1,7 @@
 # Expedição por OP — status e arquitetura
 
 > **Handoff / acompanhamento** (Matheus + Vitor + Claude). Documento vivo.
-> Última atualização: 03/08/2026.
+> Última atualização: 04/08/2026.
 
 ## Decisão (03/08): modelo do Vitor é o OFICIAL; a Expedição é um ESPELHO
 
@@ -64,6 +64,24 @@ lido pela sincronização (o ciclo do "expedido" fecha). Um modelo só, caminhos
 
 > Nota: `SHAREPOINT_SERVIDOR_DRIVE_ID` não está setado em produção; a resolução acha
 > a biblioteca "SERVIDOR" por nome ou cai no fallback. Se quiser fixar, definir a env.
+
+## Fila de pré-romaneios na aba "Romaneios" (04/08)
+A aba **Romaneios** (`/expedicao`, tela principal do módulo) agora mostra uma
+**fila consolidada dos pré-romaneios (`RomaneioPrevio`)** de todas as OPs abertas —
+o que o **Planejamento** monta dentro da OP já aparece aqui, sem a Expedição ter que
+entrar OP por OP. É o mesmo dado que a Expedição vê no espelho (`/expedicao/op`),
+reunido num lugar só.
+- API: `GET /api/expedicao/romaneios-previos` (roles `ADMIN/EXPEDICAO/PRODUCAO/COMERCIAL`)
+  — retorna os `RomaneioPrevio` não cancelados de OPs abertas, com `op{numero,cliente,obra}`,
+  `itensCount`, `pesoKg`, `dataPrevista`, e `situacao` (**PREVISTO** = em aberto /
+  **APROVADO** = liberado / **EMITIDO**). Ordem: não emitidos primeiro (fila), depois
+  por data prevista.
+- UI (`ExpedicaoClient.jsx`): tabela "Pré-romaneios do Planejamento" com badge de
+  situação (Em aberto / Liberado / Emitido R##, + chip NF quando o Fiscal vinculou),
+  respeita o filtro por OP existente, badge "N aguardando emissão" no cabeçalho, e
+  botão **"Abrir na OP"** → `/expedicao/op?op=<opId>` pra emitir o FORM 22.
+- Deep-link: `ExpedicaoOpClient` aceita `?op=<id>` (via `page.js` `searchParams`) e já
+  abre a OP selecionada no espelho.
 
 ## Ideias futuras (não feitas)
 - Levar as **bolinhas de status do Syneco por marca** (montagem/solda) — que

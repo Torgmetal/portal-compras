@@ -8,8 +8,8 @@ import ConsultaExpedicao from "@/app/comercial/[id]/ConsultaExpedicao";
 // Espelho da expedição do módulo OPs: a Expedição escolhe a OP e vê os LOTES DE
 // ENTREGA + emite/revisa o romaneio (FORM 22) — o MESMO fluxo/entidades do módulo
 // OPs (LoteExpedicao/RomaneioPrevio), sem gerenciar lotes (isso fica no OP).
-export default function ExpedicaoOpClient({ ops }) {
-  const [opSel, setOpSel] = useState(null);
+export default function ExpedicaoOpClient({ ops, initialOpId = null }) {
+  const [opSel, setOpSel] = useState(() => (initialOpId ? ops.find((o) => o.id === initialOpId) || null : null));
   const [busca, setBusca] = useState("");
 
   const opsFiltradas = useMemo(() => {

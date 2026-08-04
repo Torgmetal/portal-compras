@@ -7,7 +7,7 @@ export const metadata = {
   description: "Lista de expedição por OP: previsto × expedido e geração de romaneios.",
 };
 
-export default async function ExpedicaoOpPage() {
+export default async function ExpedicaoOpPage({ searchParams }) {
   await requireRole(["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "PLANEJAMENTO", "PCP", "ENGENHARIA"]);
 
   const ops = await prisma.oP.findMany({
@@ -16,5 +16,7 @@ export default async function ExpedicaoOpPage() {
     orderBy: { numero: "desc" },
   });
 
-  return <ExpedicaoOpClient ops={JSON.parse(JSON.stringify(ops))} />;
+  const initialOpId = typeof searchParams?.op === "string" ? searchParams.op : null;
+
+  return <ExpedicaoOpClient ops={JSON.parse(JSON.stringify(ops))} initialOpId={initialOpId} />;
 }
