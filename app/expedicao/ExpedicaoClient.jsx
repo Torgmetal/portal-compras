@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
-import { Loader2, X, ClipboardList, ArrowRight } from "lucide-react";
+import { Loader2, X, ClipboardList, ArrowRight, PackageCheck, Truck, Clock } from "lucide-react";
 import RomaneiosSharepoint from "@/components/RomaneiosSharepoint";
 
 const fmtKg = (v) =>
@@ -30,6 +30,17 @@ export default function ExpedicaoClient({ ops }) {
     return filtroOp ? lista.filter((p) => p.opId === filtroOp) : lista;
   }, [previos, filtroOp]);
 
+  // Indicadores da aba (fila + expedidos na semana/mês + atrasados)
+  const [ind, setInd] = useState(null);
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/expedicao/indicadores")
+      .then((r) => r.json())
+      .then((j) => { if (vivo && j.success) setInd(j.indicadores); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+
   return (
     <div className="space-y-6 max-w-7xl">
       <div>
@@ -39,6 +50,14 @@ export default function ExpedicaoClient({ ops }) {
         <p className="text-sm text-torg-gray mt-1">
           Romaneios de saída — cargas montadas no Planejamento e romaneios por OP.
         </p>
+      </div>
+
+      {/* Indicadores */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Kpi label="Aguardando emissão" value={ind ? String(ind.pendentes.qtd) : "—"} sub={ind ? fmtKg(ind.pendentes.pesoKg) : ""} color="bg-torg-orange" Icon={ClipboardList} />
+        <Kpi label="Expedidos (semana)" value={ind ? String(ind.semana.qtd) : "—"} sub={ind ? fmtKg(ind.semana.pesoKg) : ""} color="bg-torg-blue" Icon={Truck} />
+        <Kpi label="Expedidos (mês)" value={ind ? String(ind.mes.qtd) : "—"} sub={ind ? fmtKg(ind.mes.pesoKg) : ""} color="bg-emerald-600" Icon={PackageCheck} />
+        <Kpi label="Atrasados" value={ind ? String(ind.atrasados.qtd) : "—"} sub="previsão vencida" color={ind && ind.atrasados.qtd > 0 ? "bg-red-600" : "bg-torg-gray"} Icon={Clock} />
       </div>
 
       {/* Filtro */}
@@ -143,6 +162,19 @@ export default function ExpedicaoClient({ ops }) {
           Selecione uma OP para visualizar os romaneios com marcas e pesos detalhados.
         </p>
         <RomaneiosSharepoint ops={ops} />
+      </div>
+    </div>
+  );
+}
+
+function Kpi({ label, value, sub, color, Icon }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-3">
+      <div className={`${color} p-2.5 rounded-lg`}><Icon size={20} className="text-white" /></div>
+      <div className="min-w-0">
+        <p className="text-xs text-torg-gray truncate">{label}</p>
+        <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate">{value}</p>
+        {sub && <p className="text-[10px] text-torg-gray truncate">{sub}</p>}
       </div>
     </div>
   );
