@@ -334,14 +334,14 @@ export default function DataBookDetalheClient({ id, userId }) {
             {rastr.materiais.map((m) => (
               <div key={m.material} className="flex items-center justify-between gap-3 py-1.5 text-[12px]">
                 <span className="inline-flex items-center gap-1.5 min-w-0">
-                  {m.temCertificado
+                  {m.comCert === m.pecas
                     ? <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
                     : <AlertCircle size={14} className="text-amber-500 shrink-0" />}
                   <span className="font-medium text-torg-dark truncate">{m.material}</span>
-                  <span className="text-torg-gray shrink-0">· {m.pecas} peça{m.pecas !== 1 ? "s" : ""}</span>
+                  <span className="text-torg-gray shrink-0">· {m.pecas} posiç{m.pecas !== 1 ? "ões" : "ão"}</span>
                 </span>
                 <span className="text-[11px] text-torg-gray shrink-0">
-                  {m.temCertificado ? `${m.certificados} certificado${m.certificados !== 1 ? "s" : ""}` : "sem certificado"}
+                  {m.comCert > 0 ? `${m.comCert}/${m.pecas} com certificado${m.certificados ? ` · ${m.certificados} cert.` : ""}` : "sem certificado"}
                 </span>
               </div>
             ))}
@@ -350,7 +350,7 @@ export default function DataBookDetalheClient({ id, userId }) {
             ? <p className="text-[11px] text-amber-700 mt-2 inline-flex items-center gap-1"><AlertCircle size={12} className="shrink-0" /> Nenhum certificado de material importado para a OP — importe o CMR na aba Rastreabilidade.</p>
             : rastr.comCertificado < rastr.totalMateriais && (
               <p className="text-[10px] text-torg-gray mt-2">
-                ⚠ = material da obra sem certificado correspondente (confira no Controle de Documentos). Casamento feito pelo código do material na norma do certificado.
+                ⚠ = posição sem certificado específico (confira no Controle de Documentos). Casamento por grau + forma + espessura/bitola de cada material.
               </p>
             )}
         </div>

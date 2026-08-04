@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { specsDoMaterial, gradesDoTexto } from "@/lib/databook-lpc";
+import { montarSecaoLpc } from "@/lib/databook-lpc";
 
 export const runtime = "nodejs";
 
@@ -24,33 +24,35 @@ export async function GET(_req, { params }) {
   if (!book) return NextResponse.json({ error: "Data book não encontrado" }, { status: 404 });
   const op = extractOP(book.opNumero);
 
-  // Obras da LPC dessa OP (regra dos dígitos)
-  const allObras = (await prisma.pecaConjunto.findMany({ distinct: ["opNumero"], select: { opNumero: true } })).map((o) => o.opNumero).filter(Boolean);
-  const obras = allObras.filter((o) => extractOP(o) === op);
-
-  const mats = obras.length
-    ? await prisma.pecaConjunto.groupBy({ by: ["material"], where: { opNumero: { in: obras } }, _count: { _all: true } })
-    : [];
-  const certs = await prisma.documentoQualidade.findMany({ where: { categoria: "MATERIAL", ativo: true, opNumero: op }, select: { norma: true, nome: true, numeroCorrida: true, numeroDocumento: true } });
-  // grau casado por norma + DESCRIÇÃO (o grau real costuma estar no nome, não na norma:
-  // A-36 vem sob A1018/TUB300…); ignora cert sem corrida E sem nº (registro incompleto).
-  const certGrades = certs.filter((c) => c.numeroCorrida || c.numeroDocumento).map((c) => gradesDoTexto(`${c.norma || ""} ${c.nome || ""}`));
-
-  const materiais = mats
-    .filter((m) => m.material)
-    .map((m) => {
-      const sp = specsDoMaterial(m.material);
-      const n = certGrades.filter((g) => sp.some((s) => g.has(s))).length;
-      return { material: m.material, pecas: m._count._all, temCertificado: n > 0, certificados: n };
-    })
+  // Reusa a MESMA lógica da §02 (casamento do certificado ESPECÍFICO por posição:
+  // grau + forma + espessura/bitola). Resume a cobertura por material.
+  const lpc = await montarSecaoLpc(book.opNumero);
+  const porMat = new Map();
+  let totalPos = 0, comCertPos = 0;
+  for (const cj of lpc.conjuntos) {
+    for (const pos of (cj.posicoes || [])) {
+      totalPos++;
+      const mat = pos.material || "—";
+      const cur = porMat.get(mat) || { material: mat, pecas: 0, comCert: 0, certs: new Set() };
+      cur.pecas++;
+      if (pos.certificados?.length) {
+        cur.comCert++; comCertPos++;
+        for (const c of pos.certificados) cur.certs.add(c.indiceR || c.certificado || c.corrida);
+      }
+      porMat.set(mat, cur);
+    }
+  }
+  const materiais = [...porMat.values()]
+    .map((m) => ({ material: m.material, pecas: m.pecas, comCert: m.comCert, certificados: m.certs.size, temCertificado: m.comCert > 0 }))
     .sort((a, b) => (a.temCertificado === b.temCertificado ? b.pecas - a.pecas : a.temCertificado ? 1 : -1));
 
   return NextResponse.json({
     op,
-    obras,
-    totalCertificados: certs.length,
+    totalCertificados: lpc.totalCertificados,
     materiais,
     totalMateriais: materiais.length,
     comCertificado: materiais.filter((m) => m.temCertificado).length,
+    totalPosicoes: totalPos,
+    comCertificadoPosicoes: comCertPos,
   });
 }
