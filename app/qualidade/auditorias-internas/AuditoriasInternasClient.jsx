@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ClipboardList, Plus, Loader2, X, AlertCircle, CheckCircle2, CalendarDays, FileText, ListChecks } from "lucide-react";
+import { ClipboardList, Plus, Loader2, X, AlertCircle, CheckCircle2, CalendarDays, FileText, ListChecks, Archive } from "lucide-react";
 import { numRAI, SETORES_AUDITORIA, STATUS_AI, statusAiLabel } from "@/lib/auditoria-interna";
 import PlanosAcaoLista from "./PlanosAcaoLista";
 
@@ -25,6 +25,12 @@ export default function AuditoriasInternasClient() {
 
   const StatusChip = ({ s }) => <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_AI[s]?.cor || "bg-gray-100 text-gray-600"}`}>{statusAiLabel(s)}</span>;
 
+  // Cronograma/Relatórios mantêm só as auditorias previstas (não finalizadas);
+  // as finalizadas vão para o Histórico.
+  const previstas = itens.filter((a) => a.status !== "FINALIZADO");
+  const historico = itens.filter((a) => a.status === "FINALIZADO");
+  const dados = aba === "historico" ? historico : previstas;
+
   return (
     <div className="space-y-5 max-w-6xl">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -32,12 +38,12 @@ export default function AuditoriasInternasClient() {
           <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2"><ClipboardList className="text-torg-blue" /> Auditorias Internas</h1>
           <p className="text-xs text-torg-gray mt-0.5">Programe as auditorias dos setores, emita o relatório e acompanhe os planos de ação.</p>
         </div>
-        {aba !== "planos" && <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova auditoria</button>}
+        {aba !== "planos" && aba !== "historico" && <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova auditoria</button>}
       </div>
 
       {/* Abas */}
       <div className="flex items-center gap-1 border-b border-gray-200">
-        {[{ k: "cronograma", l: "Cronograma", icon: CalendarDays }, { k: "relatorios", l: "Relatórios", icon: FileText }, { k: "planos", l: "Plano de Ação", icon: ListChecks }].map((t) => {
+        {[{ k: "cronograma", l: "Cronograma", icon: CalendarDays }, { k: "relatorios", l: "Relatórios", icon: FileText }, { k: "planos", l: "Plano de Ação", icon: ListChecks }, { k: "historico", l: "Histórico", icon: Archive }].map((t) => {
           const Icon = t.icon;
           return (
             <button key={t.k} onClick={() => setAba(t.k)}
@@ -54,10 +60,10 @@ export default function AuditoriasInternasClient() {
         <div className="py-16 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin mb-2" /> Carregando…</div>
       ) : erro ? (
         <div className="py-10 text-center text-red-600 text-sm">{erro}</div>
-      ) : itens.length === 0 ? (
+      ) : dados.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-          <ClipboardList size={38} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-torg-gray">Nenhuma auditoria ainda. Programe a primeira.</p>
+          {aba === "historico" ? <Archive size={38} className="mx-auto text-gray-300 mb-3" /> : <ClipboardList size={38} className="mx-auto text-gray-300 mb-3" />}
+          <p className="text-sm text-torg-gray">{aba === "historico" ? "Nenhum relatório finalizado ainda. Ao concluir todas as ações de um relatório, ele aparece aqui." : "Nenhuma auditoria ainda. Programe a primeira."}</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -75,14 +81,42 @@ export default function AuditoriasInternasClient() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {itens.map((a) => (
+                  {dados.map((a) => (
                     <tr key={a.id} onClick={() => router.push(`/qualidade/auditorias-internas/${a.id}`)} className="hover:bg-torg-blue-50/40 cursor-pointer">
                       <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{numRAI(a.numero)}</td>
                       <td className="px-3 py-2 text-torg-dark whitespace-nowrap">{fmtD(a.dataAuditoria)}</td>
                       <td className="px-3 py-2 text-torg-dark font-medium">{a.setor}</td>
                       <td className="px-3 py-2 text-torg-gray">{a.responsavelAcompanhamento}</td>
                       <td className="px-3 py-2 text-torg-gray">{a.auditor || "—"}</td>
-                      <td className="px-3 py-2 text-center"><StatusChip s={a.status} /></td>
+                      <td className="px-3 py-2 text-center">
+                        <StatusChip s={a.status} />
+                        {a.status === "EMITIDO" && a.acoesPendentes > 0 && <div className="text-[10px] text-amber-600 mt-0.5">{a.acoesPendentes} ação(ões) em aberto</div>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : aba === "historico" ? (
+              <table className="w-full text-[12px]">
+                <thead className="bg-gray-50/60 text-torg-gray">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Nº</th>
+                    <th className="text-left px-3 py-2 font-medium">Setor auditado</th>
+                    <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Data auditoria</th>
+                    <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Finalizado em</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Constatações</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {dados.map((a) => (
+                    <tr key={a.id} onClick={() => router.push(`/qualidade/auditorias-internas/${a.id}`)} className="hover:bg-torg-blue-50/40 cursor-pointer">
+                      <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{numRAI(a.numero)}</td>
+                      <td className="px-3 py-2 text-torg-dark font-medium">{a.setor}</td>
+                      <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{fmtD(a.dataAuditoria)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap"><span className="text-emerald-700 font-medium inline-flex items-center gap-1"><CheckCircle2 size={12} /> {fmtD(a.finalizadoEm)}</span></td>
+                      <td className="px-3 py-2 text-center text-torg-gray">{a.totalConstatacoes}</td>
+                      <td className="px-3 py-2 text-center text-torg-gray">{a.totalAcoes || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -100,7 +134,7 @@ export default function AuditoriasInternasClient() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {itens.map((a) => (
+                  {dados.map((a) => (
                     <tr key={a.id} onClick={() => router.push(`/qualidade/auditorias-internas/${a.id}`)} className="hover:bg-torg-blue-50/40 cursor-pointer">
                       <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{numRAI(a.numero)}</td>
                       <td className="px-3 py-2 text-torg-dark font-medium">{a.setor}</td>

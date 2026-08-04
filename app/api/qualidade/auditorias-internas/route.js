@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { acoesValidas, acoesPendentes } from "@/lib/auditoria-interna";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -20,9 +21,11 @@ export async function GET() {
     return {
       id: a.id, numero: a.numero, setor: a.setor, dataAuditoria: a.dataAuditoria,
       responsavelAcompanhamento: a.responsavelAcompanhamento, auditor: a.auditor, norma: a.norma,
-      status: a.status, divulgadoEm: a.divulgadoEm,
+      status: a.status, divulgadoEm: a.divulgadoEm, finalizadoEm: a.finalizadoEm,
       totalConstatacoes: consts.length,
       naoConformidades: consts.filter((c) => c.tipo === "NAO_CONFORME").length,
+      totalAcoes: acoesValidas(a.acoes).length,
+      acoesPendentes: acoesPendentes(a.acoes).length,
     };
   });
   return NextResponse.json({ auditorias: lista });

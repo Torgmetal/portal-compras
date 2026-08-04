@@ -2,8 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ClipboardList, Loader2, FileDown, Send, Trash2, Plus, X, CheckCircle2, AlertCircle, Check, ImagePlus } from "lucide-react";
-import { numRAI, SETORES_AUDITORIA, TIPO_CONSTATACAO, TIPOS, STATUS_AI, statusAiLabel } from "@/lib/auditoria-interna";
+import { ArrowLeft, ClipboardList, Loader2, FileDown, Send, Trash2, Plus, X, CheckCircle2, AlertCircle, Check, ImagePlus, Paperclip, Lock, Unlock, CircleDot } from "lucide-react";
+import { numRAI, SETORES_AUDITORIA, TIPO_CONSTATACAO, TIPOS, STATUS_AI, statusAiLabel, acoesPendentes, podeFinalizar } from "@/lib/auditoria-interna";
 
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
@@ -42,6 +42,7 @@ export default function AuditoriaInternaDetalheClient({ id }) {
   const [acoes, setAcoes] = useState([]);
   const [fotos, setFotos] = useState([]);
   const [subindoFoto, setSubindoFoto] = useState(0);
+  const [evidUp, setEvidUp] = useState({}); // { [indiceAcao]: nº subindo }
   const [conclusao, setConclusao] = useState("");
 
   const carregar = useCallback(() => {
@@ -84,8 +85,30 @@ export default function AuditoriaInternaDetalheClient({ id }) {
   const setLegenda = (i, v) => setFotos((p) => p.map((f, j) => (j === i ? { ...f, legenda: v } : f)));
   const rmFoto = (i) => setFotos((p) => p.filter((_, j) => j !== i));
 
-  async function salvar() {
-    if (!ident.setor.trim()) return setErro("Informe o setor auditado.");
+  // Evidências de uma ação (fotos que comprovam a resposta) — mesmo fluxo das fotos.
+  const addEvidencias = async (i, files) => {
+    const lista = Array.from(files || []);
+    if (!lista.length) return;
+    setErro(""); setEvidUp((p) => ({ ...p, [i]: (p[i] || 0) + lista.length }));
+    for (const file of lista) {
+      try {
+        const reduzida = await reduzImagem(file);
+        const fd = new FormData();
+        fd.append("file", reduzida, "evidencia.jpg");
+        const r = await fetch("/api/qualidade/auditorias-internas/foto", { method: "POST", body: fd });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Falha no upload");
+        setAcoes((p) => p.map((ac, j) => (j === i ? { ...ac, evidencias: [...(ac.evidencias || []), { url: d.url, legenda: "" }] } : ac)));
+      } catch (e) { setErro(e.message || "Falha ao subir evidência"); }
+      finally { setEvidUp((p) => ({ ...p, [i]: Math.max(0, (p[i] || 1) - 1) })); }
+    }
+  };
+  const rmEvidencia = (i, k) => setAcoes((p) => p.map((ac, j) => (j === i ? { ...ac, evidencias: (ac.evidencias || []).filter((_, m) => m !== k) } : ac)));
+  const toggleConcluida = (i) => setAcoes((p) => p.map((ac, j) => (j === i ? { ...ac, concluida: !ac.concluida, respondidoEm: !ac.concluida ? (ac.respondidoEm || new Date().toISOString()) : null } : ac)));
+
+  // PATCH único: manda o estado atual do relatório + ação extra (finalizar/reabrir).
+  async function enviar(extra = {}, okMsg = "Relatório salvo.") {
+    if (!ident.setor.trim()) { setErro("Informe o setor auditado."); return false; }
     setErro(""); setSalvando(true);
     try {
       const r = await fetch(`/api/qualidade/auditorias-internas/${id}`, {
@@ -96,14 +119,19 @@ export default function AuditoriaInternaDetalheClient({ id }) {
           acoes: acoes.filter((c) => (c.oque || "").trim()),
           fotos,
           conclusao,
+          ...extra,
         }),
       });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar");
-      flash("Relatório salvo.");
+      flash(okMsg);
       carregar();
-    } catch (e) { setErro(e.message); } finally { setSalvando(false); }
+      return true;
+    } catch (e) { setErro(e.message); return false; } finally { setSalvando(false); }
   }
+  const salvar = () => enviar();
+  const finalizarRelatorio = () => { if (confirm("Finalizar o relatório? Todas as ações do plano serão encerradas e a auditoria vai para o histórico.")) enviar({ finalizar: true }, "Relatório finalizado."); };
+  const reabrirRelatorio = () => { if (confirm("Reabrir o relatório para acompanhamento das ações?")) enviar({ reabrir: true }, "Relatório reaberto."); };
 
   async function excluir() {
     if (!confirm("Excluir esta auditoria e o relatório? Esta ação não pode ser desfeita.")) return;
@@ -117,6 +145,12 @@ export default function AuditoriaInternaDetalheClient({ id }) {
 
   if (loading) return <div className="py-20 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin mb-2" /> Carregando…</div>;
   if (erro && !a) return <div className="py-20 text-center text-red-600 text-sm">{erro} · <Link href="/qualidade/auditorias-internas" className="text-torg-blue underline">voltar</Link></div>;
+
+  const acoesFiltradas = acoes.filter((c) => (c.oque || "").trim());
+  const pendentes = acoesFiltradas.filter((c) => !c.concluida).length;
+  const emitido = a?.status === "EMITIDO";
+  const finalizado = a?.status === "FINALIZADO";
+  const podeFin = emitido && pendentes === 0;
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -211,17 +245,57 @@ export default function AuditoriaInternaDetalheClient({ id }) {
       </Secao>
 
       {/* Plano de ação */}
-      <Secao titulo="Plano de ação" acao={<button onClick={() => setAcoes((p) => [...p, { oque: "", responsavel: "", prazo: "" }])} className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={13} /> Adicionar</button>}>
-        {acoes.length === 0 ? <p className="text-sm text-torg-gray">Sem ações. Registre o que precisa ser feito, por quem e até quando.</p> : (
-          <div className="space-y-2">
-            {acoes.map((ac, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <input value={ac.oque} onChange={(e) => setAc(i, "oque", e.target.value)} placeholder="Ação a executar" className="flex-1 min-w-0 text-[12px] border border-gray-200 rounded px-2 py-1.5" />
-                <input value={ac.responsavel || ""} onChange={(e) => setAc(i, "responsavel", e.target.value)} placeholder="Responsável" className="w-32 text-[12px] border border-gray-200 rounded px-2 py-1.5" />
-                <input type="date" value={ac.prazo || ""} onChange={(e) => setAc(i, "prazo", e.target.value)} className="w-32 text-[12px] border border-gray-200 rounded px-1.5 py-1.5" title="Prazo" />
-                <button onClick={() => setAcoes((p) => p.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-500 p-1 mt-1"><Trash2 size={13} /></button>
-              </div>
-            ))}
+      <Secao titulo="Plano de ação" acao={
+        <div className="flex items-center gap-3">
+          {acoesFiltradas.length > 0 && <span className={`text-[11px] font-medium ${pendentes ? "text-amber-600" : "text-emerald-600"}`}>{pendentes ? `${pendentes} em aberto` : "todas concluídas"}</span>}
+          <button onClick={() => setAcoes((p) => [...p, { oque: "", responsavel: "", prazo: "", resposta: "", evidencias: [], concluida: false }])} className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={13} /> Adicionar</button>
+        </div>
+      }>
+        {acoes.length === 0 ? <p className="text-sm text-torg-gray">Sem ações. Registre o que precisa ser feito, por quem e até quando. O relatório fica em aberto até todas as ações serem concluídas.</p> : (
+          <div className="space-y-2.5">
+            {acoes.map((ac, i) => {
+              const done = !!ac.concluida;
+              return (
+                <div key={i} className={`rounded-lg border p-3 ${done ? "border-emerald-200 bg-emerald-50/50" : "border-gray-200 bg-gray-50/40"}`}>
+                  <div className="flex items-start gap-2">
+                    <span className="mt-1.5 text-[11px] font-semibold text-torg-gray w-4 text-right shrink-0">{i + 1}.</span>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <input value={ac.oque} onChange={(e) => setAc(i, "oque", e.target.value)} placeholder="Ação a executar" className="w-full text-[12px] border border-gray-200 rounded px-2 py-1.5 bg-white" />
+                      <div className="flex gap-2 flex-wrap">
+                        <input value={ac.responsavel || ""} onChange={(e) => setAc(i, "responsavel", e.target.value)} placeholder="Responsável" className="w-40 text-[12px] border border-gray-200 rounded px-2 py-1.5 bg-white" />
+                        <input type="date" value={ac.prazo || ""} onChange={(e) => setAc(i, "prazo", e.target.value)} className="w-36 text-[12px] border border-gray-200 rounded px-1.5 py-1.5 bg-white" title="Prazo" />
+                      </div>
+                    </div>
+                    <button onClick={() => setAcoes((p) => p.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-500 p-1 shrink-0"><Trash2 size={13} /></button>
+                  </div>
+
+                  {/* Resposta / evidência do responsável */}
+                  <div className="mt-2.5 pt-2.5 border-t border-dashed border-gray-200 pl-6">
+                    <p className="text-[10px] font-semibold text-torg-gray uppercase tracking-wide mb-1.5">Resposta / evidência do responsável</p>
+                    <textarea value={ac.resposta || ""} onChange={(e) => setAc(i, "resposta", e.target.value)} rows={2} placeholder="O que foi feito para tratar esta ação…" className="w-full text-[12px] border border-gray-200 rounded px-2 py-1.5 bg-white" />
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
+                      {(ac.evidencias || []).map((ev, k) => (
+                        <div key={k} className="relative">
+                          <img src={ev.url} alt={`Evidência ${k + 1}`} className="w-16 h-16 object-cover rounded border border-gray-200" />
+                          <button onClick={() => rmEvidencia(i, k)} title="Remover" className="absolute -top-1.5 -right-1.5 bg-white rounded-full p-0.5 text-gray-400 hover:text-red-600 shadow border border-gray-200"><X size={11} /></button>
+                        </div>
+                      ))}
+                      {evidUp[i] > 0 && <span className="text-[11px] text-torg-gray inline-flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> subindo…</span>}
+                      <label className="w-16 h-16 rounded border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 hover:text-torg-blue hover:border-torg-blue cursor-pointer text-[10px] gap-0.5">
+                        <Paperclip size={13} /> anexar
+                        <input type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={(e) => { addEvidencias(i, e.target.files); e.target.value = ""; }} />
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-2">
+                      <button onClick={() => toggleConcluida(i)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${done ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-torg-gray border-gray-300 hover:border-emerald-400 hover:text-emerald-600"}`}>
+                        {done ? <CheckCircle2 size={13} /> : <CircleDot size={13} />} {done ? "Concluída" : "Marcar como concluída"}
+                      </button>
+                      {done && ac.respondidoEm && <span className="text-[10px] text-emerald-700">em {fmtDT(ac.respondidoEm)}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </Secao>
@@ -230,6 +304,27 @@ export default function AuditoriaInternaDetalheClient({ id }) {
       <Secao titulo="Conclusão">
         <textarea value={conclusao} onChange={(e) => setConclusao(e.target.value)} rows={3} placeholder="Parecer geral da auditoria…" className="inp" />
       </Secao>
+
+      {/* Encerramento — só após emitido; fica em aberto enquanto houver ação pendente */}
+      {(emitido || finalizado) && (
+        <div className={`rounded-xl border p-4 ${finalizado || podeFin ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"}`}>
+          {finalizado ? (
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-sm text-emerald-800 inline-flex items-center gap-2"><Lock size={16} /> <span><b>Relatório finalizado</b>{a.finalizadoEm ? ` em ${fmtDT(a.finalizadoEm)}` : ""}. As ações do plano foram concluídas.</span></span>
+              <button onClick={reabrirRelatorio} disabled={salvando} className="px-3 py-1.5 text-[12px] border border-emerald-300 text-emerald-800 rounded-lg hover:bg-emerald-100 inline-flex items-center gap-1.5 disabled:opacity-50"><Unlock size={13} /> Reabrir</button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-sm">
+                {podeFin
+                  ? <span className="text-emerald-800 inline-flex items-center gap-2"><CheckCircle2 size={16} /> {acoesFiltradas.length ? "Todas as ações concluídas" : "Sem ações pendentes"} — o relatório pode ser finalizado.</span>
+                  : <span className="text-amber-800 inline-flex items-center gap-2"><AlertCircle size={16} /> Relatório <b>em acompanhamento</b> — {pendentes} ação(ões) em aberto no plano.</span>}
+              </span>
+              <button onClick={finalizarRelatorio} disabled={salvando || !podeFin} title={podeFin ? "" : "Conclua todas as ações antes de finalizar"} className="px-4 py-1.5 text-[13px] rounded-lg font-medium inline-flex items-center gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"><Lock size={14} /> Finalizar relatório</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
 

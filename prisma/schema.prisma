@@ -1745,12 +1745,13 @@ model AuditoriaInterna {
   auditor                   String? // auditor (líder)
   norma                     String? // referência (ISO 9001, NBR 16775…)
   escopo                    String? // objetivo/escopo
-  status                    String    @default("AGENDADA") // AGENDADA | REALIZADA | EMITIDO
+  status                    String    @default("AGENDADA") // AGENDADA | REALIZADA | EMITIDO | FINALIZADO
   constatacoes              Json      @default("[]") // [{ tipo: CONFORME|NAO_CONFORME|MELHORIA, descricao }]
-  acoes                     Json      @default("[]") // [{ oque, responsavel, prazo }]
+  acoes                     Json      @default("[]") // [{ oque, responsavel, prazo, resposta, evidencias:[{url,legenda}], concluida, respondidoEm }]
   fotos                     Json      @default("[]") // registro fotográfico [{ url, legenda }]
   conclusao                 String?
   divulgadoEm               DateTime?
+  finalizadoEm              DateTime? // encerrado após todas as ações do plano concluídas
   divulgadoPara             Json      @default("[]") // histórico [{ email, em }]
   createdById               String?
   createdAt                 DateTime  @default(now())

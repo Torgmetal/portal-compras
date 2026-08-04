@@ -66,6 +66,11 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "OPReceita" ADD COLUMN IF NOT EXISTS "valorUnitario" DOUBLE PRECISION`);
   console.log("[ensure-mes-tables] OK — OPReceita.tipoPreco/unidade/quantidade/valorUnitario garantidas.");
 
+  // AuditoriaInterna: relatório fica "em aberto" até todas as ações do plano serem
+  // concluídas (com resposta/evidência); finalizadoEm marca o encerramento. Idempotente.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "AuditoriaInterna" ADD COLUMN IF NOT EXISTS "finalizadoEm" TIMESTAMP(3)`);
+  console.log("[ensure-mes-tables] OK — AuditoriaInterna.finalizadoEm garantida.");
+
   // BaixaExpedicao: baixa manual de marca (sem romaneio). Idempotente.
   await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "BaixaExpedicao" (
     "id" TEXT NOT NULL PRIMARY KEY,
