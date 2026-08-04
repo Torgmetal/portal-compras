@@ -1077,6 +1077,10 @@ model Cargo {
   salarioBase  Float?
   cbo          String?
   ativo        Boolean            @default(true)
+  // Matriz de Competências (FORM-11 / ISO 9001 §7.2)
+  descricao    String? // descrição da função
+  area         String? // área / setor da função
+  matriz       Json? // metadados FORM-11: { revisao, revisadaEm, escolaridadeObrigatoria, escolaridadeDesejavel, experienciaAdmissao, experienciaPromocao, qualificacoes:[{grupo,item,evidencia}], emitidoPor, aprovadoPor }
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   competencias CargoCompetencia[]

@@ -27,7 +27,7 @@ const menu = [
   { href: "/rh/ponto", label: "Controle de Ponto", icon: Clock },
   { href: "/rh/ferias", label: "Férias", icon: CalendarDays },
   { href: "/rh/beneficios", label: "Benefícios", icon: Heart },
-  { href: "/rh/competencias", label: "Competências", icon: Award },
+  { href: "/rh/competencias", label: "Matriz de competências", icon: Award },
 ];
 
 export default function SidebarRH() {

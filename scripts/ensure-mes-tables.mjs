@@ -71,6 +71,13 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "AuditoriaInterna" ADD COLUMN IF NOT EXISTS "finalizadoEm" TIMESTAMP(3)`);
   console.log("[ensure-mes-tables] OK — AuditoriaInterna.finalizadoEm garantida.");
 
+  // Cargo: Matriz de Competências (FORM-11 / ISO 9001 §7.2) — descrição da função,
+  // área e metadados da matriz (revisão, requisitos, qualificações). Idempotente.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Cargo" ADD COLUMN IF NOT EXISTS "descricao" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Cargo" ADD COLUMN IF NOT EXISTS "area" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Cargo" ADD COLUMN IF NOT EXISTS "matriz" JSONB`);
+  console.log("[ensure-mes-tables] OK — Cargo.descricao/area/matriz garantidas.");
+
   // BaixaExpedicao: baixa manual de marca (sem romaneio). Idempotente.
   await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "BaixaExpedicao" (
     "id" TEXT NOT NULL PRIMARY KEY,
