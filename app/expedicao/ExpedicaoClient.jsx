@@ -55,8 +55,8 @@ export default function ExpedicaoClient({ ops }) {
       {/* Indicadores */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Kpi label="Aguardando emissão" value={ind ? String(ind.pendentes.qtd) : "—"} sub={ind ? fmtKg(ind.pendentes.pesoKg) : ""} color="bg-torg-orange" Icon={ClipboardList} />
-        <Kpi label="Expedidos (semana)" value={ind ? String(ind.semana.qtd) : "—"} sub={ind ? fmtKg(ind.semana.pesoKg) : ""} color="bg-torg-blue" Icon={Truck} />
-        <Kpi label="Expedidos (mês)" value={ind ? String(ind.mes.qtd) : "—"} sub={ind ? fmtKg(ind.mes.pesoKg) : ""} color="bg-emerald-600" Icon={PackageCheck} />
+        <Kpi label="Romaneios emitidos (semana)" value={ind ? String(ind.semana.qtd) : "—"} sub={ind ? fmtKg(ind.semana.pesoKg) : ""} color="bg-torg-blue" Icon={Truck} />
+        <Kpi label="Romaneios emitidos (mês)" value={ind ? String(ind.mes.qtd) : "—"} sub={ind ? fmtKg(ind.mes.pesoKg) : ""} color="bg-emerald-600" Icon={PackageCheck} />
         <Kpi label="Atrasados" value={ind ? String(ind.atrasados.qtd) : "—"} sub="previsão vencida" color={ind && ind.atrasados.qtd > 0 ? "bg-red-600" : "bg-torg-gray"} Icon={Clock} />
       </div>
 
