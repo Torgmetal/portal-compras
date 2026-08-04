@@ -72,14 +72,14 @@ o que o **Planejamento** monta dentro da OP já aparece aqui, sem a Expedição 
 entrar OP por OP. É o mesmo dado que a Expedição vê no espelho (`/expedicao/op`),
 reunido num lugar só.
 - API: `GET /api/expedicao/romaneios-previos` (roles `ADMIN/EXPEDICAO/PRODUCAO/COMERCIAL`)
-  — retorna os `RomaneioPrevio` não cancelados de OPs abertas, com `op{numero,cliente,obra}`,
-  `itensCount`, `pesoKg`, `dataPrevista`, e `situacao` (**PREVISTO** = em aberto /
-  **APROVADO** = liberado / **EMITIDO**). Ordem: não emitidos primeiro (fila), depois
-  por data prevista.
+  — retorna só os `RomaneioPrevio` **NÃO emitidos** (`emitidoEm = null`) e não cancelados
+  de OPs abertas, com `op{numero,cliente,obra}`, `itensCount`, `pesoKg`, `dataPrevista`,
+  e `situacao` (**PREVISTO** = em aberto / **APROVADO** = liberado). Emitido sai da fila
+  (vira romaneio → Fiscal / SharePoint). Ordem: por data prevista (sem data por último).
 - UI (`ExpedicaoClient.jsx`): tabela "Pré-romaneios do Planejamento" com badge de
-  situação (Em aberto / Liberado / Emitido R##, + chip NF quando o Fiscal vinculou),
-  respeita o filtro por OP existente, badge "N aguardando emissão" no cabeçalho, e
-  botão **"Abrir na OP"** → `/expedicao/op?op=<opId>` pra emitir o FORM 22.
+  situação (Em aberto / Liberado), respeita o filtro por OP existente, badge
+  "N aguardando emissão" no cabeçalho, e botão **"Abrir na OP"** →
+  `/expedicao/op?op=<opId>` pra emitir o FORM 22.
 - Deep-link: `ExpedicaoOpClient` aceita `?op=<id>` (via `page.js` `searchParams`) e já
   abre a OP selecionada no espelho.
 

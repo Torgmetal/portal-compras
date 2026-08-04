@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
 import {
   FileText, Plus, Loader2, AlertCircle, X, Pencil, Trash2,
-  Truck, Package, Activity, ClipboardList, ExternalLink, ArrowRight,
+  Truck, Package, Activity, ClipboardList, ArrowRight,
 } from "lucide-react";
 import RomaneiosSharepoint from "@/components/RomaneiosSharepoint";
 
@@ -37,10 +37,6 @@ export default function ExpedicaoClient({ ops, romaneios }) {
     const lista = previos || [];
     return filtroOp ? lista.filter((p) => p.opId === filtroOp) : lista;
   }, [previos, filtroOp]);
-  const previosPendentes = useMemo(
-    () => (previos || []).filter((p) => !p.emitido).length,
-    [previos]
-  );
 
   const hoje = new Date();
   const ano = hoje.getFullYear(), mes = hoje.getMonth();
@@ -140,9 +136,9 @@ export default function ExpedicaoClient({ ops, romaneios }) {
               Cargas montadas pelo Planejamento dentro da OP. Clique em "Abrir na OP" para emitir o romaneio (FORM 22).
             </p>
           </div>
-          {previosPendentes > 0 && (
+          {previosFiltrados.length > 0 && (
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
-              {previosPendentes} aguardando emissão
+              {previosFiltrados.length} aguardando emissão
             </span>
           )}
         </div>
@@ -185,18 +181,10 @@ export default function ExpedicaoClient({ ops, romaneios }) {
                     <td className="px-4 py-2 text-xs text-torg-gray whitespace-nowrap">{p.dataPrevista ? fmtData(p.dataPrevista) : "—"}</td>
                     <td className="px-4 py-2"><SituacaoBadge p={p} /></td>
                     <td className="px-4 py-2 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-2 justify-end">
-                        {p.emitido && p.arquivoUrl && (
-                          <a href={p.arquivoUrl} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-torg-gray hover:text-torg-blue inline-flex items-center gap-1" title="Abrir o FORM 22 no SharePoint">
-                            <ExternalLink size={12} /> Excel
-                          </a>
-                        )}
-                        <Link href={`/expedicao/op?op=${p.opId}`}
-                          className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1">
-                          Abrir na OP <ArrowRight size={12} />
-                        </Link>
-                      </div>
+                      <Link href={`/expedicao/op?op=${p.opId}`}
+                        className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1">
+                        Abrir na OP <ArrowRight size={12} />
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -284,20 +272,6 @@ export default function ExpedicaoClient({ ops, romaneios }) {
 }
 
 function SituacaoBadge({ p }) {
-  if (p.emitido) {
-    return (
-      <span className="inline-flex items-center gap-1 flex-wrap">
-        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-          Emitido R{String(p.revisao ?? 0).padStart(2, "0")}
-        </span>
-        {p.nfNumero && (
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
-            NF {p.nfNumero}{p.nfTipo ? ` · ${p.nfTipo}` : ""}
-          </span>
-        )}
-      </span>
-    );
-  }
   if (p.situacao === "APROVADO") {
     return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-torg-blue-50 text-torg-blue border border-torg-blue-100 whitespace-nowrap">Liberado</span>;
   }
