@@ -8,12 +8,12 @@ export const runtime = "nodejs";
 const ROLES = ["ADMIN", "COMERCIAL", "PLANEJAMENTO", "PCP"];
 
 const schema = z.object({
-  titulo: z.string().max(200).optional(),
+  titulo: z.string().max(500).optional(),
   dataReuniao: z.string().nullable().optional(),
-  participantes: z.string().max(500).nullable().optional(),
-  pauta: z.string().max(20000).nullable().optional(),
+  participantes: z.string().max(2000).nullable().optional(),
+  pauta: z.string().max(200000).nullable().optional(), // transcrição longa da reunião
   conteudoJson: z.any().optional(),
-  anexos: z.array(z.object({ seq: z.number(), nome: z.string(), url: z.string(), tamanho: z.number().optional() })).optional(),
+  anexos: z.array(z.object({ seq: z.coerce.number(), nome: z.string(), url: z.string(), tamanho: z.coerce.number().optional().nullable() })).optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -21,7 +21,7 @@ export async function PATCH(req, { params }) {
   const ata = await prisma.ataOP.findFirst({ where: { id: params.ataId, opId: params.id }, select: { id: true } });
   if (!ata) return NextResponse.json({ error: "Ata não encontrada" }, { status: 404 });
   let body;
-  try { body = schema.parse(await req.json()); } catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
+  try { body = schema.parse(await req.json()); } catch (e) { const i = e.issues?.[0]; return NextResponse.json({ error: i ? `${(i.path || []).join(".") || "campo"}: ${i.message}` : "Dados inválidos" }, { status: 400 }); }
 
   const data = {};
   if (body.titulo !== undefined) data.titulo = body.titulo;
