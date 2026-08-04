@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Pencil, Check, X, AlertCircle, Plus, Trash2, Users, ClipboardList } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, Check, X, AlertCircle, Plus, Trash2, Users, ClipboardList, ClipboardCheck } from "lucide-react";
 
 const ESCALA = [
   "Não possui conhecimento", "Conhecimento básico", "Executa com supervisão",
@@ -43,6 +43,7 @@ export default function CargoMatrizClient({ cargoId }) {
   const [edit, setEdit] = useState(false);
   const [draft, setDraft] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [avaliando, setAvaliando] = useState(null);
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -317,7 +318,11 @@ export default function CargoMatrizClient({ cargoId }) {
                       const p = pctFunc(f); const ok = p >= 85;
                       return (
                         <tr key={f.id}>
-                          <td className="px-2.5 py-2 font-bold text-torg-dark whitespace-nowrap border-b border-gray-100">{f.nome}</td>
+                          <td className="px-2.5 py-2 whitespace-nowrap border-b border-gray-100">
+                            <button onClick={() => setAvaliando(f)} className="group font-bold text-torg-dark hover:text-torg-blue inline-flex items-center gap-1.5" title="Avaliar funcionário">
+                              {f.nome} <Pencil size={11} className="text-gray-300 group-hover:text-torg-blue" />
+                            </button>
+                          </td>
                           {competencias.map((c) => {
                             const v = f.niveis[c.competenciaId];
                             return <td key={c.competenciaId} className="px-2 py-2 text-center border-b border-gray-100">{v ? <span className="inline-grid place-items-center w-6 h-6 rounded-md text-[11px] font-extrabold tabular-nums" style={{ background: RAMP[v - 1], color: v < 3 ? "#33475a" : "#fff" }}>{v}</span> : <span className="text-gray-300">–</span>}</td>;
@@ -331,7 +336,7 @@ export default function CargoMatrizClient({ cargoId }) {
                     })}
                   </tbody>
                 </table>
-                <p className="text-[11px] text-torg-gray mt-2.5">A avaliação do nível atual de cada funcionário será lançada pelo RH — as células “–” ainda não foram avaliadas.</p>
+                <p className="text-[11px] text-torg-gray mt-2.5 inline-flex items-center gap-1.5"><ClipboardCheck size={13} className="text-torg-blue" /> Clique no nome do funcionário para lançar a avaliação. As células “–” ainda não foram avaliadas.</p>
               </div>
             )}
           </Sec>
@@ -354,6 +359,8 @@ export default function CargoMatrizClient({ cargoId }) {
       </div>
 
       {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
+
+      {avaliando && <AvaliarModal cargoId={cargoId} funcionario={avaliando} competencias={competencias} onClose={() => setAvaliando(null)} onSaved={() => { setAvaliando(null); carregar(); }} />}
 
       {edit && (
         <div className="fixed bottom-0 left-64 right-0 bg-white/95 backdrop-blur border-t border-gray-200 px-8 py-3 flex justify-end gap-2 z-20">
@@ -408,6 +415,73 @@ function LabeledInput({ tag, value, onChange }) {
     <div className="flex gap-2 items-center">
       <span className="text-[9px] font-extrabold tracking-wide px-2 py-1 rounded shrink-0 bg-gray-100 text-torg-gray w-20 text-center">{tag.toUpperCase()}</span>
       <input value={value} onChange={(e) => onChange(e.target.value)} className="flex-1 text-[12px] border border-gray-200 rounded px-2 py-1.5" />
+    </div>
+  );
+}
+
+function AvaliarModal({ cargoId, funcionario, competencias, onClose, onSaved }) {
+  const [niveis, setNiveis] = useState(() => ({ ...funcionario.niveis }));
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const set = (cid, v) => setNiveis((p) => ({ ...p, [cid]: p[cid] === v ? undefined : v }));
+
+  const somaEsp = competencias.reduce((s, c) => s + c.nivelEsperado, 0) || 1;
+  const pct = Math.round((competencias.reduce((s, c) => s + Math.min(niveis[c.competenciaId] || 0, c.nivelEsperado), 0) / somaEsp) * 100);
+  const avaliadas = competencias.filter((c) => niveis[c.competenciaId]).length;
+  const ok = pct >= 85;
+
+  async function salvar() {
+    setSalvando(true); setErro("");
+    try {
+      const avaliacoes = competencias.filter((c) => niveis[c.competenciaId]).map((c) => ({ funcionarioId: funcionario.id, competenciaId: c.competenciaId, nivelAtual: niveis[c.competenciaId] }));
+      const r = await fetch(`/api/rh/competencias/${cargoId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ avaliacoes }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar");
+      onSaved();
+    } catch (e) { setErro(e.message); setSalvando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-6">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[10.5px] tracking-wider uppercase text-torg-gray font-semibold">Avaliação de competências</div>
+            <h3 className="text-lg font-extrabold text-torg-dark">{funcionario.nome}</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="px-6 py-3 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between gap-4">
+          <div className="text-[12px] text-torg-gray">Qualificação: <b className="tabular-nums" style={{ color: ok ? "#1e9e6a" : "#F4801F" }}>{pct}%</b> · {avaliadas}/{competencias.length} avaliadas</div>
+          <div className="w-40 h-2 rounded bg-gray-200 overflow-hidden"><span className="block h-full" style={{ width: `${pct}%`, background: ok ? "#1e9e6a" : "#F4801F" }} /></div>
+        </div>
+
+        <div className="px-6 py-4 max-h-[55vh] overflow-y-auto divide-y divide-gray-50">
+          {competencias.map((c) => {
+            const atual = niveis[c.competenciaId];
+            const gap = atual && atual < c.nivelEsperado;
+            return (
+              <div key={c.competenciaId} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold text-torg-dark truncate">{c.nome}</div>
+                  <div className="text-[11px] text-torg-gray flex items-center gap-1.5">esperado <b className="text-torg-dark/70">{c.nivelEsperado}</b> · <LevelBar n={c.nivelEsperado} /> {gap && <span className="text-torg-orange font-semibold ml-1">abaixo</span>}</div>
+                </div>
+                <NivelPicker value={atual} onChange={(v) => set(c.competenciaId, v)} size={28} />
+              </div>
+            );
+          })}
+        </div>
+
+        {erro && <p className="px-6 text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
+        <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2 rounded-b-2xl">
+          <span className="text-[11px] text-torg-gray">Clique de novo no nível para desmarcar.</span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-1.5 border border-gray-300 text-torg-gray text-sm rounded-lg hover:bg-gray-100">Cancelar</button>
+            <button onClick={salvar} disabled={salvando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{salvando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Salvar avaliação</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
