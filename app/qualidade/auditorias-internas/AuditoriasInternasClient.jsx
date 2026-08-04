@@ -43,7 +43,7 @@ export default function AuditoriasInternasClient() {
 
       {/* Abas */}
       <div className="flex items-center gap-1 border-b border-gray-200">
-        {[{ k: "cronograma", l: "Cronograma", icon: CalendarDays }, { k: "relatorios", l: "Relatórios", icon: FileText }, { k: "planos", l: "Plano de Ação", icon: ListChecks }, { k: "historico", l: "Histórico", icon: Archive }].map((t) => {
+        {[{ k: "cronograma", l: "Cronograma de auditoria", icon: CalendarDays }, { k: "relatorios", l: "Relatórios", icon: FileText }, { k: "planos", l: "Plano de Ação", icon: ListChecks }, { k: "historico", l: "Histórico", icon: Archive }].map((t) => {
           const Icon = t.icon;
           return (
             <button key={t.k} onClick={() => setAba(t.k)}
