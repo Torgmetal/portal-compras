@@ -115,10 +115,10 @@ export default function CargoMatrizClient({ cargoId }) {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         {/* Masthead FORM-11 */}
         <div className="bg-torg-dark text-white px-7 py-5 flex justify-between gap-5 flex-wrap items-start">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg grid place-items-center font-extrabold text-lg" style={{ background: "linear-gradient(135deg,#006EAB,#0a4e7a)" }}>T</div>
-            <div>
-              <div className="text-[11px] tracking-[0.15em] font-semibold uppercase text-sky-200">Torg Metal · Sistema de Gestão da Qualidade</div>
+          <div className="flex items-center gap-4">
+            <img src="/torg-logo-white.png" alt="Torg Metal" className="h-9 w-auto" />
+            <div className="border-l border-white/20 pl-4">
+              <div className="text-[11px] tracking-[0.15em] font-semibold uppercase text-sky-200">Sistema de Gestão da Qualidade</div>
               <div className="text-[17px] font-extrabold mt-0.5">Matriz de Competências e Qualificações</div>
             </div>
           </div>
