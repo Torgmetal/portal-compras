@@ -14,7 +14,7 @@ const k = (s) => String(s || "").trim().toUpperCase();
 
 async function montar(opId, opNumero) {
   const where = { OR: [{ opId }, { opNumero: String(opNumero) }] };
-  const [listasRaw, revisoes, pecas, previosEmitidos] = await Promise.all([
+  const [listasRaw, revisoes, pecas, previosEmitidos, baixasOP] = await Promise.all([
     prisma.listaExpedicao.findMany({
       where, orderBy: { frente: "asc" },
       select: { id: true, frente: true, arquivo: true, revisao: true, marcas: true, qtdItens: true, pesoContratado: true, pesoExpedido: true, pesoFaltante: true, importadoEm: true, fileModificado: true },
@@ -22,6 +22,7 @@ async function montar(opId, opNumero) {
     prisma.listaExpedicaoRevisao.findMany({ where: { AND: [where, { resolvidaEm: null }] }, orderBy: { detectadaEm: "desc" }, take: 20 }),
     prisma.pecaLote.findMany({ where: { opId }, select: { marca: true, loteId: true, lote: { select: { nome: true } } } }),
     prisma.romaneioPrevio.findMany({ where: { AND: [where, { emitidoEm: { not: null } }] }, select: { itens: true } }),
+    prisma.baixaExpedicao.findMany({ where: { opId }, select: { frente: true, pesoKg: true } }),
   ]);
 
   // Expedido REAL por frente = Σ peso dos romaneios EMITIDOS no portal. Sobrescreve o
@@ -32,6 +33,12 @@ async function montar(opId, opNumero) {
   for (const r of previosEmitidos) for (const it of (Array.isArray(r.itens) ? r.itens : [])) {
     const peso = Number(it.pesoTotal ?? it.pesoKg) || 0;
     expPorFrente.set(k(it.frente), (expPorFrente.get(k(it.frente)) || 0) + peso);
+    totalPortal += peso;
+  }
+  // + baixas MANUAIS (sem romaneio) — peso já gravado na baixa.
+  for (const b of baixasOP) {
+    const peso = Number(b.pesoKg) || 0;
+    expPorFrente.set(k(b.frente), (expPorFrente.get(k(b.frente)) || 0) + peso);
     totalPortal += peso;
   }
   const listas = listasRaw.map((l) => {

@@ -40,21 +40,29 @@ export async function GET(_req, { params }) {
     expMap.set(kk, cur);
   }
 
+  // Baixas MANUAIS (sem romaneio) por marca — contam como expedido (não pendente).
+  const baixasOP = await prisma.baixaExpedicao.findMany({ where: { opId: op.id }, select: { marca: true, qtd: true, motivo: true } });
+  const baixaMap = new Map();
+  for (const b of baixasOP) { const kk = normMarca(b.marca); if (!kk) continue; const c = baixaMap.get(kk) || { qtd: 0, motivo: null }; c.qtd += Number(b.qtd) || 0; c.motivo = c.motivo || b.motivo; baixaMap.set(kk, c); }
+
   const marcas = new Map();
   for (const l of listas) {
     for (const m of Array.isArray(l.marcasJson) ? l.marcasJson : []) {
       const k = normMarca(m.marca);
       if (!k || marcas.has(k)) continue;
       const ex = expMap.get(k);
+      const bx = baixaMap.get(k);
       const qte = m.qte ?? null;
-      const expedidoQtd = ex ? (qte != null ? Math.min(ex.qtd, qte) : ex.qtd) : 0;
+      const totalExp = (ex ? ex.qtd : 0) + (bx ? bx.qtd : 0);
+      const expedidoQtd = qte != null ? Math.min(totalExp, qte) : totalExp;
       // 100% expedida (setor EXPEDIDO) por quantidade; senão cai no booleano legado.
       const full = expedidoQtd > 0 && qte != null && qte > 0 ? expedidoQtd >= qte : m.expedidoRomaneio === true;
       marcas.set(k, {
         frente: l.frente, marca: m.marca, descricao: m.descricao || "", qte, pesoTotal: m.pesoTotal || 0,
         expedidoQtd, expedido: full,
         temExpedicao: expedidoQtd > 0 || m.expedidoRomaneio === true, // saiu algo → mostra romaneio/data
-        romaneio: ex ? [...ex.romaneios].sort().join(", ") : (m.romaneio || null),
+        baixaMotivo: bx ? bx.motivo : null, // baixa manual (sem romaneio)
+        romaneio: ex ? [...ex.romaneios].sort().join(", ") : (bx ? "baixa manual" : (m.romaneio || null)),
         dataExpedicao: ex?.data ?? m.dataExpedicao ?? null,
       });
     }

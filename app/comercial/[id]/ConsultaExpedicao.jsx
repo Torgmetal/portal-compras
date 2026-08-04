@@ -8,6 +8,14 @@ const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UT
 const norm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const LIMITE = 300;
 const chave = (m) => `${m.frente}|${String(m.marca).toUpperCase()}`;
+// Baixa manual (sem romaneio) — motivos.
+const MOTIVOS_BAIXA = [
+  { v: "NAO_ENCONTRADA", l: "Não encontrada em obra" },
+  { v: "ADICIONADA", l: "Adicionada" },
+  { v: "ERRO_EXPEDICAO", l: "Erro na expedição" },
+  { v: "QTD_DIVERGENTE", l: "Quantidade divergente" },
+];
+const MOTIVO_LABEL = Object.fromEntries(MOTIVOS_BAIXA.map((m) => [m.v, m.l]));
 const STATUS = {
   PREVISTO: { l: "em aberto", c: "bg-amber-100 text-amber-800" },
   APROVADO: { l: "aprovado — vai para a Expedição", c: "bg-emerald-100 text-emerald-800" },
@@ -26,6 +34,10 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
   const [sel, setSel] = useState({});
   const [qtdImport, setQtdImport] = useState({}); // chave(marca) -> qtd desta carga (da lista ou ajustada). Sem entrada = qtd total da marca.
   const [imp, setImp] = useState(null); // { rows, nome } — arquivo em prévia de importação
+  const [modalBaixa, setModalBaixa] = useState(false); // baixa manual (sem romaneio)
+  const [motivoBaixa, setMotivoBaixa] = useState("NAO_ENCONTRADA");
+  const [obsBaixa, setObsBaixa] = useState("");
+  const [salvandoBaixa, setSalvandoBaixa] = useState(false);
   const [previos, setPrevios] = useState([]);
   const [lotes, setLotes] = useState([]);
   const [proximo, setProximo] = useState(null);
@@ -37,11 +49,12 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
 
   const carregarPrevios = () => fetch(`/api/comercial/op/${opId}/romaneios-previos`).then((r) => r.json())
     .then((j) => { if (j.success) { setPrevios(j.previos || []); setProximo(j.proximoNumero); } }).catch(() => {});
+  const carregarMarcas = () => fetch(`/api/comercial/op/${opId}/lista-expedicao/marcas`).then((r) => r.json())
+    .then((j) => { if (j.success) setDados(j); else setErro(j.error || "Erro ao carregar"); })
+    .catch(() => setErro("Não foi possível carregar a lista."));
 
   useEffect(() => {
-    fetch(`/api/comercial/op/${opId}/lista-expedicao/marcas`).then((r) => r.json())
-      .then((j) => { if (j.success) setDados(j); else setErro(j.error || "Erro ao carregar"); })
-      .catch(() => setErro("Não foi possível carregar a lista."));
+    carregarMarcas();
     fetch(`/api/comercial/op/${opId}/lotes-expedicao`).then((r) => r.json())
       .then((j) => { if (j.success) setLotes(j.lotes || []); }).catch(() => {});
     fetch(`/api/comercial/op/${opId}/local-entrega`).then((r) => r.json())
@@ -59,8 +72,10 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
   const totQ = (m) => (Number(m.qte) > 0 ? Number(m.qte) : null);
   const expQ = (m) => Math.max(0, Number(m.expedidoQtd) || 0);
   const unitPeso = (m) => { const t = totQ(m); return t ? (m.pesoTotal || 0) / t : (m.pesoTotal || 0); };
+  const temBaixa = (m) => (Array.isArray(m.baixas) && m.baixas.length > 0) || Number(m.baixaQtd) > 0;
   const expedidaFull = (m) => { const t = totQ(m), e = expQ(m); if (e > 0 && t != null && t > 0) return e >= t; return m.expedido === true; };
-  const situacaoM = (m) => { if (expedidaFull(m)) return "expedida"; if (expQ(m) > 0) return "parcial"; return "pendente"; };
+  // Baixa MANUAL tem precedência visual (amarelo + motivo); senão expedida/parcial/pendente.
+  const situacaoM = (m) => { if (temBaixa(m)) return "baixa"; if (expedidaFull(m)) return "expedida"; if (expQ(m) > 0) return "parcial"; return "pendente"; };
   const pendQ = (m) => { const t = totQ(m); if (t == null) return null; if (expedidaFull(m)) return 0; return Math.max(0, t - expQ(m)); };
   const pesoExpM = (m) => (expedidaFull(m) ? (m.pesoTotal || 0) : unitPeso(m) * expQ(m));
 
@@ -70,8 +85,9 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
       if (frente && m.frente !== frente) return false;
       const sit = situacaoM(m);
       if (situacao === "expedidas" && sit !== "expedida") return false;
-      if (situacao === "pendentes" && sit === "expedida") return false;
+      if (situacao === "pendentes" && sit !== "pendente") return false;
       if (situacao === "parciais" && sit !== "parcial") return false;
+      if (situacao === "baixas" && sit !== "baixa") return false;
       if (!b) return true;
       return norm(m.marca).includes(b) || norm(m.descricao).includes(b) || norm(m.romaneio).includes(b);
     });
@@ -80,6 +96,8 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
   const contratado = frentes.reduce((s, f) => s + (f.pesoContratado || 0), 0);
   const nFull = todas.filter((m) => situacaoM(m) === "expedida").length;
   const nParcial = todas.filter((m) => situacaoM(m) === "parcial").length;
+  const nBaixa = todas.filter((m) => situacaoM(m) === "baixa").length;
+  const nPendente = todas.filter((m) => situacaoM(m) === "pendente").length;
   const pesoExpedidoReal = todas.reduce((s, m) => s + pesoExpM(m), 0);
   const pesoFiltrado = filtradas.reduce((s, m) => s + (m.pesoTotal || 0), 0);
 
@@ -98,6 +116,24 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
   const pesoSel = marcadas.reduce((s, m) => s + pesoUsar(m), 0);
   const unSel = marcadas.reduce((s, m) => s + qteUsar(m), 0);
   const parciais = marcadas.filter((m) => baseQte(m) != null && qteUsar(m) < baseQte(m)).length;
+
+  // Baixa MANUAL (sem romaneio) das marcas selecionadas, com motivo.
+  async function darBaixa() {
+    if (!marcadas.length) return;
+    setSalvandoBaixa(true); setErro("");
+    try {
+      const itens = marcadas.map((m) => ({ marca: m.marca, frente: m.frente, qtd: qteUsar(m), pesoKg: pesoUsar(m) }));
+      const r = await fetch(`/api/comercial/op/${opId}/baixa-expedicao`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ motivo: motivoBaixa, observacao: obsBaixa.trim() || null, itens }) });
+      const j = await r.json(); if (!r.ok || !j.success) throw new Error(j.error || "Erro ao dar baixa");
+      setModalBaixa(false); setObsBaixa(""); setSel({}); setQtdImport({});
+      await carregarMarcas();
+      setMsg(`Baixa registrada em ${itens.length} marca(s) — ${MOTIVO_LABEL[motivoBaixa]}.`);
+    } catch (e) { setErro(e.message); } finally { setSalvandoBaixa(false); }
+  }
+  async function desfazerBaixa(id) {
+    try { await fetch(`/api/comercial/op/${opId}/baixa-expedicao?id=${id}`, { method: "DELETE" }); await carregarMarcas(); }
+    catch { /* silencioso */ }
+  }
 
   // Extrai a 1ª marca conhecida de uma célula/texto (tokeniza — aceita "T45 - Viga").
   function marcaNaCelula(cell) {
@@ -217,8 +253,8 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
         ) : (<>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 border border-gray-100 rounded-lg overflow-hidden mb-3">
             <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Marcas</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{todas.length}</p></div>
-            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Expedidas</p><p className="text-lg font-extrabold text-emerald-700 tabular-nums">{nFull}</p>{nParcial > 0 && <p className="text-[10px] text-amber-600">+ {nParcial} parcial(is)</p>}</div>
-            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Pendentes</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{todas.length - nFull}</p></div>
+            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Expedidas</p><p className="text-lg font-extrabold text-emerald-700 tabular-nums">{nFull}</p><p className="text-[10px] text-torg-gray">{[nParcial ? `${nParcial} parcial(is)` : null, nBaixa ? `${nBaixa} baixa` : null].filter(Boolean).join(" · ") || " "}</p></div>
+            <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Pendentes</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{nPendente}</p></div>
             <div className="bg-white p-3"><p className="text-[10px] font-medium text-torg-gray uppercase tracking-wider mb-0.5">Peso expedido</p><p className="text-lg font-extrabold text-torg-dark tabular-nums">{fmtKg(pesoExpedidoReal)}</p><p className="text-[10px] text-torg-gray">de {fmtKg(contratado)}</p></div>
           </div>
 
@@ -232,6 +268,7 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
               <option value="todas">Todas</option>
               <option value="expedidas">Só expedidas</option>
               <option value="parciais">Só parciais</option>
+              <option value="baixas">Só baixas (sem romaneio)</option>
               <option value="pendentes">Só pendentes</option>
             </select>
             {/* importar relação de peças (ao lado do filtro, como pedido) */}
@@ -254,6 +291,7 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
             <div className="flex items-center gap-2 flex-wrap mb-2 bg-torg-blue-50/60 border border-torg-blue-200 rounded-lg px-3 py-2 text-xs">
               <span className="font-semibold text-torg-dark">{marcadas.length} peça(s){unSel ? ` · ${unSel} un` : ""} · {fmtKg(pesoSel)}{parciais ? <span className="text-amber-600"> · {parciais} parcial(is)</span> : ""}</span>
               <button onClick={() => setModal(true)} className="bg-torg-blue text-white rounded-lg px-2.5 py-1 font-medium inline-flex items-center gap-1 hover:bg-torg-dark"><Truck size={12} /> Gerar romaneio prévio{proximo ? ` ${String(proximo).padStart(2, "0")}` : ""}</button>
+              <button onClick={() => setModalBaixa(true)} className="bg-amber-500 text-white rounded-lg px-2.5 py-1 font-medium inline-flex items-center gap-1 hover:bg-amber-600" title="Marcar como expedida SEM romaneio, com um motivo"><CheckCircle2 size={12} /> Dar baixa (sem romaneio)</button>
               <button onClick={() => { setSel({}); setQtdImport({}); }} className="text-torg-gray hover:text-torg-dark ml-auto">limpar seleção</button>
             </div>
           )}
@@ -279,7 +317,7 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
                   const exp = expQ(m), tot = totQ(m), pend = pendQ(m), sit = situacaoM(m);
                   const semPendente = pend != null && pend <= 0;
                   return (
-                    <tr key={`${k}-${i}`} className={sel[k] ? "bg-torg-blue-50/50" : sit === "expedida" ? "bg-emerald-50/40" : sit === "parcial" ? "bg-amber-50/30" : ""}>
+                    <tr key={`${k}-${i}`} className={sel[k] ? "bg-torg-blue-50/50" : sit === "baixa" ? "bg-amber-100/70" : sit === "expedida" ? "bg-emerald-50/40" : sit === "parcial" ? "bg-amber-50/30" : ""}>
                       {!readOnly && <td className="px-2 py-1.5"><input type="checkbox" checked={!!sel[k]} disabled={semPendente} onChange={() => setSel((s) => { const n = { ...s }; if (n[k]) delete n[k]; else n[k] = true; return n; })} className="accent-torg-blue disabled:opacity-30" title={semPendente ? "Marca totalmente expedida" : ""} /></td>}
                       <td className="px-3 py-1.5 font-mono text-torg-dark whitespace-nowrap">{m.marca}</td>
                       <td className="px-3 py-1.5 text-torg-gray truncate max-w-[240px]" title={m.descricao}>{m.descricao || "—"}</td>
@@ -307,13 +345,19 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
                       </td>
                       <td className="px-3 py-1.5 text-right text-torg-dark tabular-nums whitespace-nowrap">{fmtKg(sel[k] ? pesoUsar(m) : m.pesoTotal)}</td>
                       <td className="px-3 py-1.5 whitespace-nowrap">
-                        {sit === "expedida"
+                        {sit === "baixa"
+                          ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-semibold inline-flex items-center gap-1" title={(m.baixas || []).map((b) => MOTIVO_LABEL[b.motivo] + (b.observacao ? ` — ${b.observacao}` : "")).join(" · ")}><CheckCircle2 size={10} /> {MOTIVO_LABEL[m.baixas?.[0]?.motivo] || "baixa manual"}</span>
+                          : sit === "expedida"
                           ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium inline-flex items-center gap-1"><CheckCircle2 size={10} /> expedida</span>
                           : sit === "parcial"
                           ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium inline-flex items-center gap-1"><Clock size={10} /> parcial {exp}/{tot}</span>
                           : <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-torg-gray font-medium inline-flex items-center gap-1"><Clock size={10} /> pendente</span>}
                       </td>
-                      <td className="px-3 py-1.5 text-torg-gray whitespace-nowrap">{m.romaneio || "—"}</td>
+                      <td className="px-3 py-1.5 text-torg-gray whitespace-nowrap">
+                        {sit === "baixa"
+                          ? <span className="inline-flex items-center gap-1 text-amber-700">baixa manual{!readOnly && m.baixas?.[0]?.id && <button onClick={() => desfazerBaixa(m.baixas[0].id)} className="text-gray-400 hover:text-red-600" title="Desfazer baixa"><X size={11} /></button>}</span>
+                          : (m.romaneio || "—")}
+                      </td>
                       <td className="px-3 py-1.5 text-torg-gray whitespace-nowrap">{m.dataExpedicao ? fmtD(m.dataExpedicao) : "—"}</td>
                     </tr>
                   );
@@ -407,6 +451,36 @@ export default function ConsultaExpedicao({ opId, readOnly = false }) {
       )}
 
       {imp && <ImportarListaModal rows={imp.rows} nome={imp.nome} marcaNaCelula={marcaNaCelula} onAplicar={aplicarImport} onClose={() => setImp(null)} />}
+      {modalBaixa && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && setModalBaixa(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-torg-dark inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-amber-500" /> Dar baixa sem romaneio</h3>
+              <button onClick={() => setModalBaixa(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-torg-gray"><strong>{marcadas.length} marca(s)</strong> vão ficar <strong>expedidas sem romaneio</strong> (destacadas em amarelo na lista). Escolha o motivo:</p>
+              <div className="space-y-1.5">
+                {MOTIVOS_BAIXA.map((mo) => (
+                  <label key={mo.v} className="flex items-center gap-2 text-sm cursor-pointer text-torg-dark">
+                    <input type="radio" name="motivoBaixa" checked={motivoBaixa === mo.v} onChange={() => setMotivoBaixa(mo.v)} className="accent-amber-500" />
+                    {mo.l}
+                  </label>
+                ))}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-torg-dark mb-1">Observação <span className="text-gray-400">(opcional)</span></label>
+                <input value={obsBaixa} onChange={(e) => setObsBaixa(e.target.value)} placeholder="Detalhe se quiser" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none" />
+              </div>
+              {erro && <p className="text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2">
+              <button onClick={() => setModalBaixa(false)} className="text-sm text-torg-gray border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">Cancelar</button>
+              <button onClick={darBaixa} disabled={salvandoBaixa} className="text-sm font-semibold text-white bg-amber-500 rounded-lg px-4 py-1.5 hover:bg-amber-600 disabled:opacity-50 inline-flex items-center gap-1.5">{salvandoBaixa ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Dar baixa</button>
+            </div>
+          </div>
+        </div>
+      )}
       {modal && <NovoPrevioModal opId={opId} numero={proximo} itens={marcadas.map((m) => ({ ...m, qte: qteUsar(m), pesoTotal: pesoUsar(m) }))} peso={pesoSel} lotes={lotes} localObra={localEntrega} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); setQtdImport({}); carregarPrevios(); setMsg("Romaneio prévio criado."); }} />}
     </div>
   );

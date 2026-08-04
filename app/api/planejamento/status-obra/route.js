@@ -51,6 +51,18 @@ export async function GET(req) {
     expFrente.set(`${op}|${k(it.frente)}`, (expFrente.get(`${op}|${k(it.frente)}`) || 0) + peso);
     expOp.set(op, (expOp.get(op) || 0) + peso);
   }
+  // + baixas MANUAIS (sem romaneio) — mapeia opId → nº da OP.
+  const baixas = await prisma.baixaExpedicao.findMany({ select: { opId: true, frente: true, pesoKg: true } });
+  if (baixas.length) {
+    const opsN = await prisma.oP.findMany({ where: { id: { in: [...new Set(baixas.map((b) => b.opId))] } }, select: { id: true, numero: true } });
+    const idToPad = new Map(opsN.map((o) => [o.id, padOp(o.numero)]));
+    for (const b of baixas) {
+      const op = idToPad.get(b.opId); if (!op) continue;
+      const peso = Number(b.pesoKg) || 0;
+      expFrente.set(`${op}|${k(b.frente)}`, (expFrente.get(`${op}|${k(b.frente)}`) || 0) + peso);
+      expOp.set(op, (expOp.get(op) || 0) + peso);
+    }
+  }
   const nFrentesOp = new Map();
   for (const l of listas) { const op = padOp(l.opNumero); nFrentesOp.set(op, (nFrentesOp.get(op) || 0) + 1); }
   const listasOut = listas.map((l) => {

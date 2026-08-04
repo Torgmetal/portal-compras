@@ -38,6 +38,18 @@ export async function GET(_req, { params }) {
     }
   }
 
+  // Baixas MANUAIS (sem romaneio) por marca — motivo registrado, destaque amarelo.
+  const baixas = await prisma.baixaExpedicao.findMany({ where: { opId: op.id } });
+  const baixaMap = new Map(); // MARCA(upper) -> { qtd, itens:[{id,motivo,qtd,observacao}] }
+  for (const b of baixas) {
+    const k = String(b.marca || "").trim().toUpperCase();
+    if (!k) continue;
+    const cur = baixaMap.get(k) || { qtd: 0, itens: [] };
+    cur.qtd += Number(b.qtd) || 0;
+    cur.itens.push({ id: b.id, motivo: b.motivo, qtd: b.qtd, observacao: b.observacao });
+    baixaMap.set(k, cur);
+  }
+
   const frentes = listas.map((l) => ({
     frente: l.frente,
     arquivo: l.arquivo,
@@ -46,9 +58,13 @@ export async function GET(_req, { params }) {
     pesoExpedido: l.pesoExpedido,
     marcas: (Array.isArray(l.marcasJson) ? l.marcasJson : []).map((m) => {
       const qte = m.qte ?? null;
-      const ex = expMap.get(String(m.marca || "").trim().toUpperCase());
-      // Quanto já saiu nos romaneios emitidos (limitado ao total da marca).
-      const expedidoQtd = ex ? (qte != null ? Math.min(ex.qtd, qte) : ex.qtd) : 0;
+      const kU = String(m.marca || "").trim().toUpperCase();
+      const ex = expMap.get(kU);
+      const bx = baixaMap.get(kU);
+      const baixaQtd = bx ? bx.qtd : 0;
+      // Expedido = romaneios emitidos + baixas manuais (limitado ao total da marca).
+      const totalExp = (ex ? ex.qtd : 0) + baixaQtd;
+      const expedidoQtd = qte != null ? Math.min(totalExp, qte) : totalExp;
       const romaneios = ex ? [...ex.romaneios].sort() : [];
       // Situação derivada da quantidade: expedida (tudo saiu) / parcial / pendente.
       const totalmenteExpedida = qte != null && qte > 0 && expedidoQtd >= qte;
@@ -58,7 +74,9 @@ export async function GET(_req, { params }) {
         qte,
         pesoUnit: m.pesoUnit ?? null,
         pesoTotal: m.pesoTotal ?? 0,
-        expedidoQtd,                          // nº de peças já expedidas (romaneios emitidos)
+        expedidoQtd,                          // nº de peças expedidas (romaneios + baixas manuais)
+        baixaQtd,                             // quanto veio de baixa MANUAL (sem romaneio)
+        baixas: bx ? bx.itens : [],           // motivos + ids (destaque amarelo + desfazer)
         romaneios,                            // nº dos romaneios em que saiu
         // expedido (booleano) mantido p/ compat: true só quando saiu TUDO. Sem romaneio,
         // cai na coluna "Marca (Expedido)" do próprio arquivo.

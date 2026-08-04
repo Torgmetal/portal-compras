@@ -66,6 +66,23 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "OPReceita" ADD COLUMN IF NOT EXISTS "valorUnitario" DOUBLE PRECISION`);
   console.log("[ensure-mes-tables] OK — OPReceita.tipoPreco/unidade/quantidade/valorUnitario garantidas.");
 
+  // BaixaExpedicao: baixa manual de marca (sem romaneio). Idempotente.
+  await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "BaixaExpedicao" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "opId" TEXT NOT NULL,
+    "frente" TEXT,
+    "marca" TEXT NOT NULL,
+    "motivo" TEXT NOT NULL,
+    "qtd" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "pesoKg" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "observacao" TEXT,
+    "criadoPorId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "BaixaExpedicao" ADD COLUMN IF NOT EXISTS "pesoKg" DOUBLE PRECISION NOT NULL DEFAULT 0`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BaixaExpedicao_opId_idx" ON "BaixaExpedicao"("opId")`);
+  console.log("[ensure-mes-tables] OK — BaixaExpedicao garantida.");
+
   // Colunas do FluxoCaixa para import do extrato Omie (idempotente).
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "origemOmieId" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "FluxoCaixa" ADD COLUMN IF NOT EXISTS "contaCorrente" TEXT`);
