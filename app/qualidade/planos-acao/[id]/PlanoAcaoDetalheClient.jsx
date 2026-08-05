@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ListChecks, Loader2, FileDown, Trash2, Plus, CheckCircle2, AlertCircle } from "lucide-react";
 import { numPA, STATUS_PLANO, STATUS_PLANO_OPCOES, STATUS_ITEM, STATUS_ITEM_OPCOES, SITUACAO_ITEM, situacaoItem, situacaoItemLabel } from "@/lib/plano-acao";
 
-const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+const dISO = (d) => { if (!d) return ""; const x = new Date(d); return isNaN(x) ? "" : x.toISOString().slice(0, 10); };
 const novoItem = () => ({ oque: "", porque: "", onde: "", quem: "", quando: "", como: "", quanto: "", status: "A_FAZER", acompanhamento: "" });
 
 export default function PlanoAcaoDetalheClient({ id }) {

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown, Sparkles, Upload, Paperclip } from "lucide-react";
 import { numRNC, TIPOS_RNC, ORIGEM_NC, DISPOSICAO_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
 import { SETORES_AUDITORIA } from "@/lib/auditoria-interna";
 
@@ -15,6 +15,7 @@ export default function RncDetalheClient({ id }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [analisando, setAnalisando] = useState(false);
   const [msg, setMsg] = useState("");
 
   const carregar = useCallback(() => {
@@ -64,6 +65,18 @@ export default function RncDetalheClient({ id }) {
     catch { setErro("Erro ao excluir"); setSalvando(false); }
   }
 
+  async function analisarIA(file) {
+    if (!file) return;
+    setErro(""); setAnalisando(true);
+    try {
+      const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error("Falha ao ler o arquivo")); r.readAsDataURL(file); });
+      const r = await fetch(`/api/qualidade/rnc/${id}/analisar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base64: b64, tipo: file.type, nome: file.name }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Falha na análise");
+      flash("Análise concluída — descrição, causas, 5 porquês e plano de ação preenchidos pela IA. Revise antes de encerrar."); carregar();
+    } catch (e) { setErro(e.message); } finally { setAnalisando(false); }
+  }
+
   if (loading) return <div className="py-20 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin mb-2" /> Carregando…</div>;
   if (erro && !d) return <div className="py-20 text-center text-red-600 text-sm">{erro} · <Link href="/qualidade/rnc" className="text-torg-blue underline">voltar</Link></div>;
 
@@ -89,9 +102,24 @@ export default function RncDetalheClient({ id }) {
         </div>
         <h1 className="text-xl font-extrabold text-torg-dark tracking-tight">Relatório de Não Conformidade</h1>
         {cliente && (
-          <div className="mt-3 bg-torg-blue-50/50 border border-torg-blue-100 rounded-lg px-3 py-2 text-[12px] text-torg-dark/80 flex items-start gap-2">
-            <AlertCircle size={14} className="text-torg-blue mt-0.5 shrink-0" />
-            Anexo do cliente + conversão por IA (descrição → causa → plano de ação → resposta) entram na próxima etapa. Por ora, preencha manualmente.
+          <div className="mt-3 space-y-2">
+            <div className="bg-gradient-to-br from-torg-blue-50/70 to-white border border-torg-blue-100 rounded-xl p-4">
+              <div className="flex items-start gap-2.5">
+                <Sparkles size={18} className="text-torg-blue mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-torg-dark">Análise por IA da RNC do cliente</p>
+                  <p className="text-[12px] text-torg-gray mt-0.5">Anexe o documento (PDF ou imagem) que o cliente enviou. A IA levanta os pontos, as possíveis causas, faz os 5 porquês e já monta o plano de ação 5W2H para não reincidir.</p>
+                  <div className="flex items-center gap-3 mt-3 flex-wrap">
+                    <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm ${analisando ? "bg-gray-200 text-gray-500 cursor-wait" : "bg-torg-blue text-white hover:bg-torg-dark cursor-pointer"}`}>
+                      {analisando ? <><Loader2 size={15} className="animate-spin" /> Analisando…</> : <><Upload size={15} /> {d.anexoUrl ? "Reanalisar / trocar anexo" : "Anexar e analisar com IA"}</>}
+                      <input type="file" accept=".pdf,image/png,image/jpeg,image/webp" className="hidden" disabled={analisando} onChange={(e) => { analisarIA(e.target.files?.[0]); e.target.value = ""; }} />
+                    </label>
+                    {d.anexoUrl && <a href={d.anexoUrl} target="_blank" rel="noopener noreferrer" className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Paperclip size={13} /> ver documento do cliente</a>}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="text-[11px] text-torg-gray">O que a IA preencher é rascunho — revise a descrição, as causas, os 5 porquês e o plano de ação antes de encerrar/responder.</p>
           </div>
         )}
       </div>
