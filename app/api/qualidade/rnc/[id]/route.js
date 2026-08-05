@@ -19,7 +19,7 @@ export async function GET(_req, { params }) {
 const dstr = z.string().optional().nullable();
 const schema = z.object({
   data: dstr, cliente: dstr, opNumero: dstr, opId: dstr, desenhoProjetoMarca: dstr,
-  origem: dstr, fornecedor: dstr, processoArea: dstr, descricao: dstr,
+  origem: dstr, fornecedor: dstr, processoArea: dstr, descricao: dstr, analise: dstr,
   fotos: z.array(z.object({ url: z.string().url(), legenda: dstr })).optional(),
   disposicao: dstr, elaborador: dstr, resultadoReinspecao: dstr, abrangencia: dstr,
   necessitaAcao: dstr, motivoNaoAcao: dstr, causas: dstr,
@@ -34,7 +34,7 @@ const schema = z.object({
 });
 
 const asDate = (s) => (s ? new Date(s.length <= 10 ? s + "T12:00:00Z" : s) : null);
-const TXT = new Set(["cliente", "opNumero", "opId", "desenhoProjetoMarca", "origem", "fornecedor", "processoArea", "descricao", "disposicao", "elaborador", "resultadoReinspecao", "abrangencia", "necessitaAcao", "motivoNaoAcao", "causas", "planoAcaoId", "acompanhadoPor", "acompanhamento", "avaliacaoEficacia", "encerradaPor", "rncAnteriorId", "anexoUrl", "programa", "jobCliente", "numeroCliente", "respostaCliente"]);
+const TXT = new Set(["cliente", "opNumero", "opId", "desenhoProjetoMarca", "origem", "fornecedor", "processoArea", "descricao", "analise", "disposicao", "elaborador", "resultadoReinspecao", "abrangencia", "necessitaAcao", "motivoNaoAcao", "causas", "planoAcaoId", "acompanhadoPor", "acompanhamento", "avaliacaoEficacia", "encerradaPor", "rncAnteriorId", "anexoUrl", "programa", "jobCliente", "numeroCliente", "respostaCliente"]);
 const DATES = new Set(["data", "prazoResposta", "realizadoEm"]);
 
 export async function PATCH(req, { params }) {

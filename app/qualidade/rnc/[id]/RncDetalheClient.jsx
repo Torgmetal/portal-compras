@@ -41,7 +41,7 @@ export default function RncDetalheClient({ id }) {
     try {
       const body = {
         data: d.data || null, cliente: d.cliente, opNumero: d.opNumero, desenhoProjetoMarca: d.desenhoProjetoMarca,
-        origem: d.origem, fornecedor: d.fornecedor, processoArea: d.processoArea, descricao: d.descricao,
+        origem: d.origem, fornecedor: d.fornecedor, processoArea: d.processoArea, descricao: d.descricao, analise: d.analise,
         disposicao: d.disposicao, elaborador: d.elaborador, resultadoReinspecao: d.resultadoReinspecao, abrangencia: d.abrangencia,
         necessitaAcao: d.necessitaAcao, motivoNaoAcao: d.motivoNaoAcao, causas: d.causas,
         cincoPorques: d.cincoPorques.map((x, i) => ({ porque: `${i + 1}º porquê`, resposta: (x.resposta || "").trim() })),
@@ -112,7 +112,7 @@ export default function RncDetalheClient({ id }) {
                 <Sparkles size={18} className="text-torg-blue mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-semibold text-torg-dark">Análise por IA da RNC do cliente</p>
-                  <p className="text-[12px] text-torg-gray mt-0.5">Anexe o documento (PDF ou imagem) que o cliente enviou. A IA levanta os pontos, as possíveis causas, faz os 5 porquês e já monta o plano de ação 5W2H para não reincidir.</p>
+                  <p className="text-[12px] text-torg-gray mt-0.5">Anexe o documento (PDF ou imagem) que o cliente enviou. A IA <b>analisa</b> (não transcreve): levanta os pontos, avalia se procede, aponta as possíveis causas, faz os 5 porquês e recomenda se cabe ação — montando o plano 5W2H só quando necessário.</p>
                   <div className="flex items-center gap-3 mt-3 flex-wrap">
                     <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm ${analisando ? "bg-gray-200 text-gray-500 cursor-wait" : "bg-torg-blue text-white hover:bg-torg-dark cursor-pointer"}`}>
                       {analisando ? <><Loader2 size={15} className="animate-spin" /> Analisando…</> : <><Upload size={15} /> {d.anexoUrl ? "Reanalisar / trocar anexo" : "Anexar e analisar com IA"}</>}
@@ -123,7 +123,7 @@ export default function RncDetalheClient({ id }) {
                 </div>
               </div>
             </div>
-            <p className="text-[11px] text-torg-gray">O que a IA preencher é rascunho — revise a descrição, as causas, os 5 porquês e o plano de ação antes de encerrar/responder.</p>
+            <p className="text-[11px] text-torg-gray">O que a IA preencher é rascunho — revise a análise, a descrição, as causas, os 5 porquês e o plano de ação antes de encerrar/responder.</p>
           </div>
         )}
       </div>
@@ -154,6 +154,17 @@ export default function RncDetalheClient({ id }) {
           </>}
         </div>
       </Secao>
+
+      {/* Análise da Qualidade — o que a IA levanta e avalia (não é transcrição) */}
+      {(cliente || d.analise) && (
+        <Secao titulo="Análise da Qualidade">
+          <Campo label="Pontos levantados pelo cliente + avaliação técnica da Torg">
+            <textarea value={d.analise || ""} onChange={(e) => set("analise", e.target.value)} rows={6} className="inp"
+              placeholder={cliente ? "A IA levanta os pontos que o cliente aponta e avalia se procede, no contexto da Torg. Revise antes de responder." : ""} />
+          </Campo>
+          <p className="text-[11px] text-torg-gray -mt-1">Esta é a leitura da Qualidade para a diretoria avaliar. A recomendação de ação vai em “Necessita de ação”, abaixo; o plano 5W2H só é criado quando cabe ação.</p>
+        </Secao>
+      )}
 
       {/* Descrição + disposição */}
       <Secao titulo="Não conformidade">

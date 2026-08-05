@@ -51,7 +51,8 @@ export async function POST(req, { params }) {
   catch (e) { return NextResponse.json({ error: "Falha na análise por IA: " + (e?.message || "erro") }, { status: 502 }); }
   if (!a) return NextResponse.json({ error: "Não consegui ler o documento. Confira se é um PDF/imagem legível." }, { status: 422 });
 
-  // 3) preenche a RNC (identificação só se estiver vazia; análise sobrescreve)
+  // 3) preenche a RNC. Identificação só se estiver vazia; a ANÁLISE (descrição,
+  // análise, causas, 5 porquês, pertinência e recomendação de ação) sobrescreve.
   const orNull = (atual, novo) => (atual && atual.trim() ? atual : novo || null);
   const cinco = a.cincoPorques.map((r, i) => ({ porque: `${i + 1}º porquê`, resposta: r }));
   const data = {
@@ -59,27 +60,31 @@ export async function POST(req, { params }) {
     cliente: orNull(rnc.cliente, a.cliente), numeroCliente: orNull(rnc.numeroCliente, a.numeroCliente),
     programa: orNull(rnc.programa, a.programa), opNumero: orNull(rnc.opNumero, a.opNumero),
     desenhoProjetoMarca: orNull(rnc.desenhoProjetoMarca, a.desenhoProjetoMarca),
-    descricao: a.descricao || rnc.descricao, causas: a.causas || rnc.causas,
-    cincoPorques: cinco.length ? cinco : rnc.cincoPorques,
-    necessitaAcao: rnc.necessitaAcao || "CORRETIVA",
+    descricao: a.descricao || rnc.descricao, analise: a.analise || rnc.analise,
+    causas: a.causas || rnc.causas, cincoPorques: cinco.length ? cinco : rnc.cincoPorques,
+    necessitaAcao: a.necessitaAcao || rnc.necessitaAcao || "CORRETIVA",
+    pertinente: typeof a.pertinente === "boolean" ? a.pertinente : rnc.pertinente,
   };
 
-  // 4) plano de ação 5W2H (cria com o nº da RNC, ou atualiza o existente)
-  const pa = a.planoAcao || {};
-  const item = {
-    oque: pa.oque || "", porque: pa.porque || "", onde: pa.onde || "", quem: pa.quem || "",
-    quando: "", como: pa.como || "", quanto: pa.quanto || "", status: "A_FAZER",
-    acompanhamento: pa.prazo ? `Prazo sugerido pela IA: ${pa.prazo}` : "",
-  };
-  const titulo = `${numRNC(rnc.numero, rnc.ano)} — ${(a.descricao || "Não conformidade do cliente").slice(0, 70)}`;
-  if (rnc.planoAcaoId) {
-    await prisma.planoAcao.update({ where: { id: rnc.planoAcaoId }, data: { titulo, itens: [item] } }).catch(() => {});
-  } else {
-    const plano = await prisma.planoAcao.create({
-      data: { numero: rnc.numero, titulo, origem: numRNC(rnc.numero, rnc.ano), responsavel: pa.quem || null, status: "EM_ANDAMENTO", itens: [item], createdById: user.id },
-      select: { id: true },
-    }).catch(() => null);
-    if (plano) data.planoAcaoId = plano.id;
+  // 4) plano de ação 5W2H — SÓ quando a análise indica que cabe ação (a.planoAcao != null;
+  // NAO_NECESSARIO devolve null). Cria com o nº da RNC, ou atualiza o existente.
+  const pa = a.planoAcao;
+  if (pa) {
+    const item = {
+      oque: pa.oque || "", porque: pa.porque || "", onde: pa.onde || "", quem: pa.quem || "",
+      quando: "", como: pa.como || "", quanto: pa.quanto || "", status: "A_FAZER",
+      acompanhamento: pa.prazo ? `Prazo sugerido pela IA: ${pa.prazo}` : "",
+    };
+    const titulo = `${numRNC(rnc.numero, rnc.ano)} — ${(a.descricao || "Não conformidade do cliente").slice(0, 70)}`;
+    if (rnc.planoAcaoId) {
+      await prisma.planoAcao.update({ where: { id: rnc.planoAcaoId }, data: { titulo, itens: [item] } }).catch(() => {});
+    } else {
+      const plano = await prisma.planoAcao.create({
+        data: { numero: rnc.numero, titulo, origem: numRNC(rnc.numero, rnc.ano), responsavel: pa.quem || null, status: "EM_ANDAMENTO", itens: [item], createdById: user.id },
+        select: { id: true },
+      }).catch(() => null);
+      if (plano) data.planoAcaoId = plano.id;
+    }
   }
 
   await prisma.naoConformidade.update({ where: { id: rnc.id }, data });
