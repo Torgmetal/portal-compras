@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { isBlobUrlSegura } from "@/lib/blob-url";
-import { calcStatusValidade, diasAlertaCategoria } from "@/lib/qualidade-status";
+import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qualidade-status";
 import { backupISODocumentoQualidade } from "@/lib/qualidade-doc-backup";
 
 export const runtime = "nodejs";
@@ -64,7 +64,7 @@ export async function GET(req) {
 
   // status calculado + filtros que dependem dele
   let lista = docs.map((d) => {
-    const st = calcStatusValidade(d.dataValidade, diasAlertaCategoria(d.categoria));
+    const st = calcStatusValidade(d.dataValidade, diasAlertaCategoria(d.categoria), usaMesInteiro(d.categoria));
     return {
       id: d.id,
       nome: d.nome,

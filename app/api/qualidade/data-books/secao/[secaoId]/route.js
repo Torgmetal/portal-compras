@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { calcStatusValidade, diasAlertaCategoria } from "@/lib/qualidade-status";
+import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qualidade-status";
 import { secaoUsaModulo1 } from "@/lib/databook-secoes";
 
 export const runtime = "nodejs";
@@ -41,7 +41,7 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ success: false, error: "Vincule ao menos um documento do Controle de Documentos antes de marcar como Anexado." }, { status: 400 });
     }
     const docs = await prisma.documentoQualidade.findMany({ where: { id: { in: ids } }, select: { categoria: true, dataValidade: true, ativo: true } });
-    const vencido = docs.find((d) => calcStatusValidade(d.dataValidade, diasAlertaCategoria(d.categoria)).key === "VENCIDO");
+    const vencido = docs.find((d) => calcStatusValidade(d.dataValidade, diasAlertaCategoria(d.categoria), usaMesInteiro(d.categoria)).key === "VENCIDO");
     if (vencido) {
       return NextResponse.json({ success: false, error: "Há documento vencido vinculado — renove no Controle de Documentos antes de anexar." }, { status: 400 });
     }

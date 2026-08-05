@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { calcStatusValidade, diasAlertaCategoria } from "@/lib/qualidade-status";
+import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qualidade-status";
 import { secaoUsaModulo1 } from "@/lib/databook-secoes";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ const schema = z.object({
 });
 
 function resolverDoc(d) {
-  const st = calcStatusValidade(d.dataValidade, diasAlertaCategoria(d.categoria));
+  const st = calcStatusValidade(d.dataValidade, diasAlertaCategoria(d.categoria), usaMesInteiro(d.categoria));
   return {
     id: d.id, nome: d.nome, tipo: d.tipo, norma: d.norma, categoria: d.categoria,
     importRef: d.importRef, numeroDocumento: d.numeroDocumento,

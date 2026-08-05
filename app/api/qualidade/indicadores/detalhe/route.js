@@ -62,5 +62,16 @@ export async function GET(req) {
     return NextResponse.json({ titulo: "Cumprimento do Plano de Auditorias Internas", colunas: ["Nº", "Setor", "Data", "Situação"], linhas, resumo: `${real} realizada(s) de ${vencidas.length} vencida(s) · ${vencidas.length ? Math.round((real / vencidas.length) * 100) : 0}%${futuras ? ` · ${futuras} programada(s) p/ depois` : ""}` });
   }
 
+  // Plano de calibração — equipamentos (controle de documentos) e situação (vigência = mês inteiro).
+  if (indicador === "plano_calibracao") {
+    const eqs = await prisma.documentoQualidade.findMany({ where: { categoria: "EQUIPAMENTOS", ativo: true, dataValidade: { not: null } }, select: { nome: true, dataValidade: true }, orderBy: { dataValidade: "asc" } });
+    const fimVal = (d) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0); // último dia do mês da validade
+    const now = new Date();
+    const refMs = anoTodo ? Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) : Date.UTC(ano, mes + 1, 0);
+    const linhas = eqs.map((e) => { const V = new Date(e.dataValidade); const emDia = fimVal(V) >= refMs; return [e.nome || "—", `${String(V.getUTCMonth() + 1).padStart(2, "0")}/${V.getUTCFullYear()}`, emDia ? "Em dia" : "Vencido"]; });
+    const venc = eqs.filter((e) => fimVal(new Date(e.dataValidade)) < refMs).length;
+    return NextResponse.json({ titulo: "Cumprimento do Plano de Calibração", colunas: ["Equipamento", "Validade (mês)", "Situação"], linhas, resumo: `${eqs.length - venc} em dia de ${eqs.length} · ${venc} vencido(s)` });
+  }
+
   return NextResponse.json({ error: "Este indicador ainda não tem detalhamento." }, { status: 404 });
 }

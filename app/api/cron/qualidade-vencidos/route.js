@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
-import { calcStatusValidade, diasAlertaCategoria } from "@/lib/qualidade-status";
+import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qualidade-status";
 import { requireRole } from "@/lib/session";
 import { montarEmailVencidos } from "@/lib/qualidade-alerta-email";
 import { registrarExecucao } from "@/lib/cron-monitor";
@@ -56,7 +56,7 @@ export async function GET(req) {
   });
   const vencidos = [], vencendo = [];
   for (const d of docs) {
-    d._st = calcStatusValidade(d.dataValidade, diasAlertaCategoria(d.categoria));
+    d._st = calcStatusValidade(d.dataValidade, diasAlertaCategoria(d.categoria), usaMesInteiro(d.categoria));
     if (d._st.key === "VENCIDO") vencidos.push(d);
     else if (d._st.key === "VENCENDO") vencendo.push(d);
   }

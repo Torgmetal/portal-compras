@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { isBlobUrlSegura } from "@/lib/blob-url";
 import { backupISODocumentoQualidade, moverDocumentoParaObsoleto } from "@/lib/qualidade-doc-backup";
-import { calcStatusValidade, diasAlertaCategoria } from "@/lib/qualidade-status";
+import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qualidade-status";
 
 export const runtime = "nodejs";
 
@@ -108,7 +108,7 @@ export async function DELETE(req, { params }) {
 
   // Se o documento estiver VENCIDO e tiver arquivo no SharePoint, move para a
   // pasta de Obsoletos (em vez de só deixar no lugar). Best-effort.
-  const status = calcStatusValidade(atual.dataValidade, diasAlertaCategoria(atual.categoria)).key;
+  const status = calcStatusValidade(atual.dataValidade, diasAlertaCategoria(atual.categoria), usaMesInteiro(atual.categoria)).key;
   let obsoleto = null;
   if (status === "VENCIDO" && atual.sharepointItemId) {
     obsoleto = await moverDocumentoParaObsoleto(atual, user.id);
