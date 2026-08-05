@@ -4,25 +4,27 @@ import { useRouter } from "next/navigation";
 import { ListChecks, Plus, Loader2, X, AlertCircle, CheckCircle2 } from "lucide-react";
 import { numPA, STATUS_PLANO } from "@/lib/plano-acao";
 
-// Lista de planos de ação 5W2H — usada como aba dentro de Auditorias Internas.
-export default function PlanosAcaoLista() {
+// Lista de planos de ação 5W2H. fonte="auditoria" (padrão, dentro de Auditorias
+// Internas) ou fonte="rnc" (dentro do módulo RNC — só os vindos de RNC, sem criar).
+export default function PlanosAcaoLista({ fonte = "auditoria" }) {
   const router = useRouter();
   const [planos, setPlanos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(false);
+  const rnc = fonte === "rnc";
 
   const carregar = useCallback(() => {
     setLoading(true);
-    fetch("/api/qualidade/planos-acao").then((r) => (r.ok ? r.json() : null)).then((j) => setPlanos(j?.planos || [])).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
-  }, []);
+    fetch(`/api/qualidade/planos-acao?fonte=${fonte}`).then((r) => (r.ok ? r.json() : null)).then((j) => setPlanos(j?.planos || [])).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
+  }, [fonte]);
   useEffect(() => { carregar(); }, [carregar]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <p className="text-xs text-torg-gray">Ações no formato 5W2H (o quê, por quê, onde, quem, quando, como, quanto) com acompanhamento e status por ação.</p>
-        <button onClick={() => setModal(true)} className="px-3.5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium flex items-center gap-1.5"><Plus size={16} /> Novo plano</button>
+        <p className="text-xs text-torg-gray">{rnc ? "Planos de ação 5W2H gerados a partir das RNCs (abra a RNC para editar a análise de causa)." : "Ações no formato 5W2H (o quê, por quê, onde, quem, quando, como, quanto) com acompanhamento e status por ação."}</p>
+        {!rnc && <button onClick={() => setModal(true)} className="px-3.5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark text-sm font-medium flex items-center gap-1.5"><Plus size={16} /> Novo plano</button>}
       </div>
 
       {loading ? (
@@ -32,7 +34,7 @@ export default function PlanosAcaoLista() {
       ) : planos.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
           <ListChecks size={38} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-torg-gray">Nenhum plano de ação ainda. Crie o primeiro.</p>
+          <p className="text-sm text-torg-gray">{rnc ? "Nenhum plano de ação de RNC ainda. Eles aparecem aqui quando a RNC tem um plano." : "Nenhum plano de ação ainda. Crie o primeiro."}</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">

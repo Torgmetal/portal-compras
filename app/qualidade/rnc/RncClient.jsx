@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, User, Upload, FileSpreadsheet } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, User, Upload, FileSpreadsheet, ListChecks } from "lucide-react";
 import { numRNC, TIPOS_RNC, STATUS_RNC, statusRncLabel, diasParaPrazo } from "@/lib/nao-conformidade";
+import PlanosAcaoLista from "../auditorias-internas/PlanosAcaoLista";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
@@ -16,7 +17,9 @@ function PrazoBadge({ prazo, encerradaEm }) {
 
 export default function RncClient() {
   const router = useRouter();
-  const [aba, setAba] = useState("INTERNA");
+  const searchParams = useSearchParams();
+  const abaUrl = searchParams.get("aba");
+  const [aba, setAba] = useState(["INTERNA", "CLIENTE", "PLANOS"].includes(abaUrl) ? abaUrl : "INTERNA");
   const [itens, setItens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -24,6 +27,7 @@ export default function RncClient() {
   const [modalImport, setModalImport] = useState(false);
 
   const carregar = useCallback(() => {
+    if (aba === "PLANOS") { setLoading(false); return; } // aba renderiza o componente de planos
     setLoading(true);
     fetch(`/api/qualidade/rnc?tipo=${aba}`).then((r) => (r.ok ? r.json() : null))
       .then((j) => setItens(j?.rncs || [])).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
@@ -39,14 +43,16 @@ export default function RncClient() {
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2.5"><AlertOctagon className="text-torg-blue" size={28} /> RNC — Não Conformidades</h2>
           <p className="text-sm text-torg-gray mt-1">Relatório de Não Conformidade (FORM 20). Internas e as recebidas de clientes.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setModalImport(true)} className="px-3.5 py-2.5 border border-gray-300 text-torg-dark rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2"><Upload size={17} /> Importar</button>
-          <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova RNC {TIPOS_RNC[aba].curto.toLowerCase()}</button>
-        </div>
+        {aba !== "PLANOS" && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setModalImport(true)} className="px-3.5 py-2.5 border border-gray-300 text-torg-dark rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2"><Upload size={17} /> Importar</button>
+            <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova RNC {TIPOS_RNC[aba].curto.toLowerCase()}</button>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-1 border-b border-gray-200">
-        {[{ k: "INTERNA", l: "RNC Interna", icon: Building2 }, { k: "CLIENTE", l: "RNC de Cliente", icon: User }].map((t) => {
+        {[{ k: "INTERNA", l: "RNC Interna", icon: Building2 }, { k: "CLIENTE", l: "RNC de Cliente", icon: User }, { k: "PLANOS", l: "Plano de Ação", icon: ListChecks }].map((t) => {
           const Icon = t.icon;
           return (
             <button key={t.k} onClick={() => setAba(t.k)}
@@ -57,7 +63,9 @@ export default function RncClient() {
         })}
       </div>
 
-      {loading ? (
+      {aba === "PLANOS" ? (
+        <PlanosAcaoLista fonte="rnc" />
+      ) : loading ? (
         <div className="py-16 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin mb-2" /> Carregando…</div>
       ) : erro ? (
         <div className="py-10 text-center text-red-600 text-sm">{erro}</div>

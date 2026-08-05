@@ -65,7 +65,7 @@ export default function PlanoAcaoDetalheClient({ id }) {
   return (
     <div className="space-y-5 max-w-5xl">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Link href="/qualidade/auditorias-internas?aba=planos" className="text-sm text-torg-gray hover:text-torg-blue inline-flex items-center gap-1"><ArrowLeft size={15} /> Planos de ação</Link>
+        <Link href={p?.origem?.startsWith("RNC-") ? "/qualidade/rnc?aba=PLANOS" : "/qualidade/auditorias-internas?aba=planos"} className="text-sm text-torg-gray hover:text-torg-blue inline-flex items-center gap-1"><ArrowLeft size={15} /> Planos de ação</Link>
         <div className="flex items-center gap-2">
           <a href={`/api/qualidade/planos-acao/${id}/pdf`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-torg-dark inline-flex items-center gap-1.5"><FileDown size={14} /> PDF</a>
           <button onClick={excluir} disabled={salvando} className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-torg-gray"><Trash2 size={14} /></button>

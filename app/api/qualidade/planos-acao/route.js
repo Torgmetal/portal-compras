@@ -7,11 +7,15 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req) {
   try { await requireRole(["ADMIN", "QUALIDADE"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const planos = await prisma.planoAcao.findMany({ orderBy: [{ status: "asc" }, { numero: "desc" }], take: 300 });
+  // fonte=rnc → só os planos vindos de RNC (origem "RNC-…"); fonte=auditoria → o resto.
+  const fonte = new URL(req.url).searchParams.get("fonte");
+  const where = fonte === "rnc" ? { origem: { startsWith: "RNC-" } }
+    : fonte === "auditoria" ? { NOT: { origem: { startsWith: "RNC-" } } } : {};
+  const planos = await prisma.planoAcao.findMany({ where, orderBy: [{ status: "asc" }, { numero: "desc" }], take: 300 });
   const lista = planos.map((p) => {
     const itens = Array.isArray(p.itens) ? p.itens : [];
     return {
