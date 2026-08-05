@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { INDICADORES_ISO } from "@/lib/indicadores-iso";
+import { indicadoresQualidadeIso } from "@/lib/indicadores-qualidade-iso";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,6 @@ const diasUteis = (a, b) => {
 };
 const uteisNoMes = (ano, m) => { let c = 0; const dim = new Date(Date.UTC(ano, m + 1, 0)).getUTCDate(); for (let d = 1; d <= dim; d++) { const w = new Date(Date.UTC(ano, m, d)).getUTCDay(); if (w !== 0 && w !== 6) c++; } return c; };
 const arr12 = () => Array.from({ length: 12 }, () => null);
-const AUD_OK = new Set(["REALIZADA", "EMITIDO", "FINALIZADO"]);
 
 export async function GET(req) {
   try { await requireRole(["ADMIN", "QUALIDADE", "RH"]); }
@@ -36,7 +36,7 @@ export async function GET(req) {
   const yIni = new Date(Date.UTC(ano, 0, 1)), yFim = new Date(Date.UTC(ano + 1, 0, 1));
   const mesFim = ano < hoje.getUTCFullYear() ? 11 : hoje.getUTCMonth(); // não calcula meses futuros
 
-  const series = {}; // id -> [12]
+  const series = {}, acumulados = {}; // id -> [12] · id -> valor acumulado do ano
   const pct = (num, den) => (den > 0 ? Math.round((num / den) * 1000) / 10 : null);
 
   // ── Comercial: conversão + aderência do prazo da proposta ──
@@ -66,11 +66,9 @@ export async function GET(req) {
     for (const o of ops) { const m = o.dataFimReal.getUTCMonth(); t[m] = (t[m] || 0) + 1; if (o.dataFimReal <= o.dataFimPrevista) ok[m] = (ok[m] || 0) + 1; }
     series.prazo_fabricacao = ok.map((v, m) => pct(v || 0, t[m] || 0)); }
 
-  // ── Qualidade: cumprimento do plano de auditorias internas ──
-  { const aud = await prisma.auditoriaInterna.findMany({ where: { dataAuditoria: { gte: yIni, lt: yFim } }, select: { dataAuditoria: true, status: true } });
-    const real = arr12(), plan = arr12();
-    for (const a of aud) { const m = a.dataAuditoria.getUTCMonth(); plan[m] = (plan[m] || 0) + 1; if (AUD_OK.has(a.status)) real[m] = (real[m] || 0) + 1; }
-    series.plano_auditorias = real.map((v, m) => pct(v || 0, plan[m] || 0)); }
+  // ── Qualidade (via lib — mesma fonte do PDF): RNCs do cliente + recorrência + auditorias ──
+  { const { indicadores: qInds } = await indicadoresQualidadeIso(prisma, ano);
+    for (const qi of qInds) { series[qi.id] = qi.serie; acumulados[qi.id] = qi.acumulado; } }
 
   // ── RH: turnover + absenteísmo + acidentes com afastamento ──
   const funcs = await prisma.funcionario.findMany({ select: { dataAdmissao: true, dataDemissao: true } });
@@ -86,15 +84,9 @@ export async function GET(req) {
     const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; for (const a of ac) { const m = a.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; }
     series.acidentes_afastamento = s; }
 
-  // ── Qualidade (RNC): RNCs do cliente + recorrência de NC + erros de projeto ──
-  const rncs = await prisma.naoConformidade.findMany({ where: { data: { gte: yIni, lt: yFim } }, select: { data: true, tipo: true, origem: true, pertinente: true, recorrente: true, processoArea: true } });
-  { const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; // RNCs do cliente (contagem de pertinentes no mês)
-    for (const r of rncs) { if ((r.origem === "CLIENTE" || r.tipo === "CLIENTE") && r.pertinente) { const m = r.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; } }
-    series.rnc_cliente = s; }
-  { const rec = arr12(), tot = arr12(); // recorrência (recorrentes ÷ total)
-    for (const r of rncs) { const m = r.data.getUTCMonth(); tot[m] = (tot[m] || 0) + 1; if (r.recorrente) rec[m] = (rec[m] || 0) + 1; }
-    series.recorrencia_nc = rec.map((v, m) => pct(v || 0, tot[m] || 0)); }
-  { const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; const engRe = /ENGENH|PROJET/i; // erros de projeto (contagem de RNCs de engenharia/projeto)
+  // ── Engenharia: erros de projeto (contagem de RNCs de engenharia/projeto) ──
+  const rncs = await prisma.naoConformidade.findMany({ where: { data: { gte: yIni, lt: yFim } }, select: { data: true, processoArea: true } });
+  { const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; const engRe = /ENGENH|PROJET/i;
     for (const r of rncs) { if (engRe.test(r.processoArea || "")) { const m = r.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; } }
     series.erros_projeto = s; }
 
@@ -110,7 +102,7 @@ export async function GET(req) {
   const indicadores = INDICADORES_ISO.map((ind) => {
     const serie = series[ind.id] || arr12();
     const atual = serie[mes] ?? null;
-    return { ...ind, serie, atual };
+    return { ...ind, serie, atual, acumulado: acumulados[ind.id] ?? null };
   });
 
   return NextResponse.json({ ano, mes, mesFim, indicadores });

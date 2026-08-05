@@ -4,5 +4,5 @@ import IndicadoresIsoClient from "./IndicadoresIsoClient";
 
 export default async function Page() {
   await requireRole(["ADMIN", "QUALIDADE", "RH"]);
-  return <IndicadoresIsoClient />;
+  return <IndicadoresIsoClient detalheEndpoint="/api/qualidade/indicadores/detalhe" pdfEndpoint="/api/qualidade/indicadores/pdf" />;
 }
