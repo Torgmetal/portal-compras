@@ -95,7 +95,7 @@ export default function RncClient() {
                     <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{numRNC(r.numero, r.ano)}{r.numeroCliente ? <span className="text-[10px] text-torg-gray font-sans ml-1">({r.numeroCliente})</span> : ""}</td>
                     <td className="px-3 py-2 text-torg-dark whitespace-nowrap">{fmtD(r.data)}</td>
                     <td className="px-3 py-2 text-torg-dark">{r.cliente || "—"}</td>
-                    <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{r.opNumero || "—"}</td>
+                    <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{r.opNumero ? r.opNumero.replace(/^[Tt]\s*/, "") : "—"}</td>
                     <td className="px-3 py-2 text-torg-gray max-w-[280px] truncate">{r.descricao || <span className="italic">sem descrição</span>}{r.recorrente && <span className="ml-1.5 text-[9px] font-bold text-amber-700 bg-amber-50 rounded px-1 py-0.5">recorrente</span>}</td>
                     <td className="px-3 py-2 whitespace-nowrap"><PrazoBadge prazo={r.prazoResposta} encerradaEm={r.encerradaEm} /></td>
                     <td className="px-3 py-2 text-center"><StatusChip s={r.status} /></td>
