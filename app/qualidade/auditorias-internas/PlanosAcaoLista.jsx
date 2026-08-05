@@ -12,6 +12,7 @@ export default function PlanosAcaoLista({ fonte = "auditoria" }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(false);
+  const [sub, setSub] = useState("ATIVOS"); // ATIVOS | HISTORICO (concluídos)
   const rnc = fonte === "rnc";
 
   const carregar = useCallback(() => {
@@ -19,6 +20,11 @@ export default function PlanosAcaoLista({ fonte = "auditoria" }) {
     fetch(`/api/qualidade/planos-acao?fonte=${fonte}`).then((r) => (r.ok ? r.json() : null)).then((j) => setPlanos(j?.planos || [])).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
   }, [fonte]);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Concluídos vão para o Histórico; o resto (em andamento / cancelado) fica em Ativos.
+  const ativos = planos.filter((p) => p.status !== "CONCLUIDO");
+  const historico = planos.filter((p) => p.status === "CONCLUIDO");
+  const lista = sub === "HISTORICO" ? historico : ativos;
 
   return (
     <div className="space-y-4">
@@ -37,7 +43,15 @@ export default function PlanosAcaoLista({ fonte = "auditoria" }) {
           <p className="text-sm text-torg-gray">{rnc ? "Nenhum plano de ação de RNC ainda. Eles aparecem aqui quando a RNC tem um plano." : "Nenhum plano de ação ainda. Crie o primeiro."}</p>
         </div>
       ) : (
-        rnc ? (
+        <>
+          <div className="flex items-center gap-1 border border-gray-200 rounded-lg p-0.5 w-fit bg-gray-50">
+            {[{ k: "ATIVOS", l: "Em andamento", n: ativos.length }, { k: "HISTORICO", l: "Histórico", n: historico.length }].map((t) => (
+              <button key={t.k} onClick={() => setSub(t.k)} className={`px-3 py-1.5 text-[12px] font-medium rounded-md transition-colors ${sub === t.k ? "bg-white text-torg-blue shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>{t.l} <span className="text-[10px] opacity-70">({t.n})</span></button>
+            ))}
+          </div>
+          {lista.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-sm text-torg-gray">{sub === "HISTORICO" ? "Nenhum plano concluído ainda." : "Nenhum plano em andamento."}</div>
+          ) : rnc ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-[12px] table-fixed">
@@ -58,7 +72,7 @@ export default function PlanosAcaoLista({ fonte = "auditoria" }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {planos.map((p) => {
+                  {lista.map((p) => {
                     const pct = p.total ? Math.round((p.concluidos / p.total) * 100) : 0;
                     return (
                       <tr key={p.id} onClick={() => router.push(`/qualidade/planos-acao/${p.id}`)} className="hover:bg-torg-blue-50/40 cursor-pointer align-top">
@@ -82,7 +96,7 @@ export default function PlanosAcaoLista({ fonte = "auditoria" }) {
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {planos.map((p) => {
+            {lista.map((p) => {
               const pct = p.total ? Math.round((p.concluidos / p.total) * 100) : 0;
               return (
                 <button key={p.id} onClick={() => router.push(`/qualidade/planos-acao/${p.id}`)} className="text-left bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-torg-blue-200 hover:shadow transition-all">
@@ -105,7 +119,8 @@ export default function PlanosAcaoLista({ fonte = "auditoria" }) {
               );
             })}
           </div>
-        )
+          )}
+        </>
       )}
 
       {modal && <ModalNovoPlano onClose={() => setModal(false)} onCriado={(id) => router.push(`/qualidade/planos-acao/${id}`)} />}
