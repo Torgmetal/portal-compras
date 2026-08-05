@@ -115,12 +115,21 @@ function ModalImportar({ onClose, onFim }) {
     if (!files.length) return setErro("Selecione os arquivos .xls das RNCs.");
     setErro(""); setEnviando(true);
     try {
-      const fd = new FormData();
-      for (const f of files) fd.append("files", f);
-      const r = await fetch("/api/qualidade/rnc/importar", { method: "POST", body: fd });
-      const j = await r.json();
-      if (!r.ok || !j.success) throw new Error(j.error || "Falha na importação");
-      setRes(j); onFim();
+      // Parse no navegador (os .xls têm vários MB de fotos; só o JSON pequeno sobe).
+      const { parseRncForm20 } = await import("@/lib/parse-rnc-form20");
+      const registros = [], errosParse = [];
+      for (const f of files) {
+        try { registros.push({ ...parseRncForm20(await f.arrayBuffer()), arquivo: f.name }); }
+        catch { errosParse.push({ arquivo: f.name, resultado: "erro", erro: "não consegui ler o arquivo" }); }
+      }
+      let j = { criadas: 0, jaExistem: 0, erros: 0, resultados: [] };
+      if (registros.length) {
+        const r = await fetch("/api/qualidade/rnc/importar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ registros }) });
+        j = await r.json();
+        if (!r.ok || !j.success) throw new Error(j.error || "Falha na importação");
+      }
+      setRes({ ...j, erros: (j.erros || 0) + errosParse.length, total: files.length, resultados: [...(j.resultados || []), ...errosParse] });
+      onFim();
     } catch (e) { setErro(e.message); } finally { setEnviando(false); }
   }
 

@@ -1,42 +1,42 @@
-// Importa RNCs do FORM 20 (.xls) em massa. Upload de vários arquivos → parse
-// determinístico → cria a NaoConformidade (preservando o nº/ano do documento) +
-// o Plano de Ação 5W2H. Pula as que já existem (mesmo nº+ano).
+// Importa RNCs do FORM 20. O PARSE acontece no navegador (lib/parse-rnc-form20,
+// SheetJS client-side) — os arquivos .xls têm vários MB (fotos embutidas) e não
+// cabem no corpo da rota serverless (~4,5MB). Aqui recebemos só o JSON já extraído
+// e criamos a NaoConformidade (preservando nº/ano) + o Plano de Ação 5W2H. Pula as
+// que já existem (nº+ano+tipo INTERNA).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { parseRncForm20 } from "@/lib/parse-rnc-form20";
 import { numRNC } from "@/lib/nao-conformidade";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "");
+const D = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d) ? null : d; };
 
 export async function POST(req) {
   let user;
   try { user = await requireRole(["ADMIN", "QUALIDADE"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  let files;
-  try { files = (await req.formData()).getAll("files").filter((f) => f && typeof f.arrayBuffer === "function"); }
-  catch { return NextResponse.json({ error: "Envie os arquivos .xls" }, { status: 400 }); }
-  if (!files.length) return NextResponse.json({ error: "Nenhum arquivo enviado." }, { status: 400 });
-  if (files.length > 200) return NextResponse.json({ error: "Máximo de 200 arquivos por vez." }, { status: 400 });
+  let registros;
+  try { registros = (await req.json()).registros; }
+  catch { return NextResponse.json({ error: "Payload inválido." }, { status: 400 }); }
+  if (!Array.isArray(registros) || !registros.length) return NextResponse.json({ error: "Nenhuma RNC para importar." }, { status: 400 });
+  if (registros.length > 500) return NextResponse.json({ error: "Máximo de 500 por vez." }, { status: 400 });
 
   const resultados = [];
-  for (const file of files) {
-    const nome = file.name || "arquivo.xls";
+  for (const p of registros) {
+    const nome = p.arquivo || "arquivo.xls";
     try {
-      const buf = Buffer.from(await file.arrayBuffer());
-      const p = parseRncForm20(buf);
       if (!p.numero || !p.ano) { resultados.push({ arquivo: nome, resultado: "erro", erro: "Não consegui ler o número/ano da RNC" }); continue; }
 
       const existe = await prisma.naoConformidade.findFirst({ where: { ano: p.ano, numero: p.numero, tipo: "INTERNA" }, select: { id: true } });
       if (existe) { resultados.push({ arquivo: nome, resultado: "ja_existe", numero: p.numero, ano: p.ano }); continue; }
 
-      // Plano de ação 5W2H (reaproveita o módulo existente)
       let planoAcaoId = null;
-      const temPlano = p.plano && (p.plano.oque || p.plano.como || p.plano.porque || p.plano.onde || p.plano.quem);
+      const pl = p.plano || {};
+      const temPlano = pl.oque || pl.como || pl.porque || pl.onde || pl.quem;
       if (temPlano) {
         const ult = await prisma.planoAcao.findFirst({ orderBy: { numero: "desc" }, select: { numero: true } });
         const encerrada = p.status === "ENCERRADA";
@@ -44,9 +44,9 @@ export async function POST(req) {
           data: {
             numero: (ult?.numero || 0) + 1,
             titulo: `${numRNC(p.numero, p.ano)} — ${(p.descricao || "Não conformidade").slice(0, 70)}`,
-            origem: numRNC(p.numero, p.ano), responsavel: p.plano.quem || null,
+            origem: numRNC(p.numero, p.ano), responsavel: pl.quem || null,
             status: encerrada ? "CONCLUIDO" : "EM_ANDAMENTO",
-            itens: [{ oque: p.plano.oque || "", porque: p.plano.porque || "", onde: p.plano.onde || "", quem: p.plano.quem || "", quando: fmtD(p.prazoResposta), como: p.plano.como || "", quanto: "", status: encerrada ? "CONCLUIDO" : "PENDENTE", acompanhamento: p.acompanhamento || "", concluidoEm: p.realizadoEm ? new Date(p.realizadoEm).toISOString() : null }],
+            itens: [{ oque: pl.oque || "", porque: pl.porque || "", onde: pl.onde || "", quem: pl.quem || "", quando: fmtD(D(p.prazoResposta)), como: pl.como || "", quanto: "", status: encerrada ? "CONCLUIDO" : "PENDENTE", acompanhamento: p.acompanhamento || "", concluidoEm: D(p.realizadoEm)?.toISOString() || null }],
             createdById: user.id,
           },
           select: { id: true },
@@ -56,26 +56,26 @@ export async function POST(req) {
 
       await prisma.naoConformidade.create({
         data: {
-          numero: p.numero, ano: p.ano, tipo: "INTERNA", data: p.data || new Date(Date.UTC(p.ano, 0, 1)),
-          cliente: p.cliente, opNumero: p.opNumero, desenhoProjetoMarca: p.desenhoProjetoMarca,
-          origem: p.origem, processoArea: p.processoArea, descricao: p.descricao,
-          disposicao: p.disposicao, necessitaAcao: p.necessitaAcao, elaborador: p.elaborador,
-          abrangencia: p.abrangencia, resultadoReinspecao: p.resultadoReinspecao,
-          causas: p.causas, cincoPorques: p.cincoPorques || [], planoAcaoId,
-          prazoResposta: p.prazoResposta, realizadoEm: p.realizadoEm, acompanhadoPor: p.acompanhadoPor,
-          acompanhamento: p.acompanhamento, avaliacaoEficacia: p.avaliacaoEficacia,
-          encerradaPor: p.encerradaPor, encerradaEm: p.encerradaEm, status: p.status || "ABERTA",
+          numero: p.numero, ano: p.ano, tipo: "INTERNA", data: D(p.data) || new Date(Date.UTC(p.ano, 0, 1)),
+          cliente: p.cliente || null, opNumero: p.opNumero || null, desenhoProjetoMarca: p.desenhoProjetoMarca || null,
+          origem: p.origem || null, processoArea: p.processoArea || null, descricao: p.descricao || null,
+          disposicao: p.disposicao || null, necessitaAcao: p.necessitaAcao || null, elaborador: p.elaborador || null,
+          abrangencia: p.abrangencia || null, resultadoReinspecao: p.resultadoReinspecao || null,
+          causas: p.causas || null, cincoPorques: Array.isArray(p.cincoPorques) ? p.cincoPorques : [], planoAcaoId,
+          prazoResposta: D(p.prazoResposta), realizadoEm: D(p.realizadoEm), acompanhadoPor: p.acompanhadoPor || null,
+          acompanhamento: p.acompanhamento || null, avaliacaoEficacia: p.avaliacaoEficacia || null,
+          encerradaPor: p.encerradaPor || null, encerradaEm: D(p.encerradaEm), status: p.status || "ABERTA",
           createdById: user.id,
         },
       });
-      resultados.push({ arquivo: nome, resultado: "criada", numero: p.numero, ano: p.ano, cliente: p.cliente, descricao: p.descricao, plano: !!planoAcaoId });
+      resultados.push({ arquivo: nome, resultado: "criada", numero: p.numero, ano: p.ano });
     } catch (e) {
-      resultados.push({ arquivo: nome, resultado: "erro", erro: e.message?.slice(0, 160) || "falha ao ler" });
+      resultados.push({ arquivo: nome, resultado: "erro", erro: e.message?.slice(0, 160) || "falha ao criar" });
     }
   }
 
   const criadas = resultados.filter((r) => r.resultado === "criada").length;
   const jaExistem = resultados.filter((r) => r.resultado === "ja_existe").length;
   const erros = resultados.filter((r) => r.resultado === "erro").length;
-  return NextResponse.json({ success: true, total: files.length, criadas, jaExistem, erros, resultados });
+  return NextResponse.json({ success: true, total: registros.length, criadas, jaExistem, erros, resultados });
 }
