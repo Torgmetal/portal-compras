@@ -69,8 +69,12 @@ export default function RncDetalheClient({ id }) {
     if (!file) return;
     setErro(""); setAnalisando(true);
     try {
-      const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error("Falha ao ler o arquivo")); r.readAsDataURL(file); });
-      const r = await fetch(`/api/qualidade/rnc/${id}/analisar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base64: b64, tipo: file.type, nome: file.name }) });
+      // Sobe o documento DIRETO pro Blob (upload por token) — RNC de cliente costuma
+      // ser um PDF pesado (scan) e estourava o corpo da rota (~4,5MB). Só a URL vai.
+      const { upload } = await import("@vercel/blob/client");
+      const safe = (file.name || "rnc").replace(/[^\w.-]+/g, "-");
+      const blob = await upload(`qualidade/rnc/${Date.now()}-${safe}`, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+      const r = await fetch(`/api/qualidade/rnc/${id}/analisar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anexoUrl: blob.url, tipo: file.type }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Falha na análise");
       flash("Análise concluída — descrição, causas, 5 porquês e plano de ação preenchidos pela IA. Revise antes de encerrar."); carregar();

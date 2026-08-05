@@ -1,8 +1,9 @@
-// POST /api/qualidade/rnc/[id]/analisar  { base64, tipo, nome }
-// Sobe o documento da RNC do cliente no Blob, analisa com o Claude (pontos, causas,
-// 5 porquês) e JÁ preenche a RNC + cria o Plano de Ação 5W2H para não reincidir.
+// POST /api/qualidade/rnc/[id]/analisar  { anexoUrl, tipo }
+// O documento da RNC do cliente é subido DIRETO pro Blob pelo cliente (upload por
+// token — evita o limite de ~4,5MB do corpo da rota). Aqui recebemos só a URL,
+// baixamos, analisamos com o Claude (pontos, causas, 5 porquês) e JÁ preenchemos a
+// RNC + criamos o Plano de Ação 5W2H para não reincidir.
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { createRateLimiter } from "@/lib/rate-limit";
@@ -14,7 +15,7 @@ export const maxDuration = 120;
 
 const limiter = createRateLimiter({ name: "rnc-analisar", maxRequests: 12, windowMs: 60_000 });
 const TIPOS = { "application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
-const MAX_B64 = 12 * 1024 * 1024;
+const MAX_BYTES = 20 * 1024 * 1024;
 
 export async function POST(req, { params }) {
   let user;
@@ -30,23 +31,23 @@ export async function POST(req, { params }) {
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Payload inválido" }, { status: 400 }); }
   const tipo = String(body.tipo || "").toLowerCase();
-  const b64 = String(body.base64 || "").includes(",") ? String(body.base64).split(",")[1] : String(body.base64 || "");
+  const anexoUrl = String(body.anexoUrl || "");
   if (!TIPOS[tipo]) return NextResponse.json({ error: "Envie o documento em PDF, JPG, PNG ou WEBP." }, { status: 415 });
-  if (!b64) return NextResponse.json({ error: "Anexo vazio." }, { status: 400 });
-  if (b64.length > MAX_B64) return NextResponse.json({ error: "Documento muito grande. Reduza ou divida o arquivo." }, { status: 413 });
+  if (!/^https?:\/\//.test(anexoUrl)) return NextResponse.json({ error: "Anexo inválido — refaça o upload." }, { status: 400 });
 
-  // 1) guarda o documento no Blob
-  let anexoUrl = rnc.anexoUrl || null;
+  // 1) baixa o documento do Blob (o cliente já subiu direto por token — o arquivo
+  // pesado não passa pelo corpo da rota; evita o limite de ~4,5MB).
+  let buf;
   try {
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      const blob = await put(`qualidade/rnc/${numRNC(rnc.numero, rnc.ano).replace("/", "-")}.${TIPOS[tipo]}`, Buffer.from(b64, "base64"), { access: "public", addRandomSuffix: true, contentType: tipo });
-      anexoUrl = blob.url;
-    }
-  } catch { /* segue sem guardar o anexo */ }
+    const r = await fetch(anexoUrl);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    buf = Buffer.from(await r.arrayBuffer());
+  } catch (e) { return NextResponse.json({ error: "Não consegui baixar o anexo do storage: " + (e?.message || "erro") }, { status: 502 }); }
+  if (buf.length > MAX_BYTES) return NextResponse.json({ error: "Documento muito grande (máx 20MB). Reduza ou divida o arquivo." }, { status: 413 });
 
   // 2) analisa com a IA
   let a;
-  try { a = await analisarRncCliente(b64, tipo); }
+  try { a = await analisarRncCliente(buf, tipo); }
   catch (e) { return NextResponse.json({ error: "Falha na análise por IA: " + (e?.message || "erro") }, { status: 502 }); }
   if (!a) return NextResponse.json({ error: "Não consegui ler o documento. Confira se é um PDF/imagem legível." }, { status: 422 });
 
