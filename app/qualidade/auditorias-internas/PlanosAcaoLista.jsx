@@ -37,30 +37,68 @@ export default function PlanosAcaoLista({ fonte = "auditoria" }) {
           <p className="text-sm text-torg-gray">{rnc ? "Nenhum plano de ação de RNC ainda. Eles aparecem aqui quando a RNC tem um plano." : "Nenhum plano de ação ainda. Crie o primeiro."}</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {planos.map((p) => {
-            const pct = p.total ? Math.round((p.concluidos / p.total) * 100) : 0;
-            return (
-              <button key={p.id} onClick={() => router.push(`/qualidade/planos-acao/${p.id}`)} className="text-left bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-torg-blue-200 hover:shadow transition-all">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-semibold text-torg-blue text-sm">{numPA(p.numero)}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_PLANO[p.status]?.cor}`}>{STATUS_PLANO[p.status]?.label || p.status}</span>
+        rnc ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[12px]">
+                <thead className="bg-gray-50/60 text-torg-gray">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Nº</th>
+                    <th className="text-left px-3 py-2 font-medium">Título / origem</th>
+                    <th className="text-left px-3 py-2 font-medium">Responsável</th>
+                    <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Ações</th>
+                    <th className="text-center px-3 py-2 font-medium whitespace-nowrap">Situação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {planos.map((p) => {
+                    const pct = p.total ? Math.round((p.concluidos / p.total) * 100) : 0;
+                    return (
+                      <tr key={p.id} onClick={() => router.push(`/qualidade/planos-acao/${p.id}`)} className="hover:bg-torg-blue-50/40 cursor-pointer">
+                        <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap align-top">{numPA(p.numero)}</td>
+                        <td className="px-3 py-2"><div className="font-semibold text-torg-dark truncate max-w-[440px]">{p.titulo}</div><div className="text-[11px] text-torg-gray truncate">{p.origem || "—"}</div></td>
+                        <td className="px-3 py-2 text-torg-gray whitespace-nowrap align-top">{p.responsavel || "—"}</td>
+                        <td className="px-3 py-2 align-top">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-20 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} /></div>
+                            <span className="text-[11px] text-torg-gray whitespace-nowrap tabular-nums">{p.concluidos}/{p.total}</span>
+                            {p.atrasados > 0 && <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 whitespace-nowrap">{p.atrasados} atras.</span>}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center align-top"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_PLANO[p.status]?.cor}`}>{STATUS_PLANO[p.status]?.label || p.status}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {planos.map((p) => {
+              const pct = p.total ? Math.round((p.concluidos / p.total) * 100) : 0;
+              return (
+                <button key={p.id} onClick={() => router.push(`/qualidade/planos-acao/${p.id}`)} className="text-left bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-torg-blue-200 hover:shadow transition-all">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold text-torg-blue text-sm">{numPA(p.numero)}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_PLANO[p.status]?.cor}`}>{STATUS_PLANO[p.status]?.label || p.status}</span>
+                      </div>
+                      <p className="text-sm font-semibold text-torg-dark mt-1 truncate">{p.titulo}</p>
+                      <p className="text-[11px] text-torg-gray mt-0.5 truncate">{p.origem ? `Origem: ${p.origem}` : "—"}{p.responsavel ? ` · ${p.responsavel}` : ""}</p>
                     </div>
-                    <p className="text-sm font-semibold text-torg-dark mt-1 truncate">{p.titulo}</p>
-                    <p className="text-[11px] text-torg-gray mt-0.5 truncate">{p.origem ? `Origem: ${p.origem}` : "—"}{p.responsavel ? ` · ${p.responsavel}` : ""}</p>
+                    {p.atrasados > 0 && <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 whitespace-nowrap">{p.atrasados} atrasada{p.atrasados > 1 ? "s" : ""}</span>}
                   </div>
-                  {p.atrasados > 0 && <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 whitespace-nowrap">{p.atrasados} atrasada{p.atrasados > 1 ? "s" : ""}</span>}
-                </div>
-                <div className="mt-3">
-                  <div className="flex items-center justify-between text-[10px] text-torg-gray mb-1"><span>{p.concluidos}/{p.total} ações concluídas</span><span>{pct}%</span></div>
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} /></div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[10px] text-torg-gray mb-1"><span>{p.concluidos}/{p.total} ações concluídas</span><span>{pct}%</span></div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} /></div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )
       )}
 
       {modal && <ModalNovoPlano onClose={() => setModal(false)} onCriado={(id) => router.push(`/qualidade/planos-acao/${id}`)} />}
