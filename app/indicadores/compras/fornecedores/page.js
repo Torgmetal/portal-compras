@@ -1,7 +1,6 @@
-import { requireRole } from "@/lib/session";
-import IqfClient from "./IqfClient";
+import { redirect } from "next/navigation";
 
-export default async function ComprasFornecedoresPage() {
-  await requireRole(["ADMIN", "COMPRAS"]);
-  return <IqfClient />;
+// Movido para dentro do módulo Compras. Redireciona o link antigo.
+export default function ComprasFornecedoresRedirect() {
+  redirect("/compras/indicadores/fornecedores");
 }

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Activity, TrendingUp, ShoppingCart, Star,
+  Activity, TrendingUp,
   BarChart3, ChevronDown, ChevronRight, Target, DollarSign, Zap, Users, Briefcase,
   UserMinus, BedDouble, ShieldAlert, GraduationCap, Timer, CalendarRange, Factory,
 } from "lucide-react";
@@ -11,16 +11,8 @@ import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const setores = [
-  {
-    id: "compras",
-    label: "Compras",
-    icon: ShoppingCart,
-    base: "/indicadores/compras",
-    sub: [
-      { href: "/indicadores/compras", label: "Indicadores ISO", icon: BarChart3, exact: true },
-      { href: "/indicadores/compras/fornecedores", label: "Avaliação Fornecedores (IQF)", icon: Star },
-    ],
-  },
+  // Compras saiu daqui — os indicadores de Compras agora ficam DENTRO do módulo
+  // Compras (/compras/indicadores), pra não jogar o usuário no módulo Indicadores.
   {
     id: "comercial",
     label: "Comercial",

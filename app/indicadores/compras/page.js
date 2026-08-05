@@ -1,7 +1,7 @@
-import { requireRole } from "@/lib/session";
-import IndicadoresIsoClient from "@/app/qualidade/indicadores/IndicadoresIsoClient";
+import { redirect } from "next/navigation";
 
-export default async function ComprasIndicadoresPage() {
-  await requireRole(["ADMIN", "COMPRAS"]);
-  return <IndicadoresIsoClient processo="COMPRAS" endpoint="/api/compras/indicadores/iso" titulo="Indicadores de Compras" />;
+// Os indicadores de Compras agora ficam DENTRO do módulo Compras (pra não jogar o
+// usuário no módulo "Indicadores" com todos os setores). Redireciona links antigos.
+export default function ComprasIndicadoresRedirect() {
+  redirect("/compras/indicadores");
 }
