@@ -1804,6 +1804,7 @@ model NaoConformidade {
   fotos               Json      @default("[]") // registro fotográfico [{ url, legenda }]
   anexos              Json      @default("[]") // anexos p/ compor o relatório [{ url, nome, tipo }] (imagens/PDF/docs)
   disposicao          String? // APROVAR_CONCESSAO | RETRABALHAR | REFUGAR | DEVOLVER_FORNECEDOR
+  pesoRetrabalhoKg    Float? // peso retrabalhado (kg) — base do indicador de Retrabalho da Produção
   elaborador          String?
   resultadoReinspecao String?
   abrangencia         String?

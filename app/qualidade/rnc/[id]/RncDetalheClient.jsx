@@ -18,6 +18,7 @@ export default function RncDetalheClient({ id }) {
   const [subindo, setSubindo] = useState(false);
   const [extraindo, setExtraindo] = useState(false);
   const [criandoPlano, setCriandoPlano] = useState(false);
+  const [puxandoPeso, setPuxandoPeso] = useState(false);
   const [msg, setMsg] = useState("");
 
   const carregar = useCallback(() => {
@@ -46,7 +47,8 @@ export default function RncDetalheClient({ id }) {
         tipo: d.tipo,
         data: d.data || null, cliente: d.cliente, opNumero: d.opNumero, desenhoProjetoMarca: d.desenhoProjetoMarca,
         origem: d.origem, fornecedor: d.fornecedor, processoArea: d.processoArea, descricao: d.descricao,
-        disposicao: d.disposicao, elaborador: d.elaborador, resultadoReinspecao: d.resultadoReinspecao, abrangencia: d.abrangencia,
+        disposicao: d.disposicao, pesoRetrabalhoKg: Number.isFinite(Number(d.pesoRetrabalhoKg)) && d.pesoRetrabalhoKg !== "" && d.pesoRetrabalhoKg != null ? Number(d.pesoRetrabalhoKg) : null,
+        elaborador: d.elaborador, resultadoReinspecao: d.resultadoReinspecao, abrangencia: d.abrangencia,
         necessitaAcao: d.necessitaAcao, motivoNaoAcao: d.motivoNaoAcao, causas: d.causas,
         cincoPorques: d.cincoPorques.map((x, i) => ({ porque: `${i + 1}º porquê`, resposta: (x.resposta || "").trim() })),
         prazoResposta: d.prazoResposta || null, realizadoEm: d.realizadoEm || null, acompanhadoPor: d.acompanhadoPor,
@@ -61,6 +63,18 @@ export default function RncDetalheClient({ id }) {
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar");
       flash("RNC salva."); carregar();
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
+  }
+
+  // Tenta preencher o peso de retrabalho a partir das marcas da RNC (cadastro de peças).
+  async function puxarPeso() {
+    setPuxandoPeso(true); setErro("");
+    try {
+      const r = await fetch(`/api/qualidade/rnc/${id}/peso-marca`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao buscar peso");
+      if (j.pesoKg != null) { set("pesoRetrabalhoKg", j.pesoKg); flash(j.aviso || `Peso sugerido: ${j.pesoKg} kg (${j.encontradas.length} marca(s)).`); }
+      else flash(j.aviso || "Nenhuma marca localizada no cadastro — informe o peso manualmente.");
+    } catch (e) { setErro(e.message); } finally { setPuxandoPeso(false); }
   }
 
   async function excluir() {
@@ -251,6 +265,17 @@ export default function RncDetalheClient({ id }) {
               <Campo label="Disposição"><select value={d.disposicao || ""} onChange={(e) => set("disposicao", e.target.value)} className="inp"><option value="">—</option>{Object.entries(DISPOSICAO_NC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
               <Campo label="Necessita de ação"><select value={d.necessitaAcao || ""} onChange={(e) => set("necessitaAcao", e.target.value)} className="inp"><option value="">—</option>{Object.entries(NECESSITA_ACAO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
             </div>
+            {d.disposicao === "RETRABALHAR" && (
+              <Campo label="Peso de retrabalho (kg)">
+                <div className="flex items-center gap-2">
+                  <input type="number" step="0.01" min="0" value={d.pesoRetrabalhoKg ?? ""} onChange={(e) => set("pesoRetrabalhoKg", e.target.value)} placeholder="0" className="inp flex-1" />
+                  <button type="button" onClick={puxarPeso} disabled={puxandoPeso} className="whitespace-nowrap px-3 py-2 text-sm rounded-lg border border-torg-blue-200 text-torg-blue hover:bg-torg-blue-50 disabled:opacity-50">
+                    {puxandoPeso ? "Buscando…" : "Puxar da marca"}
+                  </button>
+                </div>
+                <p className="text-xs text-torg-dark/50 mt-1">Base do indicador de Retrabalho da Produção. Tenta puxar do cadastro pela marca; ajuste se necessário.</p>
+              </Campo>
+            )}
             {d.necessitaAcao === "NAO_NECESSARIO" && <Campo label="Motivo de não necessitar de ação"><input value={d.motivoNaoAcao || ""} onChange={(e) => set("motivoNaoAcao", e.target.value)} className="inp" /></Campo>}
             <Campo label="Abrangência"><input value={d.abrangencia || ""} onChange={(e) => set("abrangencia", e.target.value)} className="inp" /></Campo>
             <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={2} className="inp" /></Campo>

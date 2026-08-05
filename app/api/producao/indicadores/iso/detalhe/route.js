@@ -3,12 +3,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { whereSetorSyneco } from "@/lib/syneco-dia";
 
 export const runtime = "nodejs";
 
 const MS = 86400000;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const diasCorridos = (a, b) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / MS);
+const kg = (n) => (n == null ? "—" : `${Math.round(n).toLocaleString("pt-BR")} kg`);
 
 export async function GET(req) {
   try { await requireRole(["ADMIN", "PRODUCAO", "PCP"]); }
@@ -37,6 +39,29 @@ export async function GET(req) {
     });
     const noPrazo = ops.filter((o) => o.dataFimReal <= o.dataFimPrevista).length;
     return NextResponse.json({ titulo: "Cumprimento dos Prazos de Fabricação", colunas: ["OP", "Obra", "Prevista", "Concluída", "Situação"], linhas, resumo: `${noPrazo} no prazo de ${ops.length} OP(s) concluída(s) · ${ops.length ? Math.round((noPrazo / ops.length) * 100) : 0}%` });
+  }
+
+  // Retrabalho — RNCs com disposição Retrabalhar (e peso) do período + base de produção (corte).
+  if (indicador === "retrabalho") {
+    const rncs = await prisma.naoConformidade.findMany({
+      where: { disposicao: "RETRABALHAR", pesoRetrabalhoKg: { not: null }, data: { gte: pIni, lt: pFim } },
+      select: { numero: true, ano: true, data: true, desenhoProjetoMarca: true, opNumero: true, pesoRetrabalhoKg: true },
+      orderBy: { data: "asc" },
+    });
+    const corte = await prisma.mesApontamento.aggregate({
+      where: { dataInicio: { gte: pIni, lt: pFim }, ...whereSetorSyneco("CORTE") }, _sum: { produzidoKg: true },
+    });
+    const prod = corte._sum.produzidoKg || 0;
+    const totRt = rncs.reduce((s, r) => s + (r.pesoRetrabalhoKg || 0), 0);
+    const linhas = rncs.map((r) => [
+      `RNC-${String(r.numero).padStart(3, "0")}/${String(r.ano).slice(-2)}`,
+      fmtD(r.data), r.desenhoProjetoMarca || "—", r.opNumero || "—", kg(r.pesoRetrabalhoKg),
+    ]);
+    const perc = prod > 0 ? Math.round((totRt / prod) * 1000) / 10 : null;
+    return NextResponse.json({
+      titulo: "Retrabalho", colunas: ["RNC", "Data", "Marca", "OP", "Peso retrabalhado"], linhas,
+      resumo: `${kg(totRt)} retrabalhado de ${kg(prod)} produzidos (corte)${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}`,
+    });
   }
 
   return NextResponse.json({ error: "Este indicador ainda não tem detalhamento." }, { status: 404 });
