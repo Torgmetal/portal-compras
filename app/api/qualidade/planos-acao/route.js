@@ -44,7 +44,9 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
-  const ultima = await prisma.planoAcao.findFirst({ orderBy: { numero: "desc" }, select: { numero: true } });
+  // Planos criados aqui (auditoria) numeram na própria sequência — os de RNC seguem
+  // a numeração da RNC (ver importar/route.js), então ficam fora deste máximo.
+  const ultima = await prisma.planoAcao.findFirst({ where: { NOT: { origem: { startsWith: "RNC-" } } }, orderBy: { numero: "desc" }, select: { numero: true } });
   const numero = (ultima?.numero || 0) + 1;
 
   const p = await prisma.planoAcao.create({

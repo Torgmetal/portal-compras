@@ -38,11 +38,10 @@ export async function POST(req) {
       const pl = p.plano || {};
       const temPlano = pl.oque || pl.como || pl.porque || pl.onde || pl.quem;
       if (temPlano) {
-        const ult = await prisma.planoAcao.findFirst({ orderBy: { numero: "desc" }, select: { numero: true } });
         const encerrada = p.status === "ENCERRADA";
         const pa = await prisma.planoAcao.create({
           data: {
-            numero: (ult?.numero || 0) + 1,
+            numero: p.numero, // o plano da RNC segue a numeração da RNC (RNC-007 -> PA-007)
             titulo: `${numRNC(p.numero, p.ano)} — ${(p.descricao || "Não conformidade").slice(0, 70)}`,
             origem: numRNC(p.numero, p.ano), responsavel: pl.quem || null,
             status: encerrada ? "CONCLUIDO" : "EM_ANDAMENTO",
