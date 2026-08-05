@@ -14,6 +14,8 @@ const TIPOS_PERMITIDOS = [
   "image/png", "image/jpeg", "image/webp",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
 
 export async function POST(req) {

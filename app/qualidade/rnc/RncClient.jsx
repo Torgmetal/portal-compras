@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, Upload, FileSpreadsheet, ListChecks } from "lucide-react";
+import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, User, Upload, FileSpreadsheet, ListChecks } from "lucide-react";
 import { numRNC, STATUS_RNC, statusRncLabel, diasParaPrazo } from "@/lib/nao-conformidade";
 import PlanosAcaoLista from "../auditorias-internas/PlanosAcaoLista";
 
@@ -29,7 +29,7 @@ export default function RncClient() {
   const carregar = useCallback(() => {
     if (aba === "PLANOS") { setLoading(false); return; } // aba renderiza o componente de planos
     setLoading(true);
-    fetch(`/api/qualidade/rnc?tipo=${aba}`).then((r) => (r.ok ? r.json() : null))
+    fetch(`/api/qualidade/rnc`).then((r) => (r.ok ? r.json() : null)) // lista todas (internas + de cliente)
       .then((j) => setItens(j?.rncs || [])).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
   }, [aba]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -92,11 +92,11 @@ export default function RncClient() {
               <tbody className="divide-y divide-gray-50">
                 {itens.map((r) => (
                   <tr key={r.id} onClick={() => router.push(`/qualidade/rnc/${r.id}`)} className="hover:bg-torg-blue-50/40 cursor-pointer">
-                    <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{numRNC(r.numero, r.ano)}</td>
+                    <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{numRNC(r.numero, r.ano)}<span className={`ml-1.5 text-[9px] font-sans font-bold rounded px-1 py-0.5 align-middle ${r.tipo === "CLIENTE" ? "text-torg-blue bg-torg-blue-50" : "text-gray-500 bg-gray-100"}`}>{r.tipo === "CLIENTE" ? "cliente" : "interna"}</span></td>
                     <td className="px-3 py-2 text-torg-dark whitespace-nowrap">{fmtD(r.data)}</td>
                     <td className="px-3 py-2 text-torg-dark">{r.cliente || "—"}</td>
                     <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{r.opNumero ? r.opNumero.replace(/^[Tt]\s*/, "") : "—"}</td>
-                    <td className="px-3 py-2 text-torg-gray max-w-[280px] truncate">{r.descricao || <span className="italic">sem descrição</span>}{r.recorrente && <span className="ml-1.5 text-[9px] font-bold text-amber-700 bg-amber-50 rounded px-1 py-0.5">recorrente</span>}</td>
+                    <td className="px-3 py-2 text-torg-gray max-w-[280px] truncate">{r.descricao || <span className="italic">sem descrição</span>}{r.tipo === "CLIENTE" && r.pertinente === false && <span className="ml-1.5 text-[9px] font-bold text-gray-600 bg-gray-100 rounded px-1 py-0.5">improcedente</span>}{r.recorrente && <span className="ml-1.5 text-[9px] font-bold text-amber-700 bg-amber-50 rounded px-1 py-0.5">recorrente</span>}</td>
                     <td className="px-3 py-2 whitespace-nowrap"><PrazoBadge prazo={r.prazoResposta} encerradaEm={r.encerradaEm} /></td>
                     <td className="px-3 py-2 text-center"><StatusChip s={r.status} /></td>
                   </tr>
@@ -194,17 +194,20 @@ function ModalImportar({ onClose, onFim }) {
 }
 
 function ModalNova({ onClose, onCriada }) {
-  const [f, setF] = useState({ data: new Date().toISOString().slice(0, 10), cliente: "", opNumero: "", descricao: "", prazoResposta: "" });
+  const [tipo, setTipo] = useState("INTERNA");
+  const cliente = tipo === "CLIENTE";
+  const [f, setF] = useState({ data: new Date().toISOString().slice(0, 10), cliente: "", opNumero: "", descricao: "", prazoResposta: "", numeroCliente: "", programa: "" });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
   async function salvar() {
     setErro("");
+    if (cliente && !f.cliente.trim()) return setErro("Informe o cliente.");
     if (!f.descricao.trim()) return setErro("Descreva a não conformidade.");
     setSalvando(true);
     try {
-      const r = await fetch("/api/qualidade/rnc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "INTERNA", ...f }) });
+      const r = await fetch("/api/qualidade/rnc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, ...f }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao criar");
       onCriada(j.id);
@@ -219,11 +222,31 @@ function ModalNova({ onClose, onCriada }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-torg-dark mb-1.5">Tipo</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[{ k: "INTERNA", l: "Interna", icon: Building2, d: "Detectada pela Torg" }, { k: "CLIENTE", l: "De cliente", icon: User, d: "Recebida de um cliente" }].map((t) => {
+                const Icon = t.icon; const on = tipo === t.k;
+                return (
+                  <button key={t.k} type="button" onClick={() => setTipo(t.k)}
+                    className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${on ? "border-torg-blue bg-torg-blue-50/50 ring-1 ring-torg-blue" : "border-gray-200 hover:border-gray-300"}`}>
+                    <div className={`flex items-center gap-1.5 text-sm font-semibold ${on ? "text-torg-blue" : "text-torg-dark"}`}><Icon size={15} /> {t.l}</div>
+                    <p className="text-[11px] text-torg-gray mt-0.5">{t.d}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {cliente && <p className="text-[12px] text-torg-gray bg-torg-blue-50/60 rounded-lg px-3 py-2">Cadastre o registro. Na tela da RNC você define a <b>procedência</b> (procedente/improcedente), anexa o PDF/imagens do cliente e — se procedente — monta a análise de causa e o plano de ação.</p>}
           <div className="grid grid-cols-2 gap-3">
-            <Campo label="Cliente"><input value={f.cliente} onChange={(e) => set("cliente", e.target.value)} className="inp" /></Campo>
+            <Campo label={cliente ? "Cliente *" : "Cliente"}><input value={f.cliente} onChange={(e) => set("cliente", e.target.value)} className="inp" /></Campo>
             <Campo label="OP / Obra"><input value={f.opNumero} onChange={(e) => set("opNumero", e.target.value)} placeholder="T69" className="inp" /></Campo>
             <Campo label="Data"><input type="date" value={f.data} onChange={(e) => set("data", e.target.value)} className="inp" /></Campo>
             <Campo label="Prazo para resposta"><input type="date" value={f.prazoResposta} onChange={(e) => set("prazoResposta", e.target.value)} className="inp" /></Campo>
+            {cliente && <>
+              <Campo label="Nº da RNC do cliente"><input value={f.numeroCliente} onChange={(e) => set("numeroCliente", e.target.value)} placeholder="RTNC-010" className="inp" /></Campo>
+              <Campo label="Programa"><input value={f.programa} onChange={(e) => set("programa", e.target.value)} placeholder="ASME" className="inp" /></Campo>
+            </>}
           </div>
           <Campo label="Descrição da não conformidade *"><textarea value={f.descricao} onChange={(e) => set("descricao", e.target.value)} rows={3} className="inp" placeholder="O que foi constatado" /></Campo>
           {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}

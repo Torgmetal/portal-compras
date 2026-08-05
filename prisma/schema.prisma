@@ -1802,6 +1802,7 @@ model NaoConformidade {
   processoArea        String? // setor/área da ocorrência (Expedição, Engenharia…)
   descricao           String?
   fotos               Json      @default("[]") // registro fotográfico [{ url, legenda }]
+  anexos              Json      @default("[]") // anexos p/ compor o relatório [{ url, nome, tipo }] (imagens/PDF/docs)
   disposicao          String? // APROVAR_CONCESSAO | RETRABALHAR | REFUGAR | DEVOLVER_FORNECEDOR
   elaborador          String?
   resultadoReinspecao String?

@@ -21,6 +21,7 @@ const schema = z.object({
   data: dstr, cliente: dstr, opNumero: dstr, opId: dstr, desenhoProjetoMarca: dstr,
   origem: dstr, fornecedor: dstr, processoArea: dstr, descricao: dstr,
   fotos: z.array(z.object({ url: z.string().url(), legenda: dstr })).optional(),
+  anexos: z.array(z.object({ url: z.string().url(), nome: dstr, tipo: dstr })).optional(),
   disposicao: dstr, elaborador: dstr, resultadoReinspecao: dstr, abrangencia: dstr,
   necessitaAcao: dstr, motivoNaoAcao: dstr, causas: dstr,
   cincoPorques: z.array(z.object({ porque: z.string(), resposta: dstr })).optional(),

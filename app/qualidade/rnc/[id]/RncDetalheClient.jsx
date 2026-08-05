@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown, Plus, Upload, X, FileText } from "lucide-react";
 import { numRNC, TIPOS_RNC, ORIGEM_NC, DISPOSICAO_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
 import { SETORES_AUDITORIA } from "@/lib/auditoria-interna";
 
@@ -15,6 +15,8 @@ export default function RncDetalheClient({ id }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [subindo, setSubindo] = useState(false);
+  const [criandoPlano, setCriandoPlano] = useState(false);
   const [msg, setMsg] = useState("");
 
   const carregar = useCallback(() => {
@@ -24,6 +26,7 @@ export default function RncDetalheClient({ id }) {
       const r = j.rnc;
       setD({
         ...r, data: dISO(r.data), prazoResposta: dISO(r.prazoResposta), realizadoEm: dISO(r.realizadoEm),
+        anexos: Array.isArray(r.anexos) ? r.anexos : [],
         cincoPorques: Array.from({ length: 5 }, (_, i) => ({ porque: `${i + 1}º porquê`, resposta: (Array.isArray(r.cincoPorques) ? r.cincoPorques[i]?.resposta : "") || "" })),
       });
       setPlano(j.plano || null);
@@ -47,6 +50,8 @@ export default function RncDetalheClient({ id }) {
         prazoResposta: d.prazoResposta || null, realizadoEm: d.realizadoEm || null, acompanhadoPor: d.acompanhadoPor,
         acompanhamento: d.acompanhamento, avaliacaoEficacia: d.avaliacaoEficacia, encerradaPor: d.encerradaPor,
         pertinente: !!d.pertinente, recorrente: !!d.recorrente,
+        numeroCliente: d.numeroCliente, programa: d.programa, jobCliente: d.jobCliente,
+        respostaCliente: d.respostaCliente, anexos: d.anexos || [],
         ...extra,
       };
       const r = await fetch(`/api/qualidade/rnc/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -63,8 +68,48 @@ export default function RncDetalheClient({ id }) {
     catch { setErro("Erro ao excluir"); setSalvando(false); }
   }
 
+  // Anexos — sobem DIRETO pro Blob por token (evita o limite de ~4,5MB do corpo);
+  // guardamos só {url, nome, tipo} e persistimos na hora.
+  async function anexar(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setErro(""); setSubindo(true);
+    try {
+      const { upload } = await import("@vercel/blob/client");
+      const novos = [];
+      for (const file of files) {
+        const safe = (file.name || "anexo").replace(/[^\w.-]+/g, "-");
+        const blob = await upload(`qualidade/rnc/anexos/${Date.now()}-${safe}`, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+        novos.push({ url: blob.url, nome: file.name || "anexo", tipo: file.type || "" });
+      }
+      const anexos = [...(d.anexos || []), ...novos];
+      setD((p) => ({ ...p, anexos }));
+      await salvar({ anexos });
+    } catch (e) { setErro("Falha no anexo: " + e.message); } finally { setSubindo(false); }
+  }
+  function removerAnexo(url) {
+    const anexos = (d.anexos || []).filter((a) => a.url !== url);
+    setD((p) => ({ ...p, anexos }));
+    salvar({ anexos });
+  }
+
+  async function criarPlano() {
+    setCriandoPlano(true); setErro("");
+    try {
+      const r = await fetch(`/api/qualidade/rnc/${id}/plano`, { method: "POST" });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao criar plano");
+      router.push(`/qualidade/planos-acao/${j.id}`);
+    } catch (e) { setErro(e.message); setCriandoPlano(false); }
+  }
+
   if (loading) return <div className="py-20 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin mb-2" /> Carregando…</div>;
   if (erro && !d) return <div className="py-20 text-center text-red-600 text-sm">{erro} · <Link href="/qualidade/rnc" className="text-torg-blue underline">voltar</Link></div>;
+
+  const cliente = d.tipo === "CLIENTE";
+  const improcedente = cliente && d.pertinente === false; // improcedente ⇒ só justificativa
+  const mostrarAnalise = !improcedente;                   // tratamento, causa raiz, plano, acompanhamento
+  const aceita = cliente ? ".pdf,image/png,image/jpeg,image/webp" : "image/png,image/jpeg,image/webp,.pdf,.doc,.docx,.xls,.xlsx";
 
   return (
     <div className="space-y-5 max-w-4xl pb-24">
@@ -83,9 +128,29 @@ export default function RncDetalheClient({ id }) {
           <span className="font-mono font-bold text-torg-blue text-lg">{numRNC(d.numero, d.ano)}</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-torg-blue-50 text-torg-blue">{TIPOS_RNC[d.tipo]?.label || "RNC"}</span>
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_RNC[d.status]?.cor}`}>{statusRncLabel(d.status)}</span>
+          {improcedente && <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">improcedente</span>}
         </div>
         <h1 className="text-xl font-extrabold text-torg-dark tracking-tight">Relatório de Não Conformidade</h1>
       </div>
+
+      {/* Procedência (só RNC de cliente) */}
+      {cliente && (
+        <Secao titulo="Procedência">
+          <p className="text-[12px] text-torg-gray -mt-1">Avalie se o apontamento do cliente procede. <b>Improcedente</b> pede só a justificativa; <b>procedente</b> segue para causa raiz e plano de ação.</p>
+          <div className="grid grid-cols-2 gap-2 max-w-md">
+            {[{ v: true, l: "Procedente", dsc: "Cabe análise e plano de ação" }, { v: false, l: "Improcedente", dsc: "Só justificativa ao cliente" }].map((o) => {
+              const on = !!d.pertinente === o.v;
+              return (
+                <button key={String(o.v)} type="button" onClick={() => set("pertinente", o.v)}
+                  className={`text-left rounded-lg border px-3 py-2.5 transition-colors ${on ? "border-torg-blue bg-torg-blue-50/50 ring-1 ring-torg-blue" : "border-gray-200 hover:border-gray-300"}`}>
+                  <div className={`text-sm font-semibold ${on ? "text-torg-blue" : "text-torg-dark"}`}>{o.l}</div>
+                  <p className="text-[11px] text-torg-gray mt-0.5">{o.dsc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </Secao>
+      )}
 
       {/* Identificação */}
       <Secao titulo="Identificação">
@@ -106,59 +171,99 @@ export default function RncDetalheClient({ id }) {
           {d.origem === "FORNECEDOR" && <Campo label="Fornecedor"><input value={d.fornecedor || ""} onChange={(e) => set("fornecedor", e.target.value)} className="inp" /></Campo>}
           <Campo label="Data"><input type="date" value={d.data || ""} onChange={(e) => set("data", e.target.value)} className="inp" /></Campo>
           <Campo label="Prazo para resposta"><input type="date" value={d.prazoResposta || ""} onChange={(e) => set("prazoResposta", e.target.value)} className="inp" /></Campo>
+          {cliente && <>
+            <Campo label="Nº da RNC do cliente"><input value={d.numeroCliente || ""} onChange={(e) => set("numeroCliente", e.target.value)} placeholder="RTNC-010" className="inp" /></Campo>
+            <Campo label="Programa"><input value={d.programa || ""} onChange={(e) => set("programa", e.target.value)} placeholder="ASME" className="inp" /></Campo>
+            <Campo label="Job do cliente"><input value={d.jobCliente || ""} onChange={(e) => set("jobCliente", e.target.value)} className="inp" /></Campo>
+          </>}
         </div>
       </Secao>
 
-      {/* Descrição + disposição */}
+      {/* Descrição */}
       <Secao titulo="Não conformidade">
         <Campo label="Descrição da não conformidade"><textarea value={d.descricao || ""} onChange={(e) => set("descricao", e.target.value)} rows={3} className="inp" /></Campo>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Campo label="Disposição"><select value={d.disposicao || ""} onChange={(e) => set("disposicao", e.target.value)} className="inp"><option value="">—</option>{Object.entries(DISPOSICAO_NC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
-          <Campo label="Necessita de ação"><select value={d.necessitaAcao || ""} onChange={(e) => set("necessitaAcao", e.target.value)} className="inp"><option value="">—</option>{Object.entries(NECESSITA_ACAO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
-        </div>
-        {d.necessitaAcao === "NAO_NECESSARIO" && <Campo label="Motivo de não necessitar de ação"><input value={d.motivoNaoAcao || ""} onChange={(e) => set("motivoNaoAcao", e.target.value)} className="inp" /></Campo>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Campo label="Elaborador / responsável"><input value={d.elaborador || ""} onChange={(e) => set("elaborador", e.target.value)} className="inp" /></Campo>
-          <Campo label="Abrangência"><input value={d.abrangencia || ""} onChange={(e) => set("abrangencia", e.target.value)} className="inp" /></Campo>
-        </div>
-        <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={2} className="inp" /></Campo>
+        <Campo label="Elaborador / responsável"><input value={d.elaborador || ""} onChange={(e) => set("elaborador", e.target.value)} className="inp" /></Campo>
       </Secao>
 
-      {/* Causa raiz */}
-      <Secao titulo="Análise de causa raiz">
-        <Campo label="Causas da não conformidade"><textarea value={d.causas || ""} onChange={(e) => set("causas", e.target.value)} rows={2} className="inp" /></Campo>
-        <div className="space-y-2 mt-1">
-          <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Ferramenta dos 5 porquês <span className="normal-case font-normal text-[10px] text-torg-gray">— preencha os 5</span></p>
-          {d.cincoPorques.map((pq, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-torg-gray w-6 shrink-0">{i + 1}º</span>
-              <input value={pq.resposta || ""} onChange={(e) => setPq(i, "resposta", e.target.value)} placeholder={`Por que… (${i + 1}º porquê)`} className="flex-1 text-[13px] border border-gray-200 rounded px-2.5 py-1.5" />
-            </div>
-          ))}
-        </div>
-      </Secao>
-
-      {/* Plano de ação (5W2H) */}
-      <Secao titulo="Plano de ação (5W2H)">
-        {plano ? (
-          <Link href={`/qualidade/planos-acao/${plano.id}`} className="flex items-center justify-between gap-2 bg-torg-blue-50/50 border border-torg-blue-100 rounded-lg px-3 py-2.5 hover:bg-torg-blue-50">
-            <span className="text-[13px] text-torg-dark font-medium inline-flex items-center gap-2"><ListChecks size={15} className="text-torg-blue" /> {plano.titulo} · {(plano.itens || []).length} ação(ões)</span>
-            <span className="text-[11px] text-torg-blue">abrir →</span>
-          </Link>
+      {/* Anexos — imagens/documentos para compor o relatório */}
+      <Secao titulo="Anexos" acao={
+        <label className={`text-[12px] font-medium inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${subindo ? "text-gray-400 border-gray-200 cursor-wait" : "text-torg-blue border-torg-blue/30 hover:bg-torg-blue-50 cursor-pointer"}`}>
+          {subindo ? <><Loader2 size={13} className="animate-spin" /> enviando…</> : <><Upload size={13} /> anexar</>}
+          <input type="file" accept={aceita} multiple disabled={subindo} className="hidden" onChange={(e) => { anexar(e.target.files); e.target.value = ""; }} />
+        </label>
+      }>
+        <p className="text-[12px] text-torg-gray -mt-1">{cliente ? "Anexe o PDF e as imagens que o cliente enviou." : "Anexe imagens e documentos (PDF, Word, Excel) para compor o relatório."}</p>
+        {(d.anexos || []).length === 0 ? (
+          <p className="text-[13px] text-torg-gray">Nenhum anexo ainda.</p>
         ) : (
-          <p className="text-[13px] text-torg-gray">Sem plano de ação vinculado. A geração do 5W2H pela IA entra na próxima etapa.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+            {d.anexos.map((a) => <AnexoCard key={a.url} a={a} onRemover={() => removerAnexo(a.url)} />)}
+          </div>
         )}
       </Secao>
 
-      {/* Acompanhamento + eficácia */}
-      <Secao titulo="Acompanhamento e eficácia">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Campo label="Realizado em"><input type="date" value={d.realizadoEm || ""} onChange={(e) => set("realizadoEm", e.target.value)} className="inp" /></Campo>
-          <Campo label="Acompanhado por"><input value={d.acompanhadoPor || ""} onChange={(e) => set("acompanhadoPor", e.target.value)} className="inp" /></Campo>
-        </div>
-        <Campo label="Acompanhamento da implementação"><textarea value={d.acompanhamento || ""} onChange={(e) => set("acompanhamento", e.target.value)} rows={2} className="inp" /></Campo>
-        <Campo label="Avaliação da eficácia"><textarea value={d.avaliacaoEficacia || ""} onChange={(e) => set("avaliacaoEficacia", e.target.value)} rows={2} className="inp" /></Campo>
-      </Secao>
+      {improcedente && (
+        <Secao titulo="Justificativa da improcedência">
+          <Campo label="Por que a RNC é improcedente (resposta ao cliente)">
+            <textarea value={d.respostaCliente || ""} onChange={(e) => set("respostaCliente", e.target.value)} rows={5} className="inp"
+              placeholder="Explique tecnicamente por que o apontamento do cliente não procede — este texto é a resposta ao cliente." />
+          </Campo>
+        </Secao>
+      )}
+
+      {mostrarAnalise && (
+        <>
+          {/* Tratamento */}
+          <Secao titulo="Tratamento">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Campo label="Disposição"><select value={d.disposicao || ""} onChange={(e) => set("disposicao", e.target.value)} className="inp"><option value="">—</option>{Object.entries(DISPOSICAO_NC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
+              <Campo label="Necessita de ação"><select value={d.necessitaAcao || ""} onChange={(e) => set("necessitaAcao", e.target.value)} className="inp"><option value="">—</option>{Object.entries(NECESSITA_ACAO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Campo>
+            </div>
+            {d.necessitaAcao === "NAO_NECESSARIO" && <Campo label="Motivo de não necessitar de ação"><input value={d.motivoNaoAcao || ""} onChange={(e) => set("motivoNaoAcao", e.target.value)} className="inp" /></Campo>}
+            <Campo label="Abrangência"><input value={d.abrangencia || ""} onChange={(e) => set("abrangencia", e.target.value)} className="inp" /></Campo>
+            <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={2} className="inp" /></Campo>
+          </Secao>
+
+          {/* Causa raiz */}
+          <Secao titulo="Análise de causa raiz">
+            <Campo label="Causas da não conformidade"><textarea value={d.causas || ""} onChange={(e) => set("causas", e.target.value)} rows={2} className="inp" /></Campo>
+            <div className="space-y-2 mt-1">
+              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Ferramenta dos 5 porquês <span className="normal-case font-normal text-[10px] text-torg-gray">— preencha os 5</span></p>
+              {d.cincoPorques.map((pq, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-torg-gray w-6 shrink-0">{i + 1}º</span>
+                  <input value={pq.resposta || ""} onChange={(e) => setPq(i, "resposta", e.target.value)} placeholder={`Por que… (${i + 1}º porquê)`} className="flex-1 text-[13px] border border-gray-200 rounded px-2.5 py-1.5" />
+                </div>
+              ))}
+            </div>
+          </Secao>
+
+          {/* Plano de ação (5W2H) */}
+          <Secao titulo="Plano de ação (5W2H)">
+            {plano ? (
+              <Link href={`/qualidade/planos-acao/${plano.id}`} className="flex items-center justify-between gap-2 bg-torg-blue-50/50 border border-torg-blue-100 rounded-lg px-3 py-2.5 hover:bg-torg-blue-50">
+                <span className="text-[13px] text-torg-dark font-medium inline-flex items-center gap-2"><ListChecks size={15} className="text-torg-blue" /> {plano.titulo} · {(plano.itens || []).length} ação(ões)</span>
+                <span className="text-[11px] text-torg-blue">abrir →</span>
+              </Link>
+            ) : (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-[13px] text-torg-gray">Sem plano de ação vinculado.</p>
+                <button onClick={criarPlano} disabled={criandoPlano} className="px-3 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{criandoPlano ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Criar plano de ação</button>
+              </div>
+            )}
+          </Secao>
+
+          {/* Acompanhamento + eficácia */}
+          <Secao titulo="Acompanhamento e eficácia">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Campo label="Realizado em"><input type="date" value={d.realizadoEm || ""} onChange={(e) => set("realizadoEm", e.target.value)} className="inp" /></Campo>
+              <Campo label="Acompanhado por"><input value={d.acompanhadoPor || ""} onChange={(e) => set("acompanhadoPor", e.target.value)} className="inp" /></Campo>
+            </div>
+            <Campo label="Acompanhamento da implementação"><textarea value={d.acompanhamento || ""} onChange={(e) => set("acompanhamento", e.target.value)} rows={2} className="inp" /></Campo>
+            <Campo label="Avaliação da eficácia"><textarea value={d.avaliacaoEficacia || ""} onChange={(e) => set("avaliacaoEficacia", e.target.value)} rows={2} className="inp" /></Campo>
+          </Secao>
+        </>
+      )}
 
       {/* Situação + indicadores */}
       <Secao titulo="Situação e classificação">
@@ -167,7 +272,7 @@ export default function RncDetalheClient({ id }) {
           <Campo label="Encerrada por"><input value={d.encerradaPor || ""} onChange={(e) => set("encerradaPor", e.target.value)} className="inp" /></Campo>
         </div>
         <div className="flex flex-wrap gap-4 pt-1">
-          <label className="inline-flex items-center gap-2 text-[13px] text-torg-dark cursor-pointer"><input type="checkbox" checked={!!d.pertinente} onChange={(e) => set("pertinente", e.target.checked)} /> Pertinente <span className="text-[11px] text-torg-gray">(conta no indicador de RNCs)</span></label>
+          {!cliente && <label className="inline-flex items-center gap-2 text-[13px] text-torg-dark cursor-pointer"><input type="checkbox" checked={!!d.pertinente} onChange={(e) => set("pertinente", e.target.checked)} /> Pertinente <span className="text-[11px] text-torg-gray">(conta no indicador de RNCs)</span></label>}
           <label className="inline-flex items-center gap-2 text-[13px] text-torg-dark cursor-pointer"><input type="checkbox" checked={!!d.recorrente} onChange={(e) => set("recorrente", e.target.checked)} /> Recorrente <span className="text-[11px] text-torg-gray">(reincidência)</span></label>
         </div>
       </Secao>
@@ -179,6 +284,24 @@ export default function RncDetalheClient({ id }) {
       </div>
 
       <style jsx>{`.inp{width:100%;font-size:13px;border:1px solid #d1d5db;border-radius:8px;padding:8px 12px;background:#fff}`}</style>
+    </div>
+  );
+}
+
+function AnexoCard({ a, onRemover }) {
+  const img = String(a.tipo || "").startsWith("image/");
+  return (
+    <div className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+      <a href={a.url} target="_blank" rel="noopener noreferrer" className="block" title={a.nome}>
+        {img ? (
+          <img src={a.url} alt={a.nome} className="w-full h-24 object-cover" />
+        ) : (
+          <div className="h-24 flex flex-col items-center justify-center gap-1 text-torg-gray p-2">
+            <FileText size={22} /><span className="text-[10px] text-center leading-tight line-clamp-2 break-all">{a.nome}</span>
+          </div>
+        )}
+      </a>
+      <button onClick={onRemover} title="Remover anexo" className="absolute top-1 right-1 bg-white/90 rounded-full p-0.5 text-gray-500 hover:text-red-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"><X size={13} /></button>
     </div>
   );
 }
