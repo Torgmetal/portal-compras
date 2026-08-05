@@ -62,6 +62,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
   const [avisoRes, setAvisoRes] = useState(null);
   const [avisoErro, setAvisoErro] = useState("");
   const [revArquivo, setRevArquivo] = useState(null); // { num: number|null } — revisão lida do nome
+  const [arquivoNome, setArquivoNome] = useState(""); // nome do arquivo importado (vai no aviso)
   const [mudancas, setMudancas] = useState("");
   const inputRef = useRef(null);
 
@@ -70,6 +71,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
   async function importar(file) {
     if (!file) return;
     setCarregando(true); setErro(""); setRes(null); setServidor(null); setAvisoRes(null); setSel(new Set()); setAvisoErro(""); setMudancas("");
+    setArquivoNome(file.name || "");
     // Lê o número da revisão do NOME do arquivo (R1/R01/R2/R02…). Avisa se não achar.
     const mRev = (file.name || "").match(/(?:^|[\s._-])r0*(\d{1,3})(?=[\s._-]|\.[a-z0-9]+$|$)/i);
     const revNum = mRev ? parseInt(mRev[1], 10) : null;
@@ -152,7 +154,7 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
       const r = await fetch("/api/engenharia/listas/avisar-revisao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipo: sigla, opNumero: String(res.opNumero || op.trim()), obra: res.obra || null, revisao: revLabel, ehRevisao: !!ehRevisao, mudancas: mudancas.trim() || null, diff: res.diff || null, destinatarios: [...sel] }),
+        body: JSON.stringify({ tipo: sigla, opNumero: String(res.opNumero || op.trim()), obra: res.obra || null, revisao: revLabel, ehRevisao: !!ehRevisao, arquivo: arquivoNome || null, mudancas: mudancas.trim() || null, diff: res.diff || null, destinatarios: [...sel] }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Falha ao enviar");
