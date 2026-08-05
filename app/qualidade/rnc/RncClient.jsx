@@ -198,20 +198,38 @@ function ModalNova({ onClose, onCriada }) {
   const cliente = tipo === "CLIENTE";
   const [f, setF] = useState({ data: new Date().toISOString().slice(0, 10), cliente: "", opNumero: "", descricao: "", prazoResposta: "", numeroCliente: "", programa: "" });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  const [files, setFiles] = useState([]); // RNC do cliente anexada já na criação
   const [salvando, setSalvando] = useState(false);
+  const [etapa, setEtapa] = useState("");
   const [erro, setErro] = useState("");
 
   async function salvar() {
     setErro("");
-    if (cliente && !f.cliente.trim()) return setErro("Informe o cliente.");
+    if (cliente && !f.cliente.trim() && !files.length) return setErro("Informe o cliente ou anexe a RNC do cliente.");
     if (!cliente && !f.descricao.trim()) return setErro("Descreva a não conformidade.");
-    setSalvando(true);
+    setSalvando(true); setEtapa("Criando…");
     try {
       const r = await fetch("/api/qualidade/rnc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, ...f }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao criar");
+      // Anexos do cliente: sobem pro Blob, salvam na RNC e a IA já extrai os dados.
+      if (cliente && files.length) {
+        try {
+          setEtapa("Enviando anexo…");
+          const { upload } = await import("@vercel/blob/client");
+          const anexos = [];
+          for (const file of files) {
+            const safe = (file.name || "anexo").replace(/[^\w.-]+/g, "-");
+            const blob = await upload(`qualidade/rnc/anexos/${Date.now()}-${safe}`, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+            anexos.push({ url: blob.url, nome: file.name || "anexo", tipo: file.type || "" });
+          }
+          await fetch(`/api/qualidade/rnc/${j.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anexos }) });
+          const alvo = anexos.find((a) => a.tipo === "application/pdf") || anexos.find((a) => String(a.tipo).startsWith("image/"));
+          if (alvo) { setEtapa("Lendo o documento…"); await fetch(`/api/qualidade/rnc/${j.id}/extrair`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anexoUrl: alvo.url, tipo: alvo.tipo }) }); }
+        } catch { /* a RNC já foi criada; se o anexo/extração falhar, dá pra refazer na tela */ }
+      }
       onCriada(j.id);
-    } catch (e) { setErro(e.message); setSalvando(false); }
+    } catch (e) { setErro(e.message); setSalvando(false); setEtapa(""); }
   }
 
   return (
@@ -237,7 +255,17 @@ function ModalNova({ onClose, onCriada }) {
               })}
             </div>
           </div>
-          {cliente && <p className="text-[12px] text-torg-gray bg-torg-blue-50/60 rounded-lg px-3 py-2">Cadastre o registro. Na tela da RNC você define a <b>procedência</b> (procedente/improcedente), anexa o PDF/imagens do cliente e — se procedente — monta a análise de causa e o plano de ação.</p>}
+          {cliente && <>
+            <p className="text-[12px] text-torg-gray bg-torg-blue-50/60 rounded-lg px-3 py-2">Anexe o PDF da RNC do cliente aqui embaixo — a <b>IA já preenche</b> cliente, nº da RNC, data, descrição e as causas apontadas (você revisa depois). Dá pra anexar também na tela da RNC.</p>
+            <div>
+              <label className="block text-xs font-medium text-torg-dark mb-1">RNC do cliente <span className="text-torg-gray">(PDF ou imagem)</span></label>
+              <label className={`border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 ${salvando ? "opacity-60 pointer-events-none" : "cursor-pointer hover:border-torg-blue hover:bg-torg-blue-50/30"}`}>
+                <Upload size={20} className="text-torg-gray" />
+                <span className="text-[12px] text-torg-dark font-medium">{files.length ? `${files.length} arquivo(s) selecionado(s)` : "Clique para selecionar o PDF/imagens"}</span>
+                <input type="file" accept=".pdf,image/png,image/jpeg,image/webp" multiple disabled={salvando} className="hidden" onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+              </label>
+            </div>
+          </>}
           <div className="grid grid-cols-2 gap-3">
             <Campo label={cliente ? "Cliente *" : "Cliente"}><input value={f.cliente} onChange={(e) => set("cliente", e.target.value)} className="inp" /></Campo>
             <Campo label="OP / Obra"><input value={f.opNumero} onChange={(e) => set("opNumero", e.target.value)} placeholder="T69" className="inp" /></Campo>
@@ -253,7 +281,7 @@ function ModalNova({ onClose, onCriada }) {
         </div>
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
           <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
-          <button onClick={salvar} disabled={salvando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50">{salvando ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Criar</button>
+          <button onClick={salvar} disabled={salvando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50">{salvando ? <><Loader2 size={14} className="animate-spin" /> {etapa || "Criando…"}</> : <><CheckCircle2 size={14} /> Criar</>}</button>
         </div>
       </div>
       <style jsx>{`.inp{width:100%;font-size:13px;border:1px solid #d1d5db;border-radius:8px;padding:8px 12px}`}</style>
