@@ -37,18 +37,22 @@ export async function GET(req) {
   if (indicador === "prazo_fabricacao") {
     const ops = await prisma.oP.findMany({
       where: { dataFimPrevista: { gte: pIni, lt: pFim } },
-      select: { numero: true, obra: true, dataFimPrevista: true, pecasConjunto: { select: { fonte: true, tipoPeca: true, pesoTotalKg: true } } },
+      select: { id: true, numero: true, obra: true, dataFimPrevista: true, pecasConjunto: { select: { fonte: true, tipoPeca: true, pesoTotalKg: true } } },
       orderBy: { dataFimPrevista: "asc" },
     });
-    let planTot = 0, semLista = 0;
+    const les = ops.length ? await prisma.listaExpedicao.findMany({ where: { opId: { in: ops.map((o) => o.id) } }, select: { opId: true, pesoContratado: true } }) : [];
+    const contratado = new Map(les.map((l) => [l.opId, l.pesoContratado || 0]));
+    let planTot = 0, semPeso = 0;
     const linhas = ops.map((o) => {
-      const peso = pesoRealPecas(o.pecasConjunto); planTot += peso; if (peso === 0) semLista += 1;
-      return [`OP-${o.numero}`, o.obra || "—", fmtD(o.dataFimPrevista), peso === 0 ? "— (sem lista)" : kg(peso)];
+      const daLista = pesoRealPecas(o.pecasConjunto);
+      const peso = daLista || contratado.get(o.id) || 0; planTot += peso; if (peso === 0) semPeso += 1;
+      const marca = daLista ? "" : peso ? " (contratado)" : "";
+      return [`OP-${o.numero}`, o.obra || "—", fmtD(o.dataFimPrevista), peso === 0 ? "— (sem peso)" : kg(peso) + marca];
     });
     const roms = await prisma.romaneioPrevio.aggregate({ where: { emitidoEm: { gte: pIni, lt: pFim } }, _sum: { pesoKg: true } });
     const expTot = roms._sum.pesoKg || 0;
     const perc = planTot > 0 ? Math.round((expTot / planTot) * 1000) / 10 : null;
-    const avisoLista = semLista ? ` · ${semLista} OP(s) sem lista de peças (peso não conta no planejado — importar LE/LPC)` : "";
+    const avisoLista = semPeso ? ` · ${semPeso} OP(s) sem peso (sem LE/LPC nem contratado na Lista de Expedição)` : "";
     return NextResponse.json({
       titulo: "Cumprimento dos Prazos de Fabricação", colunas: ["OP", "Obra", "Previsão", "Peso planejado"], linhas,
       resumo: `${notaManual}${kg(expTot)} expedido de ${kg(planTot)} planejados (${ops.length} OP prevista(s))${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}${avisoLista}`,
