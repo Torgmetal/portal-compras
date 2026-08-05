@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity, FileText, Package, Factory, Map,
-  PackageSearch, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, ListOrdered,
+  PackageSearch, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, ListOrdered, BarChart3,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
@@ -24,6 +24,7 @@ const menu = [
   { href: "/producao/consulta-estoque", label: "Estoque", icon: PackageSearch },
   { href: "/producao/romaneios", label: "Romaneios", icon: FileText },
   { href: "/producao/mes", label: "Rastreabilidade Syneco", icon: Factory },
+  { href: "/producao/indicadores", label: "Indicadores", icon: BarChart3 },
 ];
 
 export default function SidebarProducao() {
