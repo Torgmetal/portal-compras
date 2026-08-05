@@ -28,7 +28,7 @@ function Spark({ serie, meta, mesFim }) {
   );
 }
 
-export default function IndicadoresIsoClient() {
+export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint = "/api/qualidade/indicadores", titulo = "Indicadores da Qualidade" }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -40,7 +40,7 @@ export default function IndicadoresIsoClient() {
     setLoading(true);
     const q = new URLSearchParams({ ano: String(ano) });
     if (mes != null) q.set("mes", String(mes));
-    fetch(`/api/qualidade/indicadores?${q}`).then((r) => (r.ok ? r.json() : null))
+    fetch(`${endpoint}?${q}`).then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (!j) return setErro("Erro ao carregar"); setData(j); if (mes == null) setMes(j.mes); })
       .catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
   }, [ano, mes]);
@@ -49,7 +49,7 @@ export default function IndicadoresIsoClient() {
     if (!data) return null;
     const r = { verde: 0, amarelo: 0, vermelho: 0, pendente: 0 };
     for (const ind of data.indicadores) {
-      if (ind.processo !== "QUALIDADE") continue; // só os indicadores do setor da Qualidade
+      if (ind.processo !== processo) continue; // só os indicadores do processo desta tela
       if (ind.fonte === "pendente") { r.pendente++; continue; }
       const f = farol(ind.atual, ind.meta);
       if (f) r[f]++;
@@ -61,7 +61,7 @@ export default function IndicadoresIsoClient() {
     <div className="space-y-6 max-w-[1400px]">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2.5"><Gauge className="text-torg-blue" size={28} /> Indicadores da Qualidade</h2>
+          <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2.5"><Gauge className="text-torg-blue" size={28} /> {titulo}</h2>
           <p className="text-sm text-torg-gray mt-1">Acompanhamento ISO 9001 — cada indicador é calculado do dado real do portal, sem digitação manual.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -86,7 +86,7 @@ export default function IndicadoresIsoClient() {
         <div className="py-10 text-center text-red-600 text-sm">{erro}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-          {data.indicadores.filter((i) => i.processo === "QUALIDADE").map((ind) => <Card key={ind.id} ind={ind} mesFim={data.mesFim} />)}
+          {data.indicadores.filter((i) => i.processo === processo).map((ind) => <Card key={ind.id} ind={ind} mesFim={data.mesFim} />)}
         </div>
       )}
     </div>

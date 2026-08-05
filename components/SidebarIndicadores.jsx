@@ -18,6 +18,7 @@ const setores = [
     base: "/indicadores/compras",
     sub: [
       { href: "/indicadores/compras", label: "Dashboard", icon: Activity, exact: true },
+      { href: "/indicadores/compras/iso", label: "Indicadores ISO", icon: BarChart3 },
       { href: "/indicadores/compras/mensal", label: "Evolução Mensal", icon: CalendarRange },
       { href: "/indicadores/compras/scorecard", label: "Scorecard Fornecedores", icon: Trophy },
       { href: "/indicadores/compras/savings", label: "Savings por Obra", icon: TrendingUp },
