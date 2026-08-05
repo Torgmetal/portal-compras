@@ -86,8 +86,11 @@ export async function GET(req) {
     const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; for (const a of ac) { const m = a.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; }
     series.acidentes_afastamento = s; }
 
-  // ── Qualidade (RNC): recorrência de NC + erros de projeto ──
-  const rncs = await prisma.naoConformidade.findMany({ where: { data: { gte: yIni, lt: yFim } }, select: { data: true, recorrente: true, processoArea: true } });
+  // ── Qualidade (RNC): RNCs do cliente + recorrência de NC + erros de projeto ──
+  const rncs = await prisma.naoConformidade.findMany({ where: { data: { gte: yIni, lt: yFim } }, select: { data: true, tipo: true, origem: true, pertinente: true, recorrente: true, processoArea: true } });
+  { const s = arr12(); for (let m = 0; m <= mesFim; m++) s[m] = 0; // RNCs do cliente (contagem de pertinentes no mês)
+    for (const r of rncs) { if ((r.origem === "CLIENTE" || r.tipo === "CLIENTE") && r.pertinente) { const m = r.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; } }
+    series.rnc_cliente = s; }
   { const rec = arr12(), tot = arr12(); // recorrência (recorrentes ÷ total)
     for (const r of rncs) { const m = r.data.getUTCMonth(); tot[m] = (tot[m] || 0) + 1; if (r.recorrente) rec[m] = (rec[m] || 0) + 1; }
     series.recorrencia_nc = rec.map((v, m) => pct(v || 0, tot[m] || 0)); }
