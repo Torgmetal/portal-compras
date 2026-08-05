@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Gauge, Loader2, Lock, Info, TrendingUp } from "lucide-react";
+import { Gauge, Loader2, Lock, Info, TrendingUp, X } from "lucide-react";
 import { farol, FAROL_COR, metaTexto } from "@/lib/indicadores-iso";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -28,13 +28,14 @@ function Spark({ serie, meta, mesFim }) {
   );
 }
 
-export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint = "/api/qualidade/indicadores", titulo = "Indicadores da Qualidade" }) {
+export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint = "/api/qualidade/indicadores", titulo = "Indicadores da Qualidade", detalheEndpoint = null }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const hoje = new Date();
   const [ano] = useState(hoje.getUTCFullYear());
   const [mes, setMes] = useState(null); // null = deixa a API escolher (mês atual)
+  const [detalhe, setDetalhe] = useState(null); // indicador aberto no modal de registros do mês
 
   useEffect(() => {
     setLoading(true);
@@ -86,9 +87,57 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
         <div className="py-10 text-center text-red-600 text-sm">{erro}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-          {data.indicadores.filter((i) => i.processo === processo).map((ind) => <Card key={ind.id} ind={ind} mesFim={data.mesFim} />)}
+          {data.indicadores.filter((i) => i.processo === processo).map((ind) => <Card key={ind.id} ind={ind} mesFim={data.mesFim} onAbrir={detalheEndpoint && ind.fonte !== "pendente" ? () => setDetalhe(ind) : null} />)}
         </div>
       )}
+
+      {detalhe && <DetalheModal ind={detalhe} endpoint={detalheEndpoint} ano={ano} mes={mes} onClose={() => setDetalhe(null)} />}
+    </div>
+  );
+}
+
+function DetalheModal({ ind, endpoint, ano, mes, onClose }) {
+  const [d, setD] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState("");
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${endpoint}?indicador=${encodeURIComponent(ind.id)}&ano=${ano}&mes=${mes}`).then((r) => r.json())
+      .then((j) => { if (!j || j.error) return setErro(j?.error || "Sem detalhamento"); setD(j); })
+      .catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
+  }, [ind.id, mes]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl my-6">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-torg-dark">{ind.nome}</h3>
+            <p className="text-[11px] text-torg-gray mt-0.5">{MESES[mes]} / {ano} — registros do mês (de onde saiu o número)</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        {loading ? (
+          <div className="py-14 text-center text-torg-gray"><Loader2 size={22} className="mx-auto animate-spin mb-2" /> Carregando…</div>
+        ) : erro ? (
+          <div className="py-10 text-center text-red-600 text-sm px-5">{erro}</div>
+        ) : (
+          <div className="px-5 py-4 space-y-3">
+            {d.resumo && <p className="text-[12px] text-torg-dark bg-torg-blue-50/50 border border-torg-blue-100 rounded-lg px-3 py-2">{d.resumo}</p>}
+            {(!d.linhas || d.linhas.length === 0) ? (
+              <p className="text-[13px] text-torg-gray py-6 text-center">Nenhum registro neste mês.</p>
+            ) : (
+              <div className="overflow-auto max-h-[60vh] border border-gray-100 rounded-lg">
+                <table className="w-full text-[12px]">
+                  <thead className="bg-gray-50/60 text-torg-gray sticky top-0"><tr>{d.colunas.map((c, i) => <th key={i} className="px-3 py-2 font-medium text-left whitespace-nowrap">{c}</th>)}</tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {d.linhas.map((ln, i) => <tr key={i} className="hover:bg-gray-50/60">{ln.map((cell, j) => <td key={j} className="px-3 py-1.5 text-torg-dark whitespace-nowrap">{cell}</td>)}</tr>)}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -97,12 +146,14 @@ function Chip({ n, l, cor, bg }) {
   return <div className="rounded-xl px-4 py-2 flex items-center gap-2.5" style={{ background: bg }}><span className="text-2xl font-extrabold tabular-nums" style={{ color: cor }}>{n}</span><span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: cor }}>{l}</span></div>;
 }
 
-function Card({ ind, mesFim }) {
+function Card({ ind, mesFim, onAbrir }) {
   const pendente = ind.fonte === "pendente";
   const f = pendente ? null : farol(ind.atual, ind.meta);
   const cor = f ? FAROL_COR[f] : null;
+  const clicavel = !!onAbrir;
   return (
-    <div className={`rounded-xl border p-4 flex flex-col gap-2.5 ${pendente ? "border-dashed border-gray-300 bg-gray-50/60" : "bg-white border-gray-200"}`}>
+    <div onClick={clicavel ? onAbrir : undefined} title={clicavel ? "Ver os registros do mês" : undefined}
+      className={`rounded-xl border p-4 flex flex-col gap-2.5 ${pendente ? "border-dashed border-gray-300 bg-gray-50/60" : "bg-white border-gray-200"} ${clicavel ? "cursor-pointer hover:border-torg-blue hover:shadow-sm transition-all" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="font-bold text-torg-dark text-[13.5px] leading-snug">{ind.nome}</div>
@@ -127,6 +178,7 @@ function Card({ ind, mesFim }) {
           </div>
           {ind.fonte === "parcial" && ind.nota && <div className="text-[10.5px] text-amber-700 bg-amber-50 rounded px-2 py-1 inline-flex items-start gap-1"><Info size={11} className="mt-0.5 shrink-0" /> {ind.nota}</div>}
           {ind.atual == null && <div className="text-[10.5px] text-torg-gray inline-flex items-center gap-1"><TrendingUp size={11} /> Sem dado no mês selecionado.</div>}
+          {clicavel && <div className="text-[10.5px] text-torg-blue font-medium">ver registros do mês →</div>}
         </>
       )}
     </div>
