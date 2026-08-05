@@ -19,7 +19,7 @@ export async function GET(_req, { params }) {
 const dstr = z.string().optional().nullable();
 const schema = z.object({
   data: dstr, cliente: dstr, opNumero: dstr, opId: dstr, desenhoProjetoMarca: dstr,
-  origem: dstr, fornecedor: dstr, processoArea: dstr, descricao: dstr, analise: dstr,
+  origem: dstr, fornecedor: dstr, processoArea: dstr, descricao: dstr,
   fotos: z.array(z.object({ url: z.string().url(), legenda: dstr })).optional(),
   disposicao: dstr, elaborador: dstr, resultadoReinspecao: dstr, abrangencia: dstr,
   necessitaAcao: dstr, motivoNaoAcao: dstr, causas: dstr,
@@ -34,7 +34,7 @@ const schema = z.object({
 });
 
 const asDate = (s) => (s ? new Date(s.length <= 10 ? s + "T12:00:00Z" : s) : null);
-const TXT = new Set(["cliente", "opNumero", "opId", "desenhoProjetoMarca", "origem", "fornecedor", "processoArea", "descricao", "analise", "disposicao", "elaborador", "resultadoReinspecao", "abrangencia", "necessitaAcao", "motivoNaoAcao", "causas", "planoAcaoId", "acompanhadoPor", "acompanhamento", "avaliacaoEficacia", "encerradaPor", "rncAnteriorId", "anexoUrl", "programa", "jobCliente", "numeroCliente", "respostaCliente"]);
+const TXT = new Set(["cliente", "opNumero", "opId", "desenhoProjetoMarca", "origem", "fornecedor", "processoArea", "descricao", "disposicao", "elaborador", "resultadoReinspecao", "abrangencia", "necessitaAcao", "motivoNaoAcao", "causas", "planoAcaoId", "acompanhadoPor", "acompanhamento", "avaliacaoEficacia", "encerradaPor", "rncAnteriorId", "anexoUrl", "programa", "jobCliente", "numeroCliente", "respostaCliente"]);
 const DATES = new Set(["data", "prazoResposta", "realizadoEm"]);
 
 export async function PATCH(req, { params }) {
@@ -66,7 +66,10 @@ export async function DELETE(_req, { params }) {
   let user;
   try { user = await requireRole(["ADMIN", "QUALIDADE"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  // Apaga também o plano de ação 5W2H vinculado (senão fica órfão na aba Plano de Ação).
+  const rnc = await prisma.naoConformidade.findUnique({ where: { id: params.id }, select: { planoAcaoId: true } });
   await prisma.naoConformidade.delete({ where: { id: params.id } });
+  if (rnc?.planoAcaoId) await prisma.planoAcao.delete({ where: { id: rnc.planoAcaoId } }).catch(() => {});
   await prisma.auditLog.create({ data: { userId: user.id, action: "EXCLUIR_RNC", entity: "NaoConformidade", entityId: params.id, diff: {} } }).catch(() => {});
   return NextResponse.json({ success: true });
 }

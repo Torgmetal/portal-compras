@@ -25,7 +25,7 @@ export async function GET(req) {
 }
 
 const schema = z.object({
-  tipo: z.enum(["INTERNA", "CLIENTE"]),
+  tipo: z.enum(["INTERNA"]).default("INTERNA"),
   data: z.string().optional().nullable(),
   cliente: z.string().max(200).optional().nullable(),
   opNumero: z.string().max(60).optional().nullable(),
@@ -61,7 +61,7 @@ export async function POST(req) {
       numero, ano, tipo: body.tipo, data: dt,
       cliente: body.cliente?.trim() || null, opNumero: body.opNumero?.trim() || null, opId: body.opId || null,
       desenhoProjetoMarca: body.desenhoProjetoMarca?.trim() || null,
-      origem: body.origem || (body.tipo === "CLIENTE" ? "CLIENTE" : null),
+      origem: body.origem || null,
       fornecedor: body.fornecedor?.trim() || null, processoArea: body.processoArea?.trim() || null,
       descricao: body.descricao?.trim() || null, prazoResposta: body.prazoResposta ? new Date(body.prazoResposta + "T12:00:00Z") : null,
       numeroCliente: body.numeroCliente?.trim() || null, programa: body.programa?.trim() || null,

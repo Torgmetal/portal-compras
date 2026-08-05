@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, User, Upload, FileSpreadsheet, FileText, ListChecks, Sparkles } from "lucide-react";
-import { numRNC, TIPOS_RNC, STATUS_RNC, statusRncLabel, diasParaPrazo } from "@/lib/nao-conformidade";
+import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, Upload, FileSpreadsheet, ListChecks } from "lucide-react";
+import { numRNC, STATUS_RNC, statusRncLabel, diasParaPrazo } from "@/lib/nao-conformidade";
 import PlanosAcaoLista from "../auditorias-internas/PlanosAcaoLista";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -19,7 +19,7 @@ export default function RncClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const abaUrl = searchParams.get("aba");
-  const [aba, setAba] = useState(["INTERNA", "CLIENTE", "PLANOS"].includes(abaUrl) ? abaUrl : "INTERNA");
+  const [aba, setAba] = useState(["INTERNA", "PLANOS"].includes(abaUrl) ? abaUrl : "INTERNA");
   const [itens, setItens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -41,18 +41,18 @@ export default function RncClient() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2.5"><AlertOctagon className="text-torg-blue" size={28} /> RNC — Não Conformidades</h2>
-          <p className="text-sm text-torg-gray mt-1">Relatório de Não Conformidade (FORM 20). Internas e as recebidas de clientes.</p>
+          <p className="text-sm text-torg-gray mt-1">Relatório de Não Conformidade (FORM 20).</p>
         </div>
         {aba !== "PLANOS" && (
           <div className="flex items-center gap-2">
             <button onClick={() => setModalImport(true)} className="px-3.5 py-2.5 border border-gray-300 text-torg-dark rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2"><Upload size={17} /> Importar</button>
-            <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova RNC {TIPOS_RNC[aba].curto.toLowerCase()}</button>
+            <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova RNC</button>
           </div>
         )}
       </div>
 
       <div className="flex items-center gap-1 border-b border-gray-200">
-        {[{ k: "INTERNA", l: "RNC Interna", icon: Building2 }, { k: "CLIENTE", l: "RNC de Cliente", icon: User }, { k: "PLANOS", l: "Plano de Ação", icon: ListChecks }].map((t) => {
+        {[{ k: "INTERNA", l: "RNC", icon: Building2 }, { k: "PLANOS", l: "Plano de Ação", icon: ListChecks }].map((t) => {
           const Icon = t.icon;
           return (
             <button key={t.k} onClick={() => setAba(t.k)}
@@ -72,7 +72,7 @@ export default function RncClient() {
       ) : itens.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
           <AlertOctagon size={38} className="mx-auto text-gray-300 mb-3" />
-          <p className="text-sm text-torg-gray">Nenhuma RNC {TIPOS_RNC[aba].curto.toLowerCase()} registrada.</p>
+          <p className="text-sm text-torg-gray">Nenhuma RNC registrada.</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -92,7 +92,7 @@ export default function RncClient() {
               <tbody className="divide-y divide-gray-50">
                 {itens.map((r) => (
                   <tr key={r.id} onClick={() => router.push(`/qualidade/rnc/${r.id}`)} className="hover:bg-torg-blue-50/40 cursor-pointer">
-                    <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{numRNC(r.numero, r.ano)}{r.numeroCliente ? <span className="text-[10px] text-torg-gray font-sans ml-1">({r.numeroCliente})</span> : ""}</td>
+                    <td className="px-3 py-2 font-mono font-semibold text-torg-blue whitespace-nowrap">{numRNC(r.numero, r.ano)}</td>
                     <td className="px-3 py-2 text-torg-dark whitespace-nowrap">{fmtD(r.data)}</td>
                     <td className="px-3 py-2 text-torg-dark">{r.cliente || "—"}</td>
                     <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{r.opNumero ? r.opNumero.replace(/^[Tt]\s*/, "") : "—"}</td>
@@ -107,26 +107,21 @@ export default function RncClient() {
         </div>
       )}
 
-      {modal && <ModalNova tipo={aba} onClose={() => setModal(false)} onCriada={(id) => router.push(`/qualidade/rnc/${id}`)} />}
-      {modalImport && <ModalImportar tipo={aba} onClose={() => setModalImport(false)} onFim={carregar} onAbrir={(id) => router.push(`/qualidade/rnc/${id}`)} />}
+      {modal && <ModalNova onClose={() => setModal(false)} onCriada={(id) => router.push(`/qualidade/rnc/${id}`)} />}
+      {modalImport && <ModalImportar onClose={() => setModalImport(false)} onFim={carregar} />}
     </div>
   );
 }
 
-// Importador ciente da aba: INTERNA lê o FORM 20 em Excel; CLIENTE aceita o PDF/
-// imagem que o cliente mandou, cria o registro e a IA converte tudo (descrição,
-// causas, 5 porquês e plano de ação) — o mesmo fluxo do "Analisar com IA" da RNC.
-function ModalImportar({ tipo, onClose, onFim, onAbrir }) {
-  const cliente = tipo === "CLIENTE";
+// Importador do FORM 20 (.xls) — parse no navegador (os .xls têm fotos pesadas; só o
+// JSON pequeno sobe). Cria a RNC com o número original, o plano e o encerramento.
+function ModalImportar({ onClose, onFim }) {
   const [files, setFiles] = useState([]);
-  const [prazo, setPrazo] = useState("");
   const [enviando, setEnviando] = useState(false);
-  const [prog, setProg] = useState(null); // { i, n } — progresso da análise por IA
   const [res, setRes] = useState(null);
   const [erro, setErro] = useState("");
 
-  // INTERNA — parse do FORM 20 (.xls) no navegador; só o JSON pequeno sobe.
-  async function importarExcel() {
+  async function importar() {
     if (!files.length) return setErro("Selecione os arquivos .xls das RNCs.");
     setErro(""); setEnviando(true);
     try {
@@ -147,67 +142,26 @@ function ModalImportar({ tipo, onClose, onFim, onAbrir }) {
     } catch (e) { setErro(e.message); } finally { setEnviando(false); }
   }
 
-  // CLIENTE — cada documento (PDF/imagem) vira uma RNC de cliente: sobe pro Blob
-  // por token (evita o limite de ~4,5MB), cria o registro e a IA preenche.
-  async function importarCliente() {
-    if (!files.length) return setErro("Selecione o(s) documento(s) da RNC do cliente (PDF ou imagem).");
-    setErro(""); setEnviando(true);
-    const { upload } = await import("@vercel/blob/client");
-    const resultados = []; let criadas = 0, erros = 0;
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      setProg({ i: i + 1, n: files.length });
-      try {
-        const safe = (f.name || "rnc").replace(/[^\w.-]+/g, "-");
-        const blob = await upload(`qualidade/rnc/${Date.now()}-${safe}`, f, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
-        const rc = await fetch("/api/qualidade/rnc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "CLIENTE", anexoUrl: blob.url, prazoResposta: prazo || null }) });
-        const jc = await rc.json();
-        if (!rc.ok || !jc.success) throw new Error(jc.error || "falha ao criar o registro");
-        const ra = await fetch(`/api/qualidade/rnc/${jc.id}/analisar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anexoUrl: blob.url, tipo: f.type }) });
-        const ja = await ra.json();
-        if (!ra.ok || !ja.success) throw new Error(ja.error || "registro criado, mas a IA falhou — abra a RNC e clique em Analisar");
-        criadas++;
-        resultados.push({ arquivo: f.name, resultado: "criada", numero: jc.numero, ano: jc.ano, id: jc.id });
-      } catch (e) {
-        erros++;
-        resultados.push({ arquivo: f.name, resultado: "erro", erro: e.message });
-      }
-    }
-    setProg(null); setEnviando(false);
-    setRes({ criadas, jaExistem: 0, erros, total: files.length, resultados });
-    onFim();
-    // 1 documento só e deu certo → abre a RNC pra revisar o rascunho da IA.
-    const unica = resultados.find((r) => r.resultado === "criada");
-    if (files.length === 1 && unica && onAbrir) onAbrir(unica.id);
-  }
-
-  const importar = cliente ? importarCliente : importarExcel;
-  const Icone = cliente ? FileText : FileSpreadsheet;
-  const rotulo = files.length ? `${files.length} arquivo(s) selecionado(s)` : (cliente ? "Clique para selecionar o PDF/imagem" : "Clique para selecionar os .xls");
-
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && !enviando && onClose()}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-6">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><Upload size={15} className="text-torg-blue" /> {cliente ? "Importar RNC do cliente" : "Importar RNCs (FORM 20)"}</h3>
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><Upload size={15} className="text-torg-blue" /> Importar RNCs (FORM 20)</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         {res ? (
           <div className="px-5 py-4 space-y-3">
             <div className="flex gap-2.5">
               <span className="flex-1 text-center bg-emerald-50 text-emerald-700 rounded-lg py-2"><b className="text-lg block">{res.criadas}</b><span className="text-[11px] uppercase tracking-wide">importadas</span></span>
-              {!cliente && <span className="flex-1 text-center bg-gray-100 text-gray-600 rounded-lg py-2"><b className="text-lg block">{res.jaExistem}</b><span className="text-[11px] uppercase tracking-wide">já existiam</span></span>}
+              <span className="flex-1 text-center bg-gray-100 text-gray-600 rounded-lg py-2"><b className="text-lg block">{res.jaExistem}</b><span className="text-[11px] uppercase tracking-wide">já existiam</span></span>
               {res.erros > 0 && <span className="flex-1 text-center bg-red-50 text-red-700 rounded-lg py-2"><b className="text-lg block">{res.erros}</b><span className="text-[11px] uppercase tracking-wide">com erro</span></span>}
             </div>
             <div className="max-h-64 overflow-y-auto divide-y divide-gray-50 text-[12px]">
               {res.resultados.map((r, i) => (
                 <div key={i} className="py-1.5 flex items-center justify-between gap-2">
                   <span className="text-torg-gray truncate">{r.arquivo}</span>
-                  {r.resultado === "criada" ? (
-                    r.id
-                      ? <button onClick={() => onAbrir && onAbrir(r.id)} className="text-emerald-700 font-semibold whitespace-nowrap hover:underline">✓ RNC-{String(r.numero).padStart(3, "0")}/{String(r.ano).slice(-2)}</button>
-                      : <span className="text-emerald-700 font-semibold whitespace-nowrap">✓ RNC-{String(r.numero).padStart(3, "0")}/{String(r.ano).slice(-2)}</span>
-                  ) : r.resultado === "ja_existe" ? <span className="text-gray-400 whitespace-nowrap">já existe</span>
+                  {r.resultado === "criada" ? <span className="text-emerald-700 font-semibold whitespace-nowrap">✓ RNC-{String(r.numero).padStart(3, "0")}/{String(r.ano).slice(-2)}</span>
+                    : r.resultado === "ja_existe" ? <span className="text-gray-400 whitespace-nowrap">já existe</span>
                       : <span className="text-red-600 whitespace-nowrap" title={r.erro}>erro</span>}
                 </div>
               ))}
@@ -215,26 +169,12 @@ function ModalImportar({ tipo, onClose, onFim, onAbrir }) {
           </div>
         ) : (
           <div className="px-5 py-4 space-y-3">
-            <p className="text-[12px] text-torg-gray">{cliente
-              ? <>Selecione o(s) documento(s) que o cliente enviou (<b>PDF ou imagem</b>). O portal cria a RNC de cliente e a <b>IA converte tudo</b> — descrição, causas, 5 porquês e plano de ação. Revise o rascunho antes de responder.</>
-              : <>Selecione os arquivos <b>.xls</b> das RNCs (o FORM 20 da Torg). O portal lê cada documento e cria a RNC com o número original, o plano de ação e o encerramento. As que já existem são puladas.</>}</p>
+            <p className="text-[12px] text-torg-gray">Selecione os arquivos <b>.xls</b> das RNCs (o FORM 20 da Torg). O portal lê cada documento e cria a RNC com o número original, o plano de ação e o encerramento. As que já existem são puladas.</p>
             <label className={`border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center gap-2 hover:border-torg-blue hover:bg-torg-blue-50/30 ${enviando ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}>
-              <Icone size={26} className="text-torg-gray" />
-              <span className="text-[13px] text-torg-dark font-medium">{rotulo}</span>
-              <input type="file" accept={cliente ? ".pdf,image/png,image/jpeg,image/webp" : ".xls,.xlsx"} multiple disabled={enviando} className="hidden" onChange={(e) => { setFiles(Array.from(e.target.files || [])); setErro(""); }} />
+              <FileSpreadsheet size={26} className="text-torg-gray" />
+              <span className="text-[13px] text-torg-dark font-medium">{files.length ? `${files.length} arquivo(s) selecionado(s)` : "Clique para selecionar os .xls"}</span>
+              <input type="file" accept=".xls,.xlsx" multiple disabled={enviando} className="hidden" onChange={(e) => { setFiles(Array.from(e.target.files || [])); setErro(""); }} />
             </label>
-            {cliente && (
-              <label className="flex items-center justify-between gap-3 text-[12px] text-torg-dark">
-                <span>Prazo para resposta <span className="text-torg-gray">(opcional — aplica a todas)</span></span>
-                <input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)} disabled={enviando} className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-[13px]" />
-              </label>
-            )}
-            {cliente && (
-              <p className="text-[11px] text-torg-gray flex items-center gap-1.5 bg-torg-blue-50/60 rounded-lg px-3 py-2"><Sparkles size={13} className="text-torg-blue shrink-0" /> A IA lê cada documento e monta o rascunho — leva alguns segundos por arquivo. Um documento por RNC do cliente.</p>
-            )}
-            {enviando && cliente && prog && (
-              <p className="text-[12px] text-torg-blue flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Analisando {prog.i} de {prog.n}…</p>
-            )}
             {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
           </div>
         )}
@@ -244,7 +184,7 @@ function ModalImportar({ tipo, onClose, onFim, onAbrir }) {
           ) : (
             <>
               <button onClick={onClose} disabled={enviando} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50">Cancelar</button>
-              <button onClick={importar} disabled={enviando || !files.length} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50">{enviando ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} {cliente ? "Importar e analisar" : "Importar"} {files.length || ""}</button>
+              <button onClick={importar} disabled={enviando || !files.length} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50">{enviando ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Importar {files.length || ""}</button>
             </>
           )}
         </div>
@@ -253,20 +193,18 @@ function ModalImportar({ tipo, onClose, onFim, onAbrir }) {
   );
 }
 
-function ModalNova({ tipo, onClose, onCriada }) {
-  const cliente = tipo === "CLIENTE";
-  const [f, setF] = useState({ data: new Date().toISOString().slice(0, 10), cliente: "", opNumero: "", descricao: "", prazoResposta: "", numeroCliente: "", programa: "", jobCliente: "" });
+function ModalNova({ onClose, onCriada }) {
+  const [f, setF] = useState({ data: new Date().toISOString().slice(0, 10), cliente: "", opNumero: "", descricao: "", prazoResposta: "" });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
   async function salvar() {
     setErro("");
-    if (cliente && !f.cliente.trim()) return setErro("Informe o cliente.");
     if (!f.descricao.trim()) return setErro("Descreva a não conformidade.");
     setSalvando(true);
     try {
-      const r = await fetch("/api/qualidade/rnc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, ...f }) });
+      const r = await fetch("/api/qualidade/rnc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "INTERNA", ...f }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro ao criar");
       onCriada(j.id);
@@ -277,22 +215,17 @@ function ModalNova({ tipo, onClose, onCriada }) {
     <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-xl my-6">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-torg-dark">Nova {TIPOS_RNC[tipo].label}</h3>
+          <h3 className="text-sm font-semibold text-torg-dark">Nova RNC</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-3">
-          {cliente && <p className="text-[12px] text-torg-gray bg-torg-blue-50/60 rounded-lg px-3 py-2">Cadastre o registro com o prazo. Em seguida, na tela da RNC, você anexa o documento do cliente e a IA converte tudo (descrição, causa, plano de ação e resposta).</p>}
           <div className="grid grid-cols-2 gap-3">
-            <Campo label={cliente ? "Cliente *" : "Cliente"}><input value={f.cliente} onChange={(e) => set("cliente", e.target.value)} className="inp" /></Campo>
+            <Campo label="Cliente"><input value={f.cliente} onChange={(e) => set("cliente", e.target.value)} className="inp" /></Campo>
             <Campo label="OP / Obra"><input value={f.opNumero} onChange={(e) => set("opNumero", e.target.value)} placeholder="T69" className="inp" /></Campo>
             <Campo label="Data"><input type="date" value={f.data} onChange={(e) => set("data", e.target.value)} className="inp" /></Campo>
             <Campo label="Prazo para resposta"><input type="date" value={f.prazoResposta} onChange={(e) => set("prazoResposta", e.target.value)} className="inp" /></Campo>
-            {cliente && <>
-              <Campo label="Nº da RNC do cliente"><input value={f.numeroCliente} onChange={(e) => set("numeroCliente", e.target.value)} placeholder="RTNC-010" className="inp" /></Campo>
-              <Campo label="Programa"><input value={f.programa} onChange={(e) => set("programa", e.target.value)} placeholder="ASME" className="inp" /></Campo>
-            </>}
           </div>
-          <Campo label="Descrição da não conformidade *"><textarea value={f.descricao} onChange={(e) => set("descricao", e.target.value)} rows={3} className="inp" placeholder={cliente ? "Pode deixar em branco — a IA preenche do anexo depois." : "O que foi constatado"} /></Campo>
+          <Campo label="Descrição da não conformidade *"><textarea value={f.descricao} onChange={(e) => set("descricao", e.target.value)} rows={3} className="inp" placeholder="O que foi constatado" /></Campo>
           {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
         </div>
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">

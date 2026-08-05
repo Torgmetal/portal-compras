@@ -99,7 +99,6 @@ async function main() {
     "evidencias" JSONB NOT NULL DEFAULT '[]', "createdById" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`);
-  await prisma.$executeRawUnsafe(`ALTER TABLE "NaoConformidade" ADD COLUMN IF NOT EXISTS "analise" TEXT`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "NaoConformidade_tipo_idx" ON "NaoConformidade"("tipo")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "NaoConformidade_status_idx" ON "NaoConformidade"("status")`);
   console.log("[ensure-mes-tables] OK — NaoConformidade (RNC) garantida.");

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown, Sparkles, Upload, Paperclip } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown } from "lucide-react";
 import { numRNC, TIPOS_RNC, ORIGEM_NC, DISPOSICAO_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
 import { SETORES_AUDITORIA } from "@/lib/auditoria-interna";
 
@@ -15,7 +15,6 @@ export default function RncDetalheClient({ id }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
-  const [analisando, setAnalisando] = useState(false);
   const [msg, setMsg] = useState("");
 
   const carregar = useCallback(() => {
@@ -41,14 +40,13 @@ export default function RncDetalheClient({ id }) {
     try {
       const body = {
         data: d.data || null, cliente: d.cliente, opNumero: d.opNumero, desenhoProjetoMarca: d.desenhoProjetoMarca,
-        origem: d.origem, fornecedor: d.fornecedor, processoArea: d.processoArea, descricao: d.descricao, analise: d.analise,
+        origem: d.origem, fornecedor: d.fornecedor, processoArea: d.processoArea, descricao: d.descricao,
         disposicao: d.disposicao, elaborador: d.elaborador, resultadoReinspecao: d.resultadoReinspecao, abrangencia: d.abrangencia,
         necessitaAcao: d.necessitaAcao, motivoNaoAcao: d.motivoNaoAcao, causas: d.causas,
         cincoPorques: d.cincoPorques.map((x, i) => ({ porque: `${i + 1}º porquê`, resposta: (x.resposta || "").trim() })),
         prazoResposta: d.prazoResposta || null, realizadoEm: d.realizadoEm || null, acompanhadoPor: d.acompanhadoPor,
         acompanhamento: d.acompanhamento, avaliacaoEficacia: d.avaliacaoEficacia, encerradaPor: d.encerradaPor,
         pertinente: !!d.pertinente, recorrente: !!d.recorrente,
-        numeroCliente: d.numeroCliente, programa: d.programa, jobCliente: d.jobCliente,
         ...extra,
       };
       const r = await fetch(`/api/qualidade/rnc/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -65,26 +63,9 @@ export default function RncDetalheClient({ id }) {
     catch { setErro("Erro ao excluir"); setSalvando(false); }
   }
 
-  async function analisarIA(file) {
-    if (!file) return;
-    setErro(""); setAnalisando(true);
-    try {
-      // Sobe o documento DIRETO pro Blob (upload por token) — RNC de cliente costuma
-      // ser um PDF pesado (scan) e estourava o corpo da rota (~4,5MB). Só a URL vai.
-      const { upload } = await import("@vercel/blob/client");
-      const safe = (file.name || "rnc").replace(/[^\w.-]+/g, "-");
-      const blob = await upload(`qualidade/rnc/${Date.now()}-${safe}`, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
-      const r = await fetch(`/api/qualidade/rnc/${id}/analisar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anexoUrl: blob.url, tipo: file.type }) });
-      const j = await r.json();
-      if (!r.ok || !j.success) throw new Error(j.error || "Falha na análise");
-      flash("Análise concluída — descrição, causas, 5 porquês e plano de ação preenchidos pela IA. Revise antes de encerrar."); carregar();
-    } catch (e) { setErro(e.message); } finally { setAnalisando(false); }
-  }
-
   if (loading) return <div className="py-20 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin mb-2" /> Carregando…</div>;
   if (erro && !d) return <div className="py-20 text-center text-red-600 text-sm">{erro} · <Link href="/qualidade/rnc" className="text-torg-blue underline">voltar</Link></div>;
 
-  const cliente = d.tipo === "CLIENTE";
   return (
     <div className="space-y-5 max-w-4xl pb-24">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -100,32 +81,10 @@ export default function RncDetalheClient({ id }) {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="font-mono font-bold text-torg-blue text-lg">{numRNC(d.numero, d.ano)}</span>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-torg-blue-50 text-torg-blue">{TIPOS_RNC[d.tipo].label}</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-torg-blue-50 text-torg-blue">{TIPOS_RNC[d.tipo]?.label || "RNC"}</span>
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_RNC[d.status]?.cor}`}>{statusRncLabel(d.status)}</span>
-          {cliente && d.numeroCliente && <span className="text-[11px] text-torg-gray">· cliente: {d.numeroCliente}</span>}
         </div>
         <h1 className="text-xl font-extrabold text-torg-dark tracking-tight">Relatório de Não Conformidade</h1>
-        {cliente && (
-          <div className="mt-3 space-y-2">
-            <div className="bg-gradient-to-br from-torg-blue-50/70 to-white border border-torg-blue-100 rounded-xl p-4">
-              <div className="flex items-start gap-2.5">
-                <Sparkles size={18} className="text-torg-blue mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-torg-dark">Análise por IA da RNC do cliente</p>
-                  <p className="text-[12px] text-torg-gray mt-0.5">Anexe o documento (PDF ou imagem) que o cliente enviou. A IA <b>analisa</b> (não transcreve): levanta os pontos, avalia se procede, aponta as possíveis causas, faz os 5 porquês e recomenda se cabe ação — montando o plano 5W2H só quando necessário.</p>
-                  <div className="flex items-center gap-3 mt-3 flex-wrap">
-                    <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm ${analisando ? "bg-gray-200 text-gray-500 cursor-wait" : "bg-torg-blue text-white hover:bg-torg-dark cursor-pointer"}`}>
-                      {analisando ? <><Loader2 size={15} className="animate-spin" /> Analisando…</> : <><Upload size={15} /> {d.anexoUrl ? "Reanalisar / trocar anexo" : "Anexar e analisar com IA"}</>}
-                      <input type="file" accept=".pdf,image/png,image/jpeg,image/webp" className="hidden" disabled={analisando} onChange={(e) => { analisarIA(e.target.files?.[0]); e.target.value = ""; }} />
-                    </label>
-                    {d.anexoUrl && <a href={d.anexoUrl} target="_blank" rel="noopener noreferrer" className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Paperclip size={13} /> ver documento do cliente</a>}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p className="text-[11px] text-torg-gray">O que a IA preencher é rascunho — revise a análise, a descrição, as causas, os 5 porquês e o plano de ação antes de encerrar/responder.</p>
-          </div>
-        )}
       </div>
 
       {/* Identificação */}
@@ -147,24 +106,8 @@ export default function RncDetalheClient({ id }) {
           {d.origem === "FORNECEDOR" && <Campo label="Fornecedor"><input value={d.fornecedor || ""} onChange={(e) => set("fornecedor", e.target.value)} className="inp" /></Campo>}
           <Campo label="Data"><input type="date" value={d.data || ""} onChange={(e) => set("data", e.target.value)} className="inp" /></Campo>
           <Campo label="Prazo para resposta"><input type="date" value={d.prazoResposta || ""} onChange={(e) => set("prazoResposta", e.target.value)} className="inp" /></Campo>
-          {cliente && <>
-            <Campo label="Nº da RNC do cliente"><input value={d.numeroCliente || ""} onChange={(e) => set("numeroCliente", e.target.value)} className="inp" /></Campo>
-            <Campo label="Programa"><input value={d.programa || ""} onChange={(e) => set("programa", e.target.value)} placeholder="ASME" className="inp" /></Campo>
-            <Campo label="Job do cliente"><input value={d.jobCliente || ""} onChange={(e) => set("jobCliente", e.target.value)} className="inp" /></Campo>
-          </>}
         </div>
       </Secao>
-
-      {/* Análise da Qualidade — o que a IA levanta e avalia (não é transcrição) */}
-      {(cliente || d.analise) && (
-        <Secao titulo="Análise da Qualidade">
-          <Campo label="Pontos levantados pelo cliente + avaliação técnica da Torg">
-            <textarea value={d.analise || ""} onChange={(e) => set("analise", e.target.value)} rows={6} className="inp"
-              placeholder={cliente ? "A IA levanta os pontos que o cliente aponta e avalia se procede, no contexto da Torg. Revise antes de responder." : ""} />
-          </Campo>
-          <p className="text-[11px] text-torg-gray -mt-1">Esta é a leitura da Qualidade para a diretoria avaliar. A recomendação de ação vai em “Necessita de ação”, abaixo; o plano 5W2H só é criado quando cabe ação.</p>
-        </Secao>
-      )}
 
       {/* Descrição + disposição */}
       <Secao titulo="Não conformidade">

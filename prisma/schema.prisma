@@ -1801,7 +1801,6 @@ model NaoConformidade {
   fornecedor          String?
   processoArea        String? // setor/área da ocorrência (Expedição, Engenharia…)
   descricao           String?
-  analise             String? // análise da Qualidade (IA): pontos levantados + avaliação técnica da Torg
   fotos               Json      @default("[]") // registro fotográfico [{ url, legenda }]
   disposicao          String? // APROVAR_CONCESSAO | RETRABALHAR | REFUGAR | DEVOLVER_FORNECEDOR
   elaborador          String?
