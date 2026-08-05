@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, User } from "lucide-react";
+import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, User, Upload, FileSpreadsheet } from "lucide-react";
 import { numRNC, TIPOS_RNC, STATUS_RNC, statusRncLabel, diasParaPrazo } from "@/lib/nao-conformidade";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -21,6 +21,7 @@ export default function RncClient() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(false);
+  const [modalImport, setModalImport] = useState(false);
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -38,7 +39,10 @@ export default function RncClient() {
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2.5"><AlertOctagon className="text-torg-blue" size={28} /> RNC — Não Conformidades</h2>
           <p className="text-sm text-torg-gray mt-1">Relatório de Não Conformidade (FORM 20). Internas e as recebidas de clientes.</p>
         </div>
-        <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova RNC {TIPOS_RNC[aba].curto.toLowerCase()}</button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setModalImport(true)} className="px-3.5 py-2.5 border border-gray-300 text-torg-dark rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2"><Upload size={17} /> Importar</button>
+          <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova RNC {TIPOS_RNC[aba].curto.toLowerCase()}</button>
+        </div>
       </div>
 
       <div className="flex items-center gap-1 border-b border-gray-200">
@@ -96,6 +100,77 @@ export default function RncClient() {
       )}
 
       {modal && <ModalNova tipo={aba} onClose={() => setModal(false)} onCriada={(id) => router.push(`/qualidade/rnc/${id}`)} />}
+      {modalImport && <ModalImportar onClose={() => setModalImport(false)} onFim={carregar} />}
+    </div>
+  );
+}
+
+function ModalImportar({ onClose, onFim }) {
+  const [files, setFiles] = useState([]);
+  const [enviando, setEnviando] = useState(false);
+  const [res, setRes] = useState(null);
+  const [erro, setErro] = useState("");
+
+  async function importar() {
+    if (!files.length) return setErro("Selecione os arquivos .xls das RNCs.");
+    setErro(""); setEnviando(true);
+    try {
+      const fd = new FormData();
+      for (const f of files) fd.append("files", f);
+      const r = await fetch("/api/qualidade/rnc/importar", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Falha na importação");
+      setRes(j); onFim();
+    } catch (e) { setErro(e.message); } finally { setEnviando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg my-6">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><Upload size={15} className="text-torg-blue" /> Importar RNCs (FORM 20)</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        {res ? (
+          <div className="px-5 py-4 space-y-3">
+            <div className="flex gap-2.5">
+              <span className="flex-1 text-center bg-emerald-50 text-emerald-700 rounded-lg py-2"><b className="text-lg block">{res.criadas}</b><span className="text-[11px] uppercase tracking-wide">importadas</span></span>
+              <span className="flex-1 text-center bg-gray-100 text-gray-600 rounded-lg py-2"><b className="text-lg block">{res.jaExistem}</b><span className="text-[11px] uppercase tracking-wide">já existiam</span></span>
+              {res.erros > 0 && <span className="flex-1 text-center bg-red-50 text-red-700 rounded-lg py-2"><b className="text-lg block">{res.erros}</b><span className="text-[11px] uppercase tracking-wide">com erro</span></span>}
+            </div>
+            <div className="max-h-64 overflow-y-auto divide-y divide-gray-50 text-[12px]">
+              {res.resultados.map((r, i) => (
+                <div key={i} className="py-1.5 flex items-center justify-between gap-2">
+                  <span className="text-torg-gray truncate">{r.arquivo}</span>
+                  {r.resultado === "criada" ? <span className="text-emerald-700 font-semibold whitespace-nowrap">✓ RNC-{String(r.numero).padStart(3, "0")}/{String(r.ano).slice(-2)}</span>
+                    : r.resultado === "ja_existe" ? <span className="text-gray-400 whitespace-nowrap">já existe</span>
+                      : <span className="text-red-600 whitespace-nowrap" title={r.erro}>erro</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="px-5 py-4 space-y-3">
+            <p className="text-[12px] text-torg-gray">Selecione os arquivos <b>.xls</b> das RNCs (o FORM 20 da Torg). O portal lê cada documento e cria a RNC com o número original, o plano de ação e o encerramento. As que já existem são puladas.</p>
+            <label className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-torg-blue hover:bg-torg-blue-50/30">
+              <FileSpreadsheet size={26} className="text-torg-gray" />
+              <span className="text-[13px] text-torg-dark font-medium">{files.length ? `${files.length} arquivo(s) selecionado(s)` : "Clique para selecionar os .xls"}</span>
+              <input type="file" accept=".xls,.xlsx" multiple className="hidden" onChange={(e) => { setFiles(Array.from(e.target.files || [])); setErro(""); }} />
+            </label>
+            {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
+          </div>
+        )}
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
+          {res ? (
+            <button onClick={onClose} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium">Concluir</button>
+          ) : (
+            <>
+              <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
+              <button onClick={importar} disabled={enviando || !files.length} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50">{enviando ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Importar {files.length || ""}</button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
