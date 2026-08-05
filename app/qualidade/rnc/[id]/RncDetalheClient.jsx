@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, Plus, X, ListChecks, FileDown } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown } from "lucide-react";
 import { numRNC, TIPOS_RNC, ORIGEM_NC, DISPOSICAO_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
 
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
@@ -23,7 +23,7 @@ export default function RncDetalheClient({ id }) {
       const r = j.rnc;
       setD({
         ...r, data: dISO(r.data), prazoResposta: dISO(r.prazoResposta), realizadoEm: dISO(r.realizadoEm),
-        cincoPorques: Array.isArray(r.cincoPorques) ? r.cincoPorques : [],
+        cincoPorques: Array.from({ length: 5 }, (_, i) => ({ porque: `${i + 1}º porquê`, resposta: (Array.isArray(r.cincoPorques) ? r.cincoPorques[i]?.resposta : "") || "" })),
       });
       setPlano(j.plano || null);
     }).catch(() => setErro("Erro ao carregar")).finally(() => setLoading(false));
@@ -42,7 +42,7 @@ export default function RncDetalheClient({ id }) {
         origem: d.origem, fornecedor: d.fornecedor, processoArea: d.processoArea, descricao: d.descricao,
         disposicao: d.disposicao, elaborador: d.elaborador, resultadoReinspecao: d.resultadoReinspecao, abrangencia: d.abrangencia,
         necessitaAcao: d.necessitaAcao, motivoNaoAcao: d.motivoNaoAcao, causas: d.causas,
-        cincoPorques: d.cincoPorques.filter((x) => (x.porque || "").trim() || (x.resposta || "").trim()),
+        cincoPorques: d.cincoPorques.map((x, i) => ({ porque: `${i + 1}º porquê`, resposta: (x.resposta || "").trim() })),
         prazoResposta: d.prazoResposta || null, realizadoEm: d.realizadoEm || null, acompanhadoPor: d.acompanhadoPor,
         acompanhamento: d.acompanhamento, avaliacaoEficacia: d.avaliacaoEficacia, encerradaPor: d.encerradaPor,
         pertinente: !!d.pertinente, recorrente: !!d.recorrente,
@@ -132,20 +132,17 @@ export default function RncDetalheClient({ id }) {
       </Secao>
 
       {/* Causa raiz */}
-      <Secao titulo="Análise de causa raiz" acao={<button onClick={() => set("cincoPorques", [...d.cincoPorques, { porque: "", resposta: "" }])} className="text-[12px] text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 font-medium"><Plus size={13} /> Porquê</button>}>
+      <Secao titulo="Análise de causa raiz">
         <Campo label="Causas da não conformidade"><textarea value={d.causas || ""} onChange={(e) => set("causas", e.target.value)} rows={2} className="inp" /></Campo>
-        {d.cincoPorques.length > 0 && (
-          <div className="space-y-2 mt-1">
-            <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Ferramenta dos 5 porquês</p>
-            {d.cincoPorques.map((pq, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-torg-gray w-6 shrink-0">{i + 1}º</span>
-                <input value={pq.resposta || ""} onChange={(e) => setPq(i, "resposta", e.target.value)} placeholder={`Por que… (${i + 1}º porquê)`} className="flex-1 text-[13px] border border-gray-200 rounded px-2.5 py-1.5" />
-                <button onClick={() => set("cincoPorques", d.cincoPorques.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-500 p-1"><X size={14} /></button>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="space-y-2 mt-1">
+          <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Ferramenta dos 5 porquês <span className="normal-case font-normal text-[10px] text-torg-gray">— preencha os 5</span></p>
+          {d.cincoPorques.map((pq, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-torg-gray w-6 shrink-0">{i + 1}º</span>
+              <input value={pq.resposta || ""} onChange={(e) => setPq(i, "resposta", e.target.value)} placeholder={`Por que… (${i + 1}º porquê)`} className="flex-1 text-[13px] border border-gray-200 rounded px-2.5 py-1.5" />
+            </div>
+          ))}
+        </div>
       </Secao>
 
       {/* Plano de ação (5W2H) */}
