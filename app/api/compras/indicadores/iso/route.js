@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { INDICADORES_ISO } from "@/lib/indicadores-iso";
+import { calcularIQF } from "@/lib/iqf-fornecedores";
 
 export const runtime = "nodejs";
 
@@ -44,8 +45,10 @@ export async function GET(req) {
     for (const c of cot) { const m = c.recebidaEm.getUTCMonth(); soma[m] = (soma[m] || 0) + diasUteis(c.createdAt, c.recebidaEm); n[m] = (n[m] || 0) + 1; }
     series.retorno_orcamento = soma.map((v, m) => (n[m] ? Math.round((v / n[m]) * 10) / 10 : null)); }
 
-  // compras_fornecedor_b (IQF ≥ 75%) — pendente: depende de avaliação/qualificação de
-  // fornecedores, que ainda não existe no portal. Fica sem série ("aguardando registro").
+  // Compras de fornecedores nível "B" — % do valor comprado, por mês, feito com
+  // fornecedor de IQF ≥ 75% (avaliação automática — ver lib/iqf-fornecedores.js).
+  try { const { serieComprasNivelB } = await calcularIQF(prisma, { yIni, yFim }); series.compras_fornecedor_b = serieComprasNivelB; }
+  catch { /* se o IQF falhar, o indicador só fica sem série (não derruba os outros) */ }
 
   const indicadores = INDICADORES_ISO.filter((i) => i.processo === "COMPRAS").map((ind) => {
     const serie = series[ind.id] || arr12();
