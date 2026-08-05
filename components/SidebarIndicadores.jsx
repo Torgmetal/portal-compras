@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Activity, Trophy, TrendingUp, Package, Clock, ShoppingCart, Star,
+  Activity, TrendingUp, ShoppingCart, Star,
   BarChart3, ChevronDown, ChevronRight, Target, DollarSign, Zap, Users, Briefcase,
   UserMinus, BedDouble, ShieldAlert, GraduationCap, Timer, CalendarRange, Factory,
 } from "lucide-react";
@@ -17,14 +17,8 @@ const setores = [
     icon: ShoppingCart,
     base: "/indicadores/compras",
     sub: [
-      { href: "/indicadores/compras", label: "Dashboard", icon: Activity, exact: true },
-      { href: "/indicadores/compras/iso", label: "Indicadores ISO", icon: BarChart3 },
+      { href: "/indicadores/compras", label: "Indicadores ISO", icon: BarChart3, exact: true },
       { href: "/indicadores/compras/fornecedores", label: "Avaliação Fornecedores (IQF)", icon: Star },
-      { href: "/indicadores/compras/mensal", label: "Evolução Mensal", icon: CalendarRange },
-      { href: "/indicadores/compras/scorecard", label: "Scorecard Fornecedores", icon: Trophy },
-      { href: "/indicadores/compras/savings", label: "Savings por Obra", icon: TrendingUp },
-      { href: "/indicadores/compras/otif", label: "OTIF", icon: Package },
-      { href: "/indicadores/compras/atendimento", label: "Atendimento Interno", icon: Clock },
     ],
   },
   {

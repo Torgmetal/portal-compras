@@ -1,7 +1,7 @@
 import { requireRole } from "@/lib/session";
-import { DashboardClient } from "../IndicadoresClient";
+import IndicadoresIsoClient from "@/app/qualidade/indicadores/IndicadoresIsoClient";
 
-export default async function ComprasDashboardPage() {
+export default async function ComprasIndicadoresPage() {
   await requireRole(["ADMIN", "COMPRAS"]);
-  return <DashboardClient />;
+  return <IndicadoresIsoClient processo="COMPRAS" endpoint="/api/compras/indicadores/iso" titulo="Indicadores de Compras" />;
 }
