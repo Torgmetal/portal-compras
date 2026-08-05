@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { Gauge, Loader2, Lock, Info, TrendingUp } from "lucide-react";
-import { PROCESSOS, PROCESSO_LABEL, farol, FAROL_COR, metaTexto } from "@/lib/indicadores-iso";
+import { farol, FAROL_COR, metaTexto } from "@/lib/indicadores-iso";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const MES3 = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -49,6 +49,7 @@ export default function IndicadoresIsoClient() {
     if (!data) return null;
     const r = { verde: 0, amarelo: 0, vermelho: 0, pendente: 0 };
     for (const ind of data.indicadores) {
+      if (ind.processo !== "QUALIDADE") continue; // só os indicadores do setor da Qualidade
       if (ind.fonte === "pendente") { r.pendente++; continue; }
       const f = farol(ind.atual, ind.meta);
       if (f) r[f]++;
@@ -84,22 +85,8 @@ export default function IndicadoresIsoClient() {
       ) : erro ? (
         <div className="py-10 text-center text-red-600 text-sm">{erro}</div>
       ) : (
-        <div className="space-y-7">
-          {PROCESSOS.map((proc) => {
-            const lista = data.indicadores.filter((i) => i.processo === proc);
-            if (!lista.length) return null;
-            return (
-              <div key={proc}>
-                <div className="flex items-center gap-2 mb-3">
-                  <h3 className="text-[13px] font-bold text-torg-dark uppercase tracking-wide">{PROCESSO_LABEL[proc]}</h3>
-                  <div className="flex-1 h-px bg-gray-200" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-                  {lista.map((ind) => <Card key={ind.id} ind={ind} mesFim={data.mesFim} />)}
-                </div>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+          {data.indicadores.filter((i) => i.processo === "QUALIDADE").map((ind) => <Card key={ind.id} ind={ind} mesFim={data.mesFim} />)}
         </div>
       )}
     </div>
