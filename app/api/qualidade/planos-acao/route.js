@@ -15,7 +15,7 @@ export async function GET(req) {
   const fonte = new URL(req.url).searchParams.get("fonte");
   const where = fonte === "rnc" ? { origem: { startsWith: "RNC-" } }
     : fonte === "auditoria" ? { NOT: { origem: { startsWith: "RNC-" } } } : {};
-  const planos = await prisma.planoAcao.findMany({ where, orderBy: [{ status: "asc" }, { numero: "desc" }], take: 300 });
+  const planos = await prisma.planoAcao.findMany({ where, orderBy: [{ numero: "desc" }], take: 300 });
   const lista = planos.map((p) => {
     const itens = Array.isArray(p.itens) ? p.itens : [];
     return {
