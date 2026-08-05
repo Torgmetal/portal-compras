@@ -46,7 +46,7 @@ export async function POST(req) {
             titulo: `${numRNC(p.numero, p.ano)} — ${(p.descricao || "Não conformidade").slice(0, 70)}`,
             origem: numRNC(p.numero, p.ano), responsavel: pl.quem || null,
             status: encerrada ? "CONCLUIDO" : "EM_ANDAMENTO",
-            itens: [{ oque: pl.oque || "", porque: pl.porque || "", onde: pl.onde || "", quem: pl.quem || "", quando: fmtD(D(p.prazoResposta)), como: pl.como || "", quanto: "", status: encerrada ? "CONCLUIDO" : "PENDENTE", acompanhamento: p.acompanhamento || "", concluidoEm: D(p.realizadoEm)?.toISOString() || null }],
+            itens: [{ oque: pl.oque || "", porque: pl.porque || "", onde: pl.onde || "", quem: pl.quem || "", quando: D(p.prazoResposta)?.toISOString().slice(0, 10) || "", como: pl.como || "", quanto: "", status: encerrada ? "CONCLUIDO" : "A_FAZER", acompanhamento: p.acompanhamento || "", concluidoEm: D(p.realizadoEm)?.toISOString() || null }],
             createdById: user.id,
           },
           select: { id: true },
