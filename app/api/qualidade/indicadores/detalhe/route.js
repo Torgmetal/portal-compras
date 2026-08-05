@@ -54,9 +54,12 @@ export async function GET(req) {
       where: { dataAuditoria: { gte: pIni, lt: pFim } },
       select: { numero: true, setor: true, dataAuditoria: true, status: true }, orderBy: { dataAuditoria: "asc" },
     });
-    const linhas = aud.map((a) => [`RAI-${String(a.numero).padStart(3, "0")}`, a.setor || "—", fmtD(a.dataAuditoria), AUD_LABEL[a.status] || a.status]);
-    const real = aud.filter((a) => AUD_OK.has(a.status)).length;
-    return NextResponse.json({ titulo: "Cumprimento do Plano de Auditorias Internas", colunas: ["Nº", "Setor", "Data", "Situação"], linhas, resumo: `${real} realizada(s) de ${aud.length} planejada(s) · ${aud.length ? Math.round((real / aud.length) * 100) : 0}%` });
+    const hoje = new Date();
+    const linhas = aud.map((a) => [`RAI-${String(a.numero).padStart(3, "0")}`, a.setor || "—", fmtD(a.dataAuditoria), a.dataAuditoria > hoje ? "Programada" : (AUD_LABEL[a.status] || a.status)]);
+    const vencidas = aud.filter((a) => a.dataAuditoria <= hoje);
+    const real = vencidas.filter((a) => AUD_OK.has(a.status)).length;
+    const futuras = aud.length - vencidas.length;
+    return NextResponse.json({ titulo: "Cumprimento do Plano de Auditorias Internas", colunas: ["Nº", "Setor", "Data", "Situação"], linhas, resumo: `${real} realizada(s) de ${vencidas.length} vencida(s) · ${vencidas.length ? Math.round((real / vencidas.length) * 100) : 0}%${futuras ? ` · ${futuras} programada(s) p/ depois` : ""}` });
   }
 
   return NextResponse.json({ error: "Este indicador ainda não tem detalhamento." }, { status: 404 });
