@@ -31,13 +31,16 @@ export async function GET(req) {
   const hoje = new Date();
   const ano = parseInt(url.searchParams.get("ano") || "", 10) || hoje.getUTCFullYear();
   let mes = parseInt(url.searchParams.get("mes") ?? "", 10);
-  if (Number.isNaN(mes) || mes < 0 || mes > 11) mes = hoje.getUTCMonth();
-  const mIni = new Date(Date.UTC(ano, mes, 1)), mFim = new Date(Date.UTC(ano, mes + 1, 1));
+  const anoTodo = mes === -1; // -1 = acumulado do ano
+  if (Number.isNaN(mes) || mes < -1 || mes > 11) mes = hoje.getUTCMonth();
+  const yIni = new Date(Date.UTC(ano, 0, 1)), yFim = new Date(Date.UTC(ano + 1, 0, 1));
+  const pIni = anoTodo ? yIni : new Date(Date.UTC(ano, mes, 1));
+  const pFim = anoTodo ? yFim : new Date(Date.UTC(ano, mes + 1, 1));
 
   // ── Retorno de Orçamento: cotações respondidas no mês (base da média de dias) ──
   if (indicador === "retorno_orcamento") {
     const cot = await prisma.cotacao.findMany({
-      where: { recebidaEm: { gte: mIni, lt: mFim } },
+      where: { recebidaEm: { gte: pIni, lt: pFim } },
       select: { fornecedorNome: true, fornecedor: { select: { razaoSocial: true } }, createdAt: true, recebidaEm: true, rm: { select: { numero: true, op: { select: { numero: true } } } } },
       orderBy: { recebidaEm: "asc" },
     });
@@ -56,17 +59,16 @@ export async function GET(req) {
 
   // ── Compras nível "B": compras do mês por fornecedor + IQF (conta ou não) ──
   if (indicador === "compras_fornecedor_b") {
-    const yIni = new Date(Date.UTC(ano, 0, 1)), yFim = new Date(Date.UTC(ano + 1, 0, 1));
     const { fornecedores } = await calcularIQF(prisma, { yIni, yFim });
-    const doMes = fornecedores
-      .map((f) => ({ nome: f.nome, valor: (f.comprasMes || [])[mes] || 0, iqf: f.iqf, nivelB: f.iqf != null && f.iqf >= 75 }))
+    const itens = fornecedores
+      .map((f) => ({ nome: f.nome, valor: anoTodo ? (f.comprasAno || 0) : ((f.comprasMes || [])[mes] || 0), iqf: f.iqf, nivelB: f.iqf != null && f.iqf >= 75 }))
       .filter((f) => f.valor > 0)
       .sort((a, b) => b.valor - a.valor);
-    const linhas = doMes.map((f) => [f.nome, fmtBRL(f.valor), f.iqf == null ? "—" : String(f.iqf), f.nivelB ? "Sim" : "Não"]);
-    const total = doMes.reduce((s, f) => s + f.valor, 0);
-    const nb = doMes.filter((f) => f.nivelB).reduce((s, f) => s + f.valor, 0);
+    const linhas = itens.map((f) => [f.nome, fmtBRL(f.valor), f.iqf == null ? "—" : String(f.iqf), f.nivelB ? "Sim" : "Não"]);
+    const total = itens.reduce((s, f) => s + f.valor, 0);
+    const nb = itens.filter((f) => f.nivelB).reduce((s, f) => s + f.valor, 0);
     return NextResponse.json({
-      titulo: "Compras de fornecedores nível B", colunas: ["Fornecedor", "Valor no mês", "IQF", "Nível B (≥75)"],
+      titulo: "Compras de fornecedores nível B", colunas: ["Fornecedor", anoTodo ? "Valor no ano" : "Valor no mês", "IQF", "Nível B (≥75)"],
       linhas, resumo: `${fmtBRL(total)} comprado · ${total > 0 ? Math.round((nb / total) * 100) : 0}% com fornecedor nível B`,
     });
   }

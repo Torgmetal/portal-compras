@@ -3,5 +3,5 @@ import IndicadoresIsoClient from "@/app/qualidade/indicadores/IndicadoresIsoClie
 
 export default async function ComprasIndicadoresPage() {
   await requireRole(["ADMIN", "COMPRAS"]);
-  return <IndicadoresIsoClient processo="COMPRAS" endpoint="/api/compras/indicadores/iso" titulo="Indicadores de Compras" detalheEndpoint="/api/compras/indicadores/iso/detalhe" />;
+  return <IndicadoresIsoClient processo="COMPRAS" endpoint="/api/compras/indicadores/iso" titulo="Indicadores de Compras" detalheEndpoint="/api/compras/indicadores/iso/detalhe" pdfEndpoint="/api/compras/indicadores/iso/pdf" />;
 }

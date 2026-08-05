@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Gauge, Loader2, Lock, Info, TrendingUp, X } from "lucide-react";
+import { Gauge, Loader2, Lock, Info, TrendingUp, X, FileDown } from "lucide-react";
 import { farol, FAROL_COR, metaTexto } from "@/lib/indicadores-iso";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -28,14 +28,16 @@ function Spark({ serie, meta, mesFim }) {
   );
 }
 
-export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint = "/api/qualidade/indicadores", titulo = "Indicadores da Qualidade", detalheEndpoint = null }) {
+export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint = "/api/qualidade/indicadores", titulo = "Indicadores da Qualidade", detalheEndpoint = null, pdfEndpoint = null }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const hoje = new Date();
   const [ano] = useState(hoje.getUTCFullYear());
   const [mes, setMes] = useState(null); // null = deixa a API escolher (mês atual)
+  const [modo, setModo] = useState("mes"); // mes | acumulado (do ano)
   const [detalhe, setDetalhe] = useState(null); // indicador aberto no modal de registros do mês
+  const acum = modo === "acumulado";
 
   useEffect(() => {
     setLoading(true);
@@ -52,11 +54,13 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
     for (const ind of data.indicadores) {
       if (ind.processo !== processo) continue; // só os indicadores do processo desta tela
       if (ind.fonte === "pendente") { r.pendente++; continue; }
-      const f = farol(ind.atual, ind.meta);
+      const f = farol(acum ? ind.acumulado : ind.atual, ind.meta);
       if (f) r[f]++;
     }
     return r;
-  }, [data]);
+  }, [data, acum]);
+
+  const temAcumulado = !!data?.indicadores?.some((i) => i.processo === processo && i.acumulado != null);
 
   return (
     <div className="space-y-6 max-w-[1400px]">
@@ -65,10 +69,19 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2.5"><Gauge className="text-torg-blue" size={28} /> {titulo}</h2>
           <p className="text-sm text-torg-gray mt-1">Acompanhamento ISO 9001 — cada indicador é calculado do dado real do portal, sem digitação manual.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <select value={mes ?? ""} onChange={(e) => setMes(parseInt(e.target.value, 10))} className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white">
+        <div className="flex items-center gap-2 flex-wrap">
+          {temAcumulado && (
+            <div className="flex items-center rounded-lg border border-gray-300 overflow-hidden text-sm">
+              <button onClick={() => setModo("mes")} className={`px-3 py-2 ${!acum ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:text-torg-dark"}`}>Mês</button>
+              <button onClick={() => setModo("acumulado")} className={`px-3 py-2 ${acum ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:text-torg-dark"}`}>Acumulado {ano}</button>
+            </div>
+          )}
+          <select value={mes ?? ""} onChange={(e) => setMes(parseInt(e.target.value, 10))} disabled={acum} className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white disabled:opacity-50">
             {MESES.map((m, i) => <option key={i} value={i} disabled={data && i > data.mesFim}>{m} / {ano}</option>)}
           </select>
+          {pdfEndpoint && (
+            <a href={`${pdfEndpoint}?ano=${ano}${mes != null ? `&mes=${mes}` : ""}`} target="_blank" rel="noopener noreferrer" className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white hover:bg-gray-50 text-torg-dark inline-flex items-center gap-1.5"><FileDown size={15} /> PDF</a>
+          )}
         </div>
       </div>
 
@@ -87,11 +100,11 @@ export default function IndicadoresIsoClient({ processo = "QUALIDADE", endpoint 
         <div className="py-10 text-center text-red-600 text-sm">{erro}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-          {data.indicadores.filter((i) => i.processo === processo).map((ind) => <Card key={ind.id} ind={ind} mesFim={data.mesFim} onAbrir={detalheEndpoint && ind.fonte !== "pendente" ? () => setDetalhe(ind) : null} />)}
+          {data.indicadores.filter((i) => i.processo === processo).map((ind) => <Card key={ind.id} ind={ind} mesFim={data.mesFim} acum={acum} onAbrir={detalheEndpoint && ind.fonte !== "pendente" ? () => setDetalhe(ind) : null} />)}
         </div>
       )}
 
-      {detalhe && <DetalheModal ind={detalhe} endpoint={detalheEndpoint} ano={ano} mes={mes} onClose={() => setDetalhe(null)} />}
+      {detalhe && <DetalheModal ind={detalhe} endpoint={detalheEndpoint} ano={ano} mes={acum ? -1 : mes} onClose={() => setDetalhe(null)} />}
     </div>
   );
 }
@@ -112,7 +125,7 @@ function DetalheModal({ ind, endpoint, ano, mes, onClose }) {
         <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-torg-dark">{ind.nome}</h3>
-            <p className="text-[11px] text-torg-gray mt-0.5">{MESES[mes]} / {ano} — registros do mês (de onde saiu o número)</p>
+            <p className="text-[11px] text-torg-gray mt-0.5">{mes < 0 ? `Acumulado ${ano}` : `${MESES[mes]} / ${ano}`} — registros {mes < 0 ? "do ano" : "do mês"} (de onde saiu o número)</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
@@ -146,9 +159,10 @@ function Chip({ n, l, cor, bg }) {
   return <div className="rounded-xl px-4 py-2 flex items-center gap-2.5" style={{ background: bg }}><span className="text-2xl font-extrabold tabular-nums" style={{ color: cor }}>{n}</span><span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: cor }}>{l}</span></div>;
 }
 
-function Card({ ind, mesFim, onAbrir }) {
+function Card({ ind, mesFim, onAbrir, acum }) {
   const pendente = ind.fonte === "pendente";
-  const f = pendente ? null : farol(ind.atual, ind.meta);
+  const valor = acum ? ind.acumulado : ind.atual;
+  const f = pendente ? null : farol(valor, ind.meta);
   const cor = f ? FAROL_COR[f] : null;
   const clicavel = !!onAbrir;
   return (
@@ -170,15 +184,15 @@ function Card({ ind, mesFim, onAbrir }) {
         <>
           <div className="flex items-end justify-between gap-2">
             <div>
-              <span className="text-[26px] font-extrabold tabular-nums leading-none" style={{ color: cor?.fg || "#0d2135" }}>{fmtVal(ind.atual, ind.meta.unidade)}</span>
-              {ind.atual != null && ind.meta.unidade !== "%" && <span className="text-[12px] text-torg-gray ml-1">{ind.meta.unidade}</span>}
-              <div className="text-[11px] text-torg-gray mt-1">Meta: <b className="text-torg-dark/80">{metaTexto(ind.meta)}</b> · {ind.freq}</div>
+              <span className="text-[26px] font-extrabold tabular-nums leading-none" style={{ color: cor?.fg || "#0d2135" }}>{fmtVal(valor, ind.meta.unidade)}</span>
+              {valor != null && ind.meta.unidade !== "%" && <span className="text-[12px] text-torg-gray ml-1">{ind.meta.unidade}</span>}
+              <div className="text-[11px] text-torg-gray mt-1">{acum ? "Acumulado · " : ""}Meta: <b className="text-torg-dark/80">{metaTexto(ind.meta)}</b> · {ind.freq}</div>
             </div>
             <Spark serie={ind.serie} meta={ind.meta} mesFim={mesFim} />
           </div>
           {ind.fonte === "parcial" && ind.nota && <div className="text-[10.5px] text-amber-700 bg-amber-50 rounded px-2 py-1 inline-flex items-start gap-1"><Info size={11} className="mt-0.5 shrink-0" /> {ind.nota}</div>}
-          {ind.atual == null && <div className="text-[10.5px] text-torg-gray inline-flex items-center gap-1"><TrendingUp size={11} /> Sem dado no mês selecionado.</div>}
-          {clicavel && <div className="text-[10.5px] text-torg-blue font-medium">ver registros do mês →</div>}
+          {valor == null && <div className="text-[10.5px] text-torg-gray inline-flex items-center gap-1"><TrendingUp size={11} /> Sem dado {acum ? "no ano" : "no mês selecionado"}.</div>}
+          {clicavel && <div className="text-[10.5px] text-torg-blue font-medium">ver registros {acum ? "do ano" : "do mês"} →</div>}
         </>
       )}
     </div>
