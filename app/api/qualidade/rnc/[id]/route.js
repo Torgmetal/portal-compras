@@ -18,6 +18,7 @@ export async function GET(_req, { params }) {
 
 const dstr = z.string().optional().nullable();
 const schema = z.object({
+  tipo: z.enum(["INTERNA", "CLIENTE"]).optional(),
   data: dstr, cliente: dstr, opNumero: dstr, opId: dstr, desenhoProjetoMarca: dstr,
   origem: dstr, fornecedor: dstr, processoArea: dstr, descricao: dstr,
   fotos: z.array(z.object({ url: z.string().url(), legenda: dstr })).optional(),

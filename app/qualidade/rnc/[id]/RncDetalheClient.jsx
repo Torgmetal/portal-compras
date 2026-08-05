@@ -42,6 +42,7 @@ export default function RncDetalheClient({ id }) {
     setSalvando(true); setErro("");
     try {
       const body = {
+        tipo: d.tipo,
         data: d.data || null, cliente: d.cliente, opNumero: d.opNumero, desenhoProjetoMarca: d.desenhoProjetoMarca,
         origem: d.origem, fornecedor: d.fornecedor, processoArea: d.processoArea, descricao: d.descricao,
         disposicao: d.disposicao, elaborador: d.elaborador, resultadoReinspecao: d.resultadoReinspecao, abrangencia: d.abrangencia,
@@ -155,6 +156,12 @@ export default function RncDetalheClient({ id }) {
       {/* Identificação */}
       <Secao titulo="Identificação">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Campo label="Tipo da RNC">
+            <select value={d.tipo || "INTERNA"} onChange={(e) => set("tipo", e.target.value)} className="inp">
+              <option value="INTERNA">Interna (detectada pela Torg)</option>
+              <option value="CLIENTE">De cliente (recebida do cliente)</option>
+            </select>
+          </Campo>
           <Campo label="Cliente"><input value={d.cliente || ""} onChange={(e) => set("cliente", e.target.value)} className="inp" /></Campo>
           <Campo label="OP / Obra"><input value={d.opNumero || ""} onChange={(e) => set("opNumero", e.target.value)} className="inp" /></Campo>
           <Campo label="Desenho / Projeto / Marca"><input value={d.desenhoProjetoMarca || ""} onChange={(e) => set("desenhoProjetoMarca", e.target.value)} className="inp" /></Campo>
