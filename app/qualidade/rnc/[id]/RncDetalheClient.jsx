@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown } from "lucide-react";
 import { numRNC, TIPOS_RNC, ORIGEM_NC, DISPOSICAO_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
+import { SETORES_AUDITORIA } from "@/lib/auditoria-interna";
 
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
@@ -101,7 +102,13 @@ export default function RncDetalheClient({ id }) {
           <Campo label="Cliente"><input value={d.cliente || ""} onChange={(e) => set("cliente", e.target.value)} className="inp" /></Campo>
           <Campo label="OP / Obra"><input value={d.opNumero || ""} onChange={(e) => set("opNumero", e.target.value)} className="inp" /></Campo>
           <Campo label="Desenho / Projeto / Marca"><input value={d.desenhoProjetoMarca || ""} onChange={(e) => set("desenhoProjetoMarca", e.target.value)} className="inp" /></Campo>
-          <Campo label="Processo / Área da ocorrência"><input value={d.processoArea || ""} onChange={(e) => set("processoArea", e.target.value)} placeholder="Expedição, Engenharia…" className="inp" /></Campo>
+          <Campo label="Processo / Área da ocorrência">
+            <select value={d.processoArea || ""} onChange={(e) => set("processoArea", e.target.value)} className="inp">
+              <option value="">— selecione o setor —</option>
+              {SETORES_AUDITORIA.map((s) => <option key={s} value={s}>{s}</option>)}
+              {d.processoArea && !SETORES_AUDITORIA.includes(d.processoArea) && <option value={d.processoArea}>{d.processoArea}</option>}
+            </select>
+          </Campo>
           <Campo label="Origem da não conformidade">
             <select value={d.origem || ""} onChange={(e) => set("origem", e.target.value)} className="inp"><option value="">—</option>{Object.entries(ORIGEM_NC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           </Campo>
