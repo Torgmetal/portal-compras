@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco } from "@/lib/syneco-dia";
+import { historicoProducao } from "@/lib/indicadores-producao-iso";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,11 @@ export async function GET(req) {
   const pIni = anoTodo ? yIni : new Date(Date.UTC(ano, mes, 1));
   const pFim = anoTodo ? yFim : new Date(Date.UTC(ano, mes + 1, 1));
 
+  // Mês apurado na planilha da Qualidade? O valor do card vem do histórico, não do portal,
+  // então os registros abaixo servem só de referência.
+  const manual = anoTodo ? null : historicoProducao(indicador, ano, mes);
+  const notaManual = manual == null ? "" : `Valor apurado na planilha da Qualidade: ${manual.toLocaleString("pt-BR")}%. Os registros do portal abaixo são referência. · `;
+
   // Cumprimento dos Prazos de Fabricação — OPs concluídas no período (prevista vs real).
   if (indicador === "prazo_fabricacao") {
     const ops = await prisma.oP.findMany({
@@ -38,7 +44,7 @@ export async function GET(req) {
       return [`OP-${o.numero}`, o.obra || "—", fmtD(o.dataFimPrevista), fmtD(o.dataFimReal), atraso <= 0 ? "No prazo" : `Atrasada ${atraso}d`];
     });
     const noPrazo = ops.filter((o) => o.dataFimReal <= o.dataFimPrevista).length;
-    return NextResponse.json({ titulo: "Cumprimento dos Prazos de Fabricação", colunas: ["OP", "Obra", "Prevista", "Concluída", "Situação"], linhas, resumo: `${noPrazo} no prazo de ${ops.length} OP(s) concluída(s) · ${ops.length ? Math.round((noPrazo / ops.length) * 100) : 0}%` });
+    return NextResponse.json({ titulo: "Cumprimento dos Prazos de Fabricação", colunas: ["OP", "Obra", "Prevista", "Concluída", "Situação"], linhas, resumo: `${notaManual}${noPrazo} no prazo de ${ops.length} OP(s) concluída(s) · ${ops.length ? Math.round((noPrazo / ops.length) * 100) : 0}%` });
   }
 
   // Retrabalho — RNCs com disposição Retrabalhar (e peso) do período + base de produção (corte).
@@ -60,7 +66,7 @@ export async function GET(req) {
     const perc = prod > 0 ? Math.round((totRt / prod) * 1000) / 10 : null;
     return NextResponse.json({
       titulo: "Retrabalho", colunas: ["RNC", "Data", "Marca", "OP", "Peso retrabalhado"], linhas,
-      resumo: `${kg(totRt)} retrabalhado de ${kg(prod)} produzidos (corte)${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}`,
+      resumo: `${notaManual}${kg(totRt)} retrabalhado de ${kg(prod)} produzidos (corte)${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}`,
     });
   }
 
