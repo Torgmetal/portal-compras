@@ -5,12 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco } from "@/lib/syneco-dia";
 import { historicoProducao } from "@/lib/indicadores-producao-iso";
+import { pesoRealPecas } from "@/lib/peso-op";
 
 export const runtime = "nodejs";
 
-const MS = 86400000;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
-const diasCorridos = (a, b) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / MS);
 const kg = (n) => (n == null ? "—" : `${Math.round(n).toLocaleString("pt-BR")} kg`);
 
 export async function GET(req) {
@@ -33,18 +32,27 @@ export async function GET(req) {
   const manual = anoTodo ? null : historicoProducao(indicador, ano, mes);
   const notaManual = manual == null ? "" : `Valor apurado na planilha da Qualidade: ${manual.toLocaleString("pt-BR")}%. Os registros do portal abaixo são referência. · `;
 
-  // Cumprimento dos Prazos de Fabricação — OPs concluídas no período (prevista vs real).
+  // Cumprimento dos Prazos de Fabricação — planejado (peso das OPs previstas p/ o período) vs
+  // realizado (peso expedido nos romaneios). % = expedido ÷ planejado.
   if (indicador === "prazo_fabricacao") {
     const ops = await prisma.oP.findMany({
-      where: { dataFimReal: { gte: pIni, lt: pFim }, dataFimPrevista: { not: null } },
-      select: { numero: true, obra: true, dataFimPrevista: true, dataFimReal: true }, orderBy: { dataFimReal: "asc" },
+      where: { dataFimPrevista: { gte: pIni, lt: pFim } },
+      select: { numero: true, obra: true, dataFimPrevista: true, pecasConjunto: { select: { fonte: true, tipoPeca: true, pesoTotalKg: true } } },
+      orderBy: { dataFimPrevista: "asc" },
     });
+    let planTot = 0, semLista = 0;
     const linhas = ops.map((o) => {
-      const atraso = diasCorridos(o.dataFimPrevista, o.dataFimReal);
-      return [`OP-${o.numero}`, o.obra || "—", fmtD(o.dataFimPrevista), fmtD(o.dataFimReal), atraso <= 0 ? "No prazo" : `Atrasada ${atraso}d`];
+      const peso = pesoRealPecas(o.pecasConjunto); planTot += peso; if (peso === 0) semLista += 1;
+      return [`OP-${o.numero}`, o.obra || "—", fmtD(o.dataFimPrevista), peso === 0 ? "— (sem lista)" : kg(peso)];
     });
-    const noPrazo = ops.filter((o) => o.dataFimReal <= o.dataFimPrevista).length;
-    return NextResponse.json({ titulo: "Cumprimento dos Prazos de Fabricação", colunas: ["OP", "Obra", "Prevista", "Concluída", "Situação"], linhas, resumo: `${notaManual}${noPrazo} no prazo de ${ops.length} OP(s) concluída(s) · ${ops.length ? Math.round((noPrazo / ops.length) * 100) : 0}%` });
+    const roms = await prisma.romaneioPrevio.aggregate({ where: { emitidoEm: { gte: pIni, lt: pFim } }, _sum: { pesoKg: true } });
+    const expTot = roms._sum.pesoKg || 0;
+    const perc = planTot > 0 ? Math.round((expTot / planTot) * 1000) / 10 : null;
+    const avisoLista = semLista ? ` · ${semLista} OP(s) sem lista de peças (peso não conta no planejado — importar LE/LPC)` : "";
+    return NextResponse.json({
+      titulo: "Cumprimento dos Prazos de Fabricação", colunas: ["OP", "Obra", "Previsão", "Peso planejado"], linhas,
+      resumo: `${notaManual}${kg(expTot)} expedido de ${kg(planTot)} planejados (${ops.length} OP prevista(s))${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}${avisoLista}`,
+    });
   }
 
   // Retrabalho — RNCs com disposição Retrabalhar (e peso) do período + base de produção (corte).
