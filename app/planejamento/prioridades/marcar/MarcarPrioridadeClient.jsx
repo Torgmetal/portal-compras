@@ -4,12 +4,15 @@ import Link from "next/link";
 import { Flag, Search, Loader2, ArrowLeft, AlertCircle } from "lucide-react";
 
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR")} kg`;
+// Fase da obra a partir da marca (T83A1 → "A").
+const faseDaMarca = (m) => (String(m || "").toUpperCase().match(/^T?\d+([A-Z]+)/) || [])[1] || "";
 
 export default function MarcarPrioridadeClient() {
   const [obras, setObras] = useState([]);
   const [opId, setOpId] = useState("");
   const [pecas, setPecas] = useState([]);
   const [busca, setBusca] = useState("");
+  const [filtroFase, setFiltroFase] = useState("");
   const [loadingObras, setLoadingObras] = useState(true);
   const [loadingPecas, setLoadingPecas] = useState(false);
   const [erro, setErro] = useState("");
@@ -55,7 +58,8 @@ export default function MarcarPrioridadeClient() {
     } catch (e) { setAviso(e.message); } finally { setSalvandoId(null); }
   };
 
-  const filtradas = pecas.filter((p) => !busca || p.marca.toLowerCase().includes(busca.toLowerCase()));
+  const fases = [...new Set(pecas.map((p) => faseDaMarca(p.marca)).filter(Boolean))].sort();
+  const filtradas = pecas.filter((p) => (!filtroFase || faseDaMarca(p.marca) === filtroFase) && (!busca || p.marca.toLowerCase().includes(busca.toLowerCase())));
   const nMarcadas = pecas.filter((p) => p.prioridade != null).length;
 
   return (
@@ -86,9 +90,17 @@ export default function MarcarPrioridadeClient() {
       {opId && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between gap-3 p-4 border-b border-gray-100">
-            <div className="relative flex-1 max-w-xs">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar marca…" className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm" />
+            <div className="flex items-center gap-2 flex-1">
+              <div className="relative max-w-xs flex-1">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar marca…" className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm" />
+              </div>
+              {fases.length > 1 && (
+                <select value={filtroFase} onChange={(e) => setFiltroFase(e.target.value)} className="border border-gray-200 rounded-lg px-2.5 py-2 text-sm bg-white" title="Fase da obra">
+                  <option value="">Todas as fases</option>
+                  {fases.map((f) => <option key={f} value={f}>Fase {f}</option>)}
+                </select>
+              )}
             </div>
             <div className="text-sm text-torg-gray"><b className="text-torg-dark">{nMarcadas}</b> prioritárias · {pecas.length} peças</div>
           </div>

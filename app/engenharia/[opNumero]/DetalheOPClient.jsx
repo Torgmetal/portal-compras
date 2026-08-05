@@ -5,6 +5,8 @@ import { Loader2, AlertCircle, ArrowLeft, Ruler, Package, AlertTriangle } from "
 
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR")} kg`;
 const fmtNum = (v) => Number(v || 0).toLocaleString("pt-BR");
+// Fase da obra a partir da marca (T83A1 → "A").
+const faseDaMarca = (m) => (String(m || "").toUpperCase().match(/^T?\d+([A-Z]+)/) || [])[1] || "";
 
 // Cor do status da peça no pipeline
 function statusChip(s) {
@@ -22,6 +24,7 @@ export default function DetalheOPClient({ opNumero }) {
   const [erro, setErro] = useState("");
   const [q, setQ] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroFase, setFiltroFase] = useState("");
 
   useEffect(() => {
     let vivo = true;
@@ -34,15 +37,17 @@ export default function DetalheOPClient({ opNumero }) {
     return () => { vivo = false; };
   }, [opNumero]);
 
+  const fases = useMemo(() => dados ? [...new Set(dados.marcas.map((m) => faseDaMarca(m.marca)).filter(Boolean))].sort() : [], [dados]);
   const marcas = useMemo(() => {
     if (!dados) return [];
     const busca = q.trim().toLowerCase();
     return dados.marcas.filter((m) => {
       if (filtroStatus && String(m.status).toUpperCase() !== filtroStatus) return false;
+      if (filtroFase && faseDaMarca(m.marca) !== filtroFase) return false;
       if (!busca) return true;
       return [m.marca, m.descricao, m.perfil, m.material].some((v) => String(v || "").toLowerCase().includes(busca));
     });
-  }, [dados, q, filtroStatus]);
+  }, [dados, q, filtroStatus, filtroFase]);
 
   return (
     <div className="max-w-6xl">
@@ -81,8 +86,14 @@ export default function DetalheOPClient({ opNumero }) {
                 {s.status || "—"} ({fmtNum(s.n)})
               </button>
             ))}
+            {fases.length > 1 && (
+              <select value={filtroFase} onChange={(e) => setFiltroFase(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 ml-auto bg-white" title="Fase da obra">
+                <option value="">Todas as fases</option>
+                {fases.map((f) => <option key={f} value={f}>Fase {f}</option>)}
+              </select>
+            )}
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar marca, perfil, descrição…"
-              className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 ml-auto w-56 focus:outline-none focus:ring-2 focus:ring-torg-blue/30" />
+              className={`text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-56 focus:outline-none focus:ring-2 focus:ring-torg-blue/30 ${fases.length > 1 ? "" : "ml-auto"}`} />
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">

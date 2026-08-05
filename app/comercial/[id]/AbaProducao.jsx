@@ -5,6 +5,8 @@ import { Factory, Search, Loader2, AlertCircle, X, CheckCircle2, FileSpreadsheet
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const norm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+// Fase da obra a partir da marca (T83A1 → "A", T83F-P1 → "F").
+const faseDaMarca = (m) => (String(m || "").toUpperCase().match(/^T?\d+([A-Z]+)/) || [])[1] || "";
 const LIMITE = 300;
 
 // etapas na ordem do fluxo, com rótulo e cor
@@ -25,6 +27,7 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [etapa, setEtapa] = useState("");
+  const [fase, setFase] = useState("");
   const [exportando, setExportando] = useState(false);
 
   useEffect(() => {
@@ -36,14 +39,16 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
 
   const pecas = dados?.pecas || [];
   const resumo = dados?.resumo || [];
+  const fases = useMemo(() => [...new Set(pecas.map((p) => faseDaMarca(p.marca)).filter(Boolean))].sort(), [pecas]);
   const filtradas = useMemo(() => {
     const b = norm(busca);
     return pecas.filter((p) => {
       if (etapa && p.setor !== etapa) return false;
+      if (fase && faseDaMarca(p.marca) !== fase) return false;
       if (!b) return true;
       return norm(p.marca).includes(b) || norm(p.descricao).includes(b);
     });
-  }, [pecas, busca, etapa]);
+  }, [pecas, busca, etapa, fase]);
   const pesoFiltrado = filtradas.reduce((s, p) => s + (p.pesoTotal || 0), 0);
 
   async function exportar() {
@@ -139,6 +144,12 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar marca ou descrição…" className={`${inp} w-full pl-7 pr-7`} />
             {busca && <button onClick={() => setBusca("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-torg-gray hover:text-torg-dark"><X size={13} /></button>}
           </div>
+          {fases.length > 1 && (
+            <select value={fase} onChange={(e) => setFase(e.target.value)} className={inp} title="Fase / etapa da obra">
+              <option value="">Todas as fases</option>
+              {fases.map((f) => <option key={f} value={f}>Fase {f}</option>)}
+            </select>
+          )}
           <select value={etapa} onChange={(e) => setEtapa(e.target.value)} className={inp}>
             <option value="">Todas as etapas</option>
             {ORDEM.filter((s) => resumo.some((r) => r.setor === s)).map((s) => <option key={s} value={s}>{ETAPA[s].l}</option>)}
