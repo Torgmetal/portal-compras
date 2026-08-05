@@ -1353,7 +1353,7 @@ function ModalImportarLPC({ ops, onClose, onImportado }) {
       const res = await fetch("/api/producao/pecas/importar-lpc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, opNumero: opForcada || null, sobrescrever }),
+        body: JSON.stringify({ rows, opNumero: opForcada || null, sobrescrever, arquivoNome }),
       });
       let data;
       try {

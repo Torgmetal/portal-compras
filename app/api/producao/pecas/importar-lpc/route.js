@@ -28,19 +28,24 @@ export async function POST(req) {
     return NextResponse.json({ error: "Body invalido" }, { status: 400 });
   }
 
-  const { rows, opNumero: opForcada, sobrescrever } = body;
+  const { rows, opNumero: opForcada, sobrescrever, arquivoNome } = body;
   if (!Array.isArray(rows)) {
     return NextResponse.json({ error: "Envie 'rows' como array da planilha parseada" }, { status: 400 });
   }
 
-  const parsed = parseLPC(rows, { opNumeroForcado: opForcada || null });
+  // A CHAVE da lista é a FASE (ex.: T83F), NÃO a OP (083): cada fase é uma lista
+  // própria (T83F e T83D coexistem). Prioridade: fase no nome do arquivo
+  // (T83F-LPC) > fase/OP selecionada > detecção automática pela marca.
+  const faseArquivo = String(arquivoNome || "").toUpperCase().match(/T\d+[A-Z]*/)?.[0] || null;
+  const chave = faseArquivo || opForcada || null;
+  const parsed = parseLPC(rows, { opNumeroForcado: chave });
   if (parsed.erro) {
     return NextResponse.json({ error: parsed.erro }, { status: 400 });
   }
 
   const opNumero = parsed.opNumero;
   if (!opNumero) {
-    return NextResponse.json({ error: "Não consegui detectar a OP pelas marcas (provavelmente seguem a nomenclatura do cliente). Selecione a OP na lista acima e importe de novo." }, { status: 400 });
+    return NextResponse.json({ error: "Não consegui detectar a fase/OP. Nomeie o arquivo com a fase (ex.: T83F-LPC) ou selecione a OP e importe de novo." }, { status: 400 });
   }
 
   const totalPecas = parsed.conjuntos.length + parsed.croquis.length + parsed.avulsas.length;
@@ -48,8 +53,13 @@ export async function POST(req) {
     return NextResponse.json({ error: "Nenhuma peca encontrada na planilha." }, { status: 400 });
   }
 
-  // Resolve OP no banco
-  const op = await prisma.oP.findUnique({ where: { numero: opNumero } });
+  // Resolve o opId pela OP correspondente aos DÍGITOS (todas as fases da OP —
+  // T83F, T83D… — compartilham o mesmo opId). Usa a OP selecionada, senão os
+  // dígitos da fase. Sem isso, a chave por fase (T83F) não acharia a OP.
+  const digitosDe = (s) => (String(s || "").match(/\d+/) || [])[0];
+  const cands = new Set();
+  for (const src of [opForcada, opNumero]) { const d = digitosDe(src); if (d) { cands.add(d); cands.add(d.padStart(3, "0")); cands.add(String(Number(d))); } }
+  const op = cands.size ? await prisma.oP.findFirst({ where: { numero: { in: [...cands] } } }) : null;
 
   // Diff da revisão (o que mudou vs a lista anterior): snapshot das marcas+peso
   // ANTES do upsert. incluídas = novas; removidas = sumiram; alteradas = peso mudou.
