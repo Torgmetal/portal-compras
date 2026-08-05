@@ -78,6 +78,31 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "Cargo" ADD COLUMN IF NOT EXISTS "matriz" JSONB`);
   console.log("[ensure-mes-tables] OK — Cargo.descricao/area/matriz garantidas.");
 
+  // NaoConformidade (RNC / FORM 20) — RNC interna e de cliente. Idempotente.
+  await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "NaoConformidade" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "numero" INTEGER NOT NULL,
+    "ano" INTEGER NOT NULL,
+    "tipo" TEXT NOT NULL,
+    "data" TIMESTAMP(3) NOT NULL,
+    "cliente" TEXT, "opNumero" TEXT, "opId" TEXT, "desenhoProjetoMarca" TEXT,
+    "origem" TEXT, "fornecedor" TEXT, "processoArea" TEXT, "descricao" TEXT,
+    "fotos" JSONB NOT NULL DEFAULT '[]', "disposicao" TEXT, "elaborador" TEXT,
+    "resultadoReinspecao" TEXT, "abrangencia" TEXT, "necessitaAcao" TEXT, "motivoNaoAcao" TEXT,
+    "causas" TEXT, "cincoPorques" JSONB NOT NULL DEFAULT '[]', "planoAcaoId" TEXT,
+    "prazoResposta" TIMESTAMP(3), "realizadoEm" TIMESTAMP(3), "acompanhadoPor" TEXT,
+    "acompanhamento" TEXT, "avaliacaoEficacia" TEXT, "encerradaPor" TEXT, "encerradaEm" TIMESTAMP(3),
+    "status" TEXT NOT NULL DEFAULT 'ABERTA', "pertinente" BOOLEAN NOT NULL DEFAULT true,
+    "recorrente" BOOLEAN NOT NULL DEFAULT false, "rncAnteriorId" TEXT,
+    "anexoUrl" TEXT, "programa" TEXT, "jobCliente" TEXT, "numeroCliente" TEXT,
+    "respostaCliente" TEXT, "respostaPdfUrl" TEXT, "respostaEnviadaEm" TIMESTAMP(3),
+    "evidencias" JSONB NOT NULL DEFAULT '[]', "createdById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "NaoConformidade_tipo_idx" ON "NaoConformidade"("tipo")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "NaoConformidade_status_idx" ON "NaoConformidade"("status")`);
+  console.log("[ensure-mes-tables] OK — NaoConformidade (RNC) garantida.");
+
   // BaixaExpedicao: baixa manual de marca (sem romaneio). Idempotente.
   await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "BaixaExpedicao" (
     "id" TEXT NOT NULL PRIMARY KEY,

@@ -1783,6 +1783,64 @@ model PlanoAcao {
   @@index([status])
 }
 
+// Relatório de Não Conformidade (RNC / FORM 20). tipo INTERNA (Torg detecta) ou
+// CLIENTE (o cliente envia um RTNC que anexamos e a IA converte). Alimenta os
+// indicadores RNCs do Cliente, Erros de Projeto e Recorrência de NC.
+model NaoConformidade {
+  id                  String    @id @default(cuid())
+  numero              Int // sequencial por ano
+  ano                 Int
+  tipo                String // INTERNA | CLIENTE
+  data                DateTime // abertura
+  // Identificação
+  cliente             String?
+  opNumero            String? // T69
+  opId                String?
+  desenhoProjetoMarca String?
+  origem              String? // PROCESSO | PRODUTO | CLIENTE | FORNECEDOR | AUDITORIA_INTERNA | AUDITORIA_EXTERNA | INDICADOR
+  fornecedor          String?
+  processoArea        String? // setor/área da ocorrência (Expedição, Engenharia…)
+  descricao           String?
+  fotos               Json      @default("[]") // registro fotográfico [{ url, legenda }]
+  disposicao          String? // APROVAR_CONCESSAO | RETRABALHAR | REFUGAR | DEVOLVER_FORNECEDOR
+  elaborador          String?
+  resultadoReinspecao String?
+  abrangencia         String?
+  necessitaAcao       String? // CORRETIVA | PREVENTIVA | NAO_NECESSARIO
+  motivoNaoAcao       String?
+  causas              String?
+  cincoPorques        Json      @default("[]") // análise de causa raiz [{ porque, resposta }]
+  planoAcaoId         String? // liga ao 5W2H (PlanoAcao)
+  prazoResposta       DateTime?
+  realizadoEm         DateTime?
+  acompanhadoPor      String?
+  acompanhamento      String?
+  avaliacaoEficacia   String?
+  encerradaPor        String?
+  encerradaEm         DateTime?
+  status              String    @default("ABERTA") // ABERTA | EM_ACAO | RESPONDIDA | ENCERRADA
+  // Indicadores
+  pertinente          Boolean   @default(true) // conta no indicador de RNCs do cliente
+  recorrente          Boolean   @default(false)
+  rncAnteriorId       String?
+  // RNC de Cliente (RTNC)
+  anexoUrl            String? // documento da RNC do cliente
+  programa            String? // ASME…
+  jobCliente          String? // 0326
+  numeroCliente       String? // RTNC-010
+  respostaCliente     String? // texto da resposta gerada
+  respostaPdfUrl      String?
+  respostaEnviadaEm   DateTime?
+  evidencias          Json      @default("[]") // [{ tipo, descricao, url }] treinamentos/melhorias
+  createdById         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([tipo])
+  @@index([status])
+  @@index([ano, numero])
+}
+
 // ── Portal de Apresentação ao Cliente (Compras) ──────────────────
 // Biblioteca fixa de documentos institucionais da Torg (cadastra 1x, reusa em
 // toda apresentação): cadastrais, portfólio, etc.
