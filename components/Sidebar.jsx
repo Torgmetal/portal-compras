@@ -22,6 +22,7 @@ const menu = [
   { href: "/compras/estoque", label: "Estoque", icon: Boxes },
   { href: "/compras/materiais", label: "Materiais por OP", icon: Layers },
   { href: "/compras/vendorlist", label: "Vendor List", icon: Building2 },
+  { href: "/indicadores/compras", label: "Indicadores", icon: BarChart3 },
   { href: "/compras/notificacoes", label: "Notificações", icon: Bell, masterOnly: true },
 ];
 
