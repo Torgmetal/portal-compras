@@ -204,7 +204,7 @@ function ModalNova({ onClose, onCriada }) {
   async function salvar() {
     setErro("");
     if (cliente && !f.cliente.trim()) return setErro("Informe o cliente.");
-    if (!f.descricao.trim()) return setErro("Descreva a não conformidade.");
+    if (!cliente && !f.descricao.trim()) return setErro("Descreva a não conformidade.");
     setSalvando(true);
     try {
       const r = await fetch("/api/qualidade/rnc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo, ...f }) });
@@ -248,7 +248,7 @@ function ModalNova({ onClose, onCriada }) {
               <Campo label="Programa"><input value={f.programa} onChange={(e) => set("programa", e.target.value)} placeholder="ASME" className="inp" /></Campo>
             </>}
           </div>
-          <Campo label="Descrição da não conformidade *"><textarea value={f.descricao} onChange={(e) => set("descricao", e.target.value)} rows={3} className="inp" placeholder="O que foi constatado" /></Campo>
+          <Campo label={cliente ? "Descrição da não conformidade" : "Descrição da não conformidade *"}><textarea value={f.descricao} onChange={(e) => set("descricao", e.target.value)} rows={3} className="inp" placeholder={cliente ? "Pode deixar em branco — anexe o PDF na tela da RNC e a IA preenche." : "O que foi constatado"} /></Campo>
           {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
         </div>
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">

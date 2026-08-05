@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown, Plus, Upload, X, FileText } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown, Plus, Upload, X, FileText, Sparkles } from "lucide-react";
 import { numRNC, TIPOS_RNC, ORIGEM_NC, DISPOSICAO_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
 import { SETORES_AUDITORIA } from "@/lib/auditoria-interna";
 
@@ -16,6 +16,7 @@ export default function RncDetalheClient({ id }) {
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [subindo, setSubindo] = useState(false);
+  const [extraindo, setExtraindo] = useState(false);
   const [criandoPlano, setCriandoPlano] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -86,12 +87,30 @@ export default function RncDetalheClient({ id }) {
       const anexos = [...(d.anexos || []), ...novos];
       setD((p) => ({ ...p, anexos }));
       await salvar({ anexos });
+      // RNC de cliente: ao anexar o PDF/imagem, já extrai os dados (se ainda falta preencher).
+      const alvo = novos.find((n) => n.tipo === "application/pdf") || novos.find((n) => String(n.tipo).startsWith("image/"));
+      const precisa = !(d.cliente && d.cliente.trim()) || !(d.descricao && d.descricao.trim());
+      if (d.tipo === "CLIENTE" && alvo && precisa) await extrairDoAnexo(alvo);
     } catch (e) { setErro("Falha no anexo: " + e.message); } finally { setSubindo(false); }
   }
   function removerAnexo(url) {
     const anexos = (d.anexos || []).filter((a) => a.url !== url);
     setD((p) => ({ ...p, anexos }));
     salvar({ anexos });
+  }
+
+  // Extrai (IA) os dados do documento do cliente e preenche os campos VAZIOS da RNC.
+  async function extrairDoAnexo(anexo) {
+    if (!anexo?.url) return;
+    setErro(""); setExtraindo(true);
+    try {
+      const r = await fetch(`/api/qualidade/rnc/${id}/extrair`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ anexoUrl: anexo.url, tipo: anexo.tipo }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Falha na extração");
+      const n = (j.preenchidos || []).length;
+      flash(n ? `Preenchi ${n} campo(s) a partir do anexo — revise.` : "Não encontrei dados novos no anexo.");
+      carregar();
+    } catch (e) { setErro(e.message); } finally { setExtraindo(false); }
   }
 
   async function criarPlano() {
@@ -111,6 +130,7 @@ export default function RncDetalheClient({ id }) {
   const improcedente = cliente && d.pertinente === false; // improcedente ⇒ só justificativa
   const mostrarAnalise = !improcedente;                   // tratamento, causa raiz, plano, acompanhamento
   const aceita = cliente ? ".pdf,image/png,image/jpeg,image/webp" : "image/png,image/jpeg,image/webp,.pdf,.doc,.docx,.xls,.xlsx";
+  const anexoIA = cliente ? ((d.anexos || []).find((x) => x.tipo === "application/pdf") || (d.anexos || []).find((x) => String(x.tipo || "").startsWith("image/"))) : null;
 
   return (
     <div className="space-y-5 max-w-4xl pb-24">
@@ -199,7 +219,12 @@ export default function RncDetalheClient({ id }) {
           <input type="file" accept={aceita} multiple disabled={subindo} className="hidden" onChange={(e) => { anexar(e.target.files); e.target.value = ""; }} />
         </label>
       }>
-        <p className="text-[12px] text-torg-gray -mt-1">{cliente ? "Anexe o PDF e as imagens que o cliente enviou." : "Anexe imagens e documentos (PDF, Word, Excel) para compor o relatório."}</p>
+        <p className="text-[12px] text-torg-gray -mt-1">{cliente ? "Anexe o PDF e as imagens que o cliente enviou — a IA já preenche cliente, nº da RNC, data, descrição e as causas apontadas." : "Anexe imagens e documentos (PDF, Word, Excel) para compor o relatório."}</p>
+        {anexoIA && (
+          <button onClick={() => extrairDoAnexo(anexoIA)} disabled={extraindo || subindo} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-torg-blue-50 text-torg-blue text-[12px] font-medium hover:bg-torg-blue-100 disabled:opacity-50">
+            {extraindo ? <><Loader2 size={13} className="animate-spin" /> lendo o documento…</> : <><Sparkles size={13} /> Preencher com IA a partir do anexo</>}
+          </button>
+        )}
         {(d.anexos || []).length === 0 ? (
           <p className="text-[13px] text-torg-gray">Nenhum anexo ainda.</p>
         ) : (
