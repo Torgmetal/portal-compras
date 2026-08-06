@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { pecasTekla } from "@/lib/peso-op";
 
 // GET /api/engenharia/op/[opNumero]
 // Detalhamento de uma OP: marcas/conjuntos do snapshot Tekla (PecaConjunto),
@@ -14,15 +15,15 @@ export async function GET(req, { params }) {
     const { opNumero } = await params;
 
     // opNumero e o codigo Tekla/SKA; a OP real vem por opId (relacao `op`).
-    const [rep, agg, marcas] = await Promise.all([
+    // `todas` = conjunto leve pra o cálculo canônico (sem dobra); `marcas` = lista de exibição.
+    const [rep, todas, marcas] = await Promise.all([
       prisma.pecaConjunto.findFirst({
         where: { opNumero },
         select: { op: { select: { numero: true, cliente: true, obra: true, status: true, valorTotalContrato: true } } },
       }),
-      prisma.pecaConjunto.aggregate({
+      prisma.pecaConjunto.findMany({
         where: { opNumero },
-        _sum: { pesoTotalKg: true, pesoProduzido: true, qte: true, qteProduzida: true, areaPinturaM2: true },
-        _count: { _all: true },
+        select: { fonte: true, tipoPeca: true, pesoTotalKg: true, pesoProduzido: true, qte: true, areaPinturaM2: true, status: true },
       }),
       prisma.pecaConjunto.findMany({
         where: { opNumero },
@@ -37,40 +38,42 @@ export async function GET(req, { params }) {
       }),
     ]);
 
-    if (agg._count._all === 0) {
+    if (todas.length === 0) {
       return NextResponse.json({ success: false, error: "Nenhuma marca importada para esta OP" }, { status: 404 });
     }
 
-    // Distribuição por status (funil de produção)
-    const porStatus = await prisma.pecaConjunto.groupBy({
-      by: ["status"], where: { opNumero }, _count: { _all: true }, _sum: { pesoTotalKg: true },
-    });
+    // Peso modelado/produzido do conjunto Tekla (pecasTekla) — sem dobrar croqui/LE. Ver peso-op.js.
+    const tekla = pecasTekla(todas);
+    const pesoModeladoKg = Math.round(tekla.reduce((s, p) => s + (p.pesoTotalKg || 0), 0));
+    const pesoProduzidoKg = Math.round(tekla.reduce((s, p) => s + (p.pesoProduzido || 0), 0));
+
+    // Funil por status — sobre o conjunto Tekla (senão croqui/LE dobram o peso por etapa).
+    const statusMap = new Map();
+    for (const p of tekla) { const k = p.status || "—"; const e = statusMap.get(k) || { status: k, n: 0, pesoKg: 0 }; e.n += 1; e.pesoKg += p.pesoTotalKg || 0; statusMap.set(k, e); }
+    const porStatus = [...statusMap.values()].map((s) => ({ ...s, pesoKg: Math.round(s.pesoKg) })).sort((a, b) => b.pesoKg - a.pesoKg);
 
     // Qualidade do dado: marcas sem material (grade) ou sem perfil
     const semGrade = marcas.filter((m) => !m.material || !m.material.trim()).length;
     const semPerfil = marcas.filter((m) => !m.perfil || !m.perfil.trim()).length;
-
-    const pesoModeladoKg = Math.round(agg._sum.pesoTotalKg || 0);
-    const pesoProduzidoKg = Math.round(agg._sum.pesoProduzido || 0);
 
     const op = rep?.op || null;
     return NextResponse.json({
       success: true,
       op: { opNumero, numero: op?.numero || null, cliente: op?.cliente || null, obra: op?.obra || null, status: op?.status || null, valorTotalContrato: op?.valorTotalContrato || null, semOp: !op },
       resumo: {
-        nMarcas: agg._count._all,
-        nConjuntos: marcas.filter((m) => m.tipoPeca === "CONJUNTO").length,
-        nCroquis: marcas.filter((m) => m.tipoPeca === "CROQUI").length,
-        qteTotal: agg._sum.qte || 0,
+        nMarcas: tekla.length,
+        nConjuntos: tekla.filter((m) => m.tipoPeca === "CONJUNTO").length,
+        nCroquis: todas.filter((m) => m.tipoPeca === "CROQUI").length,
+        qteTotal: tekla.reduce((s, p) => s + (p.qte || 0), 0),
         pesoModeladoKg,
         pesoProduzidoKg,
         pct: pesoModeladoKg > 0 ? Math.round((pesoProduzidoKg / pesoModeladoKg) * 1000) / 10 : 0,
-        areaPinturaM2: Math.round(agg._sum.areaPinturaM2 || 0),
+        areaPinturaM2: Math.round(tekla.reduce((s, p) => s + (p.areaPinturaM2 || 0), 0)),
         semGrade,
         semPerfil,
-        truncado: agg._count._all > marcas.length,
+        truncado: todas.length > marcas.length,
       },
-      porStatus: porStatus.map((s) => ({ status: s.status, n: s._count._all, pesoKg: Math.round(s._sum.pesoTotalKg || 0) })).sort((a, b) => b.pesoKg - a.pesoKg),
+      porStatus,
       marcas,
     });
   } catch (e) {
