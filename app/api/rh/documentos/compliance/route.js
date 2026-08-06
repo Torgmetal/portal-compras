@@ -3,58 +3,14 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import {
-  REGRAS_DOCUMENTOS,
   regrasParaFuncionario,
   regrasEmpresa,
   isSetorProducao,
+  checarRegraDocumento,
+  dispensadoDocumentos,
 } from "@/lib/regras-documentos";
 
 export const maxDuration = 30;
-
-/**
- * Verifica se um documento cobre uma regra (tipo compatível e válido).
- * Retorna { encontrado, documento, status } onde status pode ser:
- *   "OK"       → doc existe e está dentro da validade (ou regra sem validade)
- *   "VENCIDO"  → doc existe mas venceu
- *   "VENCENDO" → doc existe mas vence em ≤ 30 dias
- *   "AUSENTE"  → nenhum doc desse tipo encontrado
- */
-function checarRegra(regra, documentos) {
-  // Buscar docs do tipo correspondente (ativo, mais recente primeiro)
-  const docs = documentos
-    .filter((d) => d.tipo === regra.tipo && d.ativo !== false)
-    .sort((a, b) => {
-      const dA = a.dataValidade ? new Date(a.dataValidade).getTime() : 0;
-      const dB = b.dataValidade ? new Date(b.dataValidade).getTime() : 0;
-      return dB - dA; // mais recente primeiro
-    });
-
-  if (docs.length === 0) {
-    return { encontrado: false, documento: null, status: "AUSENTE" };
-  }
-
-  const doc = docs[0]; // doc mais recente/válido
-
-  // Se a regra não exige validade (ex: Integração feita 1x)
-  if (!regra.validadeMeses) {
-    return { encontrado: true, documento: doc, status: "OK" };
-  }
-
-  // Se o doc não tem data de validade mas a regra exige → tratar como vencido
-  if (!doc.dataValidade) {
-    return { encontrado: true, documento: doc, status: "VENCIDO" };
-  }
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const validade = new Date(doc.dataValidade);
-  validade.setHours(0, 0, 0, 0);
-  const dias = Math.ceil((validade - hoje) / 86400000);
-
-  if (dias < 0) return { encontrado: true, documento: doc, status: "VENCIDO" };
-  if (dias <= 30) return { encontrado: true, documento: doc, status: "VENCENDO" };
-  return { encontrado: true, documento: doc, status: "OK" };
-}
 
 export async function GET() {
   try {
@@ -101,13 +57,13 @@ export async function GET() {
       // Terceiros (PJ — qualquer contrato não-CLT) e Diretoria não têm
       // exigência de documentos da CCT: ficam conformes por dispensa.
       const ehDiretoria = setorNome.trim().toLowerCase() === "diretoria";
-      const dispensado = func.tipoContrato !== "CLT" || ehDiretoria;
+      const dispensado = dispensadoDocumentos(func.tipoContrato, setorNome);
       const regras = dispensado ? [] : regrasParaFuncionario(setorNome);
       const producao = !dispensado && isSetorProducao(setorNome);
       const itens = [];
 
       for (const regra of regras) {
-        const resultado = checarRegra(regra, func.documentos);
+        const resultado = checarRegraDocumento(regra, func.documentos);
         itens.push({
           regra: {
             tipo: regra.tipo,
@@ -159,7 +115,7 @@ export async function GET() {
     const itensEmpresa = [];
 
     for (const regra of regrasEmp) {
-      const resultado = checarRegra(regra, docsEmpresa);
+      const resultado = checarRegraDocumento(regra, docsEmpresa);
       itensEmpresa.push({
         regra: {
           tipo: regra.tipo,

@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { regrasParaFuncionario, checarRegraDocumento, dispensadoDocumentos } from "@/lib/regras-documentos";
 
 export const runtime = "nodejs";
 
@@ -52,22 +53,23 @@ export async function GET(req) {
     return NextResponse.json({ titulo: "Índice de acidente com afastamento", colunas: ["Data", "Colaborador", "Gravidade", "Dias perdidos"], linhas, resumo: `${ac.length} acidente(s) com afastamento no período (meta 0)` });
   }
 
-  // Atendimento das competências — snapshot atual (colaboradores ativos avaliados na matriz).
+  // Atendimento das competências — snapshot: colaboradores CLT e se têm todos os documentos
+  // obrigatórios do setor em dia (RH Documentos + regras por setor/CCT).
   if (indicador === "atendimento_competencias") {
-    const fs = await prisma.funcionario.findMany({ where: { ativo: true }, select: { nome: true, cargo: { select: { nome: true, competencias: { select: { competenciaId: true, nivelEsperado: true } } } }, competencias: { select: { competenciaId: true, nivelAtual: true } } }, orderBy: { nome: "asc" } });
-    const linhas = []; let avaliados = 0, atendidos = 0;
+    const fs = await prisma.funcionario.findMany({ where: { ativo: true }, select: { nome: true, tipoContrato: true, setor: { select: { nome: true } }, cargo: { select: { nome: true } }, documentos: { where: { ativo: true }, select: { tipo: true, dataValidade: true, ativo: true } } }, orderBy: { nome: "asc" } });
+    const linhas = []; let comRegras = 0, atende = 0;
     for (const f of fs) {
-      const req = f.cargo?.competencias || []; if (!req.length) continue;
-      const at = new Map(f.competencias.map((c) => [c.competenciaId, c.nivelAtual]));
-      const comAval = req.filter((r) => at.has(r.competenciaId));
-      if (!comAval.length) continue;
-      avaliados++;
-      const ok = comAval.every((r) => (at.get(r.competenciaId) || 0) >= r.nivelEsperado);
-      if (ok) atendidos++;
-      linhas.push([f.nome, f.cargo?.nome || "—", ok ? "Atende" : "Abaixo"]);
+      const setor = f.setor?.nome || "";
+      if (dispensadoDocumentos(f.tipoContrato, setor)) continue;
+      const regras = regrasParaFuncionario(setor);
+      if (!regras.length) continue;
+      comRegras++;
+      const falta = regras.filter((rg) => { const st = checarRegraDocumento(rg, f.documentos).status; return st !== "OK" && st !== "VENCENDO"; }).length;
+      if (falta === 0) atende++;
+      linhas.push([f.nome, f.cargo?.nome || "—", falta === 0 ? "Atende (todos em dia)" : `Faltam ${falta} de ${regras.length}`]);
     }
-    const perc = avaliados > 0 ? Math.round((atendidos / avaliados) * 1000) / 10 : null;
-    return NextResponse.json({ titulo: "Atendimento das Competências", colunas: ["Colaborador", "Cargo", "Situação"], linhas, resumo: `${atendidos} de ${avaliados} avaliado(s) atendem${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}` });
+    const perc = comRegras > 0 ? Math.round((atende / comRegras) * 1000) / 10 : null;
+    return NextResponse.json({ titulo: "Atendimento das Competências", colunas: ["Colaborador", "Cargo", "Documentos"], linhas, resumo: `${atende} de ${comRegras} colaborador(es) CLT com todos os documentos em dia${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}` });
   }
 
   return NextResponse.json({ error: "Este indicador ainda não tem detalhamento." }, { status: 404 });
