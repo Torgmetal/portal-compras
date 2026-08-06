@@ -6,7 +6,7 @@ import { z } from "zod";
 const treinamentoSchema = z.object({
   titulo: z.string().min(2, "Título obrigatório (mín. 2 caracteres)"),
   tipo: z.enum(
-    ["NR_OBRIGATORIO", "TECNICO", "COMPORTAMENTAL", "INTEGRACAO", "SST"],
+    ["NR_OBRIGATORIO", "TECNICO", "COMPORTAMENTAL", "INTEGRACAO", "SST", "MUDANCA_PROCESSO", "NAO_CONFORMIDADE", "ACAO_CORRETIVA", "AUDITORIA", "MEIO_AMBIENTE"],
     { message: "Tipo inválido" }
   ),
   nrRelacionada: z.string().optional().nullable(),

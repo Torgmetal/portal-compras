@@ -62,7 +62,7 @@ export default function CargoMatrizClient({ cargoId }) {
       matriz: {
         revisao: m.revisao || "", revisadaEm: m.revisadaEm ? String(m.revisadaEm).slice(0, 10) : "", status: m.status || "",
         escolaridadeObrigatoria: m.escolaridadeObrigatoria || "", escolaridadeDesejavel: m.escolaridadeDesejavel || "",
-        experienciaAdmissao: m.experienciaAdmissao || "", experienciaPromocao: m.experienciaPromocao || "",
+        experienciaAdmissao: m.experienciaAdmissao || "", experienciaPromocao: m.experienciaPromocao || "", promocaoAltoDesempenho: m.promocaoAltoDesempenho || "",
         qualificacoes: Array.isArray(m.qualificacoes) ? m.qualificacoes.map((q) => ({ grupo: q.grupo, item: q.item || "", evidencia: q.evidencia || "" })) : [],
         emitidoPor: m.emitidoPor || "", aprovadoPor: m.aprovadoPor || "",
       },
@@ -225,18 +225,18 @@ export default function CargoMatrizClient({ cargoId }) {
               <div className="space-y-2">
                 <p className="text-[11px] font-bold uppercase tracking-wide text-torg-gray">Grau de escolaridade</p>
                 <LabeledInput tag="Obrigatório" value={draft.matriz.escolaridadeObrigatoria} onChange={(v) => setM("escolaridadeObrigatoria", v)} />
-                <LabeledInput tag="Desejável" value={draft.matriz.escolaridadeDesejavel} onChange={(v) => setM("escolaridadeDesejavel", v)} />
               </div>
               <div className="space-y-2">
                 <p className="text-[11px] font-bold uppercase tracking-wide text-torg-gray">Experiência mínima</p>
                 <LabeledInput tag="Admissão" value={draft.matriz.experienciaAdmissao} onChange={(v) => setM("experienciaAdmissao", v)} />
-                <LabeledInput tag="Promoção" value={draft.matriz.experienciaPromocao} onChange={(v) => setM("experienciaPromocao", v)} />
+                <LabeledInput tag="Promoção (por tempo)" value={draft.matriz.experienciaPromocao} onChange={(v) => setM("experienciaPromocao", v)} />
+                <LabeledInput tag="Alto desempenho" value={draft.matriz.promocaoAltoDesempenho} onChange={(v) => setM("promocaoAltoDesempenho", v)} />
               </div>
             </div>
           ) : (matriz.escolaridadeObrigatoria || matriz.experienciaAdmissao) ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <ReqCard titulo="Grau de escolaridade" itens={[["Obrigatório", matriz.escolaridadeObrigatoria, "obr"], ["Desejável", matriz.escolaridadeDesejavel, "des"]]} />
-              <ReqCard titulo="Experiência mínima" itens={[["Admissão", matriz.experienciaAdmissao, "exp"], ["Promoção", matriz.experienciaPromocao, "exp"]]} />
+              <ReqCard titulo="Grau de escolaridade" itens={[["Obrigatório", matriz.escolaridadeObrigatoria, "obr"]]} />
+              <ReqCard titulo="Experiência mínima" itens={[["Admissão", matriz.experienciaAdmissao, "exp"], ["Promoção (por tempo)", matriz.experienciaPromocao, "exp"], ["Alto desempenho", matriz.promocaoAltoDesempenho, "exp"]]} />
             </div>
           ) : <p className="text-[13px] text-torg-gray">Não informado.</p>}
         </Sec>

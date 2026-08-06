@@ -10,7 +10,12 @@ const TIPOS = [
   { value: "TECNICO", label: "Técnico", cor: "bg-blue-100 text-blue-800" },
   { value: "COMPORTAMENTAL", label: "Comportamental", cor: "bg-purple-100 text-purple-800" },
   { value: "INTEGRACAO", label: "Integração", cor: "bg-green-100 text-green-800" },
-  { value: "SST", label: "SST", cor: "bg-amber-100 text-amber-800" },
+  { value: "SST", label: "SST - Segurança do Trabalho", cor: "bg-amber-100 text-amber-800" },
+  { value: "MUDANCA_PROCESSO", label: "Mudança de Processo", cor: "bg-indigo-100 text-indigo-800" },
+  { value: "NAO_CONFORMIDADE", label: "Não Conformidade", cor: "bg-rose-100 text-rose-800" },
+  { value: "ACAO_CORRETIVA", label: "Ação Corretiva", cor: "bg-orange-100 text-orange-800" },
+  { value: "AUDITORIA", label: "Auditorias", cor: "bg-cyan-100 text-cyan-800" },
+  { value: "MEIO_AMBIENTE", label: "Meio Ambiente", cor: "bg-lime-100 text-lime-800" },
 ];
 const tipoMap = Object.fromEntries(TIPOS.map((t) => [t.value, t]));
 
