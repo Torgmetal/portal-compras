@@ -4,13 +4,14 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Building2, Briefcase, Clock,
   CalendarDays, Heart, Network, Award, FileText,
-  UserPlus, ShieldAlert, GraduationCap, BedDouble, Map, Receipt, Wallet, Megaphone,
+  UserPlus, ShieldAlert, GraduationCap, BedDouble, Map, Receipt, Wallet, Megaphone, BarChart3,
 } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/rh", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/rh/indicadores", label: "Indicadores", icon: BarChart3 },
   { href: "/rh/mural", label: "Mural & Comunicação", icon: Megaphone },
   { href: "/rh/funcionarios", label: "Funcionários", icon: Users },
   { href: "/rh/vagas", label: "Vagas", icon: UserPlus },
