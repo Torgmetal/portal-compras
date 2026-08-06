@@ -49,7 +49,12 @@ const TIPO_TREINAMENTO = {
   TECNICO: "Técnico",
   COMPORTAMENTAL: "Comportamental",
   INTEGRACAO: "Integração",
-  SST: "SST",
+  SST: "SST - Segurança do Trabalho",
+  MUDANCA_PROCESSO: "Mudança de Processo",
+  NAO_CONFORMIDADE: "Não Conformidade",
+  ACAO_CORRETIVA: "Ação Corretiva",
+  AUDITORIA: "Auditorias",
+  MEIO_AMBIENTE: "Meio Ambiente",
 };
 
 const TIPO_TREINAMENTO_CORES = {
@@ -58,6 +63,11 @@ const TIPO_TREINAMENTO_CORES = {
   COMPORTAMENTAL: "bg-purple-500",
   INTEGRACAO: "bg-emerald-500",
   SST: "bg-amber-500",
+  MUDANCA_PROCESSO: "bg-indigo-500",
+  NAO_CONFORMIDADE: "bg-rose-500",
+  ACAO_CORRETIVA: "bg-orange-500",
+  AUDITORIA: "bg-cyan-500",
+  MEIO_AMBIENTE: "bg-lime-500",
 };
 
 // ─── HOOK DE DADOS ───────────────────────────────────────────
