@@ -21,8 +21,6 @@ const ETAPA = {
   EXPEDIDO: { l: "Expedido", c: "bg-emerald-600 text-white", dot: "bg-emerald-600" },
 };
 const ORDEM = ["PENDENTE", "CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDIDO"];
-// Setores de fabricação (colunas do relatório "Faltantes por setor").
-const SETORES_FAB = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
 
 export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente }) {
   const [dados, setDados] = useState(null);
@@ -93,44 +91,12 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
     } catch (e) { setErro("Erro ao exportar: " + e.message); } finally { setExportando(false); }
   }
 
-  // Export "Faltantes por setor": matriz peça × setor (Falta/OK), com total faltando por setor.
+  // Export "Faltantes por setor": matriz peça × setor (Falta/OK) — helper compartilhado.
   async function exportarFaltantes() {
     setExportando(true); setErro("");
     try {
-      const { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } = await import("@/lib/excel-relatorio");
-      if (!pecas.length) throw new Error("Nada para exportar.");
-      const opNum = String(opNumero || "").padStart(3, "0");
-      const idx = (s) => ORDEM.indexOf(s);
-      const faltaNo = (p, setor) => idx(p.setor) < idx(setor); // ainda não passou por esse setor
-      const resumoFalta = SETORES_FAB.map((s) => { const f = pecas.filter((p) => faltaNo(p, s)); return { setor: s, qtd: f.length, kg: f.reduce((x, p) => x + (p.pesoTotal || 0), 0) }; });
-      const kpi = resumoFalta.map((r) => `${ETAPA[r.setor].l}: ${r.qtd} (${Math.round(r.kg).toLocaleString("pt-BR")}kg)`).join(" · ");
-
-      const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
-        titulo: `Peças faltantes por setor — OP-${opNum}`,
-        subtitulo: [obra, cliente, refCliente ? `Ref. ${refCliente}` : null].filter(Boolean).join(" · "),
-        kpis: [`${pecas.length} peças · ${fmtKg(dados.pesoTotal)}`, `Faltam — ${kpi}`, dados.temSyneco ? null : "⚠ Sem apontamento do Syneco nesta OP — não reflete a produção real."].filter(Boolean),
-        totalColunas: 4 + SETORES_FAB.length + 1,
-        nomePlanilha: "Faltantes por setor",
-        codigoDoc: "REL-PRD-006",
-      });
-      ws.columns = [{ width: 20 }, { width: 32 }, { width: 8 }, { width: 13 }, ...SETORES_FAB.map(() => ({ width: 12 })), { width: 14 }];
-      let row = linhaInicio;
-      adicionarHeaderTabela(ws, row, ["Marca", "Descrição", "Qtd", "Peso (kg)", ...SETORES_FAB.map((s) => ETAPA[s].l), "Situação"]);
-      row++;
-      const primeira = row;
-      const alinCentro = Object.fromEntries(SETORES_FAB.map((_, i) => [4 + i, "center"]).concat([[2, "right"], [3, "right"], [4 + SETORES_FAB.length, "center"]]));
-      for (const p of pecas) {
-        adicionarLinhaTabela(ws, row, [
-          p.marca, p.descricao || "—", p.qte ?? "—", Number((p.pesoTotal || 0).toFixed(2)),
-          ...SETORES_FAB.map((s) => (faltaNo(p, s) ? "Falta" : "OK")),
-          (ETAPA[p.setor] || ETAPA.PENDENTE).l,
-        ], { alinhamento: alinCentro });
-        row++;
-      }
-      adicionarLinhaTotais(ws, row, ["Faltam (peças)", "", "", "", ...resumoFalta.map((r) => r.qtd), ""]);
-      row++;
-      adicionarLinhaTotais(ws, row, ["Faltam (kg)", "", "", { formula: `SUM(D${primeira}:D${row - 2})` }, ...resumoFalta.map((r) => Math.round(r.kg)), ""]);
-      await downloadWorkbook(workbook, `Faltantes-por-setor_OP-${opNum}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const { exportarFaltantesPorSetor } = await import("@/lib/export-faltantes-setor");
+      await exportarFaltantesPorSetor({ pecas, pesoTotal: dados.pesoTotal, temSyneco: dados.temSyneco, opNumero, obra, cliente, refCliente });
     } catch (e) { setErro("Erro ao exportar: " + e.message); } finally { setExportando(false); }
   }
 

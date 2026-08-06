@@ -116,6 +116,7 @@ export async function GET(req, { params }) {
 
   return NextResponse.json({
     success: true,
+    opId: cronograma.opId,
     opNumero: opNum,
     pesoTotal,
     totalPecas,

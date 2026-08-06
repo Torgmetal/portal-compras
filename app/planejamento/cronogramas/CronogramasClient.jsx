@@ -3254,6 +3254,20 @@ function ProducaoTab({ cronogramaId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [exportando, setExportando] = useState(false);
+
+  // Export "Faltantes por setor": busca as peças da OP (setor real do Syneco) e gera a matriz.
+  async function exportarFaltantes() {
+    if (!data?.opId) { setErro("OP não vinculada a este cronograma."); return; }
+    setExportando(true); setErro("");
+    try {
+      const r = await fetch(`/api/comercial/op/${data.opId}/producao`);
+      const j = await r.json();
+      if (!j.success || !j.pecas?.length) throw new Error(j.error || "Sem peças (Lista de Expedição) para exportar.");
+      const { exportarFaltantesPorSetor } = await import("@/lib/export-faltantes-setor");
+      await exportarFaltantesPorSetor({ pecas: j.pecas, pesoTotal: j.pesoTotal, temSyneco: j.temSyneco, opNumero: data.opNumero });
+    } catch (e) { setErro("Erro ao exportar: " + e.message); } finally { setExportando(false); }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -3300,6 +3314,11 @@ function ProducaoTab({ cronogramaId }) {
 
   return (
     <div className="p-4 space-y-5">
+      <div className="flex items-center justify-end">
+        <button onClick={exportarFaltantes} disabled={exportando} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40" title="Exporta a planilha das peças que faltam em cada setor">
+          {exportando ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />} Faltantes por setor
+        </button>
+      </div>
       {/* KPIs de peso */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <div className="bg-white border border-gray-100 rounded-lg px-3 py-2">
