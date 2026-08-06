@@ -162,5 +162,5 @@ export async function GET() {
   });
   const disponiveis = ops.map((op) => ({ ...op, cronogramasExistentes: countPorOp[op.numero] || 0 }));
 
-  return NextResponse.json({ ops: disponiveis, template: TEMPLATE_DEPARTAMENTOS });
+  return NextResponse.json({ ops: disponiveis });
 }
