@@ -67,6 +67,31 @@ export async function GET(_req, { params }) {
       });
     }
   }
+  // Sem Lista de Expedição (Lista Avançada) importada: cai pras peças da LPC (Tekla), que
+  // casam com o Syneco (MesOrdem) por marca — assim OPs sem a lista ainda têm status por peça
+  // (ex.: OP-089). Croqui + conjunto entram: o croqui reflete o corte, o conjunto a montagem+.
+  if (!marcas.size) {
+    const pcs = await prisma.pecaConjunto.findMany({
+      where: { opId: op.id, fonte: "LPC_IMPORT" },
+      select: { marca: true, descricao: true, qte: true, pesoTotalKg: true },
+    });
+    for (const p of pcs) {
+      const k = normMarca(p.marca);
+      if (!k || marcas.has(k)) continue;
+      const ex = expMap.get(k); const bx = baixaMap.get(k);
+      const qte = p.qte ?? null;
+      const totalExp = (ex ? ex.qtd : 0) + (bx ? bx.qtd : 0);
+      const expedidoQtd = qte != null ? Math.min(totalExp, qte) : totalExp;
+      marcas.set(k, {
+        frente: "", marca: p.marca, descricao: p.descricao || "", qte, pesoTotal: p.pesoTotalKg || 0,
+        expedidoQtd, expedido: expedidoQtd > 0 && qte != null && qte > 0 ? expedidoQtd >= qte : false,
+        temExpedicao: expedidoQtd > 0,
+        baixaMotivo: bx ? bx.motivo : null,
+        romaneio: ex ? [...ex.romaneios].sort().join(", ") : (bx ? "baixa manual" : null),
+        dataExpedicao: ex?.data ?? null,
+      });
+    }
+  }
   if (!marcas.size) return NextResponse.json({ success: true, semLista: true, pecas: [], resumo: [] });
 
   // 2) setor REAL por marca no Syneco (mais avançado com produção > 0)
