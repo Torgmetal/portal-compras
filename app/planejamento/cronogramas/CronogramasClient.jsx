@@ -596,9 +596,9 @@ function NovoCronogramaModal({ onClose, onCreated }) {
               id="usar-template"
             />
             <label htmlFor="usar-template" className="cursor-pointer">
-              <span className="text-xs font-medium text-torg-dark">Usar template padrão Torg</span>
+              <span className="text-xs font-medium text-torg-dark">Usar modelo padrão (OP-89)</span>
               <p className="text-[10px] text-torg-gray mt-0.5">
-                Cria automaticamente os departamentos (Comercial, Engenharia, Suprimentos, Fabricação, Expedição, Montagem) com tarefas padrão. Você pode editar, adicionar ou remover depois.
+                Gera, <b>para cada área</b> informada acima, a sequência: Ordem de compra · Modelo · Detalhamento · Diagrama de Montagem · Aprovação · Preparação · Montagem · Solda · Pintura · Expedição — já <b>encadeadas na ordem</b> (é só pôr a data de início e "Gerar datas"). Durações e tarefas são editáveis depois.
               </p>
             </label>
           </div>
