@@ -111,10 +111,16 @@ export async function GET(_req, { params }) {
     if (cur === undefined || ORDEM.indexOf(st) > ORDEM.indexOf(cur)) setorPorMarca.set(k, st);
   }
 
+  // Tipo de cada peça (CROQUI / CONJUNTO / avulsa) — pro relatório separar a rota: o croqui (P)
+  // só passa pelo corte e vira conjunto na montagem; o conjunto segue montagem→pintura.
+  const tiposPC = await prisma.pecaConjunto.findMany({ where: { opId: op.id }, select: { marca: true, tipoPeca: true } });
+  const tipoPorMarca = new Map();
+  for (const t of tiposPC) { const k = normMarca(t.marca); if (k && !tipoPorMarca.has(k)) tipoPorMarca.set(k, t.tipoPeca || null); }
+
   // 3) status de cada peça: expedido > setor do Syneco > pendente
   const pecas = [...marcas.values()].map((m) => {
     const setor = m.expedido ? "EXPEDIDO" : (setorPorMarca.get(normMarca(m.marca)) || "PENDENTE");
-    return { ...m, setor };
+    return { ...m, setor, tipoPeca: tipoPorMarca.get(normMarca(m.marca)) || null };
   }).sort((a, b) => (ORDEM.indexOf(b.setor) - ORDEM.indexOf(a.setor)) || String(a.marca).localeCompare(String(b.marca), "pt-BR"));
 
   // 4) resumo por etapa (contagem + peso)
