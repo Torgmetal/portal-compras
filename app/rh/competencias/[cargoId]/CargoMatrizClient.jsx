@@ -294,6 +294,9 @@ export default function CargoMatrizClient({ cargoId }) {
           </Sec>
         ) : (
           <Sec title="Matriz de qualificação — funcionários × competências" n="5" icon={<Users size={13} className="text-torg-blue" />}>
+            <p className="text-[11.5px] leading-relaxed text-torg-dark/70 bg-torg-blue-50/60 border border-torg-blue-100 rounded-lg px-3 py-2 mb-3">
+              <span className="font-semibold text-torg-dark">Periodicidade da avaliação de desempenho:</span> realizada anualmente para todos os colaboradores efetivos, podendo ocorrer avaliações extraordinárias nos casos de admissão, término do período de experiência, promoção, mudança de função, retorno de afastamento ou quando identificada necessidade decorrente de auditorias, não conformidades ou baixo desempenho.
+            </p>
             {!temMatriz ? (
               <div className="text-center py-6"><ClipboardList size={30} className="mx-auto text-gray-300 mb-2" /><p className="text-[13px] text-torg-gray">Adicione competências (Editar matriz) para qualificar os funcionários.</p></div>
             ) : funcionarios.length === 0 ? (
