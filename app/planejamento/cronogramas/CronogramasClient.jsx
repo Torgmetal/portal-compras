@@ -668,6 +668,28 @@ function SoloView({ soloCrono, soloId, detail, loadingDetail, onBack, onRefresh,
     }
   };
 
+  // Vincular o cronograma a uma OP aberta (passa a seguir Syneco/peso da obra).
+  const [vincOpen, setVincOpen] = useState(false);
+  const [vincOps, setVincOps] = useState(null);
+  const [vincSel, setVincSel] = useState("");
+  const [vincSaving, setVincSaving] = useState(false);
+  const abrirVincular = async () => {
+    setVincOpen(true);
+    if (vincOps === null) {
+      try { const r = await fetch("/api/planejamento/cronogramas/manual"); const j = await r.json(); setVincOps(j.ops || []); }
+      catch { setVincOps([]); }
+    }
+  };
+  const vincularOp = async () => {
+    if (!vincSel) return;
+    setVincSaving(true);
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${soloId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vincularOpId: vincSel }) });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || "Erro ao vincular"); }
+      setVincOpen(false); setVincSel(""); onRenamed();
+    } catch (e) { alert(e.message); } finally { setVincSaving(false); }
+  };
+
   return (
     <div className="space-y-4 max-w-7xl">
       <div className="flex items-center gap-3">
@@ -728,6 +750,26 @@ function SoloView({ soloCrono, soloId, detail, loadingDetail, onBack, onRefresh,
                   </div>
                 )}
                 {!editingTitulo && soloCrono.op && <span className="text-xs text-torg-gray shrink-0">({soloCrono.op.cliente})</span>}
+                {!editingTitulo && !soloCrono.op && (
+                  <div className="relative shrink-0">
+                    <button onClick={abrirVincular} className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-2 py-1 font-medium inline-flex items-center gap-1 hover:bg-torg-blue-50" title="Vincular a uma OP aberta pra o cronograma seguir o Syneco/peso da obra">
+                      <Milestone size={12} /> Vincular à OP
+                    </button>
+                    {vincOpen && (
+                      <div className="absolute z-30 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2.5 w-80">
+                        <p className="text-[10px] text-torg-gray mb-1.5 font-medium">Escolha a OP aberta pra vincular:</p>
+                        <select value={vincSel} onChange={(e) => setVincSel(e.target.value)} className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 mb-2 bg-white">
+                          <option value="">{vincOps === null ? "Carregando…" : "Selecione…"}</option>
+                          {(vincOps || []).map((o) => <option key={o.id} value={o.id}>{o.numero} — {o.cliente}{o.obra ? ` (${o.obra})` : ""}</option>)}
+                        </select>
+                        <div className="flex justify-end gap-1.5">
+                          <button onClick={() => setVincOpen(false)} className="text-xs text-torg-gray px-2 py-1 rounded hover:bg-gray-100">Cancelar</button>
+                          <button onClick={vincularOp} disabled={!vincSel || vincSaving} className="text-xs text-white bg-torg-blue px-2.5 py-1 rounded disabled:opacity-40 inline-flex items-center gap-1">{vincSaving && <Loader2 size={12} className="animate-spin" />} Vincular</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <h2 className="text-xl font-extrabold text-torg-dark tracking-tight">Cronograma</h2>

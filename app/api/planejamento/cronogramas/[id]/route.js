@@ -79,6 +79,7 @@ const patchSchema = z.object({
   tipoDias: z.enum(["DU", "DC"]).optional(),
   ativo: z.boolean().optional(), // false = encerrar, true = reabrir
   titulo: z.string().min(1).max(300).optional(),
+  vincularOpId: z.string().min(1).optional(), // vincula o cronograma a uma OP (segue Syneco/peso)
 });
 
 export async function PATCH(req, { params }) {
@@ -215,6 +216,21 @@ export async function PATCH(req, { params }) {
       diff: { campo: "tipoDias", antes: anterior, depois: parsed.data.tipoDias },
       createdById: user.id,
     });
+  }
+
+  // Vincular a uma OP — passa a seguir o Syneco/peso da obra (opId + opNumero da OP).
+  if (parsed.data.vincularOpId && parsed.data.vincularOpId !== cronograma.opId) {
+    const op = await prisma.oP.findUnique({ where: { id: parsed.data.vincularOpId }, select: { id: true, numero: true, obra: true } });
+    if (!op) return NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 });
+    ops.push(prisma.cronograma.update({ where: { id }, data: { opId: op.id, opNumero: op.numero } }));
+    revisoes.push({
+      cronogramaId: id,
+      tipo: "TAREFA_ALTERADA",
+      descricao: `Vinculado à OP-${op.numero}${op.obra ? " — " + op.obra : ""} por ${user.name || "usuário"}`,
+      diff: { opId: { antes: cronograma.opId, depois: op.id }, opNumero: { antes: cronograma.opNumero, depois: op.numero } },
+      createdById: user.id,
+    });
+    ops.push(prisma.auditLog.create({ data: { userId: user.id, action: "VINCULAR_OP_CRONOGRAMA", entity: "Cronograma", entityId: id, diff: { opNumero: op.numero } } }));
   }
 
   // Alterar datas do cronograma — bloqueado se baseline já definida
