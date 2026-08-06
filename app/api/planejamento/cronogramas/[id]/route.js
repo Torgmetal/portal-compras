@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { sincronizarCronogramaSyneco, avancoDaTarefa } from "@/lib/cronograma-syneco";
 
 export async function GET(req, { params }) {
   try {
@@ -43,6 +44,26 @@ export async function GET(req, { params }) {
 
   if (!cronograma) {
     return NextResponse.json({ success: false, error: "Cronograma nao encontrado" }, { status: 404 });
+  }
+
+  // Sincronismo automático: nas linhas de FABRICAÇÃO (Preparação/Montagem/Solda/Pintura/Jato/
+  // Acabamento, por área) o % vem sempre do Syneco (fonte da verdade), medido contra o escopo
+  // da lista emitida (rota real). Anexa também o histórico das baixas p/ a tela. Não derruba o
+  // cronograma se o Syneco falhar. Ver lib/cronograma-syneco.js.
+  if (cronograma.op?.id) {
+    try {
+      const sync = await sincronizarCronogramaSyneco(prisma, cronograma.op.id, cronograma.op.numero);
+      cronograma.tarefas = cronograma.tarefas.map((t) => {
+        const av = avancoDaTarefa(t, sync);
+        if (!av || av.realizado == null) return t; // não é fabricação, ou sem escopo (mantém manual)
+        return {
+          ...t,
+          percentualRealizado: av.realizado,
+          dataInicioReal: av.dataInicioReal || t.dataInicioReal,
+          syncSyneco: { escopoKg: av.escopoKg, produzidoKg: av.produzidoKg, baixas: av.baixas },
+        };
+      });
+    } catch { /* sincronismo é best-effort; não deve derrubar a carga do cronograma */ }
   }
 
   return NextResponse.json(cronograma);
