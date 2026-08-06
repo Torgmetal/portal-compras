@@ -69,6 +69,9 @@ export async function GET(req, { params }) {
   let pesoPlanejadoMes = 0;
   const porSetorMes = {};
   for (const g of mesGrupos) {
+    // "Preparação" é a mesma etapa que "Corte" (decisão do Vitor: considerar só Corte) — e no
+    // Syneco vem quase duplicada. Ignora a linha Preparação p/ não duplicar o corte.
+    if (/prepara/i.test(g.setor || "")) continue;
     const setor = g.setor || "Sem setor";
     pesoProduzidoMes += g._sum.pesoProduzido || 0;
     pesoPlanejadoMes += g._sum.pesoPlanejado || 0;
