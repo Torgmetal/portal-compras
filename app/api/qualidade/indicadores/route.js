@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { INDICADORES_ISO } from "@/lib/indicadores-iso";
 import { indicadoresQualidadeIso } from "@/lib/indicadores-qualidade-iso";
+import { indicadoresComercialIso } from "@/lib/indicadores-comercial-iso";
 
 export const runtime = "nodejs";
 
@@ -39,14 +40,12 @@ export async function GET(req) {
   const series = {}, acumulados = {}; // id -> [12] · id -> valor acumulado do ano
   const pct = (num, den) => (den > 0 ? Math.round((num / den) * 1000) / 10 : null);
 
-  // ── Comercial: conversão + aderência do prazo da proposta ──
-  const orcs = await prisma.orcamento.findMany({ where: { OR: [{ dataFechamento: { gte: yIni, lt: yFim } }, { dataEnvio: { gte: yIni, lt: yFim } }] }, select: { status: true, dataFechamento: true, dataEnvio: true, dataSolicitada: true } });
-  { const f = arr12(), t = arr12(); // conversão
-    for (const o of orcs) { if (!o.dataFechamento || o.dataFechamento < yIni || o.dataFechamento >= yFim) continue; if (o.status !== "FECHADA" && o.status !== "PERDIDA") continue; const m = o.dataFechamento.getUTCMonth(); t[m] = (t[m] || 0) + 1; if (o.status === "FECHADA") f[m] = (f[m] || 0) + 1; }
-    series.conversao_propostas = f.map((v, m) => pct(v || 0, t[m] || 0)); }
-  { const ok = arr12(), t = arr12(); const PRAZO = 5; // aderência prazo proposta (≤5 dias úteis)
-    for (const o of orcs) { if (!o.dataEnvio || !o.dataSolicitada || o.dataEnvio < yIni || o.dataEnvio >= yFim) continue; const m = o.dataEnvio.getUTCMonth(); t[m] = (t[m] || 0) + 1; if (diasUteis(o.dataSolicitada, o.dataEnvio) <= PRAZO) ok[m] = (ok[m] || 0) + 1; }
-    series.aderencia_prazo_proposta = ok.map((v, m) => pct(v || 0, t[m] || 0)); }
+  // ── Comercial: conversão + ciclo médio de vendas — LIDOS da planilha do Comercial (SharePoint),
+  // mesma fonte do painel /comercial/indicadores. Best-effort (não quebra o painel se a planilha falhar).
+  try {
+    const { indicadores: cInds } = await indicadoresComercialIso(ano);
+    for (const ci of cInds) { series[ci.id] = ci.serie; acumulados[ci.id] = ci.acumulado; }
+  } catch (e) { console.error("[qualidade] comercial:", e?.message); }
 
   // ── Engenharia: aderência do prazo do projeto (cronograma) ──
   { const tar = await prisma.cronogramaTarefa.findMany({ where: { departamento: "ENGENHARIA", dataFimReal: { gte: yIni, lt: yFim }, dataFimPrevista: { not: null } }, select: { dataFimReal: true, dataFimPrevista: true } });
