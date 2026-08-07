@@ -171,7 +171,6 @@ function Hub({ setTela }) {
             ) : (
               <EmptyBox titulo="Nada pendente na fábrica" texto="Assim que as OPs tiverem lista (LE/LPC) e apontamento no Syneco, as filas de cada setor aparecem aqui — em kg, por urgência." />
             )}
-            <AguardandoLista obras={dadosSetor?.aguardando} />
           </>
         ) : obras.length === 0 ? (
           <EmptyBox titulo="Nenhum cronograma ativo" texto="Crie/ative cronogramas em Planejamento → Cronogramas — as obras e etapas aparecem aqui automaticamente." />
@@ -292,7 +291,6 @@ function TelaSetorUnico({ tela, setTela }) {
             {ops.map((op) => <LinhaOp key={op.opNumero} op={op} />)}
           </div>
         )}
-        <AguardandoLista obras={dados?.aguardando} />
       </div>
     </div>
   );
@@ -301,12 +299,31 @@ function TelaSetorUnico({ tela, setTela }) {
 // Linha de OP no tema claro-Torg — leve, direta (posição · OP · barra · % · falta),
 // com uma linha discreta de peças (prioritárias em laranja, próximas em cinza).
 function LinhaOp({ op }) {
-  const cor = corBarra(op);
+  // Corte sem detalhamento (sem croqui) → linha de ALERTA, sem barra/peças.
+  if (op.estado === "SEM_LISTA") {
+    return (
+      <div className="bg-red-50 rounded-xl px-5 py-4 border border-red-200 shadow-[0_1px_3px_rgba(0,41,69,0.07)]">
+        <div className="flex items-center gap-4 flex-wrap">
+          <AlertTriangle size={26} className="text-red-500 shrink-0" />
+          <div className="min-w-[150px]">
+            <div className="text-[26px] font-extrabold text-torg-dark leading-none tabular-nums">OP-{op.opNumero}</div>
+            <div className="text-[13px] text-torg-gray truncate max-w-[280px]" title={op.obra}>{op.obra}</div>
+          </div>
+          <div className="flex-1 text-[15px] font-bold text-red-600">⚠ sem lista de corte — importar LE/LPC</div>
+          {op.entrega && (
+            <span className="text-[13px] text-red-600 inline-flex items-center gap-1"><CalendarClock size={13} /> {fmtData(op.entrega)}</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+  const semProg = op.estado === "SEM_PROGRAMACAO";
+  const cor = semProg && !(op.atrasoDias > 0) ? { bar: "bg-amber-400", pct: "text-amber-600" } : corBarra(op);
   const prio = op.prioritarias || [];
   const seq = (op.sequencia || []).slice(0, 4);
   const restam = (op.qtdPecas - op.qtdPrioritarias) - seq.length;
   return (
-    <div className="bg-white rounded-xl px-5 py-4 shadow-[0_1px_3px_rgba(0,41,69,0.07)]">
+    <div className={`rounded-xl px-5 py-4 shadow-[0_1px_3px_rgba(0,41,69,0.07)] ${semProg ? "bg-amber-50 border border-amber-200" : "bg-white"}`}>
       <div className="flex items-center gap-5 flex-wrap">
         <div className={`text-2xl font-extrabold w-9 shrink-0 ${op.ordem === 1 ? "text-torg-orange" : "text-torg-gray-light"}`}>{op.ordem}º</div>
         <div className="min-w-[150px]">
@@ -314,6 +331,7 @@ function LinhaOp({ op }) {
           <div className="text-[13px] text-torg-gray truncate max-w-[240px]" title={op.obra}>{op.obra}</div>
         </div>
         <div className="flex-1 min-w-[190px]">
+          {semProg && <div className="text-[12px] font-semibold text-amber-600 mb-1 inline-flex items-center gap-1"><CalendarClock size={12} /> falta programar o corte no cronograma</div>}
           <div className="h-[11px] rounded-full bg-torg-blue-50 overflow-hidden"><div className={`h-full rounded-full ${cor.bar}`} style={{ width: `${Math.min(100, op.pct)}%`, transition: "width .6s ease" }} /></div>
           <div className="flex items-center justify-between text-[13px] text-torg-gray mt-1.5">
             <span>falta <b className="text-torg-dark">{fmtKg(op.pendenteKg)}</b> · {op.qtdPecas} peças</span>
@@ -353,14 +371,19 @@ function LinhaOp({ op }) {
 
 function LaneSetor({ lane, onAbrir }) {
   const acc = LANE_ACC[lane.setor] || "#006EAB";
+  const nAlerta = lane.ops.filter((o) => o.estado === "SEM_LISTA").length;
+  const nFila = lane.ops.length - nAlerta;
   return (
     <div className="min-w-[250px] max-w-[250px] bg-white rounded-xl border border-torg-blue-100 shadow-[0_1px_3px_rgba(0,41,69,0.06)] p-3 flex flex-col gap-2" style={{ borderTopColor: acc, borderTopWidth: 3 }}>
       <button onClick={onAbrir} className="text-left group" title={`Abrir ${lane.label} em tela cheia`}>
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-extrabold uppercase tracking-wide text-torg-dark truncate group-hover:text-torg-blue">{lane.label}</span>
-          <span className="text-[11px] text-torg-gray-light shrink-0 inline-flex items-center gap-1">{lane.ops.length} OP{lane.ops.length !== 1 ? "s" : ""} <Maximize size={11} className="opacity-40 group-hover:opacity-100" /></span>
+          <span className="text-[11px] text-torg-gray-light shrink-0 inline-flex items-center gap-1">{nFila} OP{nFila !== 1 ? "s" : ""} <Maximize size={11} className="opacity-40 group-hover:opacity-100" /></span>
         </div>
-        <div className="text-[11px] text-torg-gray mt-0.5">fila {fmtKg(lane.filaKg)}{lane.setor === "CORTE" ? " · meta 6.000 kg/dia" : ""}</div>
+        <div className="text-[11px] text-torg-gray mt-0.5">
+          fila {fmtKg(lane.filaKg)}{lane.setor === "CORTE" ? " · meta 6.000 kg/dia" : ""}
+          {nAlerta > 0 && <span className="text-red-600 font-semibold"> · {nAlerta} sem lista</span>}
+        </div>
       </button>
       {lane.ops.length ? (
         lane.ops.map((op, i) => <OpMini key={`${op.opNumero}-${i}`} op={op} />)
@@ -372,9 +395,28 @@ function LaneSetor({ lane, onAbrir }) {
 }
 
 function OpMini({ op }) {
-  const cor = corBarra(op);
+  // Corte sem detalhamento (sem croqui) → cartão de ALERTA, sem barra.
+  if (op.estado === "SEM_LISTA") {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
+        <div className="flex items-center gap-1.5">
+          <AlertTriangle size={13} className="text-red-500 shrink-0" />
+          <span className="text-base font-extrabold tabular-nums text-torg-dark">OP-{op.opNumero}</span>
+          {op.entrega && (
+            <span className="ml-auto text-[11px] whitespace-nowrap inline-flex items-center gap-0.5 text-red-600">
+              <CalendarClock size={10} /> {fmtData(op.entrega)}
+            </span>
+          )}
+        </div>
+        <div className="text-[11px] text-torg-gray truncate mt-0.5 ml-[22px]" title={op.obra}>{op.obra}</div>
+        <div className="text-[11px] font-semibold text-red-600 mt-1 ml-[22px]">⚠ sem lista de corte</div>
+      </div>
+    );
+  }
+  const semProg = op.estado === "SEM_PROGRAMACAO";
+  const cor = semProg && !(op.atrasoDias > 0) ? { bar: "bg-amber-400", pct: "text-amber-600" } : corBarra(op);
   return (
-    <div className="bg-[#F7F9FB] border border-torg-blue-50 rounded-lg p-2.5">
+    <div className={`rounded-lg p-2.5 border ${semProg ? "bg-amber-50 border-amber-200" : "bg-[#F7F9FB] border-torg-blue-50"}`}>
       <div className="flex items-center gap-1.5">
         <span className={`text-[11px] font-extrabold w-5 shrink-0 ${op.ordem === 1 ? "text-torg-orange" : "text-torg-gray-light"}`}>{op.ordem}º</span>
         <span className="text-base font-extrabold tabular-nums text-torg-dark">OP-{op.opNumero}</span>
@@ -387,6 +429,7 @@ function OpMini({ op }) {
         </span>
       </div>
       <div className="text-[11px] text-torg-gray truncate mt-0.5 ml-[26px]" title={op.obra}>{op.obra}</div>
+      {semProg && <div className="text-[10px] font-semibold text-amber-600 mt-1 ml-[26px] inline-flex items-center gap-1"><CalendarClock size={10} /> falta programar o corte</div>}
       <div className="h-1.5 rounded-full bg-torg-blue-50 overflow-hidden mt-1.5">
         <div className={`h-full rounded-full ${cor.bar}`} style={{ width: `${Math.min(100, op.pct)}%`, transition: "width .6s ease" }} />
       </div>
@@ -462,24 +505,6 @@ function SetorLinha({ s }) {
       {s.setor === "FABRICACAO" && s.unificada && !s.concluida && (
         <p className="text-[10px] text-torg-gray-light mt-1">Unificada · ~{s.duracaoFab || "?"} dia{s.duracaoFab === 1 ? "" : "s"} de execução na produção</p>
       )}
-    </div>
-  );
-}
-
-function AguardandoLista({ obras }) {
-  if (!obras || !obras.length) return null;
-  return (
-    <div className="mt-5 rounded-xl border border-torg-orange-200 bg-torg-orange-50 p-3">
-      <div className="flex items-center gap-2 text-torg-orange-700 text-sm font-semibold mb-2">
-        <AlertTriangle size={15} /> {obras.length} obra{obras.length > 1 ? "s" : ""} com cronograma aguardando lista (LE/LPC)
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {obras.map((o) => (
-          <span key={o.opNumero} className="text-xs px-2.5 py-1 rounded-lg bg-white border border-torg-orange-100 text-torg-dark">
-            <b className="tabular-nums">OP-{o.opNumero}</b> <span className="text-torg-gray">{o.obra}</span>{o.entrega ? <span className="text-torg-orange-700"> · {fmtData(o.entrega)}</span> : null}
-          </span>
-        ))}
-      </div>
     </div>
   );
 }

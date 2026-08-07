@@ -4,7 +4,7 @@
 // com a tela de um setor só).
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
-import { FLUXO_SETORES, progressoPorSetor, entregaDoSetor } from "@/lib/prioridades-setor";
+import { FLUXO_SETORES, progressoPorSetor, entregaDoSetor, progressoMontagemMontavel, temDetalheCorte } from "@/lib/prioridades-setor";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
 
 export const runtime = "nodejs";
@@ -27,27 +27,50 @@ export async function GET() {
 
   const { porObra, now } = await carregarPrioridadesPorObra();
 
-  const obras = porObra.map((o) => ({ ...o, setores: progressoPorSetor(o.universo, o.realMap) }));
+  // Progresso por setor de cada obra. MONTAGEM conta só os conjuntos montáveis (croquis já
+  // cortados); guardamos temDetalhe pra tratar o Corte sem lista (alerta).
+  const obras = porObra.map((o) => {
+    const setores = progressoPorSetor(o.universo, o.realMap);
+    const mi = setores.findIndex((x) => x.setor === "MONTAGEM");
+    if (mi >= 0) setores[mi] = progressoMontagemMontavel(o.universo, o.realMap, o.links);
+    return { ...o, setores, temDetalhe: temDetalheCorte(o.universo) };
+  });
 
   const lanes = FLUXO_SETORES.map((s) => {
     const ops = [];
     for (const o of obras) {
+      const es = entregaDoSetor(o.datasSetor, s.key, o.entrega, now);
+      // Corte sem detalhamento (sem croqui) → ALERTA na raia, sem barra (nada pra cortar/rastrear).
+      if (s.key === "CORTE" && !o.temDetalhe) {
+        ops.push({
+          opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
+          entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor,
+          estado: "SEM_LISTA", totalKg: 0, feitoKg: 0, pendenteKg: 0, pct: null,
+        });
+        continue;
+      }
       const st = o.setores.find((x) => x.setor === s.key);
       if (!st || st.totalKg <= 0 || (st.pct != null && st.pct >= 100)) continue;
-      const es = entregaDoSetor(o.datasSetor, s.key, o.entrega, now);
+      // Corte com lista mas sem data de corte no cronograma → amarelo (falta programar).
+      const estado = s.key === "CORTE" ? (es.doSetor ? "FILA" : "SEM_PROGRAMACAO") : "FILA";
       ops.push({
         opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
-        entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor,
+        entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor, estado,
         totalKg: st.totalKg, feitoKg: st.feitoKg, pendenteKg: st.pendenteKg, pct: st.pct ?? 0,
       });
     }
-    ops.sort(ordenarUrgencia);
-    ops.forEach((op, i) => { op.ordem = i + 1; });
-    return { setor: s.key, label: s.label, filaKg: ops.reduce((acc, op) => acc + op.pendenteKg, 0), ops };
+    // Fila real por urgência; alertas (sem lista) por último.
+    ops.sort((a, b) => {
+      const aa = a.estado === "SEM_LISTA", bb = b.estado === "SEM_LISTA";
+      if (aa !== bb) return aa - bb;
+      return ordenarUrgencia(a, b);
+    });
+    let pos = 0;
+    ops.forEach((op) => { op.ordem = op.estado === "SEM_LISTA" ? null : ++pos; });
+    return { setor: s.key, label: s.label, filaKg: ops.reduce((acc, op) => acc + (op.pendenteKg || 0), 0), ops };
   });
 
-  // Obras com cronograma ativo mas SEM lista (LE/LPC) importada — não entram nas filas
-  // (não têm kg), mas ficam sinalizadas pra não serem esquecidas.
+  // Compat: lista de obras sem lista (agora também sinalizadas como alerta na raia do Corte).
   const aguardando = obrasAguardandoLista(porObra);
 
   return NextResponse.json({ lanes, aguardando, geradoEm: new Date().toISOString() });
