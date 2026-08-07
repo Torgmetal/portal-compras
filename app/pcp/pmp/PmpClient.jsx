@@ -29,6 +29,12 @@ const fmtPesoCell = (kg) => `${Math.round(kg).toLocaleString("pt-BR")} kg`;
 
 // Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
 const normObra = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
+// Setores da tabela "Datas por setor (cronograma)".
+const SETORES_CRONO = [
+  { k: "CORTE", l: "Corte" }, { k: "MONTAGEM", l: "Montagem" }, { k: "SOLDA", l: "Solda" },
+  { k: "ACABAMENTO", l: "Acabamento" }, { k: "JATO", l: "Jato" }, { k: "PINTURA", l: "Pintura" }, { k: "EXPEDICAO", l: "Expedição" },
+];
+const fmtDiaMes = (iso) => (iso ? new Date(iso + "T12:00:00Z").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—");
 
 // Seg–Sáb: a fábrica corta aos sábados — domingo fica de fora
 const DIAS_SEMANA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -251,6 +257,47 @@ export default function PmpClient() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Datas de produção por setor — puxadas do cronograma (mesmo sem lista importada) */}
+      {dados?.datasSetorCronograma && Object.keys(dados.datasSetorCronograma).length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2">
+            <CalendarDays size={15} className="text-torg-blue" />
+            <h3 className="text-sm font-bold text-torg-dark">Datas de produção por setor</h3>
+            <span className="text-[11px] text-torg-gray">do cronograma — data que precisa passar em cada setor, mesmo sem lista</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[760px]">
+              <thead className="bg-gray-50/60">
+                <tr>
+                  <th className="px-3 py-2 text-left text-[10px] font-medium text-gray-500 uppercase">Obra</th>
+                  {SETORES_CRONO.map((s) => <th key={s.k} className="px-2 py-2 text-center text-[10px] font-medium text-gray-500 uppercase">{s.l}</th>)}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {Object.entries(dados.datasSetorCronograma)
+                  .sort((a, b) => (a[1].CORTE?.inicio || "9").localeCompare(b[1].CORTE?.inicio || "9"))
+                  .map(([op, setores]) => {
+                    const sem = (dados.semLista || []).includes(op);
+                    return (
+                      <tr key={op} className={`hover:bg-gray-50 ${sem ? "bg-red-50/40" : ""}`}>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <span className={`font-mono font-bold ${sem ? "text-red-600" : "text-torg-blue"}`}>{fmtOP(op)}</span>
+                          {sem && <span className="ml-2 text-[9px] font-bold px-1.5 py-px rounded bg-red-100 text-red-700 uppercase tracking-wide" title="Data de produção definida no cronograma, mas a lista (LE/LPC) ainda não foi importada">sem lista</span>}
+                        </td>
+                        {SETORES_CRONO.map((s) => (
+                          <td key={s.k} className={`px-2 py-2 text-center tabular-nums ${setores[s.k] ? (sem ? "text-red-600 font-medium" : "text-torg-dark") : "text-gray-300"}`}>
+                            {fmtDiaMes(setores[s.k]?.inicio)}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

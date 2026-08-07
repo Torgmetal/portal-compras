@@ -98,6 +98,7 @@ export async function GET(req) {
   // projeto atrasado. Substitui o CORTE armazenado das OPs que têm cronograma (evita duplicar);
   // OPs com janela mas sem lista viram flag (o client marca em vermelho). Best-effort.
   let semLista = [];
+  let datasSetorCronograma = {};
   let metasFinal = metas;
   try {
     const cron = await metasCorteDoCronograma(prisma);
@@ -109,12 +110,14 @@ export async function GET(req) {
       ...metasCronSemana,
     ];
     semLista = Object.keys(cron.semLista);
+    datasSetorCronograma = cron.datasSetor;
   } catch (e) { console.error("[pmp] cronograma:", e?.message); }
 
   return NextResponse.json({
     semana: { inicio: seg.toISOString().split("T")[0], fim: dom.toISOString().split("T")[0] },
     metas: metasFinal,
     semLista,
+    datasSetorCronograma,
     realizado,
     realizadoCorteDia,
     realizadoCorteObras,
