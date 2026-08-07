@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { diaSyneco } from "@/lib/syneco-dia";
-import { carregarSolicitacoes } from "@/lib/solicitacao-producao";
 import { metasCorteDoCronograma, normOpPmp } from "@/lib/pmp-cronograma";
 
 // Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
@@ -91,10 +90,7 @@ export async function GET(req) {
     orderBy: { numero: "asc" },
   });
 
-  // 5) Demandas do Planejamento ainda pendentes (Solicitada) — somem ao virar Programada
-  const solicitacoes = await carregarSolicitacoes(["SOLICITADA"]);
-
-  // 6) CORTE puxado do CRONOGRAMA (por OP) — a data vem da Preparação planejada, mesmo com
+  // 5) CORTE puxado do CRONOGRAMA (por OP) — a data vem da Preparação planejada, mesmo com
   // projeto atrasado. Substitui o CORTE armazenado das OPs que têm cronograma (evita duplicar);
   // OPs com janela mas sem lista viram flag (o client marca em vermelho). Best-effort.
   let semLista = [];
@@ -122,7 +118,6 @@ export async function GET(req) {
     realizadoCorteDia,
     realizadoCorteObras,
     ops,
-    solicitacoes,
   });
 }
 
