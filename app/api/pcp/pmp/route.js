@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/session";
 import { z } from "zod";
 import { diaSyneco } from "@/lib/syneco-dia";
 import { carregarSolicitacoes } from "@/lib/solicitacao-producao";
+import { metasCorteDoCronograma, normOpPmp } from "@/lib/pmp-cronograma";
 
 // Normaliza código de obra pra casar Syneco × portal: "T60B"→"60B", "085"→"85"
 const normObra = (s) => String(s || "").toUpperCase().trim().replace(/^T/, "").replace(/^0+/, "") || "0";
@@ -93,9 +94,27 @@ export async function GET(req) {
   // 5) Demandas do Planejamento ainda pendentes (Solicitada) — somem ao virar Programada
   const solicitacoes = await carregarSolicitacoes(["SOLICITADA"]);
 
+  // 6) CORTE puxado do CRONOGRAMA (por OP) — a data vem da Preparação planejada, mesmo com
+  // projeto atrasado. Substitui o CORTE armazenado das OPs que têm cronograma (evita duplicar);
+  // OPs com janela mas sem lista viram flag (o client marca em vermelho). Best-effort.
+  let semLista = [];
+  let metasFinal = metas;
+  try {
+    const cron = await metasCorteDoCronograma(prisma);
+    const segIso = seg.toISOString().slice(0, 10), domIso = dom.toISOString().slice(0, 10);
+    const metasCronSemana = cron.metas.filter((m) => m.data >= segIso && m.data <= domIso);
+    const opsCron = new Set(Object.keys(cron.janela)); // OPs (normOpPmp) que puxam do cronograma
+    metasFinal = [
+      ...metas.filter((m) => !(m.setor === "CORTE" && opsCron.has(normOpPmp(m.opNumero)))),
+      ...metasCronSemana,
+    ];
+    semLista = Object.keys(cron.semLista);
+  } catch (e) { console.error("[pmp] cronograma:", e?.message); }
+
   return NextResponse.json({
     semana: { inicio: seg.toISOString().split("T")[0], fim: dom.toISOString().split("T")[0] },
-    metas,
+    metas: metasFinal,
+    semLista,
     realizado,
     realizadoCorteDia,
     realizadoCorteObras,

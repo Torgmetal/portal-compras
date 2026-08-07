@@ -83,6 +83,10 @@ export default function PmpClient() {
     for (const [norm, nomeObra] of Object.entries(dados.realizadoCorteObras || {})) {
       garantir(norm, nomeObra);
     }
+    // OPs com janela de corte no cronograma mas SEM lista importada → linha em vermelho.
+    for (const op of dados.semLista || []) {
+      garantir(normObra(op), op).semLista = true;
+    }
 
     const getReal = (norm, dia) => dados.realizadoCorteDia?.[`${dia}|${norm}`] || { pecas: 0, pesoKg: 0 };
 
@@ -96,7 +100,7 @@ export default function PmpClient() {
       }));
       const realPc = celulas.reduce((s, c) => s + c.realPc, 0);
       const realKg = celulas.reduce((s, c) => s + c.realKg, 0);
-      return { norm, obra: o.obra, celulas, metaPc: o.metaPc, metaKg: o.metaKg, realPc, realKg };
+      return { norm, obra: o.obra, celulas, metaPc: o.metaPc, metaKg: o.metaKg, realPc, realKg, semLista: !!o.semLista };
     }).sort((a, b) => (b.metaKg + b.realKg) - (a.metaKg + a.realKg));
 
     const totalDia = dias.map(({ data }, i) => ({
@@ -291,9 +295,10 @@ export default function PmpClient() {
                 {quadro.linhas.map((l) => {
                   const pct = l.metaKg > 0 ? Math.round((l.realKg / l.metaKg) * 100) : null;
                   return (
-                    <tr key={l.norm} className="hover:bg-gray-50/50">
+                    <tr key={l.norm} className={`hover:bg-gray-50/50 ${l.semLista ? "bg-red-50/40" : ""}`}>
                       <td className="px-4 py-2.5">
-                        <span className="font-mono font-bold text-torg-blue">{fmtOP(l.obra)}</span>
+                        <span className={`font-mono font-bold ${l.semLista ? "text-red-600" : "text-torg-blue"}`}>{fmtOP(l.obra)}</span>
+                        {l.semLista && <span className="ml-2 text-[9px] font-bold px-1.5 py-px rounded bg-red-100 text-red-700 uppercase tracking-wide" title="OP tem data de corte no cronograma mas a lista (LE/LPC) ainda não foi importada">sem lista</span>}
                       </td>
                       {l.celulas.map((c) => (
                         <td key={c.dia} className={`px-2 py-2 text-center ${c.dia === hojeIso ? "bg-torg-blue-50/40" : ""}`}>
