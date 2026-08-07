@@ -1230,7 +1230,7 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
           <span className="inline-flex items-center gap-1"><AlertTriangle size={10} className="text-orange-600" /> Vence nos próximos 30 dias</span>
           <span className="inline-flex items-center gap-1"><ShieldAlert size={10} className="text-red-600" /> Documento vencido</span>
           <span className="inline-flex items-center gap-1"><XCircle size={10} className="text-red-600" /> Documento ausente</span>
-          <span className="inline-flex items-center gap-1"><MinusCircle size={10} className="text-gray-500" /> Dispensado (não obrigatório p/ o funcionário — ex.: NR-10/NR-33)</span>
+          <span className="inline-flex items-center gap-1"><MinusCircle size={10} className="text-gray-500" /> Dispensado (NR não obrigatório p/ o funcionário — NR-10/12/33/35)</span>
         </div>
       </div>
     </div>

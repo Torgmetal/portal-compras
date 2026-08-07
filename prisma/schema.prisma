@@ -3966,13 +3966,13 @@ model RomaneioTerceiro {
 }
 
 // ── Dispensa de documento por funcionário (RH) ────────────────────────────────
-// Marca um documento dispensável (NR-10, NR-33) como NÃO obrigatório para um
-// funcionário específico — ele não acessa aquela atividade. No compliance o item
+// Marca um NR dispensável (NR-10, NR-12, NR-33, NR-35) como NÃO obrigatório para
+// um funcionário específico — ele não faz aquela atividade. No compliance o item
 // vira DISPENSADO (não conta como AUSENTE/pendência). Denormalizado (sem FK).
 model DocumentoDispensa {
   id            String   @id @default(cuid())
   funcionarioId String
-  tipo          String // NR_10 | NR_33 (tipos com dispensavel:true nas regras)
+  tipo          String // NR_10 | NR_12 | NR_33 | NR_35 (tipos com dispensavel:true)
   motivo        String?
   criadoPorId   String?
   criadoNome    String?
