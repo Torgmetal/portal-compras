@@ -7,6 +7,7 @@ import {
   FileSpreadsheet, CheckCircle2, XCircle, ClipboardCheck,
   ChevronRight, UserX, CircleAlert, BadgeCheck, Factory,
   Paperclip, Eye, Send, UploadCloud, Cloud, Pencil, Trash2,
+  MinusCircle, Undo2,
 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { upload } from "@vercel/blob/client";
@@ -916,6 +917,7 @@ const STATUS_ICON = {
   VENCIDO: { icon: ShieldAlert, cor: "text-red-600", bg: "bg-red-50", label: "Vencido" },
   VENCENDO: { icon: AlertTriangle, cor: "text-orange-600", bg: "bg-orange-50", label: "Vence em 30d" },
   AUSENTE: { icon: XCircle, cor: "text-red-600", bg: "bg-red-50", label: "Ausente" },
+  DISPENSADO: { icon: MinusCircle, cor: "text-gray-500", bg: "bg-gray-100", label: "Dispensado" },
 };
 
 function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFiltro, expandido, toggleExpandido, onRecarregar, onEnviar }) {
@@ -942,6 +944,18 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
   const { resumo, empresa } = compliance;
   const pctCor = (p) => p === 100 ? "text-emerald-600" : p >= 70 ? "text-yellow-600" : "text-red-600";
   const pctBg = (p) => p === 100 ? "bg-emerald-500" : p >= 70 ? "bg-yellow-500" : "bg-red-500";
+
+  // Dispensar / reverter um documento (NR-10, NR-33) por funcionário.
+  async function alterarDispensa(funcionarioId, tipo, dispensar) {
+    try {
+      const res = dispensar
+        ? await fetch("/api/rh/documentos/dispensa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ funcionarioId, tipo }) })
+        : await fetch(`/api/rh/documentos/dispensa?funcionarioId=${funcionarioId}&tipo=${tipo}`, { method: "DELETE" });
+      const j = await res.json();
+      if (!j.success) throw new Error(j.error || "Erro");
+      onRecarregar();
+    } catch (e) { alert(e.message); }
+  }
 
   return (
     <div className="space-y-6">
@@ -1096,6 +1110,11 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                         <AlertTriangle size={10} /> {f.vencendo}
                       </span>
                     )}
+                    {f.dispensados > 0 && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500" title="Documentos dispensados (não obrigatórios p/ este funcionário)">
+                        <MinusCircle size={10} /> {f.dispensados}
+                      </span>
+                    )}
                     {f.percentual === 100 && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
                         <BadgeCheck size={10} /> OK
@@ -1120,12 +1139,18 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                     {f.itens.map((item) => {
                       const st = STATUS_ICON[item.status];
                       const StIcon = st.icon;
+                      const dispensado = item.status === "DISPENSADO";
+                      const podeDispensar = item.regra.dispensavel && !dispensado && item.status !== "OK";
                       return (
-                        <div key={item.regra.tipo} className={`px-5 py-2.5 pl-12 flex items-center gap-3 ${item.status !== "OK" ? st.bg + "/40" : ""}`}>
+                        <div key={item.regra.tipo} className={`px-5 py-2.5 pl-12 flex items-center gap-3 ${item.status !== "OK" && !dispensado ? st.bg + "/40" : ""}`}>
                           <StIcon size={14} className={st.cor} />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-torg-dark">{item.regra.nome}</p>
-                            <p className="text-[10px] text-torg-gray">{item.regra.referenciaCCT}</p>
+                            <p className="text-[10px] text-torg-gray">
+                              {dispensado
+                                ? `Dispensado${item.dispensa?.criadoNome ? ` por ${item.dispensa.criadoNome}` : ""}${item.dispensa?.motivo ? ` · ${item.dispensa.motivo}` : ""}`
+                                : item.regra.referenciaCCT}
+                            </p>
                           </div>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${st.bg} ${st.cor}`}>
                             {st.label}
@@ -1134,6 +1159,20 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                             <span className="text-[10px] text-torg-gray tabular-nums hidden sm:block">
                               Val: {new Date(item.documento.dataValidade).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                             </span>
+                          )}
+                          {podeDispensar && (
+                            <button onClick={() => alterarDispensa(f.funcionario.id, item.regra.tipo, true)}
+                              title="Marcar como não obrigatório para este funcionário"
+                              className="text-[10px] font-semibold text-torg-gray hover:text-torg-dark border border-gray-200 hover:border-gray-300 rounded-full px-2 py-0.5 inline-flex items-center gap-1 whitespace-nowrap">
+                              <MinusCircle size={11} /> Dispensar
+                            </button>
+                          )}
+                          {dispensado && (
+                            <button onClick={() => alterarDispensa(f.funcionario.id, item.regra.tipo, false)}
+                              title="Voltar a exigir este documento"
+                              className="text-[10px] font-semibold text-torg-blue hover:text-torg-dark border border-torg-blue-100 hover:border-torg-blue rounded-full px-2 py-0.5 inline-flex items-center gap-1 whitespace-nowrap">
+                              <Undo2 size={11} /> Tornar obrigatório
+                            </button>
                           )}
                         </div>
                       );
@@ -1191,6 +1230,7 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
           <span className="inline-flex items-center gap-1"><AlertTriangle size={10} className="text-orange-600" /> Vence nos próximos 30 dias</span>
           <span className="inline-flex items-center gap-1"><ShieldAlert size={10} className="text-red-600" /> Documento vencido</span>
           <span className="inline-flex items-center gap-1"><XCircle size={10} className="text-red-600" /> Documento ausente</span>
+          <span className="inline-flex items-center gap-1"><MinusCircle size={10} className="text-gray-500" /> Dispensado (não obrigatório p/ o funcionário — ex.: NR-10/NR-33)</span>
         </div>
       </div>
     </div>

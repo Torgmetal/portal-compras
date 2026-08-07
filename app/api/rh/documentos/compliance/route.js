@@ -48,6 +48,16 @@ export async function GET() {
       },
     });
 
+    // Dispensas por funcionário (NR-10/NR-33 marcados como não obrigatórios).
+    const dispensasRows = await prisma.documentoDispensa.findMany({
+      select: { funcionarioId: true, tipo: true, motivo: true, criadoNome: true },
+    });
+    const dispensaMap = new Map(); // funcionarioId -> Map(tipo -> {motivo, criadoNome})
+    for (const d of dispensasRows) {
+      if (!dispensaMap.has(d.funcionarioId)) dispensaMap.set(d.funcionarioId, new Map());
+      dispensaMap.get(d.funcionarioId).set(d.tipo, { motivo: d.motivo, criadoNome: d.criadoNome });
+    }
+
     // ── Compliance por funcionário ──────────────────
     const porFuncionario = [];
     let totalPendencias = 0;
@@ -60,28 +70,37 @@ export async function GET() {
       const dispensado = dispensadoDocumentos(func.tipoContrato, setorNome);
       const regras = dispensado ? [] : regrasParaFuncionario(setorNome);
       const producao = !dispensado && isSetorProducao(setorNome);
+      const dispensasFunc = dispensaMap.get(func.id) || new Map();
       const itens = [];
 
       for (const regra of regras) {
+        const regraBase = {
+          tipo: regra.tipo,
+          nome: regra.nome,
+          categoria: regra.categoria,
+          validadeMeses: regra.validadeMeses,
+          referenciaCCT: regra.referenciaCCT,
+          dispensavel: !!regra.dispensavel,
+        };
+        // Documento dispensável marcado como não obrigatório p/ este funcionário.
+        if (regra.dispensavel && dispensasFunc.has(regra.tipo)) {
+          const info = dispensasFunc.get(regra.tipo);
+          itens.push({ regra: regraBase, encontrado: false, documento: null, status: "DISPENSADO", dispensa: info });
+          continue; // não conta como pendência nem no denominador
+        }
         const resultado = checarRegraDocumento(regra, func.documentos);
-        itens.push({
-          regra: {
-            tipo: regra.tipo,
-            nome: regra.nome,
-            categoria: regra.categoria,
-            validadeMeses: regra.validadeMeses,
-            referenciaCCT: regra.referenciaCCT,
-          },
-          ...resultado,
-        });
+        itens.push({ regra: regraBase, ...resultado });
         if (resultado.status !== "OK") totalPendencias++;
       }
 
-      const totalRegras = regras.length;
+      // DISPENSADO fica fora das contas (não é obrigatório).
+      const itensObrigatorios = itens.filter((i) => i.status !== "DISPENSADO");
+      const totalRegras = itensObrigatorios.length;
       const ok = itens.filter((i) => i.status === "OK").length;
       const ausentes = itens.filter((i) => i.status === "AUSENTE").length;
       const vencidos = itens.filter((i) => i.status === "VENCIDO").length;
       const vencendo = itens.filter((i) => i.status === "VENCENDO").length;
+      const dispensados = itens.filter((i) => i.status === "DISPENSADO").length;
 
       porFuncionario.push({
         funcionario: {
@@ -99,6 +118,7 @@ export async function GET() {
         ausentes,
         vencidos,
         vencendo,
+        dispensados,
         percentual: totalRegras > 0 ? Math.round((ok / totalRegras) * 100) : 100,
         itens,
         documentos: func.documentos.map((d) => ({
