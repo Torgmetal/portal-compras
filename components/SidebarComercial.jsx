@@ -19,12 +19,12 @@ const menu = [
       { href: "/comercial/orcamentos/servicos", label: "Propostas Serviço", icon: Wrench },
       { href: "/comercial/orcamentos/acompanhamento", label: "Acompanhamento", icon: CalendarClock },
       { href: "/comercial/orcamentos/pipeline", label: "Pipeline", icon: GitBranchPlus },
-      { href: "/comercial/orcamentos/kpis", label: "Indicadores", icon: BarChart3 },
+      { href: "/comercial/orcamentos/kpis", label: "KPIs de Vendas", icon: BarChart3 },
     ],
   },
-  { href: "/comercial/indicadores", label: "Indicadores ISO", icon: Gauge },
   { href: "/comercial/apresentacoes", label: "Apresentação ao Cliente", icon: Presentation },
   { href: "/comercial/aprovacoes", label: "Aprovações", icon: Inbox, masterOnly: true },
+  { href: "/comercial/indicadores", label: "Indicadores", icon: Gauge },
 ];
 
 export default function SidebarComercial() {

@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { BarChart3, PlusCircle, FolderKanban, Bell, Building2, Boxes, Layers, Truck, ClipboardList, RailSymbol, ShoppingCart, Forklift, Hammer, Star } from "lucide-react";
+import { Gauge, PlusCircle, FolderKanban, Bell, Building2, Boxes, Layers, Truck, ClipboardList, RailSymbol, ShoppingCart, Forklift, Hammer, Star } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -22,9 +22,9 @@ const menu = [
   { href: "/compras/estoque", label: "Estoque", icon: Boxes },
   { href: "/compras/materiais", label: "Materiais por OP", icon: Layers },
   { href: "/compras/vendorlist", label: "Vendor List", icon: Building2 },
-  { href: "/compras/indicadores", label: "Indicadores ISO", icon: BarChart3, exact: true },
   { href: "/compras/indicadores/fornecedores", label: "Avaliação Fornecedores (IQF)", icon: Star },
   { href: "/compras/notificacoes", label: "Notificações", icon: Bell, masterOnly: true },
+  { href: "/compras/indicadores", label: "Indicadores", icon: Gauge, exact: true },
 ];
 
 function SidebarNav() {
