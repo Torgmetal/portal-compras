@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/session";
 import { INDICADORES_ISO } from "@/lib/indicadores-iso";
 import { indicadoresQualidadeIso } from "@/lib/indicadores-qualidade-iso";
 import { indicadoresComercialIso } from "@/lib/indicadores-comercial-iso";
+import { indicadoresRhIso } from "@/lib/indicadores-rh-iso";
 
 export const runtime = "nodejs";
 
@@ -89,13 +90,11 @@ export async function GET(req) {
     for (const r of rncs) { if (engRe.test(r.processoArea || "")) { const m = r.data.getUTCMonth(); if (m <= mesFim) s[m] += 1; } }
     series.erros_projeto = s; }
 
-  // ── RH: atendimento das competências (snapshot, não mensal) ──
-  let atendimentoComp = null;
-  { const fs = await prisma.funcionario.findMany({ where: { ativo: true }, select: { competencias: { select: { competenciaId: true, nivelAtual: true } }, cargo: { select: { competencias: { select: { competenciaId: true, nivelEsperado: true } } } } } });
-    let avaliados = 0, atendidos = 0;
-    for (const f of fs) { const req = f.cargo?.competencias || []; if (!req.length) continue; const at = new Map(f.competencias.map((c) => [c.competenciaId, c.nivelAtual])); const comAval = req.filter((r) => at.has(r.competenciaId)); if (!comAval.length) continue; avaliados++; if (comAval.every((r) => (at.get(r.competenciaId) || 0) >= r.nivelEsperado)) atendidos++; }
-    atendimentoComp = avaliados > 0 ? Math.round((atendidos / avaliados) * 1000) / 10 : null;
-    series.atendimento_competencias = arr12().map((_, m) => (m === mes ? atendimentoComp : null)); }
+  // ── RH: atendimento das competências — DOCUMENTOS reais + dispensas, via lib de RH (mesma
+  // fonte do painel /rh/indicadores). Antes usava a matriz de competências e divergia. ──
+  { const { indicadores: rhInds } = await indicadoresRhIso(prisma, ano);
+    const at = rhInds.find((i) => i.id === "atendimento_competencias");
+    if (at) { series.atendimento_competencias = at.serie; acumulados.atendimento_competencias = at.acumulado; } }
 
   // Monta a resposta: cada indicador da config + série + valor do mês selecionado.
   const indicadores = INDICADORES_ISO.map((ind) => {

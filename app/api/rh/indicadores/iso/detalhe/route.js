@@ -56,7 +56,12 @@ export async function GET(req) {
   // Atendimento das competências — snapshot: colaboradores CLT e se têm todos os documentos
   // obrigatórios do setor em dia (RH Documentos + regras por setor/CCT).
   if (indicador === "atendimento_competencias") {
-    const fs = await prisma.funcionario.findMany({ where: { ativo: true }, select: { nome: true, tipoContrato: true, setor: { select: { nome: true } }, cargo: { select: { nome: true } }, documentos: { where: { ativo: true }, select: { tipo: true, dataValidade: true, ativo: true } } }, orderBy: { nome: "asc" } });
+    const [fs, dispRows] = await Promise.all([
+      prisma.funcionario.findMany({ where: { ativo: true }, select: { id: true, nome: true, tipoContrato: true, setor: { select: { nome: true } }, cargo: { select: { nome: true } }, documentos: { where: { ativo: true }, select: { tipo: true, dataValidade: true, ativo: true } } }, orderBy: { nome: "asc" } }),
+      prisma.documentoDispensa.findMany({ select: { funcionarioId: true, tipo: true } }),
+    ]);
+    const dispMap = new Map();
+    for (const d of dispRows) { if (!dispMap.has(d.funcionarioId)) dispMap.set(d.funcionarioId, new Set()); dispMap.get(d.funcionarioId).add(d.tipo); }
     const linhas = []; let comRegras = 0, atende = 0;
     for (const f of fs) {
       const setor = f.setor?.nome || "";
@@ -64,9 +69,12 @@ export async function GET(req) {
       const regras = regrasParaFuncionario(setor);
       if (!regras.length) continue;
       comRegras++;
-      const falta = regras.filter((rg) => { const st = checarRegraDocumento(rg, f.documentos).status; return st !== "OK" && st !== "VENCENDO"; }).length;
+      const disp = dispMap.get(f.id) || new Set();
+      // regras exigidas (desconta as dispensáveis marcadas como dispensadas p/ o funcionário)
+      const exigidas = regras.filter((rg) => !(rg.dispensavel && disp.has(rg.tipo)));
+      const falta = exigidas.filter((rg) => { const st = checarRegraDocumento(rg, f.documentos).status; return st !== "OK" && st !== "VENCENDO"; }).length;
       if (falta === 0) atende++;
-      linhas.push([f.nome, f.cargo?.nome || "—", falta === 0 ? "Atende (todos em dia)" : `Faltam ${falta} de ${regras.length}`]);
+      linhas.push([f.nome, f.cargo?.nome || "—", falta === 0 ? "Atende (todos em dia)" : `Faltam ${falta} de ${exigidas.length}`]);
     }
     const perc = comRegras > 0 ? Math.round((atende / comRegras) * 1000) / 10 : null;
     return NextResponse.json({ titulo: "Atendimento das Competências", colunas: ["Colaborador", "Cargo", "Documentos"], linhas, resumo: `${atende} de ${comRegras} colaborador(es) CLT com todos os documentos em dia${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}` });
