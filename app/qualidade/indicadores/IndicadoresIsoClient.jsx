@@ -190,7 +190,6 @@ function Card({ ind, mesFim, onAbrir, acum }) {
             </div>
             <Spark serie={ind.serie} meta={ind.meta} mesFim={mesFim} />
           </div>
-          {ind.fonte === "parcial" && ind.nota && <div className="text-[10.5px] text-amber-700 bg-amber-50 rounded px-2 py-1 inline-flex items-start gap-1"><Info size={11} className="mt-0.5 shrink-0" /> {ind.nota}</div>}
           {valor == null && <div className="text-[10.5px] text-torg-gray inline-flex items-center gap-1"><TrendingUp size={11} /> Sem dado {acum ? "no ano" : "no mês selecionado"}.</div>}
           {clicavel && <div className="text-[10.5px] text-torg-blue font-medium">ver registros {acum ? "do ano" : "do mês"} →</div>}
         </>
