@@ -7,7 +7,7 @@ export async function GET() {
   try {
     await requireRole(["ADMIN", "RH"]);
 
-    const setores = await prisma.setor.findMany({
+    const setoresTodos = await prisma.setor.findMany({
       where: { ativo: true },
       select: {
         id: true,
@@ -36,6 +36,10 @@ export async function GET() {
       },
       orderBy: { nome: "asc" },
     });
+
+    // Não mostra no organograma os setores sem colaboradores — exceto Compras, que é
+    // fundamental e fica visível mesmo vazio (Vitor 08/08).
+    const setores = setoresTodos.filter((s) => s.funcionarios.length > 0 || /compras/i.test(s.nome));
 
     // Contagem geral
     const totalFuncionarios = await prisma.funcionario.count({ where: { ativo: true } });
