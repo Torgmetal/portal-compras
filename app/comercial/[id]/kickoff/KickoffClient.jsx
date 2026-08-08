@@ -5,7 +5,7 @@ import {
   ArrowLeft, Loader2, AlertCircle, Save, Send, Printer, Sparkles,
   UploadCloud, FileText, X, Building2, Truck, Paintbrush, SearchCheck,
   Receipt, ClipboardList, AlertTriangle, CheckCircle2, Rocket,
-  CalendarRange, ListOrdered, Scale, Link2, Plus, Trash2, Wand2,
+  CalendarRange, ListOrdered, Scale, Link2, Plus, Trash2, Wand2, ChevronDown,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 
@@ -32,6 +32,7 @@ export default function KickoffClient({ opId }) {
   const [form, setForm] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [salvoEm, setSalvoEm] = useState(null);
+  const [pdfMenu, setPdfMenu] = useState(false);
   const [extraindo, setExtraindo] = useState(false);
   const [avisoIA, setAvisoIA] = useState("");
   const [pdfSubindo, setPdfSubindo] = useState(false);
@@ -298,11 +299,29 @@ export default function KickoffClient({ opId }) {
           <p className="text-sm text-torg-gray mt-1">{op.cliente}{op.obra ? ` · ${op.obra}` : ""} — alinhamento para divulgação aos setores.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={async () => { const ok = await salvar(); if (ok) window.open(`/comercial/${opId}/kickoff/imprimir`, "_blank"); }} disabled={salvando}
-            title="Salva e abre a versão limpa para gerar o PDF"
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 disabled:opacity-50">
-            <Printer size={15} /> Salvar PDF
-          </button>
+          <div className="relative">
+            <button onClick={() => setPdfMenu((v) => !v)} disabled={salvando}
+              title="Gera o PDF no padrão Torg — dois tipos (Kick Off e Fiscal)"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 disabled:opacity-50">
+              <Printer size={15} /> Salvar PDF <ChevronDown size={14} className={`transition-transform ${pdfMenu ? "rotate-180" : ""}`} />
+            </button>
+            {pdfMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setPdfMenu(false)} />
+                <div className="absolute right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                  <p className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-torg-gray-light">Dois tipos de Kick Off</p>
+                  <button onClick={async () => { setPdfMenu(false); const ok = await salvar(); if (ok) window.open(`/api/comercial/op/${opId}/kickoff/pdf?tipo=geral`, "_blank"); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-torg-dark hover:bg-torg-blue-50 text-left">
+                    <Rocket size={14} className="text-torg-orange shrink-0" /> <span><b>Kick Off</b> — setores (produção)</span>
+                  </button>
+                  <button onClick={async () => { setPdfMenu(false); const ok = await salvar(); if (ok) window.open(`/api/comercial/op/${opId}/kickoff/pdf?tipo=fiscal`, "_blank"); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-torg-dark hover:bg-torg-blue-50 text-left">
+                    <FileText size={14} className="text-torg-blue shrink-0" /> <span><b>Fiscal &amp; Financeiro</b></span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button onClick={() => salvar()} disabled={salvando}
             className="inline-flex items-center gap-2 px-4 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium disabled:opacity-50">
             {salvando ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
