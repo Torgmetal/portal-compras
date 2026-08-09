@@ -9,7 +9,7 @@ import {
   checarRegraDocumento,
   dispensadoDocumentos,
 } from "@/lib/regras-documentos";
-import { documentosDeProntuarioSeguro } from "@/lib/prontuario-certificados";
+import { documentosDeProntuarioSeguro, mesclarDocs } from "@/lib/prontuario-certificados";
 
 export const maxDuration = 60;
 
@@ -79,8 +79,8 @@ export async function GET() {
       const regras = dispensado ? [] : regrasParaFuncionario(setorNome);
       const producao = !dispensado && isSetorProducao(setorNome);
       const dispensasFunc = dispensaMap.get(func.id) || new Map();
-      // documentos do RH + certificados do prontuário (mesma forma → checarRegraDocumento)
-      const docsFunc = [...func.documentos, ...(docsPorFunc.get(func.id) || [])];
+      // documentos do RH + certificados do prontuário (complementa lacunas, não duplica tipo)
+      const docsFunc = mesclarDocs(func.documentos, docsPorFunc.get(func.id));
       const itens = [];
 
       for (const regra of regras) {

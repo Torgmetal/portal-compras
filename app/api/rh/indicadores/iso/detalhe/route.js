@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { regrasParaFuncionario, checarRegraDocumento, dispensadoDocumentos } from "@/lib/regras-documentos";
-import { documentosDeProntuarioSeguro } from "@/lib/prontuario-certificados";
+import { documentosDeProntuarioSeguro, mesclarDocs } from "@/lib/prontuario-certificados";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -76,7 +76,7 @@ export async function GET(req) {
       if (!regras.length) continue;
       comRegras++;
       const disp = dispMap.get(f.id) || new Set();
-      const docsF = [...f.documentos, ...(docsProntuario.get(f.id) || [])]; // RH + prontuário
+      const docsF = mesclarDocs(f.documentos, docsProntuario.get(f.id)); // RH + prontuário (complementa)
       // regras exigidas (desconta as dispensáveis marcadas como dispensadas p/ o funcionário)
       const exigidas = regras.filter((rg) => !(rg.dispensavel && disp.has(rg.tipo)));
       const falta = exigidas.filter((rg) => { const st = checarRegraDocumento(rg, docsF).status; return st !== "OK" && st !== "VENCENDO"; }).length;
