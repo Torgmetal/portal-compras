@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   GraduationCap, Search, PlusCircle, Loader2, AlertCircle, X,
-  ChevronDown, Clock, DollarSign, Users, BookOpen, Shield,
+  ChevronDown, Shield,
 } from "lucide-react";
 
 const TIPOS = [
@@ -177,14 +177,6 @@ export default function TreinamentosClient() {
   };
 
   // KPIs
-  const kpis = useMemo(() => {
-    const total = treinamentos.length;
-    const horasTotais = treinamentos.reduce((acc, t) => acc + (Number(t.cargaHoraria) || 0), 0);
-    const investimento = treinamentos.reduce((acc, t) => acc + (Number(t.custo) || 0), 0);
-    const participantes = treinamentos.reduce((acc, t) => acc + (t._count?.participantes || 0), 0);
-    return { total, horasTotais, investimento, participantes };
-  }, [treinamentos]);
-
   // Anos disponíveis
   const anos = useMemo(() => {
     const a = [];
@@ -233,56 +225,6 @@ export default function TreinamentosClient() {
           </button>
         </div>
       )}
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-torg-blue/10">
-              <BookOpen size={20} className="text-torg-blue" />
-            </div>
-            <div>
-              <p className="text-xs text-torg-gray font-medium uppercase tracking-wider">Total de Treinamentos</p>
-              <p className="text-2xl font-bold text-torg-dark">{kpis.total}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-purple-100">
-              <Clock size={20} className="text-purple-700" />
-            </div>
-            <div>
-              <p className="text-xs text-torg-gray font-medium uppercase tracking-wider">Horas de Capacitação</p>
-              <p className="text-2xl font-bold text-torg-dark">
-                {kpis.horasTotais.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}h
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-green-100">
-              <DollarSign size={20} className="text-green-700" />
-            </div>
-            <div>
-              <p className="text-xs text-torg-gray font-medium uppercase tracking-wider">Investimento Total</p>
-              <p className="text-2xl font-bold text-torg-dark">{fmtMoeda(kpis.investimento)}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-amber-100">
-              <Users size={20} className="text-amber-700" />
-            </div>
-            <div>
-              <p className="text-xs text-torg-gray font-medium uppercase tracking-wider">Participantes</p>
-              <p className="text-2xl font-bold text-torg-dark">{kpis.participantes}</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Filtros */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
