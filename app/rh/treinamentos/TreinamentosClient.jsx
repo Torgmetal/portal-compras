@@ -61,6 +61,11 @@ export default function TreinamentosClient() {
   const [carregandoFunc, setCarregandoFunc] = useState(false);
   const [buscaFunc, setBuscaFunc] = useState("");
 
+  // Certificados dos prontuários (SharePoint), agrupados por NR — pra mostrar quem fez cada treino
+  const [certPorNr, setCertPorNr] = useState({});
+  const [carregandoCerts, setCarregandoCerts] = useState(true);
+  const [certDetalhe, setCertDetalhe] = useState(null); // treinamento clicado
+
   // Carregar treinamentos
   const carregar = async () => {
     setCarregando(true);
@@ -82,6 +87,19 @@ export default function TreinamentosClient() {
   };
 
   useEffect(() => { carregar(); }, [filtroTipo, filtroAno]);
+
+  // Certificados dos prontuários (uma vez) — pra saber quem fez cada NR
+  useEffect(() => {
+    (async () => {
+      setCarregandoCerts(true);
+      try {
+        const r = await fetch("/api/rh/treinamentos/certificados");
+        const j = await r.json();
+        if (r.ok) setCertPorNr(j.porNr || {});
+      } catch { /* silencioso — a aba funciona sem os certificados */ }
+      finally { setCarregandoCerts(false); }
+    })();
+  }, []);
 
   // Carregar funcionários ao abrir modal
   const carregarFuncionarios = async () => {
@@ -289,15 +307,17 @@ export default function TreinamentosClient() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">NR</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Data</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Carga Horária</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Participantes</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Concluíram</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Custo</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {treinamentos.map((t) => {
                   const tipo = tipoMap[t.tipo] || { label: t.tipo, cor: "bg-gray-100 text-gray-700" };
+                  const certs = certPorNr[t.nrRelacionada] || [];
                   return (
-                    <tr key={t.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={t.id} onClick={() => setCertDetalhe(t)} title="Ver quem concluiu (certificados na pasta)"
+                      className="hover:bg-torg-blue-50/40 transition-colors cursor-pointer">
                       <td className="px-4 py-3">
                         <div>
                           <span className="font-medium text-torg-dark">{t.titulo}</span>
@@ -321,8 +341,10 @@ export default function TreinamentosClient() {
                       <td className="px-4 py-3 text-right text-xs text-torg-dark tabular-nums">
                         {Number(t.cargaHoraria).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}h
                       </td>
-                      <td className="px-4 py-3 text-right text-xs text-torg-dark tabular-nums">
-                        {t._count?.participantes || 0}
+                      <td className="px-4 py-3 text-right text-xs tabular-nums">
+                        {carregandoCerts ? <span className="text-torg-gray-light">…</span>
+                          : certs.length > 0 ? <span className="inline-flex items-center gap-1 text-torg-blue font-semibold">{certs.length}<span className="text-[10px] font-normal text-torg-gray">ver →</span></span>
+                          : <span className="text-torg-gray-light">0</span>}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-torg-dark tabular-nums">
                         {fmtMoeda(t.custo)}
@@ -606,6 +628,56 @@ export default function TreinamentosClient() {
           </div>
         </div>
       )}
+
+      {/* Modal: quem concluiu o treinamento (certificados dos prontuários) */}
+      {certDetalhe && (() => {
+        const certs = certPorNr[certDetalhe.nrRelacionada] || [];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setCertDetalhe(null)}>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between p-4 border-b border-gray-100">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-torg-dark truncate">{certDetalhe.titulo}</h3>
+                  <p className="text-xs text-torg-gray mt-0.5">{certDetalhe.nrRelacionada || "—"} · quem concluiu (certificados no prontuário do colaborador)</p>
+                </div>
+                <button onClick={() => setCertDetalhe(null)} className="p-1.5 rounded-lg hover:bg-gray-100 shrink-0"><X size={18} /></button>
+              </div>
+              <div className="p-4 overflow-y-auto">
+                {carregandoCerts ? (
+                  <div className="flex items-center gap-2 text-torg-gray py-10 justify-center"><Loader2 size={18} className="animate-spin" /> Buscando certificados na pasta…</div>
+                ) : certs.length === 0 ? (
+                  <div className="text-center text-torg-gray py-10">
+                    <p className="font-medium text-torg-dark">Nenhum certificado dessa NR nos prontuários.</p>
+                    <p className="text-xs mt-1">Só aparecem os colaboradores que já têm pasta de prontuário no SharePoint (TORG + VMI).</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-torg-gray mb-2">{certs.length} colaborador{certs.length === 1 ? "" : "es"} com certificado</p>
+                    <table className="w-full text-sm">
+                      <thead><tr className="text-left text-[11px] uppercase text-gray-400 border-b border-gray-100">
+                        <th className="py-2">Colaborador</th><th className="py-2">Cargo / Setor</th><th className="py-2 text-right whitespace-nowrap">Data do certificado</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {certs.map((c, i) => (
+                          <tr key={i}>
+                            <td className="py-2 pr-2">
+                              <span className="font-medium text-torg-dark">{c.nome}</span>
+                              {!c.vinculado && <span className="ml-1.5 text-[9px] text-amber-700 bg-amber-50 rounded px-1 py-0.5">sem cadastro</span>}
+                              <span className="ml-1.5 text-[9px] text-gray-400">{c.empresa}</span>
+                            </td>
+                            <td className="py-2 pr-2 text-xs text-torg-gray">{[c.cargo, c.setor].filter(Boolean).join(" · ") || "—"}</td>
+                            <td className="py-2 text-right text-xs text-torg-dark tabular-nums whitespace-nowrap">{c.data ? fmtData(c.data) : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
