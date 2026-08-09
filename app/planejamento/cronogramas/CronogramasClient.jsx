@@ -207,6 +207,10 @@ export default function CronogramasClient({ soloId }) {
             {syncing ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
             {syncing ? "Sincronizando..." : "Sincronizar SharePoint"}
           </button>
+          <a href="/planejamento/config-expedicao" title="Itens que NÃO contam como estrutura no % de expedição (grade de piso, telha, steel deck…)"
+            className="px-3 py-2 text-torg-gray hover:text-torg-blue text-xs rounded-lg hover:bg-gray-100 font-medium flex items-center gap-1.5 border border-gray-200">
+            <List size={14} /> Itens fora da estrutura
+          </a>
           <button onClick={carregar} className="p-2 text-torg-gray hover:text-torg-blue rounded-lg hover:bg-gray-100">
             <RefreshCw size={16} />
           </button>
