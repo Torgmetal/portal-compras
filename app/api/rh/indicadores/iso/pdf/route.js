@@ -7,6 +7,7 @@ import { indicadoresRhIso } from "@/lib/indicadores-rh-iso";
 import { gerarIndicadoresIsoPDF } from "@/lib/indicadores-iso-pdf";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(req) {
   try { await requireRole(["ADMIN", "RH"]); }

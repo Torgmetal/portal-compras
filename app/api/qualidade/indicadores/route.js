@@ -11,6 +11,7 @@ import { indicadoresComercialIso } from "@/lib/indicadores-comercial-iso";
 import { indicadoresRhIso } from "@/lib/indicadores-rh-iso";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const MS = 86400000;
 const diasUteis = (a, b) => {

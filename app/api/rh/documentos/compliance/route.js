@@ -9,7 +9,7 @@ import {
   checarRegraDocumento,
   dispensadoDocumentos,
 } from "@/lib/regras-documentos";
-import { documentosDeProntuario } from "@/lib/prontuario-certificados";
+import { documentosDeProntuarioSeguro } from "@/lib/prontuario-certificados";
 
 export const maxDuration = 60;
 
@@ -62,14 +62,9 @@ export async function GET() {
     // Certificados do Prontuário Eletrônico (SharePoint) entram como documentos da CCT:
     // treinamentos NR-12 / NR-35 / Integração / Ficha EPI passam a contar na conformidade
     // (validade = data do certificado + reciclagem da NR). Fonte única de treinamentos.
-    let docsPorFunc = new Map(), comProntuario = new Set();
-    try {
-      ({ docsPorFunc, comProntuario } = await documentosDeProntuario(
-        funcionarios.map((f) => ({ id: f.id, nome: f.nome }))
-      ));
-    } catch (err) {
-      console.error("Prontuário indisponível (compliance segue só com docs do RH):", err?.message);
-    }
+    const { docsPorFunc, comProntuario } = await documentosDeProntuarioSeguro(
+      funcionarios.map((f) => ({ id: f.id, nome: f.nome }))
+    );
 
     // ── Compliance por funcionário ──────────────────
     const porFuncionario = [];

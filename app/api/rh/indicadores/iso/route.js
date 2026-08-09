@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/session";
 import { indicadoresRhIso } from "@/lib/indicadores-rh-iso";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(req) {
   try { await requireRole(["ADMIN", "RH"]); }

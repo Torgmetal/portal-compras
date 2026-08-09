@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { regrasParaFuncionario, checarRegraDocumento, dispensadoDocumentos } from "@/lib/regras-documentos";
-import { documentosDeProntuario } from "@/lib/prontuario-certificados";
+import { documentosDeProntuarioSeguro } from "@/lib/prontuario-certificados";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -65,9 +65,8 @@ export async function GET(req) {
     const dispMap = new Map();
     for (const d of dispRows) { if (!dispMap.has(d.funcionarioId)) dispMap.set(d.funcionarioId, new Set()); dispMap.get(d.funcionarioId).add(d.tipo); }
     // Certificados do prontuário como documentos + cobertura "só quem já está no prontuário".
-    let docsProntuario = new Map(), comProntuario = new Set(), prontuarioOk = true;
-    try { ({ docsPorFunc: docsProntuario, comProntuario } = await documentosDeProntuario(fs.map((f) => ({ id: f.id, nome: f.nome })))); }
-    catch (err) { prontuarioOk = false; console.error("Prontuário indisponível (detalhe atendimento):", err?.message); }
+    const { docsPorFunc: docsProntuario, comProntuario, ok: prontuarioOk } =
+      await documentosDeProntuarioSeguro(fs.map((f) => ({ id: f.id, nome: f.nome })));
     const linhas = []; let comRegras = 0, atende = 0;
     for (const f of fs) {
       const setor = f.setor?.nome || "";
