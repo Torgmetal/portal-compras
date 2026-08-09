@@ -960,7 +960,7 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
   return (
     <div className="space-y-6">
       {/* KPI Compliance */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
             <div className={`w-3 h-3 rounded-full ${pctBg(resumo.percentualGeral)}`} />
@@ -984,6 +984,12 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
           <p className={`text-3xl font-extrabold ${resumo.empresa.pendentes > 0 ? "text-amber-700" : "text-emerald-700"}`}>{resumo.empresa.percentual}%</p>
           <p className={`text-[10px] uppercase tracking-wider mt-1 ${resumo.empresa.pendentes > 0 ? "text-amber-600" : "text-emerald-600"}`}>Empresa</p>
         </div>
+        {resumo.prontuario && (
+          <div className="bg-sky-50 rounded-xl p-4 text-center" title="Conformidade de quem já está no Prontuário Eletrônico — os certificados da pasta (NR-12, NR-35, Integração, Ficha EPI) contam como documento.">
+            <p className="text-3xl font-extrabold text-sky-700">{resumo.prontuario.percentual}%</p>
+            <p className="text-[10px] text-sky-600 uppercase tracking-wider mt-1">Prontuário ({resumo.prontuario.comProntuario})</p>
+          </div>
+        )}
       </div>
 
       {/* Documentos da Empresa */}
@@ -1070,6 +1076,12 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                       {f.funcionario.producao && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-100 text-indigo-700">
                           <Factory size={9} /> Produção
+                        </span>
+                      )}
+                      {f.funcionario.temProntuario && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-sky-100 text-sky-700"
+                          title="Já tem Prontuário Eletrônico — os certificados da pasta contam na conformidade">
+                          <Cloud size={9} /> Prontuário
                         </span>
                       )}
                       {f.funcionario.dispensado && (
@@ -1195,6 +1207,11 @@ function CompliancePanel({ compliance, carregando, funcionarios, filtro, setFilt
                                       <FileText size={13} className="text-torg-gray shrink-0" />
                                       <span className="flex-1 min-w-0 truncate text-torg-dark" title={d.nome}>{d.nome}</span>
                                       <span className="text-[10px] text-torg-gray shrink-0 hidden sm:block">{TIPO_LABEL[d.tipo] || d.tipo}</span>
+                                      {d.origem === "prontuario" && (
+                                        <span className="inline-flex items-center gap-0.5 shrink-0 text-[9px] font-bold text-sky-700 bg-sky-50 rounded px-1 py-0.5" title="Certificado lido do Prontuário Eletrônico (SharePoint) — validade = data do certificado + reciclagem da NR">
+                                          <Cloud size={9} /> prontuário
+                                        </span>
+                                      )}
                                       {d.temArquivo && (
                                         <span className="flex items-center gap-0.5 shrink-0">
                                           <a href={`/api/rh/documentos/${d.id}/download?inline=1`} target="_blank" rel="noopener noreferrer" title="Ver" className="p-1 rounded text-torg-blue hover:bg-torg-blue-50"><Eye size={13} /></a>
