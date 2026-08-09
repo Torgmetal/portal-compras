@@ -4,8 +4,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { regrasParaFuncionario, checarRegraDocumento, dispensadoDocumentos } from "@/lib/regras-documentos";
+import { documentosDeProntuario } from "@/lib/prontuario-certificados";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const NAT = { DOENCA: "Doença", ACIDENTE: "Acidente de trabalho", MATERNIDADE: "Maternidade", OUTROS: "Outros" };
@@ -62,22 +64,28 @@ export async function GET(req) {
     ]);
     const dispMap = new Map();
     for (const d of dispRows) { if (!dispMap.has(d.funcionarioId)) dispMap.set(d.funcionarioId, new Set()); dispMap.get(d.funcionarioId).add(d.tipo); }
+    // Certificados do prontuário como documentos + cobertura "só quem já está no prontuário".
+    let docsProntuario = new Map(), comProntuario = new Set(), prontuarioOk = true;
+    try { ({ docsPorFunc: docsProntuario, comProntuario } = await documentosDeProntuario(fs.map((f) => ({ id: f.id, nome: f.nome })))); }
+    catch (err) { prontuarioOk = false; console.error("Prontuário indisponível (detalhe atendimento):", err?.message); }
     const linhas = []; let comRegras = 0, atende = 0;
     for (const f of fs) {
       const setor = f.setor?.nome || "";
       if (dispensadoDocumentos(f.tipoContrato, setor)) continue;
+      if (prontuarioOk && !comProntuario.has(f.id)) continue; // cobertura: só quem já está no Prontuário (se disponível)
       const regras = regrasParaFuncionario(setor);
       if (!regras.length) continue;
       comRegras++;
       const disp = dispMap.get(f.id) || new Set();
+      const docsF = [...f.documentos, ...(docsProntuario.get(f.id) || [])]; // RH + prontuário
       // regras exigidas (desconta as dispensáveis marcadas como dispensadas p/ o funcionário)
       const exigidas = regras.filter((rg) => !(rg.dispensavel && disp.has(rg.tipo)));
-      const falta = exigidas.filter((rg) => { const st = checarRegraDocumento(rg, f.documentos).status; return st !== "OK" && st !== "VENCENDO"; }).length;
+      const falta = exigidas.filter((rg) => { const st = checarRegraDocumento(rg, docsF).status; return st !== "OK" && st !== "VENCENDO"; }).length;
       if (falta === 0) atende++;
       linhas.push([f.nome, f.cargo?.nome || "—", falta === 0 ? "Atende (todos em dia)" : `Faltam ${falta} de ${exigidas.length}`]);
     }
     const perc = comRegras > 0 ? Math.round((atende / comRegras) * 1000) / 10 : null;
-    return NextResponse.json({ titulo: "Atendimento das Competências", colunas: ["Colaborador", "Cargo", "Documentos"], linhas, resumo: `${atende} de ${comRegras} colaborador(es) CLT com todos os documentos em dia${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}` });
+    return NextResponse.json({ titulo: "Atendimento das Competências", colunas: ["Colaborador", "Cargo", "Documentos"], linhas, resumo: `${atende} de ${comRegras} colaborador(es) no Prontuário Eletrônico com todos os documentos em dia${perc == null ? "" : ` · ${perc.toLocaleString("pt-BR")}%`}` });
   }
 
   return NextResponse.json({ error: "Este indicador ainda não tem detalhamento." }, { status: 404 });

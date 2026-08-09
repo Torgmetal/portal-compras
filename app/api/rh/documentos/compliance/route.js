@@ -9,8 +9,9 @@ import {
   checarRegraDocumento,
   dispensadoDocumentos,
 } from "@/lib/regras-documentos";
+import { documentosDeProntuario } from "@/lib/prontuario-certificados";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function GET() {
   try {
@@ -58,6 +59,18 @@ export async function GET() {
       dispensaMap.get(d.funcionarioId).set(d.tipo, { motivo: d.motivo, criadoNome: d.criadoNome });
     }
 
+    // Certificados do Prontuário Eletrônico (SharePoint) entram como documentos da CCT:
+    // treinamentos NR-12 / NR-35 / Integração / Ficha EPI passam a contar na conformidade
+    // (validade = data do certificado + reciclagem da NR). Fonte única de treinamentos.
+    let docsPorFunc = new Map(), comProntuario = new Set();
+    try {
+      ({ docsPorFunc, comProntuario } = await documentosDeProntuario(
+        funcionarios.map((f) => ({ id: f.id, nome: f.nome }))
+      ));
+    } catch (err) {
+      console.error("Prontuário indisponível (compliance segue só com docs do RH):", err?.message);
+    }
+
     // ── Compliance por funcionário ──────────────────
     const porFuncionario = [];
     let totalPendencias = 0;
@@ -71,6 +84,8 @@ export async function GET() {
       const regras = dispensado ? [] : regrasParaFuncionario(setorNome);
       const producao = !dispensado && isSetorProducao(setorNome);
       const dispensasFunc = dispensaMap.get(func.id) || new Map();
+      // documentos do RH + certificados do prontuário (mesma forma → checarRegraDocumento)
+      const docsFunc = [...func.documentos, ...(docsPorFunc.get(func.id) || [])];
       const itens = [];
 
       for (const regra of regras) {
@@ -88,7 +103,7 @@ export async function GET() {
           itens.push({ regra: regraBase, encontrado: false, documento: null, status: "DISPENSADO", dispensa: info });
           continue; // não conta como pendência nem no denominador
         }
-        const resultado = checarRegraDocumento(regra, func.documentos);
+        const resultado = checarRegraDocumento(regra, docsFunc);
         itens.push({ regra: regraBase, ...resultado });
         if (resultado.status !== "OK") totalPendencias++;
       }
@@ -111,6 +126,7 @@ export async function GET() {
           cargo: func.cargo?.nome || "",
           producao,
           dispensado,
+          temProntuario: comProntuario.has(func.id),
           motivoDispensa: dispensado ? (ehDiretoria ? "Diretoria" : "Terceiro (PJ)") : null,
         },
         totalRegras,
@@ -121,11 +137,12 @@ export async function GET() {
         dispensados,
         percentual: totalRegras > 0 ? Math.round((ok / totalRegras) * 100) : 100,
         itens,
-        documentos: func.documentos.map((d) => ({
+        documentos: docsFunc.map((d) => ({
           id: d.id, nome: d.nome, tipo: d.tipo, categoria: d.categoria,
           dataValidade: d.dataValidade,
           temArquivo: !!(d.arquivoUrl || d.sharepointItemId),
           sharepointUrl: d.sharepointUrl,
+          origem: d.origem || "rh",
         })),
       });
     }
@@ -162,6 +179,13 @@ export async function GET() {
           )
         : 100;
 
+    // Recorte "só quem já está no Prontuário Eletrônico" (cobertura da migração).
+    const comProntuarioList = porFuncionario.filter((f) => f.funcionario.temProntuario);
+    const percentualProntuario =
+      comProntuarioList.length > 0
+        ? Math.round(comProntuarioList.reduce((s, f) => s + f.percentual, 0) / comProntuarioList.length)
+        : 100;
+
     return NextResponse.json({
       success: true,
       resumo: {
@@ -170,6 +194,11 @@ export async function GET() {
         funcionariosComPendencia,
         percentualGeral,
         totalPendencias,
+        prontuario: {
+          comProntuario: comProntuarioList.length,
+          conformes: comProntuarioList.filter((f) => f.percentual === 100).length,
+          percentual: percentualProntuario,
+        },
         empresa: {
           total: empresaTotal,
           ok: empresaOk,
