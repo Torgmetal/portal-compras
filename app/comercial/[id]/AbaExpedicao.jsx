@@ -80,10 +80,15 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
   const [abertos, setAbertos] = useState({});   // lotes expandidos (ver marcas)
   const [pecasLote, setPecasLote] = useState({}); // marcas por lote
   const [exportar, setExportar] = useState(null); // { lote } sendo exportado
+  const [romsSp, setRomsSp] = useState(null); // romaneios FORM-22 do SharePoint (registro, inclusive não emitidos pelo portal)
 
   const carregar = () => fetch(`/api/comercial/op/${opId}/lotes-expedicao`).then((r) => r.json())
     .then((j) => { if (j.success) setLotes(j.lotes); else setErro(j.error || "Erro"); }).catch(() => setErro("Erro ao carregar"));
   useEffect(() => { carregar(); }, [opId]);
+  useEffect(() => {
+    fetch(`/api/comercial/op/${opId}/romaneios-sharepoint`).then((r) => r.json())
+      .then((j) => setRomsSp(j.romaneios || [])).catch(() => setRomsSp([]));
+  }, [opId]);
 
   async function excluir(l) {
     if (!confirm(`Excluir o lote "${l.nome}"?`)) return;
@@ -239,6 +244,45 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
           {semPeso > 0 && <p className="text-[11px] text-torg-gray mt-2">{semPeso} lote{semPeso === 1 ? "" : "s"} ainda sem peso — normal nesta fase; entram com a lista final da Engenharia.</p>}
         </>)}
       </div>
+
+      {/* Romaneios emitidos (arquivos FORM 22 no SharePoint) — registro, inclusive os não emitidos pelo portal */}
+      {romsSp && romsSp.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-1"><FileSpreadsheet size={15} className="text-torg-gray" /> Romaneios emitidos <span className="text-torg-gray font-normal">(arquivos no SharePoint)</span></h3>
+          <p className="text-xs text-torg-gray mb-3">Romaneios FORM 22 que já saíram — inclusive os emitidos fora do portal. Registro por data e peso.</p>
+          <div className="overflow-x-auto border border-gray-100 rounded-lg">
+            <table className="w-full text-sm min-w-[480px]">
+              <thead className="bg-gray-50">
+                <tr className="text-[11px] text-torg-gray uppercase">
+                  <th className="text-left px-3 py-2 font-medium w-24">Nº</th>
+                  <th className="text-left px-3 py-2 font-medium w-32">Data</th>
+                  <th className="text-right px-3 py-2 font-medium">Peso</th>
+                  <th className="text-right px-3 py-2 font-medium w-24">Marcas</th>
+                  <th className="px-2 py-2 w-12"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {romsSp.map((r, i) => (
+                  <tr key={i} className="hover:bg-gray-50/60">
+                    <td className="px-3 py-2 font-mono font-semibold text-torg-dark whitespace-nowrap">{r.numero ? `Nº ${r.numero}` : "—"}</td>
+                    <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{r.erro ? <span className="text-amber-600 text-xs">erro ao ler</span> : fmtD(r.data)}</td>
+                    <td className="px-3 py-2 text-right text-torg-dark tabular-nums whitespace-nowrap">{r.erro ? "—" : (fmtKg(r.pesoKg) || "—")}</td>
+                    <td className="px-3 py-2 text-right text-torg-gray tabular-nums">{r.erro ? "—" : (r.marcas ?? "—")}</td>
+                    <td className="px-2 py-2 text-right">{r.webUrl && <a href={r.webUrl} target="_blank" rel="noopener noreferrer" className="text-torg-blue hover:text-torg-dark inline-flex" title="Abrir no SharePoint"><FileSpreadsheet size={14} /></a>}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50/60 text-[12px] font-semibold text-torg-dark border-t border-gray-100">
+                  <td className="px-3 py-2 whitespace-nowrap" colSpan={2}>Total ({romsSp.filter((r) => !r.erro).length})</td>
+                  <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{fmtKg(romsSp.reduce((s, r) => s + (r.erro ? 0 : (r.pesoKg || 0)), 0))}</td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Plano da proposta de serviço (referência, se houver) */}
       {proposta?.id && Array.isArray(proposta.lotes) && proposta.lotes.length > 0 && (
