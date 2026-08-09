@@ -6,8 +6,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
+import { checarRegraDocumento, REGRAS_DOCUMENTOS } from "@/lib/regras-documentos";
+import { documentosDeProntuarioSeguro, mesclarDocs, nrDoArquivo, NR_PARA_TIPO } from "@/lib/prontuario-certificados";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(_req, { params }) {
   try { await requireRole(["ADMIN", "RH"]); }
@@ -21,7 +24,11 @@ export async function GET(_req, { params }) {
       funcionarios: {
         where: { ativo: true },
         orderBy: { nome: "asc" },
-        select: { id: true, nome: true, matricula: true, competencias: { select: { competenciaId: true, nivelAtual: true, avaliadoEm: true } } },
+        select: {
+          id: true, nome: true, matricula: true,
+          competencias: { select: { competenciaId: true, nivelAtual: true, avaliadoEm: true } },
+          documentos: { where: { ativo: true }, select: { tipo: true, dataEmissao: true, dataValidade: true, createdAt: true } },
+        },
       },
     },
   });
@@ -31,15 +38,39 @@ export async function GET(_req, { params }) {
     .map((cc) => ({ competenciaId: cc.competenciaId, nome: cc.competencia.nome, descricao: cc.competencia.descricao, categoria: cc.competencia.categoria, nivelEsperado: cc.nivelEsperado }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
+  // Qualificações da matriz (seção 4) que viram documento/certificado (NR-12, NR-06, NR-35…):
+  // cada uma vira uma regra da CCT e a conformidade de cada funcionário é checada nos documentos
+  // dele — RH + certificados do Prontuário Eletrônico (complementando, sem duplicar tipo).
+  const qualifMatriz = Array.isArray(cargo.matriz?.qualificacoes) ? cargo.matriz.qualificacoes : [];
+  const docQualifs = new Map(); // tipo -> { tipo, nome, evidencia, regra }
+  for (const q of qualifMatriz) {
+    const tipo = NR_PARA_TIPO[nrDoArquivo(q.item || "")];
+    if (!tipo || docQualifs.has(tipo)) continue;
+    const regra = REGRAS_DOCUMENTOS.find((r) => r.tipo === tipo);
+    if (regra) docQualifs.set(tipo, { tipo, nome: q.item, evidencia: q.evidencia || null, regra });
+  }
+  const qualifs = [...docQualifs.values()];
+
+  let docsPorFunc = new Map();
+  if (qualifs.length) {
+    ({ docsPorFunc } = await documentosDeProntuarioSeguro(cargo.funcionarios.map((f) => ({ id: f.id, nome: f.nome }))));
+  }
+
   const funcionarios = cargo.funcionarios.map((f) => {
     const niveis = {};
     for (const fc of f.competencias) niveis[fc.competenciaId] = fc.nivelAtual;
-    return { id: f.id, nome: f.nome, matricula: f.matricula, niveis };
+    const docsF = mesclarDocs(f.documentos, docsPorFunc.get(f.id));
+    const itens = qualifs.map((q) => ({ tipo: q.tipo, nome: q.nome, status: checarRegraDocumento(q.regra, docsF).status }));
+    const emDia = itens.filter((i) => i.status === "OK" || i.status === "VENCENDO").length;
+    const conformidade = { itens, emDia, total: itens.length, percentual: itens.length ? Math.round((emDia / itens.length) * 100) : null };
+    return { id: f.id, nome: f.nome, matricula: f.matricula, niveis, conformidade };
   });
+
+  const qualificacoesDoc = qualifs.map((q) => ({ tipo: q.tipo, nome: q.nome, evidencia: q.evidencia }));
 
   return NextResponse.json({
     cargo: { id: cargo.id, nome: cargo.nome, nivel: cargo.nivel, categoria: cargo.categoria, area: cargo.area, descricao: cargo.descricao, matriz: cargo.matriz || null },
-    competencias, funcionarios,
+    competencias, funcionarios, qualificacoesDoc,
   });
 }
 

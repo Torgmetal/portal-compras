@@ -12,6 +12,14 @@ const RAMP = ["#cdd8e1", "#98b6cd", "#5a91bb", "#1b72a8", "#093f66"];
 const GRUPOS = [["TECNICA", "Técnica / Segurança", "#006EAB"], ["QUALIDADE", "Qualidade", "#F4801F"], ["DESEMPENHO", "Desempenho", "#1e9e6a"]];
 const GRUPO_LABEL = Object.fromEntries(GRUPOS.map((g) => [g[0], g[1]]));
 const LEGENDA = [["AA", "Avaliação anual"], ["AS", "Atestado pelo supervisor"], ["C", "Certificado"], ["CV", "Currículo"], ["CP", "Cópia da CTPS"], ["LP", "Lista de presença"], ["OS", "Ordem de serviço"], ["E", "Forma de evidência"]];
+// Qualificações que viram documento/certificado — rótulo curto p/ o cabeçalho da conformidade
+const TIPO_CURTO = { NR_12: "NR-12", NR_35: "NR-35", FICHA_EPI: "NR-06 / EPI", INTEGRACAO: "Integração", ASO: "ASO" };
+const STATUS_CONF = {
+  OK: { cor: "#1e9e6a", bg: "#e7f6ef", txt: "Em dia" },
+  VENCENDO: { cor: "#F4801F", bg: "#fdf0e6", txt: "Vence em breve" },
+  VENCIDO: { cor: "#dc2626", bg: "#fdeaea", txt: "Vencido" },
+  AUSENTE: { cor: "#94a3b8", bg: "#f1f5f9", txt: "Não consta" },
+};
 const fmtD = (s) => { if (!s) return "—"; const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString("pt-BR", { timeZone: "UTC" }); };
 
 function LevelBar({ n }) {
@@ -96,6 +104,10 @@ export default function CargoMatrizClient({ cargoId }) {
   if (erro && !d) return <div className="py-20 text-center text-red-600 text-sm">{erro} · <Link href="/rh/competencias" className="text-torg-blue underline">voltar</Link></div>;
 
   const { cargo, competencias, funcionarios } = d;
+  const qualificacoesDoc = d.qualificacoesDoc || [];
+  const confPcts = funcionarios.map((f) => f.conformidade?.percentual).filter((v) => v != null);
+  const confMedia = confPcts.length ? Math.round(confPcts.reduce((a, b) => a + b, 0) / confPcts.length) : null;
+  const conf100 = funcionarios.filter((f) => f.conformidade?.percentual === 100).length;
   const matriz = cargo.matriz || {};
   const temMatriz = competencias.length > 0;
   const media = temMatriz ? (competencias.reduce((s, c) => s + c.nivelEsperado, 0) / competencias.length) : 0;
@@ -280,6 +292,68 @@ export default function CargoMatrizClient({ cargoId }) {
             </div>
           ) : <p className="text-[13px] text-torg-gray">Não informado.</p>}
         </Sec>
+
+        {/* Conformidade documental — derivado do Prontuário Eletrônico + RH Documentos */}
+        {!edit && qualificacoesDoc.length > 0 && (
+          <Sec title="Conformidade documental dos funcionários" n="✓" icon={<ClipboardCheck size={13} className="text-torg-blue" />}>
+            <p className="text-[11.5px] leading-relaxed text-torg-dark/70 bg-torg-blue-50/60 border border-torg-blue-100 rounded-lg px-3 py-2 mb-3">
+              Das qualificações exigidas (seção 4), estas têm <span className="font-semibold text-torg-dark">certificado/documento</span> e são verificadas automaticamente no <span className="font-semibold text-torg-dark">Prontuário Eletrônico</span> + documentos do RH. As demais (atestado do supervisor, avaliação anual) são avaliadas na seção 5.
+            </p>
+            {funcionarios.length === 0 ? (
+              <p className="text-[13px] text-torg-gray">Nenhum funcionário ativo neste cargo.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12px] min-w-[480px] border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="text-left px-2.5 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-torg-gray font-bold border-b border-gray-200 whitespace-nowrap">Funcionário</th>
+                      {qualificacoesDoc.map((q) => (
+                        <th key={q.tipo} title={q.nome} className="px-2 py-2 bg-gray-50 text-[10px] text-torg-gray font-bold border-b border-gray-200 whitespace-nowrap">{TIPO_CURTO[q.tipo] || q.tipo}</th>
+                      ))}
+                      <th className="px-2.5 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-torg-gray font-bold border-b border-gray-200">Conformidade</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {funcionarios.map((f) => {
+                      const cf = f.conformidade || { itens: [], percentual: null };
+                      const p = cf.percentual;
+                      const ok = p === 100;
+                      const statusPorTipo = Object.fromEntries((cf.itens || []).map((i) => [i.tipo, i.status]));
+                      return (
+                        <tr key={f.id}>
+                          <td className="px-2.5 py-2 whitespace-nowrap border-b border-gray-100 font-bold text-torg-dark">{f.nome}</td>
+                          {qualificacoesDoc.map((q) => {
+                            const st = statusPorTipo[q.tipo] || "AUSENTE";
+                            const s = STATUS_CONF[st] || STATUS_CONF.AUSENTE;
+                            const Ic = st === "OK" ? Check : st === "AUSENTE" ? X : AlertCircle;
+                            return (
+                              <td key={q.tipo} className="px-2 py-2 text-center border-b border-gray-100">
+                                <span title={s.txt} className="inline-grid place-items-center w-6 h-6 rounded-md" style={{ background: s.bg, color: s.cor }}><Ic size={13} /></span>
+                              </td>
+                            );
+                          })}
+                          <td className="px-2.5 py-2 border-b border-gray-100 min-w-[92px]">
+                            {p == null ? <span className="text-gray-300">—</span> : (
+                              <>
+                                <span className="font-extrabold tabular-nums" style={{ color: ok ? "#1e9e6a" : "#F4801F" }}>{p}%</span>
+                                <div className="h-1.5 rounded bg-gray-200 overflow-hidden mt-1"><span className="block h-full" style={{ width: `${p}%`, background: ok ? "#1e9e6a" : "#F4801F" }} /></div>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {confMedia != null && (
+                  <p className="text-[11px] text-torg-gray mt-2.5 inline-flex items-center gap-1.5">
+                    <ClipboardCheck size={13} className="text-torg-blue" /> {conf100} de {funcionarios.length} colaborador(es) 100% em dia · média {confMedia}% · fonte: Prontuário Eletrônico + RH Documentos.
+                  </p>
+                )}
+              </div>
+            )}
+          </Sec>
+        )}
 
         {/* Revisão (edição) / Matriz de qualificação (leitura) */}
         {edit ? (
