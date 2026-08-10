@@ -109,33 +109,41 @@ export default function SgqClient() {
 
 function CompartilharModal({ onClose }) {
   const [shares, setShares] = useState(null);
-  const [pastasDisp, setPastasDisp] = useState([]);
   const [nome, setNome] = useState("");
-  const [sel, setSel] = useState(() => new Set());
+  const [mensagem, setMensagem] = useState("");
   const [validade, setValidade] = useState("");
+  const [pastasSel, setPastasSel] = useState(() => new Set());
+  const [docsSel, setDocsSel] = useState(() => new Set());
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState("");
   const [copiado, setCopiado] = useState("");
+  const [pPath, setPPath] = useState("");   // navegação do seletor
+  const [pItens, setPItens] = useState(null);
 
   const carregarShares = () => fetch("/api/qualidade/sgq/compartilhar").then((r) => r.json()).then((j) => setShares(j.shares || [])).catch(() => setShares([]));
+  useEffect(() => { carregarShares(); }, []);
   useEffect(() => {
-    carregarShares();
-    fetch("/api/qualidade/sgq?path=").then((r) => r.json()).then((j) => setPastasDisp((j.itens || []).filter((i) => i.tipo === "folder").map((i) => i.nome))).catch(() => {});
-  }, []);
+    setPItens(null);
+    fetch(`/api/qualidade/sgq?path=${encodeURIComponent(pPath)}`).then((r) => r.json())
+      .then((j) => setPItens((j.itens || []).filter((i) => i.tipo === "folder" || /\.pdf$/i.test(i.nome))))
+      .catch(() => setPItens([]));
+  }, [pPath]);
 
-  const toggle = (p) => setSel((s) => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n; });
+  const togglePasta = (p) => setPastasSel((s) => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n; });
+  const toggleDoc = (d) => setDocsSel((s) => { const n = new Set(s); n.has(d) ? n.delete(d) : n.add(d); return n; });
   const linkDe = (t) => (typeof window !== "undefined" ? `${window.location.origin}/sgq/${t}` : `/sgq/${t}`);
   const copiar = (t) => { navigator.clipboard?.writeText(linkDe(t)); setCopiado(t); setTimeout(() => setCopiado(""), 1500); };
+  const segs = pPath ? pPath.split("/") : [];
 
   async function criar() {
     if (nome.trim().length < 2) return setErro("Dê um nome ao link (ex.: Auditor BVQI).");
-    if (!sel.size) return setErro("Selecione ao menos uma pasta.");
+    if (!pastasSel.size && !docsSel.size) return setErro("Escolha ao menos uma pasta ou documento.");
     setErro(""); setCriando(true);
     try {
-      const r = await fetch("/api/qualidade/sgq/compartilhar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: nome.trim(), pastas: [...sel], expiraEm: validade || null }) });
+      const r = await fetch("/api/qualidade/sgq/compartilhar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: nome.trim(), mensagem: mensagem.trim() || null, pastas: [...pastasSel], documentos: [...docsSel], expiraEm: validade || null }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao criar");
-      setNome(""); setSel(new Set()); setValidade(""); carregarShares();
+      setNome(""); setMensagem(""); setValidade(""); setPastasSel(new Set()); setDocsSel(new Set()); setPPath(""); carregarShares();
     } catch (e) { setErro(e.message); } finally { setCriando(false); }
   }
   async function revogar(id) {
@@ -153,23 +161,56 @@ function CompartilharModal({ onClose }) {
         </div>
 
         <div className="px-5 py-4 space-y-3 border-b border-gray-100">
-          <p className="text-[12px] text-torg-gray">Gera um link para alguém de fora consultar (só leitura, só PDFs) as pastas que você escolher. Dá pra definir validade e revogar quando quiser.</p>
+          <p className="text-[12px] text-torg-gray">Gera um link para alguém de fora consultar (só leitura, só PDFs) as pastas ou documentos que você escolher. Dá pra definir validade e revogar quando quiser.</p>
           <div>
             <label className="block text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Para quem / referência</label>
             <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Auditor BVQI — Surveillance 1" className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-torg-blue/30" />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Pastas liberadas</label>
-            <div className="max-h-44 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-50">
-              {pastasDisp.length === 0 ? (
-                <p className="text-xs text-torg-gray p-3">Carregando pastas…</p>
-              ) : pastasDisp.map((p) => (
-                <label key={p} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
-                  <input type="checkbox" checked={sel.has(p)} onChange={() => toggle(p)} className="accent-torg-blue" />
-                  <Folder size={14} className="text-torg-blue" /> {p}
-                </label>
+            <label className="block text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Mensagem de boas-vindas <span className="font-normal normal-case">— opcional, aparece pra pessoa</span></label>
+            <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={2} placeholder="Ex.: Prezados, seguem os documentos do nosso SGQ para a auditoria. Qualquer dúvida, estamos à disposição." className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-torg-blue/30" />
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Escolha pastas e documentos</label>
+              <span className="text-[11px] text-torg-blue font-semibold">{pastasSel.size} pasta(s) · {docsSel.size} doc(s)</span>
+            </div>
+            <div className="flex items-center gap-1 flex-wrap text-[12px] mb-1">
+              <button type="button" onClick={() => setPPath("")} className="px-1.5 py-0.5 rounded hover:bg-gray-100 text-torg-gray">SGQ</button>
+              {segs.map((s, i) => (
+                <span key={i} className="inline-flex items-center gap-1">
+                  <ChevronRight size={11} className="text-gray-300" />
+                  <button type="button" onClick={() => setPPath(segs.slice(0, i + 1).join("/"))} className="px-1.5 py-0.5 rounded hover:bg-gray-100 text-torg-dark">{s}</button>
+                </span>
               ))}
             </div>
+            <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-50">
+              {pItens === null ? (
+                <div className="py-6 text-center text-torg-gray"><Loader2 size={16} className="mx-auto animate-spin" /></div>
+              ) : pItens.length === 0 ? (
+                <p className="text-xs text-torg-gray p-3">Sem PDFs ou subpastas aqui.</p>
+              ) : pItens.map((it) => {
+                const caminho = pPath ? `${pPath}/${it.nome}` : it.nome;
+                if (it.tipo === "folder") return (
+                  <div key={caminho} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
+                    <input type="checkbox" checked={pastasSel.has(caminho)} onChange={() => togglePasta(caminho)} className="accent-torg-blue" title="Incluir a pasta inteira" />
+                    <button type="button" onClick={() => setPPath(caminho)} className="flex-1 min-w-0 flex items-center gap-2 text-left">
+                      <Folder size={15} className="text-torg-blue shrink-0" />
+                      <span className="truncate text-torg-dark">{it.nome}</span>
+                    </button>
+                    <ChevronRight size={15} className="text-gray-300 shrink-0" />
+                  </div>
+                );
+                return (
+                  <label key={caminho} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" checked={docsSel.has(caminho)} onChange={() => toggleDoc(caminho)} className="accent-torg-blue" />
+                    <FileText size={15} className="text-red-500 shrink-0" />
+                    <span className="flex-1 min-w-0 truncate text-torg-dark">{it.nome.replace(/\.pdf$/i, "")}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-torg-gray mt-1">Marque uma <strong>pasta</strong> (libera tudo dela) ou entre nela e marque só os <strong>PDFs</strong> que quer apresentar.</p>
           </div>
           <div className="flex items-end gap-3 flex-wrap">
             <div>
@@ -200,7 +241,7 @@ function CompartilharModal({ onClose }) {
                       {expirado
                         ? <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">expirado</span>
                         : s.expiraEm && <span className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 inline-flex items-center gap-1"><CalendarClock size={10} /> até {fmtD(s.expiraEm)}</span>}
-                      <span className="text-[11px] text-torg-gray">{(s.pastas || []).length} pasta(s) · {s.acessos || 0} acesso(s)</span>
+                      <span className="text-[11px] text-torg-gray">{(s.pastas || []).length ? `${(s.pastas || []).length} pasta(s)` : ""}{(s.pastas || []).length && (s.documentos || []).length ? " · " : ""}{(s.documentos || []).length ? `${(s.documentos || []).length} doc(s)` : ""} · {s.acessos || 0} acesso(s)</span>
                       <button onClick={() => revogar(s.id)} className="ml-auto text-torg-gray hover:text-red-600 inline-flex items-center gap-1 text-xs" title="Revogar"><Trash2 size={13} /> Revogar</button>
                     </div>
                     <div className="mt-1.5 flex items-center gap-2">
@@ -209,7 +250,7 @@ function CompartilharModal({ onClose }) {
                         {copiado === s.token ? <><Check size={13} /> copiado</> : <><Copy size={13} /> copiar</>}
                       </button>
                     </div>
-                    <p className="text-[10px] text-torg-gray mt-1 truncate">{(s.pastas || []).join(" · ")}</p>
+                    <p className="text-[10px] text-torg-gray mt-1 truncate">{[...(s.pastas || []), ...(s.documentos || []).map((d) => d.split("/").pop())].join(" · ") || "—"}</p>
                   </div>
                 );
               })}

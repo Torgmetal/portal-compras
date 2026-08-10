@@ -35,9 +35,9 @@ export default function SgqPublicoClient({ token }) {
     <div className="min-h-screen bg-gray-50">
       {/* Cabeçalho navy padrão Torg */}
       <header className="bg-[#0D1F3C] text-white">
-        <div className="max-w-3xl mx-auto px-5 py-5 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#F4801F] grid place-items-center font-extrabold text-white shrink-0">T</div>
-          <div className="min-w-0">
+        <div className="max-w-3xl mx-auto px-5 py-5 flex items-center gap-4">
+          <img src="/torg-logo-white.png" alt="Torg Metal" className="h-9 sm:h-10 shrink-0" />
+          <div className="min-w-0 border-l border-white/15 pl-4">
             <p className="text-[11px] uppercase tracking-widest text-white/60">Torg Metal · Qualidade</p>
             <h1 className="text-lg font-bold truncate">Documentos do SGQ{dados?.nome ? ` — ${dados.nome}` : ""}</h1>
           </div>
@@ -54,6 +54,9 @@ export default function SgqPublicoClient({ token }) {
           </div>
         ) : (
           <>
+            {path === "" && dados?.mensagem && (
+              <div className="bg-torg-blue-50/60 border border-torg-blue-100 rounded-2xl px-5 py-4 mb-3 text-sm text-torg-dark whitespace-pre-wrap leading-relaxed">{dados.mensagem}</div>
+            )}
             <p className="text-[12px] text-torg-gray mb-3 inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-emerald-600" /> Acesso somente leitura às pastas liberadas. Documentos em PDF.</p>
 
             {/* Breadcrumb */}

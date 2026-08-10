@@ -3987,7 +3987,9 @@ model CompartilhamentoSGQ {
   id           String    @id @default(cuid())
   token        String    @unique
   nome         String
+  mensagem     String?
   pastas       String[]  @default([])
+  documentos   String[]  @default([])
   expiraEm     DateTime?
   ativo        Boolean   @default(true)
   criadoPorId  String?

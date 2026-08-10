@@ -19,12 +19,13 @@ export async function GET(req, { params }) {
 
   registrarAcesso(share.id);
 
-  // Raiz → mostra as pastas liberadas como entradas de navegação.
+  // Raiz → pastas liberadas (navegáveis) + documentos específicos escolhidos (abrem direto).
   if (sub === "") {
-    const itens = [...share.pastas]
-      .sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }))
+    const pastas = [...(share.pastas || [])].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }))
       .map((P) => ({ nome: P, tipo: "folder", caminho: P }));
-    return NextResponse.json({ nome: share.nome, path: "", itens });
+    const docs = [...(share.documentos || [])].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }))
+      .map((d) => ({ nome: d.split("/").pop(), tipo: "file", caminho: d, secao: d.split("/")[0] || null }));
+    return NextResponse.json({ nome: share.nome, mensagem: share.mensagem || null, path: "", itens: [...pastas, ...docs] });
   }
 
   let token;
@@ -47,5 +48,5 @@ export async function GET(req, { params }) {
     }))
     .sort((a, b) => (a.tipo === b.tipo ? a.nome.localeCompare(b.nome, "pt-BR", { numeric: true }) : a.tipo === "folder" ? -1 : 1));
 
-  return NextResponse.json({ nome: share.nome, path: sub, itens });
+  return NextResponse.json({ nome: share.nome, mensagem: share.mensagem || null, path: sub, itens });
 }

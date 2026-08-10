@@ -21,14 +21,17 @@ export async function POST(req) {
 
   const body = await req.json().catch(() => ({}));
   const nome = String(body?.nome || "").trim();
-  const pastas = Array.isArray(body?.pastas) ? [...new Set(body.pastas.map((p) => String(p).replace(/^\/+|\/+$/g, "")).filter(Boolean))] : [];
+  const mensagem = body?.mensagem ? String(body.mensagem).trim().slice(0, 2000) || null : null;
+  const limpar = (arr) => (Array.isArray(arr) ? [...new Set(arr.map((p) => String(p).replace(/^\/+|\/+$/g, "")).filter(Boolean))] : []);
+  const pastas = limpar(body?.pastas);
+  const documentos = limpar(body?.documentos);
   const expiraEm = body?.expiraEm ? new Date(body.expiraEm) : null;
   if (nome.length < 2) return NextResponse.json({ error: "Dê um nome ao link (ex.: Auditor BVQI)." }, { status: 400 });
-  if (!pastas.length) return NextResponse.json({ error: "Selecione ao menos uma pasta." }, { status: 400 });
+  if (!pastas.length && !documentos.length) return NextResponse.json({ error: "Selecione ao menos uma pasta ou documento." }, { status: 400 });
   if (expiraEm && isNaN(expiraEm)) return NextResponse.json({ error: "Data de validade inválida." }, { status: 400 });
 
   const share = await prisma.compartilhamentoSGQ.create({
-    data: { token: gerarTokenForte(24), nome, pastas, expiraEm, criadoPorId: user.id || null },
+    data: { token: gerarTokenForte(24), nome, mensagem, pastas, documentos, expiraEm, criadoPorId: user.id || null },
   });
   return NextResponse.json({ share });
 }

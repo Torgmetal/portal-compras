@@ -15,7 +15,7 @@ export async function GET(req, { params }) {
   if (!path || path.split("/").some((x) => x === "..") || !/\.pdf$/i.test(path)) {
     return new NextResponse("Arquivo inválido.", { status: 400 });
   }
-  if (!arquivoPermitido(path, share.pastas)) return new NextResponse("Acesso negado.", { status: 403 });
+  if (!arquivoPermitido(path, share)) return new NextResponse("Acesso negado.", { status: 403 });
 
   registrarAcesso(share.id);
 
