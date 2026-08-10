@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { FolderTree, Folder, FileText, FileSpreadsheet, FileImage, ChevronRight, ExternalLink, Loader2, AlertCircle, Home } from "lucide-react";
+import { FolderTree, Folder, FileText, FileSpreadsheet, FileImage, ChevronRight, ExternalLink, Loader2, AlertCircle, Home, Share2, Copy, Trash2, Check, X, CalendarClock } from "lucide-react";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
 const fmtTam = (n) => {
@@ -23,6 +23,7 @@ export default function SgqClient() {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);
+  const [compartilhar, setCompartilhar] = useState(false);
 
   const carregar = useCallback((p) => {
     setCarregando(true); setErro("");
@@ -42,10 +43,16 @@ export default function SgqClient() {
 
   return (
     <div className="max-w-4xl space-y-5">
-      <div>
-        <h1 className="text-2xl font-extrabold text-torg-dark flex items-center gap-2"><FolderTree size={22} className="text-torg-blue" /> Documentos do SGQ</h1>
-        <p className="text-sm text-torg-gray mt-1">Consulta dos documentos do Sistema de Gestão da Qualidade (ISO 9001) que ficam no servidor. Somente leitura — a <strong>edição continua no servidor</strong>; aqui reflete as alterações.</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-extrabold text-torg-dark flex items-center gap-2"><FolderTree size={22} className="text-torg-blue" /> Documentos do SGQ</h1>
+          <p className="text-sm text-torg-gray mt-1">Consulta dos documentos do Sistema de Gestão da Qualidade (ISO 9001) que ficam no servidor. Somente leitura — a <strong>edição continua no servidor</strong>; aqui reflete as alterações.</p>
+        </div>
+        <button onClick={() => setCompartilhar(true)} className="px-3.5 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 shrink-0">
+          <Share2 size={15} /> Compartilhar externo
+        </button>
       </div>
+      {compartilhar && <CompartilharModal onClose={() => setCompartilhar(false)} />}
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-1 flex-wrap text-sm">
@@ -96,6 +103,120 @@ export default function SgqClient() {
         )}
       </div>
       <p className="text-[11px] text-torg-gray">Clique numa pasta para navegar, ou num documento para abri-lo no servidor (SharePoint). Documentos alterados nos últimos {RECENTE_DIAS} dias aparecem com <span className="text-emerald-700 font-semibold">atualizado</span>.</p>
+    </div>
+  );
+}
+
+function CompartilharModal({ onClose }) {
+  const [shares, setShares] = useState(null);
+  const [pastasDisp, setPastasDisp] = useState([]);
+  const [nome, setNome] = useState("");
+  const [sel, setSel] = useState(() => new Set());
+  const [validade, setValidade] = useState("");
+  const [criando, setCriando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [copiado, setCopiado] = useState("");
+
+  const carregarShares = () => fetch("/api/qualidade/sgq/compartilhar").then((r) => r.json()).then((j) => setShares(j.shares || [])).catch(() => setShares([]));
+  useEffect(() => {
+    carregarShares();
+    fetch("/api/qualidade/sgq?path=").then((r) => r.json()).then((j) => setPastasDisp((j.itens || []).filter((i) => i.tipo === "folder").map((i) => i.nome))).catch(() => {});
+  }, []);
+
+  const toggle = (p) => setSel((s) => { const n = new Set(s); n.has(p) ? n.delete(p) : n.add(p); return n; });
+  const linkDe = (t) => (typeof window !== "undefined" ? `${window.location.origin}/sgq/${t}` : `/sgq/${t}`);
+  const copiar = (t) => { navigator.clipboard?.writeText(linkDe(t)); setCopiado(t); setTimeout(() => setCopiado(""), 1500); };
+
+  async function criar() {
+    if (nome.trim().length < 2) return setErro("Dê um nome ao link (ex.: Auditor BVQI).");
+    if (!sel.size) return setErro("Selecione ao menos uma pasta.");
+    setErro(""); setCriando(true);
+    try {
+      const r = await fetch("/api/qualidade/sgq/compartilhar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nome: nome.trim(), pastas: [...sel], expiraEm: validade || null }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao criar");
+      setNome(""); setSel(new Set()); setValidade(""); carregarShares();
+    } catch (e) { setErro(e.message); } finally { setCriando(false); }
+  }
+  async function revogar(id) {
+    if (!confirm("Revogar este link? Ele para de funcionar na hora.")) return;
+    await fetch(`/api/qualidade/sgq/compartilhar?id=${id}`, { method: "DELETE" });
+    carregarShares();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-torg-dark inline-flex items-center gap-2"><Share2 size={16} className="text-torg-blue" /> Compartilhar documentos com externo</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-5 py-4 space-y-3 border-b border-gray-100">
+          <p className="text-[12px] text-torg-gray">Gera um link para alguém de fora consultar (só leitura, só PDFs) as pastas que você escolher. Dá pra definir validade e revogar quando quiser.</p>
+          <div>
+            <label className="block text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Para quem / referência</label>
+            <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Auditor BVQI — Surveillance 1" className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-torg-blue/30" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Pastas liberadas</label>
+            <div className="max-h-44 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-50">
+              {pastasDisp.length === 0 ? (
+                <p className="text-xs text-torg-gray p-3">Carregando pastas…</p>
+              ) : pastasDisp.map((p) => (
+                <label key={p} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                  <input type="checkbox" checked={sel.has(p)} onChange={() => toggle(p)} className="accent-torg-blue" />
+                  <Folder size={14} className="text-torg-blue" /> {p}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end gap-3 flex-wrap">
+            <div>
+              <label className="block text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Validade <span className="font-normal normal-case">— opcional</span></label>
+              <input type="date" value={validade} onChange={(e) => setValidade(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-torg-blue/30" />
+            </div>
+            <button onClick={criar} disabled={criando} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">
+              {criando ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={15} />} Gerar link
+            </button>
+          </div>
+          {erro && <p className="text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
+        </div>
+
+        <div className="px-5 py-4">
+          <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-2">Links ativos</p>
+          {shares === null ? (
+            <div className="py-6 text-center text-torg-gray"><Loader2 size={18} className="mx-auto animate-spin" /></div>
+          ) : shares.length === 0 ? (
+            <p className="text-xs text-torg-gray py-2">Nenhum link criado ainda.</p>
+          ) : (
+            <div className="space-y-2">
+              {shares.map((s) => {
+                const expirado = s.expiraEm && new Date(s.expiraEm) < new Date();
+                return (
+                  <div key={s.id} className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-torg-dark">{s.nome}</span>
+                      {expirado
+                        ? <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">expirado</span>
+                        : s.expiraEm && <span className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 inline-flex items-center gap-1"><CalendarClock size={10} /> até {fmtD(s.expiraEm)}</span>}
+                      <span className="text-[11px] text-torg-gray">{(s.pastas || []).length} pasta(s) · {s.acessos || 0} acesso(s)</span>
+                      <button onClick={() => revogar(s.id)} className="ml-auto text-torg-gray hover:text-red-600 inline-flex items-center gap-1 text-xs" title="Revogar"><Trash2 size={13} /> Revogar</button>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <input readOnly value={linkDe(s.token)} className="flex-1 min-w-0 text-[12px] text-torg-gray bg-gray-50 border border-gray-200 rounded px-2 py-1 truncate" />
+                      <button onClick={() => copiar(s.token)} className="text-xs text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 shrink-0">
+                        {copiado === s.token ? <><Check size={13} /> copiado</> : <><Copy size={13} /> copiar</>}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-torg-gray mt-1 truncate">{(s.pastas || []).join(" · ")}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

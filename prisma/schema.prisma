@@ -3981,3 +3981,17 @@ model DocumentoDispensa {
   @@unique([funcionarioId, tipo])
   @@index([funcionarioId])
 }
+
+// Link de acesso externo (token) a PASTAS específicas do SGQ — só leitura, só PDFs.
+model CompartilhamentoSGQ {
+  id           String    @id @default(cuid())
+  token        String    @unique
+  nome         String
+  pastas       String[]  @default([])
+  expiraEm     DateTime?
+  ativo        Boolean   @default(true)
+  criadoPorId  String?
+  acessos      Int       @default(0)
+  ultimoAcesso DateTime?
+  createdAt    DateTime  @default(now())
+}
