@@ -140,9 +140,9 @@ export default function CalibracaoDetalheClient({ id }) {
           <div className="flex items-end gap-3">
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Erro máx. admissível (%)</label>
-              <input type="number" step="0.1" min="0" value={av.erroMaxPercent ?? ""} onChange={(e) => setA("erroMaxPercent", e.target.value)} onBlur={() => salvar({}, "Limite aplicado.")} placeholder="20" className="w-36 text-sm border border-gray-300 rounded-lg px-3 py-2" />
+              <input type="number" step="0.1" min="0" value={av.erroMaxPercent ?? ""} onChange={(e) => setA("erroMaxPercent", e.target.value)} onBlur={() => salvar({}, "Limite aplicado.")} placeholder="10" className="w-36 text-sm border border-gray-300 rounded-lg px-3 py-2" />
             </div>
-            <p className="text-[11px] text-torg-gray max-w-[240px] leading-tight">Padrão PO-20 = <strong>20%</strong> do valor nominal (erro + incerteza). Editável por equipamento; vazio usa o EMP do certificado.</p>
+            <p className="text-[11px] text-torg-gray max-w-[240px] leading-tight">Padrão PO-20 = <strong>10%</strong> do valor nominal (erro + incerteza). Editável por equipamento; vazio usa o EMP do certificado.</p>
           </div>
           <button onClick={analisar} disabled={analisando || !temCertificado} title={!temCertificado ? "Certificado sem arquivo" : ""} className="px-4 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2 text-sm disabled:opacity-50">{analisando ? <Loader2 size={15} className="animate-spin" /> : <ScanSearch size={15} />} {av.analise ? "Reanalisar certificado" : "Analisar certificado"}</button>
         </div>

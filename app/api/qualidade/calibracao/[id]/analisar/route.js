@@ -19,6 +19,16 @@ const normCT = (ct) => {
   return "application/pdf"; // assume PDF quando o servidor não informa
 };
 
+// Traduz erros da IA/download para mensagem amigável (evita despejar JSON cru na tela).
+function mensagemErroIA(e) {
+  const m = String(e?.message || "");
+  if (/credit balance|too low|billing|insufficient|payment/i.test(m)) return { msg: "Análise por IA indisponível: os créditos da API da Anthropic acabaram. Recarregue em console.anthropic.com › Plans & Billing e tente novamente.", status: 402 };
+  if (/rate.?limit|overloaded|\b429\b|\b529\b/i.test(m)) return { msg: "A IA está sobrecarregada no momento. Tente novamente em alguns instantes.", status: 503 };
+  if (/ANTHROPIC_API_KEY/i.test(m)) return { msg: "A chave da API de IA (ANTHROPIC_API_KEY) não está configurada. Avise o TI.", status: 500 };
+  if (/^\d{3}\s|invalid_request_error|"type"\s*:\s*"error"/i.test(m)) return { msg: "Falha ao analisar o certificado com a IA. Tente novamente.", status: 502 };
+  return { msg: m || "Falha ao analisar o certificado", status: 502 }; // erros de download já vêm em PT
+}
+
 async function baixarCertificado(doc) {
   if (doc.arquivoUrl) {
     assertBlobUrlSegura(doc.arquivoUrl);
@@ -49,7 +59,8 @@ export async function POST(_req, { params }) {
     const { buf, contentType } = await baixarCertificado(doc);
     dados = await extrairCalibracao(buf, contentType);
   } catch (e) {
-    return NextResponse.json({ error: e.message || "Falha ao analisar o certificado" }, { status: 502 });
+    const { msg, status } = mensagemErroIA(e);
+    return NextResponse.json({ error: msg }, { status });
   }
   if (!dados || (!dados.pontos?.length && !dados.padroes?.length && !dados.laboratorio)) {
     return NextResponse.json({ error: "Não consegui ler os dados do certificado (arquivo ilegível ou sem tabela de pontos)." }, { status: 422 });
