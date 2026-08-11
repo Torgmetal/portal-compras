@@ -87,7 +87,7 @@ export async function POST(_req, { params }) {
       const s = resPontos.resultado === "REPROVADO" ? "NAO_CONFORME" : "CONFORME";
       return { ...c, situacao: s, observacao: `Pior erro ${resPontos.piorErroPercent.toFixed(3)}%${resPontos.naoConformes ? ` · ${resPontos.naoConformes} ponto(s) acima do limite` : " · dentro do limite"}` };
     }
-    if (/(padr|rastreab)/.test(t) && resPadroes.padroes.length) {
+    if (/padr/.test(t) && resPadroes.padroes.length) {
       if (resPadroes.vencidos > 0) return { ...c, situacao: "NAO_CONFORME", observacao: `${resPadroes.vencidos} padrão(ões) vencido(s) na data da calibração` };
       if (resPadroes.semData === 0) return { ...c, situacao: "CONFORME", observacao: `${resPadroes.padroes.length} padrão(ões) na validade` };
       return { ...c, observacao: `${resPadroes.padroes.length} padrão(ões); ${resPadroes.semData} sem data de validade` };
