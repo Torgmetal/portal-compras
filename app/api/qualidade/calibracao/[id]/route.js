@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { criteriosPadrao, CRITERIO_ACEITACAO_PADRAO, avaliarPontos } from "@/lib/calibracao";
+import { criteriosPadrao, CRITERIO_ACEITACAO_PADRAO, ERRO_MAX_PERCENT_SUGERIDO, avaliarPontos } from "@/lib/calibracao";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -14,7 +14,7 @@ async function garantirAvaliacao(documentoId) {
   if (!av) {
     const ultima = await prisma.avaliacaoCalibracao.findFirst({ orderBy: { numero: "desc" }, select: { numero: true } });
     av = await prisma.avaliacaoCalibracao.create({
-      data: { numero: (ultima?.numero || 0) + 1, documentoId, criterios: criteriosPadrao(), criterioAceitacao: CRITERIO_ACEITACAO_PADRAO, conclusao: "PENDENTE" },
+      data: { numero: (ultima?.numero || 0) + 1, documentoId, criterios: criteriosPadrao(), criterioAceitacao: CRITERIO_ACEITACAO_PADRAO, erroMaxPercent: ERRO_MAX_PERCENT_SUGERIDO, conclusao: "PENDENTE" },
     });
   }
   return av;

@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { criteriosPadrao, CRITERIO_ACEITACAO_PADRAO, temAnexos } from "@/lib/calibracao";
+import { criteriosPadrao, CRITERIO_ACEITACAO_PADRAO, ERRO_MAX_PERCENT_SUGERIDO, temAnexos } from "@/lib/calibracao";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -105,6 +105,7 @@ export async function POST(req) {
       relatorioNome: body.relatorio?.nome || null,
       criterios: criteriosPadrao(),
       criterioAceitacao: CRITERIO_ACEITACAO_PADRAO,
+      erroMaxPercent: ERRO_MAX_PERCENT_SUGERIDO,
       conclusao: "PENDENTE",
       createdById: user.id,
     },
