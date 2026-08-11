@@ -106,7 +106,7 @@ export async function PATCH(req, { params }) {
     // Recalcula o veredito dos pontos com o novo limite (sem rechamar a IA).
     const a = atual.analise;
     if (a && Array.isArray(a.pontos) && a.pontos.length) {
-      const res = avaliarPontos(a.pontos, { limitePercent: body.erroMaxPercent, empGlobalAbs: a.empDeclarado, faixaMin: a.faixaMin, faixaMax: a.faixaMax });
+      const res = avaliarPontos(a.pontos, { limitePercent: body.erroMaxPercent, empGlobalAbs: a.empDeclarado, faixaMin: a.faixaMin, faixaMax: a.faixaMax, errosEmPercent: a.errosEmPercent });
       data.analise = { ...a, pontos: res.pontos, resumoPontos: { total: res.totalPontos, avaliados: res.avaliados, naoConformes: res.naoConformes, piorErroPercent: res.piorErroPercent, resultado: res.resultado } };
     }
   }

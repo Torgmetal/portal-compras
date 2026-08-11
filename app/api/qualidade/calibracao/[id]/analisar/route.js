@@ -66,13 +66,13 @@ export async function POST(_req, { params }) {
     return NextResponse.json({ error: "Não consegui ler os dados do certificado (arquivo ilegível ou sem tabela de pontos)." }, { status: 422 });
   }
 
-  const resPontos = avaliarPontos(dados.pontos || [], { limitePercent: av.erroMaxPercent, empGlobalAbs: dados.empDeclarado, faixaMin: dados.faixaMin, faixaMax: dados.faixaMax });
+  const resPontos = avaliarPontos(dados.pontos || [], { limitePercent: av.erroMaxPercent, empGlobalAbs: dados.empDeclarado, faixaMin: dados.faixaMin, faixaMax: dados.faixaMax, errosEmPercent: dados.errosEmPercent });
   const resPadroes = avaliarPadroes(dados.padroes || [], dados.dataCalibracao);
 
   const analise = {
     laboratorio: dados.laboratorio, acreditacao: dados.acreditacao, numeroCertificado: dados.numeroCertificado,
     dataCalibracao: dados.dataCalibracao, equipamento: dados.equipamento, identificacao: dados.identificacao,
-    unidade: dados.unidade, faixaMin: dados.faixaMin, faixaMax: dados.faixaMax, empDeclarado: dados.empDeclarado,
+    unidade: dados.unidade, errosEmPercent: dados.errosEmPercent, faixaMin: dados.faixaMin, faixaMax: dados.faixaMax, empDeclarado: dados.empDeclarado,
     pontos: resPontos.pontos, resumoPontos: { total: resPontos.totalPontos, avaliados: resPontos.avaliados, naoConformes: resPontos.naoConformes, piorErroPercent: resPontos.piorErroPercent, resultado: resPontos.resultado },
     padroes: resPadroes.padroes, resumoPadroes: { total: resPadroes.padroes.length, vencidos: resPadroes.vencidos, semData: resPadroes.semData },
     extraidoEm: new Date().toISOString(),
