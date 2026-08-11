@@ -11,6 +11,7 @@ import {
   AlertCircle,
   RefreshCw,
   Loader2,
+  FileDown,
   Briefcase,
 } from "lucide-react";
 
@@ -346,6 +347,15 @@ export default function OrganoClient() {
             <RefreshCw size={13} />
             Atualizar
           </button>
+          <a
+            href="/api/rh/organograma/pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-torg-blue rounded-lg hover:bg-torg-dark transition-colors"
+          >
+            <FileDown size={13} />
+            Exportar PDF
+          </a>
         </div>
       </div>
 
