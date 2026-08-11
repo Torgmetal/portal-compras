@@ -1615,12 +1615,46 @@ model DocumentoQualidade {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  // Avaliação de calibração (só para certificados da categoria EQUIPAMENTOS) — 1:1
+  avaliacaoCalibracao AvaliacaoCalibracao?
+
   @@index([categoria])
   @@index([dataValidade])
   @@index([opNumero])
   @@index([validado])
   @@index([ativo])
   @@index([importRef])
+}
+
+// Avaliação de um certificado de calibração (PO-20): parecer Aprovado/Reprovado
+// por cima do certificado (DocumentoQualidade categoria EQUIPAMENTOS). Guarda os
+// anexos obrigatórios (foto do equipamento + relatório) e os critérios avaliados.
+model AvaliacaoCalibracao {
+  id                  String    @id @default(cuid())
+  numero              Int // sequencial RAC-001
+  documentoId         String    @unique
+  documento           DocumentoQualidade @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  // Identificação complementar do equipamento (o restante vem do documento/certificado)
+  identificacao       String? // tag / patrimônio / nº de série
+  faixaUso            String? // faixa de uso / medição do equipamento
+  laboratorio         String? // laboratório que emitiu o certificado
+  // Anexos obrigatórios para avaliar (Vercel Blob) — foto do equipamento + relatório
+  fotoEquipamentoUrl  String?
+  fotoEquipamentoNome String?
+  relatorioUrl        String?
+  relatorioNome       String?
+  // Avaliação — critérios do PO-20 (editáveis) + parecer + conclusão
+  criterios           Json      @default("[]") // [{ criterio, situacao: CONFORME|NAO_CONFORME|NA, observacao }]
+  criterioAceitacao   String? // resumo do critério de aceitação (PO-20)
+  parecer             String? // parecer final da avaliação
+  conclusao           String    @default("PENDENTE") // PENDENTE | APROVADO | REPROVADO
+  avaliadorId         String?
+  avaliadoEm          DateTime?
+  createdById         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([conclusao])
 }
 
 // Portal da Qualidade — Módulo 2 (Data Book / dossiê de qualidade por OP).

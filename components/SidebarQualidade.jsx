@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileCheck2, BookCheck, ScrollText, ClipboardCheck, ClipboardList, Gauge, AlertOctagon, FolderTree } from "lucide-react";
+import { FileCheck2, BookCheck, ScrollText, ClipboardCheck, ClipboardList, Gauge, AlertOctagon, FolderTree, Ruler } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/qualidade", label: "Controle de Documentos", icon: FileCheck2, exact: true },
+  { href: "/qualidade/calibracao", label: "Calibração", icon: Ruler },
   { href: "/qualidade/sgq", label: "Documentos do SGQ", icon: FolderTree },
   { href: "/qualidade/rastreabilidade", label: "Rastreabilidade", icon: ScrollText },
   { href: "/qualidade/data-books", label: "Data Books", icon: BookCheck },

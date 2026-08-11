@@ -129,6 +129,44 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "FluxoCaixa_origemOmieId_idx" ON "FluxoCaixa"("origemOmieId")`);
   console.log("[ensure-mes-tables] OK — colunas FluxoCaixa (Omie) garantidas.");
 
+  // AvaliacaoCalibracao (avaliação Aprovado/Reprovado dos certificados de calibração, PO-20). Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "AvaliacaoCalibracao" (
+      "id"                  TEXT NOT NULL,
+      "numero"              INTEGER NOT NULL,
+      "documentoId"         TEXT NOT NULL,
+      "identificacao"       TEXT,
+      "faixaUso"            TEXT,
+      "laboratorio"         TEXT,
+      "fotoEquipamentoUrl"  TEXT,
+      "fotoEquipamentoNome" TEXT,
+      "relatorioUrl"        TEXT,
+      "relatorioNome"       TEXT,
+      "criterios"           JSONB NOT NULL DEFAULT '[]',
+      "criterioAceitacao"   TEXT,
+      "parecer"             TEXT,
+      "conclusao"           TEXT NOT NULL DEFAULT 'PENDENTE',
+      "avaliadorId"         TEXT,
+      "avaliadoEm"          TIMESTAMP(3),
+      "createdById"         TEXT,
+      "createdAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "AvaliacaoCalibracao_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "AvaliacaoCalibracao_documentoId_key" ON "AvaliacaoCalibracao"("documentoId")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AvaliacaoCalibracao_conclusao_idx" ON "AvaliacaoCalibracao"("conclusao")`);
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AvaliacaoCalibracao_documentoId_fkey') THEN
+        ALTER TABLE "AvaliacaoCalibracao"
+          ADD CONSTRAINT "AvaliacaoCalibracao_documentoId_fkey"
+          FOREIGN KEY ("documentoId") REFERENCES "DocumentoQualidade"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$;
+  `);
+  console.log("[ensure-mes-tables] OK — AvaliacaoCalibracao garantida.");
+
   // Verifica quais das duas tabelas existem
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename
