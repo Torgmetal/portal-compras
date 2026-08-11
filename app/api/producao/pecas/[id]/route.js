@@ -55,7 +55,9 @@ export async function PATCH(req, { params }) {
 export async function DELETE(req, { params }) {
   let user;
   try {
-    user = await requireRole(["ADMIN"]);
+    // Mesmos perfis que acessam a tela de Programação de Corte (Vitor 09/08) — antes só ADMIN.
+    // O auditLog abaixo mantém o registro de QUEM excluiu.
+    user = await requireRole(["ADMIN", "PRODUCAO", "PCP", "PLANEJAMENTO", "EXPEDICAO", "COMERCIAL"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }

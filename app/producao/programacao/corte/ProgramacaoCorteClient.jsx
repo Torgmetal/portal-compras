@@ -1302,17 +1302,15 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
                 Reverter para Pendente
               </button>
             )}
-            {isAdmin && (
-              <button
-                onClick={() => setConfirmDelete({ tipo: "selecionadas", count: selecionados.size })}
-                disabled={deleting}
-                title="Excluir as peças selecionadas"
-                className="px-3 py-1.5 text-red-600 border border-red-200 text-xs rounded-lg hover:bg-red-50 font-medium flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                Excluir selecionadas
-              </button>
-            )}
+            <button
+              onClick={() => setConfirmDelete({ tipo: "selecionadas", count: selecionados.size })}
+              disabled={deleting}
+              title="Excluir as peças selecionadas"
+              className="px-3 py-1.5 text-red-600 border border-red-200 text-xs rounded-lg hover:bg-red-50 font-medium flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              Excluir selecionadas
+            </button>
           </div>
         )}
       </div>
