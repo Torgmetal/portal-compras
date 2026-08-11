@@ -2,8 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { upload } from "@vercel/blob/client";
-import { ArrowLeft, Loader2, Save, CheckCircle2, XCircle, RotateCcw, FileDown, AlertCircle, Upload, Paperclip, X, Plus, Trash2, Eye, ShieldCheck } from "lucide-react";
-import { numRAC, SITUACOES, CONCLUSAO, conclusaoLabel, criteriosPadrao, sugerirConclusao } from "@/lib/calibracao";
+import { ArrowLeft, Loader2, Save, CheckCircle2, XCircle, RotateCcw, FileDown, AlertCircle, Upload, Paperclip, X, Plus, Trash2, Eye, ShieldCheck, ScanSearch, AlertTriangle } from "lucide-react";
+import { numRAC, SITUACOES, CONCLUSAO, conclusaoLabel, criteriosPadrao, sugerirConclusao, fmtPercent } from "@/lib/calibracao";
+
+const fmtNum = (v) => (v == null || v === "" ? "—" : Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 4 }));
 
 const toInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
@@ -17,6 +19,7 @@ export default function CalibracaoDetalheClient({ id }) {
   const [ok, setOk] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [enviando, setEnviando] = useState("");
+  const [analisando, setAnalisando] = useState(false);
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -37,7 +40,9 @@ export default function CalibracaoDetalheClient({ id }) {
     documento: { nome: doc.nome, norma: doc.norma, numeroDocumento: doc.numeroDocumento, dataEmissao: toInput(doc.dataEmissao) || null, dataValidade: toInput(doc.dataValidade) || null },
     identificacao: av.identificacao, faixaUso: av.faixaUso, laboratorio: av.laboratorio,
     criterios: av.criterios.filter((c) => (c.criterio || "").trim()),
-    criterioAceitacao: av.criterioAceitacao, parecer: av.parecer, ...extra,
+    criterioAceitacao: av.criterioAceitacao, parecer: av.parecer,
+    erroMaxPercent: av.erroMaxPercent === "" || av.erroMaxPercent == null ? null : Number(av.erroMaxPercent),
+    ...extra,
   });
 
   async function salvar(extra, msg) {
@@ -66,12 +71,24 @@ export default function CalibracaoDetalheClient({ id }) {
     try { await fetch(`/api/qualidade/calibracao/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(campo === "foto" ? { removerFoto: true } : { removerRelatorio: true }) }); carregar(); }
     finally { setEnviando(""); }
   }
+  async function analisar() {
+    setErro(""); setOk(""); setAnalisando(true);
+    try {
+      const r = await fetch(`/api/qualidade/calibracao/${id}/analisar`, { method: "POST" });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Falha ao analisar o certificado");
+      const rp = j.analise?.resumoPontos || {};
+      setOk(`Análise concluída — ${rp.total || 0} ponto(s), pior erro ${fmtPercent(rp.piorErroPercent)}, ${j.padroesVencidos || 0} padrão(ões) vencido(s).`);
+      carregar();
+    } catch (e) { setErro(e.message); } finally { setAnalisando(false); }
+  }
 
   if (loading) return <div className="py-20 text-center text-torg-gray"><Loader2 size={26} className="mx-auto animate-spin" /></div>;
   if (erro && !doc) return <div className="py-16 text-center"><p className="text-red-600 text-sm mb-3">{erro}</p><Link href="/qualidade/calibracao" className="text-torg-blue text-sm">← Voltar</Link></div>;
 
   const temFoto = !!av.fotoEquipamentoUrl, temRel = !!av.relatorioUrl;
   const podeAvaliar = temFoto && temRel;
+  const temCertificado = !!(doc.arquivoUrl || doc.sharepointItemId);
   const sugestao = sugerirConclusao(av.criterios);
 
   return (
@@ -115,6 +132,26 @@ export default function CalibracaoDetalheClient({ id }) {
           <Campo label="Validade"><input type="date" value={toInput(doc.dataValidade)} onChange={(e) => setD("dataValidade", e.target.value)} className={inp} /></Campo>
           <div className="sm:col-span-2"><Campo label="Norma / referência"><input value={doc.norma || ""} onChange={(e) => setD("norma", e.target.value)} className={inp} placeholder="ISO/IEC 17025 · NBR ISO 10012" /></Campo></div>
         </div>
+      </Secao>
+
+      {/* Análise do certificado (IA) */}
+      <Secao titulo="Análise do certificado (IA)">
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+          <div className="flex items-end gap-3">
+            <div>
+              <label className="block text-xs font-medium text-torg-dark mb-1">Erro máx. admissível (%)</label>
+              <input type="number" step="0.001" min="0" value={av.erroMaxPercent ?? ""} onChange={(e) => setA("erroMaxPercent", e.target.value)} onBlur={() => salvar({}, "Limite aplicado.")} placeholder="ex.: 0,05" className="w-36 text-sm border border-gray-300 rounded-lg px-3 py-2" />
+            </div>
+            <p className="text-[11px] text-torg-gray max-w-[240px] leading-tight">Vazio = usa o EMP do certificado. A norma (ISO 9001 §7.1.5) não fixa %; defina pela aplicação.</p>
+          </div>
+          <button onClick={analisar} disabled={analisando || !temCertificado} title={!temCertificado ? "Certificado sem arquivo" : ""} className="px-4 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2 text-sm disabled:opacity-50">{analisando ? <Loader2 size={15} className="animate-spin" /> : <ScanSearch size={15} />} {av.analise ? "Reanalisar certificado" : "Analisar certificado"}</button>
+        </div>
+        {av.analise ? <AnaliseResultado a={av.analise} /> : (
+          <div className="text-center py-6 text-torg-gray text-sm bg-gray-50/60 rounded-lg border border-dashed border-gray-200">
+            <ScanSearch size={22} className="mx-auto mb-1.5 text-gray-300" />
+            A IA lê o certificado, converte os erros em % (base = valor nominal) e confere se os padrões usados na calibração estão na validade. Os critérios abaixo são pré-preenchidos pelo resultado.
+          </div>
+        )}
       </Secao>
 
       {/* Anexos obrigatórios */}
@@ -175,6 +212,72 @@ function Secao({ titulo, children }) {
   );
 }
 function Campo({ label, children }) { return <div><label className="block text-xs font-medium text-torg-dark mb-1">{label}</label>{children}</div>; }
+
+function AnaliseResultado({ a }) {
+  const rp = a.resumoPontos || {}, rq = a.resumoPadroes || {};
+  const dt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2 text-[11px]">
+        {a.acreditacao && <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium">Acreditação: {a.acreditacao}</span>}
+        <span className={`px-2 py-1 rounded-full font-medium ${rp.resultado === "REPROVADO" ? "bg-red-50 text-red-700" : rp.resultado === "APROVADO" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>Pontos: {rp.naoConformes || 0}/{rp.avaliados || 0} fora · pior {fmtPercent(rp.piorErroPercent)}</span>
+        <span className={`px-2 py-1 rounded-full font-medium ${rq.vencidos > 0 ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>Padrões: {rq.vencidos || 0} vencido(s) de {rq.total || 0}</span>
+      </div>
+      {Array.isArray(a.pontos) && a.pontos.length > 0 && (
+        <div className="overflow-x-auto border border-gray-100 rounded-lg">
+          <table className="w-full text-[11.5px]">
+            <thead className="bg-gray-50 text-torg-gray"><tr>
+              <th className="text-left px-2.5 py-1.5 font-medium">Nominal{a.unidade ? ` (${a.unidade})` : ""}</th>
+              <th className="text-left px-2.5 py-1.5 font-medium">Erro</th>
+              <th className="text-left px-2.5 py-1.5 font-medium">Incerteza</th>
+              <th className="text-left px-2.5 py-1.5 font-medium">Erro %</th>
+              <th className="text-left px-2.5 py-1.5 font-medium">Limite %</th>
+              <th className="text-center px-2.5 py-1.5 font-medium">Situação</th>
+            </tr></thead>
+            <tbody className="divide-y divide-gray-50">
+              {a.pontos.map((p, i) => (
+                <tr key={i} className={p.conforme === false ? "bg-red-50/40" : ""}>
+                  <td className="px-2.5 py-1.5 text-torg-dark">{fmtNum(p.nominal)}</td>
+                  <td className="px-2.5 py-1.5 text-torg-dark">{fmtNum(p.erro)}</td>
+                  <td className="px-2.5 py-1.5 text-torg-gray">{p.incerteza != null ? fmtNum(p.incerteza) : "—"}</td>
+                  <td className="px-2.5 py-1.5 text-torg-dark">{fmtPercent(p.erroPercent)}</td>
+                  <td className="px-2.5 py-1.5 text-torg-gray">{p.limitePercent != null ? fmtPercent(p.limitePercent) : "—"}</td>
+                  <td className="px-2.5 py-1.5 text-center font-semibold">{p.conforme === true ? <span className="text-emerald-600">Conforme</span> : p.conforme === false ? <span className="text-red-600">Fora</span> : <span className="text-gray-400">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {Array.isArray(a.padroes) && a.padroes.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-torg-dark mb-1.5">Padrões utilizados na calibração (rastreabilidade)</p>
+          <div className="overflow-x-auto border border-gray-100 rounded-lg">
+            <table className="w-full text-[11.5px]">
+              <thead className="bg-gray-50 text-torg-gray"><tr>
+                <th className="text-left px-2.5 py-1.5 font-medium">Padrão / instrumento de referência</th>
+                <th className="text-left px-2.5 py-1.5 font-medium">Certificado</th>
+                <th className="text-left px-2.5 py-1.5 font-medium">Validade</th>
+                <th className="text-center px-2.5 py-1.5 font-medium">Situação</th>
+              </tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {a.padroes.map((p, i) => (
+                  <tr key={i} className={p.vencido === true ? "bg-red-50/40" : ""}>
+                    <td className="px-2.5 py-1.5 text-torg-dark">{p.nome}</td>
+                    <td className="px-2.5 py-1.5 text-torg-gray">{p.certificado || "—"}</td>
+                    <td className="px-2.5 py-1.5 text-torg-dark">{dt(p.validade)}</td>
+                    <td className="px-2.5 py-1.5 text-center font-semibold">{p.vencido === true ? <span className="text-red-600 inline-flex items-center gap-1"><AlertTriangle size={12} /> Vencido</span> : p.vencido === false ? <span className="text-emerald-600">Em dia</span> : <span className="text-gray-400">sem data</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {a.extraidoEm && <p className="text-[10px] text-torg-gray">Analisado por IA em {new Date(a.extraidoEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} · confira e ajuste os critérios abaixo se necessário.</p>}
+    </div>
+  );
+}
 
 function Anexo({ label, campo, url, nome, img, accept, enviando, onPick, onRemove }) {
   return (

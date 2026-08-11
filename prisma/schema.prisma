@@ -1648,6 +1648,10 @@ model AvaliacaoCalibracao {
   criterioAceitacao   String? // resumo do critério de aceitação (PO-20)
   parecer             String? // parecer final da avaliação
   conclusao           String    @default("PENDENTE") // PENDENTE | APROVADO | REPROVADO
+  // Análise automática do certificado (IA) — pontos convertidos em %, padrões e rastreabilidade
+  erroMaxPercent      Float? // limite de erro admissível (% do valor nominal); null = usar EMP do certificado
+  analise             Json? // { laboratorio, acreditacao, faixaMin/Max, unidade, empDeclarado, incertezaMax, pontos:[{nominal,erro,unidade,incerteza,erroPercent,limitePercent,conforme}], padroes:[{nome,certificado,validade,vencido}], resumo, extraidoEm }
+  analisadoEm         DateTime?
   avaliadorId         String?
   avaliadoEm          DateTime?
   createdById         String?

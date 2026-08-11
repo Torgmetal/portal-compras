@@ -165,6 +165,9 @@ async function main() {
       END IF;
     END $$;
   `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "AvaliacaoCalibracao" ADD COLUMN IF NOT EXISTS "erroMaxPercent" DOUBLE PRECISION`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "AvaliacaoCalibracao" ADD COLUMN IF NOT EXISTS "analise" JSONB`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "AvaliacaoCalibracao" ADD COLUMN IF NOT EXISTS "analisadoEm" TIMESTAMP(3)`);
   console.log("[ensure-mes-tables] OK — AvaliacaoCalibracao garantida.");
 
   // Verifica quais das duas tabelas existem

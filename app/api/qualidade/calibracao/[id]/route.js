@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { criteriosPadrao, CRITERIO_ACEITACAO_PADRAO } from "@/lib/calibracao";
+import { criteriosPadrao, CRITERIO_ACEITACAO_PADRAO, avaliarPontos } from "@/lib/calibracao";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -56,6 +56,7 @@ const schema = z.object({
   })).optional(),
   criterioAceitacao: z.string().max(2000).optional().nullable(),
   parecer: z.string().max(3000).optional().nullable(),
+  erroMaxPercent: z.number().min(0).max(100).optional().nullable(),
   fotoEquipamento: anexo,
   relatorio: anexo,
   removerFoto: z.boolean().optional(),
@@ -100,6 +101,15 @@ export async function PATCH(req, { params }) {
   if (body.criterios !== undefined) data.criterios = body.criterios.map((c) => ({ criterio: (c.criterio || "").trim(), situacao: c.situacao || "NA", observacao: (c.observacao || "").trim() || "" }));
   if (body.criterioAceitacao !== undefined) data.criterioAceitacao = body.criterioAceitacao?.trim() || null;
   if (body.parecer !== undefined) data.parecer = body.parecer?.trim() || null;
+  if (body.erroMaxPercent !== undefined) {
+    data.erroMaxPercent = body.erroMaxPercent;
+    // Recalcula o veredito dos pontos com o novo limite (sem rechamar a IA).
+    const a = atual.analise;
+    if (a && Array.isArray(a.pontos) && a.pontos.length) {
+      const res = avaliarPontos(a.pontos, { limitePercent: body.erroMaxPercent, empGlobalAbs: a.empDeclarado, faixaMin: a.faixaMin, faixaMax: a.faixaMax });
+      data.analise = { ...a, pontos: res.pontos, resumoPontos: { total: res.totalPontos, avaliados: res.avaliados, naoConformes: res.naoConformes, piorErroPercent: res.piorErroPercent, resultado: res.resultado } };
+    }
+  }
   if (body.removerFoto) { data.fotoEquipamentoUrl = null; data.fotoEquipamentoNome = null; }
   else if (body.fotoEquipamento?.url) { data.fotoEquipamentoUrl = body.fotoEquipamento.url; data.fotoEquipamentoNome = body.fotoEquipamento.nome || null; }
   if (body.removerRelatorio) { data.relatorioUrl = null; data.relatorioNome = null; }
