@@ -63,6 +63,7 @@ Time atual: Vitor (diretor) e Matheus.
 > - **Statement SQL constante** (ex: `INSERT ... SELECT FROM UNNEST($1::text[], ...)`) com os dados passados como **arrays-literais de texto** (`'{"a","b",NULL}'`) e cast `::tipo[]` no SQL. Nunca gerar SQL com valores inline (cada SQL diferente vira um plano cacheado → `CachedPlanQuery` OOM). Não passar arrays JS direto (Prisma manda em binário → erro `22P03 improper binary format`).
 > - **Bookkeeping não-fatal**: tabelas de auditoria/log (ex: `MesSyncLog`) em `try/catch` — uma falha de log nunca deve abortar a escrita dos dados de verdade.
 > - **Não rodar sync pesado enquanto há deploy/build da Vercel em andamento** (o build pré-renderiza páginas que batem na produção e somam pressão de memória).
+> - **Cold start (scale-to-zero) → `P1001 "Can't reach database server"`**: a compute do Neon suspende quando ociosa; o **primeiro** query de um cron estoura antes dela acordar. **Todo cron deve chamar `await aquecerBanco(prisma)` de `lib/db-retry.js` no início** (SELECT 1 com retry/backoff — acorda a compute antes do trabalho). O `registrarExecucao` (heartbeat) já retenta em erro de conexão pra não "congelar" e alertar à toa. Correção definitiva é infra: desligar o scale-to-zero / subir o mínimo de autoscaling no Neon.
 
 **Fullstack SaaS** — Next.js 14 App Router (JavaScript, no TypeScript), PostgreSQL via Neon + Prisma 6, deployed on Vercel. It is an internal ERP workflow tool for Torg Metal (steel fabrication), orchestrating the flow: **Comercial → Engenharia → Compras → Produção/Almoxarifado → Expedição**.
 

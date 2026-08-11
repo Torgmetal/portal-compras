@@ -2,8 +2,10 @@
 // Roda 1x/dia (config em vercel.json). Auth via header vercel-cron ou CRON_SECRET.
 import { NextResponse } from "next/server";
 import { temCronSecret } from "@/lib/cron-auth";
+import { prisma } from "@/lib/prisma";
 import { atualizarCacheFaturamento } from "@/lib/faturamento-cache";
 import { registrarExecucao } from "@/lib/cron-monitor";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,6 +19,7 @@ export async function GET(req) {
 
   const t0 = Date.now();
   try {
+    await aquecerBanco(prisma); // acorda o Neon (scale-to-zero) antes do 1º query
     const data = await atualizarCacheFaturamento();
     await registrarExecucao("faturamento", { ok: true, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: true, totalObras: data.totalObras, atualizadoEm: data.atualizadoEm });

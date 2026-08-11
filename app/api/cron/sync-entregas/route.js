@@ -3,6 +3,7 @@ import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { syncEntregas } from "@/lib/omie-recebimento";
 import { registrarExecucao } from "@/lib/cron-monitor";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const maxDuration = 300; // a varredura de NFs + consulta por pedido no Omie passava de 60s (504)
 
@@ -18,6 +19,9 @@ export async function GET(req) {
 
   const t0 = Date.now();
   try {
+    // Acorda a compute do Neon (scale-to-zero) antes do 1º query — evita o P1001
+    // "Can't reach database server" no cold start (cron diário, compute ociosa).
+    await aquecerBanco(prisma);
     const resultado = await syncEntregas(prisma);
     const msg = `${resultado.sincronizados} entregas · ${resultado.processados}/${resultado.total} verificados${resultado.timeboxed ? " (parcial — resto na próxima)" : ""}`;
     await registrarExecucao("sync-entregas", { ok: true, duracaoMs: Date.now() - t0, mensagem: msg });

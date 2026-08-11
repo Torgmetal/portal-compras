@@ -6,6 +6,7 @@ import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { checarSaudeCrons, registrarExecucao } from "@/lib/cron-monitor";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,6 +20,7 @@ export async function GET(req) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  await aquecerBanco(prisma).catch(() => {}); // acorda o Neon antes de ler os heartbeats
   const { problemas, heartbeats } = await checarSaudeCrons();
   let alertaEnviado = false;
 
