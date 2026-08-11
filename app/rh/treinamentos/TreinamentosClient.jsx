@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   GraduationCap, Search, PlusCircle, Loader2, AlertCircle, X,
-  ChevronDown, Shield,
+  ChevronDown, Shield, FileDown, Send, PenLine, CheckCircle2, Clock, Trash2, Plus,
 } from "lucide-react";
 
 const TIPOS = [
@@ -45,6 +45,7 @@ export default function TreinamentosClient() {
   const [treinamentos, setTreinamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
+  const [assinaturaOpen, setAssinaturaOpen] = useState(false);
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState("");
@@ -222,13 +223,24 @@ export default function TreinamentosClient() {
           <h2 className="text-3xl font-extrabold text-torg-dark tracking-tight">Treinamentos</h2>
           <p className="text-sm text-torg-gray mt-1">Gestão de capacitações e treinamentos obrigatórios</p>
         </div>
-        <button
-          onClick={abrirNovo}
-          className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2"
-        >
-          <PlusCircle size={16} /> Novo Treinamento
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <a href="/api/rh/treinamentos/pdf" target="_blank" rel="noopener noreferrer"
+            className="px-3 py-2 text-torg-gray bg-white border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 inline-flex items-center gap-1.5">
+            <FileDown size={15} /> Exportar PDF
+          </a>
+          <button onClick={() => setAssinaturaOpen(true)}
+            className="px-3 py-2 text-white bg-torg-dark text-sm font-medium rounded-lg hover:opacity-90 inline-flex items-center gap-1.5">
+            <PenLine size={15} /> Enviar p/ assinatura
+          </button>
+          <button
+            onClick={abrirNovo}
+            className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2"
+          >
+            <PlusCircle size={16} /> Novo Treinamento
+          </button>
+        </div>
       </div>
+      {assinaturaOpen && <AssinaturaModal onClose={() => setAssinaturaOpen(false)} />}
 
       {/* Erro global */}
       {erro && (
@@ -678,6 +690,111 @@ export default function TreinamentosClient() {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+function AssinaturaModal({ onClose }) {
+  const [dados, setDados] = useState(null); // { envios, revisaoAtual }
+  const [rows, setRows] = useState([{ nome: "", email: "", setor: "" }]);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [okMsg, setOkMsg] = useState("");
+
+  const carregar = () => fetch("/api/rh/treinamentos/assinatura").then((r) => r.json()).then(setDados).catch(() => setDados({ envios: [], revisaoAtual: 0 }));
+  useEffect(() => { carregar(); }, []);
+
+  const setRow = (i, k, v) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const addRow = () => setRows((rs) => [...rs, { nome: "", email: "", setor: "" }]);
+  const rmRow = (i) => setRows((rs) => (rs.length > 1 ? rs.filter((_, j) => j !== i) : rs));
+  const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
+  const rev = dados?.revisaoAtual ?? 0;
+
+  async function enviar() {
+    const destinatarios = rows.map((r) => ({ nome: r.nome.trim(), email: r.email.trim(), setor: r.setor.trim() })).filter((r) => r.nome && /.+@.+\..+/.test(r.email));
+    if (!destinatarios.length) return setErro("Preencha nome + e-mail de pelo menos um destinatário.");
+    setErro(""); setOkMsg(""); setEnviando(true);
+    try {
+      const r = await fetch("/api/rh/treinamentos/assinatura", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ destinatarios }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro ao enviar");
+      setOkMsg(`Enviado para ${j.enviados} de ${j.total} destinatário(s).`);
+      setRows([{ nome: "", email: "", setor: "" }]); carregar();
+    } catch (e) { setErro(e.message); } finally { setEnviando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-torg-dark inline-flex items-center gap-2"><PenLine size={16} className="text-torg-blue" /> Enviar Plano de Treinamentos para assinatura</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-5 py-4 space-y-3 border-b border-gray-100">
+          <div className="flex items-center gap-2 flex-wrap text-[12px]">
+            <span className="text-torg-gray">Revisão atual do plano:</span>
+            <span className="font-bold text-torg-dark bg-gray-100 rounded px-1.5 py-0.5">R{String(rev).padStart(2, "0")}</span>
+            <a href="/api/rh/treinamentos/pdf" target="_blank" rel="noopener noreferrer" className="text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 ml-auto"><FileDown size={13} /> ver o PDF</a>
+          </div>
+          <p className="text-[12px] text-torg-gray">O documento (PDF da revisão <strong>R{String(rev).padStart(2, "0")}</strong>) vai por e-mail aos destinatários; cada um assina eletronicamente (confirmação + data/hora + IP).</p>
+
+          <div className="space-y-2">
+            {rows.map((r, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input value={r.nome} onChange={(e) => setRow(i, "nome", e.target.value)} placeholder="Nome" className="flex-1 min-w-0 text-sm border border-gray-300 rounded-lg px-2.5 py-1.5" />
+                <input value={r.email} onChange={(e) => setRow(i, "email", e.target.value)} placeholder="E-mail" className="flex-1 min-w-0 text-sm border border-gray-300 rounded-lg px-2.5 py-1.5" />
+                <input value={r.setor} onChange={(e) => setRow(i, "setor", e.target.value)} placeholder="Setor (opcional)" className="w-32 text-sm border border-gray-300 rounded-lg px-2.5 py-1.5" />
+                <button onClick={() => rmRow(i)} className="text-gray-300 hover:text-red-500 shrink-0"><Trash2 size={15} /></button>
+              </div>
+            ))}
+            <button onClick={addRow} className="text-xs text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Plus size={13} /> adicionar destinatário</button>
+          </div>
+
+          {erro && <p className="text-xs text-red-600 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
+          {okMsg && <p className="text-xs text-emerald-700 inline-flex items-center gap-1"><CheckCircle2 size={13} /> {okMsg}</p>}
+          <button onClick={enviar} disabled={enviando} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">
+            {enviando ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar para assinatura
+          </button>
+        </div>
+
+        <div className="px-5 py-4">
+          <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-2">Envios e assinaturas</p>
+          {!dados ? (
+            <div className="py-6 text-center text-torg-gray"><Loader2 size={18} className="mx-auto animate-spin" /></div>
+          ) : !dados.envios?.length ? (
+            <p className="text-xs text-torg-gray py-2">Nenhum envio ainda.</p>
+          ) : (
+            <div className="space-y-3">
+              {dados.envios.map((e) => {
+                const ass = e.assinaturas || [];
+                const assinados = ass.filter((a) => a.assinadoEm).length;
+                return (
+                  <div key={e.id} className="border border-gray-200 rounded-lg px-3 py-2.5">
+                    <div className="flex items-center gap-2 flex-wrap text-sm">
+                      <span className="font-semibold text-torg-dark">R{String(e.revisao).padStart(2, "0")}</span>
+                      <span className="text-[11px] text-torg-gray">{fmtDT(e.enviadoEm)}</span>
+                      <span className={`text-[10px] font-bold rounded px-1.5 py-0.5 ${assinados === ass.length ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>{assinados}/{ass.length} assinaram</span>
+                    </div>
+                    <div className="mt-1.5 space-y-1">
+                      {ass.map((a) => (
+                        <div key={a.id} className="flex items-center gap-2 text-[12px]">
+                          {a.assinadoEm ? <CheckCircle2 size={13} className="text-emerald-600 shrink-0" /> : <Clock size={13} className="text-amber-500 shrink-0" />}
+                          <span className="font-medium text-torg-dark">{a.nome}</span>
+                          {a.setor && <span className="text-[10px] text-torg-gray">· {a.setor}</span>}
+                          <span className="ml-auto text-[11px] text-torg-gray whitespace-nowrap">
+                            {a.assinadoEm ? `assinou ${fmtDT(a.assinadoEm)}${a.ip ? ` · IP ${a.ip}` : ""}` : "aguardando"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

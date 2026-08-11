@@ -3997,3 +3997,39 @@ model CompartilhamentoSGQ {
   ultimoAcesso DateTime?
   createdAt    DateTime  @default(now())
 }
+
+// ── Documentos assináveis (Plano de Treinamentos, Cronograma de Auditoria Interna) ──
+// Revisão sobe automático quando o conteúdo muda; envio p/ assinatura por e-mail (token);
+// assinatura eletrônica = confirmação + data + IP.
+model DocumentoRevisao {
+  tipo         String   @id // PLANO_TREINAMENTO | CRONOGRAMA_AUDITORIA
+  revisao      Int      @default(0)
+  atualizadoEm DateTime @default(now()) @updatedAt
+}
+
+model EnvioAssinatura {
+  id           String                @id @default(cuid())
+  tipo         String
+  revisao      Int
+  titulo       String
+  snapshot     Json                  @default("{}")
+  enviadoEm    DateTime              @default(now())
+  enviadoPorId String?
+  assinaturas  AssinaturaDocumento[]
+
+  @@index([tipo])
+}
+
+model AssinaturaDocumento {
+  id         String          @id @default(cuid())
+  envioId    String
+  nome       String
+  email      String
+  setor      String?
+  token      String          @unique
+  assinadoEm DateTime?
+  ip         String?
+  envio      EnvioAssinatura @relation(fields: [envioId], references: [id], onDelete: Cascade)
+
+  @@index([envioId])
+}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { bumpRevisao } from "@/lib/assinatura-doc";
 import { z } from "zod";
 
 const treinamentoSchema = z.object({
@@ -88,6 +89,9 @@ export async function POST(req) {
         custo: data.custo || null,
       },
     });
+
+    // Revisão do Plano de Treinamentos sobe automático ao adicionar treinamento (Vitor 09/08).
+    await bumpRevisao("PLANO_TREINAMENTO").catch(() => {});
 
     // Criar participantes se fornecidos
     if (participantesIds.length > 0) {

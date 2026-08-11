@@ -105,7 +105,10 @@ export default withAuth(
           path.startsWith("/api/proposta/aceite/") ||
           // Consulta externa aos PDFs do SGQ (Qualidade) — publico via token unico
           path.startsWith("/sgq/") ||
-          path.startsWith("/api/sgq-publico/")
+          path.startsWith("/api/sgq-publico/") ||
+          // Assinatura eletronica de documento (Treinamentos / Auditoria) — publico via token
+          path.startsWith("/assinar/") ||
+          path.startsWith("/api/assinar/")
         ) {
           return true;
         }
