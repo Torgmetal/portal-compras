@@ -69,14 +69,6 @@ export async function GET(req) {
 }
 
 export async function DELETE(req) {
-  let user;
-  try {
-    user = await requireRole(["ADMIN"]);
-  } catch (e) {
-    const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: e.message }, { status });
-  }
-
   // Suporta: ?op=X (uma OP), body { ops: [...] } (várias OPs) OU body { ids: [...] }
   // (peças específicas selecionadas na tela).
   let opsParaDeletar = [];
@@ -102,8 +94,20 @@ export async function DELETE(req) {
     return NextResponse.json({ error: "Informe OP(s) (?op= ou body { ops: [] }) ou peças (body { ids: [] })" }, { status: 400 });
   }
 
+  // Permissão pelo tipo (Vitor 09/08): excluir PEÇAS selecionadas (ids) → todos os perfis
+  // que acessam a Programação de Corte; excluir OP INTEIRA (ops / ?op=) continua só ADMIN.
+  const porIds = idsParaDeletar.length > 0;
+  let user;
   try {
-    const porIds = idsParaDeletar.length > 0;
+    user = await requireRole(porIds
+      ? ["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"] // mesmos perfis do guard da tela de Corte
+      : ["ADMIN"]);
+  } catch (e) {
+    const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
+    return NextResponse.json({ error: e.message }, { status });
+  }
+
+  try {
     const deleted = await prisma.pecaConjunto.deleteMany({
       where: porIds ? { id: { in: idsParaDeletar } } : { opNumero: { in: opsParaDeletar } },
     });
