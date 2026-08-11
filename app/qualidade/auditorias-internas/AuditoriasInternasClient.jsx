@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ClipboardList, Plus, Loader2, X, AlertCircle, CheckCircle2, CalendarDays, FileText, ListChecks, Archive } from "lucide-react";
+import { ClipboardList, Plus, Loader2, X, AlertCircle, CheckCircle2, CalendarDays, FileText, ListChecks, Archive, FileDown, Send, PenLine, Clock, Trash2 } from "lucide-react";
 import { numRAI, SETORES_AUDITORIA, STATUS_AI, statusAiLabel } from "@/lib/auditoria-interna";
 import PlanosAcaoLista from "./PlanosAcaoLista";
 
@@ -15,6 +15,7 @@ export default function AuditoriasInternasClient() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(false);
+  const [assinaturaOpen, setAssinaturaOpen] = useState(false);
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -38,7 +39,15 @@ export default function AuditoriasInternasClient() {
           <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight flex items-center gap-2"><ClipboardList className="text-torg-blue" /> Auditorias Internas</h1>
           <p className="text-xs text-torg-gray mt-0.5">Programe as auditorias dos setores, emita o relatório e acompanhe os planos de ação.</p>
         </div>
-        {aba !== "planos" && aba !== "historico" && <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova auditoria</button>}
+        <div className="flex items-center gap-2 flex-wrap">
+          {aba === "cronograma" && (
+            <>
+              <a href="/api/qualidade/auditorias-internas/pdf" target="_blank" rel="noopener noreferrer" className="px-3.5 py-2.5 bg-white text-torg-dark border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 text-sm"><FileDown size={16} /> Exportar PDF</a>
+              <button onClick={() => setAssinaturaOpen(true)} className="px-3.5 py-2.5 bg-white text-torg-blue border border-torg-blue/40 rounded-lg hover:bg-torg-blue-50/50 font-medium flex items-center gap-2 text-sm"><Send size={16} /> Enviar p/ assinatura</button>
+            </>
+          )}
+          {aba !== "planos" && aba !== "historico" && <button onClick={() => setModal(true)} className="px-4 py-2.5 bg-torg-blue text-white rounded-lg hover:bg-torg-dark font-medium flex items-center gap-2"><Plus size={18} /> Nova auditoria</button>}
+        </div>
       </div>
 
       {/* Abas */}
@@ -152,6 +161,105 @@ export default function AuditoriasInternasClient() {
       )}
 
       {modal && <ModalNova onClose={() => setModal(false)} onCriada={(id) => router.push(`/qualidade/auditorias-internas/${id}`)} />}
+      {assinaturaOpen && <AssinaturaModal onClose={() => setAssinaturaOpen(false)} />}
+    </div>
+  );
+}
+
+const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
+const fmtRev = (n) => `R${String(n ?? 0).padStart(2, "0")}`;
+
+function AssinaturaModal({ onClose }) {
+  const [dest, setDest] = useState([{ nome: "", email: "", setor: "" }]);
+  const [envios, setEnvios] = useState([]);
+  const [revisao, setRevisao] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [ok, setOk] = useState("");
+
+  const carregar = useCallback(() => {
+    setLoading(true);
+    fetch("/api/qualidade/auditorias-internas/assinatura").then((r) => (r.ok ? r.json() : null))
+      .then((j) => { setEnvios(j?.envios || []); setRevisao(j?.revisaoAtual ?? 0); })
+      .catch(() => {}).finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const setLinha = (i, k, v) => setDest((p) => p.map((d, j) => (j === i ? { ...d, [k]: v } : d)));
+  const addLinha = () => setDest((p) => [...p, { nome: "", email: "", setor: "" }]);
+  const rmLinha = (i) => setDest((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : p));
+
+  async function enviar() {
+    setErro(""); setOk("");
+    const validos = dest.filter((d) => d.nome.trim() && /.+@.+\..+/.test(d.email.trim()));
+    if (!validos.length) return setErro("Informe ao menos um destinatário com nome e e-mail válido.");
+    setEnviando(true);
+    try {
+      const r = await fetch("/api/qualidade/auditorias-internas/assinatura", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ destinatarios: validos }) });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao enviar");
+      setOk(`Enviado para ${j.enviados} de ${j.total} destinatário(s).`);
+      setDest([{ nome: "", email: "", setor: "" }]);
+      carregar();
+    } catch (e) { setErro(e.message); } finally { setEnviando(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl my-6">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><PenLine size={16} className="text-torg-blue" /> Enviar cronograma p/ assinatura</h3>
+            <p className="text-[11px] text-torg-gray mt-0.5">Revisão atual <strong className="text-torg-dark">{fmtRev(revisao)}</strong> · o PDF vai anexado e o setor assina eletronicamente (confirmação + data + IP).</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-xs font-medium text-torg-dark">Destinatários</p>
+          {dest.map((d, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2 items-center">
+              <input value={d.nome} onChange={(e) => setLinha(i, "nome", e.target.value)} placeholder="Nome" className="col-span-4 text-sm border border-gray-300 rounded-lg px-2.5 py-2" />
+              <input value={d.email} onChange={(e) => setLinha(i, "email", e.target.value)} placeholder="e-mail" className="col-span-4 text-sm border border-gray-300 rounded-lg px-2.5 py-2" />
+              <input value={d.setor} onChange={(e) => setLinha(i, "setor", e.target.value)} placeholder="Setor" className="col-span-3 text-sm border border-gray-300 rounded-lg px-2.5 py-2" />
+              <button onClick={() => rmLinha(i)} className="col-span-1 text-gray-400 hover:text-red-500 flex justify-center" title="Remover"><Trash2 size={15} /></button>
+            </div>
+          ))}
+          <button onClick={addLinha} className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"><Plus size={13} /> Adicionar destinatário</button>
+
+          {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
+          {ok && <p className="text-[12px] text-emerald-600 flex items-center gap-1"><CheckCircle2 size={13} /> {ok}</p>}
+
+          {!loading && envios.length > 0 && (
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-xs font-medium text-torg-dark mb-2">Envios anteriores</p>
+              <div className="space-y-2 max-h-56 overflow-y-auto">
+                {envios.map((e) => (
+                  <div key={e.id} className="border border-gray-100 rounded-lg p-2.5">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[12px] font-semibold text-torg-dark">{fmtRev(e.revisao)}</span>
+                      <span className="text-[10px] text-torg-gray">{fmtDT(e.enviadoEm)}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {e.assinaturas.map((a) => (
+                        <span key={a.id} className={`px-2 py-0.5 rounded-full text-[10px] font-medium inline-flex items-center gap-1 ${a.assinadoEm ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`} title={a.assinadoEm ? `Assinado ${fmtDT(a.assinadoEm)}${a.ip ? " · IP " + a.ip : ""}` : "Aguardando assinatura"}>
+                          {a.assinadoEm ? <CheckCircle2 size={11} /> : <Clock size={11} />} {a.nome}{a.setor ? ` · ${a.setor}` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Fechar</button>
+          <button onClick={enviar} disabled={enviando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium flex items-center gap-1.5 disabled:opacity-50">{enviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Enviar e-mails</button>
+        </div>
+      </div>
     </div>
   );
 }

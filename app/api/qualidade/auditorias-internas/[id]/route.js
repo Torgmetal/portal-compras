@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { acoesPendentes } from "@/lib/auditoria-interna";
+import { bumpRevisao } from "@/lib/assinatura-doc";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -101,6 +102,10 @@ export async function PATCH(req, { params }) {
   }
 
   await prisma.auditoriaInterna.update({ where: { id: atual.id }, data });
+  // Mudou algo do CRONOGRAMA (setor/data/responsável) → sobe a revisão do documento.
+  if (data.setor !== undefined || data.dataAuditoria !== undefined || data.responsavelAcompanhamento !== undefined) {
+    await bumpRevisao("CRONOGRAMA_AUDITORIA").catch(() => {});
+  }
   if (body.finalizar || body.reabrir) {
     await prisma.auditLog.create({ data: { userId: user.id, action: body.finalizar ? "FINALIZAR_AUDITORIA_INTERNA" : "REABRIR_AUDITORIA_INTERNA", entity: "AuditoriaInterna", entityId: atual.id, diff: {} } }).catch(() => {});
   }
@@ -113,5 +118,6 @@ export async function DELETE(_req, { params }) {
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   await prisma.auditoriaInterna.delete({ where: { id: params.id } });
   await prisma.auditLog.create({ data: { userId: user.id, action: "EXCLUIR_AUDITORIA_INTERNA", entity: "AuditoriaInterna", entityId: params.id, diff: {} } }).catch(() => {});
+  await bumpRevisao("CRONOGRAMA_AUDITORIA").catch(() => {});
   return NextResponse.json({ success: true });
 }
