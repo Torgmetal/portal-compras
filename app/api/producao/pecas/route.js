@@ -100,8 +100,8 @@ export async function DELETE(req) {
   let user;
   try {
     user = await requireRole(porIds
-      ? ["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"] // mesmos perfis do guard da tela de Corte
-      : ["ADMIN"]);
+      ? ["ADMIN", "PRODUCAO", "PCP", "PLANEJAMENTO", "ENGENHARIA", "COMERCIAL", "COMPRAS", "EXPEDICAO"] // todos os perfis que acessam as telas de peças/corte (Corte, PCP, Fila, Listas Eng., Expedição)
+      : ["ADMIN"]); // excluir OP INTEIRA (ops / ?op=) continua só ADMIN
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : e.message === "Forbidden" ? 403 : 500;
     return NextResponse.json({ error: e.message }, { status });

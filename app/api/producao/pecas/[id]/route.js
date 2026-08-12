@@ -55,9 +55,9 @@ export async function PATCH(req, { params }) {
 export async function DELETE(req, { params }) {
   let user;
   try {
-    // Mesmos perfis do guard da tela de Programação de Corte (Vitor 09/08) — antes só ADMIN.
-    // O auditLog abaixo mantém o registro de QUEM excluiu.
-    user = await requireRole(["ADMIN", "COMERCIAL", "COMPRAS", "PRODUCAO"]);
+    // Todos os perfis que acessam as telas de peças/corte (Corte, PCP/Pecas-Corte, Fila de Corte,
+    // Listas de Engenharia, Expedição). O auditLog abaixo mantém o registro de QUEM excluiu.
+    user = await requireRole(["ADMIN", "PRODUCAO", "PCP", "PLANEJAMENTO", "ENGENHARIA", "COMERCIAL", "COMPRAS", "EXPEDICAO"]);
   } catch {
     return NextResponse.json({ error: "Sem permissao" }, { status: 403 });
   }
