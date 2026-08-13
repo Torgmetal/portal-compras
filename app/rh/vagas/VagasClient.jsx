@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Briefcase, Search, PlusCircle, Loader2, AlertCircle, X,
   ChevronDown, Clock, CheckCircle2, XCircle, Users, AlertTriangle,
-  ArrowRight, Calendar, Filter,
+  ArrowRight, Calendar, Filter, Mail, Send, Image as ImageIcon,
+  Download, Palette, CheckCircle,
 } from "lucide-react";
 
 const STATUS_LABELS = {
@@ -46,6 +47,10 @@ export default function VagasClient() {
   // Modal status
   const [modalStatus, setModalStatus] = useState(null);
   const [atualizando, setAtualizando] = useState(false);
+  // E-mails de aprovação + arte de divulgação
+  const [aviso, setAviso] = useState("");
+  const [notificando, setNotificando] = useState("");
+  const [arteVaga, setArteVaga] = useState(null);
 
   const carregar = async () => {
     setCarregando(true);
@@ -146,6 +151,29 @@ export default function VagasClient() {
     }
   };
 
+  // Enviar e-mail: pedir aprovação (→ aprovadores) ou avisar o RH (→ time de RH)
+  const notificar = async (vaga, tipo) => {
+    setNotificando(`${vaga.id}:${tipo}`);
+    setErro("");
+    setAviso("");
+    try {
+      const res = await fetch(`/api/rh/vagas/${vaga.id}/notificar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha ao enviar e-mail");
+      const alvo = tipo === "APROVADA" ? "o RH" : "os aprovadores";
+      setAviso(`E-mail enviado para ${alvo} (${data.enviados} destinatário${data.enviados !== 1 ? "s" : ""}).`);
+      setTimeout(() => setAviso(""), 6000);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setNotificando("");
+    }
+  };
+
   // Contadores
   const abertas = vagas.filter((v) => !["PREENCHIDA", "CANCELADA"].includes(v.status)).length;
   const urgentes = vagas.filter((v) => v.prioridade === "URGENTE" && !["PREENCHIDA", "CANCELADA"].includes(v.status)).length;
@@ -181,6 +209,11 @@ export default function VagasClient() {
       {erro && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
           <AlertCircle size={14} className="mt-0.5 shrink-0" /> {erro}
+        </div>
+      )}
+      {aviso && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+          <CheckCircle size={14} className="mt-0.5 shrink-0" /> {aviso}
         </div>
       )}
 
@@ -272,23 +305,48 @@ export default function VagasClient() {
 
                 {/* Ações */}
                 {aberta && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2">
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 flex-wrap">
                     {v.status === "SOLICITADA" && (
-                      <button onClick={() => handleStatusChange(v, "APROVADA")}
-                        className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition">
-                        Aprovar
-                      </button>
+                      <>
+                        <button onClick={() => handleStatusChange(v, "APROVADA")}
+                          className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition">
+                          Aprovar
+                        </button>
+                        <button onClick={() => notificar(v, "SOLICITAR_APROVACAO")}
+                          disabled={notificando === `${v.id}:SOLICITAR_APROVACAO`}
+                          title="Enviar e-mail aos aprovadores pedindo a liberação desta vaga"
+                          className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition inline-flex items-center gap-1.5 disabled:opacity-50">
+                          {notificando === `${v.id}:SOLICITAR_APROVACAO` ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                          Solicitar aprovação
+                        </button>
+                      </>
                     )}
                     {v.status === "APROVADA" && (
-                      <button onClick={() => handleStatusChange(v, "EM_RECRUTAMENTO")}
-                        className="px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition">
-                        Iniciar Recrutamento
-                      </button>
+                      <>
+                        <button onClick={() => handleStatusChange(v, "EM_RECRUTAMENTO")}
+                          className="px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition">
+                          Iniciar Recrutamento
+                        </button>
+                        <button onClick={() => notificar(v, "APROVADA")}
+                          disabled={notificando === `${v.id}:APROVADA`}
+                          title="Avisar o time de RH por e-mail que a vaga foi liberada"
+                          className="px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition inline-flex items-center gap-1.5 disabled:opacity-50">
+                          {notificando === `${v.id}:APROVADA` ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+                          Avisar RH
+                        </button>
+                      </>
                     )}
                     {v.status === "EM_RECRUTAMENTO" && (
                       <button onClick={() => handleStatusChange(v, "PREENCHIDA")}
                         className="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
                         Marcar Preenchida
+                      </button>
+                    )}
+                    {["APROVADA", "EM_RECRUTAMENTO"].includes(v.status) && (
+                      <button onClick={() => setArteVaga(v)}
+                        title="Gerar arte para Instagram, Facebook e LinkedIn"
+                        className="px-3 py-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition inline-flex items-center gap-1.5">
+                        <Palette size={12} /> Gerar arte
                       </button>
                     )}
                     <button onClick={() => handleStatusChange(v, "CANCELADA")}
@@ -376,6 +434,9 @@ export default function VagasClient() {
           </div>
         </div>
       )}
+
+      {/* Modal Gerar Arte */}
+      {arteVaga && <ArteModal vaga={arteVaga} onClose={() => setArteVaga(null)} />}
     </div>
   );
 }
@@ -400,6 +461,246 @@ function Sel({ label, value, onChange, options }) {
           {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────── Arte de divulgação (Instagram / Facebook / LinkedIn) ─────────────────────────
+// Renderiza no <canvas> do navegador — a foto nunca sai do dispositivo; baixa PNG pronto.
+const OBRAS_ARTE = [
+  { nome: "Planta industrial", src: "/obras/planta-industrial.jpg" },
+  { nome: "Ponte (pôr do sol)", src: "/obras/ponte-sunset.jpg" },
+  { nome: "Ponte treliçada", src: "/obras/ponte-trelica.jpg" },
+  { nome: "Torre / escada", src: "/obras/torre-escada.jpg" },
+];
+const TIPO_ARTE = { CLT: "CLT", PJ: "PJ", ESTAGIO: "Estágio", TEMPORARIO: "Temporário" };
+
+function slugArte(s) {
+  return (String(s || "vaga").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40)) || "vaga";
+}
+
+function wrapArte(ctx, text, maxW, maxLines) {
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lines = [];
+  let cur = "";
+  for (const w of words) {
+    const test = cur ? cur + " " + w : w;
+    if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; } else cur = test;
+  }
+  if (cur) lines.push(cur);
+  if (lines.length > maxLines) {
+    const kept = lines.slice(0, maxLines);
+    let last = kept[maxLines - 1];
+    while (last && ctx.measureText(last + "…").width > maxW) last = last.slice(0, -1);
+    kept[maxLines - 1] = (last || "").trimEnd() + "…";
+    return kept;
+  }
+  return lines;
+}
+
+function roundRectArte(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) { ctx.roundRect(x, y, w, h, r); return; }
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function ArteModal({ vaga, onClose }) {
+  const canvasRef = useRef(null);
+  const [formato, setFormato] = useState("feed"); // feed 1080×1080 | story 1080×1920
+  const [fotoSrc, setFotoSrc] = useState(OBRAS_ARTE[0].src);
+  const [fotoLabel, setFotoLabel] = useState(OBRAS_ARTE[0].nome);
+  const [headline, setHeadline] = useState("ESTAMOS CONTRATANDO");
+  const [titulo, setTitulo] = useState((vaga.titulo || vaga.cargo?.nome || "").toUpperCase());
+  const [contato, setContato] = useState("Trabalhe conosco · torg.com.br");
+  const [imgObra, setImgObra] = useState(null);
+  const [logo, setLogo] = useState(null);
+
+  const subInfo = [vaga.setor?.nome, `${vaga.quantidade} vaga${vaga.quantidade !== 1 ? "s" : ""}`, TIPO_ARTE[vaga.tipo] || vaga.tipo]
+    .filter(Boolean).join("   ·   ");
+
+  useEffect(() => {
+    const l = new window.Image();
+    l.onload = () => setLogo(l);
+    l.src = "/torg-logo-white.png";
+  }, []);
+
+  useEffect(() => {
+    if (!fotoSrc) { setImgObra(null); return; }
+    const im = new window.Image();
+    im.crossOrigin = "anonymous";
+    im.onload = () => setImgObra(im);
+    im.onerror = () => setImgObra(null);
+    im.src = fotoSrc;
+  }, [fotoSrc]);
+
+  useEffect(() => { desenhar(); }, [formato, imgObra, logo, headline, titulo, contato]); // eslint-disable-line
+
+  function desenhar() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const W = 1080, H = formato === "story" ? 1920 : 1080;
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+    const ctx = canvas.getContext("2d");
+    const NAVY = "#0D1F3C", ORANGE = "#F4801F";
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = NAVY; ctx.fillRect(0, 0, W, H);
+
+    // Foto de obra (cover)
+    if (imgObra && imgObra.width) {
+      const ir = imgObra.width / imgObra.height, cr = W / H;
+      let dw, dh, dx, dy;
+      if (ir > cr) { dh = H; dw = H * ir; dx = (W - dw) / 2; dy = 0; }
+      else { dw = W; dh = W / ir; dx = 0; dy = (H - dh) / 2; }
+      ctx.drawImage(imgObra, dx, dy, dw, dh);
+    }
+
+    // Gradiente navy p/ legibilidade
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "rgba(13,31,60,0.55)");
+    g.addColorStop(0.35, "rgba(13,31,60,0.18)");
+    g.addColorStop(0.68, "rgba(13,31,60,0.78)");
+    g.addColorStop(1, "rgba(13,31,60,0.97)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    const M = 84;
+
+    // Logo (topo-esquerda) + acento laranja (topo-direita)
+    if (logo && logo.width) {
+      const lh = 90, lw = lh * (logo.width / logo.height);
+      ctx.drawImage(logo, M, M - 6, lw, lh);
+    }
+    ctx.fillStyle = ORANGE; ctx.fillRect(W - M - 120, M + 34, 120, 8);
+
+    // ── Bloco inferior (medido → alinhado à base) ──
+    const TITLE = 90, lhTitle = TITLE * 1.1;
+    ctx.font = `800 ${TITLE}px Arial, sans-serif`;
+    const linhas = wrapArte(ctx, titulo || "", W - 2 * M, 3);
+
+    const pillTxt = (headline || "").toUpperCase().trim();
+    ctx.font = `800 34px Arial, sans-serif`;
+    const pillW = pillTxt ? ctx.measureText(pillTxt).width + 56 : 0;
+    const pillH = pillTxt ? 66 : 0;
+
+    const gapPill = pillTxt ? 30 : 0;
+    const gapSub = 22, subH = subInfo ? 44 : 0;
+    const salH = vaga.salarioFaixa ? 44 : 0;
+    const gapDiv = 30, ctaH = 40;
+    const blocoH = pillH + gapPill + linhas.length * lhTitle + gapSub + subH + salH + gapDiv + 5 + gapDiv + ctaH;
+
+    let cy = H - M - blocoH;
+
+    // Pill headline
+    if (pillTxt) {
+      roundRectArte(ctx, M, cy, pillW, pillH, 10);
+      ctx.fillStyle = ORANGE; ctx.fill();
+      ctx.fillStyle = NAVY; ctx.textBaseline = "middle";
+      ctx.fillText(pillTxt, M + 28, cy + pillH / 2 + 2);
+      cy += pillH + gapPill;
+    }
+
+    // Título (cargo)
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#ffffff"; ctx.font = `800 ${TITLE}px Arial, sans-serif`;
+    ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 2;
+    for (const ln of linhas) { ctx.fillText(ln, M, cy); cy += lhTitle; }
+    ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+    cy += gapSub;
+    if (subInfo) { ctx.fillStyle = "#e2e8f0"; ctx.font = `600 34px Arial, sans-serif`; ctx.fillText(subInfo, M, cy); cy += subH; }
+    if (vaga.salarioFaixa) { ctx.fillStyle = ORANGE; ctx.font = `700 32px Arial, sans-serif`; ctx.fillText(vaga.salarioFaixa, M, cy); cy += salH; }
+
+    cy += gapDiv;
+    ctx.fillStyle = ORANGE; ctx.fillRect(M, cy, 96, 5); cy += 5 + gapDiv;
+    ctx.fillStyle = "#ffffff"; ctx.font = `700 34px Arial, sans-serif`; ctx.fillText(contato || "", M, cy);
+    ctx.textBaseline = "alphabetic";
+  }
+
+  const onUpload = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { setFotoSrc(String(rd.result)); setFotoLabel(f.name); };
+    rd.readAsDataURL(f);
+  };
+
+  const baixar = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.download = `vaga-${slugArte(vaga.titulo || vaga.cargo?.nome)}-${formato}.png`;
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[94vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-torg-dark flex items-center gap-2"><Palette size={18} className="text-torg-orange" /> Gerar arte de divulgação</h3>
+            <p className="text-xs text-torg-gray mt-0.5">{vaga.titulo} · {vaga.setor?.nome}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="grid md:grid-cols-2">
+          {/* Controles */}
+          <div className="p-5 space-y-4 md:border-r border-gray-100">
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1.5">Formato</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => setFormato("feed")}
+                  className={`px-3 py-2 text-sm rounded-lg border transition ${formato === "feed" ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:bg-gray-50"}`}>
+                  Feed 1:1
+                </button>
+                <button onClick={() => setFormato("story")}
+                  className={`px-3 py-2 text-sm rounded-lg border transition ${formato === "story" ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200 hover:bg-gray-50"}`}>
+                  Story 9:16
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1.5">Foto de obra</label>
+              <div className="grid grid-cols-5 gap-2">
+                {OBRAS_ARTE.map((o) => (
+                  <button key={o.src} onClick={() => { setFotoSrc(o.src); setFotoLabel(o.nome); }} title={o.nome}
+                    className={`h-14 rounded-lg bg-cover bg-center border-2 transition ${fotoSrc === o.src ? "border-torg-blue ring-2 ring-torg-blue/30" : "border-transparent hover:border-gray-300"}`}
+                    style={{ backgroundImage: `url(${o.src})` }} />
+                ))}
+                <label className="h-14 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:bg-gray-50 text-gray-400" title="Enviar outra foto">
+                  <input type="file" accept="image/*" className="hidden" onChange={onUpload} />
+                  <ImageIcon size={16} />
+                </label>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1 truncate">{fotoLabel}</p>
+            </div>
+
+            <Campo label="Chamada (topo)" value={headline} onChange={setHeadline} placeholder="ESTAMOS CONTRATANDO" />
+            <Campo label="Cargo / título" value={titulo} onChange={setTitulo} placeholder="Ex: SOLDADOR MIG/MAG" />
+            <Campo label="Contato / chamada final" value={contato} onChange={setContato} placeholder="Envie seu currículo · torg.com.br" />
+          </div>
+
+          {/* Preview */}
+          <div className="p-5 bg-slate-50 flex flex-col items-center justify-center gap-4">
+            <canvas ref={canvasRef} className="block rounded-xl shadow-lg" style={{ maxHeight: "52vh", maxWidth: "100%" }} />
+            <button onClick={baixar}
+              className="w-full px-4 py-2.5 bg-torg-orange text-white text-sm font-semibold rounded-lg hover:bg-torg-orange/90 inline-flex items-center justify-center gap-2">
+              <Download size={16} /> Baixar PNG ({formato === "story" ? "Story 1080×1920" : "Feed 1080×1080"})
+            </button>
+            <p className="text-[11px] text-center text-gray-400 leading-relaxed">
+              Serve para o feed e stories do Instagram, Facebook e LinkedIn.<br />Troque o formato e baixe as duas versões.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
