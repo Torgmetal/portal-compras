@@ -350,7 +350,7 @@ export default function VagasClient() {
                       </button>
                     )}
                     <button onClick={() => handleStatusChange(v, "CANCELADA")}
-                      className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition ml-auto">
+                      className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition">
                       Cancelar
                     </button>
                   </div>
@@ -512,6 +512,36 @@ function roundRectArte(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// Selos de benefícios (chips com check laranja) — layout com wrap + desenho.
+function chipsLayout(ctx, chips, maxW) {
+  ctx.font = `600 27px Arial, sans-serif`;
+  const h = 52, gap = 14, padX = 26, checkW = 34;
+  const items = []; let x = 0, row = 0;
+  for (const t of chips) {
+    const w = ctx.measureText(t).width + padX * 2 + checkW;
+    if (x !== 0 && x + w > maxW) { x = 0; row++; }
+    items.push({ t, w, x, row }); x += w + gap;
+  }
+  const rows = items.length ? items[items.length - 1].row + 1 : 0;
+  return { items, h, gap, padX, checkW, totalH: rows ? rows * h + (rows - 1) * gap : 0 };
+}
+
+function drawChips(ctx, x0, y0, chips, ORANGE) {
+  const { items, h, gap, padX, checkW } = chips;
+  ctx.font = `600 27px Arial, sans-serif`; ctx.textBaseline = "middle";
+  for (const it of items) {
+    const bx = x0 + it.x, by = y0 + it.row * (h + gap);
+    roundRectArte(ctx, bx, by, it.w, h, h / 2);
+    ctx.fillStyle = "rgba(255,255,255,0.14)"; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(255,255,255,0.32)"; ctx.stroke();
+    const ccx = bx + padX + checkW / 2, ccy = by + h / 2;
+    ctx.strokeStyle = ORANGE; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(ccx - 9, ccy); ctx.lineTo(ccx - 3, ccy + 7); ctx.lineTo(ccx + 9, ccy - 8); ctx.stroke();
+    ctx.lineCap = "butt";
+    ctx.fillStyle = "#ffffff"; ctx.fillText(it.t, bx + padX + checkW, by + h / 2 + 1);
+  }
+}
+
 function ArteModal({ vaga, onClose }) {
   const canvasRef = useRef(null);
   const [formato, setFormato] = useState("feed"); // feed 1080×1080 | story 1080×1920
@@ -520,6 +550,7 @@ function ArteModal({ vaga, onClose }) {
   const [headline, setHeadline] = useState("ESTAMOS CONTRATANDO");
   const [titulo, setTitulo] = useState((vaga.titulo || vaga.cargo?.nome || "").toUpperCase());
   const [mensagem, setMensagem] = useState("Venha fazer parte de uma equipe engajada em crescer e construir grandes obras.");
+  const [beneficios, setBeneficios] = useState("Plano de Saúde, Vale Refeição");
   const [contato, setContato] = useState("Envie seu currículo: rh@torg.com.br");
   const [imgObra, setImgObra] = useState(null);
   const [logo, setLogo] = useState(null);
@@ -530,6 +561,7 @@ function ArteModal({ vaga, onClose }) {
   const [legenda, setLegenda] = useState(
     `🏗️ Estamos contratando: ${vaga.titulo}${vaga.setor?.nome ? " — " + vaga.setor.nome : ""}\n\n` +
     `Venha fazer parte de uma equipe engajada em crescer e construir grandes obras em estruturas metálicas. Aqui o seu trabalho faz parte de projetos que ficam de pé.\n\n` +
+    `✅ Benefícios: Plano de Saúde e Vale Refeição.\n\n` +
     `📩 Envie seu currículo para rh@torg.com.br\n\n` +
     `#vagas #trabalheconosco #estruturasmetalicas #torgmetal`
   );
@@ -553,7 +585,7 @@ function ArteModal({ vaga, onClose }) {
     im.src = fotoSrc;
   }, [fotoSrc]);
 
-  useEffect(() => { desenhar(); }, [formato, imgObra, logo, headline, titulo, mensagem, contato]); // eslint-disable-line
+  useEffect(() => { desenhar(); }, [formato, imgObra, logo, headline, titulo, mensagem, beneficios, contato]); // eslint-disable-line
 
   function desenhar() {
     const canvas = canvasRef.current;
@@ -606,8 +638,11 @@ function ArteModal({ vaga, onClose }) {
     ctx.font = `600 32px Arial, sans-serif`;
     const mLines = mensagem ? wrapArte(ctx, mensagem, W - 2 * M, 2) : [];
     const gapMsg = mLines.length ? 18 : 0, msgH = mLines.length * 40;
+    const benef = beneficios ? beneficios.split(",").map((s) => s.trim()).filter(Boolean) : [];
+    const chips = benef.length ? chipsLayout(ctx, benef, W - 2 * M) : null;
+    const gapBenef = chips ? 24 : 0, benefH = chips ? chips.totalH : 0;
     const gapDiv = 30, ctaH = 40;
-    const blocoH = pillH + gapPill + linhas.length * lhTitle + gapSub + subH + gapMsg + msgH + gapDiv + 5 + gapDiv + ctaH;
+    const blocoH = pillH + gapPill + linhas.length * lhTitle + gapSub + subH + gapMsg + msgH + gapBenef + benefH + gapDiv + 5 + gapDiv + ctaH;
 
     let cy = H - M - blocoH;
 
@@ -630,9 +665,11 @@ function ArteModal({ vaga, onClose }) {
     cy += gapSub;
     if (subInfo) { ctx.fillStyle = "#e2e8f0"; ctx.font = `600 34px Arial, sans-serif`; ctx.fillText(subInfo, M, cy); cy += subH; }
     if (mLines.length) { cy += gapMsg; ctx.fillStyle = "#f1f5f9"; ctx.font = `600 32px Arial, sans-serif`; for (const ln of mLines) { ctx.fillText(ln, M, cy); cy += 40; } }
+    if (chips) { cy += gapBenef; drawChips(ctx, M, cy, chips, ORANGE); cy += benefH; }
 
     cy += gapDiv;
     ctx.fillStyle = ORANGE; ctx.fillRect(M, cy, 96, 5); cy += 5 + gapDiv;
+    ctx.textBaseline = "top";
     ctx.fillStyle = "#ffffff"; ctx.font = `700 34px Arial, sans-serif`; ctx.fillText(contato || "", M, cy);
     ctx.textBaseline = "alphabetic";
   }
@@ -706,6 +743,7 @@ function ArteModal({ vaga, onClose }) {
                 placeholder="Ex: Venha fazer parte de uma equipe engajada em crescer."
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
             </div>
+            <Campo label="Benefícios (separe por vírgula)" value={beneficios} onChange={setBeneficios} placeholder="Plano de Saúde, Vale Refeição" />
             <Campo label="Contato / chamada final" value={contato} onChange={setContato} placeholder="Envie seu currículo: rh@torg.com.br" />
           </div>
 
