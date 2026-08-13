@@ -4,7 +4,7 @@ import {
   Briefcase, Search, PlusCircle, Loader2, AlertCircle, X,
   ChevronDown, Clock, CheckCircle2, XCircle, Users, AlertTriangle,
   ArrowRight, Calendar, Filter, Mail, Send, Image as ImageIcon,
-  Download, Palette, CheckCircle,
+  Download, Palette, CheckCircle, Copy,
 } from "lucide-react";
 
 const STATUS_LABELS = {
@@ -519,12 +519,26 @@ function ArteModal({ vaga, onClose }) {
   const [fotoLabel, setFotoLabel] = useState(OBRAS_ARTE[0].nome);
   const [headline, setHeadline] = useState("ESTAMOS CONTRATANDO");
   const [titulo, setTitulo] = useState((vaga.titulo || vaga.cargo?.nome || "").toUpperCase());
-  const [contato, setContato] = useState("Trabalhe conosco · torg.com.br");
+  const [mensagem, setMensagem] = useState("Mais que salário: benefícios e a oportunidade de crescer construindo grandes obras.");
+  const [contato, setContato] = useState("Envie seu currículo: rh@torg.com.br");
   const [imgObra, setImgObra] = useState(null);
   const [logo, setLogo] = useState(null);
+  const [copiado, setCopiado] = useState(false);
 
   const subInfo = [vaga.setor?.nome, `${vaga.quantidade} vaga${vaga.quantidade !== 1 ? "s" : ""}`, TIPO_ARTE[vaga.tipo] || vaga.tipo]
     .filter(Boolean).join("   ·   ");
+
+  const [legenda, setLegenda] = useState(
+    `🏗️ Estamos contratando: ${vaga.titulo}${vaga.setor?.nome ? " — " + vaga.setor.nome : ""}\n\n` +
+    `${vaga.quantidade} vaga${vaga.quantidade !== 1 ? "s" : ""}${TIPO_ARTE[vaga.tipo] ? " · " + TIPO_ARTE[vaga.tipo] : ""}. ` +
+    `Na Torg Metal você tem mais que um salário: oferecemos um pacote de benefícios e espaço para crescer construindo grandes obras em estruturas metálicas.\n\n` +
+    `📩 Envie seu currículo para rh@torg.com.br\n\n` +
+    `#vagas #trabalheconosco #estruturasmetalicas #torgmetal`
+  );
+
+  const copiarLegenda = async () => {
+    try { await navigator.clipboard.writeText(legenda); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { /* clipboard indisponível */ }
+  };
 
   useEffect(() => {
     const l = new window.Image();
@@ -541,7 +555,7 @@ function ArteModal({ vaga, onClose }) {
     im.src = fotoSrc;
   }, [fotoSrc]);
 
-  useEffect(() => { desenhar(); }, [formato, imgObra, logo, headline, titulo, contato]); // eslint-disable-line
+  useEffect(() => { desenhar(); }, [formato, imgObra, logo, headline, titulo, mensagem, contato]); // eslint-disable-line
 
   function desenhar() {
     const canvas = canvasRef.current;
@@ -592,8 +606,11 @@ function ArteModal({ vaga, onClose }) {
     const gapPill = pillTxt ? 30 : 0;
     const gapSub = 22, subH = subInfo ? 44 : 0;
     const salH = vaga.salarioFaixa ? 44 : 0;
+    ctx.font = `600 32px Arial, sans-serif`;
+    const mLines = mensagem ? wrapArte(ctx, mensagem, W - 2 * M, 2) : [];
+    const gapMsg = mLines.length ? 18 : 0, msgH = mLines.length * 40;
     const gapDiv = 30, ctaH = 40;
-    const blocoH = pillH + gapPill + linhas.length * lhTitle + gapSub + subH + salH + gapDiv + 5 + gapDiv + ctaH;
+    const blocoH = pillH + gapPill + linhas.length * lhTitle + gapSub + subH + salH + gapMsg + msgH + gapDiv + 5 + gapDiv + ctaH;
 
     let cy = H - M - blocoH;
 
@@ -616,6 +633,7 @@ function ArteModal({ vaga, onClose }) {
     cy += gapSub;
     if (subInfo) { ctx.fillStyle = "#e2e8f0"; ctx.font = `600 34px Arial, sans-serif`; ctx.fillText(subInfo, M, cy); cy += subH; }
     if (vaga.salarioFaixa) { ctx.fillStyle = ORANGE; ctx.font = `700 32px Arial, sans-serif`; ctx.fillText(vaga.salarioFaixa, M, cy); cy += salH; }
+    if (mLines.length) { cy += gapMsg; ctx.fillStyle = "#f1f5f9"; ctx.font = `600 32px Arial, sans-serif`; for (const ln of mLines) { ctx.fillText(ln, M, cy); cy += 40; } }
 
     cy += gapDiv;
     ctx.fillStyle = ORANGE; ctx.fillRect(M, cy, 96, 5); cy += 5 + gapDiv;
@@ -686,7 +704,13 @@ function ArteModal({ vaga, onClose }) {
 
             <Campo label="Chamada (topo)" value={headline} onChange={setHeadline} placeholder="ESTAMOS CONTRATANDO" />
             <Campo label="Cargo / título" value={titulo} onChange={setTitulo} placeholder="Ex: SOLDADOR MIG/MAG" />
-            <Campo label="Contato / chamada final" value={contato} onChange={setContato} placeholder="Envie seu currículo · torg.com.br" />
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1">Mensagem (benefícios)</label>
+              <textarea rows={2} value={mensagem} onChange={(e) => setMensagem(e.target.value)}
+                placeholder="Ex: Mais que salário: benefícios e espaço para crescer."
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+            </div>
+            <Campo label="Contato / chamada final" value={contato} onChange={setContato} placeholder="Envie seu currículo: rh@torg.com.br" />
           </div>
 
           {/* Preview */}
@@ -699,6 +723,17 @@ function ArteModal({ vaga, onClose }) {
             <p className="text-[11px] text-center text-gray-400 leading-relaxed">
               Serve para o feed e stories do Instagram, Facebook e LinkedIn.<br />Troque o formato e baixe as duas versões.
             </p>
+            <div className="w-full">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-torg-gray">Legenda para o post</label>
+                <button onClick={copiarLegenda}
+                  className="text-xs text-torg-blue hover:underline inline-flex items-center gap-1">
+                  {copiado ? <><CheckCircle size={12} /> Copiado</> : <><Copy size={12} /> Copiar</>}
+                </button>
+              </div>
+              <textarea rows={6} value={legenda} onChange={(e) => setLegenda(e.target.value)}
+                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue leading-relaxed" />
+            </div>
           </div>
         </div>
       </div>
