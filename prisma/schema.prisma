@@ -1742,6 +1742,18 @@ model Auditoria {
   dataBookModeloUrl  String? // PDF de Data Book modelo (exemplo p/ o cliente ver)
   checklistJson      Json? // status dos requisitos do GQ-FQ-003 { reqId: status }
   solicitacoes       String? // o que o cliente pediu (texto / e-mail colado)
+  // Relatório INTERNO da auditoria externa (apontamentos do auditor + plano de ação 5W2H
+  // próprio + fotos + conclusão). NÃO vai ao portal do auditor — registro/resposta da Torg.
+  numero             Int? // sequencial RAE-001
+  dataAuditoria      DateTime?
+  auditor            String? // auditor / certificadora que conduziu
+  norma              String? // referência (ISO 9001, NBR 16775…)
+  escopo             String?
+  constatacoes       Json           @default("[]") // [{ tipo: CONFORME|NAO_CONFORME|MELHORIA, descricao }]
+  planoAcao          Json           @default("[]") // 5W2H [{ oque, porque, onde, quem, quando, como, quanto, status, acompanhamento, concluidoEm }]
+  fotos              Json           @default("[]") // [{ url, legenda }]
+  conclusao          String?
+  relatorioEmitidoEm DateTime?
   token              String?        @unique
   status             String         @default("RASCUNHO") // RASCUNHO | PUBLICADO
   publicadoEm        DateTime?

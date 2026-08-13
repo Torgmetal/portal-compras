@@ -33,6 +33,21 @@ const schema = z.object({
   dataBookModeloUrl: z.string().url().nullable().optional(),
   checklistJson: z.any().optional(),
   solicitacoes: z.string().max(8000).nullable().optional(),
+  // Relatório interno (constatações + plano de ação 5W2H + fotos + conclusão)
+  dataAuditoria: z.string().nullable().optional(),
+  auditor: z.string().max(200).nullable().optional(),
+  norma: z.string().max(200).nullable().optional(),
+  escopo: z.string().max(4000).nullable().optional(),
+  conclusao: z.string().max(4000).nullable().optional(),
+  constatacoes: z.array(z.object({ tipo: z.enum(["CONFORME", "NAO_CONFORME", "MELHORIA"]), descricao: z.string().max(2000) })).optional(),
+  planoAcao: z.array(z.object({
+    oque: z.string().max(1000), porque: z.string().max(1000).nullable().optional(), onde: z.string().max(300).nullable().optional(),
+    quem: z.string().max(200).nullable().optional(), quando: z.string().nullable().optional(), como: z.string().max(1000).nullable().optional(),
+    quanto: z.string().max(200).nullable().optional(), status: z.enum(["A_FAZER", "EM_ANDAMENTO", "CONCLUIDO"]).optional(),
+    acompanhamento: z.string().max(2000).nullable().optional(), concluidoEm: z.string().nullable().optional(),
+  })).optional(),
+  fotos: z.array(z.object({ url: z.string().url(), legenda: z.string().max(300).nullable().optional() })).optional(),
+  emitir: z.boolean().optional(),
 });
 
 export async function PATCH(req, { params }) {
@@ -59,6 +74,30 @@ export async function PATCH(req, { params }) {
     if (body[k] !== undefined) data[k] = typeof body[k] === "string" ? (body[k].trim() || null) : body[k];
   }
   if (body.checklistJson !== undefined) data.checklistJson = body.checklistJson;
+
+  // ── Relatório interno ──
+  const dataDe = (s) => (s ? new Date(String(s).length <= 10 ? s + "T12:00:00Z" : s) : null);
+  if (body.dataAuditoria !== undefined) data.dataAuditoria = dataDe(body.dataAuditoria);
+  for (const k of ["auditor", "norma", "escopo", "conclusao"]) if (body[k] !== undefined) data[k] = (typeof body[k] === "string" ? body[k].trim() : "") || null;
+  if (body.constatacoes !== undefined) data.constatacoes = body.constatacoes.filter((c) => (c.descricao || "").trim()).map((c) => ({ tipo: c.tipo, descricao: c.descricao.trim() }));
+  if (body.planoAcao !== undefined) data.planoAcao = body.planoAcao.filter((p) => (p.oque || "").trim()).map((p) => ({
+    oque: p.oque.trim(), porque: (p.porque || "").trim() || null, onde: (p.onde || "").trim() || null, quem: (p.quem || "").trim() || null,
+    quando: p.quando || null, como: (p.como || "").trim() || null, quanto: (p.quanto || "").trim() || null, status: p.status || "A_FAZER",
+    acompanhamento: (p.acompanhamento || "").trim() || null, concluidoEm: p.status === "CONCLUIDO" ? (p.concluidoEm || new Date().toISOString()) : null,
+  }));
+  if (body.fotos !== undefined) data.fotos = body.fotos.filter((f) => (f.url || "").trim()).map((f) => ({ url: f.url, legenda: (f.legenda || "").trim() || null }));
+  if (body.emitir === true) data.relatorioEmitidoEm = new Date();
+
+  // Número RAE na primeira vez que o relatório ganha conteúdo (ou é emitido).
+  const temRelatorio = (data.constatacoes?.length || 0) > 0 || (data.planoAcao?.length || 0) > 0 || !!data.conclusao || !!data.escopo || body.emitir === true;
+  if (temRelatorio) {
+    const atual = await prisma.auditoria.findUnique({ where: { id: params.id }, select: { numero: true } });
+    if (!atual?.numero) {
+      const ult = await prisma.auditoria.findFirst({ where: { numero: { not: null } }, orderBy: { numero: "desc" }, select: { numero: true } });
+      data.numero = (ult?.numero || 0) + 1;
+    }
+  }
+
   const a = await prisma.auditoria.update({ where: { id: params.id }, data, include: { documentos: { orderBy: { createdAt: "asc" } } } });
   await prisma.auditLog.create({ data: { userId: user.id, action: "EDITAR_AUDITORIA", entity: "Auditoria", entityId: params.id, diff: body } }).catch(() => {});
   return NextResponse.json({ success: true, data: a });

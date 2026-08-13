@@ -6,8 +6,12 @@ import {
   Loader2, AlertCircle, ArrowLeft, Building2, Upload, Search, X, FileText, Trash2,
   Send, Copy, ExternalLink, Save, ClipboardList, FolderOpen, CheckCircle2,
   Sparkles, Plus, Mail, Eye, Image as ImageIcon, ClipboardCheck, BookOpen,
+  ScrollText, FileDown, ImagePlus, Stamp,
 } from "lucide-react";
 import { SECOES_AUDITORIA, ordenarSecoes, REQUISITOS_GQFQ003, STATUS_REQUISITO, requisitosDaSecao } from "@/lib/auditoria-secoes";
+import { numRAE } from "@/lib/auditoria-externa";
+import { TIPOS, tipoLabel } from "@/lib/auditoria-interna";
+import { COLUNAS_5W2H, STATUS_ITEM, STATUS_ITEM_OPCOES, situacaoItem, situacaoItemLabel } from "@/lib/plano-acao";
 
 const fmtDH = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
@@ -233,6 +237,9 @@ export default function AuditoriaDetalheClient({ id }) {
         </div>
       </div>
 
+      {/* Relatório interno (constatações + plano de ação 5W2H) */}
+      <RelatorioAuditoria id={id} data={data} onChange={carregar} />
+
       {/* Publicação + envio */}
       <div className="bg-torg-dark rounded-xl shadow-sm p-4 mb-8 text-white">
         <h2 className="text-sm font-bold inline-flex items-center gap-1.5 mb-1.5"><Send size={15} className="text-torg-orange" /> Portal do cliente</h2>
@@ -282,6 +289,178 @@ export default function AuditoriaDetalheClient({ id }) {
 
 function Campo({ label, children, wide }) {
   return <label className={`block ${wide ? "sm:col-span-2" : ""}`}><span className="text-[11px] font-medium text-torg-dark mb-1 block">{label}</span>{children}</label>;
+}
+
+const toInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+const TIPO_CLS = { CONFORME: "border-emerald-300 text-emerald-700", NAO_CONFORME: "border-red-300 text-red-700", MELHORIA: "border-amber-300 text-amber-700" };
+
+// Reduz a imagem no navegador (canvas → JPEG) — mantém o Blob e o PDF leves.
+function reduzImagem(file, max = 1600, q = 0.82) {
+  return new Promise((res) => {
+    if (!/^image\//.test(file.type)) return res(file);
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const sc = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.round(img.width * sc), h = Math.round(img.height * sc);
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+      cv.getContext("2d").drawImage(img, 0, 0, w, h);
+      cv.toBlob((b) => { URL.revokeObjectURL(url); res(b ? new File([b], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : file); }, "image/jpeg", q);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res(file); };
+    img.src = url;
+  });
+}
+
+// Relatório INTERNO da auditoria externa: constatações + fotos + plano de ação 5W2H + conclusão.
+function RelatorioAuditoria({ id, data, onChange }) {
+  const [meta, setMeta] = useState({ dataAuditoria: toInput(data.dataAuditoria), auditor: data.auditor || "", norma: data.norma || "", escopo: data.escopo || "" });
+  const [constatacoes, setConstatacoes] = useState(Array.isArray(data.constatacoes) ? data.constatacoes : []);
+  const [plano, setPlano] = useState(Array.isArray(data.planoAcao) ? data.planoAcao : []);
+  const [fotos, setFotos] = useState(Array.isArray(data.fotos) ? data.fotos : []);
+  const [conclusao, setConclusao] = useState(data.conclusao || "");
+  const [salvando, setSalvando] = useState(false);
+  const [subindo, setSubindo] = useState(0);
+  const [ok, setOk] = useState("");
+  const fotoRef = useRef(null);
+
+  const setM = (k, v) => setMeta((p) => ({ ...p, [k]: v }));
+  const setC = (i, k, v) => setConstatacoes((p) => p.map((c, j) => (j === i ? { ...c, [k]: v } : c)));
+  const addC = () => setConstatacoes((p) => [...p, { tipo: "NAO_CONFORME", descricao: "" }]);
+  const rmC = (i) => setConstatacoes((p) => p.filter((_, j) => j !== i));
+  const setA = (i, k, v) => setPlano((p) => p.map((a, j) => (j === i ? { ...a, [k]: v } : a)));
+  const addA = () => setPlano((p) => [...p, { oque: "", porque: "", onde: "", quem: "", quando: "", como: "", quanto: "", status: "A_FAZER", acompanhamento: "" }]);
+  const rmA = (i) => setPlano((p) => p.filter((_, j) => j !== i));
+  const setLeg = (i, v) => setFotos((p) => p.map((f, j) => (j === i ? { ...f, legenda: v } : f)));
+  const rmFoto = (i) => setFotos((p) => p.filter((_, j) => j !== i));
+
+  async function addFotos(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setSubindo((n) => n + files.length);
+    for (const f of files) {
+      try {
+        const red = await reduzImagem(f);
+        const blob = await upload(f.name.replace(/\.\w+$/, "") + ".jpg", red, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+        setFotos((p) => [...p, { url: blob.url, legenda: "" }]);
+      } catch (err) { alert(err.message || "Falha no upload da foto"); } finally { setSubindo((n) => n - 1); }
+    }
+    if (fotoRef.current) fotoRef.current.value = "";
+  }
+
+  async function salvar(extra = {}) {
+    setSalvando(true); setOk("");
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dataAuditoria: meta.dataAuditoria || null, auditor: meta.auditor, norma: meta.norma, escopo: meta.escopo,
+          constatacoes: constatacoes.filter((c) => (c.descricao || "").trim()),
+          planoAcao: plano.filter((a) => (a.oque || "").trim()),
+          fotos, conclusao, ...extra,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar");
+      setOk(extra.emitir ? "Relatório emitido." : "Relatório salvo.");
+      onChange();
+    } catch (e) { alert(e.message); } finally { setSalvando(false); }
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><ScrollText size={15} className="text-torg-blue" /> Relatório da auditoria <span className="text-[10px] font-medium text-torg-gray">(uso interno)</span></h2>
+        <div className="flex items-center gap-2">
+          {data.numero ? <span className="text-[11px] font-mono font-bold text-torg-blue">{numRAE(data.numero)}</span> : null}
+          <a href={`/api/qualidade/auditorias/${id}/pdf`} target="_blank" rel="noreferrer" className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><FileDown size={13} /> PDF</a>
+        </div>
+      </div>
+      <p className="text-[11px] text-torg-gray mb-3">Registro das constatações do auditor e o plano de ação da Torg. Não aparece no portal do cliente.</p>
+
+      {/* Metadados */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <Campo label="Data da auditoria"><input type="date" value={meta.dataAuditoria} onChange={(e) => setM("dataAuditoria", e.target.value)} className="inp" /></Campo>
+        <Campo label="Auditor (responsável)"><input value={meta.auditor} onChange={(e) => setM("auditor", e.target.value)} placeholder="Nome do auditor / certificadora" className="inp" /></Campo>
+        <Campo label="Norma / referência"><input value={meta.norma} onChange={(e) => setM("norma", e.target.value)} placeholder="ISO 9001:2015 · NBR 16775…" className="inp" /></Campo>
+        <Campo label="Objetivo / escopo"><input value={meta.escopo} onChange={(e) => setM("escopo", e.target.value)} placeholder="O que foi auditado" className="inp" /></Campo>
+      </div>
+
+      {/* Constatações */}
+      <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1.5">Constatações do auditor</p>
+      <div className="space-y-2 mb-2">
+        {constatacoes.map((c, i) => (
+          <div key={i} className="flex items-start gap-2">
+            <select value={c.tipo} onChange={(e) => setC(i, "tipo", e.target.value)} className={`shrink-0 text-[11px] font-medium rounded-lg px-1.5 py-2 border ${TIPO_CLS[c.tipo] || "border-gray-300"}`}>
+              {TIPOS.map((t) => <option key={t} value={t}>{tipoLabel(t)}</option>)}
+            </select>
+            <textarea value={c.descricao} onChange={(e) => setC(i, "descricao", e.target.value)} rows={1} placeholder="Descrição da constatação" className="inp flex-1 resize-y" />
+            <button onClick={() => rmC(i)} className="text-gray-400 hover:text-red-500 pt-2 shrink-0"><Trash2 size={14} /></button>
+          </div>
+        ))}
+      </div>
+      <button onClick={addC} className="text-[11px] text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 mb-4"><Plus size={12} /> Adicionar constatação</button>
+
+      {/* Registro fotográfico */}
+      <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1.5">Registro fotográfico</p>
+      {fotos.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
+          {fotos.map((f, i) => (
+            <div key={i} className="border border-gray-100 rounded-lg p-1.5">
+              <img src={f.url} alt="" className="w-full h-24 object-cover rounded mb-1 bg-gray-50" />
+              <div className="flex items-center gap-1">
+                <input value={f.legenda || ""} onChange={(e) => setLeg(i, e.target.value)} placeholder="Legenda" className="flex-1 text-[10px] border border-gray-200 rounded px-1 py-0.5 focus:border-torg-blue" />
+                <button onClick={() => rmFoto(i)} className="text-gray-400 hover:text-red-500 shrink-0"><X size={13} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <input ref={fotoRef} type="file" accept="image/*" multiple className="hidden" onChange={addFotos} />
+      <button onClick={() => fotoRef.current?.click()} disabled={subindo > 0} className="text-[11px] text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 mb-4 disabled:opacity-50">{subindo > 0 ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />} {subindo > 0 ? `Enviando ${subindo}…` : "Adicionar fotos"}</button>
+
+      {/* Plano de ação 5W2H */}
+      <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1.5">Plano de ação (5W2H)</p>
+      <div className="space-y-3 mb-2">
+        {plano.map((a, i) => {
+          const sit = situacaoItem(a);
+          return (
+            <div key={i} className="border border-gray-100 rounded-lg p-2.5">
+              <div className="flex items-start gap-2 mb-2">
+                <span className="text-[11px] font-bold text-torg-gray pt-2">{i + 1}.</span>
+                <textarea value={a.oque} onChange={(e) => setA(i, "oque", e.target.value)} rows={1} placeholder="O quê — a ação a executar" className="inp flex-1 resize-y font-medium" />
+                <select value={a.status || "A_FAZER"} onChange={(e) => setA(i, "status", e.target.value)} className={`shrink-0 text-[11px] font-medium rounded-lg px-1.5 py-2 border`} style={{ borderColor: STATUS_ITEM[a.status]?.cor || "#cbd5e1", color: STATUS_ITEM[a.status]?.cor || "#334155" }}>
+                  {STATUS_ITEM_OPCOES.map((s) => <option key={s} value={s}>{STATUS_ITEM[s].label}</option>)}
+                </select>
+                <button onClick={() => rmA(i)} className="text-gray-400 hover:text-red-500 pt-2 shrink-0"><Trash2 size={14} /></button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pl-5">
+                {COLUNAS_5W2H.filter((col) => col.key !== "oque").map((col) => (
+                  <label key={col.key} className="block">
+                    <span className="text-[10px] text-torg-gray">{col.label} <span className="text-gray-300">({col.w})</span></span>
+                    <input type={col.tipo === "date" ? "date" : "text"} value={a[col.key] || ""} onChange={(e) => setA(i, col.key, e.target.value)} placeholder={col.ph} className="w-full text-[11px] border border-gray-200 rounded px-1.5 py-1 focus:border-torg-blue" />
+                  </label>
+                ))}
+              </div>
+              <textarea value={a.acompanhamento || ""} onChange={(e) => setA(i, "acompanhamento", e.target.value)} rows={1} placeholder="Acompanhamento / evidência da ação (opcional)" className="inp w-full resize-y mt-2 ml-0 text-[11px]" />
+              <p className="text-[10px] text-torg-gray mt-1 pl-5">Situação: <strong style={{ color: STATUS_ITEM[sit === "ATRASADO" ? "A_FAZER" : sit]?.cor || "#b91c1c" }}>{situacaoItemLabel(sit)}</strong></p>
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={addA} className="text-[11px] text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 mb-4"><Plus size={12} /> Adicionar ação</button>
+
+      {/* Conclusão */}
+      <Campo label="Conclusão" wide><textarea value={conclusao} onChange={(e) => setConclusao(e.target.value)} rows={3} placeholder="Conclusão da auditoria" className="inp resize-y w-full" /></Campo>
+
+      <div className="flex items-center justify-between gap-2 mt-3 flex-wrap">
+        {ok ? <span className="text-[11px] text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 size={12} /> {ok}</span> : <span />}
+        <div className="flex items-center gap-2">
+          <button onClick={() => salvar()} disabled={salvando} className="text-[12px] font-semibold text-torg-dark bg-white border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 inline-flex items-center gap-1.5">{salvando ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar</button>
+          <button onClick={() => salvar({ emitir: true })} disabled={salvando} className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:bg-torg-dark disabled:opacity-50 inline-flex items-center gap-1.5"><Stamp size={13} /> {data.relatorioEmitidoEm ? "Reemitir" : "Emitir relatório"}</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Seção de documentos (upload + vincular doc da Qualidade + lista)

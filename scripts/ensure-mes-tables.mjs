@@ -170,6 +170,21 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "AvaliacaoCalibracao" ADD COLUMN IF NOT EXISTS "analisadoEm" TIMESTAMP(3)`);
   console.log("[ensure-mes-tables] OK — AvaliacaoCalibracao garantida.");
 
+  // Relatório interno da Auditoria Externa (constatações + plano de ação 5W2H + fotos). Idempotente.
+  for (const c of [
+    `ADD COLUMN IF NOT EXISTS "numero" INTEGER`,
+    `ADD COLUMN IF NOT EXISTS "dataAuditoria" TIMESTAMP(3)`,
+    `ADD COLUMN IF NOT EXISTS "auditor" TEXT`,
+    `ADD COLUMN IF NOT EXISTS "norma" TEXT`,
+    `ADD COLUMN IF NOT EXISTS "escopo" TEXT`,
+    `ADD COLUMN IF NOT EXISTS "constatacoes" JSONB NOT NULL DEFAULT '[]'`,
+    `ADD COLUMN IF NOT EXISTS "planoAcao" JSONB NOT NULL DEFAULT '[]'`,
+    `ADD COLUMN IF NOT EXISTS "fotos" JSONB NOT NULL DEFAULT '[]'`,
+    `ADD COLUMN IF NOT EXISTS "conclusao" TEXT`,
+    `ADD COLUMN IF NOT EXISTS "relatorioEmitidoEm" TIMESTAMP(3)`,
+  ]) await prisma.$executeRawUnsafe(`ALTER TABLE "Auditoria" ${c}`);
+  console.log("[ensure-mes-tables] OK — colunas de relatório da Auditoria garantidas.");
+
   // Verifica quais das duas tabelas existem
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename
