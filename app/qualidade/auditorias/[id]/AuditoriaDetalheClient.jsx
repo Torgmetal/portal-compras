@@ -491,8 +491,9 @@ function ItemBlock({ auditoriaId, itemId, label, secao, docs, onChange }) {
   const fileRef = useRef(null);
   const [enviando, setEnviando] = useState(false);
   const [progresso, setProgresso] = useState("");
-  // Navegador de pastas do servidor (SharePoint — SGQ ISO 9001)
+  // Navegador de pastas do servidor (SharePoint — SGQ ISO 9001 / Qualidade)
   const [servidor, setServidor] = useState(false);
+  const [spBase, setSpBase] = useState("sgq");
   const [spPath, setSpPath] = useState("");
   const [spItens, setSpItens] = useState([]);
   const [spLoading, setSpLoading] = useState(false);
@@ -526,10 +527,10 @@ function ItemBlock({ auditoriaId, itemId, label, secao, docs, onChange }) {
     await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc?docId=${encodeURIComponent(docId)}`, { method: "DELETE" });
     await onChange();
   }
-  async function carregarPasta(path) {
+  async function carregarPasta(path, base = spBase) {
     setSpLoading(true); setSpErro("");
     try {
-      const r = await fetch(`/api/qualidade/sgq?path=${encodeURIComponent(path)}`);
+      const r = await fetch(`/api/qualidade/sgq?base=${base}&path=${encodeURIComponent(path)}`);
       const j = await r.json();
       setSpPath(path);
       setSpItens(j.itens || []);
@@ -537,6 +538,7 @@ function ItemBlock({ auditoriaId, itemId, label, secao, docs, onChange }) {
     } catch { setSpErro("Falha ao acessar o servidor."); setSpItens([]); }
     finally { setSpLoading(false); }
   }
+  function trocarBase(base) { setSpBase(base); carregarPasta("", base); }
   function abrirServidor() {
     const abrir = !servidor;
     setServidor(abrir);
@@ -584,9 +586,14 @@ function ItemBlock({ auditoriaId, itemId, label, secao, docs, onChange }) {
       </div>
       {servidor && (
         <div className="mt-1.5 border border-gray-100 rounded-lg p-2 bg-white">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            {[["sgq", "SGQ ISO 9001"], ["qualidade", "Qualidade"]].map(([k, lbl]) => (
+              <button key={k} onClick={() => trocarBase(k)} className={`text-[10px] font-medium rounded-full px-2 py-0.5 transition ${spBase === k ? "bg-torg-blue text-white" : "bg-gray-100 text-torg-gray hover:bg-gray-200"}`}>{lbl}</button>
+            ))}
+          </div>
           <div className="flex items-center gap-2 mb-1.5 text-[11px]">
             <button onClick={voltar} disabled={!spPath || spLoading} className="text-torg-blue disabled:opacity-40 inline-flex items-center gap-1 shrink-0"><ArrowLeft size={12} /> voltar</button>
-            <span className="text-torg-gray truncate">SGQ ISO 9001{spPath ? " / " + spPath.replace(/\//g, " / ") : ""}</span>
+            <span className="text-torg-gray truncate">{spBase === "qualidade" ? "Qualidade" : "SGQ ISO 9001"}{spPath ? " / " + spPath.replace(/\//g, " / ") : ""}</span>
           </div>
           {spLoading ? (
             <p className="text-[11px] text-torg-gray inline-flex items-center gap-1 py-1"><Loader2 size={12} className="animate-spin" /> carregando…</p>

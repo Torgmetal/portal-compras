@@ -9,14 +9,20 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const DRIVE = process.env.SHAREPOINT_DRIVE_ID;
-const BASE = "/Administrativo/SGQ ISO 9001-2015";
+// Raízes navegáveis no servidor (SERVIDOR). Vitor pediu SGQ + Qualidade.
+const BASES = {
+  sgq: "/Administrativo/SGQ ISO 9001-2015",
+  qualidade: "/Qualidade",
+};
 const enc = (p) => p.split("/").filter(Boolean).map(encodeURIComponent).join("/");
 
 export async function GET(req) {
   try { await requireRole(["ADMIN", "QUALIDADE"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const sub = (new URL(req.url).searchParams.get("path") || "").replace(/^\/+|\/+$/g, "");
+  const params = new URL(req.url).searchParams;
+  const BASE = BASES[params.get("base")] || BASES.sgq;
+  const sub = (params.get("path") || "").replace(/^\/+|\/+$/g, "");
   if (sub.split("/").some((s) => s === "..")) return NextResponse.json({ error: "caminho inválido" }, { status: 400 });
   const full = sub ? `${BASE}/${sub}` : BASE;
 
