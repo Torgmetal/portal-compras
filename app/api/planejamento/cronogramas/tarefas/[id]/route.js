@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { z } from "zod";
-import { recalcularCronograma, rollupPercentualDepartamentos, calcularDefasagem } from "@/lib/cronograma-recalcular";
+import { recalcularCronograma, rollupPercentualDepartamentos, calcularDefasagem, addWorkdays, addCalendarDays } from "@/lib/cronograma-recalcular";
 import { registrarArea } from "@/lib/cronograma-areas";
 
 const patchSchema = z.object({
@@ -44,7 +44,7 @@ export async function PATCH(req, { params }) {
 
   const tarefa = await prisma.cronogramaTarefa.findUnique({
     where: { id },
-    include: { cronograma: { select: { id: true, dataBase: true } } },
+    include: { cronograma: { select: { id: true, dataBase: true, tipoDias: true } } },
   });
   if (!tarefa) {
     return NextResponse.json({ success: false, error: "Tarefa nao encontrada" }, { status: 404 });
@@ -162,6 +162,29 @@ export async function PATCH(req, { params }) {
       diffAntes.dataFimPrevista = tarefa.dataFimPrevista?.toISOString() || null;
       diffDepois.dataFimPrevista = novo?.toISOString() || null;
       data.dataFimPrevista = novo;
+    }
+  }
+
+  // Duração alterada → recomputa o FIM desta tarefa (início + duração, mesma
+  // convenção do motor), a menos que um fim explícito tenha vindo no mesmo request.
+  // Sem isto, mudar a duração ("dias úteis trabalhados") não movia a data de término
+  // nem cascateava pras sucessoras: o recálculo automático só recomputa o fim quando o
+  // INÍCIO desloca (e pula tarefa sem antecessora). Com o fim atualizado aqui, o
+  // recalcularCronograma abaixo propaga o deslocamento pras sucessoras (finish-to-start).
+  if (data.duracaoDias !== undefined && data.dataFimPrevista === undefined) {
+    const inicioBase = data.dataInicioPrevista !== undefined ? data.dataInicioPrevista : tarefa.dataInicioPrevista;
+    if (inicioBase) {
+      const isDU = (tarefa.cronograma.tipoDias || "DU") === "DU";
+      const inicioDate = new Date(inicioBase);
+      const dur = data.duracaoDias;
+      const novoFim = dur > 0
+        ? (isDU ? addWorkdays(inicioDate, dur) : addCalendarDays(inicioDate, dur))
+        : inicioDate;
+      if (!tarefa.dataFimPrevista || new Date(tarefa.dataFimPrevista).getTime() !== novoFim.getTime()) {
+        data.dataFimPrevista = novoFim;
+        diffAntes.dataFimPrevista = tarefa.dataFimPrevista?.toISOString() || null;
+        diffDepois.dataFimPrevista = novoFim.toISOString();
+      }
     }
   }
 
