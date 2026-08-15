@@ -67,17 +67,28 @@ export default function PortalClienteClient({ token }) {
 
   const base = `/api/qualidade/auditorias/portal/${token}/doc`;
 
-  // Agrupa os documentos por seção, na ordem padrão.
+  // Evidências adicionais (pedido a mais): docs com requisito = id de um item adicional.
+  // Não entram nas seções do GQ-FQ-003 — ganham uma aba própria, com o título do pedido.
+  const ADICIONAIS = "Evidências adicionais";
+  const adicionalIds = new Set((data.itensAdicionais || []).map((i) => i.id));
+  const ehAdicional = (d) => d.requisito && adicionalIds.has(d.requisito);
+  const adicionaisGrupos = (data.itensAdicionais || [])
+    .map((i) => ({ ...i, docs: data.documentos.filter((d) => d.requisito === i.id) }))
+    .filter((x) => x.docs.length);
+
+  // Agrupa os documentos padrão por seção, na ordem padrão.
   const porSecao = {};
-  for (const d of data.documentos) { const s = d.secao || "Outros"; (porSecao[s] ||= []).push(d); }
-  const grupos = ordenarSecoes(Object.keys(porSecao)).map((s) => [s, porSecao[s]]);
-  // Abas de seção FIXAS = todas as áreas do GQ-FQ-003 (mesmo sem documento ainda);
-  // "Outros" só aparece se tiver algo. Cada aba mostra sua contagem.
-  const secoesTabs = SECOES_AUDITORIA.filter((s) => s !== "Outros" || porSecao["Outros"]?.length);
+  for (const d of data.documentos) { if (ehAdicional(d)) continue; const s = d.secao || "Outros"; (porSecao[s] ||= []).push(d); }
+  // Abas: áreas do GQ-FQ-003 ("Outros" só se tiver algo) + "Evidências adicionais" se houver.
+  const secoesTabs = [
+    ...SECOES_AUDITORIA.filter((s) => s !== "Outros" || porSecao["Outros"]?.length),
+    ...(adicionaisGrupos.length ? [ADICIONAIS] : []),
+  ];
   const abaAtiva = (aba && secoesTabs.includes(aba)) ? aba : (secoesTabs[0] || null);
-  const docsAtivos = abaAtiva ? (porSecao[abaAtiva] || []) : [];
+  const ehAbaAdicional = abaAtiva === ADICIONAIS;
+  const docsAtivos = ehAbaAdicional ? [] : (abaAtiva ? (porSecao[abaAtiva] || []) : []);
   // Linhas (requisitos) da aba ativa + documentos agrupados por linha
-  const reqsAtivos = abaAtiva ? requisitosDaSecao(abaAtiva) : [];
+  const reqsAtivos = ehAbaAdicional ? [] : (abaAtiva ? requisitosDaSecao(abaAtiva) : []);
   const docsPorReq = {};
   for (const d of docsAtivos) {
     const k = d.requisito && reqsAtivos.some((r) => r.id === d.requisito) ? d.requisito : "__sem__";
@@ -169,7 +180,7 @@ export default function PortalClienteClient({ token }) {
           <div className="flex flex-wrap gap-2 mb-6">
             {secoesTabs.map((secao) => {
               const ativa = secao === abaAtiva;
-              const n = porSecao[secao]?.length || 0;
+              const n = secao === ADICIONAIS ? adicionaisGrupos.reduce((s, g) => s + g.docs.length, 0) : (porSecao[secao]?.length || 0);
               return (
                 <button key={secao} onClick={() => setAba(secao)}
                   className={`text-[13px] font-medium rounded-full px-3.5 py-1.5 border transition-colors inline-flex items-center gap-2 ${ativa ? "bg-torg-dark text-white border-torg-dark" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue-300 hover:text-torg-dark"}`}>
@@ -179,7 +190,20 @@ export default function PortalClienteClient({ token }) {
               );
             })}
           </div>
-          {reqsAtivos.length >= 2 ? (
+          {ehAbaAdicional ? (
+            <div className="space-y-5">
+              {adicionaisGrupos.map((g) => (
+                <div key={g.id}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-torg-orange shrink-0" />
+                    <h4 className="text-[14px] font-semibold text-torg-dark">{g.titulo || "Evidência adicional"}</h4>
+                    <span className="text-[11px] text-torg-gray">· {g.docs.length}</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{g.docs.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} />)}</div>
+                </div>
+              ))}
+            </div>
+          ) : reqsAtivos.length >= 2 ? (
             <div className="space-y-5">
               {reqsAtivos.map((r) => {
                 const ds = docsPorReq[r.id] || [];

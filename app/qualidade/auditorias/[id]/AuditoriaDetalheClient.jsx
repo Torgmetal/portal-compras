@@ -273,6 +273,7 @@ export default function AuditoriaDetalheClient({ id }) {
               <span className="text-[11px] font-mono text-blue-100 break-all flex-1 min-w-[180px]">{link || (typeof window !== "undefined" ? `${window.location.origin}/portal-cliente/${data.token}` : `/portal-cliente/${data.token}`)}</span>
               <button onClick={() => navigator.clipboard?.writeText(link || `${window.location.origin}/portal-cliente/${data.token}`)} className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><Copy size={12} /> copiar</button>
               <a href={`/portal-cliente/${data.token}`} target="_blank" rel="noreferrer" className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><ExternalLink size={12} /> abrir</a>
+              <a href={`/api/qualidade/auditorias/${id}/portal-pdf`} target="_blank" rel="noreferrer" className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><FileDown size={12} /> índice (PDF)</a>
             </div>
           </>
         ) : (
