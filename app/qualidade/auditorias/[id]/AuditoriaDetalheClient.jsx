@@ -215,7 +215,7 @@ export default function AuditoriaDetalheClient({ id }) {
       {/* Documentos para o auditor (GQ-FQ-003) — arquivos por item, publicar por arquivo */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><ClipboardCheck size={15} className="text-torg-blue" /> Documentos para o auditor (GQ-FQ-003)</h2>
+          <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><ClipboardCheck size={15} className="text-torg-blue" /> Documentos para o auditor</h2>
           <span className="text-[11px] font-bold text-torg-dark whitespace-nowrap">{publicados} de {evidenciaDocs.length} publicado{publicados === 1 ? "" : "s"}</span>
         </div>
         <p className="text-[11px] text-torg-gray mb-3">Anexe os arquivos em cada item e marque quais <b>publicar</b> no portal do auditor. Só os publicados aparecem pra ele.</p>
