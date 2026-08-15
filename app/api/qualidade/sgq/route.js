@@ -24,15 +24,17 @@ export async function GET(req) {
   try { token = await getAccessToken(); }
   catch { return NextResponse.json({ path: sub, itens: [], erro: "SharePoint indisponível" }, { status: 502 }); }
 
-  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE}/root:/${enc(full)}:/children?$select=name,folder,file,size,lastModifiedDateTime,webUrl&$top=400`;
+  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE}/root:/${enc(full)}:/children?$select=id,name,folder,file,size,lastModifiedDateTime,webUrl&$top=400`;
   const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!r.ok) return NextResponse.json({ path: sub, itens: [], erro: `pasta não acessível (${r.status})` });
 
   const itens = ((await r.json()).value || []).map((it) => ({
+    id: it.id, // driveItem id — usado p/ anexar o arquivo na auditoria (sharepointItemId)
     nome: it.name,
     tipo: it.folder ? "folder" : "file",
     filhos: it.folder?.childCount ?? null,
     tamanho: it.size ?? null,
+    mime: it.file?.mimeType || null,
     modificado: it.lastModifiedDateTime || null,
     webUrl: it.webUrl || null,
   }));

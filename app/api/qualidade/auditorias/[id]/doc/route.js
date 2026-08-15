@@ -22,6 +22,8 @@ const schema = z.object({
   arquivoTamanho: z.number().int().nonnegative().optional().nullable(),
   // origem B: vínculo a um documento da Qualidade existente
   documentoId: z.string().optional().nullable(),
+  // origem C: arquivo do servidor (SharePoint) escolhido no navegador de pastas
+  sharepointItemId: z.string().max(300).optional().nullable(),
   publicar: z.boolean().optional(), // mostra no portal (default true)
   comentario: z.string().max(2000).optional().nullable(),
 });
@@ -48,8 +50,8 @@ export async function POST(req, { params }) {
     if (it.arquivoUrl && !BLOB_OK.test(it.arquivoUrl)) {
       return NextResponse.json({ success: false, error: "Arquivo inválido (origem não permitida)." }, { status: 400 });
     }
-    if (!it.arquivoUrl && !it.documentoId) {
-      return NextResponse.json({ success: false, error: "Cada item precisa de um arquivo ou documento vinculado." }, { status: 400 });
+    if (!it.arquivoUrl && !it.documentoId && !it.sharepointItemId) {
+      return NextResponse.json({ success: false, error: "Cada item precisa de um arquivo, documento ou item do servidor." }, { status: 400 });
     }
   }
 
@@ -77,7 +79,7 @@ export async function POST(req, { params }) {
       arquivoUrl: q ? (q.arquivoUrl || null) : (it.arquivoUrl || null),
       arquivoTipo: q ? (q.arquivoTipo || null) : (it.arquivoTipo || null),
       arquivoTamanho: it.arquivoTamanho ?? null,
-      sharepointItemId: q ? (q.sharepointItemId || null) : null,
+      sharepointItemId: it.sharepointItemId || (q ? (q.sharepointItemId || null) : null),
       documentoId: it.documentoId || null,
       publicar: it.publicar ?? true,
       comentario: (it.comentario || "").trim() || null,

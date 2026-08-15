@@ -494,10 +494,13 @@ function ItemBlock({ auditoriaId, itemId, label, secao, docs, onChange }) {
   const fileRef = useRef(null);
   const [enviando, setEnviando] = useState(false);
   const [progresso, setProgresso] = useState("");
-  const [picker, setPicker] = useState(false);
-  const [busca, setBusca] = useState("");
-  const [resultados, setResultados] = useState(null);
-  const [buscando, setBuscando] = useState(false);
+  // Navegador de pastas do servidor (SharePoint — SGQ ISO 9001)
+  const [servidor, setServidor] = useState(false);
+  const [spPath, setSpPath] = useState("");
+  const [spItens, setSpItens] = useState([]);
+  const [spLoading, setSpLoading] = useState(false);
+  const [spErro, setSpErro] = useState("");
+  const [spAnexando, setSpAnexando] = useState("");
 
   async function anexarArquivo(e) {
     const files = Array.from(e.target.files || []);
@@ -526,23 +529,37 @@ function ItemBlock({ auditoriaId, itemId, label, secao, docs, onChange }) {
     await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc?docId=${encodeURIComponent(docId)}`, { method: "DELETE" });
     await onChange();
   }
-  async function buscar(e) {
-    e?.preventDefault();
-    if (busca.trim().length < 2) return;
-    setBuscando(true);
+  async function carregarPasta(path) {
+    setSpLoading(true); setSpErro("");
     try {
-      const r = await fetch(`/api/qualidade/documentos?busca=${encodeURIComponent(busca.trim())}`);
+      const r = await fetch(`/api/qualidade/sgq?path=${encodeURIComponent(path)}`);
       const j = await r.json();
-      setResultados((j.data || []).slice(0, 10));
-    } catch { setResultados([]); } finally { setBuscando(false); }
+      setSpPath(path);
+      setSpItens(j.itens || []);
+      if (j.erro) setSpErro(j.erro);
+    } catch { setSpErro("Falha ao acessar o servidor."); setSpItens([]); }
+    finally { setSpLoading(false); }
   }
-  async function vincular(d) {
-    const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "EVIDENCIA", secao, requisito: itemId || undefined, nome: d.nome, documentoId: d.id }) });
-    const j = await r.json();
-    if (!r.ok || !j.success) return alert(j.error || "Erro");
-    setPicker(false); setBusca(""); setResultados(null);
-    await onChange();
+  function abrirServidor() {
+    const abrir = !servidor;
+    setServidor(abrir);
+    if (abrir && spItens.length === 0) carregarPasta("");
   }
+  function entrarPasta(nome) { carregarPasta(spPath ? `${spPath}/${nome}` : nome); }
+  function voltar() { carregarPasta(spPath.split("/").slice(0, -1).join("/")); }
+  async function anexarDoServidor(file) {
+    setSpAnexando(file.id);
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: "EVIDENCIA", secao, requisito: itemId || undefined, nome: file.nome, sharepointItemId: file.id, arquivoTipo: file.mime || undefined }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      await onChange();
+    } catch (err) { alert(err.message); } finally { setSpAnexando(""); }
+  }
+  const jaAnexado = (fileId) => docs.some((d) => d.sharepointItemId === fileId);
 
   return (
     <div className="rounded-lg border border-gray-100 bg-gray-50/40 px-2.5 py-2">
@@ -564,26 +581,38 @@ function ItemBlock({ auditoriaId, itemId, label, secao, docs, onChange }) {
         </div>
       )}
       <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={abrirServidor} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Search size={12} /> Buscar do servidor</button>
         <input ref={fileRef} type="file" multiple className="hidden" onChange={anexarArquivo} accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.msg,.eml" />
-        <button onClick={() => fileRef.current?.click()} disabled={enviando} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? `Enviando ${progresso}…` : "Anexar arquivo"}</button>
-        <button onClick={() => setPicker((v) => !v)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Search size={12} /> Trazer do Controle</button>
+        <button onClick={() => fileRef.current?.click()} disabled={enviando} className="text-[11px] font-medium text-torg-gray hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? `Enviando ${progresso}…` : "Anexar arquivo"}</button>
       </div>
-      {picker && (
+      {servidor && (
         <div className="mt-1.5 border border-gray-100 rounded-lg p-2 bg-white">
-          <form onSubmit={buscar} className="flex items-center gap-2 mb-1">
-            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="buscar por nome, norma, nº…" className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue" />
-            <button type="submit" disabled={buscando} className="text-[11px] text-torg-blue inline-flex items-center gap-1 disabled:opacity-50">{buscando ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />} Buscar</button>
-          </form>
-          {resultados && (resultados.length ? (
-            <div className="divide-y divide-gray-50 max-h-44 overflow-y-auto">
-              {resultados.map((d) => (
-                <button key={d.id} onClick={() => vincular(d)} className="w-full flex items-center gap-2 px-1.5 py-1 text-[11px] hover:bg-torg-blue-50 text-left">
-                  <Plus size={12} className="text-torg-blue shrink-0" /><span className="truncate text-torg-dark flex-1">{d.nome}</span>
-                  <span className="text-torg-gray shrink-0 whitespace-nowrap">{d.categoria}</span>
+          <div className="flex items-center gap-2 mb-1.5 text-[11px]">
+            <button onClick={voltar} disabled={!spPath || spLoading} className="text-torg-blue disabled:opacity-40 inline-flex items-center gap-1 shrink-0"><ArrowLeft size={12} /> voltar</button>
+            <span className="text-torg-gray truncate">SGQ ISO 9001{spPath ? " / " + spPath.replace(/\//g, " / ") : ""}</span>
+          </div>
+          {spLoading ? (
+            <p className="text-[11px] text-torg-gray inline-flex items-center gap-1 py-1"><Loader2 size={12} className="animate-spin" /> carregando…</p>
+          ) : spErro ? (
+            <p className="text-[11px] text-amber-600 py-1">{spErro}</p>
+          ) : (
+            <div className="divide-y divide-gray-50 max-h-60 overflow-y-auto">
+              {spItens.length === 0 && <p className="text-[11px] text-torg-gray py-1">Pasta vazia.</p>}
+              {spItens.map((it) => it.tipo === "folder" ? (
+                <button key={it.id} onClick={() => entrarPasta(it.nome)} className="w-full flex items-center gap-2 px-1.5 py-1 text-[11px] hover:bg-torg-blue-50 text-left">
+                  <FolderOpen size={13} className="text-torg-orange shrink-0" /><span className="truncate text-torg-dark flex-1">{it.nome}</span>
+                  {it.filhos != null && <span className="text-torg-gray text-[10px] shrink-0">{it.filhos}</span>}
                 </button>
+              ) : (
+                <div key={it.id} className="flex items-center gap-2 px-1.5 py-1 text-[11px]">
+                  <FileText size={13} className="text-torg-blue shrink-0" /><span className="truncate text-torg-dark flex-1">{it.nome}</span>
+                  {jaAnexado(it.id)
+                    ? <span className="text-emerald-600 text-[10px] inline-flex items-center gap-1 shrink-0"><CheckCircle2 size={11} /> incluso</span>
+                    : <button onClick={() => anexarDoServidor(it)} disabled={spAnexando === it.id} className="text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 shrink-0 disabled:opacity-50">{spAnexando === it.id ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} anexar</button>}
+                </div>
               ))}
             </div>
-          ) : <p className="text-[10px] text-torg-gray">Nenhum documento encontrado.</p>)}
+          )}
         </div>
       )}
     </div>
