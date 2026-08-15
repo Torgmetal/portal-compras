@@ -270,13 +270,17 @@ export async function PATCH(req, { params }) {
     }
   }
 
-  // Rollup: recalcular percentual + datas da tarefa-resumo do departamento
+  // Rollup: recalcular percentual + datas das tarefas-resumo (setores). O recálculo
+  // acima cascateia cross-setor (finish-to-start): uma edição em Engenharia pode mover
+  // tarefas de Fabricação/Expedição, então rola TODOS os setores — não só o da tarefa
+  // editada. Antes só o do editado era rolado e os resumos a jusante ficavam com as
+  // datas velhas (o cabeçalho do setor lê summary.dataInicio/FimPrevista).
   const datasMudaram = diffDepois.dataInicioPrevista !== undefined || diffDepois.dataFimPrevista !== undefined || diffDepois.dataLiberacao !== undefined || diffDepois.motivoBloqueio !== undefined;
-  if ((progressoMudou || antecessorasChanged || datasMudaram) && tarefa.departamento) {
+  if (progressoMudou || antecessorasChanged || datasMudaram) {
     try {
-      await rollupPercentualDepartamentos(tarefa.cronograma.id, tarefa.departamento);
+      await rollupPercentualDepartamentos(tarefa.cronograma.id, null);
     } catch (e) {
-      console.error("Erro no rollup de departamento:", e.message);
+      console.error("Erro no rollup de departamentos:", e.message);
     }
   }
 
