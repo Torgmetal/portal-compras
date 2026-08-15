@@ -113,6 +113,9 @@ export default function AuditoriaDetalheClient({ id }) {
   function editarAdicionalTitulo(itemId, titulo) {
     setData((d) => ({ ...d, itensAdicionais: (d.itensAdicionais || []).map((i) => (i.id === itemId ? { ...i, titulo } : i)) }));
   }
+  function editarAdicionalDescricao(itemId, descricao) {
+    setData((d) => ({ ...d, itensAdicionais: (d.itensAdicionais || []).map((i) => (i.id === itemId ? { ...i, descricao } : i)) }));
+  }
   function removerAdicional(itemId) {
     salvarItensAdicionais((data.itensAdicionais || []).filter((i) => i.id !== itemId));
   }
@@ -243,6 +246,9 @@ export default function AuditoriaDetalheClient({ id }) {
                   className="flex-1 text-[13px] font-semibold text-torg-dark border-0 border-b border-gray-200 focus:border-torg-blue focus:ring-0 px-0 py-1 bg-transparent" />
                 <button onClick={() => removerAdicional(item.id)} title="Remover seção" className="text-torg-gray hover:text-red-600 shrink-0"><Trash2 size={14} /></button>
               </div>
+              <textarea value={item.descricao || ""} onChange={(e) => editarAdicionalDescricao(item.id, e.target.value)} onBlur={() => salvarItensAdicionais(itensAdicionais)}
+                placeholder="Observação da seção (opcional — aparece pro auditor)" rows={2}
+                className="w-full text-[11px] text-torg-gray border border-gray-200 rounded-lg px-2 py-1.5 mb-2 focus:border-torg-blue focus:ring-0 resize-y" />
               <ItemBlock auditoriaId={id} itemId={item.id} label="" secao={item.titulo || "Outros"} docs={docsPorReq[item.id] || []} onChange={carregar} />
             </div>
           ))}

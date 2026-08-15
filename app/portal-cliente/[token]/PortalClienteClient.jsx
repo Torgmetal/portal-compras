@@ -93,7 +93,7 @@ export default function PortalClienteClient({ token }) {
   const secoesUsuario = data.itensAdicionais || [];
   const secaoIds = new Set(secoesUsuario.map((s) => s.id));
   const grupos = secoesUsuario
-    .map((s) => ({ id: s.id, titulo: s.titulo || "Documentos", docs: data.documentos.filter((d) => d.requisito === s.id) }))
+    .map((s) => ({ id: s.id, titulo: s.titulo || "Documentos", descricao: s.descricao || null, docs: data.documentos.filter((d) => d.requisito === s.id) }))
     .filter((g) => g.docs.length);
   const docsOutros = data.documentos.filter((d) => !d.requisito || !secaoIds.has(d.requisito));
   if (docsOutros.length) grupos.push({ id: "__outros__", titulo: "Outros documentos", docs: docsOutros });
@@ -196,8 +196,11 @@ export default function PortalClienteClient({ token }) {
                       <ChevronDown size={18} className={`text-torg-gray shrink-0 transition-transform duration-200 ${aberta ? "rotate-180" : ""}`} />
                     </button>
                     {aberta && (
-                      <div className="px-4 pb-4 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-gray-50">
-                        {g.docs.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}
+                      <div className="px-4 pb-4 pt-3 border-t border-gray-50">
+                        {g.descricao && <p className="text-[14px] text-torg-gray leading-relaxed mb-3 whitespace-pre-line">{g.descricao}</p>}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {g.docs.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}
+                        </div>
                       </div>
                     )}
                   </div>
