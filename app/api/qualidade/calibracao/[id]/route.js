@@ -90,10 +90,6 @@ export async function PATCH(req, { params }) {
     if (Object.keys(d).length) await prisma.documentoQualidade.update({ where: { id: doc.id }, data: d });
   }
 
-  // Anexos finais (após remoção/substituição) — usados na trava de conclusão
-  const fotoUrl = body.removerFoto ? null : (body.fotoEquipamento?.url ?? atual.fotoEquipamentoUrl);
-  const relUrl = body.removerRelatorio ? null : (body.relatorio?.url ?? atual.relatorioUrl);
-
   const data = {};
   if (body.identificacao !== undefined) data.identificacao = body.identificacao?.trim() || null;
   if (body.faixaUso !== undefined) data.faixaUso = body.faixaUso?.trim() || null;
@@ -116,9 +112,7 @@ export async function PATCH(req, { params }) {
   else if (body.relatorio?.url) { data.relatorioUrl = body.relatorio.url; data.relatorioNome = body.relatorio.nome || null; }
 
   if (body.conclusao !== undefined) {
-    if ((body.conclusao === "APROVADO" || body.conclusao === "REPROVADO") && !relUrl) {
-      return NextResponse.json({ error: "Anexe o relatório antes de aprovar/reprovar." }, { status: 400 });
-    }
+    // Avaliar não exige anexo — foto e relatório são evidências opcionais (Vitor 15/08).
     data.conclusao = body.conclusao;
     if (body.conclusao === "PENDENTE") { data.avaliadoEm = null; data.avaliadorId = null; }
     else { data.avaliadoEm = new Date(); data.avaliadorId = user.id; }

@@ -87,7 +87,7 @@ export default function CalibracaoDetalheClient({ id }) {
   if (erro && !doc) return <div className="py-16 text-center"><p className="text-red-600 text-sm mb-3">{erro}</p><Link href="/qualidade/calibracao" className="text-torg-blue text-sm">← Voltar</Link></div>;
 
   const temFoto = !!av.fotoEquipamentoUrl, temRel = !!av.relatorioUrl;
-  const podeAvaliar = temRel; // foto deixou de ser obrigatória (Vitor 15/08); basta o relatório
+  const podeAvaliar = true; // avaliar não exige anexo — foto e relatório são evidências opcionais (Vitor 15/08)
   const temCertificado = !!(doc.arquivoUrl || doc.sharepointItemId);
   const sugestao = sugerirConclusao(av.criterios);
 
@@ -154,13 +154,13 @@ export default function CalibracaoDetalheClient({ id }) {
         )}
       </Secao>
 
-      {/* Anexos — relatório obrigatório; foto opcional */}
-      <Secao titulo="Anexos (relatório obrigatório · foto opcional)">
+      {/* Anexos — foto e relatório são evidências opcionais (não travam a avaliação) */}
+      <Secao titulo="Anexos (foto e relatório opcionais)">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Anexo label="Foto do equipamento (opcional)" campo="foto" url={av.fotoEquipamentoUrl} nome={av.fotoEquipamentoNome} img accept="image/*" enviando={enviando === "foto"} onPick={(f) => subirAnexo(f, "foto")} onRemove={() => removerAnexo("foto")} />
-          <Anexo label="Relatório" campo="relatorio" url={av.relatorioUrl} nome={av.relatorioNome} accept="application/pdf,image/*" enviando={enviando === "relatorio"} onPick={(f) => subirAnexo(f, "relatorio")} onRemove={() => removerAnexo("relatorio")} />
+          <Anexo label="Relatório (opcional)" campo="relatorio" url={av.relatorioUrl} nome={av.relatorioNome} accept="application/pdf,image/*" enviando={enviando === "relatorio"} onPick={(f) => subirAnexo(f, "relatorio")} onRemove={() => removerAnexo("relatorio")} />
         </div>
-        {!podeAvaliar && <p className="text-[12px] text-amber-600 mt-3 flex items-center gap-1"><AlertCircle size={13} /> Anexe o relatório para liberar Aprovar/Reprovar.</p>}
+        {!temFoto && !temRel && <p className="text-[12px] text-torg-gray mt-3 flex items-center gap-1"><AlertCircle size={13} /> Opcional: anexe foto e/ou relatório como evidência da avaliação.</p>}
       </Secao>
 
       {/* Critérios */}

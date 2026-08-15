@@ -92,7 +92,6 @@ export default function CalibracaoClient() {
                     </td>
                     <td className="px-3 py-2 text-center">
                       <Chip s={d.conclusao} />
-                      {d.conclusao === "PENDENTE" && !d.podeAvaliar && <div className="text-[9px] text-amber-600 mt-0.5">aguardando relatório</div>}
                     </td>
                   </tr>
                 ))}
@@ -189,7 +188,7 @@ function ModalNovo({ onClose, onCriado }) {
             <CampoArquivo label="Foto do equipamento" accept="image/*" hint="Foto (JPG/PNG)" arquivo={foto} enviando={enviando === "foto"} onPick={(file) => subir(file, "foto", setFoto)} onClear={() => setFoto(null)} />
             <CampoArquivo label="Relatório" accept="application/pdf,image/*" hint="Relatório" arquivo={rel} enviando={enviando === "relatorio"} onPick={(file) => subir(file, "relatorio", setRel)} onClear={() => setRel(null)} />
           </div>
-          <p className="text-[11px] text-torg-gray">O relatório pode ser anexado agora ou depois — é obrigatório para aprovar/reprovar. A foto do equipamento é opcional.</p>
+          <p className="text-[11px] text-torg-gray">Foto e relatório são opcionais — podem ser anexados agora ou depois como evidência.</p>
           {erro && <p className="text-[12px] text-red-600 flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
         </div>
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
