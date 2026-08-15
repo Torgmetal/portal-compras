@@ -98,13 +98,15 @@ export default function PortalClienteClient({ token }) {
   const docsOutros = data.documentos.filter((d) => !d.requisito || !secaoIds.has(d.requisito));
   if (docsOutros.length) grupos.push({ id: "__outros__", titulo: "Outros documentos", docs: docsOutros });
 
-  // Abas de topo do portal (o cliente seleciona e abre)
+  // Abas de topo do portal (o cliente seleciona e abre). Documentos sempre aparece; as
+  // demais o Vitor liga/desliga por auditoria (data.mostrarSecoes).
+  const ms = data.mostrarSecoes || {};
   const tabs = [
     { id: "documentos", label: "Documentos", icon: FileText },
-    { id: "estrutura", label: "Estrutura", icon: Layers },
-    { id: "maquinas", label: "Máquinas", icon: Cog },
-    ...(data.equipe?.length ? [{ id: "equipe", label: "Equipe", icon: Users }] : []),
-    { id: "modelo", label: "Data Book modelo", icon: BookOpen },
+    ...(ms.estrutura !== false ? [{ id: "estrutura", label: "Estrutura", icon: Layers }] : []),
+    ...(ms.maquinas !== false ? [{ id: "maquinas", label: "Máquinas", icon: Cog }] : []),
+    ...(ms.equipe !== false && data.equipe?.length ? [{ id: "equipe", label: "Equipe", icon: Users }] : []),
+    ...(ms.modelo !== false ? [{ id: "modelo", label: "Data Book modelo", icon: BookOpen }] : []),
   ];
   const painelAtivo = tabs.some((t) => t.id === painel) ? painel : "documentos";
 

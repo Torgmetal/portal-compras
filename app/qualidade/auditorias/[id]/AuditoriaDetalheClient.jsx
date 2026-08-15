@@ -31,6 +31,12 @@ export default function AuditoriaDetalheClient({ id }) {
   const [internosSel, setInternosSel] = useState([]); // e-mails internos (CC) marcados
   const [usuariosInternos, setUsuariosInternos] = useState([]);
   const [mostrarInternos, setMostrarInternos] = useState(false);
+  const [secoesPortal, setSecoesPortal] = useState({}); // abas visíveis pro auditor (default: todas)
+  const [salvandoSecoes, setSalvandoSecoes] = useState(false);
+  const SECOES_PORTAL = [
+    { key: "estrutura", label: "Estrutura" }, { key: "maquinas", label: "Máquinas" },
+    { key: "equipe", label: "Equipe" }, { key: "modelo", label: "Data Book modelo" },
+  ];
   const capaRef = useRef(null);
   const [enviandoCapa, setEnviandoCapa] = useState(false);
   const modeloRef = useRef(null);
@@ -47,6 +53,7 @@ export default function AuditoriaDetalheClient({ id }) {
       const cfg = j.data.portalConfig && typeof j.data.portalConfig === "object" ? j.data.portalConfig : {};
       setEmailCliente((cfg.emailsCliente || []).join(", ") || j.data.clienteEmail || "");
       setInternosSel(Array.isArray(cfg.emailsInternos) ? cfg.emailsInternos : []);
+      setSecoesPortal(cfg.secoes && typeof cfg.secoes === "object" ? cfg.secoes : {});
     } catch (e) { setErro(e.message); } finally { setLoading(false); }
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -153,6 +160,16 @@ export default function AuditoriaDetalheClient({ id }) {
       else alert(`E-mail enviado (${j.destinatarios} destinatário(s)${j.cc ? " + " + j.cc + " em cópia" : ""})${j.comAnexo ? " · PDF anexo" : ""}.`);
       await carregar();
     } catch (e) { alert(e.message); } finally { setEnviandoEmail(false); }
+  }
+
+  async function toggleSecao(key) {
+    const novo = { ...secoesPortal, [key]: secoesPortal[key] === false };
+    setSecoesPortal(novo);
+    setSalvandoSecoes(true);
+    try {
+      const r = await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secoes: { [key]: novo[key] } }) });
+      if (!r.ok) throw new Error();
+    } catch { setSecoesPortal(secoesPortal); alert("Não consegui salvar a seção."); } finally { setSalvandoSecoes(false); }
   }
 
   if (loading) return <div className="flex flex-col items-center justify-center py-24 text-torg-gray"><Loader2 size={24} className="animate-spin mb-3" /><p className="text-sm">Carregando…</p></div>;
@@ -279,6 +296,23 @@ export default function AuditoriaDetalheClient({ id }) {
       {/* Publicação + envio */}
       <div className="bg-torg-dark rounded-xl shadow-sm p-4 mb-8 text-white">
         <h2 className="text-sm font-bold inline-flex items-center gap-1.5 mb-1.5"><Send size={15} className="text-torg-orange" /> Portal do cliente</h2>
+
+        {/* Abas que o auditor vê — Documentos sempre aparece; as demais ligam/desligam */}
+        <div className="mb-3 pb-3 border-b border-white/10">
+          <p className="text-[11px] text-blue-100 mb-1.5">Abas visíveis pro auditor <span className="text-blue-300">(Documentos aparece sempre):</span></p>
+          <div className="flex flex-wrap gap-1.5">
+            {SECOES_PORTAL.map((s) => {
+              const on = secoesPortal[s.key] !== false;
+              return (
+                <button key={s.key} type="button" onClick={() => toggleSecao(s.key)} disabled={salvandoSecoes}
+                  className={`text-[11px] font-semibold rounded-full px-2.5 py-1 inline-flex items-center gap-1 transition disabled:opacity-50 ${on ? "bg-white text-torg-dark" : "bg-white/10 text-blue-200 line-through"}`}>
+                  {on ? <Eye size={11} /> : <X size={11} />} {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {data.status === "PUBLICADO" ? (
           <>
             <p className="text-[12px] text-blue-100 mb-2">Publicado · {publicados} de {evidenciaDocs.length} documento(s) publicado(s) pro auditor.</p>

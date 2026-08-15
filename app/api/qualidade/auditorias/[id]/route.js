@@ -33,6 +33,7 @@ const schema = z.object({
   dataBookModeloUrl: z.string().url().nullable().optional(),
   checklistJson: z.any().optional(),
   itensAdicionais: z.array(z.object({ id: z.string().min(1).max(60), titulo: z.string().max(300), descricao: z.string().max(2000).nullable().optional() })).optional(),
+  secoes: z.object({ estrutura: z.boolean(), maquinas: z.boolean(), equipe: z.boolean(), modelo: z.boolean() }).partial().optional(),
   solicitacoes: z.string().max(8000).nullable().optional(),
   // Relatório interno (constatações + plano de ação 5W2H + fotos + conclusão)
   dataAuditoria: z.string().nullable().optional(),
@@ -76,6 +77,12 @@ export async function PATCH(req, { params }) {
   }
   if (body.checklistJson !== undefined) data.checklistJson = body.checklistJson;
   if (body.itensAdicionais !== undefined) data.itensAdicionais = body.itensAdicionais.filter((i) => (i.titulo || "").trim()).map((i) => ({ id: i.id, titulo: i.titulo.trim(), descricao: (i.descricao || "").trim() || null }));
+  // Abas visíveis pro auditor — merge em portalConfig.secoes (não mexe nos e-mails salvos).
+  if (body.secoes) {
+    const cfgRow = await prisma.auditoria.findUnique({ where: { id: params.id }, select: { portalConfig: true } });
+    const cfg = cfgRow?.portalConfig && typeof cfgRow.portalConfig === "object" && !Array.isArray(cfgRow.portalConfig) ? cfgRow.portalConfig : {};
+    data.portalConfig = { ...cfg, secoes: { ...(cfg.secoes || {}), ...body.secoes } };
+  }
 
   // ── Relatório interno ──
   const dataDe = (s) => (s ? new Date(String(s).length <= 10 ? s + "T12:00:00Z" : s) : null);

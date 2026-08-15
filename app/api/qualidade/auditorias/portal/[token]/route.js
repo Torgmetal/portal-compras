@@ -38,10 +38,21 @@ export async function GET(_req, { params }) {
     if (fab) equipe.push({ grupo: "Fábrica", funcionarios: fab });
   } catch { /* RH pode não ter dados — equipe fica vazia */ }
 
+  // Quais abas o auditor vê (default: todas). Vitor liga/desliga por auditoria.
+  const cfg = aud.portalConfig && typeof aud.portalConfig === "object" && !Array.isArray(aud.portalConfig) ? aud.portalConfig : {};
+  const sec = cfg.secoes || {};
+  const mostrarSecoes = {
+    estrutura: sec.estrutura !== false,
+    maquinas: sec.maquinas !== false,
+    equipe: sec.equipe !== false,
+    modelo: sec.modelo !== false,
+  };
+
   return NextResponse.json({
     success: true,
     data: {
       empresa: aud.empresa,
+      mostrarSecoes,
       contato: aud.contato,
       titulo: aud.titulo,
       mensagemBoasVindas: aud.mensagemBoasVindas,
