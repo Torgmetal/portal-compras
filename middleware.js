@@ -166,6 +166,6 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*).*)",
+    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*|estrutura-3d).*)",
   ],
 };
