@@ -89,12 +89,19 @@ export default function AuditoriaDetalheClient({ id }) {
     if (j.success) setData(j.data);
   }
 
-  async function setReqStatus(reqId, status) {
-    const novo = { ...(data.checklistJson || {}), [reqId]: status };
-    setData((d) => ({ ...d, checklistJson: novo })); // otimista
-    try {
-      await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ checklistJson: novo }) });
-    } catch { /* mantém o estado otimista; recarregar reverte se falhar */ }
+  // Evidências adicionais (pedido a mais) — itens definidos pelo usuário; docs ligam via requisito=item.id
+  async function salvarItensAdicionais(itens) {
+    setData((d) => ({ ...d, itensAdicionais: itens })); // otimista
+    await fetch(`/api/qualidade/auditorias/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itensAdicionais: itens }) }).catch(() => {});
+  }
+  function addAdicional() {
+    salvarItensAdicionais([...(data.itensAdicionais || []), { id: `extra_${Date.now().toString(36)}`, titulo: "" }]);
+  }
+  function editarAdicionalTitulo(itemId, titulo) {
+    setData((d) => ({ ...d, itensAdicionais: (d.itensAdicionais || []).map((i) => (i.id === itemId ? { ...i, titulo } : i)) }));
+  }
+  function removerAdicional(itemId) {
+    salvarItensAdicionais((data.itensAdicionais || []).filter((i) => i.id !== itemId));
   }
 
   async function publicar(despublicar) {
@@ -140,6 +147,11 @@ export default function AuditoriaDetalheClient({ id }) {
     const g = reqGrupos.find((x) => x[0] === r.secao);
     if (g) g[1].push(r); else reqGrupos.push([r.secao, [r]]);
   }
+  // Documentos agrupados pelo item (requisito) que atendem; "__sem__" = sem item.
+  const docsPorReq = {};
+  for (const d of evidenciaDocs) { const k = d.requisito || "__sem__"; (docsPorReq[k] ||= []).push(d); }
+  const publicados = evidenciaDocs.filter((d) => d.publicar).length;
+  const itensAdicionais = data.itensAdicionais || [];
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -200,41 +212,52 @@ export default function AuditoriaDetalheClient({ id }) {
         <DocSection auditoriaId={id} tipo="SOLICITACAO" titulo="Anexos da solicitação (e-mails/listas — uso interno)" docs={solicitacoesDocs} onChange={carregar} />
       </div>
 
-      {/* Documentos compartilhados */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
-        <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1"><FolderOpen size={15} className="text-torg-blue" /> Documentos para o cliente</h2>
-        <p className="text-[11px] text-torg-gray mb-2">Estes documentos aparecem no portal do cliente para conferência e download.</p>
-        <DocSection auditoriaId={id} tipo="EVIDENCIA" titulo="" docs={evidenciaDocs} onChange={carregar} sugestao />
-      </div>
-
-      {/* Checklist do auditor (GQ-FQ-003) */}
+      {/* Documentos para o auditor (GQ-FQ-003) — arquivos por item, publicar por arquivo */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><ClipboardCheck size={15} className="text-torg-blue" /> Checklist do auditor (GQ-FQ-003)</h2>
-          <span className="text-[12px] font-bold text-torg-dark">{reqAtend}/{reqBase} · {reqPct}%</span>
+          <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><ClipboardCheck size={15} className="text-torg-blue" /> Documentos para o auditor (GQ-FQ-003)</h2>
+          <span className="text-[11px] font-bold text-torg-dark whitespace-nowrap">{publicados} de {evidenciaDocs.length} publicado{publicados === 1 ? "" : "s"}</span>
         </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-3"><div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${reqPct}%` }} /></div>
-        <div className="space-y-3">
+        <p className="text-[11px] text-torg-gray mb-3">Anexe os arquivos em cada item e marque quais <b>publicar</b> no portal do auditor. Só os publicados aparecem pra ele.</p>
+        <div className="space-y-4">
           {reqGrupos.map(([secao, reqs]) => (
             <div key={secao}>
-              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">{secao}</p>
-              <div className="divide-y divide-gray-50">
-                {reqs.map((r) => {
-                  const st = checklist[r.id] || "PENDENTE";
-                  return (
-                    <div key={r.id} className="flex items-center justify-between gap-3 py-1.5 text-[12px]">
-                      <span className="text-torg-dark min-w-0">{r.label}</span>
-                      <select value={st} onChange={(e) => setReqStatus(r.id, e.target.value)}
-                        className={`shrink-0 text-[11px] font-medium rounded-lg px-2 py-1 border-0 focus:ring-1 focus:ring-torg-blue ${STATUS_REQUISITO[st].cor}`}>
-                        {Object.entries(STATUS_REQUISITO).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                      </select>
-                    </div>
-                  );
-                })}
+              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1.5">{secao}</p>
+              <div className="space-y-1.5">
+                {reqs.map((r) => (
+                  <ItemBlock key={r.id} auditoriaId={id} itemId={r.id} label={r.label} secao={secao} docs={docsPorReq[r.id] || []} onChange={carregar} />
+                ))}
               </div>
             </div>
           ))}
+          {(docsPorReq["__sem__"] || []).length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1.5">Outros documentos (sem item)</p>
+              <ItemBlock auditoriaId={id} itemId="" label="" secao="Outros" docs={docsPorReq["__sem__"]} onChange={carregar} />
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Evidências adicionais (pedido a mais) */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+        <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1"><ClipboardList size={15} className="text-torg-blue" /> Evidências adicionais (pedido a mais)</h2>
+        <p className="text-[11px] text-torg-gray mb-3">Para o que o auditor pediu além do checklist. Descreva o pedido e anexe as evidências (também com publicar por arquivo).</p>
+        <div className="space-y-2.5">
+          {itensAdicionais.map((item) => (
+            <div key={item.id} className="border border-gray-100 rounded-lg p-2.5">
+              <div className="flex items-center gap-2 mb-1.5">
+                <input value={item.titulo} onChange={(e) => editarAdicionalTitulo(item.id, e.target.value)} onBlur={() => salvarItensAdicionais(itensAdicionais)}
+                  placeholder="O que foi pedido (ex.: dimensões da cabine de jateamento)"
+                  className="flex-1 text-[12px] font-medium text-torg-dark border-0 border-b border-gray-200 focus:border-torg-blue focus:ring-0 px-0 py-1 bg-transparent" />
+                <button onClick={() => removerAdicional(item.id)} className="text-torg-gray hover:text-red-600 shrink-0"><Trash2 size={14} /></button>
+              </div>
+              <ItemBlock auditoriaId={id} itemId={item.id} label="" secao="Outros" docs={docsPorReq[item.id] || []} onChange={carregar} />
+            </div>
+          ))}
+          {itensAdicionais.length === 0 && <p className="text-[11px] text-torg-gray italic">Nenhuma evidência adicional.</p>}
+        </div>
+        <button onClick={addAdicional} className="mt-2.5 text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Plus size={13} /> Adicionar evidência</button>
       </div>
 
       {/* Relatório interno (constatações + plano de ação 5W2H) */}
@@ -464,6 +487,108 @@ function RelatorioAuditoria({ id, data, onChange }) {
 }
 
 // Seção de documentos (upload + vincular doc da Qualidade + lista)
+// Bloco de um item (requisito do GQ-FQ-003 OU item adicional): lista os arquivos com
+// toggle Publicar/Não publicar + anexar (upload) + trazer do Controle de Documentos.
+function ItemBlock({ auditoriaId, itemId, label, secao, docs, onChange }) {
+  const fileRef = useRef(null);
+  const [enviando, setEnviando] = useState(false);
+  const [progresso, setProgresso] = useState("");
+  const [picker, setPicker] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [resultados, setResultados] = useState(null);
+  const [buscando, setBuscando] = useState(false);
+
+  async function anexarArquivo(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setEnviando(true);
+    try {
+      const itens = [];
+      for (let i = 0; i < files.length; i++) {
+        setProgresso(`${i + 1}/${files.length}`);
+        const f = files[i];
+        const blob = await upload(f.name, f, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+        itens.push({ tipo: "EVIDENCIA", secao, requisito: itemId || undefined, nome: f.name, arquivoUrl: blob.url, arquivoTipo: f.type || null, arquivoTamanho: f.size });
+      }
+      const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || "Erro");
+      await onChange();
+    } catch (err) { alert(err.message || "Falha no upload"); } finally { setEnviando(false); setProgresso(""); if (fileRef.current) fileRef.current.value = ""; }
+  }
+  async function togglePublicar(d) {
+    await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ docId: d.id, publicar: !d.publicar }) });
+    await onChange();
+  }
+  async function remover(docId) {
+    if (!confirm("Remover este documento?")) return;
+    await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc?docId=${encodeURIComponent(docId)}`, { method: "DELETE" });
+    await onChange();
+  }
+  async function buscar(e) {
+    e?.preventDefault();
+    if (busca.trim().length < 2) return;
+    setBuscando(true);
+    try {
+      const r = await fetch(`/api/qualidade/documentos?busca=${encodeURIComponent(busca.trim())}`);
+      const j = await r.json();
+      setResultados((j.data || []).slice(0, 10));
+    } catch { setResultados([]); } finally { setBuscando(false); }
+  }
+  async function vincular(d) {
+    const r = await fetch(`/api/qualidade/auditorias/${auditoriaId}/doc`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "EVIDENCIA", secao, requisito: itemId || undefined, nome: d.nome, documentoId: d.id }) });
+    const j = await r.json();
+    if (!r.ok || !j.success) return alert(j.error || "Erro");
+    setPicker(false); setBusca(""); setResultados(null);
+    await onChange();
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50/40 px-2.5 py-2">
+      {label && <p className="text-[12px] text-torg-dark font-medium mb-1">{label}</p>}
+      {docs.length > 0 && (
+        <div className="space-y-1 mb-1.5">
+          {docs.map((d) => (
+            <div key={d.id} className="flex items-center justify-between gap-2 bg-white rounded-md border border-gray-100 px-2 py-1 text-[12px]">
+              <span className="inline-flex items-center gap-1.5 min-w-0"><FileText size={13} className="text-torg-blue shrink-0" /><span className="truncate text-torg-dark">{d.nome}</span></span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={() => togglePublicar(d)} title="Mostrar ou não no portal do auditor"
+                  className={`text-[10px] font-semibold rounded-full px-2 py-0.5 inline-flex items-center gap-1 transition ${d.publicar ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-gray-100 text-torg-gray hover:bg-gray-200"}`}>
+                  {d.publicar ? <><Eye size={11} /> Publicar</> : <><X size={11} /> Não publicar</>}
+                </button>
+                <button onClick={() => remover(d.id)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-3 flex-wrap">
+        <input ref={fileRef} type="file" multiple className="hidden" onChange={anexarArquivo} accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.msg,.eml" />
+        <button onClick={() => fileRef.current?.click()} disabled={enviando} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 disabled:opacity-50">{enviando ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} {enviando ? `Enviando ${progresso}…` : "Anexar arquivo"}</button>
+        <button onClick={() => setPicker((v) => !v)} className="text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Search size={12} /> Trazer do Controle</button>
+      </div>
+      {picker && (
+        <div className="mt-1.5 border border-gray-100 rounded-lg p-2 bg-white">
+          <form onSubmit={buscar} className="flex items-center gap-2 mb-1">
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="buscar por nome, norma, nº…" className="flex-1 text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:border-torg-blue" />
+            <button type="submit" disabled={buscando} className="text-[11px] text-torg-blue inline-flex items-center gap-1 disabled:opacity-50">{buscando ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />} Buscar</button>
+          </form>
+          {resultados && (resultados.length ? (
+            <div className="divide-y divide-gray-50 max-h-44 overflow-y-auto">
+              {resultados.map((d) => (
+                <button key={d.id} onClick={() => vincular(d)} className="w-full flex items-center gap-2 px-1.5 py-1 text-[11px] hover:bg-torg-blue-50 text-left">
+                  <Plus size={12} className="text-torg-blue shrink-0" /><span className="truncate text-torg-dark flex-1">{d.nome}</span>
+                  <span className="text-torg-gray shrink-0 whitespace-nowrap">{d.categoria}</span>
+                </button>
+              ))}
+            </div>
+          ) : <p className="text-[10px] text-torg-gray">Nenhum documento encontrado.</p>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DocSection({ auditoriaId, tipo, titulo, docs, onChange, sugestao }) {
   const fileRef = useRef(null);
   const [enviando, setEnviando] = useState(false);

@@ -32,6 +32,7 @@ const schema = z.object({
   capaUrl: z.string().url().nullable().optional(),
   dataBookModeloUrl: z.string().url().nullable().optional(),
   checklistJson: z.any().optional(),
+  itensAdicionais: z.array(z.object({ id: z.string().min(1).max(60), titulo: z.string().max(300) })).optional(),
   solicitacoes: z.string().max(8000).nullable().optional(),
   // Relatório interno (constatações + plano de ação 5W2H + fotos + conclusão)
   dataAuditoria: z.string().nullable().optional(),
@@ -74,6 +75,7 @@ export async function PATCH(req, { params }) {
     if (body[k] !== undefined) data[k] = typeof body[k] === "string" ? (body[k].trim() || null) : body[k];
   }
   if (body.checklistJson !== undefined) data.checklistJson = body.checklistJson;
+  if (body.itensAdicionais !== undefined) data.itensAdicionais = body.itensAdicionais.filter((i) => (i.titulo || "").trim()).map((i) => ({ id: i.id, titulo: i.titulo.trim() }));
 
   // ── Relatório interno ──
   const dataDe = (s) => (s ? new Date(String(s).length <= 10 ? s + "T12:00:00Z" : s) : null);

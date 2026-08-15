@@ -182,8 +182,11 @@ async function main() {
     `ADD COLUMN IF NOT EXISTS "fotos" JSONB NOT NULL DEFAULT '[]'`,
     `ADD COLUMN IF NOT EXISTS "conclusao" TEXT`,
     `ADD COLUMN IF NOT EXISTS "relatorioEmitidoEm" TIMESTAMP(3)`,
+    `ADD COLUMN IF NOT EXISTS "itensAdicionais" JSONB NOT NULL DEFAULT '[]'`,
   ]) await prisma.$executeRawUnsafe(`ALTER TABLE "Auditoria" ${c}`);
-  console.log("[ensure-mes-tables] OK — colunas de relatório da Auditoria garantidas.");
+  await prisma.$executeRawUnsafe(`ALTER TABLE "AuditoriaDoc" ADD COLUMN IF NOT EXISTS "publicar" BOOLEAN NOT NULL DEFAULT true`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "AuditoriaDoc" ADD COLUMN IF NOT EXISTS "comentario" TEXT`);
+  console.log("[ensure-mes-tables] OK — colunas de relatório/publicação da Auditoria garantidas.");
 
   // Verifica quais das duas tabelas existem
   const existentes = await prisma.$queryRawUnsafe(`

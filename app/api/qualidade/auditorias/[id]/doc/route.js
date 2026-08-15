@@ -22,6 +22,8 @@ const schema = z.object({
   arquivoTamanho: z.number().int().nonnegative().optional().nullable(),
   // origem B: vínculo a um documento da Qualidade existente
   documentoId: z.string().optional().nullable(),
+  publicar: z.boolean().optional(), // mostra no portal (default true)
+  comentario: z.string().max(2000).optional().nullable(),
 });
 
 export async function POST(req, { params }) {
@@ -77,6 +79,8 @@ export async function POST(req, { params }) {
       arquivoTamanho: it.arquivoTamanho ?? null,
       sharepointItemId: q ? (q.sharepointItemId || null) : null,
       documentoId: it.documentoId || null,
+      publicar: it.publicar ?? true,
+      comentario: (it.comentario || "").trim() || null,
     };
   });
 
@@ -108,13 +112,21 @@ export async function PATCH(req, { params }) {
   }
   let body;
   try {
-    body = z.object({ docId: z.string().min(1), secao: z.string().max(120).nullable().optional(), requisito: z.string().max(60).nullable().optional() }).parse(await req.json());
+    body = z.object({
+      docId: z.string().min(1),
+      secao: z.string().max(120).nullable().optional(),
+      requisito: z.string().max(60).nullable().optional(),
+      publicar: z.boolean().optional(),
+      comentario: z.string().max(2000).nullable().optional(),
+    }).parse(await req.json());
   } catch (e) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
   const data = {};
   if (body.secao !== undefined) data.secao = body.secao?.trim() || "Outros";
   if (body.requisito !== undefined) data.requisito = body.requisito || null;
+  if (body.publicar !== undefined) data.publicar = body.publicar;
+  if (body.comentario !== undefined) data.comentario = (body.comentario || "").trim() || null;
   await prisma.auditoriaDoc.updateMany({ where: { id: body.docId, auditoriaId: params.id }, data });
   return NextResponse.json({ success: true });
 }

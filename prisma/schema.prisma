@@ -1740,7 +1740,8 @@ model Auditoria {
   mensagemBoasVindas String?
   capaUrl            String? // foto de capa do hero do portal (Blob)
   dataBookModeloUrl  String? // PDF de Data Book modelo (exemplo p/ o cliente ver)
-  checklistJson      Json? // status dos requisitos do GQ-FQ-003 { reqId: status }
+  checklistJson      Json? // status dos requisitos do GQ-FQ-003 { reqId: status } (legado; publicar hoje é por doc)
+  itensAdicionais    Json           @default("[]") // evidências "pedido a mais": [{ id, titulo }] — docs ligam via requisito=id
   solicitacoes       String? // o que o cliente pediu (texto / e-mail colado)
   // Relatório INTERNO da auditoria externa (apontamentos do auditor + plano de ação 5W2H
   // próprio + fotos + conclusão). NÃO vai ao portal do auditor — registro/resposta da Torg.
@@ -1774,13 +1775,15 @@ model AuditoriaDoc {
   auditoriaId      String
   tipo             String    @default("EVIDENCIA") // SOLICITACAO (pedido do cliente) | EVIDENCIA (compartilhado)
   secao            String? // área do GQ-FQ-003 (aba no portal)
-  requisito        String? // id do requisito/linha do GQ-FQ-003 que o documento atende
+  requisito        String? // id do requisito/linha do GQ-FQ-003 (ou id de item adicional) que o documento atende
   nome             String
   arquivoUrl       String?
   arquivoTipo      String?
   arquivoTamanho   Int?
   sharepointItemId String?
   documentoId      String? // vínculo opcional a um DocumentoQualidade existente
+  publicar         Boolean   @default(true) // mostra no portal do cliente (seleção por arquivo)
+  comentario       String? // nota/evidência do que foi pedido (usado nos itens adicionais)
   createdAt        DateTime  @default(now())
   auditoria        Auditoria @relation(fields: [auditoriaId], references: [id], onDelete: Cascade)
 
