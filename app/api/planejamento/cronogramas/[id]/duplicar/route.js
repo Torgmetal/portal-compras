@@ -16,12 +16,19 @@ const schema = z.object({
   manterProgresso: z.boolean().optional().default(false), // copia %/execução/baseline da origem
 });
 
+// Por ora, copiar cronograma é restrito ao Vitor (pedido dele). Trocar aqui p/ liberar.
+const DONO_COPIA = "vitor@torg.com.br";
+
 export async function POST(req, { params }) {
   let user;
   try {
     user = await requireRole(["ADMIN", "PLANEJAMENTO", "PRODUCAO", "COMERCIAL"]);
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
+  }
+
+  if ((user.email || "").toLowerCase() !== DONO_COPIA) {
+    return NextResponse.json({ success: false, error: "Função de copiar cronograma disponível apenas para o Vitor por enquanto." }, { status: 403 });
   }
 
   const { id } = await params;

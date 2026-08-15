@@ -1162,9 +1162,22 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const [copiarProgresso, setCopiarProgresso] = useState(true);
   const [copiando, setCopiando] = useState(false);
   const [copiarErro, setCopiarErro] = useState("");
+  const [copiarOps, setCopiarOps] = useState([]);
+  const [loadingCopiarOps, setLoadingCopiarOps] = useState(false);
+  const [isVitor, setIsVitor] = useState(false); // copiar é restrito ao Vitor por ora
 
   const now = new Date();
   const tarefas = detail.tarefas || [];
+
+  // Descobre se o usuário logado é o Vitor (só ele vê o "Copiar para OP" por enquanto).
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((d) => { if (vivo) setIsVitor((d?.user?.email || "").toLowerCase() === "vitor@torg.com.br"); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
 
   const abrirCopiar = () => {
     setCopiarOp("");
@@ -1172,16 +1185,29 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
     setCopiarProgresso(true);
     setCopiarErro("");
     setShowCopiar(true);
+    setLoadingCopiarOps(true);
+    fetch("/api/planejamento/cronogramas/manual")
+      .then((r) => r.json())
+      .then((d) => setCopiarOps(d.ops || []))
+      .catch(() => setCopiarOps([]))
+      .finally(() => setLoadingCopiarOps(false));
+  };
+  // Ao escolher a OP destino, sugere o título com a obra dela (editável).
+  const selecionarOpCopia = (numero) => {
+    setCopiarOp(numero);
+    const op = copiarOps.find((o) => o.numero === numero);
+    if (op) setCopiarTitulo(op.obra || op.cliente || detail.titulo || "");
   };
   const copiar = async () => {
     if (!copiarOp.trim() || !copiarTitulo.trim()) return;
     setCopiando(true);
     setCopiarErro("");
     try {
+      const opNumeroFinal = copiarOp.toUpperCase().startsWith("T") ? copiarOp.toUpperCase() : `T${copiarOp}`;
       const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/duplicar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: copiarOp, titulo: copiarTitulo, manterProgresso: copiarProgresso }),
+        body: JSON.stringify({ opNumero: opNumeroFinal, titulo: copiarTitulo, manterProgresso: copiarProgresso }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao copiar cronograma");
@@ -1340,12 +1366,12 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
             >
               <FileDown size={11} /> MS Project
             </button>
-            {/* Copiar cronograma para outra OP */}
-            {!readOnly && (
+            {/* Copiar cronograma para outra OP — restrito ao Vitor por enquanto */}
+            {!readOnly && isVitor && (
               <button
                 onClick={abrirCopiar}
                 className="px-3 py-1.5 text-[10px] font-medium text-torg-dark bg-white border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center gap-1.5"
-                title="Cria uma cópia deste cronograma vinculada a outra OP (mesma estrutura e datas; progresso zerado)."
+                title="Cria uma cópia deste cronograma vinculada a outra OP (mesma estrutura e datas)."
               >
                 <Copy size={11} /> Copiar para OP
               </button>
@@ -1605,9 +1631,19 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
               </p>
               <div>
                 <label className="block text-xs font-medium text-torg-gray mb-1">OP de destino *</label>
-                <input type="text" value={copiarOp} onChange={(e) => setCopiarOp(e.target.value)}
-                  placeholder="Ex: T113" autoFocus
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+                <div className="relative">
+                  <select value={copiarOp} onChange={(e) => selecionarOpCopia(e.target.value)} disabled={loadingCopiarOps} autoFocus
+                    className="appearance-none w-full pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-torg-blue focus:border-torg-blue disabled:opacity-60">
+                    <option value="">{loadingCopiarOps ? "Carregando OPs…" : "Selecione a OP de destino…"}</option>
+                    {copiarOps.map((op) => (
+                      <option key={op.id} value={op.numero}>{op.numero} — {op.cliente}{op.obra ? ` (${op.obra})` : ""}{op.cronogramasExistentes > 0 ? ` · já tem ${op.cronogramasExistentes}` : ""}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-torg-gray pointer-events-none" />
+                </div>
+                {!loadingCopiarOps && copiarOps.length === 0 && (
+                  <p className="text-[11px] text-amber-600 mt-1">Nenhuma OP sem cronograma disponível.</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-torg-gray mb-1">Título / descrição *</label>
