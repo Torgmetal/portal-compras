@@ -5,9 +5,9 @@ import { ordenarSecoes, SECOES_AUDITORIA, requisitosDaSecao } from "@/lib/audito
 import PlantaFabril from "@/components/PlantaFabril";
 import MaquinasEquipamentos from "@/components/MaquinasEquipamentos";
 
-function DocCard({ d, base, i = 0 }) {
+function DocCard({ d, base, i = 0, destaque }) {
   return (
-    <div className="group border border-gray-100 rounded-xl p-4 hover:border-torg-blue-300 hover:shadow-lg transition-shadow duration-200 pc-up" style={{ animationDelay: `${i * 45}ms` }}>
+    <div id={`doc-${d.id}`} className={`group border rounded-xl p-4 hover:shadow-lg transition-shadow duration-200 pc-up ${destaque ? "border-torg-orange ring-2 ring-torg-orange/40 bg-orange-50/40" : "border-gray-100 hover:border-torg-blue-300"}`} style={{ animationDelay: `${i * 45}ms` }}>
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-torg-blue-50 flex items-center justify-center shrink-0"><FileText size={18} className="text-torg-blue" /></div>
         <div className="min-w-0 flex-1">
@@ -44,6 +44,25 @@ export default function PortalClienteClient({ token }) {
   const [erro, setErro] = useState("");
   const [aba, setAba] = useState(null); // seção (aba) ativa escolhida pelo cliente
   const [painel, setPainel] = useState("documentos"); // aba de topo: documentos | estrutura | maquinas | equipe | modelo
+  const [focoDoc, setFocoDoc] = useState(null); // ?doc=<id> — abre direto no documento
+
+  // Lê o ?doc= do link do índice (PDF) — sem sair do portal (boas-vindas continuam).
+  useEffect(() => {
+    const d = new URLSearchParams(window.location.search).get("doc");
+    if (d) setFocoDoc(d);
+  }, []);
+  // Quando há foco, seleciona a aba do documento e rola até ele (com destaque).
+  useEffect(() => {
+    if (!data || !focoDoc) return;
+    const d = data.documentos.find((x) => x.id === focoDoc);
+    if (!d) return;
+    const adic = new Set((data.itensAdicionais || []).map((i) => i.id));
+    const alvo = (d.requisito && adic.has(d.requisito)) ? "Evidências adicionais" : (SECOES_AUDITORIA.includes(d.secao) ? d.secao : "Outros");
+    setPainel("documentos");
+    setAba(alvo);
+    const t = setTimeout(() => { document.getElementById(`doc-${focoDoc}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 320);
+    return () => clearTimeout(t);
+  }, [data, focoDoc]);
 
   const carregar = useCallback(async () => {
     try {
@@ -199,7 +218,7 @@ export default function PortalClienteClient({ token }) {
                     <h4 className="text-[14px] font-semibold text-torg-dark">{g.titulo || "Evidência adicional"}</h4>
                     <span className="text-[11px] text-torg-gray">· {g.docs.length}</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{g.docs.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} />)}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{g.docs.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
                 </div>
               ))}
             </div>
@@ -215,7 +234,7 @@ export default function PortalClienteClient({ token }) {
                       {ds.length > 0 && <span className="text-[11px] text-torg-gray">· {ds.length}</span>}
                     </div>
                     {ds.length ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{ds.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} />)}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{ds.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
                     ) : (
                       <p className="text-[12px] text-torg-gray italic pl-3.5">Documentos serão disponibilizados em breve.</p>
                     )}
@@ -225,12 +244,12 @@ export default function PortalClienteClient({ token }) {
               {docsPorReq["__sem__"]?.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-2"><span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" /><h4 className="text-[14px] font-semibold text-torg-dark">Outros documentos</h4></div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{docsPorReq["__sem__"].map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} />)}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{docsPorReq["__sem__"].map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
                 </div>
               )}
             </div>
           ) : docsAtivos.length ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{docsAtivos.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} />)}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{docsAtivos.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
           ) : (
             <div className="text-center py-10 text-torg-gray border border-dashed border-gray-200 rounded-xl">
               <FileText size={28} className="mx-auto mb-2 text-gray-300" />
