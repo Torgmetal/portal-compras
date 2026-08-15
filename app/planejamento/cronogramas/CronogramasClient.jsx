@@ -1159,6 +1159,7 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const [showCopiar, setShowCopiar] = useState(false);
   const [copiarOp, setCopiarOp] = useState("");
   const [copiarTitulo, setCopiarTitulo] = useState("");
+  const [copiarProgresso, setCopiarProgresso] = useState(true);
   const [copiando, setCopiando] = useState(false);
   const [copiarErro, setCopiarErro] = useState("");
 
@@ -1168,6 +1169,7 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const abrirCopiar = () => {
     setCopiarOp("");
     setCopiarTitulo(detail.titulo || "");
+    setCopiarProgresso(true);
     setCopiarErro("");
     setShowCopiar(true);
   };
@@ -1179,7 +1181,7 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
       const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/duplicar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: copiarOp, titulo: copiarTitulo }),
+        body: JSON.stringify({ opNumero: copiarOp, titulo: copiarTitulo, manterProgresso: copiarProgresso }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao copiar cronograma");
@@ -1599,7 +1601,7 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
             </div>
             <div className="p-5 space-y-4">
               <p className="text-xs text-torg-gray">
-                Cria um novo cronograma a partir de <b>{detail.titulo}</b>, com a <b>mesma estrutura, datas e durações</b>. O progresso e a validação (baseline) começam do zero.
+                Cria um novo cronograma a partir de <b>{detail.titulo}</b>, com a <b>mesma estrutura, datas e durações</b>.
               </p>
               <div>
                 <label className="block text-xs font-medium text-torg-gray mb-1">OP de destino *</label>
@@ -1613,6 +1615,13 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
                   placeholder="Ex: ENC 0333 - Cobertura de Caldeira"
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
               </div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={copiarProgresso} onChange={(e) => setCopiarProgresso(e.target.checked)}
+                  className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+                <span className="text-xs text-torg-gray">
+                  <b>Copiar o progresso da OP de origem</b> (% concluído, execução e baseline). Desmarque para começar do zero.
+                </span>
+              </label>
               {copiarErro && (
                 <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2 flex items-start gap-2">
                   <AlertCircle size={13} className="mt-0.5 shrink-0" /> {copiarErro}
