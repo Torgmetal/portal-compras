@@ -87,7 +87,7 @@ export default function CalibracaoDetalheClient({ id }) {
   if (erro && !doc) return <div className="py-16 text-center"><p className="text-red-600 text-sm mb-3">{erro}</p><Link href="/qualidade/calibracao" className="text-torg-blue text-sm">← Voltar</Link></div>;
 
   const temFoto = !!av.fotoEquipamentoUrl, temRel = !!av.relatorioUrl;
-  const podeAvaliar = temFoto && temRel;
+  const podeAvaliar = temRel; // foto deixou de ser obrigatória (Vitor 15/08); basta o relatório
   const temCertificado = !!(doc.arquivoUrl || doc.sharepointItemId);
   const sugestao = sugerirConclusao(av.criterios);
 
@@ -154,13 +154,13 @@ export default function CalibracaoDetalheClient({ id }) {
         )}
       </Secao>
 
-      {/* Anexos obrigatórios */}
-      <Secao titulo="Anexos (obrigatórios para avaliar)">
+      {/* Anexos — relatório obrigatório; foto opcional */}
+      <Secao titulo="Anexos (relatório obrigatório · foto opcional)">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Anexo label="Foto do equipamento" campo="foto" url={av.fotoEquipamentoUrl} nome={av.fotoEquipamentoNome} img accept="image/*" enviando={enviando === "foto"} onPick={(f) => subirAnexo(f, "foto")} onRemove={() => removerAnexo("foto")} />
+          <Anexo label="Foto do equipamento (opcional)" campo="foto" url={av.fotoEquipamentoUrl} nome={av.fotoEquipamentoNome} img accept="image/*" enviando={enviando === "foto"} onPick={(f) => subirAnexo(f, "foto")} onRemove={() => removerAnexo("foto")} />
           <Anexo label="Relatório" campo="relatorio" url={av.relatorioUrl} nome={av.relatorioNome} accept="application/pdf,image/*" enviando={enviando === "relatorio"} onPick={(f) => subirAnexo(f, "relatorio")} onRemove={() => removerAnexo("relatorio")} />
         </div>
-        {!podeAvaliar && <p className="text-[12px] text-amber-600 mt-3 flex items-center gap-1"><AlertCircle size={13} /> Anexe a foto do equipamento e o relatório para liberar Aprovar/Reprovar.</p>}
+        {!podeAvaliar && <p className="text-[12px] text-amber-600 mt-3 flex items-center gap-1"><AlertCircle size={13} /> Anexe o relatório para liberar Aprovar/Reprovar.</p>}
       </Secao>
 
       {/* Critérios */}
@@ -194,8 +194,8 @@ export default function CalibracaoDetalheClient({ id }) {
         <button onClick={() => salvar({}, "Alterações salvas.")} disabled={salvando} className="px-4 py-2 bg-white text-torg-dark border border-gray-300 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 text-sm disabled:opacity-50">{salvando ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar</button>
         <div className="flex items-center gap-2">
           {av.conclusao !== "PENDENTE" && <button onClick={() => salvar({ conclusao: "PENDENTE" }, "Reaberto.")} disabled={salvando} className="px-3 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-50 text-sm inline-flex items-center gap-1.5 disabled:opacity-50"><RotateCcw size={14} /> Reabrir</button>}
-          <button onClick={() => salvar({ conclusao: "REPROVADO" }, "Reprovado.")} disabled={salvando || !podeAvaliar} title={!podeAvaliar ? "Anexe foto e relatório" : ""} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold flex items-center gap-2 text-sm disabled:opacity-40"><XCircle size={16} /> Reprovar</button>
-          <button onClick={() => salvar({ conclusao: "APROVADO" }, "Aprovado.")} disabled={salvando || !podeAvaliar} title={!podeAvaliar ? "Anexe foto e relatório" : ""} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold flex items-center gap-2 text-sm disabled:opacity-40"><CheckCircle2 size={16} /> Aprovar</button>
+          <button onClick={() => salvar({ conclusao: "REPROVADO" }, "Reprovado.")} disabled={salvando || !podeAvaliar} title={!podeAvaliar ? "Anexe o relatório" : ""} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold flex items-center gap-2 text-sm disabled:opacity-40"><XCircle size={16} /> Reprovar</button>
+          <button onClick={() => salvar({ conclusao: "APROVADO" }, "Aprovado.")} disabled={salvando || !podeAvaliar} title={!podeAvaliar ? "Anexe o relatório" : ""} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold flex items-center gap-2 text-sm disabled:opacity-40"><CheckCircle2 size={16} /> Aprovar</button>
         </div>
       </div>
       {podeAvaliar && av.conclusao === "PENDENTE" && <p className="text-[11px] text-torg-gray text-right -mt-3 inline-flex items-center gap-1 justify-end w-full"><ShieldCheck size={12} className="text-emerald-600" /> Sugestão pelos critérios: <strong>{conclusaoLabel(sugestao)}</strong></p>}

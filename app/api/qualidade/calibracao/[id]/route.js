@@ -116,8 +116,8 @@ export async function PATCH(req, { params }) {
   else if (body.relatorio?.url) { data.relatorioUrl = body.relatorio.url; data.relatorioNome = body.relatorio.nome || null; }
 
   if (body.conclusao !== undefined) {
-    if ((body.conclusao === "APROVADO" || body.conclusao === "REPROVADO") && !(fotoUrl && relUrl)) {
-      return NextResponse.json({ error: "Anexe a foto do equipamento e o relatório antes de aprovar/reprovar." }, { status: 400 });
+    if ((body.conclusao === "APROVADO" || body.conclusao === "REPROVADO") && !relUrl) {
+      return NextResponse.json({ error: "Anexe o relatório antes de aprovar/reprovar." }, { status: 400 });
     }
     data.conclusao = body.conclusao;
     if (body.conclusao === "PENDENTE") { data.avaliadoEm = null; data.avaliadorId = null; }
