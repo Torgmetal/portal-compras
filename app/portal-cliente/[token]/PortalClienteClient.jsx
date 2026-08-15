@@ -98,9 +98,10 @@ export default function PortalClienteClient({ token }) {
   // Agrupa os documentos padrão por seção, na ordem padrão.
   const porSecao = {};
   for (const d of data.documentos) { if (ehAdicional(d)) continue; const s = d.secao || "Outros"; (porSecao[s] ||= []).push(d); }
-  // Abas: áreas do GQ-FQ-003 ("Outros" só se tiver algo) + "Evidências adicionais" se houver.
+  // Abas: só as seções que TÊM documento publicado (some as vazias) + "Evidências
+  // adicionais" se houver. Assim o auditor vê só o que foi anexado.
   const secoesTabs = [
-    ...SECOES_AUDITORIA.filter((s) => s !== "Outros" || porSecao["Outros"]?.length),
+    ...ordenarSecoes(Object.keys(porSecao)),
     ...(adicionaisGrupos.length ? [ADICIONAIS] : []),
   ];
   const abaAtiva = (aba && secoesTabs.includes(aba)) ? aba : (secoesTabs[0] || null);
@@ -220,20 +221,16 @@ export default function PortalClienteClient({ token }) {
             </div>
           ) : reqsAtivos.length >= 2 ? (
             <div className="space-y-5">
-              {reqsAtivos.map((r) => {
-                const ds = docsPorReq[r.id] || [];
+              {reqsAtivos.filter((r) => (docsPorReq[r.id] || []).length).map((r) => {
+                const ds = docsPorReq[r.id];
                 return (
                   <div key={r.id}>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-torg-orange shrink-0" />
                       <h4 className="text-[14px] font-semibold text-torg-dark">{r.label}</h4>
-                      {ds.length > 0 && <span className="text-[11px] text-torg-gray">· {ds.length}</span>}
+                      <span className="text-[11px] text-torg-gray">· {ds.length}</span>
                     </div>
-                    {ds.length ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{ds.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
-                    ) : (
-                      <p className="text-[12px] text-torg-gray italic pl-3.5">Documentos serão disponibilizados em breve.</p>
-                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{ds.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
                   </div>
                 );
               })}
