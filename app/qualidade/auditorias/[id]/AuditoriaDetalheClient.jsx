@@ -15,6 +15,9 @@ import { COLUNAS_5W2H, STATUS_ITEM, STATUS_ITEM_OPCOES, situacaoItem, situacaoIt
 
 const fmtDH = (d) => (d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
+// Seções padrão (editáveis/removíveis) — semeadas quando a auditoria ainda não tem nenhuma.
+const SECOES_PADRAO = SECOES_AUDITORIA.filter((s) => s !== "Outros");
+
 export default function AuditoriaDetalheClient({ id }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -41,6 +44,16 @@ export default function AuditoriaDetalheClient({ id }) {
     } catch (e) { setErro(e.message); } finally { setLoading(false); }
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Semeia as seções padrão na 1ª vez (auditoria sem nenhuma seção ainda).
+  const seedRef = useRef(false);
+  useEffect(() => {
+    if (!data || seedRef.current) return;
+    if ((data.itensAdicionais || []).length === 0) {
+      seedRef.current = true;
+      salvarItensAdicionais(SECOES_PADRAO.map((s, i) => ({ id: `sec_${i}`, titulo: s })));
+    }
+  }, [data]); // eslint-disable-line
 
   async function salvar() {
     setSalvando(true);
