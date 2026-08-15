@@ -32,6 +32,16 @@ const SECURITY_HEADERS = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" },
 ];
 
+// Exceção só para assets que PRECISAM ser exibidos em <iframe> dentro do próprio portal
+// (mesma origem) — hoje a planta 3D dos galpões em /estrutura-3d. Mantém toda a postura de
+// segurança; só troca o anti-framing de 'none'/DENY para permitir a MESMA origem
+// (cross-origin continua bloqueado, então clickjacking segue barrado).
+const FRAMEABLE_HEADERS = SECURITY_HEADERS.map((h) =>
+  h.key === "X-Frame-Options" ? { key: h.key, value: "SAMEORIGIN" }
+    : h.key === "Content-Security-Policy" ? { key: h.key, value: "frame-ancestors 'self'; base-uri 'self'; object-src 'none'" }
+      : h
+);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -41,7 +51,11 @@ const nextConfig = {
     NEXT_PUBLIC_BUILD_DATE: date,
   },
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+    return [
+      // A planta 3D é servida em /estrutura-3d e precisa poder ser embutida no portal.
+      { source: "/estrutura-3d/:path*", headers: FRAMEABLE_HEADERS },
+      { source: "/((?!estrutura-3d/).*)", headers: SECURITY_HEADERS },
+    ];
   },
 };
 
