@@ -268,7 +268,7 @@ export default function AuditoriaDetalheClient({ id }) {
         <h2 className="text-sm font-bold inline-flex items-center gap-1.5 mb-1.5"><Send size={15} className="text-torg-orange" /> Portal do cliente</h2>
         {data.status === "PUBLICADO" ? (
           <>
-            <p className="text-[12px] text-blue-100 mb-2">Publicado · {evidenciaDocs.length} documento(s) disponível(is).</p>
+            <p className="text-[12px] text-blue-100 mb-2">Publicado · {publicados} de {evidenciaDocs.length} documento(s) publicado(s) pro auditor.</p>
             <div className="flex items-center gap-2 flex-wrap bg-white/10 rounded-lg px-3 py-2 mb-2.5">
               <span className="text-[11px] font-mono text-blue-100 break-all flex-1 min-w-[180px]">{link || (typeof window !== "undefined" ? `${window.location.origin}/portal-cliente/${data.token}` : `/portal-cliente/${data.token}`)}</span>
               <button onClick={() => navigator.clipboard?.writeText(link || `${window.location.origin}/portal-cliente/${data.token}`)} className="text-[11px] text-white inline-flex items-center gap-1 hover:text-torg-orange"><Copy size={12} /> copiar</button>
@@ -277,19 +277,19 @@ export default function AuditoriaDetalheClient({ id }) {
             </div>
           </>
         ) : (
-          <p className="text-[12px] text-blue-100 mb-2.5">Envie por e-mail (publica e manda o link) ou apenas gere o link.{evidenciaDocs.length === 0 ? " Adicione ao menos 1 documento." : ""}</p>
+          <p className="text-[12px] text-blue-100 mb-2.5">Envie por e-mail (publica e manda o link) ou apenas gere o link. Você pode publicar os documentos depois — só aparecem pro auditor os que estiverem marcados como <b>Publicar</b>.</p>
         )}
 
         <div className="flex items-center gap-2 flex-wrap">
           <input type="email" value={emailCliente} onChange={(e) => setEmailCliente(e.target.value)} placeholder="e-mail do cliente"
             className="flex-1 min-w-[180px] text-[12px] rounded-lg px-2.5 py-1.5 bg-white text-torg-dark border border-white/20 focus:outline-none" />
-          <button onClick={enviarEmail} disabled={enviandoEmail || evidenciaDocs.length === 0}
+          <button onClick={enviarEmail} disabled={enviandoEmail}
             className="text-[12px] font-semibold text-torg-dark bg-white rounded-lg px-3 py-1.5 hover:bg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
             {enviandoEmail ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} {data.status === "PUBLICADO" ? "Reenviar e-mail" : "Publicar e enviar"}
           </button>
         </div>
         {data.status !== "PUBLICADO" && (
-          <button onClick={() => publicar(false)} disabled={publicando || evidenciaDocs.length === 0} className="text-[11px] text-blue-100 hover:text-white underline disabled:opacity-50 mt-2">
+          <button onClick={() => publicar(false)} disabled={publicando} className="text-[11px] text-blue-100 hover:text-white underline disabled:opacity-50 mt-2">
             {publicando ? "Gerando…" : "ou só gerar o link, sem e-mail"}
           </button>
         )}

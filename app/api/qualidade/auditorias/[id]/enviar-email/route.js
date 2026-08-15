@@ -23,14 +23,10 @@ export async function POST(req, { params }) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
 
-  const aud = await prisma.auditoria.findUnique({
-    where: { id: params.id },
-    include: { documentos: { where: { tipo: "EVIDENCIA" }, select: { id: true } } },
-  });
+  const aud = await prisma.auditoria.findUnique({ where: { id: params.id } });
   if (!aud) return NextResponse.json({ success: false, error: "Auditoria não encontrada" }, { status: 404 });
-  if (aud.documentos.length === 0) {
-    return NextResponse.json({ success: false, error: "Adicione ao menos um documento para o cliente antes de enviar." }, { status: 400 });
-  }
+  // Sem exigir documentos: o portal já tem boas-vindas/capa/estrutura/equipe e os
+  // documentos podem ser publicados depois (aparecem só os marcados como Publicar).
 
   const token = aud.token || gerarTokenForte(32);
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
