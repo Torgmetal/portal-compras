@@ -147,11 +147,13 @@ export default function AuditoriaDetalheClient({ id }) {
     const g = reqGrupos.find((x) => x[0] === r.secao);
     if (g) g[1].push(r); else reqGrupos.push([r.secao, [r]]);
   }
-  // Documentos agrupados pelo item (requisito) que atendem; "__sem__" = sem item.
+  // Seções criadas pelo usuário (itensAdicionais) + documentos agrupados por seção (requisito).
+  const itensAdicionais = data.itensAdicionais || [];
+  const secaoIds = new Set(itensAdicionais.map((i) => i.id));
   const docsPorReq = {};
   for (const d of evidenciaDocs) { const k = d.requisito || "__sem__"; (docsPorReq[k] ||= []).push(d); }
+  const docsSemSecao = evidenciaDocs.filter((d) => !d.requisito || !secaoIds.has(d.requisito));
   const publicados = evidenciaDocs.filter((d) => d.publicar).length;
-  const itensAdicionais = data.itensAdicionais || [];
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -212,52 +214,34 @@ export default function AuditoriaDetalheClient({ id }) {
         <DocSection auditoriaId={id} tipo="SOLICITACAO" titulo="Anexos da solicitação (e-mails/listas — uso interno)" docs={solicitacoesDocs} onChange={carregar} />
       </div>
 
-      {/* Documentos para o auditor (GQ-FQ-003) — arquivos por item, publicar por arquivo */}
+      {/* Documentos para o auditor — seções livres criadas pelo usuário */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
         <div className="flex items-center justify-between gap-2 mb-1">
           <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5"><ClipboardCheck size={15} className="text-torg-blue" /> Documentos para o auditor</h2>
           <span className="text-[11px] font-bold text-torg-dark whitespace-nowrap">{publicados} de {evidenciaDocs.length} publicado{publicados === 1 ? "" : "s"}</span>
         </div>
-        <p className="text-[11px] text-torg-gray mb-3">Anexe os arquivos em cada item e marque quais <b>publicar</b> no portal do auditor. Só os publicados aparecem pra ele.</p>
-        <div className="space-y-4">
-          {reqGrupos.map(([secao, reqs]) => (
-            <div key={secao}>
-              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1.5">{secao}</p>
-              <div className="space-y-1.5">
-                {reqs.map((r) => (
-                  <ItemBlock key={r.id} auditoriaId={id} itemId={r.id} label={r.label} secao={secao} docs={docsPorReq[r.id] || []} onChange={carregar} />
-                ))}
-              </div>
-            </div>
-          ))}
-          {(docsPorReq["__sem__"] || []).length > 0 && (
-            <div>
-              <p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1.5">Outros documentos (sem item)</p>
-              <ItemBlock auditoriaId={id} itemId="" label="" secao="Outros" docs={docsPorReq["__sem__"]} onChange={carregar} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Evidências adicionais (pedido a mais) */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
-        <h2 className="text-sm font-bold text-torg-dark inline-flex items-center gap-1.5 mb-1"><ClipboardList size={15} className="text-torg-blue" /> Evidências adicionais (pedido a mais)</h2>
-        <p className="text-[11px] text-torg-gray mb-3">Para o que o auditor pediu além do checklist. Descreva o pedido e anexe as evidências (também com publicar por arquivo).</p>
+        <p className="text-[11px] text-torg-gray mb-3">Crie as seções que quiser e anexe os arquivos onde fizer sentido (do servidor ou upload). Marque quais <b>publicar</b> — só os publicados aparecem pro auditor.</p>
         <div className="space-y-2.5">
           {itensAdicionais.map((item) => (
             <div key={item.id} className="border border-gray-100 rounded-lg p-2.5">
               <div className="flex items-center gap-2 mb-1.5">
                 <input value={item.titulo} onChange={(e) => editarAdicionalTitulo(item.id, e.target.value)} onBlur={() => salvarItensAdicionais(itensAdicionais)}
-                  placeholder="O que foi pedido (ex.: dimensões da cabine de jateamento)"
-                  className="flex-1 text-[12px] font-medium text-torg-dark border-0 border-b border-gray-200 focus:border-torg-blue focus:ring-0 px-0 py-1 bg-transparent" />
-                <button onClick={() => removerAdicional(item.id)} className="text-torg-gray hover:text-red-600 shrink-0"><Trash2 size={14} /></button>
+                  placeholder="Nome da seção (ex.: Sistema de Gestão, Engenharia, Rastreabilidade…)"
+                  className="flex-1 text-[13px] font-semibold text-torg-dark border-0 border-b border-gray-200 focus:border-torg-blue focus:ring-0 px-0 py-1 bg-transparent" />
+                <button onClick={() => removerAdicional(item.id)} title="Remover seção" className="text-torg-gray hover:text-red-600 shrink-0"><Trash2 size={14} /></button>
               </div>
-              <ItemBlock auditoriaId={id} itemId={item.id} label="" secao="Outros" docs={docsPorReq[item.id] || []} onChange={carregar} />
+              <ItemBlock auditoriaId={id} itemId={item.id} label="" secao={item.titulo || "Outros"} docs={docsPorReq[item.id] || []} onChange={carregar} />
             </div>
           ))}
-          {itensAdicionais.length === 0 && <p className="text-[11px] text-torg-gray italic">Nenhuma evidência adicional.</p>}
+          {itensAdicionais.length === 0 && <p className="text-[11px] text-torg-gray italic">Nenhuma seção ainda — clique em "Adicionar seção" abaixo.</p>}
+          {docsSemSecao.length > 0 && (
+            <div className="border border-dashed border-gray-200 rounded-lg p-2.5">
+              <p className="text-[12px] font-semibold text-torg-gray mb-1.5">Sem seção</p>
+              <ItemBlock auditoriaId={id} itemId="" label="" secao="Outros" docs={docsSemSecao} onChange={carregar} />
+            </div>
+          )}
         </div>
-        <button onClick={addAdicional} className="mt-2.5 text-[11px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1"><Plus size={13} /> Adicionar evidência</button>
+        <button onClick={addAdicional} className="mt-3 text-[12px] font-medium text-torg-blue hover:text-torg-dark inline-flex items-center gap-1.5"><Plus size={14} /> Adicionar seção</button>
       </div>
 
       {/* Relatório interno (constatações + plano de ação 5W2H) */}

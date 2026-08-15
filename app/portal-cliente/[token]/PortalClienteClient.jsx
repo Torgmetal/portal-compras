@@ -56,8 +56,8 @@ export default function PortalClienteClient({ token }) {
     if (!data || !focoDoc) return;
     const d = data.documentos.find((x) => x.id === focoDoc);
     if (!d) return;
-    const adic = new Set((data.itensAdicionais || []).map((i) => i.id));
-    const alvo = (d.requisito && adic.has(d.requisito)) ? "Evidências adicionais" : (SECOES_AUDITORIA.includes(d.secao) ? d.secao : "Outros");
+    const sid = new Set((data.itensAdicionais || []).map((i) => i.id));
+    const alvo = (d.requisito && sid.has(d.requisito)) ? d.requisito : "__outros__";
     setPainel("documentos");
     setAba(alvo);
     const t = setTimeout(() => { document.getElementById(`doc-${focoDoc}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 320);
@@ -86,34 +86,18 @@ export default function PortalClienteClient({ token }) {
 
   const base = `/api/qualidade/auditorias/portal/${token}/doc`;
 
-  // Evidências adicionais (pedido a mais): docs com requisito = id de um item adicional.
-  // Não entram nas seções do GQ-FQ-003 — ganham uma aba própria, com o título do pedido.
-  const ADICIONAIS = "Evidências adicionais";
-  const adicionalIds = new Set((data.itensAdicionais || []).map((i) => i.id));
-  const ehAdicional = (d) => d.requisito && adicionalIds.has(d.requisito);
-  const adicionaisGrupos = (data.itensAdicionais || [])
-    .map((i) => ({ ...i, docs: data.documentos.filter((d) => d.requisito === i.id) }))
-    .filter((x) => x.docs.length);
-
-  // Agrupa os documentos padrão por seção, na ordem padrão.
-  const porSecao = {};
-  for (const d of data.documentos) { if (ehAdicional(d)) continue; const s = d.secao || "Outros"; (porSecao[s] ||= []).push(d); }
-  // Abas: só as seções que TÊM documento publicado (some as vazias) + "Evidências
-  // adicionais" se houver. Assim o auditor vê só o que foi anexado.
-  const secoesTabs = [
-    ...ordenarSecoes(Object.keys(porSecao)),
-    ...(adicionaisGrupos.length ? [ADICIONAIS] : []),
-  ];
-  const abaAtiva = (aba && secoesTabs.includes(aba)) ? aba : (secoesTabs[0] || null);
-  const ehAbaAdicional = abaAtiva === ADICIONAIS;
-  const docsAtivos = ehAbaAdicional ? [] : (abaAtiva ? (porSecao[abaAtiva] || []) : []);
-  // Linhas (requisitos) da aba ativa + documentos agrupados por linha
-  const reqsAtivos = ehAbaAdicional ? [] : (abaAtiva ? requisitosDaSecao(abaAtiva) : []);
-  const docsPorReq = {};
-  for (const d of docsAtivos) {
-    const k = d.requisito && reqsAtivos.some((r) => r.id === d.requisito) ? d.requisito : "__sem__";
-    (docsPorReq[k] ||= []).push(d);
-  }
+  // Seções são criadas pela Torg (data.itensAdicionais = [{id,titulo}]). Cada documento
+  // liga a uma seção via requisito = id da seção. Docs sem seção correspondente caem em
+  // "Outros documentos". Cada seção com documento publicado vira uma aba.
+  const secoesUsuario = data.itensAdicionais || [];
+  const secaoIds = new Set(secoesUsuario.map((s) => s.id));
+  const grupos = secoesUsuario
+    .map((s) => ({ id: s.id, titulo: s.titulo || "Documentos", docs: data.documentos.filter((d) => d.requisito === s.id) }))
+    .filter((g) => g.docs.length);
+  const docsOutros = data.documentos.filter((d) => !d.requisito || !secaoIds.has(d.requisito));
+  if (docsOutros.length) grupos.push({ id: "__outros__", titulo: "Outros documentos", docs: docsOutros });
+  const abaId = (aba && grupos.some((g) => g.id === aba)) ? aba : (grupos[0]?.id || null);
+  const grupoAtivo = grupos.find((g) => g.id === abaId) || null;
 
   // Abas de topo do portal (o cliente seleciona e abre)
   const tabs = [
@@ -192,61 +176,31 @@ export default function PortalClienteClient({ token }) {
             <span className="text-[13px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{data.documentos.length} {data.documentos.length === 1 ? "documento" : "documentos"}</span>
           </div>
 
-          {/* Abas por tipo de documento — TODAS as áreas (mesmo sem documento ainda) */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {secoesTabs.map((secao) => {
-              const ativa = secao === abaAtiva;
-              const n = secao === ADICIONAIS ? adicionaisGrupos.reduce((s, g) => s + g.docs.length, 0) : (porSecao[secao]?.length || 0);
-              return (
-                <button key={secao} onClick={() => setAba(secao)}
-                  className={`text-[13px] font-medium rounded-full px-3.5 py-1.5 border transition-colors inline-flex items-center gap-2 ${ativa ? "bg-torg-dark text-white border-torg-dark" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue-300 hover:text-torg-dark"}`}>
-                  <span className="uppercase tracking-wide">{secao}</span>
-                  <span className={`text-[11px] rounded-full px-1.5 ${ativa ? "bg-white/25 text-white" : n ? "bg-gray-100 text-torg-gray" : "bg-gray-50 text-gray-300"}`}>{n}</span>
-                </button>
-              );
-            })}
-          </div>
-          {ehAbaAdicional ? (
-            <div className="space-y-5">
-              {adicionaisGrupos.map((g) => (
-                <div key={g.id}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-torg-orange shrink-0" />
-                    <h4 className="text-[14px] font-semibold text-torg-dark">{g.titulo || "Evidência adicional"}</h4>
-                    <span className="text-[11px] text-torg-gray">· {g.docs.length}</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{g.docs.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
-                </div>
-              ))}
-            </div>
-          ) : reqsAtivos.length >= 2 ? (
-            <div className="space-y-5">
-              {reqsAtivos.filter((r) => (docsPorReq[r.id] || []).length).map((r) => {
-                const ds = docsPorReq[r.id];
+          {grupos.length > 1 && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {grupos.map((g) => {
+                const ativa = g.id === abaId;
                 return (
-                  <div key={r.id}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-torg-orange shrink-0" />
-                      <h4 className="text-[14px] font-semibold text-torg-dark">{r.label}</h4>
-                      <span className="text-[11px] text-torg-gray">· {ds.length}</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{ds.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
-                  </div>
+                  <button key={g.id} onClick={() => setAba(g.id)}
+                    className={`text-[13px] font-medium rounded-full px-3.5 py-1.5 border transition-colors inline-flex items-center gap-2 ${ativa ? "bg-torg-dark text-white border-torg-dark" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue-300 hover:text-torg-dark"}`}>
+                    <span>{g.titulo}</span>
+                    <span className={`text-[11px] rounded-full px-1.5 ${ativa ? "bg-white/25 text-white" : "bg-gray-100 text-torg-gray"}`}>{g.docs.length}</span>
+                  </button>
                 );
               })}
-              {docsPorReq["__sem__"]?.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2"><span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" /><h4 className="text-[14px] font-semibold text-torg-dark">Outros documentos</h4></div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{docsPorReq["__sem__"].map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
-                </div>
-              )}
             </div>
-          ) : docsAtivos.length ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{docsAtivos.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}</div>
+          )}
+          {grupoAtivo ? (
+            <>
+              {grupos.length === 1 && <h3 className="text-[15px] font-semibold text-torg-dark mb-3">{grupoAtivo.titulo}</h3>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {grupoAtivo.docs.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}
+              </div>
+            </>
           ) : (
             <div className="text-center py-10 text-torg-gray border border-dashed border-gray-200 rounded-xl">
               <FileText size={28} className="mx-auto mb-2 text-gray-300" />
-              <p className="text-[14px]">Os documentos desta seção serão disponibilizados em breve.</p>
+              <p className="text-[14px]">Os documentos serão disponibilizados em breve.</p>
             </div>
           )}
         </div>
