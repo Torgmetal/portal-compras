@@ -183,6 +183,7 @@ async function main() {
     `ADD COLUMN IF NOT EXISTS "conclusao" TEXT`,
     `ADD COLUMN IF NOT EXISTS "relatorioEmitidoEm" TIMESTAMP(3)`,
     `ADD COLUMN IF NOT EXISTS "itensAdicionais" JSONB NOT NULL DEFAULT '[]'`,
+    `ADD COLUMN IF NOT EXISTS "portalConfig" JSONB NOT NULL DEFAULT '{}'`,
   ]) await prisma.$executeRawUnsafe(`ALTER TABLE "Auditoria" ${c}`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "AuditoriaDoc" ADD COLUMN IF NOT EXISTS "publicar" BOOLEAN NOT NULL DEFAULT true`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "AuditoriaDoc" ADD COLUMN IF NOT EXISTS "comentario" TEXT`);

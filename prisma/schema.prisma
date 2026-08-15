@@ -1742,6 +1742,7 @@ model Auditoria {
   dataBookModeloUrl  String? // PDF de Data Book modelo (exemplo p/ o cliente ver)
   checklistJson      Json? // status dos requisitos do GQ-FQ-003 { reqId: status } (legado; publicar hoje é por doc)
   itensAdicionais    Json           @default("[]") // evidências "pedido a mais": [{ id, titulo }] — docs ligam via requisito=id
+  portalConfig       Json           @default("{}") // portal: { secoes:{estrutura,maquinas,equipe,modelo}, emailsCliente:[], emailsInternos:[] }
   solicitacoes       String? // o que o cliente pediu (texto / e-mail colado)
   // Relatório INTERNO da auditoria externa (apontamentos do auditor + plano de ação 5W2H
   // próprio + fotos + conclusão). NÃO vai ao portal do auditor — registro/resposta da Torg.

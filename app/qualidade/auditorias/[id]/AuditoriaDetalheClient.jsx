@@ -6,7 +6,7 @@ import {
   Loader2, AlertCircle, ArrowLeft, Building2, Upload, Search, X, FileText, Trash2,
   Send, Copy, ExternalLink, Save, ClipboardList, FolderOpen, CheckCircle2,
   Sparkles, Plus, Mail, Eye, Image as ImageIcon, ClipboardCheck, BookOpen,
-  ScrollText, FileDown, ImagePlus, Stamp,
+  ScrollText, FileDown, ImagePlus, Stamp, Users, ChevronDown,
 } from "lucide-react";
 import { SECOES_AUDITORIA, ordenarSecoes, REQUISITOS_GQFQ003, STATUS_REQUISITO, requisitosDaSecao } from "@/lib/auditoria-secoes";
 import { numRAE } from "@/lib/auditoria-externa";
@@ -28,6 +28,9 @@ export default function AuditoriaDetalheClient({ id }) {
   const [link, setLink] = useState("");
   const [emailCliente, setEmailCliente] = useState("");
   const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [internosSel, setInternosSel] = useState([]); // e-mails internos (CC) marcados
+  const [usuariosInternos, setUsuariosInternos] = useState([]);
+  const [mostrarInternos, setMostrarInternos] = useState(false);
   const capaRef = useRef(null);
   const [enviandoCapa, setEnviandoCapa] = useState(false);
   const modeloRef = useRef(null);
@@ -41,9 +44,15 @@ export default function AuditoriaDetalheClient({ id }) {
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       setData(j.data);
       setForm({ empresa: j.data.empresa || "", contato: j.data.contato || "", titulo: j.data.titulo || "", mensagemBoasVindas: j.data.mensagemBoasVindas || "", solicitacoes: j.data.solicitacoes || "" });
+      const cfg = j.data.portalConfig && typeof j.data.portalConfig === "object" ? j.data.portalConfig : {};
+      setEmailCliente((cfg.emailsCliente || []).join(", ") || j.data.clienteEmail || "");
+      setInternosSel(Array.isArray(cfg.emailsInternos) ? cfg.emailsInternos : []);
     } catch (e) { setErro(e.message); } finally { setLoading(false); }
   }, [id]);
   useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    fetch("/api/qualidade/auditorias/destinatarios").then((r) => r.json()).then((j) => { if (j.success) setUsuariosInternos(j.usuarios || []); }).catch(() => {});
+  }, []);
 
   // Semeia as seções padrão na 1ª vez (auditoria sem nenhuma seção ainda).
   const seedRef = useRef(false);
@@ -132,15 +141,16 @@ export default function AuditoriaDetalheClient({ id }) {
   }
 
   async function enviarEmail() {
-    if (!/^\S+@\S+\.\S+$/.test(emailCliente.trim())) { alert("Informe um e-mail válido do cliente."); return; }
+    const emails = [...new Set(emailCliente.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean))];
+    if (!emails.length || !emails.every((e) => /^\S+@\S+\.\S+$/.test(e))) { alert("Informe ao menos um e-mail válido do auditor (separe vários por vírgula)."); return; }
     setEnviandoEmail(true);
     try {
-      const r = await fetch(`/api/qualidade/auditorias/${id}/enviar-email`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: emailCliente.trim() }) });
+      const r = await fetch(`/api/qualidade/auditorias/${id}/enviar-email`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emails, internos: internosSel }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       if (j.link) setLink(j.link);
       if (!j.enviado) alert("Link gerado, mas o e-mail não pôde ser enviado agora. Copie o link e envie manualmente.");
-      else alert("E-mail enviado ao cliente.");
+      else alert(`E-mail enviado (${j.destinatarios} destinatário(s)${j.cc ? " + " + j.cc + " em cópia" : ""})${j.comAnexo ? " · PDF anexo" : ""}.`);
       await carregar();
     } catch (e) { alert(e.message); } finally { setEnviandoEmail(false); }
   }
@@ -283,13 +293,36 @@ export default function AuditoriaDetalheClient({ id }) {
           <p className="text-[12px] text-blue-100 mb-2.5">Envie por e-mail (publica e manda o link) ou apenas gere o link. Você pode publicar os documentos depois — só aparecem pro auditor os que estiverem marcados como <b>Publicar</b>.</p>
         )}
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <input type="email" value={emailCliente} onChange={(e) => setEmailCliente(e.target.value)} placeholder="e-mail do cliente"
-            className="flex-1 min-w-[180px] text-[12px] rounded-lg px-2.5 py-1.5 bg-white text-torg-dark border border-white/20 focus:outline-none" />
-          <button onClick={enviarEmail} disabled={enviandoEmail}
-            className="text-[12px] font-semibold text-torg-dark bg-white rounded-lg px-3 py-1.5 hover:bg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
-            {enviandoEmail ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} {data.status === "PUBLICADO" ? "Reenviar e-mail" : "Publicar e enviar"}
-          </button>
+        <div className="space-y-2">
+          <input type="text" value={emailCliente} onChange={(e) => setEmailCliente(e.target.value)} placeholder="e-mails do auditor — separe vários por vírgula"
+            className="w-full text-[12px] rounded-lg px-2.5 py-1.5 bg-white text-torg-dark border border-white/20 focus:outline-none" />
+
+          {/* Cópia (CC) para as áreas da Torg envolvidas */}
+          <div>
+            <button type="button" onClick={() => setMostrarInternos((v) => !v)} className="text-[11px] text-blue-100 hover:text-white inline-flex items-center gap-1">
+              <Users size={12} /> Avisar áreas da Torg{internosSel.length ? ` (${internosSel.length})` : ""}
+              <ChevronDown size={12} className={mostrarInternos ? "rotate-180 transition" : "transition"} />
+            </button>
+            {mostrarInternos && (
+              <div className="mt-1.5 max-h-44 overflow-y-auto bg-white/10 rounded-lg p-2 space-y-0.5">
+                {usuariosInternos.length === 0 && <p className="text-[11px] text-blue-200 px-1 py-0.5">Carregando usuários…</p>}
+                {usuariosInternos.map((u) => (
+                  <label key={u.id} className="flex items-center gap-2 text-[12px] text-blue-50 cursor-pointer hover:bg-white/10 rounded px-1 py-0.5">
+                    <input type="checkbox" checked={internosSel.includes(u.email)} onChange={() => setInternosSel((prev) => prev.includes(u.email) ? prev.filter((e) => e !== u.email) : [...prev, u.email])} />
+                    <span className="flex-1 truncate">{u.name}{u.setor ? <span className="text-blue-300"> · {u.setor}</span> : null}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={enviarEmail} disabled={enviandoEmail}
+              className="text-[12px] font-semibold text-torg-dark bg-white rounded-lg px-3 py-1.5 hover:bg-blue-50 disabled:opacity-50 inline-flex items-center gap-1.5">
+              {enviandoEmail ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} {data.status === "PUBLICADO" ? "Reenviar e-mail" : "Publicar e enviar"}
+            </button>
+            <span className="text-[11px] text-blue-200 inline-flex items-center gap-1"><FileDown size={11} /> o índice em PDF vai anexado</span>
+          </div>
         </div>
         {data.status !== "PUBLICADO" && (
           <button onClick={() => publicar(false)} disabled={publicando} className="text-[11px] text-blue-100 hover:text-white underline disabled:opacity-50 mt-2">
