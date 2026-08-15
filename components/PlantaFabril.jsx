@@ -31,7 +31,7 @@ export default function PlantaFabril() {
 
       <div className="relative rounded-xl border border-gray-100 overflow-hidden bg-[#faf9f5]">
         <iframe
-          src={ESTRUTURA_3D}
+          src={`${ESTRUTURA_3D}?v=${process.env.NEXT_PUBLIC_BUILD_HASH || "dev"}`}
           title="Estrutura 3D — Torg Metal"
           loading="lazy"
           allow="fullscreen"
