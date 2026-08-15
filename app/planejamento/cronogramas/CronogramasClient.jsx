@@ -13,7 +13,7 @@ import {
   GanttChart, Package, FileText, CircleDot, Mail, Calendar,
   History, FileDown, Milestone, Plus, Trash2, Weight, BarChart3,
   List, Link2, Unlink, RotateCcw, Lock, Archive, ArchiveRestore, Search,
-  Pencil, Check, Layers, ArrowUpDown,
+  Pencil, Check, Layers, ArrowUpDown, Copy,
 } from "lucide-react";
 
 const DEPT_ICONS = {
@@ -1155,9 +1155,41 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
   const [gerarPreview, setGerarPreview] = useState(null);
   const [gerando, setGerando] = useState(false);
   const [encadearSetor, setEncadearSetor] = useState(true); // encadeia tarefas do mesmo setor em sequência
+  // Copiar cronograma pra outra OP (mesma estrutura, progresso zerado)
+  const [showCopiar, setShowCopiar] = useState(false);
+  const [copiarOp, setCopiarOp] = useState("");
+  const [copiarTitulo, setCopiarTitulo] = useState("");
+  const [copiando, setCopiando] = useState(false);
+  const [copiarErro, setCopiarErro] = useState("");
 
   const now = new Date();
   const tarefas = detail.tarefas || [];
+
+  const abrirCopiar = () => {
+    setCopiarOp("");
+    setCopiarTitulo(detail.titulo || "");
+    setCopiarErro("");
+    setShowCopiar(true);
+  };
+  const copiar = async () => {
+    if (!copiarOp.trim() || !copiarTitulo.trim()) return;
+    setCopiando(true);
+    setCopiarErro("");
+    try {
+      const res = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/duplicar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opNumero: copiarOp, titulo: copiarTitulo }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao copiar cronograma");
+      // vai direto pro cronograma novo
+      window.location.href = `/planejamento/cronogramas/${data.id}`;
+    } catch (e) {
+      setCopiarErro(e.message);
+      setCopiando(false);
+    }
+  };
 
   const recalcular = async () => {
     setRecalculando(true);
@@ -1306,6 +1338,16 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
             >
               <FileDown size={11} /> MS Project
             </button>
+            {/* Copiar cronograma para outra OP */}
+            {!readOnly && (
+              <button
+                onClick={abrirCopiar}
+                className="px-3 py-1.5 text-[10px] font-medium text-torg-dark bg-white border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center gap-1.5"
+                title="Cria uma cópia deste cronograma vinculada a outra OP (mesma estrutura e datas; progresso zerado)."
+              >
+                <Copy size={11} /> Copiar para OP
+              </button>
+            )}
             {/* Toggle lista / gantt */}
             <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden">
               <button
@@ -1546,6 +1588,48 @@ function CronogramaDetail({ detail, onRefresh, cronogramaId, readOnly }) {
           onClose={() => setShowImportPeso(false)}
           onImported={() => { setShowImportPeso(false); onRefresh(); }}
         />
+      )}
+
+      {showCopiar && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => !copiando && setShowCopiar(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-base font-bold text-torg-dark flex items-center gap-2"><Copy size={16} className="text-torg-blue" /> Copiar para outra OP</h3>
+              <button onClick={() => !copiando && setShowCopiar(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-torg-gray">
+                Cria um novo cronograma a partir de <b>{detail.titulo}</b>, com a <b>mesma estrutura, datas e durações</b>. O progresso e a validação (baseline) começam do zero.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">OP de destino *</label>
+                <input type="text" value={copiarOp} onChange={(e) => setCopiarOp(e.target.value)}
+                  placeholder="Ex: T113" autoFocus
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-torg-gray mb-1">Título / descrição *</label>
+                <input type="text" value={copiarTitulo} onChange={(e) => setCopiarTitulo(e.target.value)}
+                  placeholder="Ex: ENC 0333 - Cobertura de Caldeira"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+              </div>
+              {copiarErro && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2 flex items-start gap-2">
+                  <AlertCircle size={13} className="mt-0.5 shrink-0" /> {copiarErro}
+                </div>
+              )}
+            </div>
+            <div className="p-5 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button onClick={() => setShowCopiar(false)} disabled={copiando}
+                className="px-4 py-2 text-sm text-torg-gray border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+              <button onClick={copiar} disabled={copiando || !copiarOp.trim() || !copiarTitulo.trim()}
+                className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
+                {copiando ? <Loader2 size={14} className="animate-spin" /> : <Copy size={14} />}
+                {copiando ? "Copiando…" : "Copiar cronograma"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
