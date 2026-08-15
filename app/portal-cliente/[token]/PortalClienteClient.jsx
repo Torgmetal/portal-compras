@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen, Factory, Building2, Cog } from "lucide-react";
+import { Loader2, AlertCircle, FileText, Eye, Download, ShieldCheck, BadgeCheck, Layers, Users, BookOpen, Factory, Building2, Cog, ChevronDown } from "lucide-react";
 import { ordenarSecoes, SECOES_AUDITORIA, requisitosDaSecao } from "@/lib/auditoria-secoes";
 import PlantaFabril from "@/components/PlantaFabril";
 import MaquinasEquipamentos from "@/components/MaquinasEquipamentos";
@@ -42,7 +42,8 @@ export default function PortalClienteClient({ token }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
-  const [aba, setAba] = useState(null); // seção (aba) ativa escolhida pelo cliente
+  const [secoesAbertas, setSecoesAbertas] = useState(() => new Set()); // seções expandidas (accordion) — tudo fechado por padrão
+  const toggleSecao = (id) => setSecoesAbertas((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const [painel, setPainel] = useState("documentos"); // aba de topo: documentos | estrutura | maquinas | equipe | modelo
   const [focoDoc, setFocoDoc] = useState(null); // ?doc=<id> — abre direto no documento
 
@@ -59,8 +60,8 @@ export default function PortalClienteClient({ token }) {
     const sid = new Set((data.itensAdicionais || []).map((i) => i.id));
     const alvo = (d.requisito && sid.has(d.requisito)) ? d.requisito : "__outros__";
     setPainel("documentos");
-    setAba(alvo);
-    const t = setTimeout(() => { document.getElementById(`doc-${focoDoc}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 320);
+    setSecoesAbertas((prev) => new Set(prev).add(alvo)); // abre a seção do documento
+    const t = setTimeout(() => { document.getElementById(`doc-${focoDoc}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 360);
     return () => clearTimeout(t);
   }, [data, focoDoc]);
 
@@ -96,8 +97,6 @@ export default function PortalClienteClient({ token }) {
     .filter((g) => g.docs.length);
   const docsOutros = data.documentos.filter((d) => !d.requisito || !secaoIds.has(d.requisito));
   if (docsOutros.length) grupos.push({ id: "__outros__", titulo: "Outros documentos", docs: docsOutros });
-  const abaId = (aba && grupos.some((g) => g.id === aba)) ? aba : (grupos[0]?.id || null);
-  const grupoAtivo = grupos.find((g) => g.id === abaId) || null;
 
   // Abas de topo do portal (o cliente seleciona e abre)
   const tabs = [
@@ -176,31 +175,34 @@ export default function PortalClienteClient({ token }) {
             <span className="text-[13px] text-torg-gray bg-gray-50 rounded-full px-3 py-1">{data.documentos.length} {data.documentos.length === 1 ? "documento" : "documentos"}</span>
           </div>
 
-          {grupos.length > 1 && (
-            <div className="flex flex-wrap gap-2 mb-6">
-              {grupos.map((g) => {
-                const ativa = g.id === abaId;
-                return (
-                  <button key={g.id} onClick={() => setAba(g.id)}
-                    className={`text-[13px] font-medium rounded-full px-3.5 py-1.5 border transition-colors inline-flex items-center gap-2 ${ativa ? "bg-torg-dark text-white border-torg-dark" : "bg-white text-torg-gray border-gray-200 hover:border-torg-blue-300 hover:text-torg-dark"}`}>
-                    <span>{g.titulo}</span>
-                    <span className={`text-[11px] rounded-full px-1.5 ${ativa ? "bg-white/25 text-white" : "bg-gray-100 text-torg-gray"}`}>{g.docs.length}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {grupoAtivo ? (
-            <>
-              {grupos.length === 1 && <h3 className="text-[15px] font-semibold text-torg-dark mb-3">{grupoAtivo.titulo}</h3>}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {grupoAtivo.docs.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}
-              </div>
-            </>
-          ) : (
+          {grupos.length === 0 ? (
             <div className="text-center py-10 text-torg-gray border border-dashed border-gray-200 rounded-xl">
               <FileText size={28} className="mx-auto mb-2 text-gray-300" />
               <p className="text-[14px]">Os documentos serão disponibilizados em breve.</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              <p className="text-[13px] text-torg-gray mb-1">Clique numa seção para ver os documentos.</p>
+              {grupos.map((g) => {
+                const aberta = secoesAbertas.has(g.id);
+                return (
+                  <div key={g.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                    <button onClick={() => toggleSecao(g.id)} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors">
+                      <span className="inline-flex items-center gap-2.5 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-torg-orange shrink-0" />
+                        <span className="text-[15px] font-semibold text-torg-dark truncate">{g.titulo}</span>
+                        <span className="text-[12px] text-torg-gray bg-gray-100 rounded-full px-2 py-0.5 shrink-0">{g.docs.length}</span>
+                      </span>
+                      <ChevronDown size={18} className={`text-torg-gray shrink-0 transition-transform duration-200 ${aberta ? "rotate-180" : ""}`} />
+                    </button>
+                    {aberta && (
+                      <div className="px-4 pb-4 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-gray-50">
+                        {g.docs.map((d, i) => <DocCard key={d.id} d={d} base={base} i={i} destaque={focoDoc === d.id} />)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
