@@ -160,12 +160,7 @@ export default function PortalClienteClient({ token }) {
           <p className="text-blue-100 text-lg max-w-2xl leading-relaxed pc-up" style={{ animationDelay: "240ms" }}>
             {data.mensagemBoasVindas || `É um prazer receber a ${data.empresa}. Reunimos aqui, de forma organizada e transparente, toda a documentação da qualidade solicitada para a sua conferência.`}
           </p>
-          <div className="flex flex-wrap items-center gap-2.5 mt-7 pc-up" style={{ animationDelay: "320ms" }}>
-            <Chip icon={Layers} label={`${secoesTabs.length} ${secoesTabs.length === 1 ? "seção" : "seções"}`} />
-            <Chip icon={FileText} label={`${data.documentos.length} ${data.documentos.length === 1 ? "documento" : "documentos"}`} />
-            <Chip icon={BadgeCheck} label="ISO 9001 · Bureau Veritas" />
-          </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-5 text-[15px] pc-up" style={{ animationDelay: "400ms" }}>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-7 text-[15px] pc-up" style={{ animationDelay: "320ms" }}>
             <span className="text-blue-200"><span className="text-blue-400">Empresa:</span> <strong className="text-white">{data.empresa}</strong></span>
             {data.titulo && <span className="text-blue-200"><span className="text-blue-400">Auditoria:</span> <strong className="text-white">{data.titulo}</strong></span>}
           </div>
