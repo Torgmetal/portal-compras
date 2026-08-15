@@ -155,15 +155,16 @@ export default function PortalClienteClient({ token }) {
           <img src="/torg-logo-white.png" alt="Torg Metal" className="h-14 sm:h-16 mb-8 pc-up" style={{ animationDelay: "0ms" }} />
           <p className="pc-shine text-[15px] font-semibold tracking-wide uppercase mb-2 pc-up inline-block" style={{ animationDelay: "80ms" }}>Portal do Cliente · Qualidade</p>
           <h1 className="text-white text-4xl sm:text-5xl font-extrabold leading-tight mb-3 pc-up" style={{ animationDelay: "160ms" }}>
-            {data.contato ? `Bem-vindo(a), ${data.contato}!` : "Seja bem-vindo(a)!"}
+            {data.empresa}
           </h1>
-          <p className="text-blue-100 text-lg max-w-2xl leading-relaxed pc-up" style={{ animationDelay: "240ms" }}>
-            {data.mensagemBoasVindas || `É um prazer receber a ${data.empresa}. Reunimos aqui, de forma organizada e transparente, toda a documentação da qualidade solicitada para a sua conferência.`}
+          <p className="text-blue-100 text-lg max-w-2xl leading-relaxed pc-up whitespace-pre-line" style={{ animationDelay: "240ms" }}>
+            {data.mensagemBoasVindas || `Seja bem-vindo(a)! É um prazer receber a ${data.empresa}. Reunimos aqui, de forma organizada e transparente, toda a documentação da qualidade solicitada para a sua conferência.`}
           </p>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-7 text-[15px] pc-up" style={{ animationDelay: "320ms" }}>
-            <span className="text-blue-200"><span className="text-blue-400">Empresa:</span> <strong className="text-white">{data.empresa}</strong></span>
-            {data.titulo && <span className="text-blue-200"><span className="text-blue-400">Auditoria:</span> <strong className="text-white">{data.titulo}</strong></span>}
-          </div>
+          {data.titulo && (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-7 text-[15px] pc-up" style={{ animationDelay: "320ms" }}>
+              <span className="text-blue-200"><span className="text-blue-400">Auditoria:</span> <strong className="text-white">{data.titulo}</strong></span>
+            </div>
+          )}
         </div>
       </div>
 
