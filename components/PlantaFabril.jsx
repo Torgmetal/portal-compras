@@ -10,6 +10,18 @@ import { ArrowRight, Box, Map } from "lucide-react";
 const AREA_TOTAL = "3.729,96 m²";
 const FLUXO = ["Preparação", "Montagem", "Solda", "Jato", "Pintura", "Expedição"];
 const ESTRUTURA_3D = "/estrutura-3d/galpoes.html";
+// Setores de produção — cores idênticas à legenda do modelo 3D. Descritos abaixo do
+// modelo (chips) pra o auditor ler o código de cores fora da cena.
+const SETORES = [
+  { nome: "Preparação", cor: "#aec1d1" },
+  { nome: "Montagem", cor: "#8ea9c2" },
+  { nome: "Solda", cor: "#5980a6" },
+  { nome: "Usinagem", cor: "#9aacbb" },
+  { nome: "Pintura / jateamento", cor: "#c6c8c9" },
+  { nome: "Expedição", cor: "#7593b3" },
+  { nome: "Anexos / cabines", cor: "#b4b0aa" },
+  { nome: "Ponte rolante", cor: "#e8b02a" },
+];
 
 // zonas internas dos galpões (o Jato é um bloco lateral à parte, desenhado separado)
 const Z = (x, y, w, h, nome, fill, tcor) => ({ x, y, w, h, nome, fill, tcor });
@@ -91,6 +103,19 @@ export default function PlantaFabril() {
           </span>
         ))}
       </div>
+
+      {modo === "3d" && (
+        <div className="mt-3">
+          <span className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Setores de produção</span>
+          <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
+            {SETORES.map((s) => (
+              <span key={s.nome} className="inline-flex items-center gap-1.5 text-[12px] font-medium text-torg-dark bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.cor }} /> {s.nome}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
         <div className="bg-torg-blue-50/50 rounded-xl p-3"><p className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Galpão 01 · Produção</p><p className="text-lg font-bold text-torg-dark mt-0.5">2.767,64 m²</p><p className="text-[12px] text-torg-gray">Preparação · Montagem · Solda</p></div>
