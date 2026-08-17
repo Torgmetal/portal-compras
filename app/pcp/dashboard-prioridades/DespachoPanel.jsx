@@ -9,7 +9,7 @@
 // Reusa /api/pcp/despacho (GET peças+placar+reconciliação, POST despacha / dá baixa por qtd).
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown } from "lucide-react";
-import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
+import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 
 const DESTINOS = [
   { key: "PRIORIDADE", label: "Prioridade", icon: Star, cor: "bg-amber-500 hover:bg-amber-600", desc: "libera p/ desenho e corte" },
@@ -142,41 +142,35 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     } catch (e) { alert(e.message); setEnviando(false); }
   }
 
-  const synecoTxt = (p) => {
-    if (!setor || !p.baixadoPortal) return "—";
-    return p.precisaSyneco ? "Dar baixa" : "OK";
-  };
-
   async function exportar() {
-    // Exporta TODAS as peças do escopo (nada some depois da baixa) — as que precisam de baixa no
-    // Syneco (baixadas só no portal) e depois as demais baixadas ficam no topo (o "histórico").
-    const base = [...pecas].sort((a, b) =>
-      (b.precisaSyneco ? 1 : 0) - (a.precisaSyneco ? 1 : 0) ||
-      (b.baixadoPortal ? 1 : 0) - (a.baixadoPortal ? 1 : 0) ||
-      String(a.marca).localeCompare(String(b.marca)));
+    // RELAÇÃO p/ o setor de apontamento: peças baixadas MANUALMENTE no portal que o Syneco ainda
+    // não tem (precisaSyneco) — o apontamento deve dar baixa dessas no Syneco. Mesmo modelo da LPC
+    // (Marca/Tipo/Peso) + coluna Observação. Some sozinho quando o Syneco sincroniza (a peça deixa
+    // de ser precisaSyneco).
+    const base = (data?.pecas || []).filter((p) => p.precisaSyneco).sort((a, b) => String(a.marca).localeCompare(String(b.marca)));
+    if (!base.length) return alert("Nenhuma peça baixada manualmente pendente de apontamento no Syneco.");
     const hoje = new Date().toISOString().split("T")[0];
     const nomeSetor = setor ? SETOR_LABEL[setor] || setor : "Geral";
-    const headers = ["Peça", "Descrição", "Qtd total", "Qtd baixada", "Qtd produzida (Syneco)", "Peso un. (kg)", "Peso total (kg)", "Syneco"];
+    const tipoTxt = (t) => (t === "CONJUNTO" ? "Conjunto" : t === "CROQUI" ? "Croqui" : "Avulsa");
+    const headers = ["Marca", "Tipo", "Peso (kg)", "Observação"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
-      titulo: `Baixa e producao — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
-      subtitulo: `Syneco em VERMELHO "Dar baixa" = baixado so no portal (Syneco ainda sem producao equivalente) — precisa dar baixa no Syneco`,
-      kpis: [`${base.length} pecas  |  Baixadas no portal: ${data?.baixados ?? 0}  |  Precisam baixa no Syneco: ${data?.precisamSyneco ?? 0}`],
-      totalColunas: headers.length, nomePlanilha: `Baixa ${obra}`.slice(0, 31), codigoDoc: "REL-PRD-005",
+      titulo: `Apontar no Syneco — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
+      subtitulo: `${obra} · Setor: ${nomeSetor} · baixadas manualmente no portal — dar baixa no Syneco`,
+      kpis: [`${base.length} peça(s) p/ apontar no Syneco`],
+      totalColunas: headers.length, nomePlanilha: "Apontar Syneco", codigoDoc: "REL-ENG-002",
     });
-    ws.columns = [{ width: 16 }, { width: 30 }, { width: 10 }, { width: 12 }, { width: 20 }, { width: 12 }, { width: 13 }, { width: 16 }];
+    ws.columns = [{ width: 20 }, { width: 12 }, { width: 14 }, { width: 46 }];
     let row = linhaInicio;
     adicionarHeaderTabela(ws, row, headers); row++;
     const first = row;
     for (const p of base) {
-      // Vermelho = baixado só no portal (falta no Syneco); verde = baixado e já no Syneco.
-      const fill = p.precisaSyneco ? "FDE2E2" : p.baixadoPortal ? CORES.LIGHT_GREEN : undefined;
-      adicionarLinhaTabela(ws, row, [p.marca, p.descricao || "", p.qte ?? "", p.baixadoQtd || 0, p.produzidoSyneco ?? "", p.pesoUnitKg ? Number(p.pesoUnitKg.toFixed(1)) : "", p.pesoTotalKg ? Math.round(p.pesoTotalKg) : "", synecoTxt(p)],
-        { fillColor: fill, fontColors: p.precisaSyneco ? { 7: "DC2626" } : undefined, alinhamento: { 2: "right", 3: "right", 4: "right", 5: "right", 6: "right", 7: "center" } });
+      const quando = p.baixadoEm ? ` em ${new Date(p.baixadoEm).toLocaleDateString("pt-BR")}` : "";
+      const obs = `Dar baixa no Syneco (${nomeSetor}): ${fmtN(p.baixadoQtd)} un — baixa manual no portal${p.baixadoPor ? ` por ${p.baixadoPor}` : ""}${quando}`;
+      adicionarLinhaTabela(ws, row, [p.marca, tipoTxt(p.tipoPeca), p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "", obs], { alinhamento: { 1: "center", 2: "right" } });
       row++;
     }
-    const last = row - 1;
-    if (last >= first) adicionarLinhaTotais(ws, row, ["TOTAL", "", { formula: `SUM(C${first}:C${last})` }, { formula: `SUM(D${first}:D${last})` }, { formula: `SUM(E${first}:E${last})` }, "", { formula: `SUM(G${first}:G${last})` }, ""]);
-    await downloadWorkbook(workbook, `Torg_Baixa_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
+    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", { formula: `SUM(C${first}:C${row - 1})` }, ""]);
+    await downloadWorkbook(workbook, `Apontar_Syneco_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
   }
 
   const th = "text-left px-2.5 py-2 font-semibold text-torg-gray";
@@ -192,7 +186,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
             {data && <p className="text-[12px] text-torg-gray">{fmtN(data.total)} peça(s){podeBaixa ? ` · ${fmtN(pendentes.length)} a liberar · ${fmtN(prontas.length)} prontas` : ""}{podeBaixa && data.precisamSyneco > 0 ? ` · ${fmtN(data.precisamSyneco)} p/ acertar no Syneco` : ""}</p>}
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={exportar} disabled={!data} title="Exportar a lista (com coluna Syneco)" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Exportar</button>
+            <button type="button" onClick={exportar} disabled={!data} title="Relação das peças baixadas manualmente p/ o setor de apontamento dar baixa no Syneco" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Relação Syneco</button>
             <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={20} /></button>
           </div>
         </div>
