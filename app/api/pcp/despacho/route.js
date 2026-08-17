@@ -52,17 +52,34 @@ export async function GET(req) {
   }
   if (!opId) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 
-  const setor = url.searchParams.get("setor"); // opcional: escopo do setor (CORTE filtra p/ corte)
+  const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
   const todas = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, descricao: true, tipoPeca: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
-  // Escopo do CORTE (Preparação): só quem PASSA pelo corte = croquis (sub-peças "P") + peças SOLO
-  // (conjunto SEM sub-croquis, vai direto Corte→Acabamento). Conjunto COMPOSTO (tem croquis) NÃO
-  // passa pelo corte — quem passa são os croquis dele. (Regra do Vitor.)
-  const passaNoCorte = (p) => p.tipoPeca === "CROQUI" || (p._count?.conjuntoCroquis || 0) === 0;
-  const escopo = setor === "CORTE" ? todas.filter(passaNoCorte) : todas;
+  // ROTA da peça pelos setores (regra de domínio do Vitor):
+  //   • CROQUI (sub-peça "P")            → só CORTE.
+  //   • CONJUNTO COMPOSTO (tem croquis)  → Montagem→Expedição (o corte é dos croquis dele).
+  //   • MARCA vinda da LE numa OP que TEM LPC (ex.: guarda-corpo — vem da Lista de Expedição,
+  //     hoje ainda SEM croqui na LPC e sem perfil de corte) → Montagem→Expedição. É MONTADA, não
+  //     cortada. Resolve sozinho quando a LPC ganhar os croquis do GC (aí vira croqui/composta).
+  //     (Vitor 17/08. Guarda por perfil: se a marca da LE tiver perfil, é avulsa de corte, fica no corte.)
+  //   • SOLO/AVULSA (perfil de aço da LPC, OU OP que só tem LE) → CORTE + Acabamento→Expedição
+  //     (pula Montagem/Solda).
+  const temLPC = todas.some((p) => p.fonte === "LPC_IMPORT");
+  const temPerfil = (p) => !!(p.perfil && String(p.perfil).trim());
+  const ehCroqui = (p) => p.tipoPeca === "CROQUI";
+  const ehComposta = (p) => (p._count?.conjuntoCroquis || 0) > 0;
+  const ehMarcaLE = (p) => temLPC && p.fonte === "LE_IMPORT" && !ehCroqui(p) && !temPerfil(p);
+  const vaiPraMontagem = (p) => ehComposta(p) || ehMarcaLE(p);
+  const passaNoSetor = (p, s) => {
+    if (!s) return true;
+    if (ehCroqui(p)) return s === "CORTE";
+    if (vaiPraMontagem(p)) return s !== "CORTE";               // Montagem→Expedição
+    return s === "CORTE" || !["MONTAGEM", "SOLDA"].includes(s); // solo/avulsa pula Mont./Solda
+  };
+  const escopo = setor ? todas.filter((p) => passaNoSetor(p, setor)) : todas;
 
   // Reconciliação com o Syneco: marcas COM produção no mesOrdem daquele setor (quem já teve baixa lá).
   // Serve pro extremo sincronismo portal×Syneco — a coluna "Syneco" do export usa isto.
