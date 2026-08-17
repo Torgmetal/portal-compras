@@ -136,34 +136,39 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
 
   const synecoTxt = (p) => {
     if (!setor || !p.baixadoPortal) return "—";
-    return p.precisaSyneco ? "Falta no Syneco" : "OK";
+    return p.precisaSyneco ? "Dar baixa" : "OK";
   };
 
   async function exportar() {
-    const base = aba === "prontas" ? prontas : pendentes;
+    // Exporta TODAS as peças do escopo (nada some depois da baixa) — as que precisam de baixa no
+    // Syneco (baixadas só no portal) e depois as demais baixadas ficam no topo (o "histórico").
+    const base = [...pecas].sort((a, b) =>
+      (b.precisaSyneco ? 1 : 0) - (a.precisaSyneco ? 1 : 0) ||
+      (b.baixadoPortal ? 1 : 0) - (a.baixadoPortal ? 1 : 0) ||
+      String(a.marca).localeCompare(String(b.marca)));
     const hoje = new Date().toISOString().split("T")[0];
     const nomeSetor = setor ? SETOR_LABEL[setor] || setor : "Geral";
-    const tituloAba = aba === "prontas" ? "Pecas prontas" : "A liberar";
     const headers = ["Peça", "Descrição", "Qtd total", "Qtd baixada", "Qtd produzida (Syneco)", "Peso un. (kg)", "Peso total (kg)", "Syneco"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
-      titulo: `${tituloAba} — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
-      subtitulo: `Coluna Syneco = falta acertar no Syneco (baixado no portal, sem producao equivalente no Syneco)`,
-      kpis: [`${base.length} pecas  |  Baixadas: ${data?.baixados ?? 0}  |  Precisam Syneco: ${data?.precisamSyneco ?? 0}`],
-      totalColunas: headers.length, nomePlanilha: `${tituloAba} ${obra}`.slice(0, 31), codigoDoc: "REL-PRD-005",
+      titulo: `Baixa e producao — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
+      subtitulo: `Syneco em VERMELHO "Dar baixa" = baixado so no portal (Syneco ainda sem producao equivalente) — precisa dar baixa no Syneco`,
+      kpis: [`${base.length} pecas  |  Baixadas no portal: ${data?.baixados ?? 0}  |  Precisam baixa no Syneco: ${data?.precisamSyneco ?? 0}`],
+      totalColunas: headers.length, nomePlanilha: `Baixa ${obra}`.slice(0, 31), codigoDoc: "REL-PRD-005",
     });
     ws.columns = [{ width: 16 }, { width: 30 }, { width: 10 }, { width: 12 }, { width: 20 }, { width: 12 }, { width: 13 }, { width: 16 }];
     let row = linhaInicio;
     adicionarHeaderTabela(ws, row, headers); row++;
     const first = row;
     for (const p of base) {
-      const fill = !p.baixadoPortal ? undefined : p.precisaSyneco ? CORES.LIGHT_ORANGE : CORES.LIGHT_GREEN;
+      // Vermelho = baixado só no portal (falta no Syneco); verde = baixado e já no Syneco.
+      const fill = p.precisaSyneco ? "FDE2E2" : p.baixadoPortal ? CORES.LIGHT_GREEN : undefined;
       adicionarLinhaTabela(ws, row, [p.marca, p.descricao || "", p.qte ?? "", p.baixadoQtd || 0, p.produzidoSyneco ?? "", p.pesoUnitKg ? Number(p.pesoUnitKg.toFixed(1)) : "", p.pesoTotalKg ? Math.round(p.pesoTotalKg) : "", synecoTxt(p)],
-        { fillColor: fill, alinhamento: { 2: "right", 3: "right", 4: "right", 5: "right", 6: "right", 7: "center" } });
+        { fillColor: fill, fontColors: p.precisaSyneco ? { 7: "DC2626" } : undefined, alinhamento: { 2: "right", 3: "right", 4: "right", 5: "right", 6: "right", 7: "center" } });
       row++;
     }
     const last = row - 1;
     if (last >= first) adicionarLinhaTotais(ws, row, ["TOTAL", "", { formula: `SUM(C${first}:C${last})` }, { formula: `SUM(D${first}:D${last})` }, { formula: `SUM(E${first}:E${last})` }, "", { formula: `SUM(G${first}:G${last})` }, ""]);
-    await downloadWorkbook(workbook, `Torg_${tituloAba.replace(/ /g, "_")}_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
+    await downloadWorkbook(workbook, `Torg_Baixa_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
   }
 
   const th = "text-left px-2.5 py-2 font-semibold text-torg-gray";
@@ -240,7 +245,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                     <td className={`${td} text-center`}>
                       {p.baixadoPortal
                         ? (p.precisaSyneco
-                          ? <span className="text-amber-700 bg-amber-50 text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap" title="Baixado no portal, mas o Syneco ainda não tem produção equivalente">falta Syneco</span>
+                          ? <span className="text-red-700 bg-red-50 text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold" title="Baixado só no portal — o Syneco ainda não tem produção equivalente. Precisa dar baixa no Syneco.">Dar baixa</span>
                           : <span className="text-emerald-700 bg-emerald-50 text-[10px] rounded px-1.5 py-0.5">ok</span>)
                         : <span className="text-gray-300">—</span>}
                     </td>
