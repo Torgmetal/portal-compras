@@ -2305,6 +2305,10 @@ model PecaConjunto {
   destinoEm              DateTime?
   destinoPor             String?
   destinoObs             String?
+  // Baixa no PORTAL, por setor (não escreve no Syneco). Mapa { CORTE:{em,por}, MONTAGEM:{...} }.
+  // O Excel da lista traz uma coluna "Syneco" = precisa acertar no Syneco? (baixa no portal
+  // existe mas o mesOrdem ainda não registrou aquela produção).
+  baixaSetores           Json?     @default("{}")
   terceirizadoRecebidoEm DateTime?
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.

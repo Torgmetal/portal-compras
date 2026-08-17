@@ -7,14 +7,17 @@
 //   CANCELADA           → fora do escopo.
 // Body: { ids:[], destino, destinoTerceirizado?, obs? }  |  { ids:[], reverter:true } → volta pra EM ABERTO.
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { whereSetorSyneco } from "@/lib/syneco-dia";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 
 const DESTINOS = ["PRIORIDADE", "TERCEIRO", "REVISAO", "AGUARDANDO_MATERIAL", "CANCELADA"];
 const VOLTA_TERCEIRO = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
+const SETORES_BAIXA = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 
 const schema = z.object({
   ids: z.array(z.string()).min(1, "Selecione ao menos uma peça"),
@@ -22,6 +25,9 @@ const schema = z.object({
   destinoTerceirizado: z.enum(VOLTA_TERCEIRO).optional(),
   obs: z.string().max(500).optional().nullable(),
   reverter: z.boolean().optional(),
+  // Baixa PORTAL (não escreve no Syneco): grava baixaSetores[baixaSetor].
+  baixaSetor: z.enum(SETORES_BAIXA).optional(),
+  reverterBaixa: z.boolean().optional(),
 });
 
 // GET /api/pcp/despacho?opId=... — peças da OP + placar por destino (pro drill-down da TV).
@@ -49,20 +55,41 @@ export async function GET(req) {
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor (CORTE filtra p/ corte)
   const todas = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, descricao: true, tipoPeca: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, marca: true, descricao: true, tipoPeca: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
   // Escopo do CORTE (Preparação): só quem PASSA pelo corte = croquis (sub-peças "P") + peças SOLO
   // (conjunto SEM sub-croquis, vai direto Corte→Acabamento). Conjunto COMPOSTO (tem croquis) NÃO
   // passa pelo corte — quem passa são os croquis dele. (Regra do Vitor.)
   const passaNoCorte = (p) => p.tipoPeca === "CROQUI" || (p._count?.conjuntoCroquis || 0) === 0;
-  const pecas = setor === "CORTE" ? todas.filter(passaNoCorte) : todas;
+  const escopo = setor === "CORTE" ? todas.filter(passaNoCorte) : todas;
+
+  // Reconciliação com o Syneco: marcas COM produção no mesOrdem daquele setor (quem já teve baixa lá).
+  // Serve pro extremo sincronismo portal×Syneco — a coluna "Syneco" do export usa isto.
+  let synecoMarcas = new Set();
+  if (setor) {
+    try {
+      const syn = await prisma.mesOrdem.groupBy({
+        by: ["item"],
+        where: { AND: [{ opId }, whereSetorSyneco(setor), { produzidoUn: { gt: 0 } }] },
+      });
+      synecoMarcas = new Set(syn.map((s) => s.item).filter(Boolean));
+    } catch {}
+  }
+  const pecas = escopo.map((p) => {
+    const bx = p.baixaSetores && typeof p.baixaSetores === "object" ? p.baixaSetores : {};
+    const baixadoPortal = !!(setor && bx[setor]);
+    const noSyneco = setor ? synecoMarcas.has(p.marca) : null; // já tem produção no Syneco?
+    return { ...p, baixadoPortal, noSyneco, precisaSyneco: setor ? baixadoPortal && !noSyneco : null };
+  });
 
   const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");
   const placar = { ABERTO: emAberto.length, PRIORIDADE: 0, TERCEIRO: 0, REVISAO: 0, AGUARDANDO_MATERIAL: 0, CANCELADA: 0 };
   for (const p of pecas) if (p.destino && placar[p.destino] != null) placar[p.destino]++;
+  const baixados = setor ? pecas.filter((p) => p.baixadoPortal).length : 0;
+  const precisamSyneco = setor ? pecas.filter((p) => p.precisaSyneco).length : 0;
 
-  return NextResponse.json({ opId, setor: setor || null, total: pecas.length, placar, pecas });
+  return NextResponse.json({ opId, setor: setor || null, total: pecas.length, placar, baixados, precisamSyneco, pecas });
 }
 
 export async function POST(req) {
@@ -77,7 +104,35 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
-  const { ids, destino, destinoTerceirizado, obs, reverter } = body;
+  const { ids, destino, destinoTerceirizado, obs, reverter, baixaSetor, reverterBaixa } = body;
+
+  // ── Baixa PORTAL ──────────────────────────────────────────────────────────
+  // Marca/desmarca a peça como concluída NAQUELE setor (PecaConjunto.baixaSetores),
+  // sem tocar no Syneco. O extremo-sincronismo é conferido depois pela coluna Syneco.
+  if (baixaSetor) {
+    let count;
+    if (reverterBaixa) {
+      count = await prisma.$executeRaw`
+        UPDATE "PecaConjunto"
+        SET "baixaSetores" = COALESCE("baixaSetores", '{}'::jsonb) - ${baixaSetor}
+        WHERE id IN (${Prisma.join(ids)})`;
+    } else {
+      const val = JSON.stringify({ em: new Date().toISOString(), por: user.id, porNome: user.name || null });
+      count = await prisma.$executeRaw`
+        UPDATE "PecaConjunto"
+        SET "baixaSetores" = jsonb_set(COALESCE("baixaSetores", '{}'::jsonb), ${`{${baixaSetor}}`}::text[], ${val}::jsonb, true)
+        WHERE id IN (${Prisma.join(ids)})`;
+    }
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id, action: reverterBaixa ? "REVERTER_BAIXA_PECA" : "BAIXA_PECA", entity: "PecaConjunto",
+        entityId: ids.length === 1 ? ids[0] : `${ids.length} peças`,
+        diff: { setor: baixaSetor, total: ids.length, atualizados: count },
+      },
+    }).catch(() => {});
+    return NextResponse.json({ ok: true, atualizados: count, baixaSetor });
+  }
+
   const marca = { destinoEm: new Date(), destinoPor: user.id, destinoObs: (obs || "").trim() || null };
   let atualizados = 0;
 
