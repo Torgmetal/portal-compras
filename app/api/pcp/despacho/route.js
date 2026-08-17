@@ -48,7 +48,7 @@ export async function GET(req) {
 
   const pecas = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, tipoPeca: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true },
+    select: { id: true, marca: true, descricao: true, tipoPeca: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true },
     orderBy: [{ marca: "asc" }],
   });
   // EM ABERTO = ainda não despachada e ainda no fluxo (PENDENTE), pra aparecer no painel de despacho.

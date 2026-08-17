@@ -14,6 +14,8 @@ const DESTINOS = [
 ];
 const VOLTA = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 const ROTULO = { ABERTO: "Em aberto", PRIORIDADE: "Prioridade", TERCEIRO: "Terceiro", REVISAO: "Revisão", AGUARDANDO_MATERIAL: "Aguard. material", CANCELADA: "Cancelada" };
+// Só rotula o tipo quando a LPC marcou (CONJUNTO/CROQUI); null (ex.: guarda-corpo não tipado) NÃO vira "croqui".
+const tipoLabel = (t) => (t === "CONJUNTO" ? "conjunto" : t === "CROQUI" ? "croqui" : null);
 
 export default function DespachoPanel({ obra, onClose }) {
   const [data, setData] = useState(null);
@@ -83,10 +85,11 @@ export default function DespachoPanel({ obra, onClose }) {
                 {abertas.map((p) => (
                   <label key={p.id} className="flex items-center gap-2.5 text-[13px] px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} />
-                    <span className="font-mono font-semibold">{p.marca}</span>
-                    <span className="text-torg-gray text-[11px]">{p.tipoPeca === "CONJUNTO" ? "conjunto" : "croqui"}</span>
-                    {p.qte > 1 && <span className="text-torg-gray text-[11px]">×{p.qte}</span>}
-                    {p.pesoTotalKg > 0 && <span className="text-torg-gray text-[11px] ml-auto">{Math.round(p.pesoTotalKg)} kg</span>}
+                    <span className="font-mono font-semibold shrink-0">{p.marca}</span>
+                    {p.descricao && <span className="text-torg-gray text-[12px] truncate">{p.descricao}</span>}
+                    {tipoLabel(p.tipoPeca) && <span className="text-torg-gray text-[11px] shrink-0 bg-gray-100 rounded px-1.5">{tipoLabel(p.tipoPeca)}</span>}
+                    {p.qte > 1 && <span className="text-torg-gray text-[11px] shrink-0">×{p.qte}</span>}
+                    {p.pesoTotalKg > 0 && <span className="text-torg-gray text-[11px] ml-auto shrink-0">{Math.round(p.pesoTotalKg)} kg</span>}
                   </label>
                 ))}
               </div>
