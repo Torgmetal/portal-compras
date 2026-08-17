@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
+import { croquiCortado } from "@/lib/prioridades-setor";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -111,27 +112,25 @@ export async function GET(req) {
       where: { conjunto: { opId } },
       select: { conjunto: { select: { marca: true } }, croqui: { select: { marca: true } } },
     });
-    const synCorte = new Map(); // croqui marca → un cortadas no Syneco
-    try {
-      const sc = await prisma.mesOrdem.groupBy({ by: ["item"], where: { AND: [{ opId }, whereSetorSyneco("CORTE"), { produzidoUn: { gt: 0 } }] }, _sum: { produzidoUn: true } });
-      for (const s of sc) if (s.item) synCorte.set(s.item, Math.round(s._sum?.produzidoUn || 0));
-    } catch {}
     const croquiMap = new Map();
     for (const p of todas) if (ehCroqui(p)) croquiMap.set(p.marca, p);
-    const croquiCortado = (cr) => {
-      if (!cr) return false;
-      const q = Number(cr.qte) || 1;
-      if (cr.corteConcluidoEm || (Number(cr.qteProduzida) || 0) >= q) return true;
-      const bxC = cr.baixaSetores && typeof cr.baixaSetores === "object" ? cr.baixaSetores.CORTE : null;
-      const baixaCorte = bxC ? (bxC.qtd != null ? Number(bxC.qtd) : q) : 0;
-      return baixaCorte >= q || (synCorte.get(cr.marca) || 0) >= q;
+    // Quantos ainda faltam cortar deste croqui (qte total menos o já cortado/baixado).
+    const faltaCortarQtd = (cr) => {
+      const q = Number(cr?.qte) || 1;
+      const bxC = cr?.baixaSetores && typeof cr.baixaSetores === "object" ? cr.baixaSetores.CORTE : null;
+      const cortado = Math.max(Number(cr?.qteProduzida) || 0, bxC ? (bxC.qtd != null ? Number(bxC.qtd) : q) : 0);
+      return Math.max(1, q - cortado);
     };
     const porConj = new Map();
     for (const lk of links) { const a = porConj.get(lk.conjunto.marca) || []; a.push(lk.croqui.marca); porConj.set(lk.conjunto.marca, a); }
     prontoInfo = new Map();
     for (const [conj, croquis] of porConj) {
       const faltam = [];
-      for (const cm of croquis) { const cr = croquiMap.get(cm); if (!croquiCortado(cr)) faltam.push({ marca: cm, descricao: cr?.descricao || null }); }
+      for (const cm of croquis) {
+        const cr = croquiMap.get(cm);
+        // croquiCortado (critério ÚNICO, igual à TV): corte concluído / qtd produzida / baixa no corte.
+        if (!croquiCortado(cr)) faltam.push({ marca: cm, descricao: cr?.descricao || null, faltaQtd: faltaCortarQtd(cr) });
+      }
       prontoInfo.set(conj, { prontoMontar: faltam.length === 0, faltamCroquis: faltam, totalCroquis: croquis.length });
     }
   }

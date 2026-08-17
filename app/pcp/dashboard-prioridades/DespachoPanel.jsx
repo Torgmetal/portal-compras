@@ -8,7 +8,7 @@
 // Baixa é SÓ do portal (PecaConjunto.baixaSetores[setor] = { qtd, em, por }); não escreve no Syneco.
 // Reusa /api/pcp/despacho (GET peças+placar+reconciliação, POST despacha / dá baixa por qtd).
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
-import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Scissors } from "lucide-react";
+import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
 
 const DESTINOS = [
@@ -249,7 +249,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                         {p.prontoMontar === false && temFalta && (
                           <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(p.id); }} title="Ver as peças que faltam cortar"
                             className="shrink-0 text-amber-700 bg-amber-50 hover:bg-amber-100 text-[10px] rounded px-1.5 py-0.5 inline-flex items-center gap-0.5 font-medium">
-                            <Scissors size={10} /> falta {p.faltamCroquis.length} {aberto ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                            falta {p.faltamCroquis.length} {aberto ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                           </button>
                         )}
                       </div>
@@ -270,11 +270,18 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                   {aberto && temFalta && (
                     <tr className="bg-amber-50/40">
                       <td></td>
-                      <td colSpan={8} className="px-2.5 pb-2.5 pt-0.5">
-                        <div className="text-[11px] text-torg-dark"><b className="text-amber-700">Faltam cortar ({p.faltamCroquis.length}):</b>{" "}
-                          {p.faltamCroquis.map((c, i) => (
-                            <span key={i} className="inline-block mr-2"><span className="font-mono font-semibold">{c.marca}</span>{c.descricao ? <span className="text-torg-gray"> · {c.descricao}</span> : ""}</span>
-                          ))}
+                      <td colSpan={8} className="px-2.5 pb-2 pt-0">
+                        <div className="text-[11px] max-w-2xl">
+                          <div className="text-amber-700 font-semibold mb-1">Faltam cortar ({p.faltamCroquis.length}):</div>
+                          <div className="space-y-0.5">
+                            {p.faltamCroquis.map((c, i) => (
+                              <div key={i} className="flex items-baseline gap-1.5">
+                                <span className="font-mono font-semibold text-torg-dark shrink-0">{c.marca}</span>
+                                {c.descricao && <span className="text-torg-gray truncate">· {c.descricao}</span>}
+                                <span className="text-amber-700 font-semibold tabular-nums shrink-0 ml-auto">faltam {fmtN(c.faltaQtd)}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </td>
                     </tr>
