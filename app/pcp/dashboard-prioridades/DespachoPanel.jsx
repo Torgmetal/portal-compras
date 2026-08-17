@@ -1,6 +1,6 @@
 "use client";
 // Painel da OP na TV do PCP — duas abas:
-//   • Despachar → destina as peças EM ABERTO (Prioridade / Terceiro / Revisão / Aguardando / Cancelar).
+//   • Liberar   → destina as peças EM ABERTO (Prioridade / Terceiro / Revisão / Aguardando / Cancelar).
 //   • Baixa     → marca a peça como concluída NAQUELE setor (PecaConjunto.baixaSetores), SEM tocar no
 //                 Syneco. A garantia do "extremo sincronismo" é a coluna Syneco do export (precisa
 //                 dar baixa no Syneco = tem baixa no portal, mas o Syneco ainda não tem produção).
@@ -184,7 +184,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
 
         {/* Abas */}
         <div className="flex gap-1 px-5 pt-2 border-b border-gray-100">
-          <button onClick={() => trocaAba("despacho")} className={`text-[13px] font-semibold px-3 py-1.5 rounded-t-lg ${aba === "despacho" ? "bg-torg-blue text-white" : "text-torg-gray hover:bg-gray-50"}`}>Despachar</button>
+          <button onClick={() => trocaAba("despacho")} className={`text-[13px] font-semibold px-3 py-1.5 rounded-t-lg ${aba === "despacho" ? "bg-torg-blue text-white" : "text-torg-gray hover:bg-gray-50"}`} title="Liberar a peça pro próximo passo do fluxo">Liberar</button>
           <button onClick={() => trocaAba("baixa")} disabled={!podeBaixa} title={podeBaixa ? "" : "Abra por setor para dar baixa"} className={`text-[13px] font-semibold px-3 py-1.5 rounded-t-lg disabled:opacity-40 ${aba === "baixa" ? "bg-emerald-600 text-white" : "text-torg-gray hover:bg-gray-50"}`}>Baixa</button>
         </div>
 
@@ -206,7 +206,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
           {erro && <p className="text-red-600 text-sm">{erro}</p>}
 
           {/* Aba DESPACHO */}
-          {!loading && !erro && aba === "despacho" && abertas.length === 0 && <p className="text-torg-gray text-sm text-center py-8">Nenhuma peça em aberto — tudo despachado. 🎉</p>}
+          {!loading && !erro && aba === "despacho" && abertas.length === 0 && <p className="text-torg-gray text-sm text-center py-8">Nenhuma peça em aberto — tudo liberado. 🎉</p>}
           {!loading && aba === "despacho" && abertas.length > 0 && (
             <>
               <label className="flex items-center gap-2 text-[12px] font-semibold text-torg-gray mb-2 cursor-pointer">
@@ -269,7 +269,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-torg-gray">{sel.size} selecionada(s) · o despacho é reversível na tela de cada destino.</p>
+            <p className="text-[11px] text-torg-gray">{sel.size} selecionada(s) · a liberação é reversível na tela de cada destino.</p>
           </div>
         ) : (
           <div className="border-t border-gray-100 px-5 py-3 space-y-2">

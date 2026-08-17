@@ -307,7 +307,7 @@ function LinhaOp({ op, onDespachar }) {
   // Corte sem detalhamento (sem croqui) → linha de ALERTA, sem barra/peças.
   if (op.estado === "SEM_LISTA") {
     return (
-      <div onClick={onDespachar} title="Despachar peças em aberto desta OP" className="bg-red-50 rounded-xl px-5 py-4 border border-red-200 shadow-[0_1px_3px_rgba(0,41,69,0.07)] cursor-pointer hover:border-red-300">
+      <div onClick={onDespachar} title="Liberar peças em aberto desta OP" className="bg-red-50 rounded-xl px-5 py-4 border border-red-200 shadow-[0_1px_3px_rgba(0,41,69,0.07)] cursor-pointer hover:border-red-300">
         <div className="flex items-center gap-4 flex-wrap">
           <AlertTriangle size={26} className="text-red-500 shrink-0" />
           <div className="min-w-[150px]">
@@ -328,7 +328,7 @@ function LinhaOp({ op, onDespachar }) {
   const seq = (op.sequencia || []).slice(0, 4);
   const restam = (op.qtdPecas - op.qtdPrioritarias) - seq.length;
   return (
-    <div onClick={onDespachar} title="Despachar peças em aberto desta OP" className={`rounded-xl px-5 py-4 shadow-[0_1px_3px_rgba(0,41,69,0.07)] cursor-pointer hover:shadow-md transition ${semProg ? "bg-amber-50 border border-amber-200" : "bg-white"}`}>
+    <div onClick={onDespachar} title="Liberar peças em aberto desta OP" className={`rounded-xl px-5 py-4 shadow-[0_1px_3px_rgba(0,41,69,0.07)] cursor-pointer hover:shadow-md transition ${semProg ? "bg-amber-50 border border-amber-200" : "bg-white"}`}>
       <div className="flex items-center gap-5 flex-wrap">
         <div className={`text-2xl font-extrabold w-9 shrink-0 ${op.ordem === 1 ? "text-torg-orange" : "text-torg-gray-light"}`}>{op.ordem}º</div>
         <div className="min-w-[150px]">
@@ -448,7 +448,7 @@ function OpMini({ op }) {
 
 function ObraCard({ obra, onDespachar }) {
   return (
-    <div onClick={onDespachar} title="Clique para despachar as peças em aberto desta OP"
+    <div onClick={onDespachar} title="Clique para liberar as peças em aberto desta OP"
       className="bg-white rounded-xl border border-torg-blue-100 shadow-[0_1px_3px_rgba(0,41,69,0.06)] p-5 flex flex-col gap-3 cursor-pointer hover:border-torg-blue-300 hover:shadow-md transition">
       <div className="flex items-start gap-2.5">
         <span className={`text-sm font-extrabold w-8 shrink-0 pt-0.5 ${obra.ordem === 1 ? "text-torg-orange" : "text-torg-gray-light"}`}>{obra.ordem}º</span>
