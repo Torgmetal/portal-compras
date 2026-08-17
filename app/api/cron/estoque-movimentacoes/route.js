@@ -2,8 +2,10 @@
 // dos ultimos 2 dias. Roda 1x/hora.
 import { NextResponse } from "next/server";
 import { temCronSecret } from "@/lib/cron-auth";
+import { prisma } from "@/lib/prisma";
 import { sincronizarMovimentacoes } from "@/lib/omie-estoque";
 import { registrarExecucao } from "@/lib/cron-monitor";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,6 +19,7 @@ export async function GET(req) {
 
   const t0 = Date.now();
   try {
+    await aquecerBanco(prisma); // acorda o Neon (scale-to-zero) antes do 1º query
     const r = await sincronizarMovimentacoes(2);
     await registrarExecucao("estoque-movimentacoes", { ok: true, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ ok: true, ...r });

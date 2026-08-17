@@ -4,9 +4,11 @@
 // (o a receber vinha ficando dias atrasado). Auth via vercel-cron ou CRON_SECRET.
 import { NextResponse } from "next/server";
 import { temCronSecret } from "@/lib/cron-auth";
+import { prisma } from "@/lib/prisma";
 import { sincronizarContasPagar } from "@/lib/omie-contas-pagar";
 import { sincronizarContasReceber } from "@/lib/omie-contas-receber";
 import { registrarExecucao } from "@/lib/cron-monitor";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // pagar+receber juntos chegam a ~60s; folga p/ não cortar
@@ -18,6 +20,7 @@ function autorizado(req) {
 
 export async function GET(req) {
   if (!autorizado(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await aquecerBanco(prisma).catch(() => {}); // acorda o Neon (scale-to-zero) antes do 1º query
   const out = { ok: true };
   try {
     out.pagar = await sincronizarContasPagar({ incremental: true, maxDetalhe: 60, orcamentoMs: 28000 });

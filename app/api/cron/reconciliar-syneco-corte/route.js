@@ -7,6 +7,7 @@ import { temCronSecret } from "@/lib/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { reconciliarSynecoCorte } from "@/lib/reconciliar-syneco-corte";
 import { registrarExecucao } from "@/lib/cron-monitor";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +21,7 @@ export async function GET(req) {
 
   const t0 = Date.now();
   try {
+    await aquecerBanco(prisma); // acorda o Neon (scale-to-zero) antes do 1º query
     const r = await reconciliarSynecoCorte();
     // Carimbo (sempre grava, mesmo com 0 mudanças — é o "rodou às HH:MM" do painel).
     await prisma.auditLog

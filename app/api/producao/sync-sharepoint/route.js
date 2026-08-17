@@ -12,6 +12,7 @@ import { downloadPlanilhaProducao, getMesNomePt } from "@/lib/sharepoint";
 import { parseEapProducao } from "@/lib/parse-pcp-eap";
 import { isoWeekString, semanaInicio, semanaFim, parseSemana } from "@/lib/semana";
 import { registrarExecucao } from "@/lib/cron-monitor";
+import { aquecerBanco } from "@/lib/db-retry";
 
 function rangeDaSemana(date) {
   const semana = isoWeekString(date);
@@ -157,6 +158,7 @@ export async function GET(req) {
   // heartbeat de falha em vez de sumir (senão o monitor alerta "nunca executou").
   const t0 = Date.now();
   try {
+    await aquecerBanco(prisma); // acorda o Neon (scale-to-zero) antes do 1º query
     const result = await executarSync();
     await registrarExecucao("sync-sharepoint", { ok: !!result.ok, mensagem: result.ok ? null : result.error, duracaoMs: Date.now() - t0 });
     return NextResponse.json(result, { status: result.ok ? 200 : 500 });

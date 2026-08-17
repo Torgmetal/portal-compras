@@ -10,6 +10,7 @@ import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qu
 import { requireRole } from "@/lib/session";
 import { montarEmailVencidos } from "@/lib/qualidade-alerta-email";
 import { registrarExecucao } from "@/lib/cron-monitor";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -42,6 +43,7 @@ export async function GET(req) {
     }
   }
 
+  if (isCron) await aquecerBanco(prisma).catch(() => {}); // acorda o Neon (scale-to-zero) antes de tocar o banco
   if (isCron) await registrarExecucao("qualidade-vencidos", { ok: true }); // heartbeat: o cron semanal disparou
 
   const to = admin ? [admin.email].filter(Boolean) : await destinatarios();
