@@ -20,13 +20,14 @@ const VOLTA_TERCEIRO = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "E
 const SETORES_BAIXA = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 
 const schema = z.object({
-  ids: z.array(z.string()).min(1, "Selecione ao menos uma peça"),
+  ids: z.array(z.string()).optional(),
   destino: z.enum(DESTINOS).optional(),
   destinoTerceirizado: z.enum(VOLTA_TERCEIRO).optional(),
   obs: z.string().max(500).optional().nullable(),
   reverter: z.boolean().optional(),
-  // Baixa PORTAL (não escreve no Syneco): grava baixaSetores[baixaSetor].
+  // Baixa PORTAL (não escreve no Syneco): grava baixaSetores[baixaSetor] = { qtd, em, por }.
   baixaSetor: z.enum(SETORES_BAIXA).optional(),
+  baixas: z.array(z.object({ id: z.string(), qtd: z.number().nonnegative() })).optional(), // baixa por peça+qtd
   reverterBaixa: z.boolean().optional(),
 });
 
@@ -55,7 +56,7 @@ export async function GET(req) {
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
   const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
   // Descarta linhas-lixo do import (ex.: a linha "TOTAL" da Lista de Expedição que entrou como peça).
@@ -84,23 +85,28 @@ export async function GET(req) {
   };
   const escopo = setor ? todas.filter((p) => passaNoSetor(p, setor)) : todas;
 
-  // Reconciliação com o Syneco: marcas COM produção no mesOrdem daquele setor (quem já teve baixa lá).
-  // Serve pro extremo sincronismo portal×Syneco — a coluna "Syneco" do export usa isto.
-  let synecoMarcas = new Set();
+  // Reconciliação com o Syneco: quantidade PRODUZIDA no mesOrdem daquele setor, por marca
+  // (extremo sincronismo portal×Syneco — o histórico e o export usam isto).
+  const synecoQtd = new Map(); // marca → un produzidas no Syneco (no setor)
   if (setor) {
     try {
       const syn = await prisma.mesOrdem.groupBy({
         by: ["item"],
         where: { AND: [{ opId }, whereSetorSyneco(setor), { produzidoUn: { gt: 0 } }] },
+        _sum: { produzidoUn: true },
       });
-      synecoMarcas = new Set(syn.map((s) => s.item).filter(Boolean));
+      for (const s of syn) if (s.item) synecoQtd.set(s.item, Math.round(s._sum?.produzidoUn || 0));
     } catch {}
   }
   const pecas = escopo.map((p) => {
     const bx = p.baixaSetores && typeof p.baixaSetores === "object" ? p.baixaSetores : {};
-    const baixadoPortal = !!(setor && bx[setor]);
-    const noSyneco = setor ? synecoMarcas.has(p.marca) : null; // já tem produção no Syneco?
-    return { ...p, baixadoPortal, noSyneco, precisaSyneco: setor ? baixadoPortal && !noSyneco : null };
+    const reg = setor ? bx[setor] : null;
+    // Compat: baixas antigas (sem qtd) contam como peça inteira.
+    const baixadoQtd = reg ? (reg.qtd != null ? Number(reg.qtd) : p.qte) : 0;
+    const baixadoPortal = baixadoQtd > 0;
+    const produzidoSyneco = setor ? (synecoQtd.get(p.marca) || 0) : null;
+    const precisaSyneco = setor ? baixadoPortal && produzidoSyneco < baixadoQtd : null; // portal à frente do Syneco
+    return { ...p, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco };
   });
 
   const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");
@@ -124,35 +130,47 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
-  const { ids, destino, destinoTerceirizado, obs, reverter, baixaSetor, reverterBaixa } = body;
+  const { ids, destino, destinoTerceirizado, obs, reverter, baixaSetor, baixas, reverterBaixa } = body;
 
   // ── Baixa PORTAL ──────────────────────────────────────────────────────────
-  // Marca/desmarca a peça como concluída NAQUELE setor (PecaConjunto.baixaSetores),
-  // sem tocar no Syneco. O extremo-sincronismo é conferido depois pela coluna Syneco.
+  // Grava/remove a QUANTIDADE baixada da peça NAQUELE setor (PecaConjunto.baixaSetores[setor] =
+  // { qtd, em, por, porNome }), sem tocar no Syneco. O extremo-sincronismo é conferido depois
+  // (histórico/export) comparando a qtd baixada com a produzida no Syneco.
   if (baixaSetor) {
     let count;
     if (reverterBaixa) {
+      if (!ids?.length) return NextResponse.json({ error: "Sem peças para reverter." }, { status: 400 });
       count = await prisma.$executeRaw`
         UPDATE "PecaConjunto"
         SET "baixaSetores" = COALESCE("baixaSetores", '{}'::jsonb) - ${baixaSetor}
         WHERE id IN (${Prisma.join(ids)})`;
     } else {
-      const val = JSON.stringify({ em: new Date().toISOString(), por: user.id, porNome: user.name || null });
+      const lista = (baixas || []).filter((b) => b.id && b.qtd > 0);
+      if (!lista.length) return NextResponse.json({ error: "Sem peças/quantidades para dar baixa." }, { status: 400 });
+      const nowIso = new Date().toISOString();
+      const values = Prisma.join(lista.map((b) => Prisma.sql`(${b.id}::text, ${Math.round(b.qtd)}::numeric)`));
       count = await prisma.$executeRaw`
-        UPDATE "PecaConjunto"
-        SET "baixaSetores" = jsonb_set(COALESCE("baixaSetores", '{}'::jsonb), ${`{${baixaSetor}}`}::text[], ${val}::jsonb, true)
-        WHERE id IN (${Prisma.join(ids)})`;
+        UPDATE "PecaConjunto" p
+        SET "baixaSetores" = jsonb_set(
+          COALESCE(p."baixaSetores", '{}'::jsonb),
+          ${`{${baixaSetor}}`}::text[],
+          jsonb_build_object('qtd', v.qtd, 'em', ${nowIso}, 'por', ${user.id}, 'porNome', ${user.name || null}),
+          true)
+        FROM (VALUES ${values}) AS v(id, qtd)
+        WHERE p.id = v.id`;
     }
+    const alvo = reverterBaixa ? (ids?.length || 0) : (baixas?.length || 0);
     await prisma.auditLog.create({
       data: {
         userId: user.id, action: reverterBaixa ? "REVERTER_BAIXA_PECA" : "BAIXA_PECA", entity: "PecaConjunto",
-        entityId: ids.length === 1 ? ids[0] : `${ids.length} peças`,
-        diff: { setor: baixaSetor, total: ids.length, atualizados: count },
+        entityId: alvo === 1 ? (ids?.[0] || baixas?.[0]?.id || "") : `${alvo} peças`,
+        diff: { setor: baixaSetor, total: alvo, atualizados: count },
       },
     }).catch(() => {});
     return NextResponse.json({ ok: true, atualizados: count, baixaSetor });
   }
 
+  if (!ids?.length) return NextResponse.json({ error: "Selecione ao menos uma peça" }, { status: 400 });
   const marca = { destinoEm: new Date(), destinoPor: user.id, destinoObs: (obs || "").trim() || null };
   let atualizados = 0;
 

@@ -124,7 +124,7 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
           <button onClick={exportar} disabled={exportando || !pecas.length} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
         </div>
       </div>
-      {abrirBaixa && <DespachoPanel obra={String(opNumero)} setor={baixaSetor} abaInicial="baixa" onClose={() => setAbrirBaixa(false)} />}
+      {abrirBaixa && <DespachoPanel obra={String(opNumero)} setor={baixaSetor} abaInicial="despacho" onClose={() => setAbrirBaixa(false)} />}
       <p className="text-sm text-torg-gray mb-4">Status de cada peça da Lista de Expedição. A etapa vem do <strong>setor mais avançado com apontamento no Syneco</strong> — não do status cadastrado.</p>
 
       {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
