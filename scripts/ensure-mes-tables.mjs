@@ -199,6 +199,16 @@ async function main() {
   ]) await prisma.$executeRawUnsafe(`ALTER TABLE "PecaConjunto" ${c}`);
   console.log("[ensure-mes-tables] OK — PecaConjunto.destino* garantidas.");
 
+  // Romaneio de terceiro: 2º romaneio de MATERIAL (perfis a mandar) + etapa de envio.
+  try {
+    for (const c of [
+      `ADD COLUMN IF NOT EXISTS "setorEnvio" TEXT`,
+      `ADD COLUMN IF NOT EXISTS "materiais" JSONB DEFAULT '[]'`,
+      `ADD COLUMN IF NOT EXISTS "arquivoMaterialUrl" TEXT`,
+    ]) await prisma.$executeRawUnsafe(`ALTER TABLE "RomaneioTerceiro" ${c}`);
+    console.log("[ensure-mes-tables] OK — RomaneioTerceiro.materiais garantidas.");
+  } catch (e) { console.warn("[ensure-mes-tables] RomaneioTerceiro:", e?.message); }
+
   // Verifica quais das duas tabelas existem
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename

@@ -91,7 +91,8 @@ export default function AbaTerceiros({ opId }) {
                   {r.dataPrevRetorno && <span className={`inline-flex items-center gap-1 ${atrasado ? "text-red-600 font-semibold" : ""}`}><PackageCheck size={12} /> Retorno previsto {fmtData(r.dataPrevRetorno)}{atrasado ? " · atrasado" : ""}</span>}
                   {r.pesoRetornadoKg > 0 && <span className="text-emerald-700">Retornado: {fmtKg(r.pesoRetornadoKg)}</span>}
                   {r.observacao && <span className="italic truncate max-w-[320px]">{r.observacao}</span>}
-                  <a href={`/api/expedicao/terceiros/${r.id}/romaneio`} className="text-torg-blue hover:underline inline-flex items-center gap-1"><FileSpreadsheet size={12} /> Excel</a>
+                  <a href={`/api/expedicao/terceiros/${r.id}/romaneio`} className="text-torg-blue hover:underline inline-flex items-center gap-1"><FileSpreadsheet size={12} /> Peças</a>
+                  {Array.isArray(r.materiais) && r.materiais.length > 0 && <a href={`/api/expedicao/terceiros/${r.id}/material`} className="text-indigo-600 hover:underline inline-flex items-center gap-1"><FileSpreadsheet size={12} /> Material</a>}
                   {r.arquivoUrl && <a href={r.arquivoUrl} target="_blank" rel="noopener noreferrer" className="text-torg-gray hover:underline inline-flex items-center gap-1"><ExternalLink size={12} /> SharePoint</a>}
                 </div>
                 {op && (
@@ -104,6 +105,19 @@ export default function AbaTerceiros({ opId }) {
                         ))}
                       </tbody>
                     </table>
+                    {Array.isArray(r.materiais) && r.materiais.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-[10px] uppercase font-semibold text-indigo-700 mb-1">Material a mandar (p/ NF de retorno)</p>
+                        <table className="w-full text-[12px] min-w-[360px]">
+                          <thead><tr className="text-[10px] uppercase text-torg-gray"><th className="text-left py-1">Perfil</th><th className="text-left py-1">Material</th><th className="text-right py-1">Qtd</th><th className="text-right py-1">Peso</th></tr></thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {r.materiais.map((m, i) => (
+                              <tr key={i}><td className="py-1 font-mono text-torg-dark whitespace-nowrap">{m.perfil}</td><td className="py-1 text-torg-gray">{m.descricao || "—"}</td><td className="py-1 text-right tabular-nums">{fmtN(m.qtd)}</td><td className="py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(m.pesoKg)}</td></tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                     {Array.isArray(r.retornos) && r.retornos.length > 0 && (
                       <div className="mt-2 text-[11px] text-torg-gray"><b className="text-emerald-700">Retornos:</b> {r.retornos.map((rt, i) => <span key={i} className="mr-2 whitespace-nowrap">{fmtData(rt.data)} · {fmtKg(rt.pesoKg)}</span>)}</div>
                     )}

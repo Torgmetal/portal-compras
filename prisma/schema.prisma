@@ -4012,9 +4012,15 @@ model RomaneioTerceiro {
   placaVeiculo      String?
   placaCarreta      String?
   contatoTransporte String?
-  // material enviado: [{ marca, descricao, qte, pesoUn, pesoTotal }]
+  // peças enviadas (conjuntos/croquis): [{ marca, descricao, qte, pesoUn, pesoTotal }]
   itens             Json      @default("[]")
   pesoEnviadoKg     Float     @default(0)
+  // Etapa de onde a peça saiu (CORTE/MONTAGEM/SOLDA/…). Só p/ Corte/Montagem geramos o 2º
+  // romaneio de MATERIAL (perfis a cortar), pra NF de retorno. Da Solda em diante, só peças.
+  setorEnvio        String?
+  // material a mandar (agrupado por perfil): [{ perfil, descricao, qtd, pesoKg }]
+  materiais         Json      @default("[]")
+  arquivoMaterialUrl String?
   // retornos parciais: [{ id, data, itens:[{marca, qte, pesoTotal}], pesoKg, observacao, porNome }]
   retornos          Json      @default("[]")
   pesoRetornadoKg   Float     @default(0)

@@ -44,6 +44,7 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
           opRefId: opId || null, opRefNumero: String(obra), itens, dataEnvio: new Date().toISOString(),
           dataPrevRetorno: dataRetorno || null,
           observacao: `Enviado da etapa ${SETOR_LABEL[setor] || setor || "—"} · retorna para ${SETOR_LABEL[volta] || volta}`,
+          pecaIds: pecas.map((p) => p.id), setorEnvio: setor || null, // p/ o 2º romaneio de material (Corte/Montagem)
         }),
       });
       const rj = await rc.json();
@@ -100,7 +101,7 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
           {erro && <p className="text-red-600 text-sm">{erro}</p>}
         </div>
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-100">
-          <p className="text-[11px] text-torg-gray">Gera o romaneio RT-## (à parte da obra) e baixa o Excel.</p>
+          <p className="text-[11px] text-torg-gray">Gera o romaneio RT-## (à parte da obra){setor === "CORTE" || setor === "MONTAGEM" ? " + o romaneio de material (perfis a mandar, p/ a NF)" : ""} e baixa o Excel.</p>
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="text-[13px] font-semibold text-torg-gray px-3 py-2">Cancelar</button>
             <button onClick={confirmar} disabled={enviando || !fornId} className="text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg px-4 py-2 inline-flex items-center gap-1.5 disabled:opacity-40">

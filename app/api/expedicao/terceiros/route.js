@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarRomaneioTerceiroForm22 } from "@/lib/romaneio-terceiro-form22";
+import { computarMateriaisEnvio } from "@/lib/materiais-terceiro";
 import { uploadFileToFolder } from "@/lib/sharepoint";
 
 export const runtime = "nodejs";
@@ -37,6 +38,9 @@ const schema = z.object({
   dataEnvio: z.string().nullable().optional(),
   dataPrevRetorno: z.string().nullable().optional(),
   observacao: z.string().max(1000).nullable().optional(),
+  // Para o 2º romaneio de MATERIAL (só Corte/Montagem): ids das peças + etapa de envio.
+  pecaIds: z.array(z.string()).optional(),
+  setorEnvio: z.string().max(20).nullable().optional(),
 });
 
 // pesoTotal do item: usa o informado, senão qte × pesoUn.
@@ -91,6 +95,10 @@ export async function POST(req) {
   const itens = [...porMarca.values()];
   const pesoEnviadoKg = itens.reduce((s, i) => s + (i.pesoTotal || 0), 0);
 
+  // 2º romaneio de MATERIAL (perfis a cortar) — só saindo da Preparação/Montagem.
+  const setorEnvio = body.setorEnvio ? String(body.setorEnvio).toUpperCase() : null;
+  const materiais = await computarMateriaisEnvio({ pecaIds: body.pecaIds || [], setorEnvio }).catch(() => []);
+
   // corrida por número: tenta o próximo e sobe se colidir com a unique
   let criado = null;
   const ult = await prisma.romaneioTerceiro.findFirst({ orderBy: { numero: "desc" }, select: { numero: true } });
@@ -111,6 +119,7 @@ export async function POST(req) {
           placaCarreta: body.placaCarreta?.trim() || null,
           contatoTransporte: body.contatoTransporte?.trim() || null,
           itens, pesoEnviadoKg,
+          setorEnvio, materiais,
           dataEnvio: body.dataEnvio ? new Date(body.dataEnvio) : new Date(),
           dataPrevRetorno: body.dataPrevRetorno ? new Date(body.dataPrevRetorno) : null,
           observacao: body.observacao?.trim() || null,
@@ -126,16 +135,20 @@ export async function POST(req) {
 
   await prisma.auditLog.create({ data: { userId: user.id, action: "CRIAR_ROMANEIO_TERCEIRO", entity: "RomaneioTerceiro", entityId: criado.id, diff: { numero: criado.numero, terceiro: criado.terceiroNome, pesoEnviadoKg, itens: itens.length } } }).catch(() => {});
 
-  // Best-effort: sobe o Excel (FORM 22) pra pasta "Romaneios terceiros" no SharePoint e grava o
-  // arquivoUrl. Não derruba a criação se o SharePoint falhar; registra o erro no auditLog p/ rastreio.
+  // Best-effort: sobe os romaneios (FORM 22) pra pasta "Romaneios terceiros" no SharePoint e grava
+  // os arquivoUrl. 1º = PEÇAS (sempre); 2º = MATERIAL (só se houver materiais = Corte/Montagem).
+  // Não derruba a criação se o SharePoint falhar; registra o erro no auditLog p/ rastreio.
+  const XLSX_CT = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  const rt = `RT-${String(criado.numero).padStart(3, "0")}`;
+  const sufOP = criado.opRefNumero ? `-OP-${criado.opRefNumero}` : "";
   try {
     const buf = await gerarRomaneioTerceiroForm22(criado);
-    const rt = `RT-${String(criado.numero).padStart(3, "0")}`;
-    const fileName = `Romaneio-Terceiro-${rt}${criado.opRefNumero ? `-OP-${criado.opRefNumero}` : ""}.xlsx`;
-    const up = await uploadFileToFolder({ folderPath: PASTA_ROMANEIOS_TERCEIROS, fileName, buffer: buf, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    if (up?.webUrl) {
-      await prisma.romaneioTerceiro.update({ where: { id: criado.id }, data: { arquivoUrl: up.webUrl } });
-      criado.arquivoUrl = up.webUrl;
+    const up = await uploadFileToFolder({ folderPath: PASTA_ROMANEIOS_TERCEIROS, fileName: `Romaneio-Terceiro-${rt}${sufOP}.xlsx`, buffer: buf, contentType: XLSX_CT });
+    if (up?.webUrl) { await prisma.romaneioTerceiro.update({ where: { id: criado.id }, data: { arquivoUrl: up.webUrl } }); criado.arquivoUrl = up.webUrl; }
+    if (Array.isArray(criado.materiais) && criado.materiais.length) {
+      const bufM = await gerarRomaneioTerceiroForm22(criado, { material: true });
+      const upM = await uploadFileToFolder({ folderPath: PASTA_ROMANEIOS_TERCEIROS, fileName: `Romaneio-Terceiro-${rt}${sufOP}-MATERIAL.xlsx`, buffer: bufM, contentType: XLSX_CT });
+      if (upM?.webUrl) { await prisma.romaneioTerceiro.update({ where: { id: criado.id }, data: { arquivoMaterialUrl: upM.webUrl } }); criado.arquivoMaterialUrl = upM.webUrl; }
     }
   } catch (e) {
     console.error("[terceiros] SharePoint upload:", e?.message);
