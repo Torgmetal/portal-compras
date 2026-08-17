@@ -185,8 +185,22 @@ export async function POST(req) {
         SET "baixaSetores" = COALESCE("baixaSetores", '{}'::jsonb) - ${baixaSetor}
         WHERE id IN (${Prisma.join(ids)})`;
     } else {
-      const lista = (baixas || []).filter((b) => b.id && b.qtd > 0);
+      let lista = (baixas || []).filter((b) => b.id && b.qtd > 0);
       if (!lista.length) return NextResponse.json({ error: "Sem peças/quantidades para dar baixa." }, { status: 400 });
+      // Trava: peça que JÁ tem apontamento no Syneco naquele setor não pode ser baixada pelo portal
+      // (a baixa é só o atalho pro delay do Syneco). Confere no banco (autoritativo).
+      const pcs = await prisma.pecaConjunto.findMany({ where: { id: { in: lista.map((b) => b.id) } }, select: { id: true, marca: true, opId: true } });
+      const marcaById = new Map(pcs.map((p) => [p.id, p.marca]));
+      const opIdBaixa = pcs[0]?.opId;
+      if (opIdBaixa) {
+        const comSyneco = new Set();
+        try {
+          const syn = await prisma.mesOrdem.groupBy({ by: ["item"], where: { AND: [{ opId: opIdBaixa }, whereSetorSyneco(baixaSetor), { produzidoUn: { gt: 0 } }, { item: { in: [...new Set(pcs.map((p) => p.marca))] } }] } });
+          for (const s of syn) if (s.item) comSyneco.add(s.item);
+        } catch {}
+        lista = lista.filter((b) => !comSyneco.has(marcaById.get(b.id)));
+      }
+      if (!lista.length) return NextResponse.json({ error: "Peça(s) já com apontamento no Syneco — baixa pelo portal não é necessária." }, { status: 409 });
       const nowIso = new Date().toISOString();
       const values = Prisma.join(lista.map((b) => Prisma.sql`(${b.id}::text, ${Math.round(b.qtd)}::numeric)`));
       count = await prisma.$executeRaw`

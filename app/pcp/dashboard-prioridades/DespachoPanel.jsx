@@ -92,8 +92,13 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   async function baixar() {
     const alvo = pendentes.filter((p) => sel.has(p.id));
     if (!alvo.length) return;
-    const baixas = alvo.map((p) => ({ id: p.id, qtd: p.qte || 1 })); // baixa a peça inteira
-    await post({ baixaSetor: setor, baixas });
+    // A baixa no portal é só o "atalho" pro delay do Syneco: peça que JÁ tem apontamento no Syneco
+    // não precisa (e não deixa) baixar de novo — deixa o Syneco terminar.
+    const jaSyneco = alvo.filter((p) => (p.produzidoSyneco || 0) > 0);
+    const baixaveis = alvo.filter((p) => !((p.produzidoSyneco || 0) > 0));
+    if (!baixaveis.length) return alert("Essas peças já têm apontamento no Syneco — não precisa dar baixa pelo portal.");
+    const baixas = baixaveis.map((p) => ({ id: p.id, qtd: p.qte || 1 })); // baixa a peça inteira
+    await post({ baixaSetor: setor, baixas }, jaSyneco.length ? (j) => `Baixa em ${j.atualizados} peça(s). ${jaSyneco.length} já no Syneco — ignoradas.` : null);
   }
   async function reverterBaixa() {
     if (!sel.size) return;
@@ -118,21 +123,22 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       if (hRow < 0) throw new Error('Não achei a coluna "Peça"/"Marca" na planilha.');
       const idx = new Map();
       for (const p of pecas) idx.set(String(p.marca).trim().toUpperCase(), p);
-      const baixas = [], naoAchou = []; const vistos = new Set();
+      const baixas = [], naoAchou = [], jaSyneco = []; const vistos = new Set();
       for (let r = hRow + 1; r < grid.length; r++) {
         const m = String(grid[r]?.[cMarca] ?? "").trim();
         if (!m) continue;
         const p = idx.get(m.toUpperCase());
         if (!p) { naoAchou.push(m); continue; }
         if (vistos.has(p.id)) continue; vistos.add(p.id);
+        if ((p.produzidoSyneco || 0) > 0) { jaSyneco.push(m); continue; } // já no Syneco → não baixa de novo
         let qtd = p.qte || 1;
         if (cQtd >= 0) { const q = parseInt(String(grid[r][cQtd]).replace(/\D/g, ""), 10); if (Number.isFinite(q) && q > 0) qtd = q; }
         baixas.push({ id: p.id, qtd });
       }
-      if (!baixas.length) throw new Error(`Nenhuma das marcas da planilha bate com peças desta OP/setor.`);
-      const aviso = naoAchou.length ? `\n\n${naoAchou.length} não encontrada(s): ${naoAchou.slice(0, 8).join(", ")}${naoAchou.length > 8 ? "…" : ""}` : "";
-      if (!confirm(`Dar baixa em ${baixas.length} peça(s) de ${SETOR_LABEL[setor] || setor}?${aviso}`)) { setEnviando(false); return; }
-      await post({ baixaSetor: setor, baixas }, (j) => `Baixa aplicada em ${j.atualizados} peça(s).${naoAchou.length ? ` ${naoAchou.length} não encontradas.` : ""}`);
+      if (!baixas.length) throw new Error(jaSyneco.length ? `Todas as marcas da planilha já têm apontamento no Syneco — nada a baixar pelo portal.` : `Nenhuma das marcas da planilha bate com peças desta OP/setor.`);
+      const aviso = [naoAchou.length ? `${naoAchou.length} não encontrada(s): ${naoAchou.slice(0, 6).join(", ")}${naoAchou.length > 6 ? "…" : ""}` : "", jaSyneco.length ? `${jaSyneco.length} já no Syneco (ignoradas)` : ""].filter(Boolean).join("\n");
+      if (!confirm(`Dar baixa em ${baixas.length} peça(s) de ${SETOR_LABEL[setor] || setor}?${aviso ? "\n\n" + aviso : ""}`)) { setEnviando(false); return; }
+      await post({ baixaSetor: setor, baixas }, (j) => `Baixa aplicada em ${j.atualizados} peça(s).${naoAchou.length ? ` ${naoAchou.length} não encontradas.` : ""}${jaSyneco.length ? ` ${jaSyneco.length} já no Syneco.` : ""}`);
     } catch (e) { alert(e.message); setEnviando(false); }
   }
 
@@ -256,7 +262,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                     </td>
                     <td className={`${td} text-right tabular-nums`}>{fmtN(p.qte)}</td>
                     <td className={`${td} text-right tabular-nums ${p.baixadoQtd ? "text-emerald-700 font-semibold" : "text-gray-300"}`}>{p.baixadoQtd ? fmtN(p.baixadoQtd) : "—"}</td>
-                    <td className={`${td} text-right tabular-nums text-torg-gray`}>{p.produzidoSyneco ? fmtN(p.produzidoSyneco) : "—"}</td>
+                    <td className={`${td} text-right tabular-nums ${p.produzidoSyneco ? "text-emerald-700 font-medium" : "text-torg-gray"}`} title={p.produzidoSyneco ? "Já tem apontamento no Syneco — não precisa dar baixa pelo portal" : ""}>{p.produzidoSyneco ? fmtN(p.produzidoSyneco) : "—"}</td>
                     <td className={`${td} text-right tabular-nums text-torg-gray`}>{p.pesoUnitKg ? fmtKg(p.pesoUnitKg) : "—"}</td>
                     <td className={`${td} text-right tabular-nums`}>{p.pesoTotalKg ? fmtKg(p.pesoTotalKg) : "—"}</td>
                     <td className={`${td} text-center`}>
