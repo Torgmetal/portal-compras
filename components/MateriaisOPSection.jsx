@@ -329,9 +329,9 @@ export default function MateriaisOPSection({ opId }) {
                       <td className="px-3 py-2 font-mono text-xs text-torg-blue whitespace-nowrap align-top">
                         {item.rmNumero}
                       </td>
-                      <td className="px-3 py-2 align-top max-w-[240px]">
-                        <div className="text-torg-dark text-xs font-medium truncate" title={item.descricao}>{item.descricao}</div>
-                        {item.material && <div className="text-[11px] text-torg-gray truncate">{item.material}</div>}
+                      <td className="px-3 py-2 align-top min-w-[240px] max-w-[420px]">
+                        <div className="text-torg-dark text-xs font-medium break-words whitespace-normal" title={item.descricao}>{item.descricao}</div>
+                        {item.material && <div className="text-[11px] text-torg-gray break-words whitespace-normal">{item.material}</div>}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap align-top text-torg-dark text-xs">
                         {solicitadoTxt(item)}
