@@ -18,6 +18,7 @@ import DesenhosOPSection from "./DesenhosOPSection";
 import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import AbaObra from "./AbaObra";
 import AbaProducao from "./AbaProducao";
+import AbaTerceiros from "./AbaTerceiros";
 import MargemTransformacaoOP from "./MargemTransformacaoOP";
 import PrevisaoObra from "./PrevisaoObra";
 import { labelCategoria, agruparPorGrupo, isAluguel } from "@/lib/op-categorias";
@@ -60,6 +61,7 @@ const VISTAS = [
   { key: "planejamento", label: "Planejamento", icon: GanttChart },
   { key: "compras", label: "Compras", icon: ShoppingCart },
   { key: "producao", label: "Produção", icon: Factory },
+  { key: "terceiros", label: "Terceiros", icon: Truck },
   { key: "expedicao", label: "Expedição", icon: Truck },
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
@@ -909,6 +911,8 @@ export default function OPDetailClient({ op, userRole, userId, podeAlterarVerba 
           <AbaProducao opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
         </div>
       )}
+
+      {vista === "terceiros" && <AbaTerceiros opId={op.id} opNumero={op.numero} />}
 
       {vista === "financeiro" && (() => {
         const DIA = 86400000;

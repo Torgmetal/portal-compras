@@ -49,6 +49,11 @@ export async function GET(req) {
   const status = sp.get("status");
   const where = {};
   if (status && status !== "todos") where.status = status;
+  // Filtro por OP (usado pela aba Terceiros do painel da OP).
+  const opId = sp.get("opId");
+  const opNumero = sp.get("opNumero");
+  if (opId) where.opRefId = opId;
+  else if (opNumero) where.opRefNumero = opNumero;
 
   const [rows, ult] = await Promise.all([
     prisma.romaneioTerceiro.findMany({ where, orderBy: [{ createdAt: "desc" }] }),
