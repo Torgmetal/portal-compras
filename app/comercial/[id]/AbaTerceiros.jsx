@@ -107,12 +107,12 @@ export default function AbaTerceiros({ opId }) {
                     </table>
                     {Array.isArray(r.materiais) && r.materiais.length > 0 && (
                       <div className="mt-3">
-                        <p className="text-[10px] uppercase font-semibold text-indigo-700 mb-1">Material a mandar (p/ NF de retorno)</p>
-                        <table className="w-full text-[12px] min-w-[360px]">
-                          <thead><tr className="text-[10px] uppercase text-torg-gray"><th className="text-left py-1">Perfil</th><th className="text-left py-1">Material</th><th className="text-right py-1">Qtd</th><th className="text-right py-1">Peso</th></tr></thead>
+                        <p className="text-[10px] uppercase font-semibold text-indigo-700 mb-1">Material a mandar (barras/chapas — p/ NF de retorno)</p>
+                        <table className="w-full text-[12px] min-w-[380px]">
+                          <thead><tr className="text-[10px] uppercase text-torg-gray"><th className="text-left py-1">Perfil</th><th className="text-left py-1">Unidade</th><th className="text-right py-1">Qtd</th><th className="text-right py-1">Peso</th></tr></thead>
                           <tbody className="divide-y divide-gray-50">
                             {r.materiais.map((m, i) => (
-                              <tr key={i}><td className="py-1 font-mono text-torg-dark whitespace-nowrap">{m.perfil}</td><td className="py-1 text-torg-gray">{m.descricao || "—"}</td><td className="py-1 text-right tabular-nums">{fmtN(m.qtd)}</td><td className="py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(m.pesoKg)}</td></tr>
+                              <tr key={i}><td className="py-1 font-mono text-torg-dark whitespace-nowrap">{m.perfil}</td><td className="py-1 text-torg-gray whitespace-nowrap">{[m.unidade, m.descricao].filter(Boolean).join(" · ") || "—"}</td><td className="py-1 text-right tabular-nums font-semibold">{fmtN(m.qtd)}</td><td className="py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(m.pesoKg)}</td></tr>
                             ))}
                           </tbody>
                         </table>
