@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle, Truck, Columns3, LayoutGrid, ArrowLeft, RotateCw, Flag, ListOrdered, Maximize, X, Plus, Trash2 } from "lucide-react";
+import DespachoPanel from "@/app/pcp/dashboard-prioridades/DespachoPanel";
 
 const AUTO_REFRESH_MS = 60_000;
 
@@ -90,6 +91,7 @@ function Hub({ setTela }) {
   const [agora, setAgora] = useState(() => new Date());
   const [fullscreen, setFullscreen] = useState(false);
   const [gerenciarOps, setGerenciarOps] = useState(false);
+  const [despOp, setDespOp] = useState(null); // OP aberta no painel de despacho
   const rootRef = useRef(null);
 
   const carregar = useCallback(async (silent = false) => {
@@ -176,11 +178,12 @@ function Hub({ setTela }) {
           <EmptyBox titulo="Nenhum cronograma ativo" texto="Crie/ative cronogramas em Planejamento → Cronogramas — as obras e etapas aparecem aqui automaticamente." />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {obras.map((o) => <ObraCard key={o.cronogramaId} obra={o} />)}
+            {obras.map((o) => <ObraCard key={o.cronogramaId} obra={o} onDespachar={() => setDespOp(o.opNumero)} />)}
           </div>
         )}
       </div>
       <GerenciarOpsManuais open={gerenciarOps} onClose={() => setGerenciarOps(false)} onChange={() => carregar(false)} />
+      {despOp && <DespachoPanel obra={String(despOp)} onClose={() => setDespOp(null)} />}
     </div>
   );
 }
@@ -441,9 +444,10 @@ function OpMini({ op }) {
   );
 }
 
-function ObraCard({ obra }) {
+function ObraCard({ obra, onDespachar }) {
   return (
-    <div className="bg-white rounded-xl border border-torg-blue-100 shadow-[0_1px_3px_rgba(0,41,69,0.06)] p-5 flex flex-col gap-3">
+    <div onClick={onDespachar} title="Clique para despachar as peças em aberto desta OP"
+      className="bg-white rounded-xl border border-torg-blue-100 shadow-[0_1px_3px_rgba(0,41,69,0.06)] p-5 flex flex-col gap-3 cursor-pointer hover:border-torg-blue-300 hover:shadow-md transition">
       <div className="flex items-start gap-2.5">
         <span className={`text-sm font-extrabold w-8 shrink-0 pt-0.5 ${obra.ordem === 1 ? "text-torg-orange" : "text-torg-gray-light"}`}>{obra.ordem}º</span>
         <div className="min-w-0 flex-1">
