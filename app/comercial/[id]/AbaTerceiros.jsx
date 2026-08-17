@@ -3,7 +3,7 @@
 // desta OP): o que foi, quando, quanto, data de retorno prevista, status e retornos. Lê
 // /api/expedicao/terceiros?opId=... (RomaneioTerceiro filtrado pela OP).
 import { useState, useEffect } from "react";
-import { Truck, Loader2, FileSpreadsheet, AlertCircle, PackageCheck, CalendarClock, ChevronRight, ChevronDown } from "lucide-react";
+import { Truck, Loader2, FileSpreadsheet, AlertCircle, PackageCheck, CalendarClock, ChevronRight, ChevronDown, ExternalLink } from "lucide-react";
 
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
@@ -92,6 +92,7 @@ export default function AbaTerceiros({ opId }) {
                   {r.pesoRetornadoKg > 0 && <span className="text-emerald-700">Retornado: {fmtKg(r.pesoRetornadoKg)}</span>}
                   {r.observacao && <span className="italic truncate max-w-[320px]">{r.observacao}</span>}
                   <a href={`/api/expedicao/terceiros/${r.id}/romaneio`} className="text-torg-blue hover:underline inline-flex items-center gap-1"><FileSpreadsheet size={12} /> Excel</a>
+                  {r.arquivoUrl && <a href={r.arquivoUrl} target="_blank" rel="noopener noreferrer" className="text-torg-gray hover:underline inline-flex items-center gap-1"><ExternalLink size={12} /> SharePoint</a>}
                 </div>
                 {op && (
                   <div className="px-4 pb-3 pt-1 border-t border-gray-50 overflow-x-auto">

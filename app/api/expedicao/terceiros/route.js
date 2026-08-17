@@ -5,10 +5,15 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { gerarRomaneioTerceiroExcel } from "@/lib/romaneio-terceiro-excel";
+import { uploadFileToFolder } from "@/lib/sharepoint";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ALMOXARIFADO"];
+// PCP/PLANEJAMENTO incluídos: o romaneio pode ser criado pelo painel de Liberar (despacho).
+const ROLES = ["ADMIN", "EXPEDICAO", "PRODUCAO", "COMERCIAL", "ALMOXARIFADO", "PCP", "PLANEJAMENTO"];
+// Pasta À PARTE dos romaneios de obra (que ficam em cada OP/4. Expedição/4.2 Romaneios).
+const PASTA_ROMANEIOS_TERCEIROS = "/Ordem de Servico/01. OP/Romaneios terceiros";
 
 const itemSchema = z.object({
   marca: z.string().min(1),
@@ -120,5 +125,19 @@ export async function POST(req) {
   if (!criado) return NextResponse.json({ error: "Não foi possível numerar o romaneio." }, { status: 409 });
 
   await prisma.auditLog.create({ data: { userId: user.id, action: "CRIAR_ROMANEIO_TERCEIRO", entity: "RomaneioTerceiro", entityId: criado.id, diff: { numero: criado.numero, terceiro: criado.terceiroNome, pesoEnviadoKg, itens: itens.length } } }).catch(() => {});
+
+  // Best-effort: sobe o Excel pra pasta "Romaneios terceiros" no SharePoint e grava o arquivoUrl.
+  // Não derruba a criação se o SharePoint falhar (mesma política dos outros backups ISO).
+  try {
+    const buf = await gerarRomaneioTerceiroExcel(criado);
+    const rt = `RT-${String(criado.numero).padStart(3, "0")}`;
+    const fileName = `Romaneio-Terceiro-${rt}${criado.opRefNumero ? `-OP-${criado.opRefNumero}` : ""}.xlsx`;
+    const up = await uploadFileToFolder({ folderPath: PASTA_ROMANEIOS_TERCEIROS, fileName, buffer: buf, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    if (up?.webUrl) {
+      await prisma.romaneioTerceiro.update({ where: { id: criado.id }, data: { arquivoUrl: up.webUrl } });
+      criado.arquivoUrl = up.webUrl;
+    }
+  } catch (e) { console.error("[terceiros] SharePoint upload:", e?.message); }
+
   return NextResponse.json({ success: true, romaneio: criado });
 }
