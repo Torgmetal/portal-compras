@@ -53,11 +53,14 @@ export async function GET(req) {
   if (!opId) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
-  const todas = await prisma.pecaConjunto.findMany({
+  const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
     select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
+  // Descarta linhas-lixo do import (ex.: a linha "TOTAL" da Lista de Expedição que entrou como peça).
+  const ehLixo = (p) => !p.marca || !String(p.marca).trim() || /^(total|soma|subtotal)\b/i.test(String(p.marca).trim());
+  const todas = todasRaw.filter((p) => !ehLixo(p));
   // ROTA da peça pelos setores (regra de domínio do Vitor):
   //   • CROQUI (sub-peça "P")            → só CORTE.
   //   • CONJUNTO COMPOSTO (tem croquis)  → Montagem→Expedição (o corte é dos croquis dele).
