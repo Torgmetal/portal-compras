@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { gerarRomaneioTerceiroExcel } from "@/lib/romaneio-terceiro-excel";
+import { gerarRomaneioTerceiroForm22 } from "@/lib/romaneio-terceiro-form22";
 import { uploadFileToFolder } from "@/lib/sharepoint";
 
 export const runtime = "nodejs";
@@ -126,10 +126,10 @@ export async function POST(req) {
 
   await prisma.auditLog.create({ data: { userId: user.id, action: "CRIAR_ROMANEIO_TERCEIRO", entity: "RomaneioTerceiro", entityId: criado.id, diff: { numero: criado.numero, terceiro: criado.terceiroNome, pesoEnviadoKg, itens: itens.length } } }).catch(() => {});
 
-  // Best-effort: sobe o Excel pra pasta "Romaneios terceiros" no SharePoint e grava o arquivoUrl.
-  // Não derruba a criação se o SharePoint falhar (mesma política dos outros backups ISO).
+  // Best-effort: sobe o Excel (FORM 22) pra pasta "Romaneios terceiros" no SharePoint e grava o
+  // arquivoUrl. Não derruba a criação se o SharePoint falhar; registra o erro no auditLog p/ rastreio.
   try {
-    const buf = await gerarRomaneioTerceiroExcel(criado);
+    const buf = await gerarRomaneioTerceiroForm22(criado);
     const rt = `RT-${String(criado.numero).padStart(3, "0")}`;
     const fileName = `Romaneio-Terceiro-${rt}${criado.opRefNumero ? `-OP-${criado.opRefNumero}` : ""}.xlsx`;
     const up = await uploadFileToFolder({ folderPath: PASTA_ROMANEIOS_TERCEIROS, fileName, buffer: buf, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -137,7 +137,10 @@ export async function POST(req) {
       await prisma.romaneioTerceiro.update({ where: { id: criado.id }, data: { arquivoUrl: up.webUrl } });
       criado.arquivoUrl = up.webUrl;
     }
-  } catch (e) { console.error("[terceiros] SharePoint upload:", e?.message); }
+  } catch (e) {
+    console.error("[terceiros] SharePoint upload:", e?.message);
+    await prisma.auditLog.create({ data: { userId: user.id, action: "ROMANEIO_TERCEIRO_SHAREPOINT_ERRO", entity: "RomaneioTerceiro", entityId: criado.id, diff: { erro: String(e?.message || e).slice(0, 300), pasta: PASTA_ROMANEIOS_TERCEIROS } } }).catch(() => {});
+  }
 
   return NextResponse.json({ success: true, romaneio: criado });
 }
