@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml, textoParaHtml } from "@/lib/html";
 import { gerarCronogramaPDF } from "@/lib/cronograma-pdf";
+import { aplicarAvancoSyneco } from "@/lib/cronograma-syneco";
 import { gerarCronogramaMSProjectXML } from "@/lib/cronograma-msproject-xml";
 import { CONTATOS_TAREFAS } from "@/lib/contatos-tarefas";
 import { z } from "zod";
@@ -88,6 +89,8 @@ export async function POST(req, { params }) {
 
   // Vão os DOIS anexos: o PDF (visão de Gantt, pra leitura) e o XML do MS
   // Project (MSPDI), que o cliente abre no Project dele pra validar/comparar.
+  // Mesmo avanço do Syneco que a tela mostra, nos DOIS anexos (senão saem com o % defasado).
+  c.tarefas = await aplicarAvancoSyneco(prisma, c.op?.id, c.op?.numero, c.tarefas);
   let pdf, xml;
   try { pdf = await gerarCronogramaPDF(c, c.tarefas); }
   catch (e) { return NextResponse.json({ error: "Falha ao gerar o PDF: " + (e?.message || "erro") }, { status: 500 }); }
