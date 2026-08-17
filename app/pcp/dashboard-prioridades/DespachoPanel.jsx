@@ -23,14 +23,14 @@ const SETOR_LABEL = { CORTE: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda
 const tipoLabel = (t) => (t === "CONJUNTO" ? "conjunto" : t === "CROQUI" ? "croqui" : null);
 const statusLabel = (p) => (p.destino ? ROTULO[p.destino] || p.destino : p.status === "PENDENTE" ? "Em aberto" : p.status);
 
-export default function DespachoPanel({ obra, setor, onClose }) {
+export default function DespachoPanel({ obra, setor, onClose, abaInicial = "despacho" }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [sel, setSel] = useState(() => new Set());
   const [enviando, setEnviando] = useState(false);
   const [terceiroVolta, setTerceiroVolta] = useState("MONTAGEM");
-  const [aba, setAba] = useState("despacho"); // "despacho" | "baixa"
+  const [aba, setAba] = useState(setor ? abaInicial : "despacho"); // "despacho" | "baixa"
   const [filtro, setFiltro] = useState("");
   const podeBaixa = !!setor;
 

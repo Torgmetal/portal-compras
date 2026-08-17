@@ -1,6 +1,10 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Factory, Search, Loader2, AlertCircle, X, CheckCircle2, FileSpreadsheet } from "lucide-react";
+import { Factory, Search, Loader2, AlertCircle, X, CheckCircle2, FileSpreadsheet, CheckSquare } from "lucide-react";
+import DespachoPanel from "@/app/pcp/dashboard-prioridades/DespachoPanel";
+
+// Setores que dão baixa (rótulo de exibição; CORTE = Preparação).
+const SETOR_OPTS = [["CORTE", "Preparação"], ["MONTAGEM", "Montagem"], ["SOLDA", "Solda"], ["ACABAMENTO", "Acabamento"], ["JATO", "Jato"], ["PINTURA", "Pintura"], ["EXPEDICAO", "Expedição"]];
 
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -29,6 +33,8 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
   const [etapa, setEtapa] = useState("");
   const [fase, setFase] = useState("");
   const [exportando, setExportando] = useState(false);
+  const [baixaSetor, setBaixaSetor] = useState("CORTE");
+  const [abrirBaixa, setAbrirBaixa] = useState(false);
 
   useEffect(() => {
     setDados(null); setErro("");
@@ -106,11 +112,19 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
         <h3 className="text-lg font-semibold text-torg-dark flex items-center gap-2"><Factory size={18} className="text-torg-blue" /> Produção</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Baixa de peças (portal) + export com coluna Syneco, por setor — reusa o painel da TV */}
+          <div className="inline-flex items-center rounded-lg border border-gray-300 overflow-hidden">
+            <select value={baixaSetor} onChange={(e) => setBaixaSetor(e.target.value)} className="text-xs px-2 py-1.5 bg-white border-r border-gray-200 outline-none" title="Setor da baixa">
+              {SETOR_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            <button onClick={() => setAbrirBaixa(true)} className="text-xs text-torg-blue px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-blue-50"><CheckSquare size={13} /> Baixa de peças</button>
+          </div>
           <button onClick={exportarFaltantes} disabled={exportando || !pecas.length} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Faltantes por setor</button>
           <button onClick={exportar} disabled={exportando || !pecas.length} className="text-xs text-torg-gray border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1 hover:bg-gray-50 disabled:opacity-40">{exportando ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Exportar</button>
         </div>
       </div>
+      {abrirBaixa && <DespachoPanel obra={String(opNumero)} setor={baixaSetor} abaInicial="baixa" onClose={() => setAbrirBaixa(false)} />}
       <p className="text-sm text-torg-gray mb-4">Status de cada peça da Lista de Expedição. A etapa vem do <strong>setor mais avançado com apontamento no Syneco</strong> — não do status cadastrado.</p>
 
       {erro && <p className="text-xs text-red-600 mb-2 inline-flex items-center gap-1"><AlertCircle size={13} /> {erro}</p>}
