@@ -17,7 +17,7 @@ const ROTULO = { ABERTO: "Em aberto", PRIORIDADE: "Prioridade", TERCEIRO: "Terce
 // Só rotula o tipo quando a LPC marcou (CONJUNTO/CROQUI); null (ex.: guarda-corpo não tipado) NÃO vira "croqui".
 const tipoLabel = (t) => (t === "CONJUNTO" ? "conjunto" : t === "CROQUI" ? "croqui" : null);
 
-export default function DespachoPanel({ obra, onClose }) {
+export default function DespachoPanel({ obra, setor, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -28,12 +28,12 @@ export default function DespachoPanel({ obra, onClose }) {
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
     try {
-      const r = await fetch(`/api/pcp/despacho?obra=${encodeURIComponent(obra)}`);
+      const r = await fetch(`/api/pcp/despacho?obra=${encodeURIComponent(obra)}${setor ? `&setor=${setor}` : ""}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
       setData(j); setSel(new Set());
     } catch (e) { setErro(e.message); } finally { setLoading(false); }
-  }, [obra]);
+  }, [obra, setor]);
   useEffect(() => { carregar(); }, [carregar]);
 
   const abertas = (data?.pecas || []).filter((p) => !p.destino && p.status === "PENDENTE");
@@ -59,7 +59,7 @@ export default function DespachoPanel({ obra, onClose }) {
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold">{obra} · despacho de peças</h2>
-            {data && <p className="text-[12px] text-torg-gray">{data.placar.ABERTO} em aberto · {data.total} peça(s) no total</p>}
+            {data && <p className="text-[12px] text-torg-gray">{data.placar.ABERTO} em aberto · {data.total} peça(s){setor === "CORTE" ? " no corte (sub-peças P + conjuntos solo)" : " no total"}</p>}
           </div>
           <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={20} /></button>
         </div>

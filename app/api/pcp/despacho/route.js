@@ -46,17 +46,23 @@ export async function GET(req) {
   }
   if (!opId) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 
-  const pecas = await prisma.pecaConjunto.findMany({
+  const setor = url.searchParams.get("setor"); // opcional: escopo do setor (CORTE filtra p/ corte)
+  const todas = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, descricao: true, tipoPeca: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true },
+    select: { id: true, marca: true, descricao: true, tipoPeca: true, pesoTotalKg: true, qte: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
-  // EM ABERTO = ainda não despachada e ainda no fluxo (PENDENTE), pra aparecer no painel de despacho.
+  // Escopo do CORTE (Preparação): só quem PASSA pelo corte = croquis (sub-peças "P") + peças SOLO
+  // (conjunto SEM sub-croquis, vai direto Corte→Acabamento). Conjunto COMPOSTO (tem croquis) NÃO
+  // passa pelo corte — quem passa são os croquis dele. (Regra do Vitor.)
+  const passaNoCorte = (p) => p.tipoPeca === "CROQUI" || (p._count?.conjuntoCroquis || 0) === 0;
+  const pecas = setor === "CORTE" ? todas.filter(passaNoCorte) : todas;
+
   const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");
   const placar = { ABERTO: emAberto.length, PRIORIDADE: 0, TERCEIRO: 0, REVISAO: 0, AGUARDANDO_MATERIAL: 0, CANCELADA: 0 };
   for (const p of pecas) if (p.destino && placar[p.destino] != null) placar[p.destino]++;
 
-  return NextResponse.json({ opId, total: pecas.length, placar, pecas });
+  return NextResponse.json({ opId, setor: setor || null, total: pecas.length, placar, pecas });
 }
 
 export async function POST(req) {

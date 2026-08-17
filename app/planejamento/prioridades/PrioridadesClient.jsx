@@ -296,7 +296,7 @@ function TelaSetorUnico({ tela, setTela }) {
           </div>
         )}
       </div>
-      {despOp && <DespachoPanel obra={String(despOp)} onClose={() => setDespOp(null)} />}
+      {despOp && <DespachoPanel obra={String(despOp)} setor={setorAtual.key} onClose={() => setDespOp(null)} />}
     </div>
   );
 }
