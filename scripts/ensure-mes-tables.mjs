@@ -189,6 +189,15 @@ async function main() {
   await prisma.$executeRawUnsafe(`ALTER TABLE "AuditoriaDoc" ADD COLUMN IF NOT EXISTS "comentario" TEXT`);
   console.log("[ensure-mes-tables] OK — colunas de relatório/publicação da Auditoria garantidas.");
 
+  // PecaConjunto: despacho no fluxo do PCP (TV de prioridades). Idempotente.
+  for (const c of [
+    `ADD COLUMN IF NOT EXISTS "destino" TEXT`,
+    `ADD COLUMN IF NOT EXISTS "destinoEm" TIMESTAMP(3)`,
+    `ADD COLUMN IF NOT EXISTS "destinoPor" TEXT`,
+    `ADD COLUMN IF NOT EXISTS "destinoObs" TEXT`,
+  ]) await prisma.$executeRawUnsafe(`ALTER TABLE "PecaConjunto" ${c}`);
+  console.log("[ensure-mes-tables] OK — PecaConjunto.destino* garantidas.");
+
   // Verifica quais das duas tabelas existem
   const existentes = await prisma.$queryRawUnsafe(`
     SELECT tablename

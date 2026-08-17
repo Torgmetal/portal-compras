@@ -2297,6 +2297,14 @@ model PecaConjunto {
   // espera (status TERCEIRIZADO) até o Compras receber, então é liberada pro destino.
   terceirizado           Boolean                 @default(false)
   destinoTerceirizado    String? // "MONTAGEM" | "PINTURA" | "EXPEDICAO"
+  // Despacho no fluxo do PCP (TV de prioridades): rota da peça EM ABERTO. null = em aberto (não
+  // despachada); PRIORIDADE (fila de desenho/corte) | TERCEIRO (vai pra /pcp/terceirizados) |
+  // REVISAO (volta p/ engenharia) | AGUARDANDO_MATERIAL | CANCELADA. "Liberado p/ montagem" é
+  // computado (conjunto montável = todos os croquis cortados), não fica gravado aqui.
+  destino                String? // PRIORIDADE | TERCEIRO | REVISAO | AGUARDANDO_MATERIAL | CANCELADA
+  destinoEm              DateTime?
+  destinoPor             String?
+  destinoObs             String?
   terceirizadoRecebidoEm DateTime?
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.
