@@ -327,6 +327,9 @@ function LinhaOp({ op, onDespachar }) {
   const prio = op.prioritarias || [];
   const seq = (op.sequencia || []).slice(0, 4);
   const restam = (op.qtdPecas - op.qtdPrioritarias) - seq.length;
+  // Montagem: conjuntos que ainda AGUARDAM CORTE (croquis não cortados) — contam no % mas não dá
+  // pra montar agora. Os "montáveis" (prontos) vêm primeiro na fila.
+  const aguardando = [...prio, ...(op.sequencia || [])].filter((p) => p.montavel === false).length;
   return (
     <div onClick={onDespachar} title="Liberar peças em aberto desta OP" className={`rounded-xl px-5 py-4 shadow-[0_1px_3px_rgba(0,41,69,0.07)] cursor-pointer hover:shadow-md transition ${semProg ? "bg-amber-50 border border-amber-200" : "bg-white"}`}>
       <div className="flex items-center gap-5 flex-wrap">
@@ -364,9 +367,12 @@ function LinhaOp({ op, onDespachar }) {
             <span className="inline-flex items-center gap-1.5 flex-wrap text-torg-gray">
               <ListOrdered size={13} className="text-torg-gray-light" />
               <span className="uppercase text-[11px] tracking-wide text-torg-gray-light">Próximas:</span>
-              {seq.map((p, i) => <span key={i} className="tabular-nums">{p.marca}</span>)}
+              {seq.map((p, i) => <span key={i} className={`tabular-nums ${p.montavel === false ? "text-amber-600" : ""}`}>{p.marca}</span>)}
               {restam > 0 && <span className="text-torg-gray-light">+{restam} peças</span>}
             </span>
+          )}
+          {aguardando > 0 && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 font-medium"><CalendarClock size={11} /> {aguardando} aguardando corte</span>
           )}
         </div>
       )}
