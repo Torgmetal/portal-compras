@@ -57,7 +57,7 @@ export async function GET(req) {
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
   const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
   // Descarta linhas-lixo do import (ex.: a linha "TOTAL" da Lista de Expedição que entrou como peça)
@@ -102,6 +102,40 @@ export async function GET(req) {
       for (const s of syn) if (s.item) synecoQtd.set(s.item, Math.round(s._sum?.produzidoUn || 0));
     } catch {}
   }
+  // MONTAGEM — "pronto para montar" vs "pendente": um conjunto está pronto quando TODOS os croquis
+  // dele já foram cortados (baixa no corte / produção no Syneco / corte concluído). Devolve também
+  // a lista dos que faltam, pra poder clicar no conjunto e ver quais peças estão faltando.
+  let prontoInfo = null;
+  if (setor === "MONTAGEM") {
+    const links = await prisma.conjuntoCroqui.findMany({
+      where: { conjunto: { opId } },
+      select: { conjunto: { select: { marca: true } }, croqui: { select: { marca: true } } },
+    });
+    const synCorte = new Map(); // croqui marca → un cortadas no Syneco
+    try {
+      const sc = await prisma.mesOrdem.groupBy({ by: ["item"], where: { AND: [{ opId }, whereSetorSyneco("CORTE"), { produzidoUn: { gt: 0 } }] }, _sum: { produzidoUn: true } });
+      for (const s of sc) if (s.item) synCorte.set(s.item, Math.round(s._sum?.produzidoUn || 0));
+    } catch {}
+    const croquiMap = new Map();
+    for (const p of todas) if (ehCroqui(p)) croquiMap.set(p.marca, p);
+    const croquiCortado = (cr) => {
+      if (!cr) return false;
+      const q = Number(cr.qte) || 1;
+      if (cr.corteConcluidoEm || (Number(cr.qteProduzida) || 0) >= q) return true;
+      const bxC = cr.baixaSetores && typeof cr.baixaSetores === "object" ? cr.baixaSetores.CORTE : null;
+      const baixaCorte = bxC ? (bxC.qtd != null ? Number(bxC.qtd) : q) : 0;
+      return baixaCorte >= q || (synCorte.get(cr.marca) || 0) >= q;
+    };
+    const porConj = new Map();
+    for (const lk of links) { const a = porConj.get(lk.conjunto.marca) || []; a.push(lk.croqui.marca); porConj.set(lk.conjunto.marca, a); }
+    prontoInfo = new Map();
+    for (const [conj, croquis] of porConj) {
+      const faltam = [];
+      for (const cm of croquis) { const cr = croquiMap.get(cm); if (!croquiCortado(cr)) faltam.push({ marca: cm, descricao: cr?.descricao || null }); }
+      prontoInfo.set(conj, { prontoMontar: faltam.length === 0, faltamCroquis: faltam, totalCroquis: croquis.length });
+    }
+  }
+
   const pecas = escopo.map((p) => {
     const bx = p.baixaSetores && typeof p.baixaSetores === "object" ? p.baixaSetores : {};
     const reg = setor ? bx[setor] : null;
@@ -110,7 +144,10 @@ export async function GET(req) {
     const baixadoPortal = baixadoQtd > 0;
     const produzidoSyneco = setor ? (synecoQtd.get(p.marca) || 0) : null;
     const precisaSyneco = setor ? baixadoPortal && produzidoSyneco < baixadoQtd : null; // portal à frente do Syneco
-    return { ...p, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco };
+    // Montagem: só conjuntos COM croquis têm status pronto/pendente; sem croquis (ex.: GC) = null (sem chip).
+    const info = prontoInfo ? prontoInfo.get(p.marca) : null;
+    const mont = prontoInfo ? (info || { prontoMontar: null, faltamCroquis: [], totalCroquis: 0 }) : null;
+    return { ...p, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
   const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");

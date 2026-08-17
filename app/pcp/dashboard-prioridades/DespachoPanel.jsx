@@ -7,8 +7,8 @@
 //                     produzida no Syneco, peso unitário e peso total (extremo sincronismo).
 // Baixa é SÓ do portal (PecaConjunto.baixaSetores[setor] = { qtd, em, por }); não escreve no Syneco.
 // Reusa /api/pcp/despacho (GET peças+placar+reconciliação, POST despacha / dá baixa por qtd).
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
+import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Scissors } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
 
 const DESTINOS = [
@@ -34,7 +34,9 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [terceiroVolta, setTerceiroVolta] = useState("MONTAGEM");
   const [aba, setAba] = useState(setor ? abaInicial : "despacho"); // "despacho"(Liberar) | "prontas"
   const [filtro, setFiltro] = useState("");
+  const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis faltantes)
   const podeBaixa = !!setor;
+  const toggleExpand = (id) => setExpandido((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro("");
@@ -232,11 +234,26 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {visLimit.map((p) => (
-                  <tr key={p.id} className={`hover:bg-gray-50 cursor-pointer ${sel.has(p.id) ? "bg-blue-50/50" : ""}`} onClick={() => toggle(p.id)}>
+                {visLimit.map((p) => {
+                  const temFalta = Array.isArray(p.faltamCroquis) && p.faltamCroquis.length > 0;
+                  const aberto = expandido.has(p.id);
+                  return (
+                  <Fragment key={p.id}>
+                  <tr className={`hover:bg-gray-50 cursor-pointer ${sel.has(p.id) ? "bg-blue-50/50" : ""}`} onClick={() => toggle(p.id)}>
                     <td className="px-2 py-1.5"><input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} onClick={(e) => e.stopPropagation()} /></td>
                     <td className={`${td} font-mono font-semibold whitespace-nowrap`}>{p.marca}</td>
-                    <td className={`${td} text-torg-gray max-w-[280px] truncate`} title={p.descricao || ""}>{p.descricao || "—"}</td>
+                    <td className={td}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-torg-gray max-w-[240px] truncate" title={p.descricao || ""}>{p.descricao || "—"}</span>
+                        {p.prontoMontar === true && <span className="shrink-0 text-emerald-700 bg-emerald-50 text-[10px] rounded px-1.5 py-0.5 inline-flex items-center gap-0.5"><CheckCircle2 size={10} /> pronto p/ montar</span>}
+                        {p.prontoMontar === false && temFalta && (
+                          <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(p.id); }} title="Ver as peças que faltam cortar"
+                            className="shrink-0 text-amber-700 bg-amber-50 hover:bg-amber-100 text-[10px] rounded px-1.5 py-0.5 inline-flex items-center gap-0.5 font-medium">
+                            <Scissors size={10} /> falta {p.faltamCroquis.length} {aberto ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td className={`${td} text-right tabular-nums`}>{fmtN(p.qte)}</td>
                     <td className={`${td} text-right tabular-nums ${p.baixadoQtd ? "text-emerald-700 font-semibold" : "text-gray-300"}`}>{p.baixadoQtd ? fmtN(p.baixadoQtd) : "—"}</td>
                     <td className={`${td} text-right tabular-nums text-torg-gray`}>{p.produzidoSyneco ? fmtN(p.produzidoSyneco) : "—"}</td>
@@ -250,7 +267,21 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                         : <span className="text-gray-300">—</span>}
                     </td>
                   </tr>
-                ))}
+                  {aberto && temFalta && (
+                    <tr className="bg-amber-50/40">
+                      <td></td>
+                      <td colSpan={8} className="px-2.5 pb-2.5 pt-0.5">
+                        <div className="text-[11px] text-torg-dark"><b className="text-amber-700">Faltam cortar ({p.faltamCroquis.length}):</b>{" "}
+                          {p.faltamCroquis.map((c, i) => (
+                            <span key={i} className="inline-block mr-2"><span className="font-mono font-semibold">{c.marca}</span>{c.descricao ? <span className="text-torg-gray"> · {c.descricao}</span> : ""}</span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           )}
