@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
+import TerceiroModal from "./TerceiroModal";
 
 const DESTINOS = [
   { key: "PRIORIDADE", label: "Prioridade", icon: Star, cor: "bg-amber-500 hover:bg-amber-600", desc: "libera p/ desenho e corte" },
@@ -35,6 +36,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [aba, setAba] = useState(setor ? abaInicial : "despacho"); // "despacho"(Liberar) | "prontas"
   const [filtro, setFiltro] = useState("");
   const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis faltantes)
+  const [terceiroPecas, setTerceiroPecas] = useState(null); // peças abertas no modal de terceiro
   const podeBaixa = !!setor;
   const toggleExpand = (id) => setExpandido((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -85,9 +87,13 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   async function despachar(destino) {
     const ids = emAbertoSel();
     if (!ids.length) return alert("Selecione peças em aberto (sem destino) para destinar.");
-    const body = { ids, destino };
-    if (destino === "TERCEIRO") body.destinoTerceirizado = terceiroVolta;
-    await post(body);
+    await post({ ids, destino });
+  }
+  // Terceiro abre um modal (escolher fornecedor + retorno + gerar romaneio) em vez de despachar direto.
+  function abrirTerceiro() {
+    const alvo = (data?.pecas || []).filter((p) => sel.has(p.id));
+    if (!alvo.length) return alert("Selecione as peças para enviar ao terceiro.");
+    setTerceiroPecas(alvo);
   }
   async function baixar() {
     const alvo = pendentes.filter((p) => sel.has(p.id));
@@ -177,6 +183,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const td = "px-2.5 py-1.5";
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3" onClick={onClose}>
       <div className="bg-white text-torg-dark rounded-2xl w-full max-w-6xl max-h-[92vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Cabeçalho */}
@@ -310,11 +317,8 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
               )}
               <span className="w-px h-6 bg-gray-200 mx-1" />
               <span className="text-[11px] text-torg-gray">Destinar em aberto:</span>
-              <select value={terceiroVolta} onChange={(e) => setTerceiroVolta(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1 text-[11px]" title="Volta do terceiro">
-                {VOLTA.map((v) => <option key={v} value={v}>{v[0] + v.slice(1).toLowerCase()}</option>)}
-              </select>
               {DESTINOS.map((d) => (
-                <button key={d.key} onClick={() => despachar(d.key)} disabled={!sel.size || enviando} title={d.desc}
+                <button key={d.key} onClick={() => (d.key === "TERCEIRO" ? abrirTerceiro() : despachar(d.key))} disabled={!sel.size || enviando} title={d.key === "TERCEIRO" ? "Escolher fornecedor + setor de retorno e gerar o romaneio do terceiro" : d.desc}
                   className={`text-[11px] font-semibold text-white rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 ${d.cor}`}><d.icon size={12} /> {d.label}</button>
               ))}
             </div>
@@ -323,5 +327,11 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
         )}
       </div>
     </div>
+    {terceiroPecas && (
+      <TerceiroModal obra={obra} opId={data?.opId} setor={setor} pecas={terceiroPecas}
+        onClose={() => setTerceiroPecas(null)}
+        onDone={() => { setTerceiroPecas(null); setSel(new Set()); carregar(); }} />
+    )}
+    </>
   );
 }

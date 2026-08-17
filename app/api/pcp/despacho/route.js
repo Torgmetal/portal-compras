@@ -241,13 +241,15 @@ export async function POST(req) {
     atualizados = r.count;
   } else if (destino === "TERCEIRO") {
     if (!destinoTerceirizado) return NextResponse.json({ error: "Informe a volta do terceiro (Montagem/Pintura/Expedição)." }, { status: 400 });
-    // Só peças que ainda não avançaram podem virar terceirizadas (não passam pelo corte).
+    // Pode mandar pra terceiro de qualquer etapa (Corte, Montagem, …) — só não o que já foi expedido.
+    // Tira da fila de corte (queue/máquina), mas PRESERVA o corte concluído (senão quebra o
+    // "pronto para montar" dos conjuntos já cortados que vão pra terceiro montar/tratar).
     const r = await prisma.pecaConjunto.updateMany({
-      where: { id: { in: ids }, status: { in: ["PENDENTE", "CORTE"] } },
+      where: { id: { in: ids }, status: { not: "EXPEDIDO" } },
       data: {
         ...marca, destino: "TERCEIRO",
         terceirizado: true, destinoTerceirizado, terceirizadoRecebidoEm: null, status: "TERCEIRIZADO", maquina: null,
-        corteOrdem: null, corteDataMetaInicio: null, corteDataMetaFim: null, corteIniciadoEm: null, corteConcluidoEm: null,
+        corteOrdem: null, corteDataMetaInicio: null, corteDataMetaFim: null,
       },
     });
     atualizados = r.count;
