@@ -6,7 +6,7 @@
 //                 dar baixa no Syneco = tem baixa no portal, mas o Syneco ainda não tem produção).
 // Reusa /api/pcp/despacho (GET peças+placar+reconciliação, POST despacha / dá baixa).
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, CheckCircle2, Undo2 } from "lucide-react";
+import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2 } from "lucide-react";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, downloadWorkbook, CORES } from "@/lib/excel-relatorio";
 
 const DESTINOS = [
@@ -80,6 +80,52 @@ export default function DespachoPanel({ obra, setor, onClose }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
       await carregar();
+    } catch (e) { alert(e.message); } finally { setEnviando(false); }
+  }
+
+  // Baixa em massa por planilha: lê a coluna "Peça"/"Marca" (e, se houver, uma coluna
+  // "Baixa" S/N/X), casa a marca com as peças desta OP+setor e dá baixa no portal.
+  async function importar(file) {
+    if (!file || !setor) return;
+    setEnviando(true);
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer());
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const grid = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" });
+      // Acha a linha de cabeçalho (Torg tem logo/título antes) e as colunas.
+      let hRow = -1, cMarca = -1, cBaixa = -1;
+      for (let r = 0; r < grid.length && hRow < 0; r++) {
+        const row = (grid[r] || []).map((x) => String(x).trim().toLowerCase());
+        const jm = row.findIndex((x) => x === "peça" || x === "peca" || x === "marca");
+        if (jm >= 0) { hRow = r; cMarca = jm; cBaixa = row.findIndex((x) => x.includes("baixa")); }
+      }
+      if (hRow < 0) throw new Error('Não achei a coluna "Peça"/"Marca" na planilha.');
+      const truthy = (v) => ["s", "sim", "x", "1", "true", "ok", "concluido", "concluído"].includes(String(v).trim().toLowerCase());
+      const marcas = [];
+      for (let r = hRow + 1; r < grid.length; r++) {
+        const m = String(grid[r]?.[cMarca] ?? "").trim();
+        if (!m) continue;
+        if (cBaixa >= 0 && !truthy(grid[r]?.[cBaixa])) continue; // com coluna Baixa → só as marcadas
+        marcas.push(m);
+      }
+      if (!marcas.length) throw new Error("Nenhuma peça para dar baixa na planilha.");
+      const idx = new Map();
+      for (const p of data?.pecas || []) idx.set(String(p.marca).trim().toUpperCase(), p.id);
+      const ids = [], vistos = new Set(), naoAchou = [];
+      for (const m of marcas) {
+        const id = idx.get(m.toUpperCase());
+        if (id) { if (!vistos.has(id)) { ids.push(id); vistos.add(id); } }
+        else naoAchou.push(m);
+      }
+      if (!ids.length) throw new Error(`Nenhuma das ${marcas.length} marca(s) bate com peças desta OP/setor.`);
+      const aviso = naoAchou.length ? `\n\n${naoAchou.length} não encontrada(s) na OP: ${naoAchou.slice(0, 8).join(", ")}${naoAchou.length > 8 ? "…" : ""}` : "";
+      if (!confirm(`Dar baixa em ${ids.length} peça(s) de ${SETOR_LABEL[setor] || setor}?${aviso}`)) { setEnviando(false); return; }
+      const r = await fetch("/api/pcp/despacho", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, baixaSetor: setor }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Erro");
+      await carregar();
+      alert(`Baixa aplicada em ${j.atualizados} peça(s).${naoAchou.length ? ` ${naoAchou.length} não encontradas.` : ""}`);
     } catch (e) { alert(e.message); } finally { setEnviando(false); }
   }
 
@@ -236,6 +282,11 @@ export default function DespachoPanel({ obra, setor, onClose }) {
                 className="text-[12px] font-semibold text-torg-dark rounded-lg px-3 py-2 inline-flex items-center gap-1.5 disabled:opacity-40 bg-gray-100 hover:bg-gray-200">
                 <Undo2 size={13} /> Reverter baixa
               </button>
+              <label className={`text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-3 py-2 inline-flex items-center gap-1.5 ${enviando ? "opacity-40 pointer-events-none" : "hover:bg-blue-50 cursor-pointer"}`} title="Dá baixa em massa a partir de uma planilha (coluna Peça/Marca)">
+                <FileUp size={13} /> Importar planilha
+                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={enviando}
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importar(f); }} />
+              </label>
             </div>
             <p className="text-[11px] text-torg-gray">{sel.size} selecionada(s) · a baixa é só no portal. A coluna <b>Syneco</b> do export mostra o que ainda precisa dar baixa no Syneco.</p>
           </div>
