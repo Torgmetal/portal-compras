@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import DespachoPanel from "./DespachoPanel";
 import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, Trophy, CalendarClock, Package, Target, CheckCircle2, Inbox } from "lucide-react";
 
 const AUTO_REFRESH_MS = 60_000;
@@ -19,6 +20,7 @@ const numBR = (n) => Number(n || 0).toLocaleString("pt-BR");
 
 export default function DashboardPrioridadesClient() {
   const [dados, setDados] = useState(null);
+  const [despacho, setDespacho] = useState(null); // obra aberta no painel de despacho
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [agora, setAgora] = useState(() => new Date());
@@ -109,16 +111,18 @@ export default function DashboardPrioridadesClient() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {obras.map((o) => <ObraCard key={o.obra} obra={o} />)}
+          {obras.map((o) => <ObraCard key={o.obra} obra={o} onAbrir={() => setDespacho(o.obra)} />)}
         </div>
       )}
+      {despacho && <DespachoPanel obra={despacho} onClose={() => setDespacho(null)} />}
     </div>
   );
 }
 
-function ObraCard({ obra }) {
+function ObraCard({ obra, onAbrir }) {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col gap-4">
+    <div onClick={onAbrir} title="Clique para despachar as peças desta OP"
+      className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col gap-4 hover:bg-white/10 hover:border-amber-300/40 transition cursor-pointer">
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold text-torg-dark bg-amber-300 rounded-full w-7 h-7 flex items-center justify-center shrink-0" title={`${obra.melhorOrdem}ª prioridade`}>{obra.melhorOrdem}º</span>
         <h2 className="text-2xl font-extrabold tracking-tight truncate" title={obra.obra}>{obra.obra}</h2>

@@ -31,8 +31,20 @@ export async function GET(req) {
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
-  const opId = new URL(req.url).searchParams.get("opId");
-  if (!opId) return NextResponse.json({ error: "opId obrigatório" }, { status: 400 });
+  const url = new URL(req.url);
+  let opId = url.searchParams.get("opId");
+  const obra = url.searchParams.get("obra");
+  // O dashboard é por NOME de obra ("T64", "OP-67"); resolve pro opId pelo número da OP.
+  if (!opId && obra) {
+    const num = String(obra).match(/\d+/)?.[0];
+    if (num) {
+      const n = parseInt(num, 10);
+      const cands = [String(n), String(n).padStart(3, "0"), String(n).padStart(4, "0"), `OP-${n}`, `T${n}`];
+      const op = await prisma.oP.findFirst({ where: { numero: { in: cands } }, select: { id: true } });
+      opId = op?.id || null;
+    }
+  }
+  if (!opId) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
 
   const pecas = await prisma.pecaConjunto.findMany({
     where: { opId },
