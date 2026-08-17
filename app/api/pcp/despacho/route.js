@@ -11,6 +11,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { whereSetorSyneco } from "@/lib/syneco-dia";
+import { ehItemComprado } from "@/lib/item-comprado";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -59,9 +60,12 @@ export async function GET(req) {
     select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
-  // Descarta linhas-lixo do import (ex.: a linha "TOTAL" da Lista de Expedição que entrou como peça).
+  // Descarta linhas-lixo do import (ex.: a linha "TOTAL" da Lista de Expedição que entrou como peça)
+  // e os ITENS COMPRADOS (parafuso/porca/arruela/chumbador/telha/calha/… sem estrutura de
+  // fabricação) — não são feitos por nós, não entram no fluxo de produção. (Regra do Vitor; eles
+  // seguem valendo em Engenharia/Compras/Planejamento/Expedição, a LE tem 100% dos itens.)
   const ehLixo = (p) => !p.marca || !String(p.marca).trim() || /^(total|soma|subtotal)\b/i.test(String(p.marca).trim());
-  const todas = todasRaw.filter((p) => !ehLixo(p));
+  const todas = todasRaw.filter((p) => !ehLixo(p) && !ehItemComprado(p));
   // ROTA da peça pelos setores (regra de domínio do Vitor):
   //   • CROQUI (sub-peça "P")            → só CORTE.
   //   • CONJUNTO COMPOSTO (tem croquis)  → Montagem→Expedição (o corte é dos croquis dele).
