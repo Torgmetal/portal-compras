@@ -3,7 +3,7 @@
 // Lista as peças EM ABERTO da OP e destina (uma ou várias): Prioridade / Terceiro / Revisão /
 // Aguardando material / Cancelar. Reusa /api/pcp/despacho (GET peças + placar, POST despacha).
 import { useState, useEffect, useCallback } from "react";
-import { X, Loader2, Star, Truck, RotateCcw, Ban, Package } from "lucide-react";
+import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown } from "lucide-react";
 
 const DESTINOS = [
   { key: "PRIORIDADE", label: "Prioridade", icon: Star, cor: "bg-amber-500 hover:bg-amber-600", desc: "libera p/ desenho e corte" },
@@ -53,6 +53,19 @@ export default function DespachoPanel({ obra, setor, onClose }) {
     } catch (e) { alert(e.message); } finally { setEnviando(false); }
   }
 
+  async function exportar() {
+    const XLSX = await import("xlsx");
+    const rows = (data?.pecas || []).map((p) => ({
+      Marca: p.marca, "Descrição": p.descricao || "", Tipo: p.tipoPeca || "", Qtd: p.qte ?? "",
+      "Peso (kg)": p.pesoTotalKg ? Math.round(p.pesoTotalKg) : "", Setor: setor || "", "Baixa (Sim/qtd)": "",
+    }));
+    const linhas = rows.length ? rows : [{ Marca: "", "Descrição": "", Tipo: "", Qtd: "", "Peso (kg)": "", Setor: setor || "", "Baixa (Sim/qtd)": "" }];
+    const ws = XLSX.utils.json_to_sheet(linhas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Baixa");
+    XLSX.writeFile(wb, `baixa-${obra}${setor ? "-" + setor : ""}.xlsx`);
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div className="bg-white text-torg-dark rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -61,7 +74,10 @@ export default function DespachoPanel({ obra, setor, onClose }) {
             <h2 className="text-lg font-bold">{obra} · despacho de peças</h2>
             {data && <p className="text-[12px] text-torg-gray">{data.placar.ABERTO} em aberto · {data.total} peça(s){setor === "CORTE" ? " no corte (sub-peças P + conjuntos solo)" : " no total"}</p>}
           </div>
-          <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={20} /></button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={exportar} disabled={!data} title="Exportar as peças (modelo de baixa)" className="text-[12px] font-semibold text-torg-blue border border-torg-blue-100 rounded-lg px-2.5 py-1 hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1"><FileDown size={13} /> Exportar</button>
+            <button onClick={onClose} className="text-torg-gray hover:text-red-600"><X size={20} /></button>
+          </div>
         </div>
 
         {data && (
