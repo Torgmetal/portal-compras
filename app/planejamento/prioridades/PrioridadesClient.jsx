@@ -194,6 +194,7 @@ const ROTATE_MS = 20_000;
 function TelaSetorUnico({ tela, setTela }) {
   const girar = tela === "girar";
   const [rotIdx, setRotIdx] = useState(0);
+  const [despOp, setDespOp] = useState(null); // OP aberta no painel de despacho
   const setorAtual = girar ? SETORES[rotIdx % SETORES.length] : SETORES.find((s) => s.slug === tela) || SETORES[0];
   const slug = setorAtual.slug;
 
@@ -291,21 +292,22 @@ function TelaSetorUnico({ tela, setTela }) {
           <EmptyBox titulo={`Nada pendente em ${setorAtual.label}`} texto="Nenhuma OP com peça pendente nesse setor agora." />
         ) : (
           <div className="flex flex-col gap-3">
-            {ops.map((op) => <LinhaOp key={op.opNumero} op={op} />)}
+            {ops.map((op) => <LinhaOp key={op.opNumero} op={op} onDespachar={() => setDespOp(op.opNumero)} />)}
           </div>
         )}
       </div>
+      {despOp && <DespachoPanel obra={String(despOp)} onClose={() => setDespOp(null)} />}
     </div>
   );
 }
 
 // Linha de OP no tema claro-Torg — leve, direta (posição · OP · barra · % · falta),
 // com uma linha discreta de peças (prioritárias em laranja, próximas em cinza).
-function LinhaOp({ op }) {
+function LinhaOp({ op, onDespachar }) {
   // Corte sem detalhamento (sem croqui) → linha de ALERTA, sem barra/peças.
   if (op.estado === "SEM_LISTA") {
     return (
-      <div className="bg-red-50 rounded-xl px-5 py-4 border border-red-200 shadow-[0_1px_3px_rgba(0,41,69,0.07)]">
+      <div onClick={onDespachar} title="Despachar peças em aberto desta OP" className="bg-red-50 rounded-xl px-5 py-4 border border-red-200 shadow-[0_1px_3px_rgba(0,41,69,0.07)] cursor-pointer hover:border-red-300">
         <div className="flex items-center gap-4 flex-wrap">
           <AlertTriangle size={26} className="text-red-500 shrink-0" />
           <div className="min-w-[150px]">
@@ -326,7 +328,7 @@ function LinhaOp({ op }) {
   const seq = (op.sequencia || []).slice(0, 4);
   const restam = (op.qtdPecas - op.qtdPrioritarias) - seq.length;
   return (
-    <div className={`rounded-xl px-5 py-4 shadow-[0_1px_3px_rgba(0,41,69,0.07)] ${semProg ? "bg-amber-50 border border-amber-200" : "bg-white"}`}>
+    <div onClick={onDespachar} title="Despachar peças em aberto desta OP" className={`rounded-xl px-5 py-4 shadow-[0_1px_3px_rgba(0,41,69,0.07)] cursor-pointer hover:shadow-md transition ${semProg ? "bg-amber-50 border border-amber-200" : "bg-white"}`}>
       <div className="flex items-center gap-5 flex-wrap">
         <div className={`text-2xl font-extrabold w-9 shrink-0 ${op.ordem === 1 ? "text-torg-orange" : "text-torg-gray-light"}`}>{op.ordem}º</div>
         <div className="min-w-[150px]">
