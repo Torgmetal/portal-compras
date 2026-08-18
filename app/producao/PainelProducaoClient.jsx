@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw, AlertTriangle, Clock, ChevronDown, ChevronUp, ArrowRight,
-  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, CalendarClock, Download,
+  Scissors, Wrench, Flame, Sparkles, Wind, Paintbrush, Truck, CalendarClock, Download, Flag,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import { SETORES_SOLICITACAO, SETOR_LABEL_SOLIC, STATUS_SOLIC } from "@/lib/solicitacao-producao-const";
@@ -71,13 +71,20 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
             Pulso da fábrica ao vivo (Syneco) · pipeline das peças · metas do mês — atualizado {dataHora}
           </p>
         </div>
-        <button
-          onClick={() => startTransition(() => router.refresh())}
-          disabled={isPending}
-          className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5 disabled:opacity-60"
-        >
-          <RefreshCw size={14} className={isPending ? "animate-spin" : ""} /> {isPending ? "Atualizando…" : "Atualizar"}
-        </button>
+        <div className="flex items-center gap-2">
+          <Link href="/producao/prioridades"
+            className="px-3 py-1.5 bg-torg-orange text-white text-xs rounded-lg hover:bg-torg-orange/90 font-medium flex items-center gap-1.5"
+            title="Peças prioritárias por bloco de setor (Preparação · Montagem+Solda · Acabamento/Jato/Pintura)">
+            <Flag size={14} /> Prioridades
+          </Link>
+          <button
+            onClick={() => startTransition(() => router.refresh())}
+            disabled={isPending}
+            className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium flex items-center gap-1.5 disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={isPending ? "animate-spin" : ""} /> {isPending ? "Atualizando…" : "Atualizar"}
+          </button>
+        </div>
       </div>
 
       {/* Pipeline da fábrica */}
