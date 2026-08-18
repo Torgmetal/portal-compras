@@ -184,7 +184,10 @@ export default function TerceirizadosClient({ ops }) {
                                 <Undo2 size={12} /> Retorno
                               </button>
                             )}
-                            <a href={`/api/expedicao/terceiros/${r.id}/romaneio`} title="Baixar Excel" className="text-torg-gray hover:text-torg-blue p-1"><FileSpreadsheet size={15} /></a>
+                            <a href={`/api/expedicao/terceiros/${r.id}/romaneio`} title="Romaneio de peças (Excel)" className="text-torg-gray hover:text-torg-blue p-1"><FileSpreadsheet size={15} /></a>
+                            {Array.isArray(r.materiais) && r.materiais.length > 0 && (
+                              <a href={`/api/expedicao/terceiros/${r.id}/material`} title="Romaneio de material — enviado ao fornecedor (Excel)" className="text-indigo-600 hover:text-indigo-800 p-1"><FileSpreadsheet size={15} /></a>
+                            )}
                             <button onClick={() => setModal({ rom: r })} title="Editar" className="text-torg-gray hover:text-torg-blue p-1"><Pencil size={14} /></button>
                             <button onClick={() => excluir(r)} title="Excluir" className="text-torg-gray hover:text-red-600 p-1"><Trash2 size={14} /></button>
                           </div>
@@ -227,6 +230,7 @@ function Kpi({ label, value, sub, color, Icon }) {
 
 function DetalheRomaneio({ r, onDesfazRetorno, showToast }) {
   const itens = Array.isArray(r.itens) ? r.itens : [];
+  const materiais = Array.isArray(r.materiais) ? r.materiais : [];
   const retornos = Array.isArray(r.retornos) ? r.retornos : [];
   async function desfazer(ret) {
     if (!confirm("Desfazer este retorno?")) return;
@@ -237,8 +241,37 @@ function DetalheRomaneio({ r, onDesfazRetorno, showToast }) {
   }
   return (
     <div className="grid md:grid-cols-2 gap-4">
+      {/* Romaneio de MATERIAL — o que efetivamente vai pro fornecedor (matéria-prima
+          com código do Omie). Vem primeiro por ser o principal do envio a terceiro. */}
+      {materiais.length > 0 && (
+        <div className="md:col-span-2">
+          <p className="text-[11px] font-semibold text-indigo-700 uppercase mb-1 flex items-center gap-1.5"><FileSpreadsheet size={12} /> Material enviado ao fornecedor ({materiais.length})</p>
+          <div className="border border-gray-100 rounded bg-white max-h-60 overflow-x-auto">
+            <table className="w-full text-[12px] min-w-[560px]">
+              <thead className="bg-gray-50 text-torg-gray"><tr>
+                <th className="text-left px-2 py-1 font-medium">Cód. Omie</th>
+                <th className="text-left px-2 py-1 font-medium">Perfil</th>
+                <th className="text-left px-2 py-1 font-medium">Descrição / unidade</th>
+                <th className="text-right px-2 py-1 font-medium">Qtd</th>
+                <th className="text-right px-2 py-1 font-medium">Peso</th>
+              </tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {materiais.map((m, i) => (
+                  <tr key={i}>
+                    <td className="px-2 py-1 font-mono text-[11px] whitespace-nowrap">{m.codigoOmie || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-2 py-1 font-mono text-torg-dark whitespace-nowrap">{m.perfil}</td>
+                    <td className="px-2 py-1 text-torg-gray truncate max-w-[300px]" title={m.descricaoOmie || m.descricao || ""}>{[m.descricaoOmie || m.descricao, m.unidade].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="px-2 py-1 text-right tabular-nums font-semibold">{m.qtd ?? "—"}</td>
+                    <td className="px-2 py-1 text-right tabular-nums text-torg-gray whitespace-nowrap">{fmtKg(m.pesoKg)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <div>
-        <p className="text-[11px] font-semibold text-torg-gray uppercase mb-1">Material enviado ({itens.length})</p>
+        <p className="text-[11px] font-semibold text-torg-gray uppercase mb-1">Peças / marcas ({itens.length}){materiais.length > 0 && <span className="normal-case font-normal text-torg-gray"> — controle do que o terceiro produz</span>}</p>
         <div className="border border-gray-100 rounded bg-white max-h-52 overflow-y-auto">
           <table className="w-full text-[12px]">
             <thead className="bg-gray-50 text-torg-gray"><tr>
