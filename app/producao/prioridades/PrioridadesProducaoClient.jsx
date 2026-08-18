@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X, CheckCircle2, Scissors } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X, CheckCircle2 } from "lucide-react";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 
 // Uma aba por SETOR (Vitor 18/08). Deep-link: /producao/prioridades?bloco=jato
@@ -128,7 +128,7 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
             <button onClick={() => setExpandido((st) => { const n = new Set(st); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })}
               title="Ver os croquis que ainda faltam cortar"
               className="shrink-0 text-amber-700 bg-amber-50 hover:bg-amber-100 text-[10px] rounded px-1.5 py-0.5 inline-flex items-center gap-0.5 font-medium">
-              <Scissors size={10} /> falta cortar {p.faltamCroquis?.length || ""} {expandido.has(p.id) ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              falta cortar {p.faltamCroquis?.length || ""} {expandido.has(p.id) ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
             </button>
           )}
         </div>
