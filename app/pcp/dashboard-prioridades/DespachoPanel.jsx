@@ -8,7 +8,8 @@
 // Baixa é SÓ do portal (PecaConjunto.baixaSetores[setor] = { qtd, em, por }); não escreve no Syneco.
 // Reusa /api/pcp/despacho (GET peças+placar+reconciliação, POST despacha / dá baixa por qtd).
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
-import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Factory } from "lucide-react";
+import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Factory, FileText } from "lucide-react";
+import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 import TerceiroModal from "./TerceiroModal";
 
@@ -37,6 +38,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [filtro, setFiltro] = useState("");
   const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis faltantes)
   const [terceiroPecas, setTerceiroPecas] = useState(null); // peças abertas no modal de terceiro
+  const [desenhoMarca, setDesenhoMarca] = useState(null); // marca aberta no modal de desenhos (GRD)
   const podeBaixa = !!setor;
   const toggleExpand = (id) => setExpandido((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -262,7 +264,13 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                   <Fragment key={p.id}>
                   <tr className={`hover:bg-gray-50 cursor-pointer ${sel.has(p.id) ? "bg-blue-50/50" : ""}`} onClick={() => toggle(p.id)}>
                     <td className="px-2 py-1.5"><input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} onClick={(e) => e.stopPropagation()} /></td>
-                    <td className={`${td} font-mono font-semibold whitespace-nowrap`}>{p.marca}</td>
+                    <td className={`${td} font-mono font-semibold whitespace-nowrap`}>
+                      <span className="inline-flex items-center gap-1.5">
+                        {p.marca}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setDesenhoMarca(p.marca); }} title="Ver os desenhos/projetos da Engenharia (imprimir + GRD)"
+                          className="text-gray-300 hover:text-torg-blue shrink-0"><FileText size={13} /></button>
+                      </span>
+                    </td>
                     <td className={td}>
                       <div className="flex items-center gap-2">
                         <span className="text-torg-gray max-w-[240px] truncate" title={p.descricao || ""}>{p.descricao || "—"}</span>
@@ -354,6 +362,9 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       <TerceiroModal obra={obra} opId={data?.opId} setor={setor} pecas={terceiroPecas}
         onClose={() => setTerceiroPecas(null)}
         onDone={() => { setTerceiroPecas(null); setSel(new Set()); carregar(); }} />
+    )}
+    {desenhoMarca && data?.opNumero && (
+      <DesenhoPecaModal opNumero={data.opNumero} opId={data?.opId} marca={desenhoMarca} setor="PCP" onClose={() => setDesenhoMarca(null)} />
     )}
     </>
   );

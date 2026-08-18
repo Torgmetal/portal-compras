@@ -3735,6 +3735,25 @@ model SolicitacaoProducao {
   @@index([opNumero])
 }
 
+// GRD — controle de liberação de desenhos pros setores: registro de cada impressão/liberação de
+// projeto (PDF da Engenharia no SharePoint) feita pelas telas de produção/PCP. Tabela criada via
+// SQL (db push bloqueado por drift); só client gerado a partir daqui.
+model GrdLiberacao {
+  id              String   @id @default(cuid())
+  opId            String?
+  opNumero        String
+  marca           String
+  arquivo         String // nome do PDF no SharePoint (ex.: T89A1.pdf)
+  formato         String? // A1 | A2 | A3 | A4 | A4 (croqui)
+  setor           String? // bloco/setor de onde foi liberado (preparacao|montagem|acabamento|PCP)
+  itemId          String? // id do arquivo no drive (pra reabrir)
+  liberadoPorId   String?
+  liberadoPorNome String?
+  createdAt       DateTime @default(now())
+
+  @@index([opNumero, marca])
+}
+
 // OPs fixadas manualmente na TV de Prioridades por setor (as rápidas, sem cronograma).
 // Tabela criada via SQL (db push bloqueado por drift); só client gerado a partir daqui.
 model PrioridadeTvOp {

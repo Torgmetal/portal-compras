@@ -64,7 +64,7 @@ export async function GET() {
   const pecas = opIds.length ? await prisma.pecaConjunto.findMany({
     // "não croqui" INCLUINDO tipoPeca NULL (avulsas/solo) — `{ not: "CROQUI" }` sozinho descarta os NULL.
     where: { opId: { in: opIds }, OR: [{ tipoPeca: { not: "CROQUI" } }, { tipoPeca: null }] },
-    select: { id: true, opId: true, marca: true, descricao: true, tipoPeca: true, perfil: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, opId: true, marca: true, descricao: true, tipoPeca: true, perfil: true, qte: true, pesoUnitKg: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true, _count: { select: { conjuntoCroquis: true } } },
   }) : [];
 
   for (const pc of pecas) {
@@ -85,7 +85,9 @@ export async function GET() {
     if (!m.has(o.opNumero)) m.set(o.opNumero, { opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, datasSetor: o.datasSetor, entrega: o.entrega, pecas: [] });
     const terc = noTerceiroAgora(pc);
     m.get(o.opNumero).pecas.push({
-      id: pc.id, marca: pc.marca, descricao: pc.descricao || null, pesoTotalKg: Math.round(Number(pc.pesoTotalKg) || 0),
+      id: pc.id, marca: pc.marca, descricao: pc.descricao || null,
+      qte: Number(pc.qte) || 1, pesoUnitKg: Math.round((Number(pc.pesoUnitKg) || 0) * 10) / 10,
+      pesoTotalKg: Math.round(Number(pc.pesoTotalKg) || 0),
       prioridade: pc.prioridade, setor: LABEL[setorKey] || setorKey,
       terceiro: terc, retornoPrevisto: terc ? (pc.terceiroRetornoPrevisto || null) : null,
     });

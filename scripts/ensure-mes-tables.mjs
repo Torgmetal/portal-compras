@@ -50,6 +50,26 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PrioridadeTvOp_opId_idx" ON "PrioridadeTvOp"("opId")`);
   console.log("[ensure-mes-tables] OK — PrioridadeTvOp garantida.");
 
+  // GrdLiberacao (controle de liberação/impressão de desenhos pros setores). Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "GrdLiberacao" (
+      "id"              TEXT         NOT NULL,
+      "opId"            TEXT,
+      "opNumero"        TEXT         NOT NULL,
+      "marca"           TEXT         NOT NULL,
+      "arquivo"         TEXT         NOT NULL,
+      "formato"         TEXT,
+      "setor"           TEXT,
+      "itemId"          TEXT,
+      "liberadoPorId"   TEXT,
+      "liberadoPorNome" TEXT,
+      "createdAt"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "GrdLiberacao_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "GrdLiberacao_opNumero_marca_idx" ON "GrdLiberacao"("opNumero", "marca")`);
+  console.log("[ensure-mes-tables] OK — GrdLiberacao garantida.");
+
   // OP.valorFaturarPorKg (R$/kg a faturar — base da previsão de faturamento). Idempotente.
   await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "valorFaturarPorKg" DOUBLE PRECISION`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "OP" ADD COLUMN IF NOT EXISTS "emProducao" BOOLEAN NOT NULL DEFAULT false`);
