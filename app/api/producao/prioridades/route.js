@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
 import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora, entregaDoSetor } from "@/lib/prioridades-setor";
+import { ehItemComprado } from "@/lib/item-comprado";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,12 +64,15 @@ export async function GET() {
   const pecas = opIds.length ? await prisma.pecaConjunto.findMany({
     // "não croqui" INCLUINDO tipoPeca NULL (avulsas/solo) — `{ not: "CROQUI" }` sozinho descarta os NULL.
     where: { opId: { in: opIds }, OR: [{ tipoPeca: { not: "CROQUI" } }, { tipoPeca: null }] },
-    select: { id: true, opId: true, marca: true, descricao: true, tipoPeca: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, opId: true, marca: true, descricao: true, tipoPeca: true, perfil: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true, _count: { select: { conjuntoCroquis: true } } },
   }) : [];
 
   for (const pc of pecas) {
     const o = opInfo.get(pc.opId);
     if (!o) continue;
+    // Itens comprados (sem peso; ou cobertura/piso: telha/rufo/calha/grade de piso) NÃO são
+    // produção — não aparecem em nenhum setor. (Regra do peso, lib/item-comprado.)
+    if (ehItemComprado(pc)) continue;
     // FLUXO: conjunto COMPOSTO (tem croquis/subpeças) começa na MONTAGEM — o corte dele é dos
     // croquis, então NÃO cai na Preparação. Só peça SEM subpeças (solo/avulsa) fica na Preparação.
     const composta = pc.tipoPeca === "CONJUNTO" && (pc._count?.conjuntoCroquis || 0) > 0;
