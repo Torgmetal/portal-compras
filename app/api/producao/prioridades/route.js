@@ -34,11 +34,21 @@ const ABA_DO_SETOR = { CORTE: "preparacao", MONTAGEM: "montagem", SOLDA: "solda"
 const IDX = Object.fromEntries(FLUXO_SETORES.map((s, i) => [s.key, i]));
 const LABEL = Object.fromEntries(FLUXO_SETORES.map((s) => [s.key, s.label]));
 
-// índice do setor real da peça → key da ABA (não iniciada = -1 → Preparação; expedida → fora).
-function blocoDoIdx(idx) {
-  const i = idx < 0 ? IDX.CORTE : idx;
-  if (i > IDX.PINTURA) return null; // Expedição/expedido → fora das telas de produção
-  return ABA_DO_SETOR[FLUXO_SETORES[i]?.key] || null;
+// ROTA da peça (por onde ela passa): conjunto COMPOSTO é montado (o corte é dos croquis dele);
+// peça SOLO/avulsa é cortada e PULA Montagem/Solda.
+const ROTA_COMPOSTA = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
+const ROTA_SOLO = ["CORTE", "ACABAMENTO", "JATO", "PINTURA"];
+
+// Em qual setor a peça precisa ser TRABALHADA AGORA = o PRÓXIMO da rota dela depois do que já
+// foi feito. (Vitor 18/08: "as que já forem apontadas no Syneco você já manda para acabamento, as
+// que forem dadas baixa no acabamento já manda para o jato, do jato para a pintura e por aí vai".)
+// realIdx = setor mais avançado já alcançado (Syneco + status + terceiro + encaminhamento).
+function proximoSetor(pc, realIdx, composta) {
+  // Encaminhamento manual / volta do terceiro mandam: o próximo é o setor escolhido.
+  if (pc.encaminhadoSetor && IDX[pc.encaminhadoSetor] === realIdx + 1) return pc.encaminhadoSetor;
+  if (noTerceiroAgora(pc) && IDX[pc.destinoTerceirizado] === realIdx + 1) return pc.destinoTerceirizado;
+  for (const s of composta ? ROTA_COMPOSTA : ROTA_SOLO) if (IDX[s] > realIdx) return s;
+  return null; // passou de Pintura → Expedição, fora das telas de produção
 }
 
 // Prazo do bloco p/ uma OP = a data mais PRÓXIMA entre os setores do bloco (das datas por setor).
@@ -112,19 +122,20 @@ export async function GET() {
     // Itens comprados (sem peso; ou cobertura/piso: telha/rufo/calha/grade de piso) NÃO são
     // produção — não aparecem em nenhum setor. (Regra do peso, lib/item-comprado.)
     if (ehItemComprado(pc)) continue;
-    // FLUXO: conjunto COMPOSTO (tem croquis/subpeças) começa na MONTAGEM — o corte dele é dos
-    // croquis, então NÃO cai na Preparação. Só peça SEM subpeças (solo/avulsa) fica na Preparação.
+    // Setor que precisa TRABALHAR a peça agora (o próximo da rota) — peça apontada na Solda já
+    // aparece no Acabamento, e assim por diante.
     const composta = pc.tipoPeca === "CONJUNTO" && (pc._count?.conjuntoCroquis || 0) > 0;
-    let idx = setorRealIndex(pc, o.realMap);
-    if (composta && idx < IDX.MONTAGEM) idx = IDX.MONTAGEM;
-    const bloco = blocoDoIdx(idx);
-    if (!bloco) continue; // já expedida
-    const setorKey = idx < 0 ? "CORTE" : FLUXO_SETORES[idx]?.key || "CORTE";
+    const idx = setorRealIndex(pc, o.realMap);
+    const setorKey = proximoSetor(pc, idx, composta);
+    if (!setorKey) continue; // já passou da Pintura (expedição) → fora
+    const bloco = ABA_DO_SETOR[setorKey];
+    if (!bloco) continue;
     const m = acc[bloco];
     if (!m.has(o.opNumero)) m.set(o.opNumero, { opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, datasSetor: o.datasSetor, entrega: o.entrega, pecas: [] });
     const terc = noTerceiroAgora(pc);
     // Conjunto composto: liberado pra montar? (só faz sentido enquanto ele ainda está na Montagem)
-    const infoMont = composta ? prontoPorOpMarca.get(`${pc.opId}|${pc.marca}`) : null;
+    // "liberado p/ montar" só faz sentido na MONTAGEM (Vitor: na Solda não precisa dessa info).
+    const infoMont = composta && setorKey === "MONTAGEM" ? prontoPorOpMarca.get(`${pc.opId}|${pc.marca}`) : null;
     m.get(o.opNumero).pecas.push({
       id: pc.id, marca: pc.marca, descricao: pc.descricao || null,
       prontoMontar: infoMont ? infoMont.pronto : null,
