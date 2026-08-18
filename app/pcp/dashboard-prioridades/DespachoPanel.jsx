@@ -702,8 +702,8 @@ function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
 // foram usadas para cada perfil que compõe o conjunto"). O casamento é LPC × CMR pela data:
 // a peça só pode ter saído de material recebido ATÉ o dia em que foi cortada. Ver lib/rastreio-peca.js.
 const SIT = {
-  CERTA: { txt: "definida", cls: "bg-emerald-50 text-emerald-700", dica: "Só existe uma corrida desse material nesta OP (ou a data eliminou as outras) — não há dúvida." },
-  PROVAVEL: { txt: "provável", cls: "bg-sky-50 text-sky-700", dica: "Mais de uma corrida possível; o rateio FIFO por data e peso escolheu esta. As outras candidatas ficam listadas." },
+  DEFINIDA: { txt: "definida", cls: "bg-emerald-50 text-emerald-700", dica: "Só uma corrida desse material tinha chegado nesta OP até o dia do corte — a dedução é fechada." },
+  INDEFINIDA: { txt: "indefinida", cls: "bg-amber-100 text-amber-800", dica: "Mais de uma corrida do mesmo material já estava na fábrica no dia do corte. O portal NÃO escolhe: lista todas. Só quem separou a barra pode dizer qual foi." },
   SEM_CORRIDA: { txt: "sem corrida", cls: "bg-amber-50 text-amber-700", dica: "O material chegou e tem nº de rastreabilidade, mas o CMR está sem a corrida/lote — dá pra achar pelo R e completar no Almoxarifado." },
   ESTOQUE: { txt: "de estoque", cls: "bg-amber-50 text-amber-700", dica: "A peça foi cortada ANTES de qualquer entrega desta OP: saiu de sobra/estoque, o CMR desta OP não explica." },
   SEM_MATERIAL: { txt: "sem material", cls: "bg-slate-100 text-slate-500", dica: "Nenhuma entrada desse perfil no CMR desta OP." },
@@ -761,15 +761,20 @@ function RastroDoItem({ peca, opNumero, onClose }) {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {itens.map((it, i) => {
-                    const u = it.usadas?.[0];
+                    const u = it.usadas?.[0]; // vazio de propósito quando a corrida é INDEFINIDA
                     const e = SIT[it.situacao] || SIT.SEM_MATERIAL;
+                    const nCand = new Set((it.candidatas || []).map((c) => c.corrida)).size;
                     return (
                       <Fragment key={i}>
                         <tr>
                           {conjunto && <td className="py-1.5 font-mono font-semibold whitespace-nowrap">{it.marca}</td>}
                           <td className="py-1.5 whitespace-nowrap">{it.perfil || "—"}</td>
-                          <td className="py-1.5 whitespace-nowrap font-mono font-bold">{u?.rastreio || <span className="text-gray-300">—</span>}</td>
-                          <td className="py-1.5 whitespace-nowrap font-mono font-semibold">{u?.corrida || (u ? <span className="text-amber-600 font-semibold">sem corrida</span> : <span className="text-gray-300">—</span>)}</td>
+                          <td className="py-1.5 whitespace-nowrap font-mono font-bold">
+                            {u?.rastreio || (nCand > 1 ? <span className="text-amber-700 font-sans font-semibold">{nCand} possíveis</span> : <span className="text-gray-300">—</span>)}
+                          </td>
+                          <td className="py-1.5 whitespace-nowrap font-mono font-semibold">
+                            {u?.corrida || (u ? <span className="text-amber-600 font-semibold">sem corrida</span> : nCand > 1 ? <span className="text-amber-700 font-sans">ver abaixo</span> : <span className="text-gray-300">—</span>)}
+                          </td>
                           <td className="py-1.5 whitespace-nowrap font-mono text-torg-gray">{u?.certificado || "—"}</td>
                           <td className="py-1.5 whitespace-nowrap font-mono">{u?.nf || "—"}</td>
                           <td className="py-1.5 whitespace-nowrap">{u?.fornecedor || "—"}</td>
@@ -780,11 +785,16 @@ function RastroDoItem({ peca, opNumero, onClose }) {
                             {it.saldoEsgotado && <span className="ml-1 text-[10px] text-amber-700" title="Cortou-se mais desse material do que o CMR registra ter chegado — falta lançar recebimento.">⚠</span>}
                           </td>
                         </tr>
-                        {it.situacao === "PROVAVEL" && it.candidatas?.length > 1 && (
-                          <tr className="bg-sky-50/40">
+                        {nCand > 1 && (
+                          <tr className="bg-amber-50/50">
                             {conjunto && <td />}
-                            <td colSpan={9} className="py-1 px-1 text-[11px] text-torg-gray">
-                              outras corridas possíveis deste material: {it.candidatas.filter((c) => c.corrida !== u?.corrida).map((c) => `R ${c.rastreio || "—"} · corrida ${c.corrida} (recebida ${fmtD(c.recebidoEm)})`).join("  |  ")}
+                            <td colSpan={9} className="py-1.5 px-1 text-[11px]">
+                              <span className="text-amber-800 font-semibold">
+                                {it.situacao === "ESTOQUE" ? "Cortada antes de qualquer entrega — o material desta OP não explica. Entradas da OP:" : `Saiu de UMA destas ${nCand} corridas — as duas já estavam na fábrica no dia do corte:`}
+                              </span>
+                              <span className="ml-1 text-torg-gray">
+                                {it.candidatas.map((c) => `R ${c.rastreio || "—"} · corrida ${c.corrida || "—"} · cert ${c.certificado || "—"} (recebida ${fmtD(c.recebidoEm)}, ${Math.round(c.pesoKg || 0)} kg)`).join("   |   ")}
+                              </span>
                             </td>
                           </tr>
                         )}
@@ -798,7 +808,7 @@ function RastroDoItem({ peca, opNumero, onClose }) {
         </div>
         <div className="px-5 py-2.5 border-t border-gray-100">
           <p className="text-[11px] text-torg-gray">
-            Casamento automático: <b>peças da LPC</b> × <b>entradas do CMR</b> daquela OP — a peça só pode ter saído de material recebido <b>até o dia em que foi cortada</b> (data do Syneco); havendo mais de uma corrida possível, o rateio é FIFO por peso. "definida" = não havia outra opção.
+            Casamento automático: <b>peças da LPC</b> × <b>entradas do CMR</b> daquela OP. Só duas coisas definem a corrida, e as duas são fatos do CMR: <b>(1)</b> o material teve uma corrida só nesta OP, ou <b>(2)</b> as outras chegaram <b>depois</b> do dia em que a peça foi cortada (data do Syneco). Fora disso fica <b>indefinida</b> e o portal lista todas as candidatas — <b>não escolhe</b>. Premissa: o material é comprado e recebido por OP; peça cortada antes de qualquer entrega cai em "de estoque".
           </p>
         </div>
       </div>
