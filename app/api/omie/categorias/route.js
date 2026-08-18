@@ -6,6 +6,18 @@ const OMIE_CATEG_URL = "https://app.omie.com.br/api/v1/geral/categorias/";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
+// O Omie devolve a descrição com entidades HTML (ex: "EPI&apos;S", "&quot;x&quot;").
+// Decodifica pras mais comuns pra exibir texto normal ("EPI'S").
+function decodeEntidades(txt) {
+  return String(txt || "")
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&"); // por último, pra não re-expandir entidades acima
+}
+
 // Prefixo numérico da descrição (ex: "5.2 - Material Auxiliar" → "5.2").
 // É por esse número que o Omie ordena e exibe a "Categoria da Compra".
 function prefixoNumerico(descricao) {
@@ -108,7 +120,7 @@ export async function GET() {
     const categorias = todas
       .map((c) => ({
         codigo: c.codigo || "",
-        descricao: c.descricao || "",
+        descricao: decodeEntidades(c.descricao),
         conta_despesa: c.conta_despesa || "N",
         totalizadora: c.totalizadora || "N",
         transferencia: c.transferencia || "N",
