@@ -1,5 +1,5 @@
 "use client";
-// Prioridades de Produção — 3 blocos de setor (Preparação · Montagem+Solda · Acabamento/Jato/Pintura).
+// Prioridades de Produção — UMA ABA POR SETOR (Preparação · Montagem · Solda · Acabamento · Jato · Pintura).
 // SÓ as OPs ENVIADAS pra produção (OP.emProducao). Por OP: PRIORITÁRIAS em cima (1,2,3 reordenável)
 // e as DEMAIS pendentes embaixo, com Qtd · Peso un. · Peso total, o PRAZO do setor ("até quando"),
 // botão de DESENHO (projetos da Engenharia + registro GRD) e exportação em Excel padrão Torg.
@@ -9,10 +9,14 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X } from "lucide-react";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 
+// Uma aba por SETOR (Vitor 18/08). Deep-link: /producao/prioridades?bloco=jato
 const BLOCOS = [
   { key: "preparacao", label: "Preparação" },
-  { key: "montagem", label: "Montagem + Solda" },
-  { key: "acabamento", label: "Acabamento, Jato e Pintura" },
+  { key: "montagem", label: "Montagem" },
+  { key: "solda", label: "Solda" },
+  { key: "acabamento", label: "Acabamento" },
+  { key: "jato", label: "Jato" },
+  { key: "pintura", label: "Pintura" },
 ];
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
@@ -167,14 +171,14 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
           </div>
         </div>
         {/* Abas dos 3 blocos */}
-        <div className="max-w-6xl mx-auto px-4 flex gap-1">
+        <div className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {BLOCOS.map((b) => {
             const bd = (dados || []).find((x) => x.key === b.key);
             const n = bd ? bd.total : null;
             const on = aba === b.key;
             return (
               <button key={b.key} onClick={() => setAba(b.key)}
-                className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg transition ${on ? "bg-[#F3F6F9] text-torg-dark" : "text-white/70 hover:text-white hover:bg-white/5"}`}>
+                className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg transition whitespace-nowrap shrink-0 ${on ? "bg-[#F3F6F9] text-torg-dark" : "text-white/70 hover:text-white hover:bg-white/5"}`}>
                 {b.label}{n != null && <span className={`ml-2 text-[11px] px-1.5 py-0.5 rounded-full ${on ? "bg-torg-orange/15 text-torg-orange" : "bg-white/15 text-white/80"}`}>{n}</span>}
               </button>
             );
@@ -190,7 +194,7 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
         ) : !blocoAtual || blocoAtual.ops.length === 0 ? (
           <div className="border border-dashed border-gray-200 rounded-xl py-16 text-center bg-white">
             <Inbox size={30} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-sm font-semibold text-torg-dark">Nada neste bloco</p>
+            <p className="text-sm font-semibold text-torg-dark">Nada neste setor</p>
             <p className="text-xs text-torg-gray mt-1">Só aparecem as OPs <b>enviadas para produção</b> (botão no painel de Liberar do PCP). Se uma OP não está aqui, ela ainda não foi enviada.</p>
           </div>
         ) : (

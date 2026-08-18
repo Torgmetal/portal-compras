@@ -1,10 +1,8 @@
-// Prioridades de PRODUÇÃO por bloco de setor (Painel de Produção).
-// GET  — SÓ as OPs enviadas pra produção (OP.emProducao). Por bloco (Preparação / Montagem+Solda /
-//        Acabamento,Jato,Pintura) e por OP: PRIORITÁRIAS em cima (na ordem) + as DEMAIS pendentes
-//        embaixo, com o PRAZO do setor ("até quando"). O setor atual vem do realMap (Syneco+status).
-//          • Preparação            = Corte
-//          • Montagem + Solda
-//          • Acabamento, Jato e Pintura
+// Prioridades de PRODUÇÃO — UMA ABA POR SETOR (Painel de Produção).
+// GET  — SÓ as OPs enviadas pra produção (OP.emProducao). Por SETOR (Preparação · Montagem · Solda ·
+//        Acabamento · Jato · Pintura) e por OP: PRIORITÁRIAS em cima (na ordem) + as DEMAIS
+//        pendentes embaixo, com o PRAZO do setor ("até quando"). Cada peça aparece só no setor
+//        ONDE ELA ESTÁ agora (realMap = Syneco + status + terceiro + encaminhamento).
 // POST — reordena: troca a prioridade entre DUAS peças da MESMA OP (↑/↓ na tela).
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -21,21 +19,26 @@ const ROLES_VER = ["ADMIN", "PLANEJAMENTO", "PCP", "PRODUCAO", "COMERCIAL"];
 const ROLES_EDIT = ["ADMIN", "PLANEJAMENTO", "PCP"];
 const LIMITE_DEMAIS = 40; // teto de "demais" por OP/bloco na tela
 
+// Uma aba por SETOR (Vitor 18/08: "deixa uma aba por setor"). Expedição fica de fora (a peça
+// expedida sai das telas de produção).
 const BLOCOS = [
   { key: "preparacao", label: "Preparação", setores: ["CORTE"] },
-  { key: "montagem", label: "Montagem + Solda", setores: ["MONTAGEM", "SOLDA"] },
-  { key: "acabamento", label: "Acabamento, Jato e Pintura", setores: ["ACABAMENTO", "JATO", "PINTURA"] },
+  { key: "montagem", label: "Montagem", setores: ["MONTAGEM"] },
+  { key: "solda", label: "Solda", setores: ["SOLDA"] },
+  { key: "acabamento", label: "Acabamento", setores: ["ACABAMENTO"] },
+  { key: "jato", label: "Jato", setores: ["JATO"] },
+  { key: "pintura", label: "Pintura", setores: ["PINTURA"] },
 ];
+// setor canônico → key da aba
+const ABA_DO_SETOR = { CORTE: "preparacao", MONTAGEM: "montagem", SOLDA: "solda", ACABAMENTO: "acabamento", JATO: "jato", PINTURA: "pintura" };
 const IDX = Object.fromEntries(FLUXO_SETORES.map((s, i) => [s.key, i]));
 const LABEL = Object.fromEntries(FLUXO_SETORES.map((s) => [s.key, s.label]));
 
-// índice do setor real da peça → key do bloco (não iniciada = -1 → Preparação).
+// índice do setor real da peça → key da ABA (não iniciada = -1 → Preparação; expedida → fora).
 function blocoDoIdx(idx) {
   const i = idx < 0 ? IDX.CORTE : idx;
-  if (i <= IDX.CORTE) return "preparacao";
-  if (i <= IDX.SOLDA) return "montagem";
-  if (i <= IDX.PINTURA) return "acabamento";
-  return null; // Expedição/expedido → fora
+  if (i > IDX.PINTURA) return null; // Expedição/expedido → fora das telas de produção
+  return ABA_DO_SETOR[FLUXO_SETORES[i]?.key] || null;
 }
 
 // Prazo do bloco p/ uma OP = a data mais PRÓXIMA entre os setores do bloco (das datas por setor).
