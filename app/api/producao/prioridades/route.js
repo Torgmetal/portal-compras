@@ -61,14 +61,19 @@ export async function GET() {
   // LE). O setor atual de cada uma sai do realMap (Syneco + status). Priorizadas + demais.
   const opIds = [...opInfo.keys()];
   const pecas = opIds.length ? await prisma.pecaConjunto.findMany({
-    where: { opId: { in: opIds }, tipoPeca: { not: "CROQUI" } },
-    select: { id: true, opId: true, marca: true, descricao: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true },
+    // "não croqui" INCLUINDO tipoPeca NULL (avulsas/solo) — `{ not: "CROQUI" }` sozinho descarta os NULL.
+    where: { opId: { in: opIds }, OR: [{ tipoPeca: { not: "CROQUI" } }, { tipoPeca: null }] },
+    select: { id: true, opId: true, marca: true, descricao: true, tipoPeca: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true, _count: { select: { conjuntoCroquis: true } } },
   }) : [];
 
   for (const pc of pecas) {
     const o = opInfo.get(pc.opId);
     if (!o) continue;
-    const idx = setorRealIndex(pc, o.realMap);
+    // FLUXO: conjunto COMPOSTO (tem croquis/subpeças) começa na MONTAGEM — o corte dele é dos
+    // croquis, então NÃO cai na Preparação. Só peça SEM subpeças (solo/avulsa) fica na Preparação.
+    const composta = pc.tipoPeca === "CONJUNTO" && (pc._count?.conjuntoCroquis || 0) > 0;
+    let idx = setorRealIndex(pc, o.realMap);
+    if (composta && idx < IDX.MONTAGEM) idx = IDX.MONTAGEM;
     const bloco = blocoDoIdx(idx);
     if (!bloco) continue; // já expedida
     const setorKey = idx < 0 ? "CORTE" : FLUXO_SETORES[idx]?.key || "CORTE";
