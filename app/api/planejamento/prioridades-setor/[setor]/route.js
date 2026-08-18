@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { FLUXO_SETORES, progressoPorSetor, pecasPendentesNoSetor, entregaDoSetor, progressoMontagemMontavel, temDetalheCorte } from "@/lib/prioridades-setor";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
+import { statusCompraPorOp } from "@/lib/status-compra";
 import { ordenarUrgencia, obrasAguardandoLista } from "../route";
 
 export const runtime = "nodejs";
@@ -36,6 +37,10 @@ export async function GET(req, { params }) {
     return { o, setores, montaveis: mont ? mont.montaveis : null, temDetalhe: temDetalheCorte(o.universo), semPecas: (o.universo || []).length === 0, produzindo: (o.realMap?.size || 0) > 0 };
   });
 
+  // Status de compra (CMR × RM) — mostrado na Preparação.
+  let compra = new Map();
+  if (setorKey === "CORTE") { try { compra = await statusCompraPorOp(porObra.map((o) => o.opNumero)); } catch {} }
+
   // Fila detalhada do setor pedido.
   const ops = [];
   for (const { o, setores, montaveis, temDetalhe, semPecas, produzindo } of comSetores) {
@@ -46,6 +51,7 @@ export async function GET(req, { params }) {
       ops.push({
         opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
         entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor, estado: produzindo ? "SEM_LISTA_PRODUZINDO" : "SEM_LISTA",
+        compra: compra.get(o.opNumero) || null,
         totalKg: 0, feitoKg: 0, pendenteKg: 0, pct: null,
         qtdPecas: 0, qtdPrioritarias: 0, prioritarias: [], sequencia: [],
       });
@@ -70,6 +76,7 @@ export async function GET(req, { params }) {
       totalKg: st.totalKg, feitoKg: st.feitoKg, pendenteKg: st.pendenteKg, pct: st.pct ?? 0,
       qtdPecas: pend.length, qtdPrioritarias: prioritarias.length,
       qtdTerceiro: noTerc.length, terceiroVolta: voltaTerc ? voltaTerc.toISOString() : null,
+      compra: compra.get(o.opNumero) || null,
       prioritarias: prioritarias.slice(0, 16),
       sequencia: sequencia.slice(0, 16),
     });

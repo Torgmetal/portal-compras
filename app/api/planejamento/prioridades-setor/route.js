@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { FLUXO_SETORES, progressoPorSetor, entregaDoSetor, progressoMontagemMontavel, temDetalheCorte } from "@/lib/prioridades-setor";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
+import { statusCompraPorOp } from "@/lib/status-compra";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,11 @@ export async function GET() {
     return { ...o, setores, temDetalhe: temDetalheCorte(o.universo), semPecas: (o.universo || []).length === 0, produzindo: (o.realMap?.size || 0) > 0 };
   });
 
+  // STATUS DE COMPRA (CMR do Almoxarifado × RM) — só interessa na PREPARAÇÃO: o corte não
+  // começa sem material. (Vitor 18/08.)
+  let compra = new Map();
+  try { compra = await statusCompraPorOp(obras.map((o) => o.opNumero)); } catch {}
+
   const lanes = FLUXO_SETORES.map((s) => {
     const ops = [];
     for (const o of obras) {
@@ -50,6 +56,7 @@ export async function GET() {
           opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
           entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor,
           estado: o.produzindo ? "SEM_LISTA_PRODUZINDO" : "SEM_LISTA", totalKg: 0, feitoKg: 0, pendenteKg: 0, pct: null,
+          compra: compra.get(o.opNumero) || null,
         });
         continue;
       }
@@ -61,6 +68,7 @@ export async function GET() {
         opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
         entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor, estado,
         totalKg: st.totalKg, feitoKg: st.feitoKg, pendenteKg: st.pendenteKg, pct: st.pct ?? 0,
+        compra: s.key === "CORTE" ? compra.get(o.opNumero) || null : null,
       });
     }
     // Fila real por urgência; alertas (sem lista) por último.

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, RefreshCw, Maximize2, Minimize2, CalendarClock, Inbox, CheckCircle2, Lock, AlertTriangle, Truck, Columns3, LayoutGrid, ArrowLeft, RotateCw, Flag, ListOrdered, Maximize, X, Plus, Trash2 } from "lucide-react";
 import DespachoPanel from "@/app/pcp/dashboard-prioridades/DespachoPanel";
+import CompraChip from "@/components/CompraChip";
 
 const AUTO_REFRESH_MS = 60_000;
 
@@ -319,6 +320,7 @@ function LinhaOp({ op, onDespachar }) {
           <div className={`flex-1 text-[15px] font-bold ${produzindo ? "text-red-700" : "text-amber-700"}`}>
             {produzindo ? "⚠ PRODUZINDO SEM LISTA no portal — importar LPC urgente" : "aguardando lista de corte da Engenharia"}
           </div>
+          {op.compra && <CompraChip compra={op.compra} opNumero={op.opNumero} />}
           {op.entrega && (
             <span className={`text-[13px] inline-flex items-center gap-1 ${produzindo ? "text-red-700" : "text-amber-700"}`}><CalendarClock size={13} /> {fmtData(op.entrega)}</span>
           )}
@@ -346,7 +348,10 @@ function LinhaOp({ op, onDespachar }) {
           {semProg && <div className="text-[12px] font-semibold text-amber-600 mb-1 inline-flex items-center gap-1"><CalendarClock size={12} /> falta programar o corte no cronograma</div>}
           <div className="h-[11px] rounded-full bg-torg-blue-50 overflow-hidden"><div className={`h-full rounded-full ${cor.bar}`} style={{ width: `${Math.min(100, op.pct)}%`, transition: "width .6s ease" }} /></div>
           <div className="flex items-center justify-between text-[13px] text-torg-gray mt-1.5">
-            <span>falta <b className="text-torg-dark">{fmtKg(op.pendenteKg)}</b> · {op.qtdPecas} peças</span>
+            <span className="inline-flex items-center gap-2 flex-wrap">
+              falta <b className="text-torg-dark">{fmtKg(op.pendenteKg)}</b> · {op.qtdPecas} peças
+              {op.compra && <CompraChip compra={op.compra} opNumero={op.opNumero} />}
+            </span>
             {op.atrasoDias > 0 ? (
               <span className="text-red-600 font-semibold inline-flex items-center gap-1"><AlertTriangle size={13} /> {op.atrasoDias}d atraso</span>
             ) : op.entrega ? (
@@ -429,6 +434,7 @@ function OpMini({ op }) {
           )}
         </div>
         <div className="text-[11px] text-torg-gray truncate mt-0.5 ml-[22px]" title={op.obra}>{op.obra}</div>
+        {op.compra && <div className="ml-[22px] mt-1"><CompraChip compra={op.compra} opNumero={op.opNumero} mini /></div>}
         <div className={`text-[11px] font-semibold mt-1 ml-[22px] ${produzindo ? "text-red-700" : "text-amber-700"}`}>{produzindo ? "⚠ produzindo sem lista" : "aguardando lista da Engenharia"}</div>
       </div>
     );
@@ -450,6 +456,8 @@ function OpMini({ op }) {
       </div>
       <div className="text-[11px] text-torg-gray truncate mt-0.5 ml-[26px]" title={op.obra}>{op.obra}</div>
       {semProg && <div className="text-[10px] font-semibold text-amber-600 mt-1 ml-[26px] inline-flex items-center gap-1"><CalendarClock size={10} /> falta programar o corte</div>}
+      {/* Status do MATERIAL (só na Preparação): o corte não começa sem material. */}
+      {op.compra && <div className="ml-[26px] mt-1"><CompraChip compra={op.compra} opNumero={op.opNumero} mini /></div>}
       <div className="h-1.5 rounded-full bg-torg-blue-50 overflow-hidden mt-1.5">
         <div className={`h-full rounded-full ${cor.bar}`} style={{ width: `${Math.min(100, op.pct)}%`, transition: "width .6s ease" }} />
       </div>
