@@ -359,7 +359,7 @@ function LinhaOp({ op, onDespachar }) {
             <span className="inline-flex items-center gap-1.5 flex-wrap">
               <Flag size={13} className="text-torg-orange" />
               <span className="text-torg-orange font-semibold uppercase text-[11px] tracking-wide">Prioritárias:</span>
-              {prio.slice(0, 4).map((p, i) => <b key={i} className="text-torg-dark tabular-nums">{p.marca}</b>)}
+              {prio.slice(0, 4).map((p, i) => <b key={i} className={`tabular-nums ${p.terceiro ? "text-indigo-600" : "text-torg-dark"}`} title={p.terceiro ? "no terceiro" : undefined}>{p.marca}</b>)}
               {op.qtdPrioritarias > 4 && <span className="text-torg-gray-light">+{op.qtdPrioritarias - 4}</span>}
             </span>
           )}
@@ -367,12 +367,15 @@ function LinhaOp({ op, onDespachar }) {
             <span className="inline-flex items-center gap-1.5 flex-wrap text-torg-gray">
               <ListOrdered size={13} className="text-torg-gray-light" />
               <span className="uppercase text-[11px] tracking-wide text-torg-gray-light">Próximas:</span>
-              {seq.map((p, i) => <span key={i} className={`tabular-nums ${p.montavel === false ? "text-amber-600" : ""}`}>{p.marca}</span>)}
+              {seq.map((p, i) => <span key={i} className={`tabular-nums ${p.terceiro ? "text-indigo-600" : p.montavel === false ? "text-amber-600" : ""}`} title={p.terceiro ? "no terceiro" : undefined}>{p.marca}</span>)}
               {restam > 0 && <span className="text-torg-gray-light">+{restam} peças</span>}
             </span>
           )}
           {aguardando > 0 && (
             <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 font-medium"><CalendarClock size={11} /> {aguardando} aguardando corte</span>
+          )}
+          {op.qtdTerceiro > 0 && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-indigo-600 font-medium"><Truck size={11} /> {op.qtdTerceiro} no terceiro{op.terceiroVolta ? ` · volta ${fmtData(op.terceiroVolta)}` : ""}</span>
           )}
         </div>
       )}

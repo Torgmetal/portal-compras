@@ -55,12 +55,20 @@ export async function GET(req, { params }) {
     const pend = pecasPendentesNoSetor(o.universo, o.realMap, setorKey, montaveis);
     const prioritarias = pend.filter((p) => p.prioridade != null);
     const sequencia = pend.filter((p) => p.prioridade == null);
+    // Peças que estão NO TERCEIRO e voltam neste setor (com a data mais próxima de retorno).
+    const noTerc = pend.filter((p) => p.terceiro);
+    const voltaTerc = noTerc.reduce((min, p) => {
+      if (!p.retornoPrevisto) return min;
+      const d = new Date(p.retornoPrevisto);
+      return !min || d < min ? d : min;
+    }, null);
     const estado = setorKey === "CORTE" ? (es.doSetor ? "FILA" : "SEM_PROGRAMACAO") : "FILA";
     ops.push({
       opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
       entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor, estado,
       totalKg: st.totalKg, feitoKg: st.feitoKg, pendenteKg: st.pendenteKg, pct: st.pct ?? 0,
       qtdPecas: pend.length, qtdPrioritarias: prioritarias.length,
+      qtdTerceiro: noTerc.length, terceiroVolta: voltaTerc ? voltaTerc.toISOString() : null,
       prioritarias: prioritarias.slice(0, 16),
       sequencia: sequencia.slice(0, 16),
     });

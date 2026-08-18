@@ -55,7 +55,7 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
       // 2) despacha as peças (marca terceirizado + setor de retorno)
       const dc = await fetch("/api/pcp/despacho", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: pecas.map((p) => p.id), destino: "TERCEIRO", destinoTerceirizado: volta }),
+        body: JSON.stringify({ ids: pecas.map((p) => p.id), destino: "TERCEIRO", destinoTerceirizado: volta, dataPrevRetorno: dataRetorno || null }),
       });
       const dj = await dc.json();
       if (!dc.ok) throw new Error(dj.error || "Romaneio criado, mas falhou ao despachar as peças.");

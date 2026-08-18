@@ -2310,6 +2310,10 @@ model PecaConjunto {
   // existe mas o mesOrdem ainda não registrou aquela produção).
   baixaSetores           Json?     @default("{}")
   terceirizadoRecebidoEm DateTime?
+  // Data prevista de RETORNO informada pelo terceiro (do romaneio RT). Enquanto no terceiro
+  // (terceirizado=true, ainda não recebido), a peça aparece na fila do setor de RETORNO
+  // (destinoTerceirizado) com essa data — e sai da fila do setor de onde saiu.
+  terceiroRetornoPrevisto DateTime?
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.
   corteOrdem             Int? // posição na fila (menor = corta primeiro)

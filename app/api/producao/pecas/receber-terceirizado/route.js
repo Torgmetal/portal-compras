@@ -48,7 +48,7 @@ export async function POST(req) {
       const dest = p.destinoTerceirizado || "MONTAGEM";
       const r = await prisma.pecaConjunto.updateMany({
         where: { id: p.id, status: "TERCEIRIZADO" },
-        data: { status: STATUS_DESTINO[dest] || "MONTAGEM", ultimoSetor: SETOR_DESTINO[dest] || "Montagem", terceirizadoRecebidoEm: agora },
+        data: { status: STATUS_DESTINO[dest] || "MONTAGEM", ultimoSetor: SETOR_DESTINO[dest] || "Montagem", terceirizadoRecebidoEm: agora, terceiroRetornoPrevisto: null },
       });
       atualizados += r.count;
     }

@@ -25,6 +25,7 @@ const schema = z.object({
   ids: z.array(z.string()).optional(),
   destino: z.enum(DESTINOS).optional(),
   destinoTerceirizado: z.enum(VOLTA_TERCEIRO).optional(),
+  dataPrevRetorno: z.string().optional().nullable(), // volta prevista do terceiro (romaneio RT)
   obs: z.string().max(500).optional().nullable(),
   reverter: z.boolean().optional(),
   // Baixa PORTAL (não escreve no Syneco): grava baixaSetores[baixaSetor] = { qtd, em, por }.
@@ -170,7 +171,7 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
-  const { ids, destino, destinoTerceirizado, obs, reverter, baixaSetor, baixas, reverterBaixa } = body;
+  const { ids, destino, destinoTerceirizado, dataPrevRetorno, obs, reverter, baixaSetor, baixas, reverterBaixa } = body;
 
   // ── Baixa PORTAL ──────────────────────────────────────────────────────────
   // Grava/remove a QUANTIDADE baixada da peça NAQUELE setor (PecaConjunto.baixaSetores[setor] =
@@ -234,7 +235,7 @@ export async function POST(req) {
       where: { id: { in: ids } },
       data: {
         destino: null, destinoEm: null, destinoPor: null, destinoObs: null,
-        terceirizado: false, destinoTerceirizado: null, terceirizadoRecebidoEm: null,
+        terceirizado: false, destinoTerceirizado: null, terceirizadoRecebidoEm: null, terceiroRetornoPrevisto: null,
         status: "PENDENTE", ultimoSetor: null,
       },
     });
@@ -249,6 +250,7 @@ export async function POST(req) {
       data: {
         ...marca, destino: "TERCEIRO",
         terceirizado: true, destinoTerceirizado, terceirizadoRecebidoEm: null, status: "TERCEIRIZADO", maquina: null,
+        terceiroRetornoPrevisto: dataPrevRetorno ? new Date(dataPrevRetorno) : null,
         corteOrdem: null, corteDataMetaInicio: null, corteDataMetaFim: null,
       },
     });
