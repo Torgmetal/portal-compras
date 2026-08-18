@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReceiptText } from "lucide-react";
+import { ReceiptText, Factory } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
 const menu = [
   { href: "/fiscal", label: "Romaneios / NF", icon: ReceiptText, exact: true },
+  { href: "/fiscal/remessa-terceiro", label: "Remessa Terceiro", icon: Factory },
 ];
 
 export default function SidebarFiscal() {

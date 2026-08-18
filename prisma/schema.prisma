@@ -4062,12 +4062,25 @@ model RomaneioTerceiro {
   dataPrevRetorno   DateTime?
   observacao        String?
   arquivoUrl        String?
+  // ── Remessa fiscal (NF de remessa p/ industrialização — aba Remessa Terceiro do Fiscal) ──
+  // A remessa é PRÉ-CRIADA junto do romaneio (remessaStatus PENDENTE) e emitida no Fiscal.
+  remessaStatus     String    @default("PENDENTE") // PENDENTE | EMITIDA | CANCELADA | DISPENSADA
+  remessaCfop       String? // 5901 (dentro do estado) / 6901 (fora) — remessa p/ industrialização
+  remessaNatureza   String? // natureza da operação (ex.: "Remessa para industrialização")
+  remessaNfNumero   String?
+  remessaNfSerie    String?
+  remessaNfChave    String? // chave de acesso (44 díg.)
+  remessaNfEmitidaEm DateTime?
+  remessaPedidoOmie String? // codigo do pedido de venda no Omie (Fase 2 — emissão integrada)
+  remessaObservacao String?
+  remessaPorNome    String?
   criadoPorId       String?
   criadoNome        String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
   @@index([status])
+  @@index([remessaStatus])
 }
 
 // ── Dispensa de documento por funcionário (RH) ────────────────────────────────
