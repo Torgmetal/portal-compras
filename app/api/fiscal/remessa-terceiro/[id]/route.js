@@ -60,8 +60,7 @@ export async function PATCH(req, { params }) {
         remessaStatus: "PEDIDO_CRIADO",
         remessaPedidoOmie: String(resultado.codigoPedido),
         remessaPedidoNumero: resultado.numeroPedido || null,
-        remessaCfop: resultado.cfop || null,
-        remessaNatureza: "Remessa para industrialização",
+        remessaNatureza: "Remessa de Produto",
         remessaPorNome: user.name || null,
       },
     });
