@@ -6,6 +6,33 @@ const OMIE_CATEG_URL = "https://app.omie.com.br/api/v1/geral/categorias/";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
+// Prefixo numérico da descrição (ex: "5.2 - Material Auxiliar" → "5.2").
+// É por esse número que o Omie ordena e exibe a "Categoria da Compra".
+function prefixoNumerico(descricao) {
+  const m = String(descricao || "").match(/^\s*(\d+(?:\.\d+)*)/);
+  return m ? m[1] : null;
+}
+
+// Ordena igual ao Omie: pelo número da descrição, natural (2 < 3 < ... < 10 < 11),
+// e por nível (5.1 < 5.2 < 5.3). Categorias sem número na descrição vão pro fim.
+function compararComoOmie(a, b) {
+  const pa = prefixoNumerico(a.descricao);
+  const pb = prefixoNumerico(b.descricao);
+  if (pa && pb) {
+    const sa = pa.split(".").map(Number);
+    const sb = pb.split(".").map(Number);
+    for (let i = 0; i < Math.max(sa.length, sb.length); i++) {
+      const x = sa[i] ?? 0;
+      const y = sb[i] ?? 0;
+      if (x !== y) return x - y;
+    }
+    return 0;
+  }
+  if (pa) return -1;
+  if (pb) return 1;
+  return String(a.descricao).localeCompare(String(b.descricao), "pt-BR");
+}
+
 // Lista categorias cadastradas no Omie pra popular dropdown.
 // Filtra apenas categorias DESPESA (que fazem sentido em pedido de compra).
 export async function GET() {
@@ -52,12 +79,19 @@ export async function GET() {
       pagina++;
     }
 
-    // Mapeia pra estrutura simples e filtra: só ativas e que aceitem despesa/compra
+    // Mapeia pra estrutura simples e filtra igual ao dropdown de compra do Omie:
+    //  - conta_despesa = "S": só categorias de DESPESA (compra); tira receitas (1.x)
+    //  - totalizadora  ≠ "S": tira os cabeçalhos de grupo (ex: "3 - Custos Diretos"),
+    //    que não são lançáveis
+    //  - conta_inativa ≠ "S" e nao_exibir ≠ "S": tira as inativas/ocultas
+    //  - transferencia ≠ "S": tira as contas internas de transferência
     const categorias = todas
       .map((c) => ({
         codigo: c.codigo || "",
         descricao: c.descricao || "",
-        natureza: c.natureza || "", // "D" = despesa, "R" = receita
+        conta_despesa: c.conta_despesa || "N",
+        totalizadora: c.totalizadora || "N",
+        transferencia: c.transferencia || "N",
         conta_inativa: c.conta_inativa || "N",
         nao_exibir: c.nao_exibir || "N",
       }))
@@ -65,11 +99,13 @@ export async function GET() {
         (c) =>
           c.codigo &&
           c.descricao &&
+          c.conta_despesa === "S" &&
+          c.totalizadora !== "S" &&
+          c.transferencia !== "S" &&
           c.conta_inativa !== "S" &&
-          c.nao_exibir !== "S" &&
-          (c.natureza === "D" || c.natureza === "" || c.natureza === "B") // despesa, ou sem natureza específica
+          c.nao_exibir !== "S"
       )
-      .sort((a, b) => a.codigo.localeCompare(b.codigo, "pt-BR", { numeric: true }));
+      .sort(compararComoOmie);
 
     return NextResponse.json({ categorias, _meta: { count: categorias.length } });
   } catch (err) {

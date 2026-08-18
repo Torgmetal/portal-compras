@@ -1051,7 +1051,7 @@ function ModalGerarPedidos({ fornecedoresVencedores, totaisPorFornecedor, totalG
                 <option value="">— Selecionar —</option>
                 {categoriasOpcoes.map((c) => (
                   <option key={c.codigo} value={c.codigo}>
-                    {c.codigo} — {c.descricao}
+                    {c.descricao}
                   </option>
                 ))}
               </select>
