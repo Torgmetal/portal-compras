@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X, CheckCircle2, Scissors } from "lucide-react";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 
 // Uma aba por SETOR (Vitor 18/08). Deep-link: /producao/prioridades?bloco=jato
@@ -31,6 +31,7 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
   const [movendo, setMovendo] = useState("");
   const [desenho, setDesenho] = useState(null); // { opNumero, marca }
   const [exportando, setExportando] = useState(false);
+  const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis que faltam cortar)
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -117,8 +118,28 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
         {prioritaria ? <span className="w-6 h-6 rounded-full bg-torg-orange/10 text-torg-orange font-extrabold text-[12px] inline-flex items-center justify-center tabular-nums">{p.prioridade}</span> : null}
       </td>
       <td className="px-2 py-2 min-w-[140px]">
-        <p className={`font-mono text-[13px] truncate ${prioritaria ? "font-semibold text-torg-dark" : "text-torg-dark"}`}>{p.marca}</p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className={`font-mono text-[13px] ${prioritaria ? "font-semibold text-torg-dark" : "text-torg-dark"}`}>{p.marca}</p>
+          {/* Conjunto de croquis: mostra se JÁ PODE ser montado (todos os croquis cortados). */}
+          {p.prontoMontar === true && (
+            <span className="shrink-0 text-emerald-700 bg-emerald-50 text-[10px] rounded px-1.5 py-0.5 inline-flex items-center gap-0.5 font-medium"><CheckCircle2 size={10} /> liberado p/ montar</span>
+          )}
+          {p.prontoMontar === false && (
+            <button onClick={() => setExpandido((st) => { const n = new Set(st); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })}
+              title="Ver os croquis que ainda faltam cortar"
+              className="shrink-0 text-amber-700 bg-amber-50 hover:bg-amber-100 text-[10px] rounded px-1.5 py-0.5 inline-flex items-center gap-0.5 font-medium">
+              <Scissors size={10} /> falta cortar {p.faltamCroquis?.length || ""} {expandido.has(p.id) ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            </button>
+          )}
+        </div>
         {p.descricao && <p className="text-[11px] text-torg-gray truncate max-w-[260px]">{p.descricao}</p>}
+        {expandido.has(p.id) && p.faltamCroquis?.length > 0 && (
+          <div className="mt-1 pl-1 border-l-2 border-amber-200 space-y-0.5">
+            {p.faltamCroquis.map((c, i) => (
+              <p key={i} className="text-[11px] text-torg-gray"><span className="font-mono font-semibold text-torg-dark">{c.marca}</span>{c.descricao ? ` · ${c.descricao}` : ""} — <span className="text-amber-700 font-semibold">faltam {fmtN(c.faltaQtd)}</span></p>
+            ))}
+          </div>
+        )}
       </td>
       <td className="px-2 py-2 whitespace-nowrap">
         {p.terceiro ? (

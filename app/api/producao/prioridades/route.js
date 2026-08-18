@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
-import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora, entregaDoSetor } from "@/lib/prioridades-setor";
+import { setorRealIndex, FLUXO_SETORES, noTerceiroAgora, entregaDoSetor, croquiCortado } from "@/lib/prioridades-setor";
 import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe, renumerarPrioridades } from "@/lib/pecas-producao";
 
@@ -71,6 +71,35 @@ export async function GET() {
     select: { id: true, opId: true, marca: true, descricao: true, tipoPeca: true, perfil: true, qte: true, pesoUnitKg: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true, encaminhadoSetor: true, _count: { select: { conjuntoCroquis: true } } },
   }) : [];
 
+  // "LIBERADO PARA MONTAGEM": um conjunto só pode ser montado quando TODOS os croquis dele já
+  // foram cortados (critério ÚNICO `croquiCortado` — o mesmo do painel de Liberar e da TV).
+  // Vitor 18/08: "quando forma um conjunto de peças de croqui precisa aparecer na montagem que
+  // essa peça está liberada para montagem". Devolve também quantos/quais faltam cortar.
+  const prontoPorOpMarca = new Map(); // `${opId}|${marcaConjunto}` → { pronto, faltam:[{marca,faltaQtd}] }
+  if (opIds.length) {
+    const [croquis, links] = await Promise.all([
+      prisma.pecaConjunto.findMany({ where: { opId: { in: opIds }, tipoPeca: "CROQUI" }, select: { opId: true, marca: true, descricao: true, qte: true, qteProduzida: true, corteConcluidoEm: true, baixaSetores: true } }),
+      prisma.conjuntoCroqui.findMany({ where: { conjunto: { opId: { in: opIds } } }, select: { conjunto: { select: { opId: true, marca: true } }, croqui: { select: { marca: true } } } }),
+    ]);
+    const croquiPorChave = new Map(croquis.map((c) => [`${c.opId}|${c.marca}`, c]));
+    const faltaQtd = (cr) => {
+      const q = Number(cr?.qte) || 1;
+      const bx = cr?.baixaSetores && typeof cr.baixaSetores === "object" ? cr.baixaSetores.CORTE : null;
+      const feito = Math.max(Number(cr?.qteProduzida) || 0, bx ? (bx.qtd != null ? Number(bx.qtd) : q) : 0);
+      return Math.max(1, q - feito);
+    };
+    for (const lk of links) {
+      const chave = `${lk.conjunto.opId}|${lk.conjunto.marca}`;
+      if (!prontoPorOpMarca.has(chave)) prontoPorOpMarca.set(chave, { pronto: true, faltam: [] });
+      const reg = prontoPorOpMarca.get(chave);
+      const cr = croquiPorChave.get(`${lk.conjunto.opId}|${lk.croqui.marca}`);
+      if (!croquiCortado(cr)) {
+        reg.pronto = false;
+        if (reg.faltam.length < 12) reg.faltam.push({ marca: lk.croqui.marca, descricao: cr?.descricao || null, faltaQtd: faltaQtd(cr) });
+      }
+    }
+  }
+
   // dedupLpcLe: mesma marca com linha na LPC e na LE conta 1× (a da LPC) — senão a peça
   // aparece duplicada na tela do setor. Aplicado POR OP (a regra é dentro da OP).
   const porOp = new Map();
@@ -94,8 +123,12 @@ export async function GET() {
     const m = acc[bloco];
     if (!m.has(o.opNumero)) m.set(o.opNumero, { opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, datasSetor: o.datasSetor, entrega: o.entrega, pecas: [] });
     const terc = noTerceiroAgora(pc);
+    // Conjunto composto: liberado pra montar? (só faz sentido enquanto ele ainda está na Montagem)
+    const infoMont = composta ? prontoPorOpMarca.get(`${pc.opId}|${pc.marca}`) : null;
     m.get(o.opNumero).pecas.push({
       id: pc.id, marca: pc.marca, descricao: pc.descricao || null,
+      prontoMontar: infoMont ? infoMont.pronto : null,
+      faltamCroquis: infoMont && !infoMont.pronto ? infoMont.faltam : null,
       qte: Number(pc.qte) || 1, pesoUnitKg: Math.round((Number(pc.pesoUnitKg) || 0) * 10) / 10,
       pesoTotalKg: Math.round(Number(pc.pesoTotalKg) || 0),
       prioridade: pc.prioridade, setor: LABEL[setorKey] || setorKey,
@@ -106,7 +139,11 @@ export async function GET() {
   const blocos = BLOCOS.map((b) => {
     const ops = [...acc[b.key].values()].map((op) => {
       const prioritarias = op.pecas.filter((p) => p.prioridade != null).sort((a, z) => a.prioridade - z.prioridade);
-      const demaisAll = op.pecas.filter((p) => p.prioridade == null).sort((a, z) => String(a.marca).localeCompare(String(z.marca), "pt-BR", { numeric: true }));
+      // Demais: na Montagem os LIBERADOS (croquis cortados) vêm primeiro — é o que dá pra fazer agora.
+      const demaisAll = op.pecas.filter((p) => p.prioridade == null).sort((a, z) => {
+        if (b.key === "montagem" && (a.prontoMontar === true) !== (z.prontoMontar === true)) return a.prontoMontar === true ? -1 : 1;
+        return String(a.marca).localeCompare(String(z.marca), "pt-BR", { numeric: true });
+      });
       return {
         opNumero: op.opNumero, obra: op.obra, cliente: op.cliente,
         prazo: prazoDoBloco(op.datasSetor, b.setores, op.entrega, now),
