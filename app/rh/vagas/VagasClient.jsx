@@ -522,6 +522,15 @@ function roundRectArte(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// Requisitos: "um por linha" ou separados por ";" viram itens; se vier tudo numa linha só,
+// tenta separar por vírgula (caso o RH cole o texto corrido da vaga).
+function parseReqs(s) {
+  if (!s) return [];
+  const byLine = String(s).split(/[\n;]+/).map((x) => x.trim()).filter(Boolean);
+  if (byLine.length > 1) return byLine;
+  return String(s).split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean);
+}
+
 // Selos de benefícios (chips com check laranja) — layout com wrap + desenho.
 function chipsLayout(ctx, chips, maxW) {
   ctx.font = `600 27px Arial, sans-serif`;
@@ -561,17 +570,20 @@ function ArteModal({ vaga, onClose }) {
   const [titulo, setTitulo] = useState((vaga.titulo || vaga.cargo?.nome || "").toUpperCase());
   const [mensagem, setMensagem] = useState("Venha fazer parte de uma equipe engajada em crescer e construir grandes obras.");
   const [beneficios, setBeneficios] = useState("Plano de Saúde, Vale Refeição");
+  const [requisitos, setRequisitos] = useState(vaga.requisitos || "");
   const [contato, setContato] = useState("Envie seu currículo: rh@torg.com.br");
   const [imgObra, setImgObra] = useState(null);
   const [logo, setLogo] = useState(null);
   const [copiado, setCopiado] = useState(false);
 
   const subInfo = vaga.setor?.nome || "";
+  const reqInit = parseReqs(vaga.requisitos || "");
 
   const [legenda, setLegenda] = useState(
     `🏗️ Estamos contratando: ${vaga.titulo}${vaga.setor?.nome ? " — " + vaga.setor.nome : ""}\n\n` +
     `Venha fazer parte de uma equipe engajada em crescer e construir grandes obras em estruturas metálicas. Aqui o seu trabalho faz parte de projetos que ficam de pé.\n\n` +
     `✅ Benefícios: Plano de Saúde e Vale Refeição.\n\n` +
+    (reqInit.length ? `📋 Requisitos: ${reqInit.join("; ")}.\n\n` : "") +
     `📩 Envie seu currículo para rh@torg.com.br\n\n` +
     `#vagas #trabalheconosco #estruturasmetalicas #torgmetal`
   );
@@ -595,7 +607,7 @@ function ArteModal({ vaga, onClose }) {
     im.src = fotoSrc;
   }, [fotoSrc]);
 
-  useEffect(() => { desenhar(); }, [formato, imgObra, logo, headline, titulo, mensagem, beneficios, contato]); // eslint-disable-line
+  useEffect(() => { desenhar(); }, [formato, imgObra, logo, headline, titulo, mensagem, requisitos, beneficios, contato]); // eslint-disable-line
 
   function desenhar() {
     const canvas = canvasRef.current;
@@ -634,9 +646,12 @@ function ArteModal({ vaga, onClose }) {
     ctx.fillStyle = ORANGE; ctx.fillRect(W - M - 120, M + 34, 120, 8);
 
     // ── Bloco inferior (medido → alinhado à base) ──
-    const TITLE = 90, lhTitle = TITLE * 1.1;
+    // Título encolhe quando precisa de 3 linhas (cargos longos) pra não empurrar o bloco no logo.
+    let TITLE = 90;
     ctx.font = `800 ${TITLE}px Arial, sans-serif`;
-    const linhas = wrapArte(ctx, titulo || "", W - 2 * M, 3);
+    let linhas = wrapArte(ctx, titulo || "", W - 2 * M, 3);
+    if (linhas.length >= 3) { TITLE = 70; ctx.font = `800 ${TITLE}px Arial, sans-serif`; linhas = wrapArte(ctx, titulo || "", W - 2 * M, 3); }
+    const lhTitle = TITLE * 1.1;
 
     const pillTxt = (headline || "").toUpperCase().trim();
     ctx.font = `800 34px Arial, sans-serif`;
@@ -651,8 +666,31 @@ function ArteModal({ vaga, onClose }) {
     const benef = beneficios ? beneficios.split(",").map((s) => s.trim()).filter(Boolean) : [];
     const chips = benef.length ? chipsLayout(ctx, benef, W - 2 * M) : null;
     const gapBenef = chips ? 24 : 0, benefH = chips ? chips.totalH : 0;
-    const gapDiv = 30, ctaH = 40;
-    const blocoH = pillH + gapPill + linhas.length * lhTitle + gapSub + subH + gapMsg + msgH + gapBenef + benefH + gapDiv + 5 + gapDiv + ctaH;
+    const gapDiv = 22, ctaH = 40;
+
+    // Requisitos: título "REQUISITOS" + itens (1 linha cada, densos). Os que não couberem viram
+    // "+N" pra o bloco não invadir o logo (Feed é apertado); a legenda leva a lista completa.
+    const reqAll = parseReqs(requisitos);
+    const REQ_MAX = formato === "story" ? 6 : 4;
+    const reqHeadH = reqAll.length ? 34 : 0, reqLineH = 36, gapReq = reqAll.length ? 20 : 0;
+    const buildReq = (shown) => {
+      ctx.font = `600 27px Arial, sans-serif`;
+      const ls = shown.map((t) => (wrapArte(ctx, `•  ${t}`, W - 2 * M, 1)[0] || ""));
+      const hid = reqAll.length - shown.length;
+      if (hid > 0) ls.push(`+${hid} requisito${hid > 1 ? "s" : ""}`);
+      return ls;
+    };
+    const reqBlockH = (lines) => (reqAll.length ? reqHeadH + lines.length * reqLineH : 0);
+    const fixoH = pillH + gapPill + linhas.length * lhTitle + gapSub + subH + gapMsg + msgH + gapBenef + benefH + gapDiv + 5 + gapDiv + ctaH;
+    const availH = H - M - (M + 90); // topo do bloco deve ficar abaixo do logo
+    let reqShown = reqAll.slice(0, REQ_MAX);
+    let reqLines = buildReq(reqShown);
+    let blocoH = fixoH + gapReq + reqBlockH(reqLines);
+    while (blocoH > availH && reqShown.length > 0) {
+      reqShown = reqShown.slice(0, -1);
+      reqLines = buildReq(reqShown);
+      blocoH = fixoH + gapReq + reqBlockH(reqLines);
+    }
 
     let cy = H - M - blocoH;
 
@@ -675,6 +713,12 @@ function ArteModal({ vaga, onClose }) {
     cy += gapSub;
     if (subInfo) { ctx.fillStyle = "#e2e8f0"; ctx.font = `600 34px Arial, sans-serif`; ctx.fillText(subInfo, M, cy); cy += subH; }
     if (mLines.length) { cy += gapMsg; ctx.fillStyle = "#f1f5f9"; ctx.font = `600 32px Arial, sans-serif`; for (const ln of mLines) { ctx.fillText(ln, M, cy); cy += 40; } }
+    if (reqAll.length) {
+      cy += gapReq;
+      ctx.fillStyle = ORANGE; ctx.font = `800 24px Arial, sans-serif`; ctx.fillText("REQUISITOS", M, cy); cy += reqHeadH;
+      ctx.fillStyle = "#e2e8f0"; ctx.font = `600 27px Arial, sans-serif`;
+      for (const ln of reqLines) { ctx.fillText(ln, M, cy); cy += reqLineH; }
+    }
     if (chips) { cy += gapBenef; drawChips(ctx, M, cy, chips, ORANGE); cy += benefH; }
 
     cy += gapDiv;
@@ -751,6 +795,12 @@ function ArteModal({ vaga, onClose }) {
               <label className="block text-xs font-medium text-torg-gray mb-1">Mensagem</label>
               <textarea rows={2} value={mensagem} onChange={(e) => setMensagem(e.target.value)}
                 placeholder="Ex: Venha fazer parte de uma equipe engajada em crescer."
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-torg-gray mb-1">Requisitos (um por linha)</label>
+              <textarea rows={3} value={requisitos} onChange={(e) => setRequisitos(e.target.value)}
+                placeholder={"Ex: Experiência em leitura de desenho\nCurso técnico na área\nConhecimento em ensaios (END)"}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
             </div>
             <Campo label="Benefícios (separe por vírgula)" value={beneficios} onChange={setBeneficios} placeholder="Plano de Saúde, Vale Refeição" />
