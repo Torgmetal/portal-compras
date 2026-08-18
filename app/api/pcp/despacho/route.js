@@ -10,10 +10,10 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { whereSetorSyneco } from "@/lib/syneco-dia";
+import { whereSetorSyneco, normalizeSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe } from "@/lib/pecas-producao";
-import { croquiCortado } from "@/lib/prioridades-setor";
+import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES } from "@/lib/prioridades-setor";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -66,7 +66,7 @@ export async function GET(req) {
   const setor = url.searchParams.get("setor"); // opcional: escopo do setor pela ROTA da peça
   const todasRaw = await prisma.pecaConjunto.findMany({
     where: { opId },
-    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, marca: true, descricao: true, tipoPeca: true, perfil: true, fonte: true, pesoUnitKg: true, pesoTotalKg: true, qte: true, qteProduzida: true, corteConcluidoEm: true, status: true, destino: true, destinoTerceirizado: true, terceirizado: true, terceirizadoRecebidoEm: true, encaminhadoSetor: true, prioridade: true, baixaSetores: true, _count: { select: { conjuntoCroquis: true } } },
     orderBy: [{ marca: "asc" }],
   });
   // Descarta linhas-lixo do import (ex.: a linha "TOTAL" da Lista de Expedição que entrou como peça)
@@ -113,6 +113,17 @@ export async function GET(req) {
       for (const s of syn) if (s.item) synecoQtd.set(s.item, Math.round(s._sum?.produzidoUn || 0));
     } catch {}
   }
+  // SETOR REAL de cada peça (Syneco de TODOS os setores + status + terceiro + encaminhamento).
+  // Serve pra não deixar peça que JÁ AVANÇOU aparecer na fila de um setor ANTERIOR (Vitor 18/08:
+  // "peças que estiverem em outros setores não podem ficar paradas em setores para trás").
+  const IDX_SETOR = Object.fromEntries(FLUXO_SETORES.map((x, i) => [x.key, i]));
+  let realMapOp = new Map();
+  try {
+    const synAll = await prisma.mesOrdem.groupBy({ by: ["item", "setor"], where: { opId, produzidoUn: { gt: 0 } }, _sum: { produzidoUn: true } });
+    realMapOp = mapaSetorReal(synAll.map((l) => ({ item: l.item, setor: l.setor })), normalizeSetorSyneco);
+  } catch {}
+  const jaAvancouAlem = (p) => (setor ? setorRealIndex(p, realMapOp) > (IDX_SETOR[setor] ?? -1) : false);
+
   // MONTAGEM — "pronto para montar" vs "pendente": um conjunto está pronto quando TODOS os croquis
   // dele já foram cortados (baixa no corte / produção no Syneco / corte concluído). Devolve também
   // a lista dos que faltam, pra poder clicar no conjunto e ver quais peças estão faltando.
@@ -156,7 +167,9 @@ export async function GET(req) {
     // Montagem: só conjuntos COM croquis têm status pronto/pendente; sem croquis (ex.: GC) = null (sem chip).
     const info = prontoInfo ? prontoInfo.get(p.marca) : null;
     const mont = prontoInfo ? (info || { prontoMontar: null, faltamCroquis: [], totalCroquis: 0 }) : null;
-    return { ...p, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
+    // avancouAlem: a peça JÁ está num setor à frente deste (Syneco/status/terceiro/encaminhada) —
+    // não pode ficar pendente aqui atrás; o painel joga pro histórico (aba Peças prontas).
+    return { ...p, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
   const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");

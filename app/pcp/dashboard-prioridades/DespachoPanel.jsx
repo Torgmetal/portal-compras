@@ -75,10 +75,13 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   // foi produzido (mesmo sem baixa no portal) NÃO aparece como pendente. (Vitor: "não temos
   // essas peças para fazer" — eram peças já produzidas no Syneco.)
   const feitoQtd = (p) => Math.max(p.baixadoQtd || 0, p.produzidoSyneco || 0);
-  // Liberar: só o que FALTA — não concluído no Syneco nem baixado no portal.
-  const pendentes = useMemo(() => pecas.filter((p) => feitoQtd(p) < (p.qte || 1)), [pecas]);
-  // Peças prontas: já concluídas no setor (produzidas no Syneco OU baixadas no portal) — histórico.
-  const prontas = useMemo(() => pecas.filter((p) => feitoQtd(p) >= (p.qte || 1)), [pecas]);
+  // "Já resolvida neste setor" = concluída (baixa/Syneco) OU já avançou pra um setor À FRENTE
+  // (avancouAlem) — peça que está no Jato não pode ficar pendente na Montagem. (Vitor 18/08.)
+  const resolvida = (p) => feitoQtd(p) >= (p.qte || 1) || !!p.avancouAlem;
+  // Liberar: só o que FALTA de verdade neste setor.
+  const pendentes = useMemo(() => pecas.filter((p) => !resolvida(p)), [pecas]);
+  // Peças prontas: histórico do setor (concluídas aqui ou que já seguiram adiante).
+  const prontas = useMemo(() => pecas.filter((p) => resolvida(p)), [pecas]);
   const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro]);
   const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro]);
   const visiveis = aba === "prontas" ? listaProntas : listaLiberar;
