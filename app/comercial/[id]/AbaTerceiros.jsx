@@ -108,11 +108,17 @@ export default function AbaTerceiros({ opId }) {
                     {Array.isArray(r.materiais) && r.materiais.length > 0 && (
                       <div className="mt-3">
                         <p className="text-[10px] uppercase font-semibold text-indigo-700 mb-1">Material a mandar (barras/chapas — p/ NF de retorno)</p>
-                        <table className="w-full text-[12px] min-w-[380px]">
-                          <thead><tr className="text-[10px] uppercase text-torg-gray"><th className="text-left py-1">Perfil</th><th className="text-left py-1">Unidade</th><th className="text-right py-1">Qtd</th><th className="text-right py-1">Peso</th></tr></thead>
+                        <table className="w-full text-[12px] min-w-[520px]">
+                          <thead><tr className="text-[10px] uppercase text-torg-gray"><th className="text-left py-1">Cód. Omie</th><th className="text-left py-1">Perfil</th><th className="text-left py-1">Descrição / unidade</th><th className="text-right py-1">Qtd</th><th className="text-right py-1">Peso</th></tr></thead>
                           <tbody className="divide-y divide-gray-50">
                             {r.materiais.map((m, i) => (
-                              <tr key={i}><td className="py-1 font-mono text-torg-dark whitespace-nowrap">{m.perfil}</td><td className="py-1 text-torg-gray whitespace-nowrap">{[m.unidade, m.descricao].filter(Boolean).join(" · ") || "—"}</td><td className="py-1 text-right tabular-nums font-semibold">{fmtN(m.qtd)}</td><td className="py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(m.pesoKg)}</td></tr>
+                              <tr key={i}>
+                                <td className="py-1 font-mono text-[11px] whitespace-nowrap">{m.codigoOmie || <span className="text-gray-300">—</span>}</td>
+                                <td className="py-1 font-mono text-torg-dark whitespace-nowrap">{m.perfil}</td>
+                                <td className="py-1 text-torg-gray truncate max-w-[280px]" title={m.descricaoOmie || m.descricao || ""}>{[m.descricaoOmie || m.descricao, m.unidade].filter(Boolean).join(" · ") || "—"}</td>
+                                <td className="py-1 text-right tabular-nums font-semibold">{fmtN(m.qtd)}</td>
+                                <td className="py-1 text-right tabular-nums whitespace-nowrap">{fmtKg(m.pesoKg)}</td>
+                              </tr>
                             ))}
                           </tbody>
                         </table>
