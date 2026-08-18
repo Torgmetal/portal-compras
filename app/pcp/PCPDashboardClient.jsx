@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { fmtOP, fmtKg } from "@/lib/utils";
 import { MAQUINA_LABEL } from "@/lib/maquina-corte";
+import BotaoSincronizarCmr from "@/components/BotaoSincronizarCmr";
 
 const fmtHora = (d) => (d ? new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—");
 
@@ -170,6 +171,8 @@ export default function PCPDashboardClient({ isAdmin = false }) {
           <button onClick={carregar} className="px-3 py-1.5 bg-white border border-torg-blue-200 text-torg-blue text-xs rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-1.5">
             <RefreshCw size={13} /> Atualizar
           </button>
+          {/* CMR do Almoxarifado → status de compra do material na Preparação */}
+          <BotaoSincronizarCmr onPronto={carregar} />
         </div>
       </div>
 

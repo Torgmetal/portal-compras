@@ -7,6 +7,7 @@ import {
   FileSpreadsheet, Upload, Paperclip, Link2, ScrollText, Mail,
 } from "lucide-react";
 import { CATEGORIAS_QUALIDADE, CATEGORIA_LABEL, STATUS_COR } from "@/lib/qualidade-status";
+import BotaoSincronizarCmr from "@/components/BotaoSincronizarCmr";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtTam = (b) => (!b ? "" : b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(1)} MB`);
@@ -120,6 +121,7 @@ export default function QualidadeClient({ escopo = "empresa", isAdmin = false })
         <div className="flex items-center gap-2 shrink-0">
           {material && (
             <>
+              <BotaoSincronizarCmr onPronto={carregar} />
               <button onClick={() => setImportar(true)}
                 className="text-sm font-semibold text-torg-blue border border-torg-blue-300 hover:bg-torg-blue-50 px-3 py-2 rounded-lg inline-flex items-center gap-2">
                 <FileSpreadsheet size={15} /> Importar (CMR)
