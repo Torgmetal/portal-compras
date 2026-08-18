@@ -220,6 +220,9 @@ async function main() {
     `ADD COLUMN IF NOT EXISTS "destinoObs" TEXT`,
     `ADD COLUMN IF NOT EXISTS "baixaSetores" JSONB DEFAULT '{}'`,
     `ADD COLUMN IF NOT EXISTS "terceiroRetornoPrevisto" TIMESTAMP(3)`,
+    `ADD COLUMN IF NOT EXISTS "encaminhadoSetor" TEXT`,
+    `ADD COLUMN IF NOT EXISTS "encaminhadoEm" TIMESTAMP(3)`,
+    `ADD COLUMN IF NOT EXISTS "encaminhadoPor" TEXT`,
   ]) await prisma.$executeRawUnsafe(`ALTER TABLE "PecaConjunto" ${c}`);
   console.log("[ensure-mes-tables] OK — PecaConjunto.destino* garantidas.");
 

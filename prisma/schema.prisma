@@ -2319,6 +2319,11 @@ model PecaConjunto {
   // (terceirizado=true, ainda não recebido), a peça aparece na fila do setor de RETORNO
   // (destinoTerceirizado) com essa data — e sai da fila do setor de onde saiu.
   terceiroRetornoPrevisto DateTime?
+  // Encaminhada MANUALMENTE pra um setor (painel de Liberar do PCP): a peça pula as etapas
+  // anteriores e fica pendente no setor escolhido (ex.: direto pro Jato). Reverter limpa.
+  encaminhadoSetor        String? // MONTAGEM | SOLDA | ACABAMENTO | JATO | PINTURA
+  encaminhadoEm           DateTime?
+  encaminhadoPor          String?
   // Fila / kanban de corte (programação pós-liberação). As datas META não
   // mudam depois de programadas; o real vem dos botões Iniciar/Concluir.
   corteOrdem             Int? // posição na fila (menor = corta primeiro)

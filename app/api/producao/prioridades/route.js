@@ -64,7 +64,7 @@ export async function GET() {
   const pecas = opIds.length ? await prisma.pecaConjunto.findMany({
     // "não croqui" INCLUINDO tipoPeca NULL (avulsas/solo) — `{ not: "CROQUI" }` sozinho descarta os NULL.
     where: { opId: { in: opIds }, OR: [{ tipoPeca: { not: "CROQUI" } }, { tipoPeca: null }] },
-    select: { id: true, opId: true, marca: true, descricao: true, tipoPeca: true, perfil: true, qte: true, pesoUnitKg: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true, _count: { select: { conjuntoCroquis: true } } },
+    select: { id: true, opId: true, marca: true, descricao: true, tipoPeca: true, perfil: true, qte: true, pesoUnitKg: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true, encaminhadoSetor: true, _count: { select: { conjuntoCroquis: true } } },
   }) : [];
 
   for (const pc of pecas) {

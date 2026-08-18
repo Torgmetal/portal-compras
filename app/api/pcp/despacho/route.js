@@ -21,11 +21,16 @@ const DESTINOS = ["PRIORIDADE", "TERCEIRO", "REVISAO", "AGUARDANDO_MATERIAL", "C
 const VOLTA_TERCEIRO = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 const SETORES_BAIXA = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 
+const SETORES_ENCAMINHAR = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"];
+
 const schema = z.object({
   ids: z.array(z.string()).optional(),
   destino: z.enum(DESTINOS).optional(),
   destinoTerceirizado: z.enum(VOLTA_TERCEIRO).optional(),
   dataPrevRetorno: z.string().optional().nullable(), // volta prevista do terceiro (romaneio RT)
+  // Encaminhar direto pra um setor (pula as etapas anteriores; ex.: direto pro Jato).
+  encaminharSetor: z.enum(SETORES_ENCAMINHAR).optional(),
+  comPrioridade: z.boolean().optional(), // junto com o encaminhar: também numera como prioridade
   obs: z.string().max(500).optional().nullable(),
   reverter: z.boolean().optional(),
   // Baixa PORTAL (não escreve no Syneco): grava baixaSetores[baixaSetor] = { qtd, em, por }.
@@ -172,7 +177,7 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); }
   catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
-  const { ids, destino, destinoTerceirizado, dataPrevRetorno, obs, reverter, baixaSetor, baixas, reverterBaixa } = body;
+  const { ids, destino, destinoTerceirizado, dataPrevRetorno, encaminharSetor, comPrioridade, obs, reverter, baixaSetor, baixas, reverterBaixa } = body;
 
   // ── Baixa PORTAL ──────────────────────────────────────────────────────────
   // Grava/remove a QUANTIDADE baixada da peça NAQUELE setor (PecaConjunto.baixaSetores[setor] =
@@ -230,18 +235,45 @@ export async function POST(req) {
   const marca = { destinoEm: new Date(), destinoPor: user.id, destinoObs: (obs || "").trim() || null };
   let atualizados = 0;
 
+  // Numera como prioridade (append na fila de cada OP) as peças ainda SEM número — o que faz a
+  // peça aparecer nas telas de Prioridades de Produção e na TV, já ordenável.
+  async function numerarPrioridade(idsAlvo) {
+    const novas = await prisma.pecaConjunto.findMany({ where: { id: { in: idsAlvo }, prioridade: null }, select: { id: true, opId: true, ordemCampo: true, marca: true } });
+    const porOp = {};
+    for (const pc of novas) (porOp[pc.opId] ||= []).push(pc);
+    for (const opId of Object.keys(porOp)) {
+      const arr = porOp[opId].sort((a, b) => (a.ordemCampo ?? 1e9) - (b.ordemCampo ?? 1e9) || String(a.marca).localeCompare(String(b.marca)));
+      const mx = await prisma.pecaConjunto.aggregate({ where: { opId, prioridade: { not: null } }, _max: { prioridade: true } });
+      let n = mx._max.prioridade || 0;
+      for (const pc of arr) { n++; await prisma.pecaConjunto.update({ where: { id: pc.id }, data: { prioridade: n } }); }
+    }
+  }
+
   if (reverter) {
-    // Volta pra EM ABERTO: limpa o despacho; se era terceirizado, volta pro fluxo de corte.
+    // Volta pra EM ABERTO: limpa o despacho; se era terceirizado/encaminhada, volta pro fluxo normal.
     const r = await prisma.pecaConjunto.updateMany({
       where: { id: { in: ids } },
       data: {
         destino: null, destinoEm: null, destinoPor: null, destinoObs: null,
         terceirizado: false, destinoTerceirizado: null, terceirizadoRecebidoEm: null, terceiroRetornoPrevisto: null,
+        encaminhadoSetor: null, encaminhadoEm: null, encaminhadoPor: null,
         prioridade: null, // "prioridade" = destino PRIORIDADE + número; ao voltar pra aberto, sai da lista
         status: "PENDENTE", ultimoSetor: null,
       },
     });
     atualizados = r.count;
+  } else if (encaminharSetor) {
+    // ENCAMINHAR direto pro setor (ex.: Jato): a peça pula as etapas anteriores e fica pendente
+    // no setor escolhido (motor: realIdx = setor-1). Com `comPrioridade`, também numera (1,2,3…).
+    const r = await prisma.pecaConjunto.updateMany({
+      where: { id: { in: ids }, status: { not: "EXPEDIDO" } },
+      data: { encaminhadoSetor: encaminharSetor, encaminhadoEm: new Date(), encaminhadoPor: user.id },
+    });
+    atualizados = r.count;
+    if (comPrioridade) {
+      await prisma.pecaConjunto.updateMany({ where: { id: { in: ids }, status: { not: "EXPEDIDO" }, destino: null }, data: { ...marca, destino: "PRIORIDADE" } });
+      await numerarPrioridade(ids);
+    }
   } else if (destino === "TERCEIRO") {
     if (!destinoTerceirizado) return NextResponse.json({ error: "Informe a volta do terceiro (Montagem/Pintura/Expedição)." }, { status: 400 });
     // Pode mandar pra terceiro de qualquer etapa (Corte, Montagem, …) — só não o que já foi expedido.
@@ -263,24 +295,14 @@ export async function POST(req) {
     atualizados = r.count;
     // "Prioridade" = UMA coisa só: além do destino, ganha o NÚMERO de prioridade (append na fila
     // da OP) — assim aparece nas telas de Prioridades de Produção e na TV, já reordenável.
-    if (destino === "PRIORIDADE") {
-      const novas = await prisma.pecaConjunto.findMany({ where: { id: { in: ids }, prioridade: null }, select: { id: true, opId: true, ordemCampo: true, marca: true } });
-      const porOp = {};
-      for (const pc of novas) (porOp[pc.opId] ||= []).push(pc);
-      for (const opId of Object.keys(porOp)) {
-        const arr = porOp[opId].sort((a, b) => (a.ordemCampo ?? 1e9) - (b.ordemCampo ?? 1e9) || String(a.marca).localeCompare(String(b.marca)));
-        const mx = await prisma.pecaConjunto.aggregate({ where: { opId, prioridade: { not: null } }, _max: { prioridade: true } });
-        let n = mx._max.prioridade || 0;
-        for (const pc of arr) { n++; await prisma.pecaConjunto.update({ where: { id: pc.id }, data: { prioridade: n } }); }
-      }
-    }
+    if (destino === "PRIORIDADE") await numerarPrioridade(ids);
   }
 
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "DESPACHAR_PECA", entity: "PecaConjunto",
       entityId: ids.length === 1 ? ids[0] : `${ids.length} peças`,
-      diff: { destino: reverter ? "ABERTO" : destino || null, destinoTerceirizado: destinoTerceirizado || null, total: ids.length, atualizados },
+      diff: { destino: reverter ? "ABERTO" : destino || null, destinoTerceirizado: destinoTerceirizado || null, encaminharSetor: encaminharSetor || null, comPrioridade: !!comPrioridade, total: ids.length, atualizados },
     },
   }).catch(() => {});
 

@@ -39,6 +39,8 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis faltantes)
   const [terceiroPecas, setTerceiroPecas] = useState(null); // peças abertas no modal de terceiro
   const [desenhoMarca, setDesenhoMarca] = useState(null); // marca aberta no modal de desenhos (GRD)
+  const [encSetor, setEncSetor] = useState("JATO"); // setor do "enviar direto p/ setor"
+  const [encPrio, setEncPrio] = useState(true); // enviar pro setor JÁ marcando prioridade
   const podeBaixa = !!setor;
   const toggleExpand = (id) => setExpandido((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -104,6 +106,13 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     const ids = emAbertoSel();
     if (!ids.length) return alert("Selecione peças em aberto (sem destino) para destinar.");
     await post({ ids, destino });
+  }
+  // Encaminhar DIRETO pra um setor (ex.: Jato) — a peça pula as etapas anteriores e fica pendente
+  // no setor escolhido; com "priorizar", também ganha o número de prioridade.
+  async function encaminhar() {
+    const ids = [...sel];
+    if (!ids.length) return alert("Selecione as peças para enviar ao setor.");
+    await post({ ids, encaminharSetor: encSetor, comPrioridade: encPrio }, (j) => `${j.atualizados} peça(s) enviada(s) para ${SETOR_LABEL[encSetor] || encSetor}${encPrio ? " (com prioridade)" : ""}.`);
   }
   // Terceiro abre um modal (escolher fornecedor + retorno + gerar romaneio) em vez de despachar direto.
   function abrirTerceiro() {
@@ -352,6 +361,20 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                 <button key={d.key} onClick={() => (d.key === "TERCEIRO" ? abrirTerceiro() : despachar(d.key))} disabled={!sel.size || enviando} title={d.key === "TERCEIRO" ? "Escolher fornecedor + setor de retorno e gerar o romaneio do terceiro" : d.desc}
                   className={`text-[11px] font-semibold text-white rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 ${d.cor}`}><d.icon size={12} /> {d.label}</button>
               ))}
+              <span className="w-px h-6 bg-gray-200 mx-1" />
+              {/* Enviar DIRETO pra um setor (pula as etapas anteriores) — ex.: prioridade + direto pro Jato */}
+              <span className="inline-flex items-center gap-1.5">
+                <span className="text-[11px] text-torg-gray">Enviar p/ setor:</span>
+                <select value={encSetor} onChange={(e) => setEncSetor(e.target.value)} disabled={enviando}
+                  className="text-[11px] font-semibold border border-gray-300 rounded-lg px-1.5 py-[7px]">
+                  {["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA"].map((s) => <option key={s} value={s}>{SETOR_LABEL[s] || s}</option>)}
+                </select>
+                <label className="inline-flex items-center gap-1 text-[11px] text-torg-gray cursor-pointer" title="Além de enviar, já marca as peças como prioridade (1,2,3…)">
+                  <input type="checkbox" checked={encPrio} onChange={(e) => setEncPrio(e.target.checked)} /> priorizar
+                </label>
+                <button onClick={encaminhar} disabled={!sel.size || enviando} title="A peça pula as etapas anteriores e entra na fila do setor escolhido"
+                  className="text-[11px] font-semibold text-white rounded-lg px-2.5 py-2 inline-flex items-center gap-1 disabled:opacity-40 bg-teal-600 hover:bg-teal-700"><ChevronRight size={12} /> Enviar</button>
+              </span>
             </div>
             <p className="text-[11px] text-torg-gray">{sel.size} selecionada(s) · <b>Dar baixa</b> = concluída no setor (vai pro histórico). Destinar age só nas <b>em aberto</b>. A baixa é do portal; a coluna Syneco mostra o que falta acertar lá.</p>
           </div>
