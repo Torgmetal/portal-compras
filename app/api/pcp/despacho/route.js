@@ -13,6 +13,7 @@ import { requireRole } from "@/lib/session";
 import { whereSetorSyneco, normalizeSetorSyneco } from "@/lib/syneco-dia";
 import { ehItemComprado } from "@/lib/item-comprado";
 import { dedupLpcLe, renumerarPrioridades } from "@/lib/pecas-producao";
+import { materialPorPerfil } from "@/lib/status-compra";
 import { croquiCortado, setorRealIndex, mapaSetorReal, FLUXO_SETORES } from "@/lib/prioridades-setor";
 import { z } from "zod";
 
@@ -157,6 +158,13 @@ export async function GET(req) {
     }
   }
 
+  // MATERIAL por peça (do CMR do Almoxarifado): o corte precisa saber, item a item, se o
+  // material daquele perfil já chegou. (Vitor 18/08 — antes só existia o resumo da OP.)
+  let matPorPerfil = new Map();
+  try {
+    if (opInfo?.numero) matPorPerfil = await materialPorPerfil(opInfo.numero, escopo.map((p) => p.perfil));
+  } catch {}
+
   const pecas = escopo.map((p) => {
     const bx = p.baixaSetores && typeof p.baixaSetores === "object" ? p.baixaSetores : {};
     const reg = setor ? bx[setor] : null;
@@ -170,7 +178,8 @@ export async function GET(req) {
     const mont = prontoInfo ? (info || { prontoMontar: null, faltamCroquis: [], totalCroquis: 0 }) : null;
     // avancouAlem: a peça JÁ está num setor à frente deste (Syneco/status/terceiro/encaminhada) —
     // não pode ficar pendente aqui atrás; o painel joga pro histórico (aba Peças prontas).
-    return { ...p, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
+    const mat = p.perfil ? matPorPerfil.get(String(p.perfil).trim().toUpperCase()) || null : null;
+    return { ...p, material: mat, baixadoQtd, baixadoPor: reg?.porNome || null, baixadoEm: reg?.em || null, baixadoPortal, produzidoSyneco, precisaSyneco, avancouAlem: jaAvancouAlem(p), prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null };
   });
 
   const emAberto = pecas.filter((p) => !p.destino && p.status === "PENDENTE");

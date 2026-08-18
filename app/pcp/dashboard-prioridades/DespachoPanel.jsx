@@ -2,23 +2,23 @@
 // Painel da OP na TV do PCP — duas abas:
 //   • Liberar       → área de trabalho do setor: lista as peças a concluir (filtro + seleção),
 //                     dá BAIXA (por quantidade), importa planilha (marca + qtd) e ainda destina
-//                     as em aberto (Prioridade / Terceiro / Revisão / Aguardando / Cancelar).
+//                     as em aberto (Prioridade / Terceiro) e mostra o MATERIAL de cada peça (CMR).
 //   • Peças prontas → histórico do que já teve baixa NAQUELE setor: qtd total, qtd baixada, qtd
 //                     produzida no Syneco, peso unitário e peso total (extremo sincronismo).
 // Baixa é SÓ do portal (PecaConjunto.baixaSetores[setor] = { qtd, em, por }); não escreve no Syneco.
 // Reusa /api/pcp/despacho (GET peças+placar+reconciliação, POST despacha / dá baixa por qtd).
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
-import { X, Loader2, Star, Truck, RotateCcw, Ban, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Factory, FileText } from "lucide-react";
+import { X, Loader2, Star, Truck, Package, FileDown, FileUp, CheckCircle2, Undo2, ClipboardList, ChevronRight, ChevronDown, Factory, FileText } from "lucide-react";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import { criarRelatorioTorg, adicionarHeaderTabela, adicionarLinhaTabela, adicionarLinhaTotais, downloadWorkbook } from "@/lib/excel-relatorio";
 import TerceiroModal from "./TerceiroModal";
 
+// Só os destinos que o PCP usa de fato. Revisão / Aguard. material / Cancelar saíram a pedido do
+// Vitor (18/08) — não faziam sentido no dia a dia e poluíam a barra. O status de material agora
+// vem do CMR, item a item, então "Aguard. material" virou informação, não ação.
 const DESTINOS = [
   { key: "PRIORIDADE", label: "Prioridade", icon: Star, cor: "bg-amber-500 hover:bg-amber-600", desc: "libera p/ desenho e corte" },
   { key: "TERCEIRO", label: "Terceiro", icon: Truck, cor: "bg-indigo-600 hover:bg-indigo-700", desc: "terceiriza (vai p/ /pcp/terceirizados)" },
-  { key: "REVISAO", label: "Revisão", icon: RotateCcw, cor: "bg-sky-600 hover:bg-sky-700", desc: "volta p/ engenharia revisar" },
-  { key: "AGUARDANDO_MATERIAL", label: "Aguard. material", icon: Package, cor: "bg-slate-500 hover:bg-slate-600", desc: "trava esperando matéria-prima" },
-  { key: "CANCELADA", label: "Cancelar", icon: Ban, cor: "bg-red-600 hover:bg-red-700", desc: "tira do escopo" },
 ];
 const VOLTA = ["MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", "EXPEDICAO"];
 const ROTULO = { ABERTO: "Em aberto", PRIORIDADE: "Prioridade", TERCEIRO: "Terceiro", REVISAO: "Revisão", AGUARDANDO_MATERIAL: "Aguard. material", CANCELADA: "Cancelada" };
@@ -36,6 +36,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const [terceiroVolta, setTerceiroVolta] = useState("MONTAGEM");
   const [aba, setAba] = useState(setor ? abaInicial : "despacho"); // "despacho"(Liberar) | "prontas"
   const [filtro, setFiltro] = useState("");
+  const [soSemMaterial, setSoSemMaterial] = useState(false); // filtro rápido: só o que está sem material
   const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis faltantes)
   const [terceiroPecas, setTerceiroPecas] = useState(null); // peças abertas no modal de terceiro
   const [desenhoMarca, setDesenhoMarca] = useState(null); // marca aberta no modal de desenhos (GRD)
@@ -70,7 +71,12 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   };
 
   const pecas = data?.pecas || [];
-  const filtrar = (arr) => { const q = filtro.trim().toLowerCase(); return q ? arr.filter((p) => `${p.marca} ${p.descricao || ""}`.toLowerCase().includes(q)) : arr; };
+  const filtrar = (arr) => {
+    const q = filtro.trim().toLowerCase();
+    let r = q ? arr.filter((p) => `${p.marca} ${p.descricao || ""}`.toLowerCase().includes(q)) : arr;
+    if (soSemMaterial) r = r.filter((p) => p.perfil && !p.material); // só perfis sem recebimento no CMR
+    return r;
+  };
   // "Feito" no setor = o maior entre o produzido no Syneco e a baixa do portal. Assim o que já
   // foi produzido (mesmo sem baixa no portal) NÃO aparece como pendente. (Vitor: "não temos
   // essas peças para fazer" — eram peças já produzidas no Syneco.)
@@ -82,10 +88,14 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const pendentes = useMemo(() => pecas.filter((p) => !resolvida(p)), [pecas]);
   // Peças prontas: histórico do setor (concluídas aqui ou que já seguiram adiante).
   const prontas = useMemo(() => pecas.filter((p) => resolvida(p)), [pecas]);
-  const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro]);
-  const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro]);
+  const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro, soSemMaterial]);
+  const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro, soSemMaterial]);
+  // Resumo do que está na tela (deixa o painel mais informativo: o setor vê o tamanho da carga).
+  const semMaterial = useMemo(() => pendentes.filter((p) => p.perfil && !p.material).length, [pendentes]);
   const visiveis = aba === "prontas" ? listaProntas : listaLiberar;
   const visLimit = visiveis.slice(0, LIMITE);
+  const pesoVisivel = useMemo(() => visiveis.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0), [visiveis]);
+  const pesoSelecionado = useMemo(() => (data?.pecas || []).filter((p) => sel.has(p.id)).reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0), [data, sel]);
 
   // em aberto (pra destinos) = sem destino e PENDENTE, dentro do que está selecionado
   const emAbertoSel = () => [...sel].filter((id) => { const p = pecas.find((x) => x.id === id); return p && !p.destino && p.status === "PENDENTE"; });
@@ -195,24 +205,29 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     const hoje = new Date().toISOString().split("T")[0];
     const nomeSetor = setor ? SETOR_LABEL[setor] || setor : "Geral";
     const tipoTxt = (t) => (t === "CONJUNTO" ? "Conjunto" : t === "CROQUI" ? "Croqui" : "Avulsa");
-    const headers = ["Marca", "Tipo", "Peso (kg)", "Observação"];
+    const headers = ["Marca", "Tipo", "Material", "Peso (kg)", "Observação"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `Apontar no Syneco — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
       subtitulo: `${obra} · Setor: ${nomeSetor} · baixadas manualmente no portal — dar baixa no Syneco`,
       kpis: [`${base.length} peça(s) p/ apontar no Syneco`],
       totalColunas: headers.length, nomePlanilha: "Apontar Syneco", codigoDoc: "REL-ENG-002",
     });
-    ws.columns = [{ width: 20 }, { width: 12 }, { width: 14 }, { width: 46 }];
+    ws.columns = [{ width: 20 }, { width: 12 }, { width: 26 }, { width: 14 }, { width: 46 }];
     let row = linhaInicio;
     adicionarHeaderTabela(ws, row, headers); row++;
     const first = row;
     for (const p of base) {
       const quando = p.baixadoEm ? ` em ${new Date(p.baixadoEm).toLocaleDateString("pt-BR")}` : "";
       const obs = `Dar baixa no Syneco (${nomeSetor}): ${fmtN(p.baixadoQtd)} un — baixa manual no portal${p.baixadoPor ? ` por ${p.baixadoPor}` : ""}${quando}`;
-      adicionarLinhaTabela(ws, row, [p.marca, tipoTxt(p.tipoPeca), p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "", obs], { alinhamento: { 1: "center", 2: "right" } });
+      // Material do perfil (CMR): "ok · NF 234399 (20/07)" ou "sem material" — o setor leva a
+      // informação junto da relação. (Vitor 18/08.)
+      const mat = !p.perfil ? "" : p.material
+        ? `ok${p.material.nf ? ` · NF ${p.material.nf}` : ""}${p.material.dataRecebimento ? ` (${new Date(p.material.dataRecebimento).toLocaleDateString("pt-BR")})` : ""}`
+        : "sem material";
+      adicionarLinhaTabela(ws, row, [p.marca, tipoTxt(p.tipoPeca), mat, p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "", obs], { alinhamento: { 1: "center", 2: "center", 3: "right" } });
       row++;
     }
-    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", { formula: `SUM(C${first}:C${row - 1})` }, ""]);
+    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", { formula: `SUM(D${first}:D${row - 1})` }, ""]);
     await downloadWorkbook(workbook, `Apontar_Syneco_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
   }
 
@@ -250,6 +265,14 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
               <input type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={enviando} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importar(f); }} />
             </label>
           )}
+          {/* Quantas peças pendentes estão SEM material (CMR) — clica e filtra só elas. */}
+          {data && aba === "despacho" && semMaterial > 0 && (
+            <button onClick={() => setSoSemMaterial((v) => !v)}
+              title="Peças cujo perfil ainda não tem recebimento registrado no CMR desta OP"
+              className={`text-[11px] font-bold rounded-full px-2.5 py-1 border inline-flex items-center gap-1 ${soSemMaterial ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"}`}>
+              <Package size={11} /> {fmtN(semMaterial)} sem material
+            </button>
+          )}
           {data && aba === "despacho" && Object.entries(data.placar).filter(([, v]) => v > 0).map(([k, v]) => (
             <span key={k} className="bg-gray-100 rounded-full px-2 py-0.5 text-[11px] font-medium">{ROTULO[k] || k}: {v}</span>
           ))}
@@ -274,6 +297,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                   <th className={`${th} text-right`}>Produz. Syneco</th>
                   <th className={`${th} text-right`}>Peso un.</th>
                   <th className={`${th} text-right`}>Peso tot.</th>
+                  <th className={`${th} text-center`} title="Material do perfil já recebido? (CMR do Almoxarifado)">Material</th>
                   <th className={`${th} text-center`}>Syneco</th>
                 </tr>
               </thead>
@@ -309,6 +333,19 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                     <td className={`${td} text-right tabular-nums ${p.produzidoSyneco ? "text-emerald-700 font-medium" : "text-torg-gray"}`} title={p.produzidoSyneco ? "Já tem apontamento no Syneco — não precisa dar baixa pelo portal" : ""}>{p.produzidoSyneco ? fmtN(p.produzidoSyneco) : "—"}</td>
                     <td className={`${td} text-right tabular-nums text-torg-gray`}>{p.pesoUnitKg ? fmtKg(p.pesoUnitKg) : "—"}</td>
                     <td className={`${td} text-right tabular-nums`}>{p.pesoTotalKg ? fmtKg(p.pesoTotalKg) : "—"}</td>
+                    {/* MATERIAL do perfil (CMR do Almoxarifado): o corte vê item a item se o
+                        material já chegou. Sem perfil (conjunto/GC) não se aplica. */}
+                    <td className={`${td} text-center`}>
+                      {!p.perfil ? <span className="text-gray-300">—</span>
+                        : p.material ? (
+                          <span className="text-emerald-700 bg-emerald-50 text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold"
+                            title={`${p.material.material}\nNF ${p.material.nf || "—"}${p.material.corrida ? ` · corrida ${p.material.corrida}` : ""}${p.material.dataRecebimento ? ` · recebido em ${new Date(p.material.dataRecebimento).toLocaleDateString("pt-BR")}` : ""}`}>
+                            ok{p.material.dataRecebimento ? ` ${new Date(p.material.dataRecebimento).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}` : ""}
+                          </span>
+                        ) : (
+                          <span className="text-amber-700 bg-amber-50 text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold" title={`Sem registro de recebimento do perfil ${p.perfil} no CMR desta OP.`}>sem material</span>
+                        )}
+                    </td>
                     <td className={`${td} text-center`}>
                       {p.baixadoPortal
                         ? (p.precisaSyneco
@@ -320,7 +357,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                   {aberto && temFalta && (
                     <tr className="bg-amber-50/40">
                       <td></td>
-                      <td colSpan={8} className="px-2.5 pb-2 pt-0">
+                      <td colSpan={9} className="px-2.5 pb-2 pt-0">
                         <div className="text-[11px] max-w-2xl">
                           <div className="text-amber-700 font-semibold mb-1">Faltam cortar ({p.faltamCroquis.length}):</div>
                           <div className="space-y-0.5">
@@ -343,6 +380,14 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
             </table>
           )}
           {visiveis.length > LIMITE && <p className="text-[11px] text-torg-gray mt-2">Mostrando {LIMITE} de {fmtN(visiveis.length)} — use o filtro pra refinar (o "Selecionar todas" pega as {LIMITE} visíveis).</p>}
+          {/* Resumo da carga: quanto tem na tela e quanto está selecionado (o setor dimensiona o dia). */}
+          {visiveis.length > 0 && (
+            <div className="mt-2 flex items-center gap-4 flex-wrap text-[11px] text-torg-gray border-t border-gray-100 pt-2">
+              <span><b className="text-torg-dark">{fmtN(visiveis.length)}</b> peça(s) na tela · <b className="text-torg-dark">{fmtKg(pesoVisivel)} kg</b></span>
+              {sel.size > 0 && <span className="text-torg-blue font-semibold">{fmtN(sel.size)} selecionada(s) · {fmtKg(pesoSelecionado)} kg</span>}
+              {soSemMaterial && <span className="text-amber-700 font-semibold">filtrando só sem material</span>}
+            </div>
+          )}
         </div>
 
         {/* Ações por aba */}
