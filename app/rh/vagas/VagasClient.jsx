@@ -468,11 +468,21 @@ function Sel({ label, value, onChange, options }) {
 
 // ───────────────────────── Arte de divulgação (Instagram / Facebook / LinkedIn) ─────────────────────────
 // Renderiza no <canvas> do navegador — a foto nunca sai do dispositivo; baixa PNG pronto.
-const OBRAS_ARTE = [
-  { nome: "Planta industrial", src: "/obras/planta-industrial.jpg" },
-  { nome: "Ponte (pôr do sol)", src: "/obras/ponte-sunset.jpg" },
-  { nome: "Ponte treliçada", src: "/obras/ponte-trelica.jpg" },
-  { nome: "Torre / escada", src: "/obras/torre-escada.jpg" },
+// Banco de imagens EXCLUSIVO do RH (em /public/rh/banco) — fundos por cargo/setor, separados
+// da /public/obras (que é do login/fornecedores/home). Same-origin: canvas.toDataURL() sem taint.
+const FUNDOS_RH = [
+  { nome: "Produção", src: "/rh/banco/producao.jpg" },
+  { nome: "Soldador", src: "/rh/banco/soldador.jpg" },
+  { nome: "Operador de máquina", src: "/rh/banco/operador-maquina.jpg" },
+  { nome: "Qualidade", src: "/rh/banco/qualidade.jpg" },
+  { nome: "Engenharia", src: "/rh/banco/engenharia.jpg" },
+  { nome: "Expedição", src: "/rh/banco/expedicao.jpg" },
+  { nome: "Auxiliar", src: "/rh/banco/auxiliar.jpg" },
+  { nome: "Auxiliar / Soldador", src: "/rh/banco/auxiliar-soldador.jpg" },
+  { nome: "Engenharia / Qualidade / ADM", src: "/rh/banco/engenharia-qualidade-adm.jpg" },
+  { nome: "Produção (2)", src: "/rh/banco/producao-2.jpg" },
+  { nome: "Soldador (2)", src: "/rh/banco/soldador-2.jpg" },
+  { nome: "Auxiliar (2)", src: "/rh/banco/auxiliar-2.jpg" },
 ];
 const TIPO_ARTE = { CLT: "CLT", PJ: "PJ", ESTAGIO: "Estágio", TEMPORARIO: "Temporário" };
 
@@ -545,8 +555,8 @@ function drawChips(ctx, x0, y0, chips, ORANGE) {
 function ArteModal({ vaga, onClose }) {
   const canvasRef = useRef(null);
   const [formato, setFormato] = useState("feed"); // feed 1080×1080 | story 1080×1920
-  const [fotoSrc, setFotoSrc] = useState(OBRAS_ARTE[0].src);
-  const [fotoLabel, setFotoLabel] = useState(OBRAS_ARTE[0].nome);
+  const [fotoSrc, setFotoSrc] = useState(FUNDOS_RH[0].src);
+  const [fotoLabel, setFotoLabel] = useState(FUNDOS_RH[0].nome);
   const [headline, setHeadline] = useState("ESTAMOS CONTRATANDO");
   const [titulo, setTitulo] = useState((vaga.titulo || vaga.cargo?.nome || "").toUpperCase());
   const [mensagem, setMensagem] = useState("Venha fazer parte de uma equipe engajada em crescer e construir grandes obras.");
@@ -720,9 +730,9 @@ function ArteModal({ vaga, onClose }) {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-torg-gray mb-1.5">Foto de obra</label>
+              <label className="block text-xs font-medium text-torg-gray mb-1.5">Imagem de fundo</label>
               <div className="grid grid-cols-5 gap-2">
-                {OBRAS_ARTE.map((o) => (
+                {FUNDOS_RH.map((o) => (
                   <button key={o.src} onClick={() => { setFotoSrc(o.src); setFotoLabel(o.nome); }} title={o.nome}
                     className={`h-14 rounded-lg bg-cover bg-center border-2 transition ${fotoSrc === o.src ? "border-torg-blue ring-2 ring-torg-blue/30" : "border-transparent hover:border-gray-300"}`}
                     style={{ backgroundImage: `url(${o.src})` }} />
