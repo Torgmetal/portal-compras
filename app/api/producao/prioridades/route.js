@@ -40,24 +40,33 @@ export async function GET() {
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const { porObra } = await carregarPrioridadesPorObra();
+  const opInfo = new Map(porObra.map((o) => [o.opId, o])); // opId → { realMap, obra, cliente, refCliente, opNumero }
   const acc = Object.fromEntries(BLOCOS.map((b) => [b.key, new Map()])); // bloco → (opNumero → { info, pecas })
 
-  for (const o of porObra) {
-    for (const p of o.universo || []) {
-      if (p.prioridade == null) continue;
-      const idx = setorRealIndex(p, o.realMap);
-      const bloco = blocoDoIdx(idx);
-      if (!bloco) continue;
-      const setorKey = idx < 0 ? "CORTE" : FLUXO_SETORES[idx]?.key || "CORTE";
-      const m = acc[bloco];
-      if (!m.has(o.opNumero)) m.set(o.opNumero, { opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente, pecas: [] });
-      const terc = noTerceiroAgora(p);
-      m.get(o.opNumero).pecas.push({
-        id: p.id, marca: p.marca, descricao: p.descricao || null, pesoTotalKg: Math.round(Number(p.pesoTotalKg) || 0),
-        prioridade: p.prioridade, setor: LABEL[setorKey] || setorKey,
-        terceiro: terc, retornoPrevisto: terc ? (p.terceiroRetornoPrevisto || null) : null,
-      });
-    }
+  // Peças MARCADAS (prioridade != null) das OPs ativas — lidas DIRETO do banco, independente de
+  // LPC/LE. (O universo do TV usa só a LPC quando ela existe e descartaria prioridades marcadas na
+  // LE — ex.: as chapas/guarda-corpos da OP-089.) O setor atual vem do realMap (Syneco+status).
+  const opIds = [...opInfo.keys()];
+  const pecas = opIds.length ? await prisma.pecaConjunto.findMany({
+    where: { opId: { in: opIds }, prioridade: { not: null } },
+    select: { id: true, opId: true, marca: true, descricao: true, pesoTotalKg: true, prioridade: true, status: true, terceirizado: true, destinoTerceirizado: true, terceirizadoRecebidoEm: true, terceiroRetornoPrevisto: true },
+  }) : [];
+
+  for (const pc of pecas) {
+    const o = opInfo.get(pc.opId);
+    if (!o) continue;
+    const idx = setorRealIndex(pc, o.realMap);
+    const bloco = blocoDoIdx(idx);
+    if (!bloco) continue;
+    const setorKey = idx < 0 ? "CORTE" : FLUXO_SETORES[idx]?.key || "CORTE";
+    const m = acc[bloco];
+    if (!m.has(o.opNumero)) m.set(o.opNumero, { opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente, pecas: [] });
+    const terc = noTerceiroAgora(pc);
+    m.get(o.opNumero).pecas.push({
+      id: pc.id, marca: pc.marca, descricao: pc.descricao || null, pesoTotalKg: Math.round(Number(pc.pesoTotalKg) || 0),
+      prioridade: pc.prioridade, setor: LABEL[setorKey] || setorKey,
+      terceiro: terc, retornoPrevisto: terc ? (pc.terceiroRetornoPrevisto || null) : null,
+    });
   }
 
   const blocos = BLOCOS.map((b) => {

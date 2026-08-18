@@ -236,6 +236,7 @@ export async function POST(req) {
       data: {
         destino: null, destinoEm: null, destinoPor: null, destinoObs: null,
         terceirizado: false, destinoTerceirizado: null, terceirizadoRecebidoEm: null, terceiroRetornoPrevisto: null,
+        prioridade: null, // "prioridade" = destino PRIORIDADE + número; ao voltar pra aberto, sai da lista
         status: "PENDENTE", ultimoSetor: null,
       },
     });
@@ -259,6 +260,19 @@ export async function POST(req) {
     if (!destino) return NextResponse.json({ error: "Informe o destino." }, { status: 400 });
     const r = await prisma.pecaConjunto.updateMany({ where: { id: { in: ids } }, data: { ...marca, destino } });
     atualizados = r.count;
+    // "Prioridade" = UMA coisa só: além do destino, ganha o NÚMERO de prioridade (append na fila
+    // da OP) — assim aparece nas telas de Prioridades de Produção e na TV, já reordenável.
+    if (destino === "PRIORIDADE") {
+      const novas = await prisma.pecaConjunto.findMany({ where: { id: { in: ids }, prioridade: null }, select: { id: true, opId: true, ordemCampo: true, marca: true } });
+      const porOp = {};
+      for (const pc of novas) (porOp[pc.opId] ||= []).push(pc);
+      for (const opId of Object.keys(porOp)) {
+        const arr = porOp[opId].sort((a, b) => (a.ordemCampo ?? 1e9) - (b.ordemCampo ?? 1e9) || String(a.marca).localeCompare(String(b.marca)));
+        const mx = await prisma.pecaConjunto.aggregate({ where: { opId, prioridade: { not: null } }, _max: { prioridade: true } });
+        let n = mx._max.prioridade || 0;
+        for (const pc of arr) { n++; await prisma.pecaConjunto.update({ where: { id: pc.id }, data: { prioridade: n } }); }
+      }
+    }
   }
 
   await prisma.auditLog.create({
