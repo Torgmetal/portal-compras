@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle, Flag, ChevronUp, ChevronDown, Truck, RefreshCw, Inbox, CalendarClock, FileText, FileDown, X, CheckCircle2, ChevronRight, ChevronsDownUp } from "lucide-react";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 
 // Uma aba por SETOR (Vitor 18/08). Deep-link: /producao/prioridades?bloco=jato
@@ -32,6 +32,17 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
   const [desenho, setDesenho] = useState(null); // { opNumero, marca }
   const [exportando, setExportando] = useState(false);
   const [expandido, setExpandido] = useState(() => new Set()); // conjuntos abertos (ver croquis que faltam cortar)
+  // OPs MINIMIZADAS (Vitor 18/08: "minimizar os projetos de uma OP pra facilitar a visualização").
+  // Guarda no navegador pra não reabrir tudo a cada F5 / troca de aba.
+  const [fechadas, setFechadas] = useState(() => new Set());
+  useEffect(() => {
+    try { const g = JSON.parse(localStorage.getItem("prioridadesOpsFechadas") || "[]"); if (Array.isArray(g)) setFechadas(new Set(g)); } catch {}
+  }, []);
+  const salvarFechadas = (novo) => {
+    setFechadas(novo);
+    try { localStorage.setItem("prioridadesOpsFechadas", JSON.stringify([...novo])); } catch {}
+  };
+  const toggleOp = (opNumero) => { const n = new Set(fechadas); n.has(opNumero) ? n.delete(opNumero) : n.add(opNumero); salvarFechadas(n); };
 
   const carregar = useCallback(async () => {
     setErro("");
@@ -184,6 +195,11 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
             <h1 className="text-xl sm:text-2xl font-extrabold">Prioridades de Produção</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <button onClick={() => { const todas = (blocoAtual?.ops || []).map((o) => o.opNumero); const algumaAberta = todas.some((n) => !fechadas.has(n)); const nova = new Set(fechadas); todas.forEach((n) => (algumaAberta ? nova.add(n) : nova.delete(n))); salvarFechadas(nova); }}
+              disabled={!blocoAtual?.ops?.length} title="Minimizar/expandir todas as OPs desta aba"
+              className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 inline-flex items-center gap-1.5">
+              <ChevronsDownUp size={14} /> Minimizar
+            </button>
             <button onClick={exportar} disabled={exportando || !blocoAtual?.ops?.length}
               className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 inline-flex items-center gap-1.5" title="Exportar o bloco em Excel (padrão Torg)">
               {exportando ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />} Exportar
@@ -223,9 +239,13 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
             {blocoAtual.ops.map((op) => {
               const prazo = op.prazo;
               const atrasado = prazo && prazo.atrasoDias > 0;
+              const fechada = fechadas.has(op.opNumero);
               return (
                 <div key={op.opNumero} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3 flex-wrap">
+                  {/* Cabeçalho da OP = botão de minimizar/expandir */}
+                  <button onClick={() => toggleOp(op.opNumero)} title={fechada ? "Expandir esta OP" : "Minimizar esta OP"}
+                    className={`w-full px-4 py-3 flex items-center gap-3 flex-wrap text-left hover:bg-gray-50 transition ${fechada ? "" : "border-b border-gray-100"}`}>
+                    {fechada ? <ChevronRight size={16} className="text-torg-gray shrink-0" /> : <ChevronDown size={16} className="text-torg-gray shrink-0" />}
                     <span className="text-lg font-extrabold text-torg-dark tabular-nums">OP-{op.opNumero}</span>
                     <span className="text-sm text-torg-gray truncate max-w-[220px]" title={op.obra}>{op.obra}</span>
                     {prazo && (
@@ -233,9 +253,18 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
                         <CalendarClock size={11} /> {atrasado ? `${prazo.atrasoDias}d de atraso` : `até ${fmtData(prazo.entrega)}`}
                       </span>
                     )}
+                    {/* Minimizada: resumo do que tem dentro */}
+                    {fechada && (
+                      <span className="text-[11px] text-torg-gray">
+                        {op.prioritarias.length > 0 && <b className="text-torg-orange">{op.prioritarias.length} prioritária(s)</b>}
+                        {op.prioritarias.length > 0 && op.demaisTotal > 0 && " · "}
+                        {op.demaisTotal > 0 && `${fmtN(op.demaisTotal)} pendente(s)`}
+                      </span>
+                    )}
                     <span className="ml-auto text-xs text-torg-gray tabular-nums">{fmtKg(op.pesoKg)}</span>
-                  </div>
+                  </button>
 
+                  {!fechada && (<>
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[720px] text-left">
                       <thead>
@@ -262,6 +291,7 @@ export default function PrioridadesProducaoClient({ podeEditar }) {
                     </table>
                   </div>
                   {op.demaisTotal > op.demais.length && <p className="px-4 py-2 text-[11px] text-torg-gray border-t border-gray-50">+{op.demaisTotal - op.demais.length} peças (use o Exportar pra lista completa da tela)</p>}
+                  </>)}
                 </div>
               );
             })}
