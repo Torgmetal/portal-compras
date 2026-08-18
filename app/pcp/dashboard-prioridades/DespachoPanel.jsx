@@ -82,6 +82,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   // massa depende disso). Mesma ideia para a PROGRAMAÇÃO do Syneco.
   const [fMaterial, setFMaterial] = useState("TODOS"); // TODOS | COM | SEM
   const [fProg, setFProg] = useState("TODOS"); // TODOS | PROG | NAO
+  const [fMont, setFMont] = useState("TODAS"); // TODAS | LIBERADAS | AGUARDANDO (só na Montagem)
   const [rastroOp, setRastroOp] = useState(false); // modal de rastreabilidade da OP inteira
   const [rastroItem, setRastroItem] = useState(null); // peça com a rastreabilidade do material dela
   const [progItem, setProgItem] = useState(null); // peça com as ordens do Syneco (conferir a programação)
@@ -128,6 +129,10 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     else if (fMaterial === "SEM") r = r.filter((p) => p.perfil && !p.material);
     if (fProg === "PROG") r = r.filter(foiProgramada);
     else if (fProg === "NAO") r = r.filter((p) => !foiProgramada(p));
+    // Montagem: o ÚNICO setor que depende de outro (o conjunto espera os croquis serem cortados).
+    // prontoMontar null = conjunto sem croqui na LPC (ex.: guarda-corpo) — não espera nada, é liberada.
+    if (fMont === "AGUARDANDO") r = r.filter((p) => p.prontoMontar === false);
+    else if (fMont === "LIBERADAS") r = r.filter((p) => p.prontoMontar !== false);
     return r;
   };
   // "Feito" no setor = o maior entre o produzido no Syneco e a baixa do portal. Assim o que já
@@ -141,14 +146,25 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
   const pendentes = useMemo(() => pecas.filter((p) => !resolvida(p)), [pecas]);
   // Peças prontas: histórico do setor (concluídas aqui ou que já seguiram adiante).
   const prontas = useMemo(() => pecas.filter((p) => resolvida(p)), [pecas]);
-  const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro, fMaterial, fProg]);
-  const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro, fMaterial, fProg]);
+  const listaLiberar = useMemo(() => filtrar(pendentes), [pendentes, filtro, fMaterial, fProg, fMont]);
+  const listaProntas = useMemo(() => filtrar(prontas), [prontas, filtro, fMaterial, fProg, fMont]);
   // Resumo do que está na tela (deixa o painel mais informativo: o setor vê o tamanho da carga).
   const comMaterial = useMemo(() => pendentes.filter((p) => p.perfil && p.material).length, [pendentes]);
   const semMaterial = useMemo(() => pendentes.filter((p) => p.perfil && !p.material).length, [pendentes]);
   const programadas = useMemo(() => pendentes.filter(foiProgramada).length, [pendentes]);
   const naoProgramadas = pendentes.length - programadas;
   const temColunaProg = useMemo(() => pecas.some((p) => p.programacao), [pecas]);
+  // Montagem: conjunto liberado p/ montar × aguardando os croquis serem cortados.
+  const aguardando = useMemo(() => pendentes.filter((p) => p.prontoMontar === false).length, [pendentes]);
+  const liberadas = pendentes.length - aguardando;
+  // QUAIS FILTROS APARECEM EM CADA SETOR (Vitor 18/08): a Preparação é a única que depende de
+  // COMPRA e de PROGRAMAÇÃO; a Montagem é a única que depende de OUTRO SETOR (espera os croquis);
+  // de Solda pra frente a peça não depende de mais ninguém — filtro ali só polui a tela.
+  const mostraMaterial = !setor || setor === "CORTE";
+  const mostraProg = !setor || setor === "CORTE";
+  const mostraMont = setor === "MONTAGEM";
+  const temFiltros = (mostraMaterial && (comMaterial > 0 || semMaterial > 0)) || (mostraProg && temColunaProg) || mostraMont;
+  const filtrandoAlgo = fMaterial !== "TODOS" || fProg !== "TODOS" || fMont !== "TODAS";
   const visiveis = aba === "prontas" ? listaProntas : listaLiberar;
   const visLimit = visiveis.slice(0, LIMITE);
   const pesoVisivel = useMemo(() => visiveis.reduce((a, p) => a + (Number(p.pesoTotalKg) || 0), 0), [visiveis]);
@@ -294,6 +310,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     const nomeSetor = setor ? SETOR_LABEL[setor] || setor : "Geral";
     const tipoTxt = (t) => (t === "CONJUNTO" ? "Conjunto" : t === "CROQUI" ? "Croqui" : "Avulsa");
     const recorte = [fMaterial === "COM" ? "com material" : fMaterial === "SEM" ? "sem material" : null,
+      fMont === "LIBERADAS" ? "liberados p/ montar" : fMont === "AGUARDANDO" ? "aguardando componentes" : null,
       fProg === "PROG" ? "programadas" : fProg === "NAO" ? "não lançadas no Syneco" : null,
       filtro.trim() ? `filtro "${filtro.trim()}"` : null].filter(Boolean).join(" · ");
     const headers = ["Marca", "Descrição", "Tipo", "Perfil", "Qtd", "Peso un. (kg)", "Peso tot. (kg)", "Material", "Rastreab. (R)", "Corrida / lote", "NF", "Pedido", "Recebido em", "Programação"];
@@ -370,24 +387,33 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
 
         {/* Seletores de bloco: material (CMR) e programação (Syneco). Servem pra SELECIONAR em
             massa — filtra, marca "selecionar todas" e despacha só aquele grupo. (Vitor 18/08.) */}
-        {data && aba === "despacho" && (
+        {data && aba === "despacho" && temFiltros && (
           <div className="flex items-center gap-4 flex-wrap px-5 py-2 border-b border-gray-50 bg-gray-50/60">
-            {(comMaterial > 0 || semMaterial > 0) && (
+            {mostraMaterial && (comMaterial > 0 || semMaterial > 0) && (
               <Seg titulo="Material" valor={fMaterial} onChange={setFMaterial} opcoes={[
                 { key: "TODOS", label: "Todos", dica: "Sem filtro de material" },
                 { key: "COM", label: "Com material", n: comMaterial, ativo: "bg-emerald-600 text-white", dica: "Perfis com recebimento registrado no CMR desta OP" },
                 { key: "SEM", label: "Sem material", n: semMaterial, ativo: "bg-amber-500 text-white", dica: "Perfis que ainda não têm recebimento no CMR desta OP" },
               ]} />
             )}
-            {temColunaProg && (
+            {/* MONTAGEM — o único setor que espera outro: o conjunto só monta com os croquis
+                cortados. Daqui pra frente a peça não depende de mais ninguém. (Vitor 18/08.) */}
+            {mostraMont && (
+              <Seg titulo="Conjuntos" valor={fMont} onChange={setFMont} opcoes={[
+                { key: "TODAS", label: "Todos", dica: "Sem filtro" },
+                { key: "LIBERADAS", label: "Liberados p/ montar", n: liberadas, ativo: "bg-emerald-600 text-white", dica: "Todos os croquis do conjunto já foram cortados — pode montar" },
+                { key: "AGUARDANDO", label: "Aguardando componentes", n: aguardando, ativo: "bg-amber-500 text-white", dica: "Ainda falta cortar croqui do conjunto — clique em \"falta N\" na linha para ver quais" },
+              ]} />
+            )}
+            {mostraProg && temColunaProg && (
               <Seg titulo={`Programação${data.ordensSincronizadasEm ? ` (Syneco ${new Date(data.ordensSincronizadasEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})` : ""}`} valor={fProg} onChange={setFProg} opcoes={[
                 { key: "TODOS", label: "Todas", dica: "Sem filtro de programação" },
                 { key: "PROG", label: "Programadas", n: programadas, ativo: "bg-sky-600 text-white", dica: "O programador já lançou a peça na produção (ordem no Syneco)" },
                 { key: "NAO", label: "Não lançadas", n: naoProgramadas, ativo: "bg-red-600 text-white", dica: "Ainda sem ordem no Syneco — o programador não lançou" },
               ]} />
             )}
-            {(fMaterial !== "TODOS" || fProg !== "TODOS") && (
-              <button type="button" onClick={() => { setFMaterial("TODOS"); setFProg("TODOS"); }} className="text-[11px] font-semibold text-torg-gray hover:text-red-600 underline">limpar filtros</button>
+            {filtrandoAlgo && (
+              <button type="button" onClick={() => { setFMaterial("TODOS"); setFProg("TODOS"); setFMont("TODAS"); }} className="text-[11px] font-semibold text-torg-gray hover:text-red-600 underline">limpar filtros</button>
             )}
           </div>
         )}
@@ -397,7 +423,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
           {loading && <div className="py-10 text-center text-torg-gray"><Loader2 className="mx-auto animate-spin" /></div>}
           {erro && <p className="text-red-600 text-sm">{erro}</p>}
           {!loading && !erro && visiveis.length === 0 && (
-            <p className="text-torg-gray text-sm text-center py-10">{aba === "prontas" && !filtro && fMaterial === "TODOS" && fProg === "TODOS" ? "Nenhuma peça com baixa ainda." : filtro || fMaterial !== "TODOS" || fProg !== "TODOS" ? "Nenhuma peça nos filtros escolhidos." : "Nada a liberar — tudo pronto. 🎉"}</p>
+            <p className="text-torg-gray text-sm text-center py-10">{aba === "prontas" && !filtro && !filtrandoAlgo ? "Nenhuma peça com baixa ainda." : filtro || filtrandoAlgo ? "Nenhuma peça nos filtros escolhidos." : "Nada a liberar — tudo pronto. 🎉"}</p>
           )}
           {!loading && visiveis.length > 0 && (
             <table className="w-full text-[13px] min-w-[1120px]">
@@ -528,6 +554,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
               {sel.size > 0 && <span className="text-torg-blue font-semibold">{fmtN(sel.size)} selecionada(s) · {fmtKg(pesoSelecionado)} kg</span>}
               {fMaterial !== "TODOS" && <span className={fMaterial === "SEM" ? "text-amber-700 font-semibold" : "text-emerald-700 font-semibold"}>filtrando {fMaterial === "SEM" ? "só sem material" : "só com material"}</span>}
               {fProg !== "TODOS" && <span className={fProg === "NAO" ? "text-red-700 font-semibold" : "text-sky-700 font-semibold"}>filtrando {fProg === "NAO" ? "só não lançadas no Syneco" : "só programadas"}</span>}
+              {fMont !== "TODAS" && <span className={fMont === "AGUARDANDO" ? "text-amber-700 font-semibold" : "text-emerald-700 font-semibold"}>filtrando {fMont === "AGUARDANDO" ? "só aguardando componentes" : "só liberados p/ montar"}</span>}
             </div>
           )}
         </div>
