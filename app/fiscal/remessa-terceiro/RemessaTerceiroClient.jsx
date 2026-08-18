@@ -4,7 +4,7 @@ import { useStore } from "@/lib/store";
 import { fmtOP } from "@/lib/utils";
 import {
   Factory, Loader2, AlertCircle, X, FileText, Search,
-  PackageOpen, ReceiptText, MinusCircle, Undo2, Truck, FilePlus2,
+  PackageOpen, ReceiptText, MinusCircle, Undo2, Truck, FilePlus2, Eye, Boxes, Package,
 } from "lucide-react";
 
 const fmtKg = (n) => (n == null ? "—" : `${Number(n).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
@@ -24,6 +24,7 @@ export default function RemessaTerceiroClient() {
   const [filtro, setFiltro] = useState("pendente"); // pendente | emitida | todos
   const [busca, setBusca] = useState("");
   const [emitir, setEmitir] = useState(null); // remessa em emissão
+  const [verItens, setVerItens] = useState(null); // remessa cujos itens estão sendo vistos
 
   const carregar = useCallback(() => {
     setErro("");
@@ -124,7 +125,11 @@ export default function RemessaTerceiroClient() {
                         <span className="block text-[11px] text-torg-gray">{r.terceiro?.cnpj || "sem CNPJ no cadastro"}{r.terceiro?.uf ? ` · ${r.terceiro.uf}` : ""}{r.servico ? ` · ${r.servico}` : ""}</span>
                       </td>
                       <td className="px-3 py-2 text-xs font-mono text-torg-blue">{r.opRefNumero ? fmtOP(r.opRefNumero) : <span className="text-gray-300">—</span>}</td>
-                      <td className="px-3 py-2 text-right text-torg-gray tabular-nums text-xs">{r.itensCount}{r.materiaisCount ? ` +${r.materiaisCount}mat` : ""}</td>
+                      <td className="px-3 py-2 text-right">
+                        <button onClick={() => setVerItens(r)} title="Ver itens da remessa" className="text-xs text-torg-blue hover:text-torg-dark inline-flex items-center gap-1 tabular-nums">
+                          <Eye size={13} /> {r.itensCount}{r.materiaisCount ? ` +${r.materiaisCount}` : ""}
+                        </button>
+                      </td>
                       <td className="px-3 py-2 text-right text-torg-dark font-medium tabular-nums whitespace-nowrap">{fmtKg(r.pesoEnviadoKg)}</td>
                       <td className="px-3 py-2 text-center text-xs font-mono text-torg-gray">{r.cfop}</td>
                       <td className="px-3 py-2">
@@ -162,6 +167,95 @@ export default function RemessaTerceiroClient() {
       </div>
 
       {emitir && <ModalEmitir remessa={emitir} onClose={() => setEmitir(null)} onSalvo={() => { setEmitir(null); carregar(); showToast("NF de remessa registrada", "success"); }} />}
+      {verItens && <ModalItens remessa={verItens} onClose={() => setVerItens(null)} />}
+    </div>
+  );
+}
+
+// Visualização dos itens que compõem a remessa: MATERIAIS (matéria-prima → produto
+// real do Omie) e MARCAS (peças fabricadas → ARM000001). Só leitura.
+function ModalItens({ remessa, onClose }) {
+  const materiais = Array.isArray(remessa.materiais) ? remessa.materiais : [];
+  const marcas = Array.isArray(remessa.itens) ? remessa.itens : [];
+  const semCodigo = materiais.filter((m) => !m.codigoOmie).length;
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-torg-dark flex items-center gap-2"><Boxes size={16} className="text-torg-blue" /> Itens da remessa — RT-{String(remessa.numero).padStart(3, "0")}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-5 max-h-[70vh] overflow-y-auto">
+          <div className="bg-gray-50 rounded-lg p-3 text-xs text-torg-gray">
+            <p><strong className="text-torg-dark">{remessa.terceiro?.nome}</strong>{remessa.terceiro?.uf ? ` · ${remessa.terceiro.uf}` : ""}{remessa.servico ? ` · ${remessa.servico}` : ""}{remessa.opRefNumero ? ` · OP ${remessa.opRefNumero}` : ""}</p>
+            <p className="mt-0.5">{marcas.length} marca(s){materiais.length ? ` · ${materiais.length} material(is)` : ""} · {fmtKg(remessa.pesoEnviadoKg)}</p>
+          </div>
+
+          {materiais.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wider mb-2 flex items-center gap-1.5"><Package size={13} className="text-torg-orange" /> Matéria-prima (produto do Omie)</p>
+              {semCodigo > 0 && (
+                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2.5 py-1.5 mb-2 flex items-start gap-1.5"><AlertCircle size={13} className="mt-0.5 shrink-0" /> {semCodigo} item(ns) sem código do Omie — o casamento perfil→produto não achou correspondência segura. Ajustar antes de emitir a NF.</p>
+              )}
+              <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                <table className="w-full text-xs min-w-[640px]">
+                  <thead className="bg-gray-50/60"><tr className="text-[10px] text-gray-500 uppercase">
+                    <th className="px-2.5 py-1.5 text-left font-medium">Cód. Omie</th>
+                    <th className="px-2.5 py-1.5 text-left font-medium">Descrição (Omie)</th>
+                    <th className="px-2.5 py-1.5 text-left font-medium">Perfil (Eng.)</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Qtd</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Peso</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {materiais.map((m, i) => (
+                      <tr key={i} className={m.codigoOmie ? "" : "bg-amber-50/40"}>
+                        <td className="px-2.5 py-1.5 font-mono text-torg-dark whitespace-nowrap">{m.codigoOmie || <span className="text-amber-600 inline-flex items-center gap-1"><AlertCircle size={11} /> sem código</span>}</td>
+                        <td className="px-2.5 py-1.5 text-torg-dark">{m.descricaoOmie || <span className="text-gray-400 italic">—</span>}</td>
+                        <td className="px-2.5 py-1.5 text-torg-gray whitespace-nowrap">{m.perfil}{m.descricao ? ` · ${m.descricao}` : ""}</td>
+                        <td className="px-2.5 py-1.5 text-right tabular-nums whitespace-nowrap">{m.qtd}{m.unidade ? ` ${m.unidade}` : ""}</td>
+                        <td className="px-2.5 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(m.pesoKg)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {marcas.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-torg-dark uppercase tracking-wider mb-2 flex items-center gap-1.5"><Factory size={13} className="text-torg-blue" /> Marcas / peças (ARM000001 na NF)</p>
+              <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                <table className="w-full text-xs min-w-[520px]">
+                  <thead className="bg-gray-50/60"><tr className="text-[10px] text-gray-500 uppercase">
+                    <th className="px-2.5 py-1.5 text-left font-medium">Marca</th>
+                    <th className="px-2.5 py-1.5 text-left font-medium">Descrição</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Qtd</th>
+                    <th className="px-2.5 py-1.5 text-right font-medium">Peso</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {marcas.map((m, i) => (
+                      <tr key={i}>
+                        <td className="px-2.5 py-1.5 font-mono text-torg-dark whitespace-nowrap">{m.marca}</td>
+                        <td className="px-2.5 py-1.5 text-torg-gray">{m.descricao || <span className="text-gray-400 italic">—</span>}</td>
+                        <td className="px-2.5 py-1.5 text-right tabular-nums">{m.qte}</td>
+                        <td className="px-2.5 py-1.5 text-right tabular-nums whitespace-nowrap">{fmtKg(m.pesoTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {materiais.length === 0 && marcas.length === 0 && (
+            <p className="text-sm text-torg-gray text-center py-6">Esta remessa não tem itens cadastrados.</p>
+          )}
+        </div>
+        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end rounded-b-xl">
+          <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Fechar</button>
+        </div>
+      </div>
     </div>
   );
 }

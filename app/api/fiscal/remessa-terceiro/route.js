@@ -41,12 +41,17 @@ export async function GET(req) {
     const uf = f?.uf || null;
     const cfopSugerido = uf ? (uf.toUpperCase() === UF_TORG ? "5901" : "6901") : "5901";
     const itens = Array.isArray(r.itens) ? r.itens : [];
+    const materiais = Array.isArray(r.materiais) ? r.materiais : [];
     return {
       id: r.id, numero: r.numero,
       terceiro: { nome: r.terceiroNome, cnpj: f?.cnpj || null, uf, razaoSocial: f?.razaoSocial || null },
       servico: r.servico, opRefNumero: r.opRefNumero, setorEnvio: r.setorEnvio,
       itensCount: itens.length, pesoEnviadoKg: r.pesoEnviadoKg || 0,
-      materiaisCount: Array.isArray(r.materiais) ? r.materiais.length : 0,
+      materiaisCount: materiais.length,
+      // itens (marcas → ARM000001) e materiais (matéria-prima → produto real do Omie),
+      // pra visualizar a composição da remessa na tela do Fiscal
+      itens: itens.map((it) => ({ marca: it.marca || null, descricao: it.descricao || null, qte: Number(it.qte || 0) || 0, pesoTotal: Number(it.pesoTotal || 0) || 0 })),
+      materiais: materiais.map((m) => ({ perfil: m.perfil || null, descricao: m.descricao || null, qtd: Number(m.qtd || 0) || 0, unidade: m.unidade || null, pesoKg: Number(m.pesoKg || 0) || 0, codigoOmie: m.codigoOmie || null, descricaoOmie: m.descricaoOmie || null })),
       dataEnvio: r.dataEnvio,
       remessaStatus: r.remessaStatus,
       cfop: r.remessaCfop || cfopSugerido,
