@@ -50,6 +50,24 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PrioridadeTvOp_opId_idx" ON "PrioridadeTvOp"("opId")`);
   console.log("[ensure-mes-tables] OK — PrioridadeTvOp garantida.");
 
+  // ProdutoOmie (cache do cadastro de produtos do Omie — código do item nos romaneios). Idempotente.
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "ProdutoOmie" (
+      "id"           TEXT NOT NULL,
+      "codigo"       TEXT NOT NULL,
+      "codigoOmie"   TEXT,
+      "descricao"    TEXT NOT NULL,
+      "unidade"      TEXT,
+      "familia"      TEXT,
+      "inativo"      BOOLEAN NOT NULL DEFAULT false,
+      "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ProdutoOmie_pkey" PRIMARY KEY ("id")
+    )
+  `);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "ProdutoOmie_codigo_key" ON "ProdutoOmie"("codigo")`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ProdutoOmie_descricao_idx" ON "ProdutoOmie"("descricao")`);
+  console.log("[ensure-mes-tables] OK — ProdutoOmie garantida.");
+
   // GrdLiberacao (controle de liberação/impressão de desenhos pros setores). Idempotente.
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "GrdLiberacao" (
