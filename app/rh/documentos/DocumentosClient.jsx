@@ -30,6 +30,7 @@ const TIPOS = {
     { value: "ANALISE_AGUA", label: "Análise de Água" },
     { value: "NR_10", label: "NR-10 (Eletricidade)" },
     { value: "NR_12", label: "NR-12 (Máquinas)" },
+    { value: "NR_20", label: "NR-20 (Inflamáveis)" },
     { value: "NR_33", label: "NR-33 (Espaço Confinado)" },
     { value: "NR_35", label: "NR-35 (Altura)" },
     { value: "PPRA", label: "PPRA (legado)" },

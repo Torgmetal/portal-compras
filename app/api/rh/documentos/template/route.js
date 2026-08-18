@@ -49,7 +49,7 @@ export async function GET() {
       ["Campo", "Obrigatório", "Formato", "Observação"],
       ["Nome do Documento", "SIM", "Texto", "Nome descritivo. Ex: ASO Periódico 2025, Alvará 2025"],
       ["Categoria", "SIM", "Texto", "Saúde / Segurança, Pessoal, Treinamento, ou Empresa / Licenças"],
-      ["Tipo", "Não", "Texto", "ASO, NR-10, NR-12, NR-33, NR-35, PPRA, PCMSO, CNH, Passaporte, Certificado, Alvará, AVCB, ISO, Licença Ambiental, Outro"],
+      ["Tipo", "Não", "Texto", "ASO, NR-10, NR-12, NR-20, NR-33, NR-35, PPRA, PCMSO, CNH, Passaporte, Certificado, Alvará, AVCB, ISO, Licença Ambiental, Outro"],
       ["Funcionário", "Não", "Nome ou Matrícula", "Se vazio = documento da empresa. Busca por nome (parcial) ou matrícula exata"],
       ["Data Emissão", "Não", "DD/MM/AAAA", "Data em que o documento foi emitido"],
       ["Data Validade", "Não", "DD/MM/AAAA", "Data de vencimento. Essencial para controle de renovação"],

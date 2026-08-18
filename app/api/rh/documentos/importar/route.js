@@ -27,6 +27,7 @@ const TIPO_MAP = {
   "aso": "ASO",
   "nr-10": "NR_10", "nr 10": "NR_10", "nr10": "NR_10",
   "nr-12": "NR_12", "nr 12": "NR_12", "nr12": "NR_12",
+  "nr-20": "NR_20", "nr 20": "NR_20", "nr20": "NR_20",
   "nr-33": "NR_33", "nr 33": "NR_33", "nr33": "NR_33",
   "nr-35": "NR_35", "nr 35": "NR_35", "nr35": "NR_35",
   "ppra": "PPRA", "pcmso": "PCMSO",

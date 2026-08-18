@@ -76,7 +76,7 @@ export async function GET() {
       // exigência de documentos da CCT: ficam conformes por dispensa.
       const ehDiretoria = setorNome.trim().toLowerCase() === "diretoria";
       const dispensado = dispensadoDocumentos(func.tipoContrato, setorNome);
-      const regras = dispensado ? [] : regrasParaFuncionario(setorNome);
+      const regras = dispensado ? [] : regrasParaFuncionario(setorNome, func.cargo?.nome);
       const producao = !dispensado && isSetorProducao(setorNome);
       const dispensasFunc = dispensaMap.get(func.id) || new Map();
       // documentos do RH + certificados do prontuário (complementa lacunas, não duplica tipo)

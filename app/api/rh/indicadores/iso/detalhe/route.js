@@ -72,7 +72,7 @@ export async function GET(req) {
       const setor = f.setor?.nome || "";
       if (dispensadoDocumentos(f.tipoContrato, setor)) continue;
       if (prontuarioOk && !comProntuario.has(f.id)) continue; // cobertura: só quem já está no Prontuário (se disponível)
-      const regras = regrasParaFuncionario(setor);
+      const regras = regrasParaFuncionario(setor, f.cargo?.nome);
       if (!regras.length) continue;
       comRegras++;
       const disp = dispMap.get(f.id) || new Set();
