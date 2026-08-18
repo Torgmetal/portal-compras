@@ -65,6 +65,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/compras/produtos-omie/sincronizar",
+      "schedule": "0 5 * * 1"
+    },
+    {
       "path": "/api/cron/monitor",
       "schedule": "0 10 * * *"
     }

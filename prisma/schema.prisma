@@ -3766,6 +3766,22 @@ model GrdLiberacao {
   @@index([opNumero, marca])
 }
 
+// Cache do CADASTRO DE PRODUTOS do Omie (2.4k itens). O portal só enxergava os ~190 itens que já
+// passaram por uma RM — por isso perfis existentes no Omie apareciam "sem código" no romaneio de
+// terceiro. Sincronizado por cron/botão. Tabela criada via SQL (db push bloqueado por drift).
+model ProdutoOmie {
+  id           String   @id @default(cuid())
+  codigo       String   @unique // código do produto no Omie (ex.: 201000010)
+  codigoOmie   String? // nCodProd (id interno do Omie)
+  descricao    String
+  unidade      String?
+  familia      String?
+  inativo      Boolean  @default(false)
+  atualizadoEm DateTime @default(now())
+
+  @@index([descricao])
+}
+
 // OPs fixadas manualmente na TV de Prioridades por setor (as rápidas, sem cronograma).
 // Tabela criada via SQL (db push bloqueado por drift); só client gerado a partir daqui.
 model PrioridadeTvOp {
