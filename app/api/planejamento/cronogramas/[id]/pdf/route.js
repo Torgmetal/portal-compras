@@ -31,6 +31,8 @@ export async function GET(_req, { params }) {
 
   return new Response(Buffer.from(out.bytes), {
     status: 200,
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${out.filename}"` },
+    // no-store: sem isso o navegador pode reaproveitar o PDF antigo da MESMA URL
+    // (heurística de cache) e a prévia abre sem as linhas novas do cronograma.
+    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${out.filename}"`, "Cache-Control": "no-store" },
   });
 }

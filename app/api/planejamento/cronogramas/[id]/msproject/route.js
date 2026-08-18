@@ -31,6 +31,8 @@ export async function GET(_req, { params }) {
 
   return new Response(out.xml, {
     status: 200,
-    headers: { "Content-Type": "application/xml; charset=utf-8", "Content-Disposition": `attachment; filename="${out.filename}"` },
+    // no-store: sem isso o navegador pode reaproveitar um download antigo da MESMA URL
+    // (heurística de cache) e o arquivo sai sem as linhas novas do cronograma.
+    headers: { "Content-Type": "application/xml; charset=utf-8", "Content-Disposition": `attachment; filename="${out.filename}"`, "Cache-Control": "no-store" },
   });
 }
