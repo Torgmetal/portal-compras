@@ -43,17 +43,31 @@ Ponta a ponta hoje: **PCP (Prioridades) → romaneio a terceiro → SharePoint �
   registrar/dispensar/reabrir). Roles `ADMIN/FISCAL/FINANCEIRO`.
 - UI: `app/fiscal/remessa-terceiro/{page.js,RemessaTerceiroClient.jsx}` + item no `SidebarFiscal`.
 
-### ⏳ Fase 2 — emissão 100% integrada no Omie (NÃO ligada de propósito)
-Decisão do Matheus: emitir a NF-e direto pelo portal. **Ainda não liguei o disparo** porque
-o portal **nunca emitiu NF** (só consulta o Omie) e NF-e é **irreversível**. Pré-requisitos:
-1. **Marcas → produtos do Omie**: a NF-e exige cada item como produto cadastrado (nCodProd/NCM).
-   As marcas (T64A…) precisam de mapeamento p/ produto Omie.
-2. **Terceiro como cliente no Omie** (destinatário da nota).
-3. **Teste em homologação** antes da 1ª NF real.
+### 🔨 Fase 2 — construída (parametrizada) e DESLIGADA até config fiscal
+Decisão (Matheus): automatizar via **Pedido de Venda** no Omie, mas **1ª versão SEGURA** —
+o portal só **cria o pedido como RASCUNHO** (não fatura); o Fiscal confere e **fatura no Omie**
+(aí sai a NF-e). Depois o portal puxa nº/chave via `ConsultarNF`. Nada irreversível é disparado
+pelo portal.
 
-🔜 **Próximo passo**: investigar o caminho de emissão via **pedido de venda** (`IncluirPedido`
-em `produtos/pedido/` + avançar etapa → faturamento) — a infra de escrita no Omie já existe
-(`omie-pedido-compra.js` usa `IncluirPedCompra`). Trazer plano concreto antes de disparar.
+Já implementado:
+- `lib/omie-remessa-industrializacao.js` — `resolverClienteOmie` (nCodOmie ou lookup por CNPJ
+  via `ListarClientes`) + `criarPedidoRemessa` (monta e chama `IncluirPedido`, rascunho).
+- Linha da NF = produto genérico **ARM000001** (ARMACAO DE ESTRUTURAS METALICAS, NCM 9406.90.20,
+  KG) **repetido**, 1 linha por peça/marca, com a **marca na descrição da própria linha**
+  (definição do Matheus). Qtde = peso da marca (kg).
+- Ação `gerar_pedido_omie` no PATCH + botão **“Gerar pedido Omie”** na aba; status novo
+  `PEDIDO_CRIADO` (mostra o nº do pedido “confira e fature no Omie”). Campo `remessaPedidoNumero`
+  (migração aditiva).
+
+⛔ **Falta ligar (definição do contador):** configurar no `.env`/Vercel —
+- `OMIE_CENARIO_REMESSA` = código do **cenário de impostos** de “remessa p/ industrialização”
+  (Configurações → Cenários de Impostos no Omie). Opcional `OMIE_CENARIO_REMESSA_FORA` p/ fora de SP.
+- `OMIE_REMESSA_VALOR_KG` = R$/kg pra valorar a mercadoria (ARM000001 está com valor 0).
+- Opcional `OMIE_PARCELA_REMESSA` (default `000`).
+
+🔜 Assim que o cenário estiver setado: criar **1 rascunho de teste** (reversível — é só excluir
+o pedido no Omie), ajustar 1–2 campos do `IncluirPedido` se o Omie reclamar (normal), e validar
+o faturamento manual → `ConsultarNF` puxando nº/chave de volta.
 
 ---
 

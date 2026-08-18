@@ -26,6 +26,7 @@ export async function GET(req) {
       opRefNumero: true, itens: true, materiais: true, pesoEnviadoKg: true, dataEnvio: true, setorEnvio: true,
       remessaStatus: true, remessaCfop: true, remessaNatureza: true,
       remessaNfNumero: true, remessaNfSerie: true, remessaNfChave: true, remessaNfEmitidaEm: true,
+      remessaPedidoOmie: true, remessaPedidoNumero: true,
       remessaObservacao: true, remessaPorNome: true,
     },
   });
@@ -53,6 +54,7 @@ export async function GET(req) {
       natureza: r.remessaNatureza || "Remessa para industrialização",
       nfNumero: r.remessaNfNumero, nfSerie: r.remessaNfSerie, nfChave: r.remessaNfChave,
       nfEmitidaEm: r.remessaNfEmitidaEm, observacao: r.remessaObservacao, porNome: r.remessaPorNome,
+      pedidoOmie: r.remessaPedidoOmie, pedidoNumero: r.remessaPedidoNumero,
     };
   });
 

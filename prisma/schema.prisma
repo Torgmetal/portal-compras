@@ -4071,7 +4071,8 @@ model RomaneioTerceiro {
   remessaNfSerie    String?
   remessaNfChave    String? // chave de acesso (44 díg.)
   remessaNfEmitidaEm DateTime?
-  remessaPedidoOmie String? // codigo do pedido de venda no Omie (Fase 2 — emissão integrada)
+  remessaPedidoOmie String? // codigo interno do pedido de venda no Omie (Fase 2 — emissão integrada)
+  remessaPedidoNumero String? // nº do pedido de venda no Omie (humano, p/ conferir/faturar lá)
   remessaObservacao String?
   remessaPorNome    String?
   criadoPorId       String?
