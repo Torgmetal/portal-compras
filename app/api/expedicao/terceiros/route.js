@@ -41,6 +41,7 @@ const schema = z.object({
   // Para o 2º romaneio de MATERIAL (só Corte/Montagem): ids das peças + etapa de envio.
   pecaIds: z.array(z.string()).optional(),
   setorEnvio: z.string().max(20).nullable().optional(),
+  chapaModo: z.enum(["INTEIRA", "CORTADA"]).optional(), // como contar as chapas no romaneio de material
 });
 
 // pesoTotal do item: usa o informado, senão qte × pesoUn.
@@ -97,7 +98,7 @@ export async function POST(req) {
 
   // 2º romaneio de MATERIAL (perfis a cortar) — só saindo da Preparação/Montagem.
   const setorEnvio = body.setorEnvio ? String(body.setorEnvio).toUpperCase() : null;
-  const materiais = await computarMateriaisEnvio({ pecaIds: body.pecaIds || [], setorEnvio }).catch(() => []);
+  const materiais = await computarMateriaisEnvio({ pecaIds: body.pecaIds || [], setorEnvio, chapaModo: body.chapaModo }).catch(() => []);
 
   // corrida por número: tenta o próximo e sobe se colidir com a unique
   let criado = null;

@@ -17,8 +17,10 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
   const [servico, setServico] = useState("");
   const [volta, setVolta] = useState("MONTAGEM");
   const [dataRetorno, setDataRetorno] = useState("");
+  const [chapaModo, setChapaModo] = useState(setor === "MONTAGEM" ? "CORTADA" : "INTEIRA"); // como contar as chapas no romaneio de material
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const geraMaterial = setor === "CORTE" || setor === "MONTAGEM";
 
   useEffect(() => {
     fetch(`/api/fornecedores?ativos=1&categoria=${CAT_PRESTADOR}`)
@@ -44,7 +46,7 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
           opRefId: opId || null, opRefNumero: String(obra), itens, dataEnvio: new Date().toISOString(),
           dataPrevRetorno: dataRetorno || null,
           observacao: `Enviado da etapa ${SETOR_LABEL[setor] || setor || "—"} · retorna para ${SETOR_LABEL[volta] || volta}`,
-          pecaIds: pecas.map((p) => p.id), setorEnvio: setor || null, // p/ o 2º romaneio de material (Corte/Montagem)
+          pecaIds: pecas.map((p) => p.id), setorEnvio: setor || null, chapaModo, // p/ o 2º romaneio de material (Corte/Montagem)
         }),
       });
       const rj = await rc.json();
@@ -98,6 +100,18 @@ export default function TerceiroModal({ obra, opId, setor, pecas, onClose, onDon
             <label className="text-[12px] font-semibold text-torg-gray">Serviço (opcional)</label>
             <input value={servico} onChange={(e) => setServico(e.target.value)} placeholder="ex.: galvanização, usinagem, corte…" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[13px] mt-1" />
           </div>
+          {geraMaterial && (
+            <div>
+              <label className="text-[12px] font-semibold text-torg-gray">Chapas no romaneio de material</label>
+              <div className="flex gap-2 mt-1">
+                {[["INTEIRA", "Chapa inteira", "conta chapas 3000×1500 por espessura"], ["CORTADA", "Chapa cortada", "só o peso das peças cortadas + qual chapa"]].map(([v, l, d]) => (
+                  <button key={v} type="button" onClick={() => setChapaModo(v)} title={d}
+                    className={`flex-1 text-[12px] font-semibold rounded-lg px-3 py-2 border ${chapaModo === v ? "bg-torg-blue text-white border-torg-blue" : "text-torg-gray border-gray-300 hover:bg-gray-50"}`}>{l}</button>
+                ))}
+              </div>
+              <p className="text-[10px] text-torg-gray mt-1">{chapaModo === "CORTADA" ? "Vamos mandar as chapas já cortadas — a lista traz só o peso e qual chapa." : "Vamos mandar chapa inteira pro terceiro cortar — a lista traz o nº de chapas 3000×1500."}</p>
+            </div>
+          )}
           {erro && <p className="text-red-600 text-sm">{erro}</p>}
         </div>
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-100">
