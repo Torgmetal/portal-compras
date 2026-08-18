@@ -522,6 +522,9 @@ function roundRectArte(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// minúsculas sem acento — p/ comparar cargo × setor (evitar repetir "Qualidade" etc.).
+function semAcento(s) { return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+
 // Requisitos: "um por linha" ou separados por ";" viram itens; se vier tudo numa linha só,
 // tenta separar por vírgula (caso o RH cole o texto corrido da vaga).
 function parseReqs(s) {
@@ -580,7 +583,7 @@ function ArteModal({ vaga, onClose }) {
   const reqInit = parseReqs(vaga.requisitos || "");
 
   const [legenda, setLegenda] = useState(
-    `🏗️ Estamos contratando: ${vaga.titulo}${vaga.setor?.nome ? " — " + vaga.setor.nome : ""}\n\n` +
+    `🏗️ Estamos contratando: ${vaga.titulo}${vaga.setor?.nome && !semAcento(vaga.titulo).includes(semAcento(vaga.setor.nome)) ? " — " + vaga.setor.nome : ""}\n\n` +
     `Venha fazer parte de uma equipe engajada em crescer e construir grandes obras em estruturas metálicas. Aqui o seu trabalho faz parte de projetos que ficam de pé.\n\n` +
     `✅ Benefícios: Plano de Saúde e Vale Refeição.\n\n` +
     (reqInit.length ? `📋 Requisitos: ${reqInit.join("; ")}.\n\n` : "") +
@@ -659,7 +662,9 @@ function ArteModal({ vaga, onClose }) {
     const pillH = pillTxt ? 66 : 0;
 
     const gapPill = pillTxt ? 30 : 0;
-    const gapSub = 22, subH = subInfo ? 44 : 0;
+    // Não repete o setor quando o cargo já o contém (ex.: "Inspetor de Qualidade" + setor "Qualidade").
+    const setorTxt = subInfo && !semAcento(titulo).includes(semAcento(subInfo)) ? subInfo : "";
+    const gapSub = setorTxt ? 22 : 0, subH = setorTxt ? 44 : 0;
     ctx.font = `600 32px Arial, sans-serif`;
     const mLines = mensagem ? wrapArte(ctx, mensagem, W - 2 * M, 2) : [];
     const gapMsg = mLines.length ? 18 : 0, msgH = mLines.length * 40;
@@ -711,7 +716,7 @@ function ArteModal({ vaga, onClose }) {
     ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
 
     cy += gapSub;
-    if (subInfo) { ctx.fillStyle = "#e2e8f0"; ctx.font = `600 34px Arial, sans-serif`; ctx.fillText(subInfo, M, cy); cy += subH; }
+    if (setorTxt) { ctx.fillStyle = "#e2e8f0"; ctx.font = `600 34px Arial, sans-serif`; ctx.fillText(setorTxt, M, cy); cy += subH; }
     if (mLines.length) { cy += gapMsg; ctx.fillStyle = "#f1f5f9"; ctx.font = `600 32px Arial, sans-serif`; for (const ln of mLines) { ctx.fillText(ln, M, cy); cy += 40; } }
     if (reqAll.length) {
       cy += gapReq;
