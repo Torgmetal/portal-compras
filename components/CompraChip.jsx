@@ -70,6 +70,11 @@ export function ModalRastreabilidade({ opNumero, onClose }) {
           </p>
         )}
 
+        {d?.linhas?.some((l) => !l.corrida) && (
+          <p className="mx-5 mt-3 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-1.5">
+            <AlertTriangle size={13} /> {d.linhas.filter((l) => !l.corrida).length} entrada(s) sem corrida/lote no CMR — dá pra achar pelo nº da rastreabilidade e completar no Almoxarifado.
+          </p>
+        )}
         <div className="px-5 py-4 overflow-y-auto">
           {erro && <p className="text-sm text-red-600">{erro}</p>}
           {!d && !erro ? (
@@ -79,20 +84,24 @@ export function ModalRastreabilidade({ opNumero, onClose }) {
               <table className="w-full text-[12px] min-w-[760px]">
                 <thead>
                   <tr className="text-[10px] uppercase text-torg-gray border-b border-gray-100">
+                    {/* Nº da rastreabilidade (ÍNDICE R do CMR) na frente de tudo: é por ele que
+                        o Almoxarifado/Qualidade acha o material e o certificado. (Vitor 18/08.) */}
+                    <th className="text-left py-1.5">Rastreab. (R)</th>
+                    <th className="text-left py-1.5">Corrida / lote</th><th className="text-left py-1.5">Certificado</th>
                     <th className="text-left py-1.5">Recebido</th><th className="text-left py-1.5">NF</th>
-                    <th className="text-left py-1.5">Pedido</th><th className="text-left py-1.5">Corrida / lote</th>
-                    <th className="text-left py-1.5">Certificado</th><th className="text-left py-1.5">Fornecedor</th>
+                    <th className="text-left py-1.5">Pedido</th><th className="text-left py-1.5">Fornecedor</th>
                     <th className="text-left py-1.5">Material</th><th className="text-right py-1.5">Peso</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {d.linhas.map((l, i) => (
                     <tr key={i}>
+                      <td className="py-1.5 whitespace-nowrap font-mono font-bold">{l.rastreio || <span className="text-amber-600">sem índice</span>}</td>
+                      <td className="py-1.5 whitespace-nowrap font-mono">{l.corrida || <span className="text-amber-600 font-semibold">sem corrida</span>}</td>
+                      <td className="py-1.5 whitespace-nowrap font-mono text-torg-gray">{l.certificado || "—"}</td>
                       <td className="py-1.5 whitespace-nowrap tabular-nums">{fmtD(l.recebidoEm)}</td>
                       <td className="py-1.5 whitespace-nowrap font-mono">{l.nf || "—"}</td>
                       <td className="py-1.5 whitespace-nowrap font-mono">{l.pedido || "—"}</td>
-                      <td className="py-1.5 whitespace-nowrap font-mono">{l.corrida || <span className="text-amber-600">sem corrida</span>}</td>
-                      <td className="py-1.5 whitespace-nowrap font-mono text-torg-gray">{l.certificado || "—"}</td>
                       <td className="py-1.5 whitespace-nowrap">{l.fornecedor || "—"}</td>
                       <td className="py-1.5 truncate max-w-[280px]" title={l.material}>{l.material}</td>
                       <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{l.pesoKg ? fmtKg(l.pesoKg) : l.quantidade ? `${l.quantidade} pç` : "—"}</td>

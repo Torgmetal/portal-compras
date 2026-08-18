@@ -62,8 +62,9 @@ const textoMaterial = (p) => {
   if (!p.perfil) return "";
   const m = p.material;
   if (!m) return "sem material";
-  const partes = [m.material, m.nf ? `NF ${m.nf}` : null, m.pedido ? `pedido ${m.pedido}` : null,
-    m.corrida ? `corrida ${m.corrida}` : null, m.fornecedor || null].filter(Boolean);
+  const partes = [m.rastreio ? `R ${m.rastreio}` : null, m.material,
+    m.corrida ? `corrida ${m.corrida}` : "sem corrida",
+    m.nf ? `NF ${m.nf}` : null, m.pedido ? `pedido ${m.pedido}` : null, m.fornecedor || null].filter(Boolean);
   return partes.join(" · ");
 };
 const textoProg = (p) => (p.programacao ? PROG[p.programacao.situacao]?.txt || "" : "");
@@ -295,14 +296,14 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
     const recorte = [fMaterial === "COM" ? "com material" : fMaterial === "SEM" ? "sem material" : null,
       fProg === "PROG" ? "programadas" : fProg === "NAO" ? "não lançadas no Syneco" : null,
       filtro.trim() ? `filtro "${filtro.trim()}"` : null].filter(Boolean).join(" · ");
-    const headers = ["Marca", "Descrição", "Tipo", "Perfil", "Qtd", "Peso un. (kg)", "Peso tot. (kg)", "Material", "NF", "Pedido", "Corrida / lote", "Recebido em", "Programação"];
+    const headers = ["Marca", "Descrição", "Tipo", "Perfil", "Qtd", "Peso un. (kg)", "Peso tot. (kg)", "Material", "Rastreab. (R)", "Corrida / lote", "NF", "Pedido", "Recebido em", "Programação"];
     const { workbook, sheet: ws, linhaInicio } = await criarRelatorioTorg({
       titulo: `${aba === "prontas" ? "Peças prontas" : "Peças a liberar"} — ${obra}${setor ? ` (${nomeSetor})` : ""}`,
       subtitulo: `${obra} · Setor: ${nomeSetor}${recorte ? ` · Recorte: ${recorte}` : ""}`,
       kpis: [`${fmtN(visiveis.length)} peça(s)`, `${fmtKg(pesoVisivel)} kg`],
       totalColunas: headers.length, nomePlanilha: "Peças", codigoDoc: "REL-PCP-004",
     });
-    ws.columns = [{ width: 18 }, { width: 34 }, { width: 11 }, { width: 22 }, { width: 8 }, { width: 13 }, { width: 14 }, { width: 34 }, { width: 12 }, { width: 11 }, { width: 15 }, { width: 13 }, { width: 15 }];
+    ws.columns = [{ width: 18 }, { width: 34 }, { width: 11 }, { width: 22 }, { width: 8 }, { width: 13 }, { width: 14 }, { width: 34 }, { width: 14 }, { width: 16 }, { width: 12 }, { width: 11 }, { width: 13 }, { width: 15 }];
     let row = linhaInicio;
     adicionarHeaderTabela(ws, row, headers); row++;
     const first = row;
@@ -311,12 +312,12 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
       adicionarLinhaTabela(ws, row, [
         p.marca, p.descricao || "", tipoTxt(p.tipoPeca), p.perfil || "",
         p.qte || 1, p.pesoUnitKg ? Number(p.pesoUnitKg.toFixed(2)) : "", p.pesoTotalKg ? Number(p.pesoTotalKg.toFixed(1)) : "",
-        textoMaterial(p), m?.nf || "", m?.pedido || "", m?.corrida || "",
+        textoMaterial(p), m?.rastreio || "", m ? m.corrida || "sem corrida" : "", m?.nf || "", m?.pedido || "",
         m?.dataRecebimento ? new Date(m.dataRecebimento).toLocaleDateString("pt-BR") : "", textoProg(p),
-      ], { alinhamento: { 2: "center", 4: "center", 5: "right", 6: "right", 8: "center", 9: "center", 10: "center", 11: "center", 12: "center" } });
+      ], { alinhamento: { 2: "center", 4: "center", 5: "right", 6: "right", 8: "center", 9: "center", 10: "center", 11: "center", 12: "center", 13: "center" } });
       row++;
     }
-    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", "", { formula: `SUM(G${first}:G${row - 1})` }, "", "", "", "", "", ""]);
+    if (row > first) adicionarLinhaTotais(ws, row, ["TOTAL", "", "", "", "", "", { formula: `SUM(G${first}:G${row - 1})` }, "", "", "", "", "", "", ""]);
     await downloadWorkbook(workbook, `Pecas_${obra}${setor ? "_" + nomeSetor : ""}_${hoje}.xlsx`);
   }
 
@@ -460,7 +461,7 @@ export default function DespachoPanel({ obra, setor, onClose, abaInicial = "desp
                         : p.material ? (
                           <button type="button" onClick={(e) => { e.stopPropagation(); setRastroItem(p); }}
                             className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap font-semibold"
-                            title={`${p.material.material}\nNF ${p.material.nf || "—"}${p.material.corrida ? ` · corrida ${p.material.corrida}` : ""}${p.material.pedido ? ` · pedido ${p.material.pedido}` : ""}\nClique para ver a rastreabilidade.`}>
+                            title={`Rastreab. R ${p.material.rastreio || "—"}${p.material.corrida ? ` · corrida ${p.material.corrida}` : " · SEM CORRIDA no CMR"}\n${p.material.material}\nNF ${p.material.nf || "—"}${p.material.pedido ? ` · pedido ${p.material.pedido}` : ""}\nClique para ver a rastreabilidade.`}>
                             ok{p.material.dataRecebimento ? ` ${fmtD(p.material.dataRecebimento)}` : ""}
                           </button>
                         ) : (
@@ -676,7 +677,7 @@ function OrdensDoItem({ peca, setor, sincronizadoEm, onClose }) {
 const SIT = {
   CERTA: { txt: "definida", cls: "bg-emerald-50 text-emerald-700", dica: "Só existe uma corrida desse material nesta OP (ou a data eliminou as outras) — não há dúvida." },
   PROVAVEL: { txt: "provável", cls: "bg-sky-50 text-sky-700", dica: "Mais de uma corrida possível; o rateio FIFO por data e peso escolheu esta. As outras candidatas ficam listadas." },
-  SEM_CORRIDA: { txt: "sem corrida", cls: "bg-amber-50 text-amber-700", dica: "O material chegou, mas o CMR não tem a corrida/lote preenchida — falta lançar no Almoxarifado." },
+  SEM_CORRIDA: { txt: "sem corrida", cls: "bg-amber-50 text-amber-700", dica: "O material chegou e tem nº de rastreabilidade, mas o CMR está sem a corrida/lote — dá pra achar pelo R e completar no Almoxarifado." },
   ESTOQUE: { txt: "de estoque", cls: "bg-amber-50 text-amber-700", dica: "A peça foi cortada ANTES de qualquer entrega desta OP: saiu de sobra/estoque, o CMR desta OP não explica." },
   SEM_MATERIAL: { txt: "sem material", cls: "bg-slate-100 text-slate-500", dica: "Nenhuma entrada desse perfil no CMR desta OP." },
 };
@@ -714,11 +715,14 @@ function RastroDoItem({ peca, opNumero, onClose }) {
           {d && !itens.length && <p className="text-sm text-torg-gray py-6 text-center">Sem informação de material para esta peça.</p>}
           {itens.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px] min-w-[860px]">
+              <table className="w-full text-[12px] min-w-[960px]">
                 <thead>
                   <tr className="text-[10px] uppercase text-torg-gray border-b border-gray-100">
                     {conjunto && <th className="text-left py-1.5">Peça</th>}
                     <th className="text-left py-1.5">Perfil</th>
+                    {/* O nº da rastreabilidade (ÍNDICE R do CMR) vem ANTES da corrida e do lote —
+                        é o número pelo qual o material é procurado. (Vitor 18/08.) */}
+                    <th className="text-left py-1.5">Rastreab. (R)</th>
                     <th className="text-left py-1.5">Corrida / lote</th>
                     <th className="text-left py-1.5">Certificado</th>
                     <th className="text-left py-1.5">NF</th>
@@ -737,7 +741,8 @@ function RastroDoItem({ peca, opNumero, onClose }) {
                         <tr>
                           {conjunto && <td className="py-1.5 font-mono font-semibold whitespace-nowrap">{it.marca}</td>}
                           <td className="py-1.5 whitespace-nowrap">{it.perfil || "—"}</td>
-                          <td className="py-1.5 whitespace-nowrap font-mono font-semibold">{u?.corrida || <span className="text-gray-300">—</span>}</td>
+                          <td className="py-1.5 whitespace-nowrap font-mono font-bold">{u?.rastreio || <span className="text-gray-300">—</span>}</td>
+                          <td className="py-1.5 whitespace-nowrap font-mono font-semibold">{u?.corrida || (u ? <span className="text-amber-600 font-semibold">sem corrida</span> : <span className="text-gray-300">—</span>)}</td>
                           <td className="py-1.5 whitespace-nowrap font-mono text-torg-gray">{u?.certificado || "—"}</td>
                           <td className="py-1.5 whitespace-nowrap font-mono">{u?.nf || "—"}</td>
                           <td className="py-1.5 whitespace-nowrap">{u?.fornecedor || "—"}</td>
@@ -751,8 +756,8 @@ function RastroDoItem({ peca, opNumero, onClose }) {
                         {it.situacao === "PROVAVEL" && it.candidatas?.length > 1 && (
                           <tr className="bg-sky-50/40">
                             {conjunto && <td />}
-                            <td colSpan={8} className="py-1 px-1 text-[11px] text-torg-gray">
-                              outras corridas possíveis deste material: {it.candidatas.filter((c) => c.corrida !== u?.corrida).map((c) => `${c.corrida} (recebida ${fmtD(c.recebidoEm)})`).join(" · ")}
+                            <td colSpan={9} className="py-1 px-1 text-[11px] text-torg-gray">
+                              outras corridas possíveis deste material: {it.candidatas.filter((c) => c.corrida !== u?.corrida).map((c) => `R ${c.rastreio || "—"} · corrida ${c.corrida} (recebida ${fmtD(c.recebidoEm)})`).join("  |  ")}
                             </td>
                           </tr>
                         )}
