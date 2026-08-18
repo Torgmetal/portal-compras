@@ -4,7 +4,7 @@ import {
   Briefcase, Search, PlusCircle, Loader2, AlertCircle, X,
   ChevronDown, Clock, CheckCircle2, XCircle, Users, AlertTriangle,
   ArrowRight, Calendar, Filter, Mail, Send, Image as ImageIcon,
-  Download, Palette, CheckCircle, Copy,
+  Download, Palette, CheckCircle, Copy, Pencil,
 } from "lucide-react";
 
 const STATUS_LABELS = {
@@ -44,6 +44,7 @@ export default function VagasClient() {
   const [modalAberto, setModalAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState({});
+  const [editandoId, setEditandoId] = useState(null); // null = criando; id = editando vaga existente
   // Modal status
   const [modalStatus, setModalStatus] = useState(null);
   const [atualizando, setAtualizando] = useState(false);
@@ -89,6 +90,7 @@ export default function VagasClient() {
 
   // Criar vaga
   const abrirNova = () => {
+    setEditandoId(null);
     setForm({
       titulo: "", setorId: setores[0]?.id || "", cargoId: "",
       quantidade: 1, prioridade: "NORMAL", tipo: "CLT",
@@ -97,28 +99,58 @@ export default function VagasClient() {
     setModalAberto(true);
   };
 
+  // Editar vaga existente — abre o MESMO modal pré-preenchido; salva via PATCH.
+  const abrirEdicao = (v) => {
+    setEditandoId(v.id);
+    setErro("");
+    setForm({
+      titulo: v.titulo || "", setorId: v.setorId || v.setor?.id || "", cargoId: v.cargoId || v.cargo?.id || "",
+      quantidade: v.quantidade || 1, prioridade: v.prioridade || "NORMAL", tipo: v.tipo || "CLT",
+      nivelCargo: v.nivelCargo || "", justificativa: v.justificativa || "", requisitos: v.requisitos || "", salarioFaixa: v.salarioFaixa || "",
+    });
+    setModalAberto(true);
+  };
+
   const salvarVaga = async () => {
     setSalvando(true);
     setErro("");
     try {
-      const body = {
-        ...form,
-        quantidade: Number(form.quantidade) || 1,
-        cargoId: form.cargoId || undefined,
-        nivelCargo: form.nivelCargo || undefined,
-        justificativa: form.justificativa || undefined,
-        requisitos: form.requisitos || undefined,
-        salarioFaixa: form.salarioFaixa || undefined,
-      };
-      const res = await fetch("/api/rh/vagas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao criar vaga");
-      setVagas((prev) => [data.data, ...prev]);
-      setModalAberto(false);
+      if (editandoId) {
+        // Edição — PATCH só dos campos da vaga ("" limpa cargo/nível).
+        const body = {
+          titulo: form.titulo, setorId: form.setorId, cargoId: form.cargoId || null,
+          quantidade: Number(form.quantidade) || 1, prioridade: form.prioridade, tipo: form.tipo,
+          nivelCargo: form.nivelCargo || null, justificativa: form.justificativa || null,
+          requisitos: form.requisitos || null, salarioFaixa: form.salarioFaixa || null,
+        };
+        const res = await fetch(`/api/rh/vagas/${editandoId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erro ao salvar a vaga");
+        setVagas((prev) => prev.map((v) => (v.id === editandoId ? { ...v, ...data.data } : v)));
+        setModalAberto(false);
+        setEditandoId(null);
+      } else {
+        const body = {
+          ...form,
+          quantidade: Number(form.quantidade) || 1,
+          cargoId: form.cargoId || undefined,
+          nivelCargo: form.nivelCargo || undefined,
+          justificativa: form.justificativa || undefined,
+          requisitos: form.requisitos || undefined,
+          salarioFaixa: form.salarioFaixa || undefined,
+        };
+        const res = await fetch("/api/rh/vagas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erro ao criar vaga");
+        setVagas((prev) => [data.data, ...prev]);
+        setModalAberto(false);
+      }
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -281,6 +313,8 @@ export default function VagasClient() {
                   <div className="flex items-center gap-2 shrink-0">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${pri.cor}`}>{pri.label}</span>
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${st.cor}`}>{st.label}</span>
+                    <button onClick={() => abrirEdicao(v)} title="Editar vaga (cargo, setor, requisitos…)"
+                      className="text-gray-400 hover:text-torg-blue p-1 -m-0.5 rounded transition"><Pencil size={14} /></button>
                   </div>
                 </div>
 
@@ -366,7 +400,7 @@ export default function VagasClient() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-torg-dark">Nova Solicitação de Vaga</h3>
+              <h3 className="text-lg font-bold text-torg-dark">{editandoId ? "Editar Vaga" : "Nova Solicitação de Vaga"}</h3>
               <button onClick={() => setModalAberto(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
@@ -427,8 +461,8 @@ export default function VagasClient() {
               </button>
               <button onClick={salvarVaga} disabled={salvando || !form.titulo || !form.setorId}
                 className="px-4 py-2 bg-torg-blue text-white text-sm font-medium rounded-lg hover:bg-torg-blue/90 inline-flex items-center gap-2 disabled:opacity-50">
-                {salvando ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-                {salvando ? "Criando…" : "Criar Vaga"}
+                {salvando ? <Loader2 size={14} className="animate-spin" /> : editandoId ? <Pencil size={14} /> : <PlusCircle size={14} />}
+                {salvando ? (editandoId ? "Salvando…" : "Criando…") : editandoId ? "Salvar alterações" : "Criar Vaga"}
               </button>
             </div>
           </div>

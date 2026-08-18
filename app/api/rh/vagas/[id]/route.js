@@ -16,6 +16,11 @@ const patchVagaSchema = z.object({
   justificativa: z.string().optional().nullable(),
   requisitos: z.string().optional().nullable(),
   salarioFaixa: z.string().optional().nullable(),
+  // Edição dos dados da vaga (não só status): setor/cargo/tipo/nível editáveis depois de aberta.
+  setorId: z.string().min(1).optional(),
+  cargoId: z.string().optional().nullable(),
+  tipo: z.enum(["CLT", "PJ", "ESTAGIO", "TEMPORARIO"]).optional().nullable(),
+  nivelCargo: z.enum(["OPERACIONAL", "TECNICO", "SUPERVISAO", "GERENCIA"]).optional().nullable(),
 });
 
 // GET — Detalhe de uma vaga
