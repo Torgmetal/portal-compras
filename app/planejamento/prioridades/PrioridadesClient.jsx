@@ -304,19 +304,23 @@ function TelaSetorUnico({ tela, setTela }) {
 // Linha de OP no tema claro-Torg — leve, direta (posição · OP · barra · % · falta),
 // com uma linha discreta de peças (prioritárias em laranja, próximas em cinza).
 function LinhaOp({ op, onDespachar }) {
-  // Corte sem detalhamento (sem croqui) → linha de ALERTA, sem barra/peças.
-  if (op.estado === "SEM_LISTA") {
+  // Corte sem detalhamento (sem croqui) → linha de ALERTA, sem barra/peças. Dois níveis:
+  // SEM_LISTA_PRODUZINDO = a fábrica JÁ está produzindo sem a lista no portal (crítico).
+  if (String(op.estado).startsWith("SEM_LISTA")) {
+    const produzindo = op.estado === "SEM_LISTA_PRODUZINDO";
     return (
-      <div onClick={onDespachar} title="Liberar peças em aberto desta OP" className="bg-red-50 rounded-xl px-5 py-4 border border-red-200 shadow-[0_1px_3px_rgba(0,41,69,0.07)] cursor-pointer hover:border-red-300">
+      <div onClick={onDespachar} title="Liberar peças em aberto desta OP" className={`rounded-xl px-5 py-4 border shadow-[0_1px_3px_rgba(0,41,69,0.07)] cursor-pointer ${produzindo ? "bg-red-100 border-red-400 hover:border-red-500" : "bg-amber-50 border-amber-200 hover:border-amber-300"}`}>
         <div className="flex items-center gap-4 flex-wrap">
-          <AlertTriangle size={26} className="text-red-500 shrink-0" />
+          <AlertTriangle size={26} className={`shrink-0 ${produzindo ? "text-red-600" : "text-amber-500"}`} />
           <div className="min-w-[150px]">
             <div className="text-[26px] font-extrabold text-torg-dark leading-none tabular-nums">OP-{op.opNumero}</div>
             <div className="text-[13px] text-torg-gray truncate max-w-[280px]" title={op.obra}>{op.obra}</div>
           </div>
-          <div className="flex-1 text-[15px] font-bold text-red-600">⚠ sem lista de corte — importar LE/LPC</div>
+          <div className={`flex-1 text-[15px] font-bold ${produzindo ? "text-red-700" : "text-amber-700"}`}>
+            {produzindo ? "⚠ PRODUZINDO SEM LISTA no portal — importar LPC urgente" : "aguardando lista de corte da Engenharia"}
+          </div>
           {op.entrega && (
-            <span className="text-[13px] text-red-600 inline-flex items-center gap-1"><CalendarClock size={13} /> {fmtData(op.entrega)}</span>
+            <span className={`text-[13px] inline-flex items-center gap-1 ${produzindo ? "text-red-700" : "text-amber-700"}`}><CalendarClock size={13} /> {fmtData(op.entrega)}</span>
           )}
         </div>
       </div>
@@ -385,7 +389,7 @@ function LinhaOp({ op, onDespachar }) {
 
 function LaneSetor({ lane, onAbrir }) {
   const acc = LANE_ACC[lane.setor] || "#006EAB";
-  const nAlerta = lane.ops.filter((o) => o.estado === "SEM_LISTA").length;
+  const nAlerta = lane.ops.filter((o) => String(o.estado).startsWith("SEM_LISTA")).length;
   const nFila = lane.ops.length - nAlerta;
   return (
     <div className="min-w-[250px] max-w-[250px] bg-white rounded-xl border border-torg-blue-100 shadow-[0_1px_3px_rgba(0,41,69,0.06)] p-3 flex flex-col gap-2" style={{ borderTopColor: acc, borderTopWidth: 3 }}>
@@ -409,21 +413,23 @@ function LaneSetor({ lane, onAbrir }) {
 }
 
 function OpMini({ op }) {
-  // Corte sem detalhamento (sem croqui) → cartão de ALERTA, sem barra.
-  if (op.estado === "SEM_LISTA") {
+  // Corte sem detalhamento (sem croqui) → cartão de ALERTA, sem barra. Vermelho forte = já
+  // produzindo sem a lista no portal; âmbar = só esperando a Engenharia detalhar.
+  if (String(op.estado).startsWith("SEM_LISTA")) {
+    const produzindo = op.estado === "SEM_LISTA_PRODUZINDO";
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
+      <div className={`border rounded-lg p-2.5 ${produzindo ? "bg-red-100 border-red-400" : "bg-amber-50 border-amber-200"}`}>
         <div className="flex items-center gap-1.5">
-          <AlertTriangle size={13} className="text-red-500 shrink-0" />
+          <AlertTriangle size={13} className={`shrink-0 ${produzindo ? "text-red-600" : "text-amber-500"}`} />
           <span className="text-base font-extrabold tabular-nums text-torg-dark">OP-{op.opNumero}</span>
           {op.entrega && (
-            <span className="ml-auto text-[11px] whitespace-nowrap inline-flex items-center gap-0.5 text-red-600">
+            <span className={`ml-auto text-[11px] whitespace-nowrap inline-flex items-center gap-0.5 ${produzindo ? "text-red-700" : "text-amber-700"}`}>
               <CalendarClock size={10} /> {fmtData(op.entrega)}
             </span>
           )}
         </div>
         <div className="text-[11px] text-torg-gray truncate mt-0.5 ml-[22px]" title={op.obra}>{op.obra}</div>
-        <div className="text-[11px] font-semibold text-red-600 mt-1 ml-[22px]">⚠ sem lista de corte</div>
+        <div className={`text-[11px] font-semibold mt-1 ml-[22px] ${produzindo ? "text-red-700" : "text-amber-700"}`}>{produzindo ? "⚠ produzindo sem lista" : "aguardando lista da Engenharia"}</div>
       </div>
     );
   }

@@ -33,7 +33,10 @@ export async function GET() {
     const setores = progressoPorSetor(o.universo, o.realMap);
     const mi = setores.findIndex((x) => x.setor === "MONTAGEM");
     if (mi >= 0) setores[mi] = progressoMontagemMontavel(o.universo, o.realMap, o.links);
-    return { ...o, setores, temDetalhe: temDetalheCorte(o.universo) };
+    // semPecas: nada importado (nem LE nem LPC) — não há o que o corte fazer, sai da raia.
+    // produzindoSemLista: NÃO tem croqui no portal mas JÁ tem produção no Syneco → crítico
+    // (a fábrica está cortando sem a lista no sistema — caso da OP-071). Vitor 18/08.
+    return { ...o, setores, temDetalhe: temDetalheCorte(o.universo), semPecas: (o.universo || []).length === 0, produzindo: (o.realMap?.size || 0) > 0 };
   });
 
   const lanes = FLUXO_SETORES.map((s) => {
@@ -42,10 +45,11 @@ export async function GET() {
       const es = entregaDoSetor(o.datasSetor, s.key, o.entrega, now);
       // Corte sem detalhamento (sem croqui) → ALERTA na raia, sem barra (nada pra cortar/rastrear).
       if (s.key === "CORTE" && !o.temDetalhe) {
+        if (o.semPecas) continue; // OP sem NENHUMA peça importada — não ocupa a raia do corte
         ops.push({
           opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
           entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor,
-          estado: "SEM_LISTA", totalKg: 0, feitoKg: 0, pendenteKg: 0, pct: null,
+          estado: o.produzindo ? "SEM_LISTA_PRODUZINDO" : "SEM_LISTA", totalKg: 0, feitoKg: 0, pendenteKg: 0, pct: null,
         });
         continue;
       }
@@ -61,12 +65,12 @@ export async function GET() {
     }
     // Fila real por urgência; alertas (sem lista) por último.
     ops.sort((a, b) => {
-      const aa = a.estado === "SEM_LISTA", bb = b.estado === "SEM_LISTA";
+      const aa = String(a.estado).startsWith("SEM_LISTA"), bb = String(b.estado).startsWith("SEM_LISTA");
       if (aa !== bb) return aa - bb;
       return ordenarUrgencia(a, b);
     });
     let pos = 0;
-    ops.forEach((op) => { op.ordem = op.estado === "SEM_LISTA" ? null : ++pos; });
+    ops.forEach((op) => { op.ordem = String(op.estado).startsWith("SEM_LISTA") ? null : ++pos; });
     return { setor: s.key, label: s.label, filaKg: ops.reduce((acc, op) => acc + (op.pendenteKg || 0), 0), ops };
   });
 

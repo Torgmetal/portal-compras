@@ -33,18 +33,19 @@ export async function GET(req, { params }) {
     const setores = progressoPorSetor(o.universo, o.realMap);
     const mi = setores.findIndex((x) => x.setor === "MONTAGEM");
     const mont = mi >= 0 ? (setores[mi] = progressoMontagemMontavel(o.universo, o.realMap, o.links)) : null;
-    return { o, setores, montaveis: mont ? mont.montaveis : null, temDetalhe: temDetalheCorte(o.universo) };
+    return { o, setores, montaveis: mont ? mont.montaveis : null, temDetalhe: temDetalheCorte(o.universo), semPecas: (o.universo || []).length === 0, produzindo: (o.realMap?.size || 0) > 0 };
   });
 
   // Fila detalhada do setor pedido.
   const ops = [];
-  for (const { o, setores, montaveis, temDetalhe } of comSetores) {
+  for (const { o, setores, montaveis, temDetalhe, semPecas, produzindo } of comSetores) {
     const es = entregaDoSetor(o.datasSetor, setorKey, o.entrega, now);
     // Corte sem detalhamento (sem croqui) → ALERTA (sem fila de peças).
     if (setorKey === "CORTE" && !temDetalhe) {
+      if (semPecas) continue; // sem nenhuma peça importada → fora da fila do corte
       ops.push({
         opNumero: o.opNumero, obra: o.obra, cliente: o.cliente, refCliente: o.refCliente,
-        entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor, estado: "SEM_LISTA",
+        entrega: es.entrega, atrasoDias: es.atrasoDias, doSetor: es.doSetor, estado: produzindo ? "SEM_LISTA_PRODUZINDO" : "SEM_LISTA",
         totalKg: 0, feitoKg: 0, pendenteKg: 0, pct: null,
         qtdPecas: 0, qtdPrioritarias: 0, prioritarias: [], sequencia: [],
       });
@@ -74,19 +75,19 @@ export async function GET(req, { params }) {
     });
   }
   ops.sort((a, b) => {
-    const aa = a.estado === "SEM_LISTA", bb = b.estado === "SEM_LISTA";
+    const aa = String(a.estado).startsWith("SEM_LISTA"), bb = String(b.estado).startsWith("SEM_LISTA");
     if (aa !== bb) return aa - bb;
     return ordenarUrgencia(a, b);
   });
   let pos = 0;
-  ops.forEach((op) => { op.ordem = op.estado === "SEM_LISTA" ? null : ++pos; });
+  ops.forEach((op) => { op.ordem = String(op.estado).startsWith("SEM_LISTA") ? null : ++pos; });
 
   // Resumo de todos os setores (pras abas): fila em kg + nº de OPs pendentes; no Corte,
   // nº de OPs sem lista (alerta) à parte.
   const resumo = FLUXO_SETORES.map((s) => {
     let filaKg = 0, nOps = 0, nAlertas = 0;
-    for (const { setores, temDetalhe } of comSetores) {
-      if (s.key === "CORTE" && !temDetalhe) { nAlertas++; continue; }
+    for (const { setores, temDetalhe, semPecas } of comSetores) {
+      if (s.key === "CORTE" && !temDetalhe) { if (!semPecas) nAlertas++; continue; }
       const st = setores.find((x) => x.setor === s.key);
       if (st && st.totalKg > 0 && (st.pct == null || st.pct < 100)) { filaKg += st.pendenteKg; nOps++; }
     }
