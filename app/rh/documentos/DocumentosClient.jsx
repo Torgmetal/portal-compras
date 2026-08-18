@@ -46,6 +46,8 @@ const TIPOS = {
     { value: "CERTIFICADO", label: "Certificado de Curso" },
     { value: "TREINAMENTO_NR", label: "Treinamento NR" },
     { value: "INTEGRACAO", label: "Integração" },
+    { value: "FORMACAO", label: "Formação (Técnico/Superior)" },
+    { value: "REGISTRO_CLASSE", label: "Registro em Órgão de Classe" },
   ],
   EMPRESA: [
     { value: "ALVARA", label: "Alvará" },

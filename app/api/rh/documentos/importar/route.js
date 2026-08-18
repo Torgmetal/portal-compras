@@ -30,6 +30,8 @@ const TIPO_MAP = {
   "nr-20": "NR_20", "nr 20": "NR_20", "nr20": "NR_20",
   "nr-33": "NR_33", "nr 33": "NR_33", "nr33": "NR_33",
   "nr-35": "NR_35", "nr 35": "NR_35", "nr35": "NR_35",
+  "formacao": "FORMACAO", "formação": "FORMACAO", "diploma": "FORMACAO", "graduacao": "FORMACAO", "graduação": "FORMACAO", "tecnico": "FORMACAO", "técnico": "FORMACAO",
+  "registro de classe": "REGISTRO_CLASSE", "orgao de classe": "REGISTRO_CLASSE", "órgão de classe": "REGISTRO_CLASSE", "crea": "REGISTRO_CLASSE", "crt": "REGISTRO_CLASSE", "cft": "REGISTRO_CLASSE", "cra": "REGISTRO_CLASSE", "art": "REGISTRO_CLASSE",
   "ppra": "PPRA", "pcmso": "PCMSO",
   "cnh": "CNH", "passaporte": "PASSAPORTE",
   "certidao": "CERTIDAO", "rg": "RG",
